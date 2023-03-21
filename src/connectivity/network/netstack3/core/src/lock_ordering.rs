@@ -125,6 +125,8 @@ pub(crate) struct IpStateRoutingTable<I>(PhantomData<I>, Never);
 
 pub(crate) enum DeviceLayerStateOrigin {}
 pub(crate) enum DeviceLayerState {}
+pub(crate) enum AnyDeviceSockets {}
+pub(crate) enum DeviceSockets {}
 pub(crate) struct EthernetDeviceIpState<I>(PhantomData<I>, Never);
 pub(crate) enum EthernetDeviceStaticState {}
 pub(crate) enum EthernetDeviceDynamicState {}
@@ -175,10 +177,12 @@ impl_lock_after!(IpState<Ipv6> => LoopbackTxQueue);
 impl_lock_after!(IpState<Ipv6> => EthernetTxQueue);
 impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
 
-impl_lock_after!(IpState<Ipv6> => DeviceLayerState);
+impl_lock_after!(IpState<Ipv6> => AnyDeviceSockets);
 
+impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
 // TODO(https://fxbug.dev/120973): Double-check that locking IPv4 ethernet state
 // before IPv6 is correct and won't interfere with dual-stack sockets.
 impl_lock_after!(EthernetDeviceIpState<Ipv4> => EthernetDeviceIpState<Ipv6>);
 impl_lock_after!(DeviceLayerState => EthernetDeviceDynamicState);
+impl_lock_after!(DeviceLayerState => DeviceSockets);

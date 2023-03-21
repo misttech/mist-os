@@ -10,6 +10,7 @@ pub(crate) mod link;
 pub mod loopback;
 pub(crate) mod ndp;
 pub mod queue;
+pub mod socket;
 mod state;
 
 use alloc::vec::Vec;
@@ -51,6 +52,7 @@ use crate::{
             rx::ReceiveQueueHandler,
             tx::{BufferTransmitQueueHandler, TransmitQueueConfiguration, TransmitQueueHandler},
         },
+        socket::Sockets,
         state::IpLinkDeviceState,
     },
     error::{ExistsError, NotFoundError, NotSupportedError},
@@ -1393,6 +1395,7 @@ pub(crate) struct Devices<C: DeviceLayerEventDispatcher> {
 pub(crate) struct DeviceLayerState<C: DeviceLayerEventDispatcher> {
     devices: RwLock<Devices<C>>,
     origin: OriginTracker,
+    shared_sockets: RwLock<Sockets<WeakDeviceId<C>>>,
 }
 
 impl<NonSyncCtx: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceLayerState>
@@ -1429,6 +1432,22 @@ impl<C: DeviceLayerEventDispatcher> RwLockFor<crate::lock_ordering::DeviceLayerS
     }
 }
 
+impl<C: DeviceLayerEventDispatcher> RwLockFor<crate::lock_ordering::AnyDeviceSockets>
+    for DeviceLayerState<C>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Sockets<WeakDeviceId<C>>>
+        where
+            Self: 'l ;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Sockets<WeakDeviceId<C>>>
+        where
+            Self: 'l ;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.shared_sockets.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.shared_sockets.write()
+    }
+}
 /// Light-weight tracker for recording the source of some instance.
 ///
 /// This should be held as a field in a parent type that is cloned into each
@@ -1463,7 +1482,11 @@ impl OriginTracker {
 impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
     /// Creates a new [`DeviceLayerState`] instance.
     pub(crate) fn new() -> Self {
-        Self { devices: Default::default(), origin: OriginTracker::new() }
+        Self {
+            devices: Default::default(),
+            origin: OriginTracker::new(),
+            shared_sockets: Default::default(),
+        }
     }
 
     /// Add a new ethernet device to the device layer.

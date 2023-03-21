@@ -8,7 +8,11 @@ use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter};
 
 use derivative::Derivative;
-use lock_order::{lock::LockFor, relation::LockBefore, Locked};
+use lock_order::{
+    lock::{LockFor, RwLockFor},
+    relation::LockBefore,
+    Locked,
+};
 use net_types::{
     ip::{Ip as _, IpAddress, IpVersion, Ipv4, Ipv6},
     SpecifiedAddr,
@@ -30,11 +34,12 @@ use crate::{
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
+        socket::DeviceSockets,
         state::IpLinkDeviceState,
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, FrameDestination,
     },
-    sync::{StrongRc, WeakRc},
+    sync::{RwLock, StrongRc, WeakRc},
     Instant, NonSyncContext, SyncCtx,
 };
 
@@ -159,11 +164,17 @@ pub(super) struct LoopbackDeviceState {
     mtu: Mtu,
     rx_queue: ReceiveQueue<IpVersion, Buf<Vec<u8>>>,
     tx_queue: TransmitQueue<IpVersion, Buf<Vec<u8>>, BufVecU8Allocator>,
+    sockets: RwLock<DeviceSockets>,
 }
 
 impl LoopbackDeviceState {
     pub(super) fn new(mtu: Mtu) -> LoopbackDeviceState {
-        LoopbackDeviceState { mtu, rx_queue: Default::default(), tx_queue: Default::default() }
+        LoopbackDeviceState {
+            mtu,
+            rx_queue: Default::default(),
+            tx_queue: Default::default(),
+            sockets: Default::default(),
+        }
     }
 }
 
@@ -208,6 +219,23 @@ impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackTxDequeue>
             Self: 'l;
     fn lock(&self) -> Self::Data<'_> {
         self.link.tx_queue.deque.lock()
+    }
+}
+
+impl<I: Instant, S> RwLockFor<crate::lock_ordering::DeviceSockets>
+    for IpLinkDeviceState<I, S, LoopbackDeviceState>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, DeviceSockets>
+        where
+            Self: 'l ;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, DeviceSockets>
+        where
+            Self: 'l ;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.link.sockets.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.link.sockets.write()
     }
 }
 

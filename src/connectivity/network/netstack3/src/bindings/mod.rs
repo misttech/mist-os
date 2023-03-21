@@ -970,7 +970,7 @@ impl NetstackSeed {
                     socket.serve_with(|rs| socket::serve(netstack.ctx.clone(), rs)).await
                 }
                 WorkItem::Incoming(Service::PacketSocket(socket)) => {
-                    socket.serve_with(|rs| socket::packet::serve(rs)).await
+                    socket.serve_with(|rs| socket::packet::serve(netstack.ctx.clone(), rs)).await
                 }
                 WorkItem::Incoming(Service::RawSocket(socket)) => {
                     socket.serve_with(|rs| socket::raw::serve(rs)).await

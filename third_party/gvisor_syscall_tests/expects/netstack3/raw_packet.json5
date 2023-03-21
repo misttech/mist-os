@@ -10,13 +10,20 @@
             ],
         },
         {
+            type: "expect_failure",
+            matchers: [
+                // TODO(https://fxbug.dev/106735): Support packet sockets.
+                "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
+                "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
+            ],
+        },
+        {
             type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/110824): Stop skipping these manually once NS3 is
                 // returning EPERM for raw and packet socket creation.
                 "AllInetTests/RawPacketTest.*",
                 "AllInetTests/CookedPacketTest.*",
-                "AllPacketSocketTests/*",
                 "AllRawPacketMsgSizeTest/*",
                 "BasicCookedPacketTest.WrongType",
                 "RawHDRINCL.*",

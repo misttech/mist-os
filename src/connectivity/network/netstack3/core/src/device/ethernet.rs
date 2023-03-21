@@ -53,6 +53,7 @@ use crate::{
             },
             DequeueState, TransmitQueueFrameError,
         },
+        socket::DeviceSockets,
         state::IpLinkDeviceState,
         with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
@@ -478,6 +479,7 @@ impl EthernetDeviceStateBuilder {
             static_state: StaticEthernetDeviceState { mac, max_frame_size },
             dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
             tx_queue: Default::default(),
+            sockets: Default::default(),
         }
     }
 }
@@ -522,6 +524,8 @@ pub(crate) struct EthernetDeviceState {
     dynamic_state: RwLock<DynamicEthernetDeviceState>,
 
     tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
+
+    sockets: RwLock<DeviceSockets>,
 }
 
 impl<I: Instant, S> UnlockedAccess<crate::lock_ordering::EthernetDeviceStaticState>
@@ -584,6 +588,23 @@ impl<I: Instant> RwLockFor<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>
     }
     fn write_lock(&self) -> Self::WriteData<'_> {
         self.ipv6.write()
+    }
+}
+
+impl<I: Instant, S> RwLockFor<crate::lock_ordering::DeviceSockets>
+    for IpLinkDeviceState<I, S, EthernetDeviceState>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, DeviceSockets>
+        where
+            Self: 'l ;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, DeviceSockets>
+        where
+            Self: 'l ;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.link.sockets.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.link.sockets.write()
     }
 }
 
