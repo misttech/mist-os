@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("test_manager_test_bin") {
@@ -47,6 +48,29 @@ rustc_test("test_manager_stress_test_bin") {
   sources = [ "src/stress_tests.rs" ]
 }
 
+rustc_test("test_manager_specified_realm_bin") {
+  edition = "2021"
+  name = "test_manager_specified_realm_test"
+  source_root = "src/specified_realm_test.rs"
+  deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
+    "//src/lib/diagnostics/selectors",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//src/sys/test_manager:test_lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:pretty_assertions",
+  ]
+
+  sources = [ "src/specified_realm_test.rs" ]
+}
+
 rustc_test("test_manager_legacy_test_bin") {
   edition = "2021"
   name = "test_manager_legacy_test"
@@ -85,6 +109,26 @@ fuchsia_unittest_package("test_manager_test") {
       max_severity = "ERROR"
     }
   }
+}
+
+fuchsia_component("test_realm") {
+  testonly = true
+  manifest = "meta/test_realm.cml"
+}
+
+fuchsia_unittest_package("test_manager_specified_realm_test") {
+  manifest = "meta/test_manager_specified_realm_test.cml"
+  deps = [
+    ":test_manager_specified_realm_bin",
+    ":test_realm",
+    "test_data:debug_data_write_test",
+    "test_data:echo_test_client",
+    "test_data:echo_test_realm",
+    "//examples/components/routing/rust/echo_server:echo_server_cmp",
+    "//src/sys/test_manager:test_manager_cmp",
+  ]
+
+  restricted_features = [ "allow_non_hermetic_packages" ]
 }
 
 fuchsia_unittest_package("test_manager_stress_test") {
@@ -130,6 +174,7 @@ group("legacy_tests") {
 group("tests") {
   testonly = true
   deps = [
+    ":test_manager_specified_realm_test",
     ":test_manager_stress_test",
     ":test_manager_test",
     "chromium_tests:tests",

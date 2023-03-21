@@ -9,9 +9,10 @@ use {
         debug_data_processor::{DebugDataDirectory, DebugDataProcessor},
         error::TestManagerError,
         facet,
+        offers::map_offers,
         running_suite::{enumerate_test_cases, RunningSuite},
         self_diagnostics::RootDiagnosticNode,
-        test_suite::{Suite, TestRunBuilder},
+        test_suite::{Suite, SuiteRealm, TestRunBuilder},
     },
     fidl::endpoints::ControlHandle,
     fidl_fuchsia_component_resolution::ResolverProxy,
@@ -54,6 +55,57 @@ pub async fn run_test_manager(
                 };
 
                 builder.suites.push(Suite {
+                    realm: None,
+                    test_url,
+                    options,
+                    controller,
+                    resolver: resolver.clone(),
+                    above_root_capabilities_for_test: above_root_capabilities_for_test.clone(),
+                    facets: facet::ResolveStatus::Unresolved,
+                });
+            }
+            ftest_manager::RunBuilderRequest::AddSuiteInRealm {
+                realm,
+                offers,
+                test_collection,
+                test_url,
+                options,
+                controller,
+                control_handle,
+            } => {
+                let realm_proxy = match realm.into_proxy() {
+                    Ok(r) => r,
+                    Err(e) => {
+                        warn!(
+                            "Cannot add suite {}, invalid realm. Closing connection. error: {}",
+                            test_url, e
+                        );
+                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
+                        break;
+                    }
+                };
+                let controller = match controller.into_stream() {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(
+                            "Cannot add suite {}, invalid controller. Closing connection. error: {}",
+                            test_url,e
+                        );
+                        control_handle.shutdown_with_epitaph(zx::Status::BAD_HANDLE);
+                        break;
+                    }
+                };
+                let offers = match map_offers(offers) {
+                    Ok(offers) => offers,
+                    Err(e) => {
+                        warn!("Cannot add suite {}, invalid offers. error: {}", test_url, e);
+                        control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                        break;
+                    }
+                };
+
+                builder.suites.push(Suite {
+                    realm: SuiteRealm { realm_proxy, offers, test_collection }.into(),
                     test_url,
                     options,
                     controller,
@@ -125,6 +177,9 @@ pub async fn run_test_manager_query_server(
                             above_root_capabilities_for_test.clone(),
                             sender,
                             &diagnostics,
+                            // Currently we don't support querying tests which don't run in test
+                            // manager provided realm.
+                            &None,
                         )
                     });
                 match launch_fut.await {

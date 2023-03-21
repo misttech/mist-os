@@ -18,8 +18,9 @@ use {
     },
     anyhow::Error,
     fidl::endpoints::Responder,
+    fidl_fuchsia_component::RealmProxy,
     fidl_fuchsia_component_resolution::ResolverProxy,
-    fidl_fuchsia_test_manager as ftest_manager,
+    fidl_fuchsia_component_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{
         LaunchError, RunControllerRequest, RunControllerRequestStream, SchedulingOptions,
         SuiteControllerRequest, SuiteControllerRequestStream, SuiteEvent as FidlSuiteEvent,
@@ -35,6 +36,12 @@ use {
     tracing::{error, info, warn},
 };
 
+pub(crate) struct SuiteRealm {
+    pub realm_proxy: RealmProxy,
+    pub offers: Vec<ftest::Capability>,
+    pub test_collection: String,
+}
+
 pub(crate) struct Suite {
     pub test_url: String,
     pub options: ftest_manager::RunOptions,
@@ -42,6 +49,7 @@ pub(crate) struct Suite {
     pub resolver: Arc<ResolverProxy>,
     pub above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     pub facets: facet::ResolveStatus,
+    pub realm: Option<SuiteRealm>,
 }
 
 pub(crate) struct TestRunBuilder {
@@ -343,8 +351,15 @@ pub(crate) async fn run_single_suite(
     let (stop_sender, stop_recv) = oneshot::channel::<()>();
     let mut maybe_instance = None;
 
-    let Suite { test_url, options, controller, resolver, above_root_capabilities_for_test, facets } =
-        suite;
+    let Suite {
+        test_url,
+        options,
+        controller,
+        resolver,
+        above_root_capabilities_for_test,
+        facets,
+        realm: suite_realm,
+    } = suite;
 
     let run_test_fut = async {
         diagnostics.set_property("execution", "get_facets");
@@ -385,6 +400,7 @@ pub(crate) async fn run_single_suite(
             above_root_capabilities_for_test,
             debug_data_sender,
             &diagnostics,
+            &suite_realm,
         )
         .await
         {
@@ -434,6 +450,10 @@ where
     let mut parallel_suites: Vec<Suite> = Vec::new();
 
     for mut suite in suites {
+        if suite.realm.is_some() {
+            serial_suites.push(suite);
+            continue;
+        }
         let test_url = suite.test_url.clone();
         let resolver = suite.resolver.clone();
         let facet_result = get_facets_fn(test_url, resolver).await;
@@ -632,6 +652,7 @@ mod tests {
         let resolver_proxy = Arc::new(resolver_proxy);
         let routing_info = Arc::new(AboveRootCapabilitiesForTest::new_empty_for_tests());
         Suite {
+            realm: None,
             test_url,
             options: ftest_manager::RunOptions {
                 parallel: None,

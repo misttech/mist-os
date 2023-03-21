@@ -10,6 +10,7 @@ mod diagnostics;
 mod enclosing_env;
 mod error;
 mod facet;
+mod offers;
 mod resolver;
 mod run_events;
 mod running_suite;

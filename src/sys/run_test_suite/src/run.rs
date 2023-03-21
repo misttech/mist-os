@@ -479,6 +479,9 @@ mod test {
                         panic!("Not expecting calls to WithSchedulingOptions where options.max_parallel_suites is Some()")
                     }
                 }
+                ftest_manager::RunBuilderRequest::AddSuiteInRealm { .. } => {
+                    panic!("AddSuiteInRealm not supported")
+                }
             }
         }
         assert!(
@@ -868,6 +871,9 @@ mod test {
             match req {
                 ftest_manager::RunBuilderRequest::AddSuite { .. } => {
                     panic!("Not expecting an AddSuite request")
+                }
+                ftest_manager::RunBuilderRequest::AddSuiteInRealm { .. } => {
+                    panic!("Not expecting an AddSuiteInRealm request")
                 }
                 ftest_manager::RunBuilderRequest::Build { .. } => {
                     panic!("Not expecting a Build request")

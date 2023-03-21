@@ -151,6 +151,7 @@ mod tests {
         let resolver_proxy = Arc::new(resolver_proxy);
         let routing_info = Arc::new(AboveRootCapabilitiesForTest::new_empty_for_tests());
         Suite {
+            realm: None,
             test_url,
             options: RunOptions {
                 parallel: None,

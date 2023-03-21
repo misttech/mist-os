@@ -7,6 +7,7 @@ using fuchsia.component;
 using fuchsia.developer.remotecontrol;
 using fuchsia.diagnostics;
 using fuchsia.io;
+using fuchsia.component.decl;
 using fuchsia.url;
 using zx;
 
@@ -85,6 +86,24 @@ protocol RunBuilder {
     /// using "Suite" protocol and return results using `controller`. The
     /// controller is also used to control the execution of the test suite.
     AddSuite(resource struct {
+        test_url fuchsia.url.Url;
+        options RunOptions;
+        controller server_end:SuiteController;
+    });
+
+    /// Add a suite to this run which would run in provided 'realm'. A suite is
+    /// a component that implements `fuchsia.test.Suite`. Implementors of this
+    /// API will talk to test suites using "Suite" protocol and return results
+    /// using `controller`. The controller is also used to control the execution
+    /// of the test suite.
+    AddSuiteInRealm(resource struct {
+        /// The realm which contains the collection to launch the test in
+        realm client_end:fuchsia.component.Realm;
+        /// All offers from the realm to the test collection
+        offers vector<fuchsia.component.decl.Offer>:MAX;
+        /// the test collection to launch the test in.
+        test_collection string:MAX;
+
         test_url fuchsia.url.Url;
         options RunOptions;
         controller server_end:SuiteController;

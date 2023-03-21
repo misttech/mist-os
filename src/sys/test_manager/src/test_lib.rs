@@ -134,6 +134,28 @@ impl TestBuilder {
         Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })
     }
 
+    /// Add suite to run in a realm.
+    pub async fn add_suite_in_realm(
+        &self,
+        realm: fidl::endpoints::ClientEnd<fidl_fuchsia_component::RealmMarker>,
+        offers: &mut dyn ExactSizeIterator<Item = &mut fidl_fuchsia_component_decl::Offer>,
+        test_collection: &str,
+        test_url: &str,
+        run_options: ftest_manager::RunOptions,
+    ) -> Result<SuiteRunInstance, Error> {
+        let (controller_proxy, controller) =
+            fidl::endpoints::create_proxy().context("Cannot create proxy")?;
+        self.proxy.add_suite_in_realm(
+            realm,
+            offers,
+            test_collection,
+            test_url,
+            run_options,
+            controller,
+        )?;
+        Ok(SuiteRunInstance { controller_proxy: controller_proxy.into() })
+    }
+
     /// Runs all tests to completion and collects events.
     pub async fn run(self) -> Result<Vec<TestRunEvent>, Error> {
         let (controller_proxy, controller) =

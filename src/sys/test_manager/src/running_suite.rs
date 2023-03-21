@@ -12,9 +12,12 @@ use {
         debug_data_processor::{serve_debug_data_publisher, DebugDataSender},
         diagnostics, enclosing_env,
         error::LaunchTestError,
-        facet, resolver,
+        facet,
+        offers::apply_offers,
+        resolver,
         run_events::SuiteEvents,
         self_diagnostics::DiagnosticNode,
+        test_suite::SuiteRealm,
         utilities::stream_fn,
     },
     anyhow::{anyhow, format_err, Context, Error},
@@ -80,6 +83,10 @@ pub(crate) struct RunningSuite {
     test_collection: &'static str,
     /// `Realm` protocol for the test root.
     test_realm_proxy: fcomponent::RealmProxy,
+
+    /// `Realm` protocol for test collection parent
+    /// realm when running in some outside realm.
+    realm_proxy: Option<fcomponent::RealmProxy>,
 }
 
 impl RunningSuite {
@@ -91,6 +98,7 @@ impl RunningSuite {
         above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
         debug_data_sender: DebugDataSender,
         diagnostics: &DiagnosticNode,
+        suite_realm: &Option<SuiteRealm>,
     ) -> Result<Self, LaunchTestError> {
         info!(test_url, ?diagnostics, collection = facets.collection, "Starting test suite.");
 
@@ -108,6 +116,7 @@ impl RunningSuite {
             above_root_capabilities_for_test,
             resolver,
             debug_data_sender,
+            suite_realm,
         )
         .await
         .map_err(LaunchTestError::InitializeTestRealm)?;
@@ -141,6 +150,7 @@ impl RunningSuite {
             instance,
             test_realm_proxy,
             test_collection: facets.collection,
+            realm_proxy: suite_realm.as_ref().map_or(None, |o| o.realm_proxy.clone().into()),
         })
     }
 
@@ -323,6 +333,11 @@ impl RunningSuite {
         &mut self,
         sender: &mut mpsc::Sender<Result<FidlSuiteEvent, LaunchError>>,
     ) -> Result<(), Error> {
+        // TODO(https://fxbug.dev/123478): Support custom artifacts when test is running in outside
+        // realm.
+        if self.realm_proxy.is_some() {
+            return Ok(());
+        }
         let artifact_storage_admin = connect_to_protocol::<fsys::StorageAdminMarker>()?;
 
         let root_moniker =
@@ -591,11 +606,16 @@ async fn get_realm(
     above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     resolver: Arc<ResolverProxy>,
     debug_data_sender: DebugDataSender,
+    suite_realm: &Option<SuiteRealm>,
 ) -> Result<(RealmBuilder, async_utils::event::Event), RealmBuilderError> {
-    let builder = RealmBuilder::with_params(
-        RealmBuilderParams::new().in_collection(suite_facet.collection.to_string()),
-    )
-    .await?;
+    let mut realm_param = RealmBuilderParams::new();
+    realm_param = match suite_realm {
+        Some(suite_realm) => realm_param
+            .with_realm_proxy(suite_realm.realm_proxy.clone())
+            .in_collection(suite_realm.test_collection.clone()),
+        None => realm_param.in_collection(suite_facet.collection.to_string()),
+    };
+    let builder = RealmBuilder::with_params(realm_param).await?;
     let wrapper_realm =
         builder.add_child_realm(WRAPPER_REALM_NAME, ChildOptions::new().eager()).await?;
 
@@ -635,7 +655,7 @@ async fn get_realm(
                 ))
             },
             // This component is launched eagerly so that debug_data always signals ready, even
-            // in absense of a connection request. TODO(fxbug.dev/105308): Remove once
+            // in absence of a connection request. TODO(fxbug.dev/105308): Remove once
             // synchronization is provided by cm.
             ChildOptions::new().eager(),
         )
@@ -869,10 +889,13 @@ async fn get_realm(
                 .to(Ref::parent()),
         )
         .await?;
-
-    above_root_capabilities_for_test
-        .apply(suite_facet.collection, &builder, &wrapper_realm)
-        .await?;
+    if let Some(suite_realm) = suite_realm {
+        apply_offers(&builder, &wrapper_realm, &suite_realm.offers).await?;
+    } else {
+        above_root_capabilities_for_test
+            .apply(suite_facet.collection, &builder, &wrapper_realm)
+            .await?;
+    }
 
     Ok((builder, mock_ready_event))
 }
