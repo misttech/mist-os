@@ -4,10 +4,7 @@
 {
     actions: [
         {
-            type: "expect_pass",
-            matchers: [
-                "*",
-            ],
+            include: "dgramsocket_common.json5",
         },
         {
             type: "skip",

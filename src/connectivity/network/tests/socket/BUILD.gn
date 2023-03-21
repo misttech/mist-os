@@ -282,6 +282,7 @@ netstack2_fastudp_tests = [
   },
   {
     label = dgramsocket_label
+    expects = true
   },
   {
     label = if_nameindex_label

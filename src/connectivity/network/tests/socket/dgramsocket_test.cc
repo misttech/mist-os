@@ -293,6 +293,26 @@ TEST(LocalhostTest, IpAddMembershipAny) {
   EXPECT_EQ(close(s.release()), 0) << strerror(errno);
 }
 
+TEST(LocalhostTest, IpAddMembershipInvalidIface) {
+  fbl::unique_fd s;
+  ASSERT_TRUE(s = fbl::unique_fd(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))) << strerror(errno);
+
+  ip_mreqn param = {
+      .imr_address =
+          {
+              .s_addr = htonl(INADDR_ANY),
+          },
+      .imr_ifindex = -1,
+  };
+  int n = inet_pton(AF_INET, "224.0.2.1", &param.imr_multiaddr.s_addr);
+  ASSERT_GE(n, 0) << strerror(errno);
+  ASSERT_EQ(n, 1);
+  ASSERT_EQ(setsockopt(s.get(), SOL_IP, IP_ADD_MEMBERSHIP, &param, sizeof(param)), -1);
+  ASSERT_EQ(errno, ENODEV);
+
+  EXPECT_EQ(close(s.release()), 0) << strerror(errno);
+}
+
 TEST(LocalhostTest, ConnectAFMismatchINET) {
   fbl::unique_fd s;
   ASSERT_TRUE(s = fbl::unique_fd(socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP))) << strerror(errno);
