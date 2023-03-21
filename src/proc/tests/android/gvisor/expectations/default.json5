@@ -135,14 +135,7 @@
                 "FAdvise64Test.NoPipes",
 
                 // fallocate_test
-                "AllocateTest.FallocateWithOpath",
-                "AllocateTest.Fallocate",
-                "AllocateTest.FallocateInvalid",
-                "AllocateTest.FallocateReadonly",
-                "AllocateTest.FallocatePipe",
-                "AllocateTest.FallocateChar",
                 "AllocateTest.FallocateRlimit",
-                "AllocateTest.FallocateOtherFDs",
 
                 // fcntl_test
                 "FcntlTest.SetFileStatusFlagWithOpath",
@@ -405,7 +398,6 @@
                 "MountTest.TmpfsSizeRoundUpSinglePageSize",
                 "MountTest.TmpfsSizeAllocationMultiplePages",
                 "MountTest.TmpfsSizeMoreThanSinglePgSZMultipleFiles",
-                "MountTest.TmpfsSizeFtruncate",
                 "MountTest.TmpfsDirectoryAllocCheck",
                 "MountTest.TmpfsSymlinkAllocCheck",
                 "MountTest.TmpfsSymlinkUnallocCheck",

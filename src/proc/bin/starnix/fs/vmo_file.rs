@@ -76,8 +76,11 @@ impl FsNodeOps for VmoFileNode {
             return Ok(());
         }
 
-        if let Some(seals) = &self.seals {
-            let seals = seals.lock();
+        // We must hold the lock till the end of the operation to guarantee that
+        // there is no change to the seals.
+        let seals = self.seals.as_ref().map(|s| s.lock());
+
+        if let Some(seals) = &seals {
             if info.size > length as usize {
                 // A decrease in file size must pass the shrink seal check.
                 seals.check_not_present(SealFlags::SHRINK)?;
@@ -93,6 +96,37 @@ impl FsNodeOps for VmoFileNode {
             _ => impossible_error(status),
         })?;
         info.size = length as usize;
+        info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
+        let time = fuchsia_runtime::utc_time();
+        info.time_access = time;
+        info.time_modify = time;
+        Ok(())
+    }
+
+    fn allocate(&self, node: &FsNode, offset: u64, length: u64) -> Result<(), Errno> {
+        let new_size = offset + length;
+
+        let mut info = node.info_write();
+        if info.size >= new_size as usize {
+            // The file size remains unaffected.
+            return Ok(());
+        }
+
+        // We must hold the lock till the end of the operation to guarantee that
+        // there is no change to the seals.
+        let seals = self.seals.as_ref().map(|s| s.lock());
+
+        if let Some(seals) = &seals {
+            // An increase in file size must pass the grow seal check.
+            seals.check_not_present(SealFlags::GROW)?;
+        }
+
+        self.vmo.set_size(new_size).map_err(|status| match status {
+            zx::Status::NO_MEMORY => errno!(ENOMEM),
+            zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
+            _ => impossible_error(status),
+        })?;
+        info.size = new_size as usize;
         info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
         let time = fuchsia_runtime::utc_time();
         info.time_access = time;
@@ -161,24 +195,26 @@ impl VmoFileObject {
             return error!(EINVAL);
         }
 
-        // Non-zero writes must pass the write seal check.
-        if want_write != 0 {
-            if let Some(seals) = seals {
-                let seals = seals.lock();
-                seals.check_not_present(SealFlags::WRITE | SealFlags::FUTURE_WRITE)?;
-            }
-        }
-
         let buf = data.read_all()?;
 
         let mut info = file.node().info_write();
         let mut write_end = offset + want_write;
         let mut update_content_size = false;
 
+        // We must hold the lock till the end of the operation to guarantee that
+        // there is no change to the seals.
+        let seals = seals.map(|s| s.lock());
+
+        // Non-zero writes must pass the write seal check.
+        if want_write != 0 {
+            if let Some(seals) = &seals {
+                seals.check_not_present(SealFlags::WRITE | SealFlags::FUTURE_WRITE)?;
+            }
+        }
+
         // Writing past the file size
         if write_end > info.size {
-            if let Some(seals) = seals {
-                let seals = seals.lock();
+            if let Some(seals) = &seals {
                 // The grow seal check failed.
                 if let Err(e) = seals.check_not_present(SealFlags::GROW) {
                     if offset >= info.size {

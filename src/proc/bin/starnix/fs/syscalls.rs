@@ -1954,8 +1954,21 @@ pub fn sys_fallocate(
     offset: off_t,
     len: off_t,
 ) -> Result<(), Errno> {
-    let _file = current_task.files.get(fd)?;
-    not_implemented!(current_task, "fallocate({}, {}, {}, {})", fd, mode, offset, len);
+    let file = current_task.files.get(fd)?;
+    if mode != 0 {
+        not_implemented!(current_task, "fallocate({}, {}, {}, {})", fd, mode, offset, len);
+        return Ok(());
+    }
+
+    // Offset must not be less than 0.
+    // Length must not be less than or equal to 0.
+    // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS
+    if offset < 0 || len <= 0 {
+        return error!(EINVAL);
+    }
+
+    file.fallocate(offset as u64, len as u64)?;
+
     Ok(())
 }
 

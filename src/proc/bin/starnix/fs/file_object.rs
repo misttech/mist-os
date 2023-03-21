@@ -832,6 +832,28 @@ impl FileObject {
         self.node().ftruncate(length)
     }
 
+    pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {
+        // If the file is a pipe or FIFO, ESPIPE is returned.
+        // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS
+        if self.node().is_fifo() {
+            return error!(ESPIPE);
+        }
+
+        // Must be a regular file or directory.
+        // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS
+        if !self.node().is_dir() && !self.node().is_reg() {
+            return error!(ENODEV);
+        }
+
+        // The file must be opened with write permissions. Otherwise operation is forbidden.
+        // See https://man7.org/linux/man-pages/man2/fallocate.2.html#ERRORS
+        if !self.can_write() {
+            return error!(EBADF);
+        }
+
+        self.node().fallocate(offset, length)
+    }
+
     pub fn to_handle(self: &Arc<Self>, kernel: &Kernel) -> Result<Option<zx::Handle>, Errno> {
         self.ops().to_handle(self, kernel)
     }

@@ -260,6 +260,11 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         error!(EINVAL)
     }
 
+    /// Manipulate allocated disk space for the file.
+    fn allocate(&self, _node: &FsNode, _offset: u64, _length: u64) -> Result<(), Errno> {
+        error!(EINVAL)
+    }
+
     /// Update node.info as needed.
     ///
     /// FsNode calls this method before converting the FsNodeInfo struct into
@@ -749,6 +754,12 @@ impl FsNode {
         self.ops().truncate(self, length)
     }
 
+    /// Avoid calling this method directly. You probably want to call `FileObject::fallocate()`
+    /// which will also perform additional verifications.
+    pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {
+        self.ops().allocate(self, offset, length)
+    }
+
     /// Check whether the node can be accessed in the current context with the specified access
     /// flags (read, write, or exec). Accounts for capabilities and whether the current user is the
     /// owner or is in the file's group.
@@ -827,6 +838,11 @@ impl FsNode {
     /// Whether this node is a socket.
     pub fn is_sock(&self) -> bool {
         self.info().mode.is_sock()
+    }
+
+    /// Whether this node is a FIFO.
+    pub fn is_fifo(&self) -> bool {
+        self.info().mode.is_fifo()
     }
 
     /// Whether this node is a symbolic link.
