@@ -1,0 +1,14 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("vim3.gni")
+
+# BoardInformation for Product Assembly
+board_information_for_assembly = "//boards/vim3/dfv2_board_information.json5"
+
+board_bootfs_labels += [
+  # For DFv2. TODO(fxbug.dev/93333): Move this to //products/bringup.gni
+  # once we have enough space on ARM for this binary.
+  "//src/devices/bin/driver_host2",
+]
