@@ -143,7 +143,6 @@ arch/x64/sysroot/include/sys/errno.h
 arch/x64/sysroot/include/sys/eventfd.h
 arch/x64/sysroot/include/sys/fcntl.h
 arch/x64/sysroot/include/sys/file.h
-arch/x64/sysroot/include/sys/fsuid.h
 arch/x64/sysroot/include/sys/inotify.h
 arch/x64/sysroot/include/sys/io.h
 arch/x64/sysroot/include/sys/ioctl.h

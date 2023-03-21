@@ -220,7 +220,6 @@ sysroot_uninstrumented_libc_entries = [
         "sys/eventfd.h",
         "sys/fcntl.h",
         "sys/file.h",
-        "sys/fsuid.h",
         "sys/inotify.h",
         "sys/io.h",
         "sys/ioctl.h",
