@@ -4,8 +4,8 @@
 
 use {
     crate::{
-        args::PackageBuildCommand, to_writer_json_pretty, BLOBS_JSON_NAME, META_FAR_MERKLE_NAME,
-        PACKAGE_MANIFEST_NAME,
+        args::PackageBuildCommand, to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME,
+        META_FAR_MERKLE_NAME, PACKAGE_MANIFEST_NAME,
     },
     anyhow::{bail, Context as _, Result},
     fuchsia_pkg::{
@@ -88,13 +88,6 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
     // creation manifest already depends on the package contents. We should make sure all build
     // systems support this, and remove the `--depfile` here.
     if cmd.depfile {
-        let depfile_path = cmd.out.join(META_FAR_DEPFILE_NAME);
-        let file =
-            File::create(&depfile_path).with_context(|| format!("creating {depfile_path}"))?;
-        let mut file = BufWriter::new(file);
-
-        write!(file, "{meta_far_path}:")?;
-
         let mut deps = package_build_manifest
             .far_contents()
             .values()
@@ -121,12 +114,10 @@ pub async fn cmd_package_build(cmd: PackageBuildCommand) -> Result<()> {
             }
         }
 
-        for path in deps {
-            // Spaces are separators, so spaces in filenames must be escaped.
-            let path = path.replace(' ', "\\ ");
+        let dep_paths = deps.iter().map(|x| x.to_string()).collect::<BTreeSet<String>>();
+        let depfile_path = cmd.out.join(META_FAR_DEPFILE_NAME);
 
-            write!(file, " {path}")?;
-        }
+        write_depfile(depfile_path.as_std_path(), meta_far_path.as_path(), dep_paths.into_iter())?;
     }
 
     // FIXME(fxbug.dev/101304): Write out the meta.far.merkle file, that contains the meta.far
@@ -197,6 +188,7 @@ fn get_abi_revision(cmd: &PackageBuildCommand) -> Result<Option<u64>> {
 mod test {
     use {
         super::*,
+        crate::convert_to_depfile_filepath,
         camino::{Utf8Path, Utf8PathBuf},
         fuchsia_pkg::{MetaPackage, MetaSubpackages},
         fuchsia_url::RelativePackageUrl,
@@ -731,20 +723,28 @@ mod test {
             ],
         );
 
-        // Make sure the depfile is correct, which should be all the files we touched in sorted
-        // order.
-        let mut expected = vec![
-            subpackages_build_manifest_path.to_string(),
-            empty_file_path.to_string(),
-            meta_package_path.to_string(),
-            subpackage_merkle_file.to_string(),
-            subpackage_package_manifest_file.to_string(),
+        // Make sure the depfile is correct.
+        let expected = vec![
+            convert_to_depfile_filepath(subpackages_build_manifest_path.as_str()),
+            convert_to_depfile_filepath(empty_file_path.as_str()),
+            convert_to_depfile_filepath(meta_package_path.as_str()),
+            convert_to_depfile_filepath(subpackage_merkle_file.as_str()),
+            convert_to_depfile_filepath(subpackage_package_manifest_file.as_str()),
         ];
-        expected.sort();
 
         assert_eq!(
             read_to_string(meta_far_depfile_path).unwrap(),
-            format!("{}: {}", meta_far_path, expected.join(" ")),
+            format!(
+                "{}: {}",
+                convert_to_depfile_filepath(meta_far_path.as_str()),
+                expected
+                    .iter()
+                    .map(|p| p.as_str())
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ),
         );
 
         assert_eq!(

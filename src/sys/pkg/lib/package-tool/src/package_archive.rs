@@ -5,11 +5,13 @@
 use {
     crate::{
         args::{PackageArchiveCreateCommand, PackageArchiveExtractCommand},
-        to_writer_json_pretty, BLOBS_JSON_NAME, META_FAR_MERKLE_NAME, PACKAGE_MANIFEST_NAME,
+        to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, META_FAR_MERKLE_NAME,
+        PACKAGE_MANIFEST_NAME,
     },
     anyhow::{Context as _, Result},
-    fuchsia_pkg::PackageManifest,
-    std::fs::File,
+    camino::Utf8Path,
+    fuchsia_pkg::{PackageManifest, SubpackageInfo},
+    std::{collections::BTreeSet, fs::File},
 };
 
 pub async fn cmd_package_archive_create(cmd: PackageArchiveCreateCommand) -> Result<()> {
@@ -25,9 +27,51 @@ pub async fn cmd_package_archive_create(cmd: PackageArchiveCreateCommand) -> Res
         .with_context(|| format!("creating package archive file {}", cmd.out.display()))?;
 
     package_manifest
+        .clone()
         .archive(cmd.root_dir, output)
         .await
         .with_context(|| format!("writing archive {}", cmd.out.display()))?;
+
+    if let Some(depfile_path) = &cmd.depfile {
+        let mut dep_paths: BTreeSet<String> = BTreeSet::<String>::new();
+
+        // Getting top-level blobs
+        for blob in package_manifest.blobs() {
+            dep_paths.insert(blob.source_path.clone());
+        }
+
+        // Recursively checking each Subpackage, building `dep_paths` as we go.
+        let mut visited_subpackages: BTreeSet<fuchsia_merkle::Hash> =
+            BTreeSet::<fuchsia_merkle::Hash>::new();
+        let mut subpackage_list: Vec<SubpackageInfo> = package_manifest.subpackages().to_vec();
+
+        while let Some(subpackage) = subpackage_list.pop() {
+            // If subpackage already seen, skip.
+            if visited_subpackages.contains(&subpackage.merkle) {
+                continue;
+            }
+            visited_subpackages.insert(subpackage.merkle);
+
+            dep_paths.insert(subpackage.manifest_path.clone());
+
+            let subpackage_manifest = PackageManifest::try_load_from(&subpackage.manifest_path)
+                .with_context(|| format!("opening {}", &subpackage.manifest_path))?;
+
+            // Gathering subpackage blobs.
+            for subpackage_blob in subpackage_manifest.blobs() {
+                dep_paths.insert(subpackage_blob.source_path.clone());
+            }
+
+            // Gathering possible additional subpackages.
+            for inner_subpackage in subpackage_manifest.subpackages() {
+                subpackage_list.push(inner_subpackage.clone());
+            }
+        }
+
+        let far_path = Utf8Path::from_path(cmd.out.as_path()).unwrap();
+
+        write_depfile(depfile_path.as_std_path(), far_path, dep_paths.into_iter())?;
+    }
 
     Ok(())
 }
@@ -75,7 +119,8 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
 mod tests {
     use {
         super::*,
-        camino::{Utf8Path, Utf8PathBuf},
+        crate::convert_to_depfile_filepath,
+        camino::Utf8PathBuf,
         fuchsia_archive::Utf8Reader,
         fuchsia_pkg::PackageBuilder,
         pretty_assertions::assert_eq,
@@ -231,6 +276,7 @@ mod tests {
             out: archive_path.clone().into(),
             root_dir: pkg_dir.to_owned(),
             package_manifest: package.manifest_path.clone(),
+            depfile: None,
         })
         .await
         .unwrap();
@@ -317,6 +363,7 @@ mod tests {
             out: archive_path.clone().into(),
             root_dir: pkg_dir.to_owned(),
             package_manifest: package.manifest_path.clone(),
+            depfile: None,
         })
         .await
         .unwrap();
@@ -380,6 +427,60 @@ mod tests {
         extract_contents.remove(&extract_dir.join("blobs.manifest")).unwrap();
         extract_contents.remove(&extract_dir.join("package.manifest")).unwrap();
         assert_eq!(extract_contents, BTreeMap::new());
+    }
+
+    #[fuchsia::test]
+    async fn test_archive_create_with_depfile() {
+        let tmp = TempDir::new().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let pkg_dir = root.join("pkg");
+        let package = create_package(&pkg_dir);
+        let depfile_path = root.join("archive.far.d");
+
+        // Write the archive.
+        let archive_path = root.join("archive.far");
+        cmd_package_archive_create(PackageArchiveCreateCommand {
+            out: archive_path.clone().into(),
+            root_dir: pkg_dir.to_owned(),
+            package_manifest: package.manifest_path.clone(),
+            depfile: Some(depfile_path.clone()),
+        })
+        .await
+        .unwrap();
+
+        // Read the generated archive file.
+        let mut archive = Utf8Reader::new(File::open(&archive_path).unwrap()).unwrap();
+
+        assert_eq!(
+            read_archive(&mut archive),
+            BTreeMap::from([
+                ("meta.far".to_string(), package.meta_far_contents.clone()),
+                (BIN_HASH.to_string(), BIN_CONTENTS.to_vec()),
+                (LIB_HASH.to_string(), LIB_CONTENTS.to_vec()),
+            ]),
+        );
+
+        let expected_deps = vec![
+            convert_to_depfile_filepath(root.join("pkg/meta.far").as_str()),
+            convert_to_depfile_filepath(root.join("pkg/bin").as_str()),
+            convert_to_depfile_filepath(root.join("pkg/lib").as_str()),
+        ];
+
+        assert_eq!(
+            std::fs::read_to_string(&depfile_path).unwrap(),
+            format!(
+                "{}: {}",
+                convert_to_depfile_filepath(root.join("archive.far").as_str()),
+                expected_deps
+                    .iter()
+                    .map(|p| p.as_str())
+                    .collect::<BTreeSet<_>>()
+                    .into_iter()
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            ),
+        );
     }
 
     #[fuchsia::test]

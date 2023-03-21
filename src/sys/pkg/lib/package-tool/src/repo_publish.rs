@@ -3,7 +3,10 @@
 // found in the LICENSE file.
 
 use {
-    crate::args::{RepoMergeCommand, RepoPublishCommand},
+    crate::{
+        args::{RepoMergeCommand, RepoPublishCommand},
+        write_depfile,
+    },
     anyhow::{format_err, Context, Result},
     camino::{Utf8Path, Utf8PathBuf},
     fidl_fuchsia_developer_ffx::ListFields,
@@ -20,12 +23,7 @@ use {
     },
     futures::StreamExt,
     sdk_metadata::get_repositories,
-    std::{
-        collections::BTreeSet,
-        fs::File,
-        io::{BufReader, BufWriter, Write},
-        str::FromStr,
-    },
+    std::{collections::BTreeSet, fs::File, io::BufReader, str::FromStr},
     tracing::{error, info, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
 };
@@ -311,23 +309,12 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
         // Deps don't need to be written for incremental publish.
         return Ok(());
     }
-
     if let Some(depfile_path) = &cmd.depfile {
         let timestamp_path = cmd.repo_path.join("repository").join("timestamp.json");
 
-        let file =
-            File::create(depfile_path).with_context(|| format!("creating {depfile_path}"))?;
+        let dep_paths = deps.iter().map(|x| x.to_string()).collect::<BTreeSet<String>>();
 
-        let mut file = BufWriter::new(file);
-
-        write!(file, "{timestamp_path}:")?;
-
-        for path in deps {
-            // Spaces are separators, so spaces in filenames must be escaped.
-            let path = path.as_str().replace(' ', "\\ ");
-
-            write!(file, " {path}")?;
-        }
+        write_depfile(depfile_path.as_std_path(), timestamp_path.as_path(), dep_paths.into_iter())?;
     }
 
     Ok(())
@@ -367,6 +354,7 @@ fn read_repo_keys_if_exists(deps: &mut BTreeSet<Utf8PathBuf>, path: &Utf8Path) -
 mod tests {
     use {
         super::*,
+        crate::convert_to_depfile_filepath,
         assembly_partitions_config::PartitionsConfig,
         assert_matches::assert_matches,
         camino::{Utf8Path, Utf8PathBuf},
@@ -377,7 +365,7 @@ mod tests {
         futures::FutureExt,
         sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
         serde_json::json,
-        std::fs::create_dir_all,
+        std::{fs::create_dir_all, io::Write},
         tempfile::TempDir,
         tuf::metadata::Metadata as _,
     };
@@ -474,8 +462,17 @@ mod tests {
                     std::fs::read_to_string(&self.depfile_path).unwrap(),
                     format!(
                         "{}: {}",
-                        self.repo_path.join("repository").join("timestamp.json"),
-                        expected_deps.iter().map(|p| p.as_str()).collect::<Vec<_>>().join(" "),
+                        convert_to_depfile_filepath(
+                            self.repo_path.join("repository").join("timestamp.json").as_str()
+                        ),
+                        expected_deps
+                            .iter()
+                            .map(|p| p.as_str())
+                            .collect::<BTreeSet<_>>()
+                            .into_iter()
+                            .map(convert_to_depfile_filepath)
+                            .collect::<Vec<_>>()
+                            .join(" "),
                     )
                 );
             }

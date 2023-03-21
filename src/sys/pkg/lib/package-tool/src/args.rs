@@ -28,6 +28,9 @@ pub struct PackageArchiveCreateCommand {
     )]
     pub root_dir: Utf8PathBuf,
 
+    #[argh(option, description = "produce a depfile file at the provided path")]
+    pub depfile: Option<Utf8PathBuf>,
+
     #[argh(positional, description = "package_manifest.json to archive")]
     pub package_manifest: Utf8PathBuf,
 }
