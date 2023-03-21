@@ -16,6 +16,7 @@
 #include "tools/fidl/fidlc/include/fidl/flat/resolve_step.h"
 #include "tools/fidl/fidlc/include/fidl/flat/sort_step.h"
 #include "tools/fidl/fidlc/include/fidl/flat/verify_steps.h"
+#include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 
 namespace fidl::flat {
@@ -295,20 +296,27 @@ class CalcDependencies {
           VisitReference(composed_protocol.reference);
         }
         for (auto& method_with_info : protocol_decl->all_methods) {
+          auto method = method_with_info.method;
           // Make sure we insert libraries for all transitive composed
           // protocols, even if they have no methods with payloads.
-          deps_.insert(method_with_info.method->owning_protocol->name.library());
-          for (auto type_ctor : {method_with_info.method->maybe_request.get(),
-                                 method_with_info.method->maybe_response.get()}) {
-            if (type_ctor) {
-              VisitTypeConstructor(type_ctor);
-              auto type_decl = static_cast<const flat::IdentifierType*>(type_ctor->type)->type_decl;
-              // Since we flatten struct parameters, we need to add dependencies
-              // as if they were copied and pasted into the library.
-              if (type_decl->kind == Decl::Kind::kStruct) {
-                VisitDecl(static_cast<const Struct*>(type_decl));
+          deps_.insert(method->owning_protocol->name.library());
+          if (auto request = method->maybe_request.get()) {
+            VisitTypeConstructorAndStructFields(request);
+          }
+          if (method->HasResultUnion()) {
+            auto response_id =
+                static_cast<const flat::IdentifierType*>(method->maybe_response->type);
+            auto response_struct = static_cast<const flat::Struct*>(response_id->type_decl);
+            auto result_union_type = response_struct->members[0].type_ctor->type;
+            auto result_union = static_cast<const flat::Union*>(
+                static_cast<const flat::IdentifierType*>(result_union_type)->type_decl);
+            for (const auto& member : result_union->members) {
+              if (auto used = member.maybe_used.get()) {
+                VisitTypeConstructorAndStructFields(used->type_ctor.get());
               }
             }
+          } else if (auto response = method->maybe_response.get()) {
+            VisitTypeConstructorAndStructFields(response);
           }
         }
         break;
@@ -365,6 +373,19 @@ class CalcDependencies {
           }
         }
         break;
+      }
+    }
+  }
+
+  // Like `VisitTypeConstructor`, but also visits the struct fields if it is a
+  // struct. We use this for method requests and responses because some bindings
+  // flatten struct requests/responses into lists of parameters.
+  void VisitTypeConstructorAndStructFields(const TypeConstructor* type_ctor) {
+    VisitTypeConstructor(type_ctor);
+    if (type_ctor->type->kind == Type::Kind::kIdentifier) {
+      auto type_decl = static_cast<const flat::IdentifierType*>(type_ctor->type)->type_decl;
+      if (type_decl->kind == Decl::Kind::kStruct) {
+        VisitDecl(static_cast<const Struct*>(type_decl));
       }
     }
   }
