@@ -74,6 +74,8 @@ closed protocol Controller {
         netstack strict enum {
             /// Netstack2.
             V2 = 1;
+            /// Netstack3.
+            V3 = 2;
         };
     }) -> () error Error;
 

@@ -31,6 +31,10 @@ use std::convert::TryFrom as _;
 /// Netstack2 instance.
 const HERMETIC_NETWORK_V2_URL: &'static str = "#meta/hermetic_network_v2.cm";
 
+/// URL for the realm that contains the hermetic network components with a
+/// Netstack3 instance.
+const HERMETIC_NETWORK_V3_URL: &'static str = "#meta/hermetic_network_v3.cm";
+
 /// Values for creating an interface on the hermetic Netstack.
 ///
 /// Note that the topological path and the file path are not used by the
@@ -1365,6 +1369,7 @@ impl Controller {
 
         let url = match netstack {
             fntr::Netstack::V2 => HERMETIC_NETWORK_V2_URL,
+            fntr::Netstack::V3 => HERMETIC_NETWORK_V3_URL,
         };
 
         create_child(

@@ -4,11 +4,8 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
-
-group("tests") {
-  deps = [ ":network-test-realm-integration-tests" ]
-  testonly = true
-}
+import(
+    "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
 
 rustc_test("network-test-realm") {
   edition = "2021"
@@ -54,21 +51,53 @@ fuchsia_test_component("network-test-realm-integration-test") {
   deps = [ ":network-test-realm" ]
 }
 
-fuchsia_test_package("network-test-realm-integration-tests") {
-  test_components = [ ":network-test-realm-integration-test" ]
+package_deps = [
+  # used as test stubs for testing start-stub, stop-stub, and poll-udp.
+  "unreliable-echo:unreliable-echo-v4",
+  "unreliable-echo:unreliable-echo-v6",
 
+  # netemul-sandbox-v2 is used to create hermetic test realms.
+  "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
+
+  # controller is used to interact with the Network Test Realm.
+  "//src/connectivity/network/testing/network-test-realm/service:controller",
+
+  # component-debug corresponds to a Netstack2 instance configured by netemul.
+  "//src/connectivity/network/netstack:component-debug",
+
+  # expectations comparer
+  "//src/lib/testing/expectation:expectation_comparer",
+]
+
+name = "network-test-realm-integration-test"
+no_err_logs_name = "${name}-no-err-logs"
+fuchsia_test_with_expectations_package("${no_err_logs_name}") {
+  test_components = [ ":${name}" ]
+  expectations = "expects/network-test-realm.json5"
+  treatment_of_cases_with_error_logs = "SKIP_CASES_WITH_ERROR_LOGS"
+  deps = package_deps
+  test_specs = {
+    parallel = 1
+  }
+}
+
+with_err_logs_name = "${name}-with-err-logs"
+fuchsia_test_with_expectations_package("${with_err_logs_name}") {
+  test_components = [ ":${name}" ]
+  expectations = "expects/network-test-realm.json5"
+  treatment_of_cases_with_error_logs = "RUN_ONLY_CASES_WITH_ERROR_LOGS"
+  deps = package_deps
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+group("tests") {
+  testonly = true
   deps = [
-    # used as test stubs for testing start-stub, stop-stub, and poll-udp.
-    "unreliable-echo:unreliable-echo-v4",
-    "unreliable-echo:unreliable-echo-v6",
-
-    # netemul-sandbox-v2 is used to create hermetic test realms.
-    "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-
-    # controller is used to interact with the Network Test Realm.
-    "//src/connectivity/network/testing/network-test-realm/service:controller",
-
-    # component-debug corresponds to a Netstack2 instance configured by netemul.
-    "//src/connectivity/network/netstack:component-debug",
+    ":${no_err_logs_name}",
+    ":${with_err_logs_name}",
   ]
 }

@@ -60,15 +60,23 @@ rustc_library("network_test_realm") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
+hermetic_network_common_deps = [
+  "//src/connectivity/network/dhcpv4/server:component",
+  "//src/connectivity/network/dhcpv6/client:component",
+  "//src/connectivity/network/dns:component",
+]
+
 fuchsia_component("hermetic_network_v2") {
   manifest = "meta/hermetic_network_v2.cml"
-  component_name = "hermetic_network_v2"
-  deps = [
-    "//src/connectivity/network/dhcpv4/server:component",
-    "//src/connectivity/network/dhcpv6/client:component",
-    "//src/connectivity/network/dns:component",
-    "//src/connectivity/network/netstack:component-conformance",
-  ]
+  deps = hermetic_network_common_deps +
+         [ "//src/connectivity/network/netstack:component-conformance" ]
+  testonly = true
+}
+
+fuchsia_component("hermetic_network_v3") {
+  manifest = "meta/hermetic_network_v3.cml"
+  deps = hermetic_network_common_deps +
+         [ "//src/connectivity/network/netstack3:component-debug" ]
   testonly = true
 }
 
@@ -78,6 +86,7 @@ fuchsia_component("controller") {
   deps = [
     ":bin",
     ":hermetic_network_v2",
+    ":hermetic_network_v3",
   ]
   testonly = true
 }

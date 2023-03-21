@@ -228,6 +228,7 @@ async fn add_interface_to_netstack<'a>(
 /// A forwarding entry is also added for the relevant interface and the provided
 /// `subnet`.
 async fn add_address_to_hermetic_interface(
+    netstack_variant: fntr::Netstack,
     interface_name: &str,
     subnet: fnet::Subnet,
     realm: &netemul::TestRealm<'_>,
@@ -254,20 +255,30 @@ async fn add_address_to_hermetic_interface(
     // Allow the address to live beyond the `address_state_provider` handle.
     address_state_provider.detach().expect("detatch failed");
 
-    // Subnet forwarding entries are not automatically configured when an
-    // address is added using the `Control` protocol.
-    let stack_proxy =
-        connect_to_hermetic_network_realm_protocol::<fstack::StackMarker>(&realm).await;
-    stack_proxy
-        .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
-            subnet: fnet_ext::apply_subnet_mask(subnet),
-            device_id: id,
-            next_hop: None,
-            metric: 0,
-        })
-        .await
-        .expect("add_forwarding_entry failed")
-        .expect("add_forwarding_entry error");
+    // While Netstack3 installs a link-local subnet route when an interface is
+    // added, Netstack2 installs it only when an interface is enabled. Add the
+    // forwarding entry manually for Netstack2 to compensate.
+    // TODO(https://fxbug.dev/123440): Unify behavior for adding a link-local
+    // subnet route between NS2/NS3.
+    if netstack_variant == fntr::Netstack::V2 {
+        let stack_proxy =
+            connect_to_hermetic_network_realm_protocol::<fstack::StackMarker>(&realm).await;
+        stack_proxy
+            .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
+                subnet: fnet_ext::apply_subnet_mask(subnet),
+                device_id: id,
+                next_hop: None,
+                metric: 0,
+            })
+            .await
+            .expect("add_forwarding_entry failed")
+            .unwrap_or_else(|_| {
+                panic!(
+                    "add_forwarding_entry error for addr {:?}",
+                    fnet_ext::apply_subnet_mask(subnet)
+                )
+            });
+    }
 }
 
 /// Adds an interface to the hermetic Netstack with `interface_name` and
@@ -279,6 +290,7 @@ async fn join_network_with_hermetic_netstack<'a>(
     realm: &'a netemul::TestRealm<'a>,
     network: &'a netemul::TestNetwork<'a>,
     network_test_realm: &'a fntr::ControllerProxy,
+    netstack_variant: fntr::Netstack,
     interface_name: &'a str,
     mac_address: fnet::MacAddress,
     subnet: fnet::Subnet,
@@ -303,14 +315,16 @@ async fn join_network_with_hermetic_netstack<'a>(
         .expect("add_interface failed")
         .expect("add_interface error");
 
-    add_address_to_hermetic_interface(interface_name, subnet, realm).await;
+    add_address_to_hermetic_interface(netstack_variant, interface_name, subnet, realm).await;
     interface
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn start_hermetic_network_realm() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn start_hermetic_network_realm(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("start_hermetic_network_realm", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -318,7 +332,7 @@ async fn start_hermetic_network_realm() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -327,16 +341,23 @@ async fn start_hermetic_network_realm() {
 }
 
 #[netstack_test]
-async fn start_hermetic_network_realm_replaces_existing_realm(name: &str) {
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn start_hermetic_network_realm_replaces_existing_realm(
+    name: &str,
+    sub_name: &str,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -355,7 +376,7 @@ async fn start_hermetic_network_realm_replaces_existing_realm(name: &str) {
         .expect("add_interface error");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -384,9 +405,16 @@ async fn start_hermetic_network_realm_replaces_existing_realm(name: &str) {
 }
 
 #[netstack_test]
-#[test_case("no_wait_any_ip_address", false)]
-#[test_case("wait_any_ip_address", true)]
-async fn add_interface(name: &str, sub_name: &str, wait_any_ip_address: bool) {
+#[test_case("no_wait_any_ip_address_netstack2", false, fntr::Netstack::V2)]
+#[test_case("wait_any_ip_address_netstack2", true, fntr::Netstack::V2)]
+#[test_case("no_wait_any_ip_address_netstack3", false, fntr::Netstack::V3)]
+#[test_case("wait_any_ip_address_netstack3", true, fntr::Netstack::V3)]
+async fn add_interface(
+    name: &str,
+    sub_name: &str,
+    wait_any_ip_address: bool,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
@@ -396,7 +424,7 @@ async fn add_interface(name: &str, sub_name: &str, wait_any_ip_address: bool) {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -466,16 +494,19 @@ async fn add_interface(name: &str, sub_name: &str, wait_any_ip_address: bool) {
 }
 
 #[netstack_test]
-async fn add_interface_already_exists(name: &str) {
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn add_interface_already_exists(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -512,16 +543,23 @@ async fn add_interface_already_exists(name: &str) {
 // Tests the case where the MAC address provided to `Controller.AddInterface`
 // does not match any of the interfaces on the system.
 #[netstack_test]
-async fn add_interface_with_no_matching_interface(name: &str) {
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn add_interface_with_no_matching_interface(
+    name: &str,
+    sub_name: &str,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -548,16 +586,23 @@ async fn add_interface_with_no_matching_interface(name: &str) {
 // Tests the case where the MAC address provided to `Controller.AddInterface`
 // matches an interface in devfs, but not in the system Netstack.
 #[netstack_test]
-async fn add_interface_with_no_matching_interface_in_netstack(name: &str) {
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn add_interface_with_no_matching_interface_in_netstack(
+    name: &str,
+    sub_name: &str,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -579,16 +624,19 @@ async fn add_interface_with_no_matching_interface_in_netstack(name: &str) {
 }
 
 #[netstack_test]
-async fn stop_hermetic_network_realm(name: &str) {
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn stop_hermetic_network_realm(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm(name, &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -645,18 +693,20 @@ async fn stop_hermetic_network_realm_with_no_existing_realm() {
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn start_stub() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn start_stub(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        create_netstack_realm("start_stub", &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -670,20 +720,27 @@ async fn start_stub() {
     assert!(has_stub(&realm).await);
 }
 
-#[test_case(fposix_socket::Domain::Ipv4 ; "IPv4")]
-#[test_case(fposix_socket::Domain::Ipv6 ; "IPv6")]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn poll_udp(domain: fposix_socket::Domain) {
+#[netstack_test]
+#[test_case("ipv4_netstack2", fposix_socket::Domain::Ipv4, fntr::Netstack::V2)]
+#[test_case("ipv6_netstack2", fposix_socket::Domain::Ipv6, fntr::Netstack::V2)]
+#[test_case("ipv4_netstack3", fposix_socket::Domain::Ipv4, fntr::Netstack::V3)]
+#[test_case("ipv6_netstack3", fposix_socket::Domain::Ipv6, fntr::Netstack::V3)]
+async fn poll_udp(
+    name: &str,
+    sub_name: &str,
+    domain: fposix_socket::Domain,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        create_netstack_realm("start_stub", &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -723,18 +780,20 @@ async fn poll_udp(domain: fposix_socket::Domain) {
     assert_eq!(response, Err(fntr::Error::TimeoutExceeded));
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn poll_udp_unreachable() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn poll_udp_unreachable(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        create_netstack_realm("start_stub", &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -755,10 +814,12 @@ async fn poll_udp_unreachable() {
     assert_eq!(response, Err(fntr::Error::AddressUnreachable));
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn start_stub_with_existing_stub() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn start_stub_with_existing_stub(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("start_stub_with_existing_stub", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -766,7 +827,7 @@ async fn start_stub_with_existing_stub() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -839,10 +900,16 @@ async fn start_stub_with_existing_stub() {
     assert!(has_stub(&realm).await);
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn start_stub_with_non_existent_component() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn start_stub_with_non_existent_component(
+    name: &str,
+    sub_name: &str,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("start_stub_with_non_existent_component", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -850,7 +917,7 @@ async fn start_stub_with_non_existent_component() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -864,10 +931,16 @@ async fn start_stub_with_non_existent_component() {
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn start_stub_with_malformed_component_url() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn start_stub_with_malformed_component_url(
+    name: &str,
+    sub_name: &str,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("start_stub_with_malformed_component_url", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -875,7 +948,7 @@ async fn start_stub_with_malformed_component_url() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -905,18 +978,20 @@ async fn start_stub_with_no_hermetic_network_realm() {
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn stop_stub() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn stop_stub(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm =
-        create_netstack_realm("stop_stub", &sandbox).expect("failed to create netstack realm");
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
+        .expect("failed to create netstack realm");
 
     let network_test_realm = realm
         .connect_to_protocol::<fntr::ControllerMarker>()
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -932,10 +1007,12 @@ async fn stop_stub() {
     assert!(!has_stub(&realm).await);
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn stop_stub_with_no_running_stub() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn stop_stub_with_no_running_stub(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("stop_stub_with_no_running_stub", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -943,7 +1020,7 @@ async fn stop_stub_with_no_running_stub() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1003,97 +1080,108 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
+    "ipv4_netstack2",
     IPV4_ADDRESS_CONFIG,
     PingOptions::default(),
+    fntr::Netstack::V2,
     Ok(());
-    "ipv4")]
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv4_bind_to_existing_interface",
+    "ipv4_bind_to_existing_interface_netstack2",
     IPV4_ADDRESS_CONFIG,
     PingOptions {
         interface_name:  Some(INTERFACE1_NAME.to_string()),
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Ok(());
-    "ipv4 bind to existing interface")]
+    "ipv4 bind to existing interface netstack2")]
 #[test_case(
-    "ipv4_bind_to_non_existent_interface",
+    "ipv4_bind_to_non_existent_interface_netstack2",
     IPV4_ADDRESS_CONFIG,
     PingOptions {
         interface_name: Some(NON_EXISTENT_INTERFACE_NAME.to_string()),
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Err(fntr::Error::InterfaceNotFound);
-    "ipv4 bind to non existent interface")]
+    "ipv4 bind to non existent interface netstack2")]
 #[test_case(
-    "ipv6",
+    "ipv6_netstack2",
     IPV6_ADDRESS_CONFIG,
     PingOptions::default(),
+    fntr::Netstack::V2,
     Ok(());
-    "ipv6")]
+    "ipv6 netstack2")]
 #[test_case(
-    "ipv6_bind_to_existing_interface",
+    "ipv6_bind_to_existing_interface_netstack2",
     IPV6_ADDRESS_CONFIG,
     PingOptions {
         interface_name:  Some(INTERFACE1_NAME.to_string()),
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Ok(());
-    "ipv6 bind to existing interface")]
+    "ipv6 bind to existing interface netstack2")]
 #[test_case(
-    "ipv6_link_local_bind_to_existing_interface",
+    "ipv6_link_local_bind_to_existing_interface_netstack2",
     IPV6_LINK_LOCAL_ADDRESS_CONFIG,
     PingOptions {
         interface_name:  Some(INTERFACE1_NAME.to_string()),
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Ok(());
-    "ipv6 link local bind to existing interface")]
+    "ipv6 link local bind to existing interface netstack2")]
 #[test_case(
-    "ipv6_link_local_with_no_interface_specified",
+    "ipv6_link_local_with_no_interface_specified_netstack2",
     IPV6_LINK_LOCAL_ADDRESS_CONFIG,
     PingOptions::default(),
+    fntr::Netstack::V2,
     Err(fntr::Error::InvalidArguments);
-    "ipv6 link local with no interface specified")]
+    "ipv6 link local with no interface specified netstack2")]
 #[test_case(
-    "ipv6_bind_to_non_existent_interface",
+    "ipv6_bind_to_non_existent_interface_netstack2",
     IPV6_ADDRESS_CONFIG,
     PingOptions {
         interface_name: Some(NON_EXISTENT_INTERFACE_NAME.to_string()),
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Err(fntr::Error::InterfaceNotFound);
-    "ipv6 bind to non existent interface")]
+    "ipv6 bind to non existent interface netstack2")]
 #[test_case(
-    "timeout_exceeded",
+    "timeout_exceeded_netstack2",
     IPV4_ADDRESS_CONFIG,
     // Attempting to ping a target interface that is disabled forces a timeout.
     PingOptions {
         disable_target_interface: true,
         timeout: MINIMUM_TIMEOUT, ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Err(fntr::Error::TimeoutExceeded);
-    "timeout exceeded")]
+    "timeout exceeded netstack2")]
 #[test_case(
-    "no_timeout_with_disabled_target_interface",
+    "no_timeout_with_disabled_target_interface_netstack2",
     IPV4_ADDRESS_CONFIG,
     PingOptions {
         disable_target_interface: true,
         timeout: NO_WAIT_TIMEOUT,
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     // Since no timeout is defined, this ping should succeed.
     Ok(());
-    "no timeout with disabled target interface")]
+    "no timeout with disabled target interface netstack2")]
 #[test_case(
-    "no_timeout",
+    "no_timeout_netstack2",
     IPV4_ADDRESS_CONFIG,
     PingOptions { timeout: NO_WAIT_TIMEOUT, ..PingOptions::default() },
+    fntr::Netstack::V2,
     Ok(());
-    "no timeout")]
+    "no timeout netstack2")]
 #[test_case(
-    "host_unreachable",
+    "host_unreachable_netstack2",
     PingAddressConfig {
         target_subnet: fidl_subnet!("192.167.1.1/16"),
         ..IPV4_ADDRESS_CONFIG
@@ -1102,19 +1190,143 @@ const IPV6_LINK_LOCAL_ADDRESS_CONFIG: PingAddressConfig = PingAddressConfig {
         interface_name:  Some(INTERFACE1_NAME.to_string()),
         ..PingOptions::default()
     },
+    fntr::Netstack::V2,
     Err(fntr::Error::PingFailed);
-    "host unreachable")]
+    "host unreachable netstack2")]
 #[test_case(
-    "oversized_payload_length",
+    "oversized_payload_length_netstack2",
     IPV4_ADDRESS_CONFIG,
     PingOptions { payload_length: u16::MAX, ..PingOptions::default() },
+    fntr::Netstack::V2,
     Err(fntr::Error::InvalidArguments);
-    "oversized payload length")]
+    "oversized payload length netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        PingOptions::default(),
+        fntr::Netstack::V3,
+        Ok(());
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv4_bind_to_existing_interface_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        PingOptions {
+            interface_name:  Some(INTERFACE1_NAME.to_string()),
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Ok(());
+        "ipv4 bind to existing interface netstack3")]
+#[test_case(
+        "ipv4_bind_to_non_existent_interface_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        PingOptions {
+            interface_name: Some(NON_EXISTENT_INTERFACE_NAME.to_string()),
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Err(fntr::Error::InterfaceNotFound);
+        "ipv4 bind to non existent interface netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        IPV6_ADDRESS_CONFIG,
+        PingOptions::default(),
+        fntr::Netstack::V3,
+        Ok(());
+        "ipv6 netstack3")]
+#[test_case(
+        "ipv6_bind_to_existing_interface_netstack3",
+        IPV6_ADDRESS_CONFIG,
+        PingOptions {
+            interface_name:  Some(INTERFACE1_NAME.to_string()),
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Ok(());
+        "ipv6 bind to existing interface netstack3")]
+#[test_case(
+        "ipv6_link_local_bind_to_existing_interface_netstack3",
+        IPV6_LINK_LOCAL_ADDRESS_CONFIG,
+        PingOptions {
+            interface_name:  Some(INTERFACE1_NAME.to_string()),
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Ok(());
+        "ipv6 link local bind to existing interface netstack3")]
+#[test_case(
+        "ipv6_link_local_with_no_interface_specified_netstack3",
+        IPV6_LINK_LOCAL_ADDRESS_CONFIG,
+        PingOptions::default(),
+        fntr::Netstack::V3,
+        Err(fntr::Error::InvalidArguments);
+        "ipv6 link local with no interface specified netstack3")]
+#[test_case(
+        "ipv6_bind_to_non_existent_interface_netstack3",
+        IPV6_ADDRESS_CONFIG,
+        PingOptions {
+            interface_name: Some(NON_EXISTENT_INTERFACE_NAME.to_string()),
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Err(fntr::Error::InterfaceNotFound);
+        "ipv6 bind to non existent interface netstack3")]
+#[test_case(
+        "timeout_exceeded_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        // Attempting to ping a target interface that is disabled forces a timeout.
+        PingOptions {
+            disable_target_interface: true,
+            timeout: MINIMUM_TIMEOUT, ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Err(fntr::Error::TimeoutExceeded);
+        "timeout exceeded netstack3")]
+#[test_case(
+        "no_timeout_with_disabled_target_interface_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        PingOptions {
+            disable_target_interface: true,
+            timeout: NO_WAIT_TIMEOUT,
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        // Since no timeout is defined, this ping should succeed.
+        Ok(());
+        "no timeout with disabled target interface netstack3")]
+#[test_case(
+        "no_timeout_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        PingOptions { timeout: NO_WAIT_TIMEOUT, ..PingOptions::default() },
+        fntr::Netstack::V3,
+        Ok(());
+        "no timeout netstack3")]
+#[test_case(
+        "host_unreachable_netstack3",
+        PingAddressConfig {
+            target_subnet: fidl_subnet!("192.167.1.1/16"),
+            ..IPV4_ADDRESS_CONFIG
+        },
+        PingOptions {
+            interface_name:  Some(INTERFACE1_NAME.to_string()),
+            ..PingOptions::default()
+        },
+        fntr::Netstack::V3,
+        Err(fntr::Error::PingFailed);
+        "host unreachable netstack3")]
+#[test_case(
+        "oversized_payload_length_netstack3",
+        IPV4_ADDRESS_CONFIG,
+        PingOptions { payload_length: u16::MAX, ..PingOptions::default() },
+        fntr::Netstack::V3,
+        Err(fntr::Error::InvalidArguments);
+        "oversized payload length netstack3")]
 async fn ping(
     name: &str,
     case_name: &str,
     address_config: PingAddressConfig,
     options: PingOptions,
+    netstack: fntr::Netstack,
     expected_result: Result<(), fntr::Error>,
 ) {
     // TODO(https://fxbug.dev/95457): Destructure these types in the parameter
@@ -1176,7 +1388,7 @@ async fn ping(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1191,7 +1403,7 @@ async fn ping(
         .expect("add_interface failed")
         .expect("add_interface error");
 
-    add_address_to_hermetic_interface(INTERFACE1_NAME, source_subnet, &realm).await;
+    add_address_to_hermetic_interface(netstack, INTERFACE1_NAME, source_subnet, &realm).await;
 
     assert_eq!(
         network_test_realm
@@ -1227,10 +1439,12 @@ async fn ping_with_no_hermetic_network_realm() {
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn ping_with_no_added_interface() {
+#[netstack_test]
+#[test_case("netstack2", fntr::Netstack::V2)]
+#[test_case("netstack3", fntr::Netstack::V3)]
+async fn ping_with_no_added_interface(name: &str, sub_name: &str, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("ping_with_no_added_interface", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -1238,7 +1452,7 @@ async fn ping_with_no_added_interface() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1430,18 +1644,33 @@ async fn expect_multicast_event(
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
+    "ipv4_netstack2",
+    fntr::Netstack::V2,
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
     DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
+    "ipv4_netstack3",
+    fntr::Netstack::V3,
+    fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+    DEFAULT_IPV4_SOURCE_SUBNET;
+    "ipv4 netstack3")]
+#[test_case(
+    "ipv6_netstack2",
+    fntr::Netstack::V2,
     fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
     DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    "ipv6 netstack2")]
+#[test_case(
+    "ipv6_netstack3",
+    fntr::Netstack::V3,
+    fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
+    "ipv6 netstack3")]
 async fn join_multicast_group(
     name: &str,
     case_name: &str,
+    netstack: fntr::Netstack,
     // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
@@ -1457,7 +1686,7 @@ async fn join_multicast_group(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1466,6 +1695,7 @@ async fn join_multicast_group(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1488,17 +1718,33 @@ async fn join_multicast_group(
 // network realm is stopped.
 #[netstack_test]
 #[test_case(
-    "ipv4",
+    "ipv4_netstack2",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
     fnet::IpAddress::Ipv4(fidl_ip_v4!("224.1.2.4")),
-    DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    DEFAULT_IPV4_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
+    "ipv6_netstack2",
     fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
     fnet::IpAddress::Ipv6(fidl_ip_v6!("ff02::4")),
-    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv6 netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+        fnet::IpAddress::Ipv4(fidl_ip_v4!("224.1.2.4")),
+        DEFAULT_IPV4_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
+        fnet::IpAddress::Ipv6(fidl_ip_v6!("ff02::4")),
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv6 netstack3")]
 async fn join_multicast_group_after_stop(
     name: &str,
     case_name: &str,
@@ -1506,6 +1752,7 @@ async fn join_multicast_group_after_stop(
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     #[allow(unused_mut)] mut second_multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
+    netstack: fntr::Netstack,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
@@ -1518,7 +1765,7 @@ async fn join_multicast_group_after_stop(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1527,6 +1774,7 @@ async fn join_multicast_group_after_stop(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1558,6 +1806,7 @@ async fn join_multicast_group_after_stop(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE2_NAME,
         INTERFACE2_MAC_ADDRESS,
         subnet,
@@ -1578,21 +1827,36 @@ async fn join_multicast_group_after_stop(
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
+    "ipv4_netstack2",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
-    DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    DEFAULT_IPV4_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
+    "ipv6_netstack2",
     fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
-    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv6 netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+        DEFAULT_IPV4_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv6 netstack3")]
 async fn leave_multicast_group(
     name: &str,
     case_name: &str,
     // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
+    netstack: fntr::Netstack,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
@@ -1605,7 +1869,7 @@ async fn leave_multicast_group(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1614,6 +1878,7 @@ async fn leave_multicast_group(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1660,10 +1925,16 @@ async fn join_multicast_group_with_no_hermetic_network_realm() {
     );
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
-async fn join_multicast_group_with_non_existent_interface() {
+#[netstack_test]
+#[test_case("v2", fntr::Netstack::V2)]
+#[test_case("v3", fntr::Netstack::V3)]
+async fn join_multicast_group_with_non_existent_interface(
+    name: &str,
+    case_name: &str,
+    netstack: fntr::Netstack,
+) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
-    let realm = create_netstack_realm("join_multicast_group_with_non_existent_interface", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, case_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -1671,11 +1942,17 @@ async fn join_multicast_group_with_non_existent_interface() {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
 
+    // TODO(https://fxbug.dev/123365): Resolve error code discrepancy for `IP_ADD_MEMBERSHIP`
+    // (called under the hood by `join_multicast_group` below).
+    let expected_err = match netstack {
+        fntr::Netstack::V2 => fntr::Error::InvalidArguments,
+        fntr::Netstack::V3 => fntr::Error::Internal,
+    };
     assert_eq!(
         network_test_realm
             .join_multicast_group(
@@ -1686,23 +1963,36 @@ async fn join_multicast_group_with_non_existent_interface() {
             )
             .await
             .expect("join_multicast_group failed"),
-        Err(fntr::Error::InvalidArguments),
+        Err(expected_err),
     );
 }
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
-    DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    "ipv4_netstack2",
+    DEFAULT_IPV4_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
-    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    "ipv6_netstack2",
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv6 netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        DEFAULT_IPV4_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv6 netstack3")]
 async fn join_multicast_group_with_non_multicast_address(
     name: &str,
     case_name: &str,
     subnet: fnet::Subnet,
+    netstack: fntr::Netstack,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
@@ -1714,7 +2004,7 @@ async fn join_multicast_group_with_non_multicast_address(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1723,6 +2013,7 @@ async fn join_multicast_group_with_non_multicast_address(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1746,21 +2037,36 @@ async fn join_multicast_group_with_non_multicast_address(
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
+    "ipv4_netstack2",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
-    DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    DEFAULT_IPV4_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
+    "ipv6_netstack2",
     fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
-    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv6 netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+        DEFAULT_IPV4_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv6 netstack3")]
 async fn join_same_multicast_group_multiple_times(
     name: &str,
     case_name: &str,
     // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
+    netstack: fntr::Netstack,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
@@ -1772,7 +2078,7 @@ async fn join_same_multicast_group_multiple_times(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1781,6 +2087,7 @@ async fn join_same_multicast_group_multiple_times(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1830,17 +2137,30 @@ async fn leave_multicast_group_with_no_hermetic_network_realm() {
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
-    DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    "ipv4_netstack2",
+    DEFAULT_IPV4_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
-    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    "ipv6_netstack2",
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv6 netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        DEFAULT_IPV4_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv6 netstack3")]
 async fn leave_multicast_group_with_non_multicast_address(
     name: &str,
     case_name: &str,
     subnet: fnet::Subnet,
+    netstack: fntr::Netstack,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
@@ -1852,7 +2172,7 @@ async fn leave_multicast_group_with_non_multicast_address(
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1861,6 +2181,7 @@ async fn leave_multicast_group_with_non_multicast_address(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1884,21 +2205,36 @@ async fn leave_multicast_group_with_non_multicast_address(
 
 #[netstack_test]
 #[test_case(
-    "ipv4",
+    "ipv4_netstack2",
     fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
-    DEFAULT_IPV4_SOURCE_SUBNET;
-    "ipv4")]
+    DEFAULT_IPV4_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv4 netstack2")]
 #[test_case(
-    "ipv6",
+    "ipv6_netstack2",
     fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
-    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET;
-    "ipv6")]
+    DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    fntr::Netstack::V2;
+    "ipv6 netstack2")]
+#[test_case(
+        "ipv4_netstack3",
+        fnet::IpAddress::Ipv4(DEFAULT_IPV4_MULTICAST_ADDRESS),
+        DEFAULT_IPV4_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv4 netstack3")]
+#[test_case(
+        "ipv6_netstack3",
+        fnet::IpAddress::Ipv6(DEFAULT_IPV6_MULTICAST_ADDRESS),
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+        fntr::Netstack::V3;
+        "ipv6 netstack3")]
 async fn leave_unjoined_multicast_group(
     name: &str,
     case_name: &str,
     // TODO(https://fxbug.dev/95458): Support mut parameters from variant_test.
     #[allow(unused_mut)] mut multicast_address: fnet::IpAddress,
     subnet: fnet::Subnet,
+    netstack: fntr::Netstack,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
@@ -1919,6 +2255,7 @@ async fn leave_unjoined_multicast_group(
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         subnet,
@@ -1938,14 +2275,16 @@ async fn leave_unjoined_multicast_group(
     );
 }
 
-#[test_case(true; "stateful")]
-#[test_case(false; "stateless")]
-#[fuchsia_async::run_singlethreaded(test)]
-async fn start_dhcpv6_client(stateful: bool) {
+#[netstack_test]
+#[test_case("stateful_ns2", true, fntr::Netstack::V2; "stateful netstack2")]
+#[test_case("stateless_ns2", false, fntr::Netstack::V2; "stateless netstack2")]
+#[test_case("stateful_ns3", true, fntr::Netstack::V3; "stateful netstack3")]
+#[test_case("stateless_ns3", false, fntr::Netstack::V3; "stateless netstack3")]
+async fn start_dhcpv6_client(name: &str, sub_name: &str, stateful: bool, netstack: fntr::Netstack) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("network").await.expect("failed to create network");
     let fake_ep = network.create_fake_endpoint().expect("failed to create fake endpoint");
-    let realm = create_netstack_realm("start_dhcpv6_client", &sandbox)
+    let realm = create_netstack_realm(format!("{}_{}", name, sub_name), &sandbox)
         .expect("failed to create netstack realm");
 
     let network_test_realm = realm
@@ -1953,7 +2292,7 @@ async fn start_dhcpv6_client(stateful: bool) {
         .expect("failed to connect to network test realm controller");
 
     network_test_realm
-        .start_hermetic_network_realm(fntr::Netstack::V2)
+        .start_hermetic_network_realm(netstack)
         .await
         .expect("start_hermetic_network_realm failed")
         .expect("start_hermetic_network_realm error");
@@ -1962,6 +2301,7 @@ async fn start_dhcpv6_client(stateful: bool) {
         &realm,
         &network,
         &network_test_realm,
+        netstack,
         INTERFACE1_NAME,
         INTERFACE1_MAC_ADDRESS,
         DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,

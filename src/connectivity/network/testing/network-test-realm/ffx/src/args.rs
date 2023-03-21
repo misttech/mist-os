@@ -210,6 +210,7 @@ pub struct Dhcpv6ClientStop {}
 fn parse_netstack_type(value: &str) -> Result<fntr::Netstack, String> {
     match &value.to_lowercase()[..] {
         "v2" => Ok(fntr::Netstack::V2),
+        "v3" => Ok(fntr::Netstack::V3),
         _ => Err("invalid netstack type".to_string()),
     }
 }
