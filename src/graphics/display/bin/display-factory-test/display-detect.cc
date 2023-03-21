@@ -54,12 +54,20 @@ Boards GetBoard() {
 }
 
 zx::result<uint8_t> GetGpioValue(const char* gpio_path) {
-  zx::result client_end = component::Connect<gpio::Gpio>(gpio_path);
+  zx::result client_end = component::Connect<gpio::Device>(gpio_path);
   if (client_end.is_error()) {
     return client_end.take_error();
   }
-
-  const fidl::WireResult result = fidl::WireCall(*client_end)->Read();
+  zx::result endpoints = fidl::CreateEndpoints<gpio::Gpio>();
+  if (endpoints.is_error()) {
+    return endpoints.take_error();
+  }
+  auto& [client, server] = endpoints.value();
+  const fidl::Status status = fidl::WireCall(client_end.value())->OpenSession(std::move(server));
+  if (!status.ok()) {
+    return zx::error(status.status());
+  }
+  const fidl::WireResult result = fidl::WireCall(client)->Read();
   if (!result.ok()) {
     return zx::error(result.status());
   }

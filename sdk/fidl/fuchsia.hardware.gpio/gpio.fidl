@@ -22,7 +22,6 @@ type GpioPolarity = strict enum : uint32 {
     HIGH = 0x1;
 };
 
-@discoverable
 protocol Gpio {
     /// Get the pin of a GPIO
     GetPin() -> (struct {
@@ -100,8 +99,4 @@ protocol Device {
     OpenSession(resource struct {
         session server_end:Gpio;
     });
-};
-
-service Service {
-    device client_end:Gpio;
 };
