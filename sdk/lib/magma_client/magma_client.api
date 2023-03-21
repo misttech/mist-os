@@ -1,0 +1,5 @@
+{
+  "pkg/magma_client/include/lib/magma/magma.h": "5b2a93e59d7c119fe777f9d9c510a082",
+  "pkg/magma_client/include/lib/magma/magma_common_defs.h": "38694cf6edb78f4559e0579f3e1bccf2",
+  "pkg/magma_client/include/lib/magma/magma_sysmem.h": "f3146fed2886d0626f7ad4644fe494e3"
+}

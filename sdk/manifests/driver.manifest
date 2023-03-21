@@ -65,7 +65,6 @@ sdk://pkg/hwreg
 sdk://pkg/input_report_reader
 sdk://pkg/inspect
 sdk://pkg/inspect_component_cpp
-sdk://pkg/magma_client
 sdk://pkg/mmio
 sdk://pkg/mmio-ptr
 sdk://pkg/stdcompat
