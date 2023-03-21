@@ -4,7 +4,7 @@
 use {
     crate::fuchsia::{errors::map_to_status, file::FxFile, node::OpenedNode},
     anyhow::Error,
-    fidl::endpoints::ServerEnd,
+    fidl::{encoding::Decodable as _, endpoints::ServerEnd},
     fidl_fuchsia_hardware_block as block,
     fidl_fuchsia_hardware_block_volume::{
         self as volume, VolumeAndNodeMarker, VolumeAndNodeRequest,
@@ -31,7 +31,7 @@ use {
 // Multiple Block I/O request may be sent as a group.
 // Notes:
 // - the group is identified by `group_id` in the request
-// - if using groups, a response will not be sent unless `BLOCKIO_GROUP_LAST`
+// - if using groups, a response will not be sent unless `BLOCK_GROUP_LAST`
 //   flag is set.
 // - when processing a request of a group fails, subsequent requests of that
 //   group will not be processed.
@@ -65,9 +65,9 @@ impl FifoMessageGroup {
     fn into_response(self) -> BlockFifoResponse {
         return BlockFifoResponse {
             status: self.status,
-            group_id: self.group_id,
+            group: self.group_id,
             count: self.count,
-            ..Default::default()
+            ..BlockFifoResponse::new_empty()
         };
     }
 
@@ -97,7 +97,7 @@ impl FifoMessageGroups {
         self.0.entry(group_id).or_insert_with(|| FifoMessageGroup::new(group_id))
     }
 
-    // Remove a group when `BLOCKIO_GROUP_LAST` flag is set.
+    // Remove a group when `BLOCK_GROUP_LAST` flag is set.
     fn remove(&mut self, group_id: u16) -> FifoMessageGroup {
         match self.0.remove(&group_id) {
             Some(group) => group,
@@ -166,14 +166,12 @@ impl BlockServer {
         let mut data = {
             let vmos = self.vmos.lock().unwrap();
             let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
-            let mut buffer = vec![0u8; (request.block_count as u64 * block_size) as usize];
-            vmo.read(&mut buffer[..], request.vmo_block * block_size)?;
+            let mut buffer = vec![0u8; (request.length as u64 * block_size) as usize];
+            vmo.read(&mut buffer[..], request.vmo_offset * block_size)?;
             buffer
         };
 
-        self.file
-            .write_at_uncached(request.device_block * block_size as u64, &mut data[..])
-            .await?;
+        self.file.write_at_uncached(request.dev_offset * block_size as u64, &mut data[..]).await?;
 
         Ok(())
     }
@@ -181,10 +179,10 @@ impl BlockServer {
     async fn handle_blockio_read(&self, request: &BlockFifoRequest) -> Result<(), Error> {
         let block_size = self.file.get_block_size();
 
-        let mut buffer = vec![0u8; (request.block_count as u64 * block_size) as usize];
+        let mut buffer = vec![0u8; (request.length as u64 * block_size) as usize];
         let bytes_read = self
             .file
-            .read_at_uncached(request.device_block * (block_size as u64), &mut buffer[..])
+            .read_at_uncached(request.dev_offset * (block_size as u64), &mut buffer[..])
             .await?;
 
         // Fill in the rest of the buffer if bytes_read is less than the requested amount
@@ -192,7 +190,7 @@ impl BlockServer {
 
         let vmos = self.vmos.lock().unwrap();
         let vmo = vmos.get(&request.vmoid).ok_or(FxfsError::NotFound)?;
-        vmo.write(&buffer[..], request.vmo_block * block_size)?;
+        vmo.write(&buffer[..], request.vmo_offset * block_size)?;
 
         Ok(())
     }
@@ -203,55 +201,55 @@ impl BlockServer {
             status.into_raw()
         }
 
-        match request.op_code & remote_block_device::BLOCK_OP_MASK {
-            remote_block_device::BLOCKIO_CLOSE_VMO => {
+        match request.opcode & remote_block_device::BLOCK_OP_MASK {
+            remote_block_device::BLOCK_OP_CLOSE_VMO => {
                 let mut vmos = self.vmos.lock().unwrap();
                 match vmos.remove(&request.vmoid) {
                     Some(_vmo) => zx::sys::ZX_OK,
                     None => zx::sys::ZX_ERR_NOT_FOUND,
                 }
             }
-            remote_block_device::BLOCKIO_WRITE => {
+            remote_block_device::BLOCK_OP_WRITE => {
                 into_raw_status(self.handle_blockio_write(&request).await)
             }
-            remote_block_device::BLOCKIO_READ => {
+            remote_block_device::BLOCK_OP_READ => {
                 into_raw_status(self.handle_blockio_read(&request).await)
             }
             // TODO(fxbug.dev/89873): simply returning ZX_OK since we're
             // writing to device and no need to flush cache, but need to
             // check that flush goes down the stack
-            remote_block_device::BLOCKIO_FLUSH => zx::sys::ZX_OK,
+            remote_block_device::BLOCK_OP_FLUSH => zx::sys::ZX_OK,
             // TODO(fxbug.dev/89873)
-            remote_block_device::BLOCKIO_TRIM => zx::sys::ZX_OK,
-            _ => panic!("Unexpected message, request {:?}", request.op_code),
+            remote_block_device::BLOCK_OP_TRIM => zx::sys::ZX_OK,
+            _ => panic!("Unexpected message, request {:?}", request.opcode),
         }
     }
 
     async fn handle_fifo_request(&self, request: BlockFifoRequest) -> Option<BlockFifoResponse> {
-        let is_group = (request.op_code & remote_block_device::BLOCK_GROUP_ITEM) > 0;
-        let wants_reply = (request.op_code & remote_block_device::BLOCK_GROUP_LAST) > 0;
+        let is_group = (request.opcode & remote_block_device::BLOCK_GROUP_ITEM) > 0;
+        let wants_reply = (request.opcode & remote_block_device::BLOCK_GROUP_LAST) > 0;
 
         // Set up the BlockFifoResponse for this request, but do no process request yet
         let mut maybe_reply = {
             if is_group {
                 let mut groups = self.message_groups.lock().unwrap();
                 if wants_reply {
-                    let mut group = groups.remove(request.group_id);
+                    let mut group = groups.remove(request.group);
                     group.increment_count();
 
                     // This occurs when a previous request in this group has failed
                     if group.is_err() {
                         let mut reply = group.into_response();
-                        reply.request_id = request.request_id;
+                        reply.reqid = request.reqid;
                         // No need to process this request
                         return Some(reply);
                     }
 
                     let mut response = group.into_response();
-                    response.request_id = request.request_id;
+                    response.reqid = request.reqid;
                     Some(response)
                 } else {
-                    let group = groups.get(request.group_id);
+                    let group = groups.get(request.group);
                     group.increment_count();
 
                     if group.is_err() {
@@ -262,9 +260,9 @@ impl BlockServer {
                 }
             } else {
                 Some(BlockFifoResponse {
-                    request_id: request.request_id,
+                    reqid: request.reqid,
                     count: 1,
-                    ..Default::default()
+                    ..BlockFifoResponse::new_empty()
                 })
             }
         };
@@ -274,7 +272,7 @@ impl BlockServer {
             match &mut maybe_reply {
                 None => {
                     // maybe_reply will only be None if it's part of a group request
-                    self.message_groups.lock().unwrap().get(request.group_id).set_status(status);
+                    self.message_groups.lock().unwrap().get(request.group).set_status(status);
                 }
                 Some(reply) => {
                     reply.status = status;

@@ -2,19 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// !!! IMPORTANT !!!
-// Most of the definitions in this file need to be kept in sync with:
-// - //sdk/fidl/fuchsia.hardware.block.driver/block.fidl;
-// - //zircon/public/system/public/zircon/device/block.h.
-
 use {
     anyhow::{ensure, Error},
     async_trait::async_trait,
-    fidl_fuchsia_hardware_block as block,
-    fuchsia_async::{self as fasync, FifoReadable, FifoWritable},
+    fidl::encoding::Decodable as _,
+    fidl_fuchsia_hardware_block as block, fidl_fuchsia_hardware_block_driver as block_driver,
+    fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
     fuchsia_trace as trace,
     fuchsia_zircon::sys::zx_handle_t,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_zircon::{self as zx, HandleBased as _},
     futures::{channel::oneshot, executor::block_on},
     lazy_static::lazy_static,
     std::{
@@ -38,57 +34,34 @@ pub mod cache;
 
 pub mod testing;
 
-const BLOCK_VMOID_INVALID: u16 = 0;
 const TEMP_VMO_SIZE: usize = 65536;
 
-// See fuchsia.hardware.block/block.fidl
-pub const BLOCKIO_READ: u32 = 1;
-pub const BLOCKIO_WRITE: u32 = 2;
-pub const BLOCKIO_FLUSH: u32 = 3;
-pub const BLOCKIO_TRIM: u32 = 4;
-pub const BLOCKIO_CLOSE_VMO: u32 = 5;
+pub use block_driver::BLOCK_VMOID_INVALID;
 
-pub const BLOCK_GROUP_ITEM: u32 = 0x00000400;
-pub const BLOCK_GROUP_LAST: u32 = 0x00000800;
+pub use block_driver::BLOCK_OP_CLOSE_VMO;
+pub use block_driver::BLOCK_OP_FLUSH;
+pub use block_driver::BLOCK_OP_READ;
+pub use block_driver::BLOCK_OP_TRIM;
+pub use block_driver::BLOCK_OP_WRITE;
 
-pub const BLOCK_OP_MASK: u32 = 0x000000ff;
+pub use block_driver::BLOCK_GROUP_ITEM;
+pub use block_driver::BLOCK_GROUP_LAST;
+
+pub use block_driver::BLOCK_OP_MASK;
 
 fn op_code_str(op_code: u32) -> &'static str {
     match op_code & BLOCK_OP_MASK {
-        BLOCKIO_READ => "read",
-        BLOCKIO_WRITE => "write",
-        BLOCKIO_FLUSH => "flush",
-        BLOCKIO_TRIM => "trim",
-        BLOCKIO_CLOSE_VMO => "close_vmo",
+        BLOCK_OP_READ => "read",
+        BLOCK_OP_WRITE => "write",
+        BLOCK_OP_FLUSH => "flush",
+        BLOCK_OP_TRIM => "trim",
+        BLOCK_OP_CLOSE_VMO => "close_vmo",
         _ => "unknown",
     }
 }
 
-#[derive(Default, zerocopy::AsBytes, zerocopy::FromBytes)]
-#[repr(C)]
-pub struct BlockFifoRequest {
-    pub op_code: u32,
-    pub request_id: u32,
-    pub group_id: u16,
-    pub vmoid: u16,
-    pub block_count: u32,
-    pub vmo_block: u64,
-    pub device_block: u64,
-    pub trace_flow_id: u64,
-}
-
-#[derive(Default, zerocopy::AsBytes, zerocopy::FromBytes)]
-#[repr(C)]
-pub struct BlockFifoResponse {
-    pub status: i32,
-    pub request_id: u32,
-    pub group_id: u16,
-    pub reserved1: u16,
-    pub count: u32,
-    pub reserved2: u64,
-    pub reserved3: u64,
-    pub reserved4: u64,
-}
+pub use block_driver::BlockFifoRequest;
+pub use block_driver::BlockFifoResponse;
 
 // Generates a trace ID that will be unique across the system (as long as |request_id| isn't
 // reused within this process).
@@ -349,7 +322,7 @@ impl Common {
             trace::Id::new(),
             "storage",
             "BlockOp",
-            "op" => op_code_str(request.op_code)
+            "op" => op_code_str(request.opcode)
         );
         let (request_id, trace_flow_id) = {
             let mut state = self.fifo_state.lock().unwrap();
@@ -365,7 +338,7 @@ impl Common {
                 state.map.insert(request_id, RequestState::default()).is_none(),
                 "request id in use!"
             );
-            request.request_id = request_id;
+            request.reqid = request_id;
             request.trace_flow_id = generate_trace_flow_id(request_id);
             trace::flow_begin!("storage", "BlockOp", trace_flow_id.into());
             state.queue.push_back(request);
@@ -401,9 +374,9 @@ impl Common {
 
     async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error> {
         self.send(BlockFifoRequest {
-            op_code: BLOCKIO_CLOSE_VMO,
+            opcode: BLOCK_OP_CLOSE_VMO,
             vmoid: vmo_id.into_id(),
-            ..Default::default()
+            ..BlockFifoRequest::new_empty()
         })
         .await
     }
@@ -416,12 +389,12 @@ impl Common {
         match buffer_slice {
             MutableBufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
-                    op_code: BLOCKIO_READ,
+                    opcode: BLOCK_OP_READ,
                     vmoid: vmo_id.id(),
-                    block_count: self.to_blocks(length)?.try_into()?,
-                    vmo_block: self.to_blocks(offset)?,
-                    device_block: self.to_blocks(device_offset)?,
-                    ..Default::default()
+                    length: self.to_blocks(length)?.try_into()?,
+                    vmo_offset: self.to_blocks(offset)?,
+                    dev_offset: self.to_blocks(device_offset)?,
+                    ..BlockFifoRequest::new_empty()
                 })
                 .await?
             }
@@ -432,12 +405,12 @@ impl Common {
                     let to_do = std::cmp::min(TEMP_VMO_SIZE, slice.len());
                     let block_count = self.to_blocks(to_do as u64)? as u32;
                     self.send(BlockFifoRequest {
-                        op_code: BLOCKIO_READ,
+                        opcode: BLOCK_OP_READ,
                         vmoid: self.temp_vmo_id.id(),
-                        block_count: block_count,
-                        vmo_block: 0,
-                        device_block: device_block,
-                        ..Default::default()
+                        length: block_count,
+                        vmo_offset: 0,
+                        dev_offset: device_block,
+                        ..BlockFifoRequest::new_empty()
                     })
                     .await?;
                     temp_vmo.read(&mut slice[..to_do], 0)?;
@@ -460,12 +433,12 @@ impl Common {
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
-                    op_code: BLOCKIO_WRITE,
+                    opcode: BLOCK_OP_WRITE,
                     vmoid: vmo_id.id(),
-                    block_count: self.to_blocks(length)?.try_into()?,
-                    vmo_block: self.to_blocks(offset)?,
-                    device_block: self.to_blocks(device_offset)?,
-                    ..Default::default()
+                    length: self.to_blocks(length)?.try_into()?,
+                    vmo_offset: self.to_blocks(offset)?,
+                    dev_offset: self.to_blocks(device_offset)?,
+                    ..BlockFifoRequest::new_empty()
                 })
                 .await?;
             }
@@ -477,12 +450,12 @@ impl Common {
                     let block_count = self.to_blocks(to_do as u64)? as u32;
                     temp_vmo.write(&slice[..to_do], 0)?;
                     self.send(BlockFifoRequest {
-                        op_code: BLOCKIO_WRITE,
+                        opcode: BLOCK_OP_WRITE,
                         vmoid: self.temp_vmo_id.id(),
-                        block_count: block_count,
-                        vmo_block: 0,
-                        device_block: device_block,
-                        ..Default::default()
+                        length: block_count,
+                        vmo_offset: 0,
+                        dev_offset: device_block,
+                        ..BlockFifoRequest::new_empty()
                     })
                     .await?;
                     if to_do == slice.len() {
@@ -498,9 +471,9 @@ impl Common {
 
     async fn flush(&self) -> Result<(), Error> {
         self.send(BlockFifoRequest {
-            op_code: BLOCKIO_FLUSH,
+            opcode: BLOCK_OP_FLUSH,
             vmoid: BLOCK_VMOID_INVALID,
-            ..Default::default()
+            ..BlockFifoRequest::new_empty()
         })
         .await
     }
@@ -714,7 +687,7 @@ impl Future for FifoPoller {
         while let Poll::Ready(result) = fifo.read_one(context) {
             match result {
                 Ok(response) => {
-                    let request_id = response.request_id;
+                    let request_id = response.reqid;
                     // If the request isn't in the map, assume that it's a cancelled read.
                     if let Some(request_state) = state.map.get_mut(&request_id) {
                         request_state.result.replace(zx::Status::from_raw(response.status));
@@ -742,8 +715,9 @@ mod tests {
             BlockClient, BlockFifoRequest, BlockFifoResponse, BufferSlice, MutableBufferSlice,
             RemoteBlockClient, RemoteBlockClientSync,
         },
-        fidl_fuchsia_hardware_block::{self as block, BlockRequest, SessionRequest},
-        fuchsia_async::{self as fasync, FifoReadable, FifoWritable},
+        fidl::encoding::Decodable as _,
+        fidl_fuchsia_hardware_block as block,
+        fuchsia_async::{self as fasync, FifoReadable as _, FifoWritable as _},
         fuchsia_zircon as zx,
         futures::{
             future::{AbortHandle, Abortable, TryFutureExt as _},
@@ -1008,7 +982,7 @@ mod tests {
     // set_fifo_hander respectively
     struct FakeBlockServer<'a> {
         server_channel: Option<fidl::endpoints::ServerEnd<block::BlockMarker>>,
-        channel_handler: Box<dyn Fn(&SessionRequest) -> bool + 'a>,
+        channel_handler: Box<dyn Fn(&block::SessionRequest) -> bool + 'a>,
         fifo_handler: Box<dyn Fn(BlockFifoRequest) -> BlockFifoResponse + 'a>,
     }
 
@@ -1026,7 +1000,7 @@ mod tests {
         // FakeBlockServer will send over the fifo.
         fn new(
             server_channel: fidl::endpoints::ServerEnd<block::BlockMarker>,
-            channel_handler: impl Fn(&SessionRequest) -> bool + 'a,
+            channel_handler: impl Fn(&block::SessionRequest) -> bool + 'a,
             fifo_handler: impl Fn(BlockFifoRequest) -> BlockFifoResponse + 'a,
         ) -> FakeBlockServer<'a> {
             FakeBlockServer {
@@ -1074,7 +1048,7 @@ mod tests {
                         let request = request.expect("unexpected fidl error");
 
                         match request {
-                            BlockRequest::GetInfo { responder } => {
+                            block::BlockRequest::GetInfo { responder } => {
                                 responder
                                     .send(&mut Ok(block::BlockInfo {
                                         block_count: 1024,
@@ -1084,7 +1058,7 @@ mod tests {
                                     }))
                                     .expect("send failed");
                             }
-                            BlockRequest::OpenSession { session, control_handle: _ } => {
+                            block::BlockRequest::OpenSession { session, control_handle: _ } => {
                                 let stream = session.into_stream().expect("into_stream failed");
                                 stream
                                     .for_each(|request| async {
@@ -1095,7 +1069,7 @@ mod tests {
                                             return;
                                         }
                                         match request {
-                                            SessionRequest::GetFifo { responder } => {
+                                            block::SessionRequest::GetFifo { responder } => {
                                                 match maybe_server_fifo.lock().unwrap().take() {
                                                     Some(fifo) => responder.send(&mut Ok(fifo)),
                                                     None => responder.send(&mut Err(
@@ -1104,12 +1078,13 @@ mod tests {
                                                 }
                                                 .expect("send failed")
                                             }
-                                            SessionRequest::AttachVmo { vmo: _, responder } => {
-                                                responder
-                                                    .send(&mut Ok(block::VmoId { id: 1 }))
-                                                    .expect("send failed")
-                                            }
-                                            SessionRequest::Close { responder } => {
+                                            block::SessionRequest::AttachVmo {
+                                                vmo: _,
+                                                responder,
+                                            } => responder
+                                                .send(&mut Ok(block::VmoId { id: 1 }))
+                                                .expect("send failed"),
+                                            block::SessionRequest::Close { responder } => {
                                                 fifo_future_abort.abort();
                                                 responder.send(&mut Ok(())).expect("send failed")
                                             }
@@ -1139,8 +1114,8 @@ mod tests {
             // The drop here should cause Close to be sent.
         });
 
-        let channel_handler = |request: &SessionRequest| -> bool {
-            if let SessionRequest::Close { .. } = request {
+        let channel_handler = |request: &block::SessionRequest| -> bool {
+            if let block::SessionRequest::Close { .. } = request {
                 *close_called.lock().unwrap() = true;
             }
             false
@@ -1165,11 +1140,11 @@ mod tests {
                 let flush_called = std::sync::Mutex::new(false);
                 let fifo_handler = |request: BlockFifoRequest| -> BlockFifoResponse {
                     *flush_called.lock().unwrap() = true;
-                    assert_eq!(request.op_code, super::BLOCKIO_FLUSH);
+                    assert_eq!(request.opcode, super::BLOCK_OP_FLUSH);
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
-                        request_id: request.request_id,
-                        ..Default::default()
+                        reqid: request.reqid,
+                        ..BlockFifoResponse::new_empty()
                     }
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;
@@ -1196,8 +1171,8 @@ mod tests {
                     }
                     BlockFifoResponse {
                         status: zx::Status::OK.into_raw(),
-                        request_id: request.request_id,
-                        ..Default::default()
+                        reqid: request.reqid,
+                        ..BlockFifoResponse::new_empty()
                     }
                 };
                 FakeBlockServer::new(server, |_| false, fifo_handler).run().await;

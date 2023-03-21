@@ -7,7 +7,6 @@ using zx;
 
 // !!! IMPORTANT !!!
 // Most of the definitions in this file need to be kept in sync with:
-// - //src/lib/storage/block_client/rust/src/lib.rs;
 // - //zircon/public/system/public/zircon/device/block.h.
 
 const BLOCK_MAX_TRANSFER_UNBOUNDED uint32 = 0xFFFFFFFF;
