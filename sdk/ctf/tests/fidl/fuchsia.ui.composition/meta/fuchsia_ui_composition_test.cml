@@ -1,0 +1,49 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "//sdk/ctf/meta/rust.shard.cml",
+        "//sdk/ctf/meta/test.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    children: [
+        {
+            name: "fuchsia_ui_composition_flatland_test",
+            url: "#meta/fuchsia_ui_composition_flatland_test.cm",
+            environment: "#subpackaged-runner-env",
+        },
+        {
+            name: "flatland_test_realm",
+            url: "fuchsia.ui.composition.flatland_test_realm#meta/default.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#flatland_test_realm",
+        },
+        {
+            storage: "tmp",
+            from: "parent",
+            to: "#flatland_test_realm",
+        },
+        {
+            protocol: "fuchsia.ui.test.context.Factory",
+            from: "#flatland_test_realm",
+            to: "#fuchsia_ui_composition_flatland_test",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#fuchsia_ui_composition_flatland_test",
+        },
+    ],
+}
