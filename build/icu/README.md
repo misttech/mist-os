@@ -14,3 +14,12 @@ of each target it is instantiated for.
 For example, `icu_source_set("foo")` produces several targets named
 `foo.icu_XXXX`, where `XXXX` is replaced by the commit ID of the ICU library
 used in its compilation.
+
+## Why do we do this?
+
+Since the choice of the ICU library is made at compile time, but the choice of
+components for a given product is made at product assembly time, we must offer
+the product assembly "flavors" of the same components, built with different
+ICU commit IDs. Product assembly can then use these "flavored" builds to make
+the correct selection of a component.
+

@@ -84,8 +84,15 @@ template("third_party_icu_headers") {
     foreach(icu_flavor, icu_flavors) {
       source_set(
           "${icu_target_name}.icu_${icu_flavor.name}_${icu_flavor.commit_id}") {
+        # gn check is wrong about includes here. Don't check.
+        # See the same declaration at the very bottom of this file for the
+        # reason.
+        check_includes = false
         sources = [ _header_name ]
-        public_deps = [ "//third_party/icu/${icu_flavor.name}:icu" ]
+        public_deps = [
+          "//third_party/icu/${icu_flavor.name}:icu",
+          "//third_party/icu/${icu_flavor.name}:icuuc_public",
+        ]
         configs += [
           # defines FUCHSIA_ICU_VARIANT
           "//src/lib/icu:${icu_flavor.name}",
@@ -93,10 +100,6 @@ template("third_party_icu_headers") {
       }
     }
   }
-
-  # icu_root
-  # generate a stub include file
-  # make the include file into a source set.
 
   # Writes out the header file contents during the analysis phase.
   _contents = []
@@ -162,7 +165,16 @@ template("third_party_icu_headers") {
   write_file(_header_name, _all_contents, "list lines")
 
   source_set("${icu_target_name}") {
-    sources = [ _header_name ] + headers
+    # gn check is wrong about includes here. Don't check.
+    #
+    # gn check does not seem to take the preprocessor results when checking
+    # for inclusion. The generated file here has several mutually exclusive
+    # ifdefs, each including its appropriate public_deps.  Each such ifdef
+    # branch has its includes and deps set correctly, but gn does not know
+    # that and objects about missing deps for includes that are effectively
+    # ifdef'd out.
+    check_includes = false
+    sources = [ _header_name ]
     public_deps = [
       "//src/lib/icu:data",
       "//src/lib/icu:lib",

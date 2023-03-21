@@ -4,6 +4,8 @@
 
 """Fuchsia assembly input bundle names."""
 
+load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
+
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
 PLATFORM_AIB_NAMES = [
     "bootstrap",
@@ -28,6 +30,9 @@ PLATFORM_AIB_NAMES = [
     "wlan_softmac_support",
     "virtcon",
     "virtualization_support",
+    "intl_services.icu_default_{}".format(icu_flavors.default_git_commit),
+    "intl_services.icu_latest_{}".format(icu_flavors.latest_git_commit),
+    "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
 ]
 
 # The names of all of the platform's Assembly Input Bundles.

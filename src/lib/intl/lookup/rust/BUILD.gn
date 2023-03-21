@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/icu/icu_rustc_staticlib.gni")
 import("//build/intl/intl_strings.gni")
 import("//build/rust/rustc_staticlib.gni")
 import("//build/testing/environments.gni")
@@ -21,25 +22,24 @@ group("tests") {
   public_deps = [ ":intl-lookup-rust-tests" ]
 }
 
-rustc_staticlib("lib") {
+icu_rustc_staticlib("lib") {
   with_unit_tests = true
   name = "intl_lookup"
   edition = "2021"
   public = [ "lookup.h" ]
-  deps = [
+  icu_deps = [
     "//src/lib/icu_data/rust/icu_data",
-    "//src/lib/intl/model:lib",
-    "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:libc",
     "//third_party/rust_crates:rust_icu_common",
     "//third_party/rust_crates:rust_icu_sys",
     "//third_party/rust_crates:rust_icu_uloc",
+  ]
+  deps = [
+    "//src/lib/intl/model:lib",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:libc",
     "//third_party/rust_crates:tracing",
   ]
-  non_rust_deps = [
-    "//src/lib/icu:lib",
-    "//zircon/system/ulib/zx",
-  ]
+  non_rust_deps = [ "//zircon/system/ulib/zx" ]
   test_deps = [
     ":fuchsia.intl.test_rust",
     ":l10n",

@@ -4,34 +4,31 @@
 
 import("//build/components.gni")
 import("//build/dist/resource.gni")
-import("//build/rust/rustc_library.gni")
+import("//build/icu/icu_rustc_library.gni")
 import("//src/lib/icu/tzdata/icu_tzdata_resource.gni")
 
-rustc_library("icu_data") {
+icu_rustc_library("icu_data") {
   edition = "2021"
   with_unit_tests = true
+
+  icu_deps = [
+    "//third_party/rust_crates:rust_icu_common",
+    "//third_party/rust_crates:rust_icu_ucal",
+    "//third_party/rust_crates:rust_icu_udata",
+  ]
 
   deps = [
     "//src/lib/fdio/rust:fdio",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:lazy_static",
-    "//third_party/rust_crates:rust_icu_common",
-    "//third_party/rust_crates:rust_icu_ucal",
-    "//third_party/rust_crates:rust_icu_udata",
     "//third_party/rust_crates:thiserror",
   ]
 
-  test_deps = [
-    "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:rust_icu_uenum",
-  ]
+  icu_test_deps = [ "//third_party/rust_crates:rust_icu_uenum" ]
+  test_deps = [ "//third_party/rust_crates:assert_matches" ]
 
-  non_rust_deps = [
-    "../../cpp:icu_data_cpp",
-    "//src/lib/icu:data",
-    "//src/lib/icu:lib",
-  ]
+  icu_non_rust_deps = [ "../../cpp:icu_data_cpp" ]
 
   sources = [ "src/lib.rs" ]
 }

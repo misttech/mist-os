@@ -3,9 +3,11 @@
 # found in the LICENSE file.
 
 # This import must be here before "version.gni" below.
-import("config.gni")
+import("//build/icu/config.gni")  # icu_root, icu_flavor_major_versions
 
 import("//build/dist/resource.gni")
+import("//build/icu/icu_resource.gni")
+
 import("${icu_root}/version.gni")
 
 # Automatically declares the correct ICU library major version number
@@ -20,6 +22,21 @@ config("version") {
     # See https://github.com/google/rust_icu#features
     "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_major_version_number}",
   ]
+}
+
+config("version_default") {
+  rustenv =
+      [ "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_flavor_major_versions.default}" ]
+}
+
+config("version_stable") {
+  rustenv =
+      [ "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_flavor_major_versions.stable}" ]
+}
+
+config("version_latest") {
+  rustenv =
+      [ "RUST_ICU_MAJOR_VERSION_NUMBER=${icu_flavor_major_versions.latest}" ]
 }
 
 group("icu") {
@@ -39,22 +56,43 @@ group("tools") {
 }
 
 # Depend on this library instead of //third_party/icu directly.
+# DO NOT USE in icu_* target types, simply omit the dep.
 group("lib") {
-  public_deps = [ "${icu_root}:icu" ]
+  public_deps = [
+    "${icu_root}:icu",
+    "${icu_root}:icuuc_public",
+  ]
 }
 
 # Depend on this library instead of //third_party/icu:icudata directly.
+# DO NOT USE in icu_* target types, simply omit the dep.
 group("data") {
   public_deps = [ "${icu_root}:icudata" ]
 }
 
-resource("icudtl") {
+icu_resource("icudtl") {
   sources = [ "${icu_root}/common/icudtl.dat" ]
   outputs = [ "data/icudtl.dat" ]
 }
 
 # TODO(fmil): Is there a way to unify with above?
-resource("icudtl_root") {
+icu_resource("icudtl_root") {
   sources = [ "${icu_root}/common/icudtl.dat" ]
   outputs = [ "icudtl.dat" ]
+}
+
+config("default") {
+  defines = [ "FUCHSIA_ICU_VARIANT=0" ]
+}
+
+config("stable") {
+  defines = [ "FUCHSIA_ICU_VARIANT=1" ]
+}
+
+config("latest") {
+  defines = [ "FUCHSIA_ICU_VARIANT=2" ]
+}
+
+config("icu_root") {
+  defines = [ "FUCHSIA_ICU_VARIANT=3" ]
 }

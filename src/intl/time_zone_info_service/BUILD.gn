@@ -29,6 +29,7 @@ executable("bin") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl",
+    "//src/lib/icu:lib",
     "//src/lib/intl/time_zone_info:time-zone-info-service-lib",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

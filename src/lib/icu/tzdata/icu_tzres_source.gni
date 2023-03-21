@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/lib/icu/third_party_icu_headers.gni")
+import("//build/icu/third_party_icu_headers.gni")
 
 declare_args() {
   # Which source location to use for ICU's time zone .res files:

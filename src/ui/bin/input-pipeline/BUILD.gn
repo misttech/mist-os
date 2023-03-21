@@ -3,7 +3,9 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_binary.gni")
+import("//build/icu/icu_fuchsia_component.gni")
+import("//build/icu/icu_fuchsia_package.gni")
+import("//build/icu/icu_rustc_binary.gni")
 
 group("input-pipeline") {
   testonly = true
@@ -18,11 +20,12 @@ group("tests") {
   deps = [ ":input-pipeline-tests" ]
 }
 
-rustc_binary("input-pipeline-bin") {
+icu_rustc_binary("input-pipeline-bin") {
   output_name = "input-pipeline"
   with_unit_tests = true
   edition = "2021"
 
+  icu_deps = [ "//src/ui/lib/input_pipeline:input_pipeline" ]
   deps = [
     ":input_config_lib",
     "//sdk/fidl/fuchsia.factory:fuchsia.factory_rust",
@@ -43,7 +46,6 @@ rustc_binary("input-pipeline-bin") {
     "//src/lib/syslog/rust:syslog",
     "//src/lib/trace/rust:trace-provider",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/ui/lib/input_pipeline",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
@@ -59,9 +61,9 @@ fuchsia_component_manifest("manifest") {
   manifest = "meta/input-pipeline.cml"
 }
 
-fuchsia_component("component") {
+icu_fuchsia_component("component") {
   cm_label = ":manifest"
-  deps = [ ":input-pipeline-bin" ]
+  icu_deps = [ ":input-pipeline-bin" ]
 }
 
 # TODO(fxbug.dev/106573): Remove test-only target when
@@ -75,9 +77,9 @@ group("component-for-test") {
 }
 
 # Standard package containing input-pipeline.cm.
-fuchsia_package("pkg") {
+icu_fuchsia_package("pkg") {
   package_name = "input-pipeline"
-  deps = [ ":component" ]
+  icu_deps = [ ":component" ]
 }
 
 fuchsia_unittest_package("input-pipeline-tests") {

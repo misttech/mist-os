@@ -12,7 +12,7 @@ import("config.gni")  # icu_flavors, icu_fixup_deps
 # the ideas of which are commonly reused in all icu_* templates.
 template("_common") {
   forward_variables_from(invoker, [ "output_name" ])
-  assert(defined(icu_flavor), "icu_flavor is required")
+  assert(defined(invoker.icu_flavor), "icu_flavor is required")
   not_needed([ "output_name" ])
 
   _shadow = "${target_name}.original"

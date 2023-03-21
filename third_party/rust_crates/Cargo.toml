@@ -672,26 +672,37 @@ rustflags = []
 # pest relies on this being set to find the grammar file
 env_vars = [ "CARGO_MANIFEST_DIR=../../third_party/rust_crates/vendor/handlebars-4.3.5" ]
 
+# Refer to //build/icu/README.md for the details of the approach.
 [gn.package.rust_icu_uchar."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_common."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_sys."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_ucal."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_udat."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_udata."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_uenum."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_uloc."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_unorm2."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 [gn.package.rust_icu_ustring."3.0.0"]
 configs = [ "//src/lib/icu:version" ]
+target_renaming = { import = "//build/icu/icu_rust_crates.gni", group_name = "icu_group", rule_name = "icu_rust_library" }
 
 [gn.package.trust-dns-resolver."0.22.0"]
 env_vars = [ "CARGO_PKG_VERSION=\\\"0.22.0\\\"" ]

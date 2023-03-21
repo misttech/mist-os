@@ -644,62 +644,64 @@ group("ring") {
   public_deps = [ ":ring-v0_16_12" ]
 }
 
+import("//build/icu/icu_rust_crates.gni")
+
 if (current_os == "fuchsia") {
-  group("rust_icu_common") {
+  icu_group("rust_icu_common") {
     public_deps = [ ":rust_icu_common-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_sys") {
+  icu_group("rust_icu_sys") {
     public_deps = [ ":rust_icu_sys-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_ucal") {
+  icu_group("rust_icu_ucal") {
     public_deps = [ ":rust_icu_ucal-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_uchar") {
+  icu_group("rust_icu_uchar") {
     public_deps = [ ":rust_icu_uchar-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_udat") {
+  icu_group("rust_icu_udat") {
     public_deps = [ ":rust_icu_udat-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_udata") {
+  icu_group("rust_icu_udata") {
     public_deps = [ ":rust_icu_udata-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_uenum") {
+  icu_group("rust_icu_uenum") {
     public_deps = [ ":rust_icu_uenum-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_uloc") {
+  icu_group("rust_icu_uloc") {
     public_deps = [ ":rust_icu_uloc-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_unorm2") {
+  icu_group("rust_icu_unorm2") {
     public_deps = [ ":rust_icu_unorm2-v3_0_0" ]
   }
 }
 
 if (current_os == "fuchsia") {
-  group("rust_icu_ustring") {
+  icu_group("rust_icu_ustring") {
     public_deps = [ ":rust_icu_ustring-v3_0_0" ]
   }
 }
@@ -8785,7 +8787,7 @@ rust_library("ring-v0_16_12") {
   visibility += [ ":webpki-v0_21_0" ]
 }
 
-rust_library("rust_icu_common-v3_0_0") {
+icu_rust_library("rust_icu_common-v3_0_0") {
   crate_name = "rust_icu_common"
   crate_root =
       "//third_party/rust_crates/vendor/rust_icu_common-3.0.0/src/lib.rs"
@@ -8813,7 +8815,7 @@ rust_library("rust_icu_common-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_sys-v3_0_0") {
+icu_rust_library("rust_icu_sys-v3_0_0") {
   crate_name = "rust_icu_sys"
   crate_root = "//third_party/rust_crates/vendor/rust_icu_sys-3.0.0/src/lib.rs"
   output_name = "rust_icu_sys-e19f29ddf482344e"
@@ -8839,7 +8841,7 @@ rust_library("rust_icu_sys-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_ucal-v3_0_0") {
+icu_rust_library("rust_icu_ucal-v3_0_0") {
   crate_name = "rust_icu_ucal"
   crate_root = "//third_party/rust_crates/vendor/rust_icu_ucal-3.0.0/src/lib.rs"
   output_name = "rust_icu_ucal-bb4f07d7ba3832be"
@@ -8869,7 +8871,7 @@ rust_library("rust_icu_ucal-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_uchar-v3_0_0") {
+icu_rust_library("rust_icu_uchar-v3_0_0") {
   crate_name = "rust_icu_uchar"
   crate_root =
       "//third_party/rust_crates/vendor/rust_icu_uchar-3.0.0/src/lib.rs"
@@ -8898,7 +8900,7 @@ rust_library("rust_icu_uchar-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_udat-v3_0_0") {
+icu_rust_library("rust_icu_udat-v3_0_0") {
   crate_name = "rust_icu_udat"
   crate_root = "//third_party/rust_crates/vendor/rust_icu_udat-3.0.0/src/lib.rs"
   output_name = "rust_icu_udat-133f311681bf7c48"
@@ -8929,7 +8931,7 @@ rust_library("rust_icu_udat-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_udata-v3_0_0") {
+icu_rust_library("rust_icu_udata-v3_0_0") {
   crate_name = "rust_icu_udata"
   crate_root =
       "//third_party/rust_crates/vendor/rust_icu_udata-3.0.0/src/lib.rs"
@@ -8957,7 +8959,7 @@ rust_library("rust_icu_udata-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_uenum-v3_0_0") {
+icu_rust_library("rust_icu_uenum-v3_0_0") {
   crate_name = "rust_icu_uenum"
   crate_root =
       "//third_party/rust_crates/vendor/rust_icu_uenum-3.0.0/src/lib.rs"
@@ -8985,7 +8987,7 @@ rust_library("rust_icu_uenum-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_uloc-v3_0_0") {
+icu_rust_library("rust_icu_uloc-v3_0_0") {
   crate_name = "rust_icu_uloc"
   crate_root = "//third_party/rust_crates/vendor/rust_icu_uloc-3.0.0/src/lib.rs"
   output_name = "rust_icu_uloc-be7f58b0cb598f70"
@@ -9015,7 +9017,7 @@ rust_library("rust_icu_uloc-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_unorm2-v3_0_0") {
+icu_rust_library("rust_icu_unorm2-v3_0_0") {
   crate_name = "rust_icu_unorm2"
   crate_root =
       "//third_party/rust_crates/vendor/rust_icu_unorm2-3.0.0/src/lib.rs"
@@ -9048,7 +9050,7 @@ rust_library("rust_icu_unorm2-v3_0_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("rust_icu_ustring-v3_0_0") {
+icu_rust_library("rust_icu_ustring-v3_0_0") {
   crate_name = "rust_icu_ustring"
   crate_root =
       "//third_party/rust_crates/vendor/rust_icu_ustring-3.0.0/src/lib.rs"

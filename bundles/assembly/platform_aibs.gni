@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/icu/config.gni")  # icu_git_info
+
 platform_aibs_dir = get_label_info("//bundles/assembly", "target_out_dir")
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -59,6 +61,11 @@ platform_aib_names = [
   "virtualization_support",
   "empty_live_usb",
   "live_usb",
+
+  # ICU-specific version of intl_services
+  "intl_services.icu_default_${icu_git_info.default}",
+  "intl_services.icu_latest_${icu_git_info.latest}",
+  "intl_services.icu_stable_${icu_git_info.stable}",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

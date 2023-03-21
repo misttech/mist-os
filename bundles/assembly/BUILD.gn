@@ -2,9 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# NOTE:  This is the only file that can be imported in this BUILD.gn file.  No
-# other files are to be imported.
 import("//build/assembly/assembly_input_bundle.gni")
+import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
 
 ########
@@ -717,4 +716,8 @@ assembly_input_bundle("emulator_support") {
 # TODO(122864) Remove transitional labels
 group("third_party_sbase_for_transition") {
   public_deps = [ "//third_party/sbase" ]
+}
+
+icu_assembly_input_bundle("intl_services") {
+  icu_base_packages = [ "//src/intl/intl_services:pkg" ]
 }
