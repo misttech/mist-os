@@ -17,7 +17,7 @@ use futures::{lock::Mutex, FutureExt as _, TryStreamExt as _};
 use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
-    device::{ethernet, WeakDeviceId},
+    device::{ethernet, EthernetWeakDeviceId},
     ip::device::{
         slaac::{
             SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
@@ -29,15 +29,17 @@ use netstack3_core::{
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, BindingsNonSyncCtxImpl, DeviceId, Netstack,
-    NetstackContext, NonSyncContext, SyncCtx,
+    devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, NonSyncContext,
+    StackTime, SyncCtx,
 };
 
 #[derive(Clone)]
 struct Inner {
     device: netdevice_client::Client,
     session: netdevice_client::Session,
-    state: Arc<Mutex<netdevice_client::PortSlab<WeakDeviceId<BindingsNonSyncCtxImpl>>>>,
+    state: Arc<
+        Mutex<netdevice_client::PortSlab<EthernetWeakDeviceId<StackTime, devices::NetdeviceInfo>>>,
+    >,
 }
 
 /// The worker that receives messages from the ethernet device, and passes them
@@ -140,7 +142,7 @@ impl NetdeviceWorker {
             netstack3_core::device::receive_frame(
                 sync_ctx,
                 non_sync_ctx,
-                &id,
+                &id.into(),
                 packet::Buf::new(&mut buff[..], ..len),
             )
             .unwrap_or_else(|e| {
@@ -324,6 +326,8 @@ impl DeviceHandler {
             dynamic: _,
         } = core_id.external_state();
         let binding_id = *binding_id;
+        state_entry.insert(core_id.downgrade());
+
         let core_id = core_id.into();
         add_initial_routes(sync_ctx, non_sync_ctx, &core_id).expect("failed to add default routes");
 
@@ -363,7 +367,6 @@ impl DeviceHandler {
         );
 
         non_sync_ctx.devices.add_device(binding_id, core_id.clone());
-        state_entry.insert(core_id.downgrade());
 
         Ok((binding_id, status_stream))
     }
@@ -458,7 +461,7 @@ impl PortHandler {
     pub(crate) async fn uninstall(self) -> Result<(), netdevice_client::Error> {
         let Self { id: _, port_id, inner: Inner { device: _, session, state }, _mac_proxy: _ } =
             self;
-        let _: WeakDeviceId<_> = assert_matches::assert_matches!(
+        let _: EthernetWeakDeviceId<_, _> = assert_matches::assert_matches!(
             state.lock().await.remove(&port_id),
             netdevice_client::port_slab::RemoveOutcome::Removed(core_id) => core_id
         );

@@ -1037,7 +1037,7 @@ impl<I: Instant, S> Display for EthernetWeakDeviceId<I, S> {
 impl<I: Instant, S> EthernetWeakDeviceId<I, S> {
     /// Attempts to upgrade the ID to an [`EthernetDeviceId`], failing if the
     /// device no longer exists.
-    fn upgrade(&self) -> Option<EthernetDeviceId<I, S>> {
+    pub fn upgrade(&self) -> Option<EthernetDeviceId<I, S>> {
         let Self(id, rc) = self;
         rc.upgrade().map(|rc| EthernetDeviceId(*id, rc))
     }
@@ -1089,7 +1089,8 @@ impl<I: Instant, S> EthernetDeviceId<I, S> {
         &rc.external_state
     }
 
-    pub(crate) fn downgrade(&self) -> EthernetWeakDeviceId<I, S> {
+    /// Downgrades the ID to an [`EthernetWeakDeviceId`].
+    pub fn downgrade(&self) -> EthernetWeakDeviceId<I, S> {
         let Self(id, rc) = self;
         EthernetWeakDeviceId(*id, StrongRc::downgrade(rc))
     }
