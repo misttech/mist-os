@@ -161,7 +161,7 @@ void WlanPhyImplDevice::CreateIface(CreateIfaceRequestView request, fdf::Arena& 
   }
   wlan_softmac_device.release();
 
-  IWL_INFO("%s() created iface %u\n", __func__, out_iface_id);
+  IWL_INFO(this, "%s() created iface %u\n", __func__, out_iface_id);
 
   fidl::Arena fidl_arena;
   auto builder = phyimpl_fidl::WlanPhyImplCreateIfaceResponse::Builder(fidl_arena);
@@ -177,7 +177,7 @@ void WlanPhyImplDevice::DestroyIface(DestroyIfaceRequestView request, fdf::Arena
     return;
   }
 
-  IWL_INFO("%s() for iface %u\n", __func__, request->iface_id());
+  IWL_INFO(this, "%s() for iface %u\n", __func__, request->iface_id());
   zx_status_t status = phy_destroy_iface(drvdata(), request->iface_id());
   if (status != ZX_OK) {
     completer.buffer(arena).ReplyError(status);
