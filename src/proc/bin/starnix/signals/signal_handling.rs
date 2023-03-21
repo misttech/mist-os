@@ -112,36 +112,75 @@ pub fn dequeue_signal(current_task: &mut CurrentTask) {
     }
 }
 
-pub fn deliver_signal(task: &Task, siginfo: SignalInfo, registers: &mut RegisterState) {
+pub fn deliver_signal(task: &Task, mut siginfo: SignalInfo, registers: &mut RegisterState) {
     let mut task_state = task.write();
 
-    let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
-    let action = action_for_signal(&siginfo, sigaction);
-    log_trace!(task, "handling signal {:?} with action {:?}", siginfo, action);
-    match action {
-        DeliveryAction::Ignore => {}
-        DeliveryAction::CallHandler => {
-            dispatch_signal_handler(task, registers, &mut task_state.signals, siginfo, sigaction);
-        }
-        DeliveryAction::Terminate => {
-            // Release the signals lock. [`ThreadGroup::exit`] sends signals to threads which
-            // will include this one and cause a deadlock re-acquiring the signals lock.
-            drop(task_state);
-            task.thread_group.exit(ExitStatus::Kill(siginfo));
-        }
-        DeliveryAction::CoreDump => {
-            task_state.dump_on_exit = true;
-            drop(task_state);
-            task.thread_group.exit(ExitStatus::CoreDump(siginfo));
-        }
-        DeliveryAction::Stop => {
-            drop(task_state);
-            task.thread_group.set_stopped(true, siginfo);
-        }
-        DeliveryAction::Continue => {
-            // Nothing to do. Effect already happened when the signal was raised.
-        }
-    };
+    loop {
+        let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
+        let action = action_for_signal(&siginfo, sigaction);
+        log_trace!(task, "handling signal {:?} with action {:?}", siginfo, action);
+        match action {
+            DeliveryAction::Ignore => {}
+            DeliveryAction::CallHandler => {
+                let signal = siginfo.signal;
+                if let Err(err) = dispatch_signal_handler(
+                    task,
+                    registers,
+                    &mut task_state.signals,
+                    siginfo,
+                    sigaction,
+                ) {
+                    log_warn!(task, "failed to deliver signal {:?}: {:?}", signal, err);
+
+                    siginfo = SignalInfo::default(SIGSEGV);
+                    // The behavior that we want is:
+                    //  1. If we failed to send a SIGSEGV, or SIGSEGV is masked, or SIGSEGV is ignored,
+                    //  we reset the signal disposition and unmask SIGSEGV.
+                    //  2. Send a SIGSEGV to the program, with the (possibly) updated signal
+                    //  disposition and mask.
+                    let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
+                    let action = action_for_signal(&siginfo, sigaction);
+                    let masked_signals = task_state.signals.mask();
+                    if signal == SIGSEGV
+                        || masked_signals.has_signal(SIGSEGV)
+                        || action == DeliveryAction::Ignore
+                    {
+                        task_state
+                            .signals
+                            .set_mask(masked_signals.with_sigset_removed(SIGSEGV.into()));
+                        task.thread_group.signal_actions.set(SIGSEGV, sigaction_t::default());
+                    }
+
+                    // Try to deliver the SIGSEGV.
+                    // We already checked whether we needed to unmask or reset the signal
+                    // disposition.
+                    // This could not lead to an infinite loop, because if we had a SIGSEGV
+                    // handler, and we failed to send a SIGSEGV, we remove the handler and resend
+                    // the SIGSEGV.
+                    continue;
+                }
+            }
+            DeliveryAction::Terminate => {
+                // Release the signals lock. [`ThreadGroup::exit`] sends signals to threads which
+                // will include this one and cause a deadlock re-acquiring the signals lock.
+                drop(task_state);
+                task.thread_group.exit(ExitStatus::Kill(siginfo));
+            }
+            DeliveryAction::CoreDump => {
+                task_state.dump_on_exit = true;
+                drop(task_state);
+                task.thread_group.exit(ExitStatus::CoreDump(siginfo));
+            }
+            DeliveryAction::Stop => {
+                drop(task_state);
+                task.thread_group.set_stopped(true, siginfo);
+            }
+            DeliveryAction::Continue => {
+                // Nothing to do. Effect already happened when the signal was raised.
+            }
+        };
+        break;
+    }
 }
 
 pub fn sys_restart_syscall(current_task: &mut CurrentTask) -> Result<SyscallResult, Errno> {

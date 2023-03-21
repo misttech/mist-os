@@ -87,7 +87,7 @@ pub fn dispatch_signal_handler(
     signal_state: &mut SignalState,
     siginfo: SignalInfo,
     action: sigaction_t,
-) {
+) -> Result<(), Errno> {
     let signal_stack_frame = SignalStackFrame::new(
         &siginfo,
         ucontext {
@@ -132,14 +132,14 @@ pub fn dispatch_signal_handler(
     // If the signal handler is executed on the main stack, adjust the stack pointer to account for
     // the red zone.
     // https://en.wikipedia.org/wiki/Red_zone_%28computing%29
-    let main_stack = registers.rsp - RED_ZONE_SIZE;
+    let main_stack = registers.rsp.checked_sub(RED_ZONE_SIZE);
     let mut stack_pointer = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
         match signal_state.alt_stack {
             Some(sigaltstack) => {
                 // Since the stack grows down, the size is added to the ss_sp when calculating the
                 // "bottom" of the stack.
                 if let Some(sp) = sigaltstack.ss_sp.ptr().checked_add(sigaltstack.ss_size) {
-                    sp as u64
+                    Some(sp as u64)
                 } else {
                     // Use the main stack if sigaltstack overflows.
                     main_stack
@@ -149,7 +149,8 @@ pub fn dispatch_signal_handler(
         }
     } else {
         main_stack
-    };
+    }
+    .ok_or(errno!(EINVAL))?;
 
     stack_pointer -= SIG_STACK_SIZE as u64;
     stack_pointer = misalign_stack_pointer(stack_pointer);
@@ -167,6 +168,7 @@ pub fn dispatch_signal_handler(
         registers.rdx = stack_pointer + memoffset::offset_of!(SignalStackFrame, context) as u64;
     }
     registers.rip = action.sa_handler.ptr() as u64;
+    Ok(())
 }
 
 pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {

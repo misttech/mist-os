@@ -42,8 +42,9 @@ pub fn dispatch_signal_handler(
     _signal_state: &mut SignalState,
     _siginfo: SignalInfo,
     _action: sigaction_t,
-) {
+) -> Result<(), Errno> {
     // TODO(fxbug.dev/121659) implement this on ARM.
+    Ok(())
 }
 
 pub fn restore_from_signal_handler(_current_task: &mut CurrentTask) -> Result<(), Errno> {
