@@ -202,7 +202,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//src/firmware/lib/zbi:*",
     "//src/firmware/lib/zircon_boot:*",
     "//src/lib/elfldltl:*",
-    "//src/lib/fasync:*",
     "//src/lib/llvm-profdata:*",
     "//src/lib/trivial-allocator:*",
     "//src/lib/zbitl:*",
