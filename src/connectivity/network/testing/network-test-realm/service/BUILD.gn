@@ -69,6 +69,7 @@ fuchsia_component("hermetic_network_v2") {
     "//src/connectivity/network/dns:component",
     "//src/connectivity/network/netstack:component-conformance",
   ]
+  testonly = true
 }
 
 fuchsia_component("controller") {
@@ -78,9 +79,11 @@ fuchsia_component("controller") {
     ":bin",
     ":hermetic_network_v2",
   ]
+  testonly = true
 }
 
 fuchsia_package("network-test-realm") {
   package_name = "network-test-realm"
   deps = [ ":controller" ]
+  testonly = true
 }

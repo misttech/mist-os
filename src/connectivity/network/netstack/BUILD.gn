@@ -70,6 +70,7 @@ fuchsia_component("component-conformance") {
   component_name = "netstack-conformance"
   manifest = "meta/netstack_conformance.cml"
   deps = [ ":bin_with_deadlock_detection" ]
+  testonly = true
 }
 
 go_binary("bin_with_tracing") {
