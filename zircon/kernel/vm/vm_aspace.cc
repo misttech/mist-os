@@ -372,7 +372,7 @@ zx_status_t VmAspace::MapObjectInternal(fbl::RefPtr<VmObject> vmo, const char* n
 
   // return the vaddr if requested
   if (ptr) {
-    *ptr = (void*)r->base();
+    *ptr = (void*)r->base_locking();
   }
 
   return ZX_OK;
@@ -715,8 +715,13 @@ void VmAspace::DropUserPageTables() {
 }
 
 bool VmAspace::IntersectsVdsoCodeLocked(vaddr_t base, size_t size) const {
-  return vdso_code_mapping_ &&
-         Intersects(vdso_code_mapping_->base(), vdso_code_mapping_->size(), base, size);
+  if (vdso_code_mapping_) {
+    AssertHeld(vdso_code_mapping_->lock_ref());
+    return Intersects(vdso_code_mapping_->base_locked(), vdso_code_mapping_->size_locked(), base,
+                      size);
+  }
+
+  return false;
 }
 
 bool VmAspace::IsHighMemoryPriority() const {
