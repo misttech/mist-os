@@ -4,6 +4,7 @@
 library fuchsia.diagnostics;
 
 using fuchsia.mem;
+using zx;
 
 ///  The size bound of 1024 is a reasonably low size restriction that meets most
 ///  canonical selectors we've ecountered.
@@ -48,6 +49,12 @@ type FormattedContent = flexible resource union {
     /// A diagnostics schema encoded as text.
     /// The VMO will contain up to 1mb of diagnostics data.
     2: text fuchsia.mem.Buffer;
+
+    /// A diagnostics schema encoded as cbor.
+    /// The VMO will contain up to 1mb of diagnostics data.
+    /// The size will be in ZX_PROP_VMO_CONTENT_SIZE.
+    @available(added=HEAD)
+    3: cbor zx.handle:<VMO>;
 };
 
 /// Enum specifying the modes by which a user can connect to and stream diagnostics metrics.

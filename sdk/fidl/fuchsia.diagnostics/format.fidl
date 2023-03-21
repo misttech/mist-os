@@ -12,4 +12,8 @@ type Format = strict enum {
     JSON = 1;
     /// Dump read results per the Iquery text specifications.
     TEXT = 2;
+    /// Dump read results per the Diagnostics CBOR
+    /// Schema specifications.
+    @available(added=HEAD)
+    CBOR = 3;
 };
