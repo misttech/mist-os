@@ -7,3 +7,8 @@ build:fuchsia_arm64 --crosstool_top=@fuchsia_clang//:toolchain
 build:fuchsia_arm64 --cpu=aarch64
 build:fuchsia_arm64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build:fuchsia_arm64 --copt=--debug --strip=never
+
+build:fuchsia_riscv64 --crosstool_top=@fuchsia_clang//:toolchain
+build:fuchsia_riscv64 --cpu=riscv64
+build:fuchsia_riscv64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+build:fuchsia_riscv64 --copt=--debug --strip=never

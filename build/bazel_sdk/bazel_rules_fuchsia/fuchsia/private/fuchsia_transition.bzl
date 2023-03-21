@@ -18,6 +18,7 @@ NATIVE_CPU_ALIASES = {
 FUCHSIA_PLATFORMS_MAP = {
     "x86_64": "fuchsia_x64",
     "aarch64": "fuchsia_arm64",
+    "riscv64": "fuchsia_riscv64",
 }
 
 def _fuchsia_transition_impl(settings, _):

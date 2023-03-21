@@ -77,6 +77,7 @@ def _fuchsia_clang_repository_impl(ctx):
     # (see fuchsia-sysroot-{arch} definitions in cc_toolchain_config.bzl.
     ctx.symlink(str(fuchsia_sdk_path) + "/arch/arm64/sysroot", "fuchsia_sysroot_aarch64")
     ctx.symlink(str(fuchsia_sdk_path) + "/arch/x64/sysroot", "fuchsia_sysroot_x86_64")
+    ctx.symlink(str(fuchsia_sdk_path) + "/arch/riscv64/sysroot", "fuchsia_sysroot_riscv64")
 
     normalized_os = normalize_os(ctx)
     if ctx.attr.local_path:

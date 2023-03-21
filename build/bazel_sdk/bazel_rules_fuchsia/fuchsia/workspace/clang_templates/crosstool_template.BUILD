@@ -23,6 +23,10 @@ cc_toolchain_suite(
                 "x86_64|llvm": ":cc-compiler-x86_64",
                 "x86_64": ":cc-compiler-x86_64",
             },
+            "riscv64": {
+                "riscv64|llvm": ":cc-compiler-riscv64",
+                "riscv64": ":cc-compiler-riscv64",
+            },
         },
         sdk_constants.target_cpus,
     ),
@@ -277,6 +281,18 @@ fuchsia_package_resource_group(
                     "//:lib/x86_64-unknown-fuchsia/asan/libunwind.so.1",
                 ],
             },
+            "riscv64": {
+                ":riscv64_novariant": [
+                    "//:lib/riscv64-unknown-fuchsia/libc++.so.2",
+                    "//:lib/riscv64-unknown-fuchsia/libc++abi.so.1",
+                    "//:lib/riscv64-unknown-fuchsia/libunwind.so.1",
+                ],
+                ":riscv64_asan_variant": [
+                    "//:lib/riscv64-unknown-fuchsia/asan/libc++.so.2",
+                    "//:lib/riscv64-unknown-fuchsia/asan/libc++abi.so.1",
+                    "//:lib/riscv64-unknown-fuchsia/asan/libunwind.so.1",
+                ],
+            },
         },
         sdk_constants.target_cpus,
     ),
@@ -293,6 +309,10 @@ fuchsia_package_resource_group(
             "x64": {
                 ":x86_novariant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia",
                 ":x86_asan_variant": "../fuchsia_clang/lib/x86_64-unknown-fuchsia/asan",
+            },
+            "riscv64": {
+                ":riscv64_novariant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia",
+                ":riscv64_asan_variant": "../fuchsia_clang/lib/riscv64-unknown-fuchsia/asan",
             },
         },
         sdk_constants.target_cpus,
@@ -314,6 +334,11 @@ fuchsia_package_resource_group(
                     "//:lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia/libclang_rt.asan.so",
                 ],
             },
+            "riscv64": {
+                ":riscv64_asan_variant": [
+                    "//:lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia/libclang_rt.asan.so",
+                ],
+            },
         },
         sdk_constants.target_cpus,
         default = [],
@@ -330,6 +355,9 @@ fuchsia_package_resource_group(
             "x64": {
                 ":x86_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/x86_64-unknown-fuchsia",
             },
+            "riscv64": {
+                ":riscv64_build": "../fuchsia_clang/lib/clang/%{CLANG_VERSION}/lib/riscv64-unknown-fuchsia",
+            },
         },
         sdk_constants.target_cpus,
     ),
@@ -337,54 +365,53 @@ fuchsia_package_resource_group(
 )
 
 config_setting(
-    name = "aarch64_build",
+    name = "aarch64_cpu_build",
     values = {"cpu": "aarch64"},
 )
 
 config_setting(
-    name = "aarch64_platform_build",
-    constraint_values = [
-        "@platforms//cpu:aarch64",
-    ],
-)
-
-config_setting(
-    name = "armeabi-v7a_build",
+    name = "armeabi-v7a_cpu_build",
     values = {"cpu": "armeabi-v7a"},
 )
 
 selects.config_setting_group(
     name = "arm_build",
     match_any = [
-        ":aarch64_build",
-        ":aarch64_platform_build",
-        ":armeabi-v7a_build",
+        "@platforms//cpu:arm64",
+        ":aarch64_cpu_build",
+        ":armeabi-v7a_cpu_build",
     ],
 )
 
 config_setting(
-    name = "k8_build",
-    values = {"cpu": "k8"},
-)
-
-config_setting(
-    name = "x86_64_build",
+    name = "x86_64_cpu_build",
     values = {"cpu": "x86_64"},
 )
 
 config_setting(
-    name = "x86_64_platform_build",
-    constraint_values = [
-        "@platforms//cpu:x86_64",
-    ],
+    name = "k8_cpu_build",
+    values = {"cpu": "k8"},
 )
 
 selects.config_setting_group(
     name = "x86_build",
     match_any = [
-        ":k8_build",
-        ":x86_64_build",
-        ":x86_64_platform_build",
+        "@platforms//cpu:x86_64",
+        ":x86_64_cpu_build",
+        ":k8_cpu_build",
+    ],
+)
+
+config_setting(
+    name = "riscv64_cpu_build",
+    values = {"cpu": "riscv64"},
+)
+
+selects.config_setting_group(
+    name = "riscv64_build",
+    match_any = [
+        "@platforms//cpu:riscv64",
+        ":riscv64_cpu_build",
     ],
 )
 
@@ -438,6 +465,22 @@ selects.config_setting_group(
     name = "x86_asan_variant",
     match_all = [
         ":x86_build",
+        ":asan_variant",
+    ],
+)
+
+selects.config_setting_group(
+    name = "riscv64_novariant",
+    match_all = [
+        ":riscv64_build",
+        ":novariant",
+    ],
+)
+
+selects.config_setting_group(
+    name = "riscv64_asan_variant",
+    match_all = [
+        ":riscv64_build",
         ":asan_variant",
     ],
 )

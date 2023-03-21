@@ -21,3 +21,12 @@ platform(
     ],
     visibility = ["//visibility:public"],
 )
+
+platform(
+    name = "fuchsia_riscv64",
+    constraint_values = [
+        "@platforms//cpu:riscv64",
+        "@platforms//os:fuchsia",
+    ],
+    visibility = ["//visibility:public"],
+)
