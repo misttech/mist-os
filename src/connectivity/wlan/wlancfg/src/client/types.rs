@@ -84,6 +84,8 @@ pub struct ScanResult {
     pub compatibility: Compatibility,
 }
 
+// Only derive(Debug) in tests, we should never directly print this in non-test code
+#[cfg_attr(test, derive(Debug, PartialEq, Eq, PartialOrd, Ord))]
 pub struct NetworkIdentifierDetailed {
     pub ssid: Ssid,
     pub security_type: SecurityTypeDetailed,

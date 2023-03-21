@@ -259,8 +259,30 @@ async fn perform_scan(
 
         match scan_results {
             Ok(results) => {
-                record_scan_results(vec![], &results, saved_networks_manager.clone()).await;
-                insert_bss_to_network_bss_map(&mut bss_by_network, results, true);
+                let target_ssids = match scan_request {
+                    fidl_sme::ScanRequest::Passive(_) => vec![],
+                    fidl_sme::ScanRequest::Active(ref req) => req
+                        .ssids
+                        .iter()
+                        .map(|s| types::Ssid::from_bytes_unchecked(s.to_vec()))
+                        .collect(),
+                };
+                bss_by_network = bss_to_network_map(results, &target_ssids);
+                // TODO(fxbug.dev/123619): remove the SmeNetworkIdentifier type to simplify this.
+                // Consider passing in scan results and reading the "ScanObservation" from there.
+                // (creates a single source of truth for "ScanObservation")
+                saved_networks_manager
+                    .record_scan_result(
+                        target_ssids,
+                        bss_by_network
+                            .keys()
+                            .map(|n| types::NetworkIdentifierDetailed {
+                                ssid: n.ssid.clone(),
+                                security_type: n.protection,
+                            })
+                            .collect(),
+                    )
+                    .await;
                 break;
             }
             Err(scan_err) => match scan_err {
@@ -284,24 +306,8 @@ async fn perform_scan(
         telemetry_sender.send(TelemetryEvent::ScanDefect(ScanIssue::EmptyScanResults))
     }
 
-    let scan_results = network_bss_map_to_scan_result(bss_by_network);
+    let scan_results = network_map_to_scan_result(bss_by_network);
     (scan_request, Ok(scan_results))
-}
-
-/// Update the hidden network probabilties of saved networks seen (or not) in a scan.
-async fn record_scan_results(
-    target_ssids: Vec<types::Ssid>,
-    scan_result_list: &Vec<wlan_common::scan::ScanResult>,
-    saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
-) {
-    let ids = scan_result_list
-        .iter()
-        .map(|scan_result| types::NetworkIdentifierDetailed {
-            ssid: scan_result.bss_description.ssid.clone(),
-            security_type: scan_result.bss_description.protection().into(),
-        })
-        .collect();
-    saved_networks_manager.record_scan_result(target_ssids, ids).await;
 }
 
 /// The location sensor module uses scan results to help determine the
@@ -340,13 +346,13 @@ impl ScanResultUpdate for LocationSensorUpdater {
     }
 }
 
-/// Converts sme::ScanResult to our internal BSS type, then adds it to the provided bss_by_network map.
+/// Converts sme::ScanResult to our internal BSS type, then adds it to a map.
 /// Only keeps the first unique instance of a BSSID
-fn insert_bss_to_network_bss_map(
-    bss_by_network: &mut HashMap<SmeNetworkIdentifier, Vec<types::Bss>>,
+fn bss_to_network_map(
     scan_result_list: Vec<wlan_common::scan::ScanResult>,
-    observed_in_passive_scan: bool,
-) {
+    target_ssids: &Vec<types::Ssid>,
+) -> HashMap<SmeNetworkIdentifier, Vec<types::Bss>> {
+    let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
     for scan_result in scan_result_list.into_iter() {
         let protection: types::SecurityTypeDetailed =
             scan_result.bss_description.protection().into();
@@ -372,19 +378,21 @@ fn insert_bss_to_network_bss_map(
                 snr_db: scan_result.bss_description.snr_db,
                 channel: scan_result.bss_description.channel,
                 timestamp: scan_result.timestamp,
-                observation: if observed_in_passive_scan {
-                    types::ScanObservation::Passive
-                } else {
+                // TODO(123709): if target_ssids contains the wildcard, this need to be "Unknown"
+                observation: if target_ssids.contains(&scan_result.bss_description.ssid) {
                     types::ScanObservation::Active
+                } else {
+                    types::ScanObservation::Passive
                 },
                 compatibility: scan_result.compatibility,
                 bss_description: scan_result.bss_description.into(),
             });
         };
     }
+    bss_by_network
 }
 
-fn network_bss_map_to_scan_result(
+fn network_map_to_scan_result(
     mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>>,
 ) -> Vec<types::ScanResult> {
     let mut scan_results: Vec<types::ScanResult> = bss_by_network
@@ -441,7 +449,6 @@ mod tests {
         super::*,
         crate::{
             access_point::state_machine as ap_fsm,
-            config_management::network_config::Credential,
             mode_management::{
                 iface_manager_api::{ConnectAttemptRequest, SmeForScan},
                 Defect, IfaceFailure,
@@ -618,11 +625,11 @@ mod tests {
 
     // Creates test data for the scan functions.
     struct MockScanData {
-        passive_input_aps: Vec<fidl_sme::ScanResult>,
-        passive_internal_aps: Vec<types::ScanResult>,
+        sme_results: Vec<fidl_sme::ScanResult>,
+        internal_results: Vec<types::ScanResult>,
     }
-    fn create_scan_ap_data() -> MockScanData {
-        let passive_result_1 = fidl_sme::ScanResult {
+    fn create_scan_ap_data(observation: types::ScanObservation) -> MockScanData {
+        let sme_result_1 = fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
@@ -636,7 +643,7 @@ mod tests {
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
             ),
         };
-        let passive_result_2 = fidl_sme::ScanResult {
+        let sme_result_2 = fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
             })),
@@ -650,7 +657,7 @@ mod tests {
                 channel: types::WlanChan::new(8, types::Cbw::Cbw20),
             ),
         };
-        let passive_result_3 = fidl_sme::ScanResult {
+        let sme_result_3 = fidl_sme::ScanResult {
             compatibility: None,
             timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
             bss_description: random_fidl_bss_description!(
@@ -663,11 +670,10 @@ mod tests {
             ),
         };
 
-        let passive_input_aps =
-            vec![passive_result_1.clone(), passive_result_2.clone(), passive_result_3.clone()];
+        let sme_results = vec![sme_result_1.clone(), sme_result_2.clone(), sme_result_3.clone()];
         // input_aps contains some duplicate SSIDs, which should be
         // grouped in the output.
-        let passive_internal_aps = vec![
+        let internal_results = vec![
             types::ScanResult {
                 ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
                 security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
@@ -675,24 +681,24 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid([0, 0, 0, 0, 0, 0]),
                         rssi: 0,
-                        timestamp: zx::Time::from_nanos(passive_result_1.timestamp_nanos),
+                        timestamp: zx::Time::from_nanos(sme_result_1.timestamp_nanos),
                         snr_db: 1,
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
-                        observation: types::ScanObservation::Passive,
+                        observation: observation,
                         compatibility: Compatibility::expect_some([
                             SecurityDescriptor::WPA3_PERSONAL,
                         ]),
-                        bss_description: passive_result_1.bss_description.clone(),
+                        bss_description: sme_result_1.bss_description.clone(),
                     },
                     types::Bss {
                         bssid: types::Bssid([7, 8, 9, 10, 11, 12]),
                         rssi: 13,
-                        timestamp: zx::Time::from_nanos(passive_result_3.timestamp_nanos),
+                        timestamp: zx::Time::from_nanos(sme_result_3.timestamp_nanos),
                         snr_db: 3,
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
-                        observation: types::ScanObservation::Passive,
+                        observation: observation,
                         compatibility: None,
-                        bss_description: passive_result_3.bss_description.clone(),
+                        bss_description: sme_result_3.bss_description.clone(),
                     },
                 ],
                 compatibility: types::Compatibility::Supported,
@@ -703,18 +709,18 @@ mod tests {
                 entries: vec![types::Bss {
                     bssid: types::Bssid([1, 2, 3, 4, 5, 6]),
                     rssi: 7,
-                    timestamp: zx::Time::from_nanos(passive_result_2.timestamp_nanos),
+                    timestamp: zx::Time::from_nanos(sme_result_2.timestamp_nanos),
                     snr_db: 2,
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
-                    observation: types::ScanObservation::Passive,
+                    observation: observation,
                     compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-                    bss_description: passive_result_2.bss_description.clone(),
+                    bss_description: sme_result_2.bss_description.clone(),
                 }],
                 compatibility: types::Compatibility::Supported,
             },
         ];
 
-        MockScanData { passive_input_aps, passive_internal_aps }
+        MockScanData { sme_results, internal_results }
     }
 
     fn create_telemetry_sender_and_receiver() -> (TelemetrySender, mpsc::Receiver<TelemetryEvent>) {
@@ -757,8 +763,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data
-        let MockScanData { passive_input_aps: input_aps, passive_internal_aps: _ } =
-            create_scan_ap_data();
+        let MockScanData { sme_results: input_aps, internal_results: _ } =
+            create_scan_ap_data(types::ScanObservation::Passive);
         // Validate the SME received the scan_request and send back mock data
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -807,8 +813,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data
-        let MockScanData { passive_input_aps: input_aps, passive_internal_aps: _ } =
-            create_scan_ap_data();
+        let MockScanData { sme_results: input_aps, internal_results: _ } =
+            create_scan_ap_data(types::ScanObservation::Active);
         // Validate the SME received the scan_request and send back mock data
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
@@ -890,8 +896,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         // Create mock scan data and send it via the SME
-        let MockScanData { passive_input_aps: input_aps, passive_internal_aps: internal_aps } =
-            create_scan_ap_data();
+        let MockScanData { sme_results: input_aps, internal_results: internal_aps } =
+            create_scan_ap_data(types::ScanObservation::Passive);
         assert_variant!(
             exec.run_until_stalled(&mut sme_stream.next()),
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
@@ -964,55 +970,25 @@ mod tests {
     }
 
     /// Verify that saved networks have their hidden network probabilities updated.
-    #[test_case(true)]
-    #[test_case(false)]
+    #[test_case(active_sme_req(vec![], vec![])          ; "active_sme_req, no ssid")]
+    #[test_case(active_sme_req(vec![""], vec![])        ; "active_sme_req, wildcard ssid")]
+    #[test_case(active_sme_req(vec!["", "foo"], vec![]) ; "active_sme_req, wildcard and foo ssid")]
+    #[test_case(active_sme_req(vec!["foo"], vec![])     ; "active_sme_req, foo ssid")]
+    #[test_case(passive_sme_req())]
     #[fuchsia::test(add_test_attr = false)]
-    fn scan_updates_hidden_network_probabilities(passive: bool) {
+    fn scan_updates_hidden_network_probabilities(sme_scan_request: fidl_sme::ScanRequest) {
         let mut exec = fasync::TestExecutor::new();
         let (client, mut sme_stream) = exec.run_singlethreaded(create_iface_manager());
         let saved_networks_manager = Arc::new(FakeSavedNetworksManager::new());
         let (telemetry_sender, _telemetry_receiver) = create_telemetry_sender_and_receiver();
 
-        // Create the passive scan info
-        let sme_scan = if passive { passive_sme_req() } else { active_sme_req(vec![], vec![]) };
-        let MockScanData { passive_input_aps: input_aps, passive_internal_aps: _ } =
-            create_scan_ap_data();
-
-        // Save a network that WILL be seen in the passive scan.
-        let first_ap = wlan_common::scan::ScanResult::try_from(input_aps[0].clone()).unwrap();
-        // If this changes, also change the `security_type` for `seen_in_passive_network` below
-        assert_eq!(
-            first_ap.bss_description.protection(),
-            wlan_common::bss::Protection::Wpa3Personal
-        );
-        let seen_in_passive_network = types::NetworkIdentifier {
-            ssid: first_ap.bss_description.ssid.clone(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        assert!(exec
-            .run_singlethreaded(
-                saved_networks_manager
-                    .store(seen_in_passive_network, Credential::Password(b"randompass".to_vec()))
-            )
-            .expect("failed to store network")
-            .is_none());
-
-        // Save a network that will NOT be seen in the passive scan.
-        let not_seen_net_id = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("not_seen_net_id").unwrap(),
-            security_type: types::SecurityType::Wpa,
-        };
-        assert!(exec
-            .run_singlethreaded(
-                saved_networks_manager
-                    .store(not_seen_net_id.clone(), Credential::Password(b"foobarbaz".to_vec()))
-            )
-            .expect("failed to store network")
-            .is_none());
+        // Create the scan info
+        let MockScanData { sme_results: input_aps, internal_results: scan_results } =
+            create_scan_ap_data(types::ScanObservation::Unknown);
 
         // Issue request to scan.
         let scan_fut = perform_scan(
-            sme_scan.clone(),
+            sme_scan_request.clone(),
             client,
             saved_networks_manager.clone(),
             telemetry_sender,
@@ -1028,7 +1004,7 @@ mod tests {
             Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {
                 req, responder,
             }))) => {
-                assert_eq!(req, sme_scan);
+                assert_eq!(req, sme_scan_request);
                 responder.send(&mut Ok(input_aps.clone())).expect("failed to send scan data");
             }
         );
@@ -1037,19 +1013,36 @@ mod tests {
         // will be pending, otherwise it will be ready.
         let _ = exec.run_until_stalled(&mut scan_fut);
 
-        // Verify that the passive scan results were recorded.
-        assert!(*exec.run_singlethreaded(saved_networks_manager.scan_result_recorded.lock()));
+        // Verify that the scan results were recorded.
+        let target_ssids = match sme_scan_request {
+            fidl_sme::ScanRequest::Passive(_) => vec![],
+            fidl_sme::ScanRequest::Active(ref req) => {
+                req.ssids.iter().map(|s| types::Ssid::from_bytes_unchecked(s.to_vec())).collect()
+            }
+        };
+        let mut scan_results_ids: Vec<types::NetworkIdentifierDetailed> = scan_results
+            .iter()
+            .map(|scan_result| types::NetworkIdentifierDetailed {
+                ssid: scan_result.ssid.clone(),
+                security_type: scan_result.security_type_detailed,
+            })
+            .collect();
+        let mut scan_result_record_guard =
+            exec.run_singlethreaded(saved_networks_manager.scan_result_records.lock());
+        assert_eq!(scan_result_record_guard.len(), 1);
+        assert_eq!(scan_result_record_guard[0].0, target_ssids);
+        scan_result_record_guard[0].1.sort();
+        scan_results_ids.sort();
+        assert_eq!(scan_result_record_guard[0].1, scan_results_ids);
 
         // Note: the decision to active scan is non-deterministic (using the hidden network probabilities),
         // no need to continue and verify the results in this test case.
     }
 
     #[fuchsia::test]
-    fn insert_bss_to_network_bss_map_duplicated_bss() {
-        let mut bss_by_network = HashMap::new();
-
+    fn bss_to_network_map_duplicated_bss() {
         // Create some input data with duplicated BSSID and Network Identifiers
-        let passive_result = fidl_sme::ScanResult {
+        let first_result = fidl_sme::ScanResult {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
@@ -1063,9 +1056,25 @@ mod tests {
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
             ),
         };
+        let second_result = fidl_sme::ScanResult {
+            compatibility: Some(Box::new(fidl_sme::Compatibility {
+                mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
+            })),
+            timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+            bss_description: random_fidl_bss_description!(
+                Wpa3,
+                ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
+                bssid: [1, 2, 3, 4, 5, 6],
+                rssi_dbm: 101,
+                snr_db: 101,
+                channel: types::WlanChan::new(101, types::Cbw::Cbw40),
+            ),
+        };
 
-        let passive_input_aps = vec![
-            passive_result.clone(),
+        let sme_results = vec![
+            first_result.clone(),
+            second_result.clone(),
+            // same bssid as first_result
             fidl_sme::ScanResult {
                 compatibility: Some(Box::new(fidl_sme::Compatibility {
                     mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
@@ -1087,97 +1096,39 @@ mod tests {
             protection: fidl_sme::Protection::Wpa3Personal,
         };
 
-        // We should only see one entry for the duplicated BSSs in the passive scan results
-        let expected_bss = vec![types::Bss {
-            bssid: types::Bssid([0, 0, 0, 0, 0, 0]),
-            rssi: 0,
-            timestamp: zx::Time::from_nanos(passive_result.timestamp_nanos),
-            snr_db: 1,
-            channel: types::WlanChan::new(1, types::Cbw::Cbw20),
-            observation: types::ScanObservation::Passive,
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
-            bss_description: passive_result.bss_description.clone(),
-        }];
-
-        insert_bss_to_network_bss_map(
-            &mut bss_by_network,
-            passive_input_aps
-                .iter()
-                .map(|scan_result| {
-                    scan_result.clone().try_into().expect("Failed to convert ScanResult")
-                })
-                .collect::<Vec<wlan_common::scan::ScanResult>>(),
-            true,
-        );
-        assert_eq!(bss_by_network.len(), 1);
-        assert_eq!(bss_by_network[&expected_id], expected_bss);
-
-        // Create some input data with one duplicate BSSID and one new BSSID
-        let active_result = fidl_sme::ScanResult {
-            compatibility: Some(Box::new(fidl_sme::Compatibility {
-                mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
-            })),
-            timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
-            bss_description: random_fidl_bss_description!(
-                Wpa3,
-                ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
-                bssid: [1, 2, 3, 4, 5, 6],
-                rssi_dbm: 101,
-                snr_db: 101,
-                channel: types::WlanChan::new(101, types::Cbw::Cbw40),
-            ),
-        };
-        let active_input_aps = vec![
-            fidl_sme::ScanResult {
-                compatibility: Some(Box::new(fidl_sme::Compatibility {
-                    mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
-                })),
-                timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
-                bss_description: random_fidl_bss_description!(
-                    Wpa3,
-                    bssid: [0, 0, 0, 0, 0, 0],
-                    ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
-                    rssi_dbm: 100,
-                    snr_db: 100,
-                    channel: types::WlanChan::new(100, types::Cbw::Cbw40),
-                ),
-            },
-            active_result.clone(),
-        ];
-
-        // After the active scan, there should be a second bss included in the results
+        // We should only see one entry for the duplicated BSSs in the scan results, and a second
+        // entry for the unique bss
         let expected_bss = vec![
             types::Bss {
                 bssid: types::Bssid([0, 0, 0, 0, 0, 0]),
                 rssi: 0,
-                timestamp: zx::Time::from_nanos(passive_result.timestamp_nanos),
+                timestamp: zx::Time::from_nanos(first_result.timestamp_nanos),
                 snr_db: 1,
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
-                bss_description: passive_result.bss_description.clone(),
+                bss_description: first_result.bss_description.clone(),
             },
             types::Bss {
                 bssid: types::Bssid([1, 2, 3, 4, 5, 6]),
                 rssi: 101,
-                timestamp: zx::Time::from_nanos(active_result.timestamp_nanos),
+                timestamp: zx::Time::from_nanos(second_result.timestamp_nanos),
                 snr_db: 101,
                 channel: types::WlanChan::new(101, types::Cbw::Cbw40),
-                observation: types::ScanObservation::Active,
+                observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
-                bss_description: active_result.bss_description.clone(),
+                bss_description: second_result.bss_description.clone(),
             },
         ];
 
-        insert_bss_to_network_bss_map(
-            &mut bss_by_network,
-            active_input_aps
+        let bss_by_network = bss_to_network_map(
+            sme_results
                 .iter()
                 .map(|scan_result| {
                     scan_result.clone().try_into().expect("Failed to convert ScanResult")
                 })
                 .collect::<Vec<wlan_common::scan::ScanResult>>(),
-            false,
+            &vec![],
         );
         assert_eq!(bss_by_network.len(), 1);
         assert_eq!(bss_by_network[&expected_id], expected_bss);
@@ -1285,9 +1236,10 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
 
         if retry_succeeds {
-            // Create mock scan data and send it via the SME
-            let MockScanData { passive_input_aps: input_aps, passive_internal_aps: internal_aps } =
-                create_scan_ap_data();
+            // Create mock scan data and send it via the SME. Although it's an active scan, the
+            // scan doesn't target any of these SSIDs, so results should be ScanObservation::Passive
+            let MockScanData { sme_results: input_aps, internal_results: internal_aps } =
+                create_scan_ap_data(types::ScanObservation::Passive);
             assert_variant!(
                 exec.run_until_stalled(&mut sme_stream.next()),
                 Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan {

@@ -34,10 +34,10 @@ impl QueuedRequest {
     fn ssids_match(&self, sme_request: &fidl_sme::ScanRequest) -> bool {
         // An undirected (i.e. passive or wildcard active) scan can fulfill the request if
         // the request has no SSIDs specified, or specifies only the wildcard SSID
-        let undirected_scan_allowable =
+        let undirected_scan_fulfills_request =
             self.ssids.is_empty() || self.ssids.iter().all(|s| *s == *WILDCARD_SSID);
 
-        if undirected_scan_allowable {
+        if undirected_scan_fulfills_request {
             // Can be fulfilled by a passive scan or a wildcard active scan
             match sme_request {
                 fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest {}) => true,

@@ -34,7 +34,10 @@ pub struct FakeSavedNetworksManager {
     connect_results_recorded: Mutex<Vec<ConnectResultRecord>>,
     lookup_compatible_response: Mutex<LookupCompatibleResponse>,
     pub fail_all_stores: bool,
-    pub scan_result_recorded: Arc<Mutex<bool>>,
+    // A type alias for this complex type would be needless indirection, so allow the complex type
+    #[allow(clippy::type_complexity)]
+    pub scan_result_records:
+        Arc<Mutex<Vec<(Vec<client_types::Ssid>, Vec<client_types::NetworkIdentifierDetailed>)>>>,
     pub past_connections_response: PastConnectionList,
 }
 
@@ -76,7 +79,7 @@ impl FakeSavedNetworksManager {
             connect_results_recorded: Mutex::new(vec![]),
             fail_all_stores: false,
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
-            scan_result_recorded: Arc::new(Mutex::new(false)),
+            scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::new(),
         }
     }
@@ -105,7 +108,7 @@ impl FakeSavedNetworksManager {
             connect_results_recorded: Mutex::new(vec![]),
             fail_all_stores: false,
             lookup_compatible_response: Mutex::new(LookupCompatibleResponse::new()),
-            scan_result_recorded: Arc::new(Mutex::new(false)),
+            scan_result_records: Arc::new(Mutex::new(vec![])),
             past_connections_response: PastConnectionList::new(),
         }
     }
@@ -253,11 +256,11 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
 
     async fn record_scan_result(
         &self,
-        _target_ssids: Vec<client_types::Ssid>,
-        _results: Vec<client_types::NetworkIdentifierDetailed>,
+        target_ssids: Vec<client_types::Ssid>,
+        results: Vec<client_types::NetworkIdentifierDetailed>,
     ) {
-        let mut v = self.scan_result_recorded.lock().await;
-        *v = true;
+        let mut records = self.scan_result_records.lock().await;
+        records.push((target_ssids, results));
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
