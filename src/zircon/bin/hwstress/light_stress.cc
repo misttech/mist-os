@@ -17,7 +17,7 @@
 
 namespace hwstress {
 
-constexpr std::string_view kDefaultLightDevicePath = "/dev/class/light/000";
+constexpr std::string_view kDefaultLightFolderPath = "/dev/class/light";
 
 namespace {
 
@@ -101,7 +101,7 @@ zx::result<std::vector<LightInfo>> GetLights(const fuchsia::hardware::light::Lig
 
 bool StressLight(StatusLine* status, const CommandLineArgs& args, zx::duration duration) {
   // Open the light device.
-  zx::result<zx::channel> channel = OpenDeviceChannel(kDefaultLightDevicePath);
+  zx::result<zx::channel> channel = OpenDeviceChannel(kDefaultLightFolderPath);
   if (channel.is_error()) {
     status->Log("Could not open device: %s\n", channel.status_string());
     return false;

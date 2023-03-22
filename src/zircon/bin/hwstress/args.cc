@@ -94,7 +94,7 @@ Attempts to stress hardware components by placing them under high load.
 Subcommands:
   cpu                    Perform a CPU stress test.
   flash                  Perform a flash stress test.
-  light                  Perform a device light / LED stress test.
+  light                  Perform a device light / LED stress test using the first available device.
   memory                 Perform a RAM stress test.
 
 Global options:
