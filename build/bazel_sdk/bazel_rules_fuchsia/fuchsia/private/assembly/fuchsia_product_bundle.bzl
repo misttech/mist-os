@@ -23,6 +23,7 @@ def _scrutiny_validation(
     deps = []
     ffx_invocation = [
         ffx_tool.path,
+        "--isolate-dir $FFX_ISOLATE_DIR",
         "scrutiny",
         "verify",
     ]
@@ -95,6 +96,7 @@ def _verify_bootfs_filelist(
         zbi_bootfs_filelist_goldens,
         zbi_bootfs_packages_goldens):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_bootfs.stamp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_bootfs.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -121,7 +123,8 @@ def _verify_bootfs_filelist(
     inputs = [ffx_tool, pb_out_dir] + zbi_bootfs_filelist_goldens + zbi_bootfs_packages_goldens
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file],
+        outputs = [stamp_file, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Bootfs file list for %s" % ctx.label.name,
     )
@@ -134,6 +137,7 @@ def _verify_kernel_cmdline(
         pb_out_dir,
         zbi_kernel_cmdline_goldens):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_kernel.stamp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_kernel.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -155,7 +159,8 @@ def _verify_kernel_cmdline(
     inputs = [ffx_tool, pb_out_dir] + zbi_kernel_cmdline_goldens
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file],
+        outputs = [stamp_file, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Kernel Cmdline for %s" % ctx.label.name,
     )
@@ -169,6 +174,7 @@ def _verify_route_sources(
         routes_config_golden):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_route.stamp")
     tmp_dir = ctx.actions.declare_directory(ctx.label.name + "_route.tmp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_route.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -189,7 +195,8 @@ def _verify_route_sources(
     inputs = [ffx_tool, pb_out_dir, routes_config_golden]
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file, tmp_dir],
+        outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Route sources for %s" % ctx.label.name,
     )
@@ -203,6 +210,7 @@ def _verify_component_resolver_allowlist(
         component_resolver_allowlist):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_component_resolver.stamp")
     tmp_dir = ctx.actions.declare_directory(ctx.label.name + "_component_resolver.tmp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_component_resolver.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -223,7 +231,8 @@ def _verify_component_resolver_allowlist(
     inputs = [ffx_tool, pb_out_dir, component_resolver_allowlist]
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file, tmp_dir],
+        outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Component Resolver for %s" % ctx.label.name,
     )
@@ -238,6 +247,7 @@ def _verify_routes(
         component_tree_config):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_routes.stamp")
     tmp_dir = ctx.actions.declare_directory(ctx.label.name + "_routes.tmp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_routes.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -266,7 +276,8 @@ def _verify_routes(
     inputs = [ffx_tool, pb_out_dir, component_tree_config] + allow_lists
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file, tmp_dir],
+        outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Routes for %s" % ctx.label.name,
     )
@@ -280,6 +291,7 @@ def _verify_base_packages(
         base_packages):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_static_pkgs.stamp")
     tmp_dir = ctx.actions.declare_directory(ctx.label.name + "_static_pkgs.tmp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_static_pkgs.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -300,7 +312,8 @@ def _verify_base_packages(
     inputs = [ffx_tool, pb_out_dir, base_packages]
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file, tmp_dir],
+        outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify Static pkgs for %s" % ctx.label.name,
     )
@@ -314,6 +327,7 @@ def _verify_structured_config(
         structured_config_policy):
     stamp_file = ctx.actions.declare_file(ctx.label.name + "_structured_config.stamp")
     tmp_dir = ctx.actions.declare_directory(ctx.label.name + "_structured_config.tmp")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_structured_config.ffx")
     _ffx_invocation = []
     _ffx_invocation.extend(ffx_invocation)
     _ffx_invocation += [
@@ -334,7 +348,8 @@ def _verify_structured_config(
     inputs = [ffx_tool, pb_out_dir, structured_config_policy]
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [stamp_file, tmp_dir],
+        outputs = [stamp_file, tmp_dir, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
         command = "\n".join(script_lines),
         progress_message = "Verify structured config for %s" % ctx.label.name,
     )
@@ -343,8 +358,10 @@ def _verify_structured_config(
 def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
     structured_config = ctx.actions.declare_file(ctx.label.name + "_structured_config")
     depfile = ctx.actions.declare_file(ctx.label.name + "_depfile")
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_extract_structured_config.ffx")
     ffx_invocation = [
         ffx_tool.path,
+        "--isolate-dir " + ffx_isolate_dir.path,
         "scrutiny",
         "extract",
         "structured-config",
@@ -367,7 +384,7 @@ def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
     inputs = [ffx_tool, pb_out_dir]
     ctx.actions.run_shell(
         inputs = inputs,
-        outputs = [structured_config, depfile],
+        outputs = [structured_config, depfile, ffx_isolate_dir],
         command = "\n".join(script_lines),
         progress_message = "Extract structured config for %s" % ctx.label.name,
     )
