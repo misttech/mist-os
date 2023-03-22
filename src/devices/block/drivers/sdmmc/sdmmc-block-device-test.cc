@@ -53,6 +53,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
 
     sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) -> void {
       *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+      out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
       out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
       out_data[MMC_EXT_CSD_EXT_CSD_REV] = 6;
       out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
@@ -240,6 +241,20 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
   std::vector<uint8_t> test_block_;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_rpmb::Rpmb>> binding_;
 };
+
+TEST_F(SdmmcBlockDeviceTest, ProbeMmcFailsIfCacheEnabled) {
+  sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
+    out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
+    out_data[MMC_EXT_CSD_EXT_CSD_REV] = 6;
+    out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
+    out_data[MMC_EXT_CSD_BOOT_SIZE_MULT] = 0x10;
+    out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
+  });
+
+  EXPECT_EQ(dut_->ProbeMmc(), ZX_ERR_BAD_STATE);
+}
 
 TEST_F(SdmmcBlockDeviceTest, BlockImplQuery) {
   AddDevice();
@@ -646,6 +661,7 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
 
 TEST_F(SdmmcBlockDeviceTest, DdkLifecycle) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
     out_data[MMC_EXT_CSD_BOOT_SIZE_MULT] = 0;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
@@ -659,6 +675,7 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycle) {
 
 TEST_F(SdmmcBlockDeviceTest, DdkLifecycleBootPartitionsExistButNotUsed) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 2;
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
     out_data[MMC_EXT_CSD_BOOT_SIZE_MULT] = 1;
@@ -673,6 +690,7 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycleBootPartitionsExistButNotUsed) {
 
 TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootPartitions) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
     out_data[MMC_EXT_CSD_BOOT_SIZE_MULT] = 1;
@@ -687,6 +705,7 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootPartitions) {
 
 TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootAndRpmbPartitions) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_RPMB_SIZE_MULT] = 1;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
@@ -821,6 +840,7 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnSuspend) {
 
 TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_DEVICE_TYPE] = 1 << 4;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 1;
   });
@@ -841,6 +861,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
 
 TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_DEVICE_TYPE] = 1 << 4;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 1;
   });
@@ -1047,6 +1068,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
 
 TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_DEVICE_TYPE] = 0b0101'0110;  // Card supports HS200/400, HS/DDR.
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
@@ -1066,6 +1088,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
 
 TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_DEVICE_TYPE] = 0b0101'0110;  // Card supports HS200/400, HS/DDR.
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
@@ -1084,6 +1107,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
 
 TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_DEVICE_TYPE] = 0b0101'0110;  // Card supports HS200/400, HS/DDR.
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
@@ -1156,6 +1180,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeSd) {
 
 TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_RPMB_SIZE_MULT] = 0x74;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_REL_WR_SEC_C] = 1;
@@ -1265,6 +1290,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
 
 TEST_F(SdmmcBlockDeviceTest, RpmbRequestLimit) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_RPMB_SIZE_MULT] = 0x74;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_REL_WR_SEC_C] = 1;
@@ -1404,6 +1430,7 @@ void SdmmcBlockDeviceTest::QueueRpmbRequests() {
 TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_RPMB_SIZE_MULT] = 0x10;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
@@ -1462,6 +1489,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
 TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_RPMB_SIZE_MULT] = 0x10;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_PARTITION_SWITCH_TIME] = 0;
@@ -1523,6 +1551,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
 TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_RPMB_SIZE_MULT] = 0x74;
     out_data[MMC_EXT_CSD_PARTITION_CONFIG] = 0xa8;
     out_data[MMC_EXT_CSD_REL_WR_SEC_C] = 1;
@@ -1557,6 +1586,11 @@ TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
 TEST_F(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
+    out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
+    out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
+    out_data[MMC_EXT_CSD_CACHE_SIZE_251] = 0x34;
+    out_data[MMC_EXT_CSD_CACHE_SIZE_MSB] = 0x12;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A] = 3;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B] = 7;
   });
@@ -1594,6 +1628,10 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
       root->node().get_property<inspect::UintPropertyValue>("max_lifetime_used");
   ASSERT_NOT_NULL(max_lifetime);
   EXPECT_EQ(max_lifetime->value(), 7);
+
+  const auto* cache_size = root->node().get_property<inspect::UintPropertyValue>("cache_size_bits");
+  ASSERT_NOT_NULL(cache_size);
+  EXPECT_EQ(cache_size->value(), 1024 * 0x12345678ull);
 
   // IO error count should be a successful block op.
   std::optional<block::Operation<OperationContext>> op1;
@@ -1749,6 +1787,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
 TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    out_data[MMC_EXT_CSD_CACHE_CTRL] = 0;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_A] = 0xe;
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B] = 6;
   });

@@ -138,6 +138,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   inspect::UintProperty type_a_lifetime_used_;  // Set once by the init thread.
   inspect::UintProperty type_b_lifetime_used_;  // Set once by the init thread.
   inspect::UintProperty max_lifetime_used_;     // Set once by the init thread.
+  inspect::UintProperty cache_size_bits_;       // Set once by the init thread.
 };
 
 }  // namespace sdmmc
