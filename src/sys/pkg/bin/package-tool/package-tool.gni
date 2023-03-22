@@ -288,3 +288,77 @@ template("package_tool_repository_publish") {
     args += [ rebase_path(_output_repository_dir, root_build_dir) ]
   }
 }
+
+# Generate a package archive in the format produced by `ffx package archive create'.
+#
+# The archive is generated at $target_out_dir/$package_name where package_name
+# is `get_label_info($package, "name")`
+#
+# Parameters
+#
+#   manifest (required)
+#     [label] A generate_manifest() target defined earlier in the same file.
+#     This provides the contents for the package.
+#
+#   package (required)
+#     [label] A pm_build() target defined earlier in the same file.
+#
+#   archive_name (optional)
+#     [string] The name of the far file to output.
+template("package_tool_archive_create") {
+  assert(defined(invoker.package), "package is required")
+  assert(defined(invoker.manifest), "manifest is required")
+
+  package_name = get_label_info(invoker.package, "name")
+  pkg_out_dir =
+      get_label_info(invoker.package, "target_out_dir") + "/${package_name}"
+  pkg_manifest_outputs = get_target_outputs(invoker.manifest)
+  pkg_manifest_file = pkg_manifest_outputs[0]
+
+  if (defined(invoker.archive_name)) {
+    archive_name = invoker.archive_name
+  } else {
+    archive_name = package_name
+  }
+  archive_out = "${target_out_dir}/${archive_name}.far"
+  archive_depfile = "${archive_out}.d"
+
+  compiled_action(target_name) {
+    tool = "//src/sys/pkg/bin/package-tool"
+    tool_output_name = "package-tool"
+    forward_variables_from(invoker,
+                           [
+                             "metadata",
+                             "public_deps",
+                             "testonly",
+                             "visibility",
+                             "no_output_dir_leaks",
+                           ])
+
+    deps = [
+      invoker.manifest,
+      invoker.package,
+    ]
+    depfile = archive_depfile
+    inputs = [
+      pkg_manifest_file,
+
+      # The output package manifest from pm_build(). This is a hack due to
+      # pm archive's lack of support for depfiles, and ensures that this
+      # target is rebuilt if any of the files in the dependent package change
+      # since that would modify package_manifest.json.
+      "${pkg_out_dir}/package_manifest.json",
+    ]
+    outputs = [ archive_out ]
+    args = [
+      "package",
+      "archive",
+      "create",
+      rebase_path(pkg_out_dir, root_build_dir) + "/package_manifest.json",
+      "--depfile",
+      rebase_path(archive_depfile, root_build_dir),
+      "-o",
+      rebase_path(archive_out, root_build_dir),
+    ]
+  }
+}
