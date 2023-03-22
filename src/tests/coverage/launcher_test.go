@@ -16,7 +16,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"go.fuchsia.dev/fuchsia/tools/botanist/constants"
@@ -24,7 +23,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/debug/covargs/api/llvm"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
-	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testrunner"
@@ -207,25 +205,10 @@ func runCoverageTest(t *testing.T, testOutDir string) string {
 		t.Fatalf("failed to record data sinks: %s", err)
 	}
 
-	// If running on target, copy profiles to the host. There might be a delay between when
-	// the test finishes and data sinks including profiles are available on the target to copy.
-	// When that's the case, EnsureSinks() does not return an error, and it logs the message.
-	// Therefore, check whether v2 sinks directory exists to ensure copying is successful.
-	// When there is a delay, retry.
-	// TODO(fxbug.dev/77634): When we start treating profiles as artifacts, remove retry.
 	if !*host {
 		var sinks []runtests.DataSinkReference
-		err = retry.Retry(ctx, retry.NewConstantBackoff(5*time.Second), func() error {
-			if err := tester.EnsureSinks(ctx, sinks, outputs); err != nil {
-				return err
-			}
-			v2SinksDir := filepath.Join(testOutDir, "v2")
-			_, err := os.ReadDir(v2SinksDir)
-			if err != nil {
-				return err
-			}
-			return nil
-		}, nil)
+		// Copy profiles to the host.
+		err = tester.EnsureSinks(ctx, sinks, outputs)
 		if err != nil {
 			t.Fatalf("failed to collect data sinks: %s", err)
 		}
