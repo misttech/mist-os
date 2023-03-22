@@ -155,16 +155,29 @@ template("gigaboot_esp") {
   esp(target_name) {
     output_name = target_name
 
-    # In esp template, `gigaboot_target` and `gigaboot_bin` is only used when target_cpu is x64.
-    if (target_cpu == "x64") {
+    if (use_gigaboot) {
       gigaboot_target = ":$_efi_target($efi_toolchain)"
       gigaboot_bin = get_label_info("$gigaboot_target", "root_out_dir") + "/" +
                      get_label_info(gigaboot_target, "name") + ".efi"
+      metadata = {
+        images = [
+          {
+            label = get_label_info(":$target_name", "label_with_toolchain")
+            archive = true
+            bootserver_pave = [ "--bootloader" ]
+            bootserver_pave_zedboot = [ "--bootloader" ]
+            fastboot_flash = [ "fuchsia-esp" ]
+            name = "${target_name}.esp"
+            path = "${target_name}.esp.blk"
+            type = "blk"
+          },
+        ]
+      }
     }
   }
 }
 
-gigaboot_esp("eng-esp") {
+gigaboot_esp("fuchsia") {
   permanent_attributes_file = gigaboot_eng_permanent_attributes
 }
 

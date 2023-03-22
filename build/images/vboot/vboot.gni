@@ -4,6 +4,7 @@
 
 import("//build/compiled_action.gni")
 import("//build/config/clang/clang.gni")
+import("//build/images/args.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
 
 declare_args() {
@@ -195,14 +196,14 @@ template("esp") {
       inputs += [ invoker.cmdline ]
     }
 
-    if (!defined(deps)) {
-      deps = []
+    if (!defined(public_deps)) {
+      public_deps = []
     }
 
-    if (target_cpu == "x64") {
-      gigaboot_target = "//src/firmware/gigaboot:bootloader(//src/firmware/gigaboot:efi_$target_cpu)"
-      gigaboot_bin =
-          get_label_info(gigaboot_target, "root_out_dir") + "/bootx64.efi"
+    if (use_gigaboot) {
+      gigaboot_target = "//src/firmware/gigaboot/cpp:fuchsia(//zircon/kernel/phys/efi:kernel.efi_${target_cpu})"
+      gigaboot_bin = get_label_info(gigaboot_target, "root_out_dir") + "/" +
+                     "fuchsia-efi.efi"
 
       if (defined(invoker.gigaboot_target)) {
         gigaboot_target = invoker.gigaboot_target
@@ -217,7 +218,7 @@ template("esp") {
         rebase_path(gigaboot_bin, root_build_dir),
       ]
       inputs += [ gigaboot_bin ]
-      deps += [ gigaboot_target ]
+      public_deps += [ gigaboot_target ]
     }
   }
 }

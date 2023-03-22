@@ -453,7 +453,7 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
 
     if args.bootloader.is_none() {
         if let Some(build_dir) = &args.fuchsia_build_dir {
-            args.bootloader = Some(build_dir.join("efi_x64").join("bootx64.efi"));
+            args.bootloader = Some(build_dir.join("kernel.efi_x64").join("bootx64.efi"));
         } else {
             bail!("Missing --bootloader");
         }

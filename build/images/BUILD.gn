@@ -177,17 +177,17 @@ compiled_action("uefi-disk") {
 
   deps = [
     "zedboot",
-    "//src/firmware/gigaboot:bootloader(//src/firmware/gigaboot:efi_$target_cpu)",
+    "//src/firmware/gigaboot/cpp:fuchsia",
     labels.images,
     mkfs_label,
   ]
   testonly = true
   tool = "//tools/make-fuchsia-vol"
   inputs = [ mkfs_bin ]
-  bootloader_path = "efi_${target_cpu}/boot${target_cpu}.efi"
-  if (target_cpu == "arm64") {
-    bootloader_path = "efi_${target_cpu}/bootaa64.efi"
-  }
+
+  bootloader_path =
+      rebase_path("${root_build_dir}/kernel.efi_${target_cpu}/fuchsia-efi.efi")
+
   args = [
     "--fuchsia-build-dir",
     rebase_path("$root_build_dir"),

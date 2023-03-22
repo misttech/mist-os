@@ -23,28 +23,8 @@ flash_image_deps = []
 firmware_info = []
 
 # EFI ESP images.
-esp("esp") {
-  output_name = "fuchsia"
-  testonly = true
-  if (always_zedboot) {
-    cmdline = "zedboot/efi_cmdline.txt"
-  } else {
-    cmdline = "efi_local_cmdline.txt"
-  }
-  metadata = {
-    images = [
-      {
-        label = get_label_info(":$target_name", "label_with_toolchain")
-        archive = true
-        bootserver_pave = [ "--bootloader" ]
-        bootserver_pave_zedboot = [ "--bootloader" ]
-        fastboot_flash = [ "fuchsia-esp" ]
-        name = "fuchsia.esp"
-        path = "fuchsia.esp.blk"
-        type = "blk"
-      },
-    ]
-  }
+group("esp") {
+  public_deps = [ "//src/firmware/gigaboot/cpp:fuchsia" ]
 }
 
 bazel_input_resource("esp.bazel_input") {
@@ -57,7 +37,7 @@ bazel_input_resource("esp.bazel_input") {
 if (use_gigaboot) {
   flash_image_deps += [ ":esp" ]
 
-  esp_outputs = get_target_outputs(":esp")
+  esp_outputs = [ "${root_build_dir}/kernel.efi_${target_cpu}/fuchsia.esp.blk" ]
 
   firmware_info += [
     {

@@ -64,36 +64,7 @@ if (is_efi_toolchain) {
   # extra dependencies for it.
   group("efi_config_deps") {
   }
-
-  # This is the Gigaboot bootloader binary.
-  executable("bootloader") {
-    output_dir = root_out_dir
-    if (current_cpu == "arm64") {
-      output_name = "bootaa64"
-    } else {
-      output_name = "boot${current_cpu}"
-    }
-    output_extension = "efi"
-
-    deps = [
-      "lib",
-      "src",
-    ]
-
-    ldflags = [
-      "-Wl,/subsystem:efi_application",
-      "-Wl,/entry:efi_main",
-
-      # These only really affect instrumented builds but are always harmless.
-      "-noprofilelib",
-      "-Wl,/nodefaultlib",
-    ]
-  }
 } else {
-  group("bootloader") {
-    public_deps = [ ":bootloader(//src/firmware/gigaboot:efi_${current_cpu})" ]
-  }
-
   # Gigaboot would be difficult to test on-device, so we run host unittests
   # instead, stubbing out the necessary functions.
   group("tests") {
