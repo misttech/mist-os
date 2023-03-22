@@ -37,7 +37,7 @@ def main():
     run_git_cmd(['remote', 'add', 'source', git_url])
     run_git_cmd(['remote', 'add', 'bundle', os.path.abspath(args.git_bundle)])
     run_git_cmd(
-        ['fetch', '--quiet', '--tags', '--shallow-exclude=JIRI_HEAD', 'source'])
+        ['fetch', '--quiet', '--tags', 'source'])
     run_git_cmd(['fetch', '--quiet', 'bundle'])
     run_git_cmd(['checkout', '-b', 'main', 'bundle/' + args.git_bundle_head])
 
