@@ -1576,13 +1576,15 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         // start at 90%, meaning this has a 0.1^6 chance of flaking (one in a million).
         for _i in 1..=7 {
             // First, pop any pending timers to make sure the idle interface scanning mechanism
-            // activates now. This is only really necessary after the first scan, but it's harmless
-            // to do it every time.
-            assert_variant!(
-                exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
-                Poll::Pending
-            );
-            let _woken_timer = exec.wake_next_timer();
+            // activates now. Do it twice in case one catches the timeout for sending scan results
+            // to the location sensor, and then an extra time for good measure.
+            for _j in 1..=3 {
+                assert_variant!(
+                    exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+                    Poll::Pending
+                );
+                let _woken_timer = exec.wake_next_timer();
+            }
 
             let next_sme_stream_req = run_while(
                 &mut exec,
