@@ -24,6 +24,12 @@ class MockRegisters : public fidl::WireServer<fuchsia_hardware_registers::Device
     fidl::BindServer(dispatcher_, std::move(server_end), this);
   }
 
+  fuchsia_hardware_registers::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_registers::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
+    });
+  }
+
   template <typename T>
   void ExpectRead(uint64_t offset, T mask, T value) {
     static_assert(std::is_same_v<T, uint8_t> || std::is_same_v<T, uint16_t> ||
@@ -136,6 +142,7 @@ class MockRegisters : public fidl::WireServer<fuchsia_hardware_registers::Device
   }
 
   async_dispatcher_t* dispatcher_;
+  fidl::ServerBindingGroup<fuchsia_hardware_registers::Device> binding_group_;
 
   std::map<uint64_t, std::queue<std::pair<uint8_t, uint8_t>>> expect_read8;
   std::map<uint64_t, std::queue<std::pair<uint16_t, uint16_t>>> expect_read16;

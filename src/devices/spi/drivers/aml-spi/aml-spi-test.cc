@@ -31,6 +31,7 @@ namespace spi {
 
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
+  mock_registers::MockRegisters registers{async_get_default_dispatcher()};
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -38,8 +39,6 @@ class AmlSpiTest : public zxtest::Test {
  public:
   AmlSpiTest()
       : root_(MockDevice::FakeRootParent()),
-        loop_(&kAsyncLoopConfigNeverAttachToThread),
-        registers_(loop_.dispatcher()),
         mmio_region_(mmio_registers_, sizeof(uint32_t),
                      sizeof(uint32_t) * std::size(mmio_registers_)) {}
 
@@ -53,14 +52,9 @@ class AmlSpiTest : public zxtest::Test {
 
   virtual void SetUpBti(fake_pdev::FakePDevFidl::Config& config) {}
 
-  virtual void SetUpFragments() {
-    root_->AddProtocol(ZX_PROTOCOL_REGISTERS, registers_.proto()->ops, registers_.proto()->ctx,
-                       "reset");
-  }
+  virtual bool SetupResetRegister() { return true; }
 
   void SetUp() override {
-    SetUpFragments();
-
     fake_pdev::FakePDevFidl::Config config;
     config.device_info = pdev_device_info_t{
         .mmio_count = 1,
@@ -75,19 +69,30 @@ class AmlSpiTest : public zxtest::Test {
     SetUpInterrupt(config);
     SetUpBti(config);
 
-    zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(outgoing_endpoints);
+    zx::result pdev_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(pdev_endpoints);
+    zx::result registers_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(registers_endpoints);
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
-                           IncomingNamespace* infra) mutable {
-      infra->pdev_server.SetConfig(std::move(config));
-      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          infra->pdev_server.GetInstanceHandler()));
-      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    incoming_.SyncCall([config = std::move(config), pdev_server = std::move(pdev_endpoints->server),
+                        registers_server = std::move(registers_endpoints->server)](
+                           IncomingNamespace* incoming) mutable {
+      incoming->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          incoming->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
+          incoming->registers.GetInstanceHandler()));
+      ASSERT_OK(incoming->outgoing.Serve(std::move(pdev_server)));
+      ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
     });
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
-                          std::move(outgoing_endpoints->client), "pdev");
+                          std::move(pdev_endpoints->client), "pdev");
+
+    if (SetupResetRegister()) {
+      root_->AddFidlService(fuchsia_hardware_registers::Service::Name,
+                            std::move(registers_endpoints->client), "reset");
+    }
 
     root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-2");
     root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-3");
@@ -95,8 +100,10 @@ class AmlSpiTest : public zxtest::Test {
 
     root_->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kSpiConfig, sizeof(kSpiConfig));
 
-    EXPECT_OK(loop_.StartThread("aml-spi-test-registers-thread"));
-    registers_.fidl_service()->ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
+    incoming_.SyncCall([](IncomingNamespace* incoming) {
+      incoming->registers.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
+    });
+    ASSERT_NO_FATAL_FAILURE();
 
     // Set the transfer complete bit so the driver doesn't get stuck waiting on the interrupt.
     mmio_region_[AML_SPI_STATREG].SetReadCallback(
@@ -107,12 +114,16 @@ class AmlSpiTest : public zxtest::Test {
   ddk::MockGpio& gpio() { return gpio_; }
   ddk_fake::FakeMmioRegRegion& mmio() { return mmio_region_; }
   bool ControllerReset() {
-    zx_status_t status = registers_.fidl_service()->VerifyAll();
-    if (status == ZX_OK) {
-      // Always keep a single expectation in the queue, that way we can verify when the controller
-      // is not reset.
-      registers_.fidl_service()->ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
-    }
+    zx_status_t status;
+    incoming_.SyncCall([&status](IncomingNamespace* incoming) {
+      status = incoming->registers.VerifyAll();
+      if (status == ZX_OK) {
+        // Always keep a single expectation in the queue, that way we can verify when the controller
+        // is not reset.
+        incoming->registers.ExpectWrite<uint32_t>(0x1c, 1 << 1, 1 << 1);
+      }
+    });
+
     return status == ZX_OK;
   }
 
@@ -128,8 +139,6 @@ class AmlSpiTest : public zxtest::Test {
   };
 
   std::shared_ptr<MockDevice> root_;
-  async::Loop loop_;
-  mock_registers::MockRegistersDevice registers_;
   zx::vmo mmio_;
   fzl::VmoMapper mmio_mapper_;
   ddk::MockGpio gpio_;
@@ -1001,7 +1010,7 @@ TEST_F(AmlSpiTest, Shutdown) {
 
 class AmlSpiNoResetFragmentTest : public AmlSpiTest {
  public:
-  virtual void SetUpFragments() {}
+  bool SetupResetRegister() override { return false; }
 };
 
 TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {

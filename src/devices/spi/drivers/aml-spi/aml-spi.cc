@@ -5,7 +5,6 @@
 #include "aml-spi.h"
 
 #include <endian.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/spiimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -658,19 +657,13 @@ zx_status_t AmlSpi::Create(void* ctx, zx_device_t* device) {
     return ZX_ERR_INVALID_ARGS;
   }
 
+  zx::result reset_register_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(device, "reset");
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_fidl_client;
-  ddk::RegistersProtocolClient reset(device, "reset");
-  if (reset.is_valid()) {
-    zx::channel reset_server;
-    fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_client;
-    status = zx::channel::create(0, &reset_server, &reset_client.channel());
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to create reset register channel: %d", status);
-      return status;
-    }
-
-    reset.Connect(std::move(reset_server));
-    reset_fidl_client = fidl::WireSyncClient(std::move(reset_client));
+  if (reset_register_client.is_ok() && reset_register_client.value().is_valid()) {
+    reset_fidl_client.Bind(std::move(reset_register_client.value()));
+  } else {
+    zxlogf(WARNING, "Did not bind the reset register client.");
   }
 
   zx::interrupt interrupt;
