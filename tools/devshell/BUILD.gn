@@ -18,7 +18,7 @@ if (!is_host) {
   # available and get automatically rebuilt by every `fx build`.
   group("fx") {
     deps = [
-      "//src/developer/ffx:host",
+      "//src/developer/ffx:ffx_tool",
       "//src/sys/pkg/bin/pm:host",
       "//third_party/openssh-portable/fuchsia/developer-keys:ssh_config($default_toolchain)",
       "//tools/bootserver_old:host",

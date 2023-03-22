@@ -7,8 +7,6 @@ import("//src/developer/ffx/config.gni")
 assert(is_host)
 
 group("tools") {
-  testonly = true
-
   public_deps = [ "echo" ]
 
   # Any plugins that can be built in dual mode should be listed here, and that

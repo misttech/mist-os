@@ -21,7 +21,6 @@ group("ffx") {
     ":ffx_tool",
     ":tests",
     "lib($host_toolchain)",
-    "tools($host_toolchain)",
   ]
 }
 
@@ -182,6 +181,7 @@ group("ffx_tool") {
   deps = [
     ":ffx_bin($host_toolchain)",
     ":host",
+    "tools($host_toolchain)",
   ]
 }
 
