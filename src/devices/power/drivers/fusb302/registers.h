@@ -63,34 +63,6 @@
 //   primary mask bit that suppresses all interrupts; interrupt signals are
 //   propagated through masks to the INT_N pin
 
-#define DEVICE_ID_ADDR 0x01
-#define SWITCHES0_ADDR 0x02
-#define SWITCHES1_ADDR 0x03
-#define MEASURE_ADDR 0x04
-#define SLICE_ADDR 0x05
-#define CONTROL0_ADDR 0x06
-#define CONTROL1_ADDR 0x07
-#define CONTROL2_ADDR 0x08
-#define CONTROL3_ADDR 0x09
-#define MASK_ADDR 0x0A
-#define POWER_ADDR 0x0B
-#define RESET_ADDR 0x0C
-#define OCP_REG_ADDR 0x0D
-#define MASK_A_ADDR 0x0E
-#define MASK_B_ADDR 0x0F
-#define CONTROL4_ADDR 0x10
-#define STATUS0_A_ADDR 0x3C
-#define STATUS1_A_ADDR 0x3D
-#define INTERRUPT_A_ADDR 0x3E
-#define INTERRUPT_B_ADDR 0x3F
-#define STATUS0_ADDR 0x40
-#define STATUS1_ADDR 0x41
-#define INTERRUPT_ADDR 0x42
-#define FIFOS_ADDR 0x43
-
-constexpr float kVbusMeasureVoltageStep = 0.42f;
-constexpr float kCcMeasureVoltageStep = 0.042f;
-
 namespace fusb302 {
 
 enum Polarity : bool {
