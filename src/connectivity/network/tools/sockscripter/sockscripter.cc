@@ -756,11 +756,14 @@ bool SockScripter::PacketBind(char* arg) {
     return false;
   }
 
-  unsigned int if_index = api_->if_nametoindex(ifname_str.c_str());
-  if (!if_index) {
-    LOG(ERROR) << "Error-if_nametoindex(" << ifname_str << ") failed -"
-               << "[" << errno << "]" << strerror(errno);
-    return false;
+  unsigned int if_index = 0;
+  if (!ifname_str.empty()) {
+    if_index = api_->if_nametoindex(ifname_str.c_str());
+    if (!if_index) {
+      LOG(ERROR) << "Error-if_nametoindex(" << ifname_str << ") failed -"
+                 << "[" << errno << "]" << strerror(errno);
+      return false;
+    }
   }
 
   const struct sockaddr_ll sll = {

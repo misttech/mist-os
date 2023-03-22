@@ -489,6 +489,30 @@ TEST(CommandLine, PacketBind) {
       .WillOnce(testing::Return(0));
   EXPECT_EQ(test.RunCommandLine("packet packet-bind 2048:myinterfacename recvfrom"), 0);
 }
+
+TEST(CommandLine, PacketBindNoInterface) {
+  constexpr uint16_t kEthProtocol = 2048;
+  testing::StrictMock<TestApi> test;
+  testing::InSequence s;
+  EXPECT_CALL(test, socket(AF_PACKET, SOCK_DGRAM, 0)).WillOnce(testing::Return(kSockFd));
+  EXPECT_CALL(test, bind(kSockFd, testing::_, testing::_))
+      .WillOnce([](testing::Unused, const struct sockaddr* addr, socklen_t addrlen) {
+        const struct sockaddr_ll expected_addr = {
+            .sll_family = AF_PACKET,
+            .sll_protocol = htons(kEthProtocol),
+            .sll_ifindex = 0,
+        };
+        EXPECT_GE(addrlen, sizeof(expected_addr));
+        const auto& addr_ll = *reinterpret_cast<const struct sockaddr_ll*>(addr);
+        EXPECT_EQ(addr_ll.sll_family, expected_addr.sll_family);
+        EXPECT_EQ(addr_ll.sll_protocol, expected_addr.sll_protocol);
+        EXPECT_EQ(addr_ll.sll_ifindex, expected_addr.sll_ifindex);
+        return 0;
+      });
+  EXPECT_CALL(test, recvfrom(kSockFd, testing::_, testing::_, testing::_, testing::_, testing::_))
+      .WillOnce(testing::Return(0));
+  EXPECT_EQ(test.RunCommandLine("packet packet-bind 2048: recvfrom"), 0);
+}
 #endif
 
 struct SockOptParam {
