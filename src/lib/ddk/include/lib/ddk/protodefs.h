@@ -21,7 +21,7 @@
 #define PF_NOPUB 1
 #endif
 DDK_PROTOCOL_DEF(BLOCK,                   1,    "block", 0)
-DDK_PROTOCOL_DEF(BLOCK_IMPL,              2,    "block-impl", 0)
+DDK_PROTOCOL_DEF(BLOCK_IMPL,              2,    "block-impl", PF_NOPUB)
 DDK_PROTOCOL_DEF(BLOCK_PARTITION,         3,    "block-partition", 0)
 DDK_PROTOCOL_DEF(BLOCK_VOLUME,            4,    "block-volume", 0)
 DDK_PROTOCOL_DEF(CODEC,                   6,    "codec", 0)
