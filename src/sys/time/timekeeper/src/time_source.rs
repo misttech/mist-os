@@ -15,7 +15,7 @@ use {
     fuchsia_zircon as zx,
     futures::{stream::Stream, FutureExt, TryFutureExt},
     std::{fmt::Debug, sync::Arc},
-    tracing::info,
+    tracing::debug,
 };
 
 const TIMESOURCE_COLLECTION_NAME: &str = "timesource";
@@ -141,7 +141,7 @@ impl TimeSourceLauncher {
 
     /// Launches the timesource.
     async fn launch(&self) -> Result<DirectoryProxy, Error> {
-        info!("Launching TimeSource at {}", self.component_url);
+        debug!("Launching TimeSource at {}", self.component_url);
         let realm = client::connect_to_protocol::<RealmMarker>()
             .context("failed to connect to fuchsia.component.Realm")?;
         self.ensure_timesource_destroyed(&realm).await.or_else(|e| match e {
@@ -183,7 +183,7 @@ impl TimeSourceLauncher {
         &self,
         realm: &RealmProxy,
     ) -> Result<(), DestroyChildError> {
-        info!("Destroying TimeSource at {}", self.component_url);
+        debug!("Destroying TimeSource at {}", self.component_url);
         // Destroy the previously launched timesource.
         let mut child_ref = ChildRef {
             name: self.name.clone(),

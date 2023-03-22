@@ -253,14 +253,16 @@ impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
                 time_source,
             }),
             TimeSource::Pull(time_source) => TimeManager::Pull(PullSourceManager {
+                role,
                 backstop,
                 delays_enabled: true,
+                monotonic: KernelMonotonicProvider(),
+                time_source,
                 diagnostics,
                 last_sample_request_time: None,
-                monotonic: KernelMonotonicProvider(),
                 received_sample: false,
-                role,
-                time_source,
+                first_time_delay_logged: false,
+                time_sample_delay_logged_count: 0,
             }),
         };
         TimeSourceManager { manager }
@@ -335,6 +337,14 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
 
     /// If the manager ever received a sample.
     received_sample: bool,
+
+    /// Set if the first time delay log message has been already logged.
+    /// Used to reduce log spam.
+    first_time_delay_logged: bool,
+
+    /// The number of times we logged the time sample delay.
+    /// Used to reduce log spam.
+    time_sample_delay_logged_count: u32,
 }
 
 impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
@@ -355,16 +365,22 @@ impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
                 match self.time_source.sample(&urgency).await {
                     Ok(sample) => break sample,
                     Err(err) => {
-                        error!("Error obtaining time sample on {:?}: {:?}", self.role, err);
+                        debug!("Error obtaining time sample on {:?}: {:?}", self.role, err);
                         self.record_time_source_failure(TimeSourceError::LaunchFailed);
                         if self.delays_enabled {
                             let delay = if self.received_sample {
                                 RESTART_DELAY
                             } else {
-                                warn!("First time pull sample is delayed, this may affect UTC-sensitive programs");
+                                if !self.first_time_delay_logged {
+                                    warn!("First time pull sample is delayed, this may affect UTC-sensitive programs");
+                                    self.first_time_delay_logged = true;
+                                }
                                 RESTART_DELAY_INITIAL
                             };
-                            debug!("Time sample delay: {:?}", delay);
+                            if self.time_sample_delay_logged_count < 2 {
+                                info!("Time sample delay: {:?}", delay);
+                                self.time_sample_delay_logged_count += 1;
+                            }
                             fasync::Timer::new(fasync::Time::after(delay)).await;
                         }
                         continue;
@@ -497,6 +513,8 @@ mod test {
             diagnostics,
             last_sample_request_time: None,
             received_sample: false,
+            first_time_delay_logged: false,
+            time_sample_delay_logged_count: 0,
         });
         TimeSourceManager { manager }
     }

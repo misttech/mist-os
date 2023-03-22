@@ -21,7 +21,7 @@ use {
     httpdate_hyper::{HttpsDateError, HttpsDateErrorType},
     push_source::Update,
     rand::Rng,
-    tracing::{error, info, warn},
+    tracing::{debug, error, info},
 };
 
 /// A definition of how long an algorithm should wait between polls. Defines fixed wait durations
@@ -103,11 +103,11 @@ where
                     Status::UnknownUnhealthy
                 }
                 HttpsDateErrorType::NetworkError => {
-                    warn!("Failed to poll time: {:?}", http_error);
+                    debug!("Failed to poll time: {:?}", http_error);
                     Status::Network
                 }
                 _ => {
-                    warn!("Failed to poll time: {:?}", http_error);
+                    debug!("Failed to poll time: {:?}", http_error);
                     Status::Protocol
                 }
             };
@@ -205,11 +205,11 @@ where
                 Some(a) => a,
                 None => match last_error_type {
                     None => {
-                        warn!("Exhausted attempts to fetch a sample, empty last error type.");
+                        debug!("Exhausted attempts to fetch a sample, empty last error type.");
                         return Err(pull_source::SampleError::Internal);
                     }
                     Some(e) => {
-                        warn!("Exhausted attempts to fetch a sample, last error type {:?}.", e);
+                        debug!("Exhausted attempts to fetch a sample, last error type {:?}.", e);
                         match e {
                             HttpsDateErrorType::InvalidHostname
                             | HttpsDateErrorType::SchemeNotHttps => {
