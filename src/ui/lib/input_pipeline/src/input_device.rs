@@ -17,6 +17,7 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fuchsia_async as fasync,
+    fuchsia_inspect::health::Reporter,
     fuchsia_syslog::{fx_log_err, fx_log_warn},
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, stream::StreamExt},
@@ -30,6 +31,57 @@ pub const INPUT_EVENT_BUFFER_SIZE: usize = 100;
 
 /// The path to the input-report directory.
 pub static INPUT_REPORT_PATH: &str = "/dev/class/input-report";
+
+/// An [`InputDeviceStatus`] is tied to an [`InputDeviceBinding`] and provides properties
+/// detailing its Inspect status.
+pub struct InputDeviceStatus {
+    /// A node that contains the state below.
+    _node: fuchsia_inspect::Node,
+
+    /// The total number of reports received by the device driver.
+    _reports_received_count: fuchsia_inspect::UintProperty,
+
+    /// The number of reports received by the device driver that did
+    /// not get converted into InputEvents processed by InputPipeline.
+    _reports_filtered_count: fuchsia_inspect::UintProperty,
+
+    /// The total number of events generated from received
+    /// InputReports that were sent to InputPipeline.
+    _events_generated: fuchsia_inspect::UintProperty,
+
+    /// The event time the last received InputReport was generated.
+    _last_received_timestamp_ns: fuchsia_inspect::UintProperty,
+
+    /// The event time the last InputEvent was generated.
+    _last_generated_timestamp_ns: fuchsia_inspect::UintProperty,
+
+    // This node records the health status of the `InputDevice`.
+    _health_node: fuchsia_inspect::health::Node,
+}
+
+impl InputDeviceStatus {
+    fn _new(parent_node: &fuchsia_inspect::Node, filename: &str, device_type: &str) -> Self {
+        let device_node = parent_node.create_child(format!("{}_{}", filename, device_type));
+        let mut health_node = fuchsia_inspect::health::Node::new(&device_node);
+        health_node.set_starting_up();
+
+        let reports_received_count = device_node.create_uint("reports_received_count", 0);
+        let reports_filtered_count = device_node.create_uint("reports_filtered_count", 0);
+        let events_generated = device_node.create_uint("events_generated", 0);
+        let last_received_timestamp_ns = device_node.create_uint("last_received_timestamp_ns", 0);
+        let last_generated_timestamp_ns = device_node.create_uint("last_generated_timestamp_ns", 0);
+
+        Self {
+            _node: device_node,
+            _reports_received_count: reports_received_count,
+            _reports_filtered_count: reports_filtered_count,
+            _events_generated: events_generated,
+            _last_received_timestamp_ns: last_received_timestamp_ns,
+            _last_generated_timestamp_ns: last_generated_timestamp_ns,
+            _health_node: health_node,
+        }
+    }
+}
 
 /// An [`InputEvent`] holds information about an input event and the device that produced the event.
 #[derive(Clone, Debug, PartialEq)]
@@ -393,8 +445,8 @@ impl InputEvent {
 mod tests {
     use {
         super::*, assert_matches::assert_matches, fidl::endpoints::spawn_stream_handler,
-        fuchsia_zircon as zx, pretty_assertions::assert_eq, std::convert::TryFrom as _,
-        test_case::test_case,
+        fuchsia_inspect::AnyProperty, fuchsia_zircon as zx, pretty_assertions::assert_eq,
+        std::convert::TryFrom as _, test_case::test_case,
     };
 
     #[test]
@@ -407,6 +459,30 @@ mod tests {
     fn min_event_time() {
         let event_time = event_time_or_now(Some(std::i64::MIN));
         assert_eq!(event_time, zx::Time::INFINITE_PAST);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn input_device_status_initialized_with_correct_properties() {
+        let inspector = fuchsia_inspect::Inspector::default();
+        let input_pipeline_node = inspector.root().create_child("input_pipeline");
+        let _input_device_status = InputDeviceStatus::_new(&input_pipeline_node, "001", "keyboard");
+        fuchsia_inspect::assert_data_tree!(inspector, root: {
+            input_pipeline: {
+                "001_keyboard": {
+                    reports_received_count: 0u64,
+                    reports_filtered_count: 0u64,
+                    events_generated: 0u64,
+                    last_received_timestamp_ns: 0u64,
+                    last_generated_timestamp_ns: 0u64,
+                    "fuchsia.inspect.Health": {
+                        status: "STARTING_UP",
+                        // Timestamp value is unpredictable and not relevant in this context,
+                        // so we only assert that the property is present.
+                        start_timestamp_nanos: AnyProperty
+                    },
+                }
+            }
+        });
     }
 
     // Tests that is_device_type() returns true for InputDeviceType::ConsumerControls when a
