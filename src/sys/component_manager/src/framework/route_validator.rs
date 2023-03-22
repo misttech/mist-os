@@ -10,7 +10,9 @@ use {
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
-            routing::{self, RouteRequest, RouteSource, RoutingError},
+            routing::{
+                self, service::CollectionServiceRoute, RouteRequest, RouteSource, RoutingError,
+            },
         },
     },
     async_trait::async_trait,
@@ -26,7 +28,7 @@ use {
         AbsoluteMoniker, AbsoluteMonikerBase, ExtendedMoniker, RelativeMoniker, RelativeMonikerBase,
     },
     std::{
-        convert::TryFrom,
+        cmp::Ordering,
         path::PathBuf,
         sync::{Arc, Weak},
     },
@@ -177,12 +179,13 @@ impl RouteValidator {
             let decl_type = Some(target.decl_type);
             match Self::route_instance(scope_moniker, request, &instance).await {
                 Ok(info) => {
-                    let source_moniker = info;
+                    let (source_moniker, service_instances) = info;
                     fsys::RouteReport {
                         capability,
                         decl_type,
                         error: None,
                         source_moniker: Some(source_moniker),
+                        service_instances,
                         ..fsys::RouteReport::EMPTY
                     }
                 }
@@ -236,7 +239,7 @@ impl RouteValidator {
         scope_moniker: &AbsoluteMoniker,
         request: RouteRequest,
         target: &Arc<ComponentInstance>,
-    ) -> Result<String, RoutingError> {
+    ) -> Result<(String, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
         let source = routing::route(request, target).await?;
         let source = match source {
             RouteSource::Directory(s, _) => s,
@@ -252,14 +255,51 @@ impl RouteValidator {
                     Some(s) => ExtendedMoniker::ComponentInstance(s.abs_moniker.clone()),
                     None => ExtendedMoniker::ComponentManager,
                 };
-                return Ok(Self::extended_moniker_to_str(scope_moniker, moniker));
+                return Ok((Self::extended_moniker_to_str(scope_moniker, moniker), None));
             }
+        };
+        let service_dir = match &source {
+            CapabilitySource::Collection { capability, component, collection_name, .. } => {
+                let component = component.upgrade()?;
+                let route = CollectionServiceRoute {
+                    source_moniker: component.abs_moniker.clone(),
+                    collection_name: collection_name.clone(),
+                    service_name: capability.source_name().clone(),
+                };
+                let state = component.lock_state().await;
+                match &*state {
+                    InstanceState::Resolved(r) => r.collection_services.get(&route).cloned(),
+                    _ => None,
+                }
+            }
+            _ => None,
         };
         let moniker = Self::extended_moniker_to_str(
             scope_moniker,
             source.source_instance().extended_moniker(),
         );
-        Ok(moniker)
+        let service_info = match service_dir {
+            Some(service_dir) => {
+                let mut service_info: Vec<_> = service_dir.entries().await;
+                // Sort the entries (they can show up in any order)
+                service_info.sort_by(|a, b| match a.source_child_name.cmp(&b.source_child_name) {
+                    Ordering::Equal => a.service_instance.cmp(&b.service_instance),
+                    o => o,
+                });
+                let service_info = service_info
+                    .into_iter()
+                    .map(|e| fsys::ServiceInstance {
+                        instance_name: Some(e.name.clone()),
+                        child_name: Some(e.source_child_name.clone()),
+                        child_instance_name: Some(e.service_instance.clone()),
+                        ..fsys::ServiceInstance::EMPTY
+                    })
+                    .collect();
+                Some(service_info)
+            }
+            None => None,
+        };
+        Ok((moniker, service_info))
     }
 
     fn extended_moniker_to_str(scope_moniker: &AbsoluteMoniker, m: ExtendedMoniker) -> String {
@@ -394,12 +434,18 @@ async fn validate_exposes(
 mod tests {
     use {
         super::*,
-        crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult},
+        crate::model::{
+            component::StartReason,
+            testing::{
+                out_dir::OutDir,
+                test_helpers::{TestEnvironmentBuilder, TestModelResult},
+            },
+        },
         assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints,
-        fuchsia_async as fasync,
+        fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
     };
 
     #[derive(Ord, PartialOrd, Eq, PartialEq)]
@@ -826,6 +872,173 @@ mod tests {
                 ..
             } if s == "biz.buz" && m == "./my_child"
         );
+    }
+
+    #[fuchsia::test]
+    async fn route_service() {
+        let offer_from_collection_decl = OfferDecl::Service(OfferServiceDecl {
+            source: OfferSource::Collection("coll".into()),
+            source_name: "my_service".into(),
+            target: OfferTarget::static_child("target".into()),
+            target_name: "my_service".into(),
+            availability: Availability::Required,
+            source_instance_filter: None,
+            renamed_instances: None,
+        });
+        let expose_from_self_decl = ExposeDecl::Service(ExposeServiceDecl {
+            source: ExposeSource::Self_,
+            source_name: "my_service".into(),
+            target: ExposeTarget::Parent,
+            target_name: "my_service".into(),
+            availability: cm_rust::Availability::Required,
+        });
+        let use_decl = UseDecl::Service(UseServiceDecl {
+            source: UseSource::Parent,
+            source_name: "my_service".into(),
+            target_path: CapabilityPath::try_from("/svc/foo.bar").unwrap(),
+            dependency_type: DependencyType::Strong,
+            availability: Availability::Required,
+        });
+        let capability_decl = ServiceDecl {
+            name: "my_service".into(),
+            source_path: Some(CapabilityPath::try_from("/svc/foo.bar").unwrap()),
+        };
+
+        let components = vec![
+            (
+                "root",
+                ComponentDeclBuilder::new()
+                    .offer(offer_from_collection_decl)
+                    .add_transient_collection("coll")
+                    .add_lazy_child("target")
+                    .build(),
+            ),
+            ("target", ComponentDeclBuilder::new().use_(use_decl).build()),
+            (
+                "child_a",
+                ComponentDeclBuilder::new()
+                    .service(capability_decl.clone())
+                    .expose(expose_from_self_decl.clone())
+                    .build(),
+            ),
+            (
+                "child_b",
+                ComponentDeclBuilder::new()
+                    .service(capability_decl.clone())
+                    .expose(expose_from_self_decl.clone())
+                    .build(),
+            ),
+        ];
+
+        let TestModelResult { model, builtin_environment, realm_proxy, mock_runner, .. } =
+            TestEnvironmentBuilder::new()
+                .set_components(components)
+                .set_realm_moniker(AbsoluteMoniker::root())
+                .build()
+                .await;
+        let realm_proxy = realm_proxy.unwrap();
+
+        let validator_server = {
+            let env = builtin_environment.lock().await;
+            env.route_validator.clone().unwrap()
+        };
+        let (validator, request_stream) =
+            endpoints::create_proxy_and_stream::<fsys::RouteValidatorMarker>().unwrap();
+        let _validator_task = fasync::Task::local(async move {
+            validator_server.serve(AbsoluteMoniker::root(), request_stream).await
+        });
+
+        model.start().await;
+
+        // Create two children in the collection, each exposing `my_service` with two instances.
+        let mut collection_ref = fdecl::CollectionRef { name: "coll".into() };
+        for name in &["child_a", "child_b"] {
+            realm_proxy
+                .create_child(
+                    &mut collection_ref,
+                    child_decl(name),
+                    fcomponent::CreateChildArgs::EMPTY,
+                )
+                .await
+                .unwrap()
+                .unwrap();
+
+            let mut out_dir = OutDir::new();
+            out_dir.add_echo_protocol(
+                CapabilityPath::try_from("/svc/foo.bar/instance_a/echo").unwrap(),
+            );
+            out_dir.add_echo_protocol(
+                CapabilityPath::try_from("/svc/foo.bar/instance_b/echo").unwrap(),
+            );
+            mock_runner.add_host_fn(&format!("test:///{}_resolved", name), out_dir.host_fn());
+
+            let child = model
+                .look_up(&format!("/coll:{}", name).as_str().try_into().unwrap())
+                .await
+                .unwrap();
+            child.start(&StartReason::Debug).await.unwrap();
+        }
+
+        // Open the service directory from `target` so that it gets instantiated.
+        {
+            let target = model.look_up(&"/target".try_into().unwrap()).await.unwrap();
+            target.start(&StartReason::Debug).await.unwrap();
+            let ns = mock_runner.get_namespace("test:///target_resolved").unwrap();
+            let mut ns = ns.lock().await;
+            // /pkg and /svc
+            assert_eq!(ns.len(), 2);
+            let ns = ns.remove(1);
+            assert_eq!(ns.path.as_ref().unwrap(), "/svc");
+            let svc_dir = ns.directory.unwrap().into_proxy().unwrap();
+            fuchsia_fs::directory::open_directory(
+                &svc_dir,
+                "foo.bar",
+                fio::OpenFlags::RIGHT_WRITABLE,
+            )
+            .await
+            .unwrap();
+        }
+
+        let mut targets =
+            vec![fsys::RouteTarget { name: "my_service".into(), decl_type: fsys::DeclType::Use }];
+        let mut results =
+            validator.route("./target", &mut targets.iter_mut()).await.unwrap().unwrap();
+
+        assert_eq!(results.len(), 1);
+
+        let report = results.remove(0);
+        let service_instances: Vec<_> = [("a", "a"), ("a", "b"), ("b", "a"), ("b", "b")]
+            .into_iter()
+            .map(|p| {
+                let (c, i) = p;
+                fsys::ServiceInstance {
+                    instance_name: Some(format!("child_{},instance_{}", c, i)),
+                    child_name: Some(format!("child_{}", c)),
+                    child_instance_name: Some(format!("instance_{}", i)),
+                    ..fsys::ServiceInstance::EMPTY
+                }
+            })
+            .collect();
+        assert_matches!(
+            report,
+            fsys::RouteReport {
+                capability: Some(s),
+                decl_type: Some(fsys::DeclType::Use),
+                source_moniker: Some(m),
+                service_instances: Some(v),
+                error: None,
+                ..
+            } if s == "my_service" && m == "." && v == service_instances
+        );
+    }
+
+    fn child_decl(name: &str) -> fdecl::Child {
+        fdecl::Child {
+            name: Some(name.to_owned()),
+            url: Some(format!("test:///{}", name)),
+            startup: Some(fdecl::StartupMode::Lazy),
+            ..fdecl::Child::EMPTY
+        }
     }
 
     #[fuchsia::test]

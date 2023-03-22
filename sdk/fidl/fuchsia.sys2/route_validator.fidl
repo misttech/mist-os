@@ -35,6 +35,23 @@ type RouteReport = table {
     /// The absolute moniker of the source component.
     @available(added=12)
     4: source_moniker string:MAX;
+
+    /// Metadata about the instances in a service. Populated only for aggregated services.
+    @available(added=12)
+    5: service_instances vector<ServiceInstance>:MAX;
+};
+
+/// Metadata about a service instance.
+@available(added=12)
+type ServiceInstance = table {
+    /// The name of the service instance in this service directory.
+    1: instance_name string:MAX;
+
+    /// The name of the child component that serves the service instance.
+    2: child_name fuchsia.component.child_name;
+
+    /// The name of the service instance as exposed by the child.
+    3: child_instance_name string:MAX;
 };
 
 /// A capability in a target component to route to the source.

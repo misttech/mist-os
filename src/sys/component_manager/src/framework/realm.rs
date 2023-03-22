@@ -1217,7 +1217,7 @@ mod tests {
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let mut out_dir = OutDir::new();
-        out_dir.add_echo_service(CapabilityPath::try_from("/svc/foo").unwrap());
+        out_dir.add_echo_protocol(CapabilityPath::try_from("/svc/foo").unwrap());
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
 
         // Open exposed directory of child.
@@ -1283,7 +1283,7 @@ mod tests {
             .new_event_stream(vec![EventType::Resolved.into(), EventType::Started.into()])
             .await;
         let mut out_dir = OutDir::new();
-        out_dir.add_echo_service(CapabilityPath::try_from("/svc/foo").unwrap());
+        out_dir.add_echo_protocol(CapabilityPath::try_from("/svc/foo").unwrap());
         test.mock_runner.add_host_fn("test:///system_resolved", out_dir.host_fn());
 
         // Add "system" to collection.

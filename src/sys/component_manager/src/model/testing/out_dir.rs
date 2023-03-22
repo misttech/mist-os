@@ -33,9 +33,9 @@ impl OutDir {
         self.paths.insert(path, entry);
     }
 
-    /// Adds a file providing the echo service at the given path.
-    pub fn add_echo_service(&mut self, path: CapabilityPath) {
-        self.add_entry(path, host(Self::echo_server_fn));
+    /// Adds a file providing the echo protocol at the given path.
+    pub fn add_echo_protocol(&mut self, path: CapabilityPath) {
+        self.add_entry(path, host(Self::echo_protocol_fn));
     }
 
     /// Adds a static file at the given path.
@@ -86,8 +86,8 @@ impl OutDir {
         })
     }
 
-    /// Hosts a new service on `server_end` that implements `fidl.examples.routing.echo.Echo`.
-    async fn echo_server_fn(mut stream: EchoRequestStream) {
+    /// Hosts a new protocol on `server_end` that implements `fidl.examples.routing.echo.Echo`.
+    async fn echo_protocol_fn(mut stream: EchoRequestStream) {
         while let Some(EchoRequest::EchoString { value, responder }) =
             stream.try_next().await.unwrap()
         {

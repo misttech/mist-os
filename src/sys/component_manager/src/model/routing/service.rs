@@ -451,7 +451,7 @@ impl lazy_immutable_dir::LazyDirectory for AggregateServiceDirectory {
         Ok(Arc::new(ServiceInstanceDirectoryEntry {
             name: name.to_string(),
             source,
-            source_component_name: component.to_string(),
+            source_child_name: component.to_string(),
             service_instance: instance.to_string(),
             parent: self.parent.clone(),
         }))
@@ -665,6 +665,12 @@ impl CollectionServiceDirectory {
         self.inner.lock().await.dir.clone()
     }
 
+    /// Returns metadata about all the service instances in their original representation,
+    /// useful for exposing debug info.
+    pub async fn entries(&self) -> Vec<Arc<ServiceInstanceDirectoryEntry>> {
+        self.inner.lock().await.entries.clone()
+    }
+
     /// Adds directory entries from services exposed by a child in the aggregated collection.
     pub async fn add_entries_from_child(&self, child_name: &str) -> Result<(), ModelError> {
         let parent =
@@ -707,7 +713,7 @@ impl CollectionServiceDirectory {
 
     async fn add_entries_from_capability_source_lazy(
         self: Arc<Self>,
-        component_name: String,
+        child_name: String,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
         let task_scope = self.parent.upgrade()?.nonblocking_task_scope();
@@ -717,7 +723,7 @@ impl CollectionServiceDirectory {
         // to enumerates service instances, but this directory is not served until the
         // component is actually running. The component is only started *after* all hooks run.
         let add_instances_to_dir = async move {
-            self.add_entries_from_capability_source(component_name.as_str(), source)
+            self.add_entries_from_capability_source(child_name.as_str(), source)
                 .then(|result| async {
                     if let Err(e) = result {
                         error!(error = ?e, "failed to add service instances");
@@ -731,14 +737,14 @@ impl CollectionServiceDirectory {
 
     /// Opens the service capability at `source` and adds entries for each service instance.
     ///
-    /// Entry names are named by joining the originating component, `component_name`,
-    /// and the service instance name, with a comma.
+    /// Entry names are named by joining the originating child component instance,
+    /// `child_name`, and the service instance name, with a comma.
     ///
     /// # Errors
     /// Returns an error if `source` is not a service capability, or could not be opened.
     pub async fn add_entries_from_capability_source(
         &self,
-        component_name: &str,
+        child_name: &str,
         source: CapabilitySource,
     ) -> Result<(), ModelError> {
         let mut inner = self.inner.lock().await;
@@ -771,15 +777,15 @@ impl CollectionServiceDirectory {
         .await?;
         let dirents = fuchsia_fs::directory::readdir(&proxy).await.map_err(|e| {
             error!("Error reading entries from service directory for component '{}', capability name '{}'. Error: {}", target.abs_moniker.clone(), source.source_name().unwrap_or(&"".into()), e);
-            ModelError::open_directory_error(target.abs_moniker.clone(), component_name)
+            ModelError::open_directory_error(target.abs_moniker.clone(), child_name)
         })?;
         for dirent in dirents {
-            let name = format!("{},{}", &component_name, &dirent.name);
+            let name = format!("{},{}", &child_name, &dirent.name);
             let entry: Arc<ServiceInstanceDirectoryEntry> =
                 Arc::new(ServiceInstanceDirectoryEntry {
                     name: name.clone(),
                     source: source.clone(),
-                    source_component_name: component_name.to_string(),
+                    source_child_name: child_name.to_string(),
                     service_instance: dirent.name.to_string(),
                     parent: self.parent.clone(),
                 });
@@ -820,19 +826,16 @@ impl CollectionServiceDirectory {
         if self.route.matches_child_component(component_moniker)
             && self.route.matches_exposed_service(component_decl)
         {
-            let instance_name = component_moniker
+            let child_name = component_moniker
                 .leaf()
                 .unwrap() // checked in `matches_child_component`
                 .name
                 .clone();
             let capability_source =
-                self.aggregate_capability_provider.route_instance(instance_name.as_str()).await?;
+                self.aggregate_capability_provider.route_instance(child_name.as_str()).await?;
 
-            self.add_entries_from_capability_source_lazy(
-                instance_name.to_string(),
-                capability_source,
-            )
-            .await?;
+            self.add_entries_from_capability_source_lazy(child_name.to_string(), capability_source)
+                .await?;
         }
         Ok(())
     }
@@ -848,7 +851,7 @@ impl CollectionServiceDirectory {
                 .as_str();
             let mut inner = self.inner.lock().await;
             for entry in &inner.entries {
-                if entry.source_component_name == *target_name {
+                if entry.source_child_name == *target_name {
                     inner.dir.remove_node(&entry.name).map_err(|err| {
                         ModelError::CollectionServiceDirError {
                             moniker: target_moniker.clone(),
@@ -857,7 +860,7 @@ impl CollectionServiceDirectory {
                     })?;
                 }
             }
-            inner.entries.retain(|entry| entry.source_component_name != *target_name);
+            inner.entries.retain(|entry| entry.source_child_name != *target_name);
         }
         Ok(())
     }
@@ -887,15 +890,15 @@ impl Hook for CollectionServiceDirectory {
 
 /// A directory entry representing an instance of a service.
 /// Upon opening, performs capability routing and opens the instance at its source.
-struct ServiceInstanceDirectoryEntry {
+pub struct ServiceInstanceDirectoryEntry {
     /// The name of the entry in its parent directory.
-    name: String,
+    pub name: String,
     /// The source of the service capability instance to route.
     source: CapabilitySource,
-    /// The name of the component that serves `source`.
-    source_component_name: String,
+    /// The name of the child component that serves `source` (without the collection name).
+    pub source_child_name: String,
     /// The name of the service instance directory to open at the source.
-    service_instance: String,
+    pub service_instance: String,
     /// The component that is hosting the directory.
     parent: WeakComponentInstance,
 }
@@ -942,7 +945,7 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
                     .with_logger_as_default(|| {
                         error!(
                             service_instance=%self.service_instance,
-                            source_component=%self.source_component_name,
+                            source_component=%self.source_child_name,
                             error=%err,
                             "Failed to open service instance from component",
                         );

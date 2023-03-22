@@ -340,7 +340,7 @@ impl RoutingTest {
     ///   - A static file `/svc/file`, containing the string "hippos" encoded as UTF-8.
     pub fn install_default_out_files(dir: &mut OutDir) {
         // Add "/svc/foo", providing an echo server.
-        dir.add_echo_service(CapabilityPath::try_from("/svc/foo").unwrap());
+        dir.add_echo_protocol(CapabilityPath::try_from("/svc/foo").unwrap());
 
         // Add "/svc/file", providing a read-only file.
         dir.add_static_file(CapabilityPath::try_from("/svc/file").unwrap(), "hippos");

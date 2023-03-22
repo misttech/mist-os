@@ -283,6 +283,7 @@ pub async fn wait_for_runner_request(
 pub struct TestModelResult {
     pub model: Arc<Model>,
     pub builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
+    pub realm_proxy: Option<fcomponent::RealmProxy>,
     pub mock_runner: Arc<MockRunner>,
     pub mock_resolver: Box<MockResolver>,
 }
@@ -293,6 +294,8 @@ pub struct TestEnvironmentBuilder {
     config_values: Vec<(&'static str, ValuesData)>,
     runtime_config: RuntimeConfig,
     component_id_index_path: Option<String>,
+    realm_moniker: Option<AbsoluteMoniker>,
+    hooks: Vec<HooksRegistration>,
 }
 
 impl TestEnvironmentBuilder {
@@ -303,6 +306,8 @@ impl TestEnvironmentBuilder {
             config_values: vec![],
             runtime_config: Default::default(),
             component_id_index_path: None,
+            realm_moniker: None,
+            hooks: vec![],
         }
     }
 
@@ -328,6 +333,16 @@ impl TestEnvironmentBuilder {
 
     pub fn set_runtime_config(mut self, runtime_config: RuntimeConfig) -> Self {
         self.runtime_config = runtime_config;
+        self
+    }
+
+    pub fn set_realm_moniker(mut self, moniker: AbsoluteMoniker) -> Self {
+        self.realm_moniker = Some(moniker);
+        self
+    }
+
+    pub fn set_hooks(mut self, hooks: Vec<HooksRegistration>) -> Self {
+        self.hooks = hooks;
         self
     }
 
@@ -367,7 +382,36 @@ impl TestEnvironmentBuilder {
                 .expect("builtin environment setup failed"),
         ));
         let model = builtin_environment.lock().await.model.clone();
-        TestModelResult { model, builtin_environment, mock_runner, mock_resolver }
+
+        model.root().hooks.install(self.hooks).await;
+
+        // Host framework service for `moniker`, if requested.
+        let builtin_environment_inner = builtin_environment.clone();
+        let realm_proxy = if let Some(moniker) = self.realm_moniker {
+            let (realm_proxy, stream) =
+                endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
+            let component = WeakComponentInstance::from(
+                &model
+                    .look_up(&moniker)
+                    .await
+                    .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e)),
+            );
+            fasync::Task::spawn(async move {
+                builtin_environment_inner
+                    .lock()
+                    .await
+                    .realm_capability_host
+                    .serve(component, stream)
+                    .await
+                    .expect("failed serving realm service");
+            })
+            .detach();
+            Some(realm_proxy)
+        } else {
+            None
+        };
+
+        TestModelResult { model, builtin_environment, realm_proxy, mock_runner, mock_resolver }
     }
 }
 
@@ -396,42 +440,17 @@ impl ActionsTest {
         moniker: Option<AbsoluteMoniker>,
         extra_hooks: Vec<HooksRegistration>,
     ) -> Self {
-        let TestModelResult { model, builtin_environment, mock_runner, mock_resolver } =
-            TestEnvironmentBuilder::new()
-                .set_root_component(root_component)
-                .set_components(components)
-                .build()
-                .await;
-
         let test_hook = Arc::new(TestHook::new());
-        model.root().hooks.install(test_hook.hooks()).await;
-        model.root().hooks.install(extra_hooks).await;
-
-        // Host framework service for root, if requested.
-        let builtin_environment_inner = builtin_environment.clone();
-        let realm_proxy = if let Some(moniker) = moniker {
-            let (realm_proxy, stream) =
-                endpoints::create_proxy_and_stream::<fcomponent::RealmMarker>().unwrap();
-            let component = WeakComponentInstance::from(
-                &model
-                    .look_up(&moniker)
-                    .await
-                    .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e)),
-            );
-            fasync::Task::spawn(async move {
-                builtin_environment_inner
-                    .lock()
-                    .await
-                    .realm_capability_host
-                    .serve(component, stream)
-                    .await
-                    .expect("failed serving realm service");
-            })
-            .detach();
-            Some(realm_proxy)
-        } else {
-            None
-        };
+        let mut hooks = test_hook.hooks();
+        hooks.extend(extra_hooks);
+        let builder = TestEnvironmentBuilder::new()
+            .set_root_component(root_component)
+            .set_components(components)
+            .set_hooks(hooks);
+        let builder =
+            if let Some(moniker) = moniker { builder.set_realm_moniker(moniker) } else { builder };
+        let TestModelResult { model, builtin_environment, realm_proxy, mock_runner, mock_resolver } =
+            builder.build().await;
 
         Self {
             model,
