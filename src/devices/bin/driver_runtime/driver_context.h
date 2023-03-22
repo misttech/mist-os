@@ -5,9 +5,10 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_RUNTIME_DRIVER_CONTEXT_H_
 #define SRC_DEVICES_BIN_DRIVER_RUNTIME_DRIVER_CONTEXT_H_
 
+#include <zircon/types.h>
+
 namespace driver_runtime {
 class Dispatcher;
-class DispatcherCoordinator;
 }  // namespace driver_runtime
 
 /// TODO(fxbug.dev/102881): rename to thread_context.
@@ -38,8 +39,11 @@ bool IsDriverInCallStack(const void* driver);
 // Returns whether the thread's current call stack is empty.
 bool IsCallStackEmpty();
 
-// Notifies |coordinator| of the thread wakeup for irq garbage collection.
-void OnThreadWakeup(driver_runtime::DispatcherCoordinator& coordinator);
+// Returns the latest generation id seen by the current thread.
+uint32_t GetIrqGenerationId();
+
+// Sets the latest generation id seen by the current thread.
+void SetIrqGenerationId(uint32_t id);
 
 }  // namespace driver_context
 

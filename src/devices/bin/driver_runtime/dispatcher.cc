@@ -183,7 +183,6 @@ bool Dispatcher::AsyncWait::Cancel() {
 void Dispatcher::AsyncWait::Handler(async_dispatcher_t* dispatcher, async_wait_t* wait,
                                     zx_status_t status, const zx_packet_signal_t* signal) {
   static_cast<AsyncWait*>(wait)->OnSignal(dispatcher, status, signal);
-  driver_context::OnThreadWakeup(GetDispatcherCoordinator());
 }
 
 void Dispatcher::AsyncWait::OnSignal(async_dispatcher_t* async_dispatcher, zx_status_t status,
@@ -195,6 +194,7 @@ void Dispatcher::AsyncWait::OnSignal(async_dispatcher_t* async_dispatcher, zx_st
   signal_packet_ = *signal;
 
   dispatcher->QueueWait(this, status);
+  dispatcher->thread_pool()->OnThreadWakeup();
 }
 
 Dispatcher::AsyncIrq::AsyncIrq(async_irq_t* original_irq, Dispatcher& dispatcher)
@@ -267,7 +267,6 @@ std::unique_ptr<driver_runtime::CallbackRequest> Dispatcher::AsyncIrq::CreateCal
 void Dispatcher::AsyncIrq::Handler(async_dispatcher_t* dispatcher, async_irq_t* irq,
                                    zx_status_t status, const zx_packet_interrupt_t* packet) {
   static_cast<AsyncIrq*>(irq)->OnSignal(dispatcher, status, packet);
-  driver_context::OnThreadWakeup(GetDispatcherCoordinator());
 }
 
 void Dispatcher::AsyncIrq::OnSignal(async_dispatcher_t* global_dispatcher, zx_status_t status,
@@ -283,10 +282,11 @@ void Dispatcher::AsyncIrq::OnSignal(async_dispatcher_t* global_dispatcher, zx_st
   // We do not hold the irq lock before calling |QueueIrq|, as it would cause
   // incorrect lock ordering.
   dispatcher->QueueIrq(this, status);
+  dispatcher->thread_pool()->OnThreadWakeup();
 }
 
 Dispatcher::Dispatcher(uint32_t options, std::string_view name, bool unsynchronized,
-                       bool allow_sync_calls, const void* owner,
+                       bool allow_sync_calls, const void* owner, ThreadPool* thread_pool,
                        async_dispatcher_t* process_shared_dispatcher,
                        fdf_dispatcher_shutdown_observer_t* observer)
     : async_dispatcher_t{&g_dispatcher_ops},
@@ -294,6 +294,7 @@ Dispatcher::Dispatcher(uint32_t options, std::string_view name, bool unsynchroni
       unsynchronized_(unsynchronized),
       allow_sync_calls_(allow_sync_calls),
       owner_(owner),
+      thread_pool_(thread_pool),
       process_shared_dispatcher_(process_shared_dispatcher),
       timer_(this),
       shutdown_observer_(observer) {
@@ -303,6 +304,7 @@ Dispatcher::Dispatcher(uint32_t options, std::string_view name, bool unsynchroni
 // static
 zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
                                         std::string_view scheduler_role, const void* owner,
+                                        ThreadPool* thread_pool,
                                         async_dispatcher_t* parent_dispatcher, ThreadAdder adder,
                                         fdf_dispatcher_shutdown_observer_t* observer,
                                         Dispatcher** out_dispatcher) {
@@ -323,8 +325,9 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
     }
   }
 
-  auto dispatcher = fbl::MakeRefCounted<Dispatcher>(options, name, unsynchronized, allow_sync_calls,
-                                                    owner, parent_dispatcher, observer);
+  auto dispatcher =
+      fbl::MakeRefCounted<Dispatcher>(options, name, unsynchronized, allow_sync_calls, owner,
+                                      thread_pool, parent_dispatcher, observer);
 
   zx::event event;
   if (zx_status_t status = zx::event::create(0, &event); status != ZX_OK) {
@@ -335,8 +338,9 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
   auto event_waiter = std::make_unique<EventWaiter>(
       std::move(event),
       [self](std::unique_ptr<EventWaiter> event_waiter, fbl::RefPtr<Dispatcher> dispatcher_ref) {
+        auto ref = dispatcher_ref;
         self->DispatchCallbacks(std::move(event_waiter), std::move(dispatcher_ref));
-        driver_context::OnThreadWakeup(GetDispatcherCoordinator());
+        ref->thread_pool()->OnThreadWakeup();
       });
   dispatcher->SetEventWaiter(event_waiter.get());
   zx_status_t status = EventWaiter::BeginWaitWithRef(std::move(event_waiter), dispatcher);
@@ -362,8 +366,12 @@ zx_status_t Dispatcher::CreateWithLoop(uint32_t options, std::string_view name,
                                        async::Loop* loop,
                                        fdf_dispatcher_shutdown_observer_t* observer,
                                        Dispatcher** out_dispatcher) {
+  // TODO(fxbug.dev/123943): the dispatcher uses the default thread pool to track IRQs,
+  // so we pass it in even though we already have a loop. This is so we don't have to add
+  // null checks everywhere. Eventually we will be deleting this |CreateWithLoop| API anyway.
+  auto default_thread_pool = GetDispatcherCoordinator().default_thread_pool();
   return CreateWithAdder(
-      options, name, scheduler_role, owner, loop->dispatcher(),
+      options, name, scheduler_role, owner, default_thread_pool, loop->dispatcher(),
       [&]() { return loop->StartThread(); }, observer, out_dispatcher);
 }
 
@@ -374,10 +382,11 @@ zx_status_t Dispatcher::Create(uint32_t options, std::string_view name,
                                std::string_view scheduler_role,
                                fdf_dispatcher_shutdown_observer_t* observer,
                                Dispatcher** out_dispatcher) {
+  auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
   return CreateWithAdder(
-      options, name, scheduler_role, driver_context::GetCurrentDriver(),
-      GetDispatcherCoordinator().loop()->dispatcher(),
-      []() { return GetDispatcherCoordinator().AddThread(); }, observer, out_dispatcher);
+      options, name, scheduler_role, driver_context::GetCurrentDriver(), thread_pool,
+      thread_pool->loop()->dispatcher(), [thread_pool]() { return thread_pool->AddThread(); },
+      observer, out_dispatcher);
 }
 
 // static
@@ -518,7 +527,7 @@ void Dispatcher::CompleteShutdown() {
     // Though the irq has been unbound, it's possible that another |process_shared_dispatcher|
     // thread has already pulled an irq packet from the port and may attempt to call the irq
     // handler. Delay destroying our irq wrapper for a bit in case this race condition happens.
-    GetDispatcherCoordinator().CacheUnboundIrq(std::move(irq));
+    thread_pool_->CacheUnboundIrq(std::move(irq));
   }
 
   // We want |fdf_dispatcher_get_current_dispatcher| to work in cancellation and shutdown callbacks.
@@ -706,7 +715,7 @@ void Dispatcher::CheckDelayedTasks() {
 void Dispatcher::Timer::Handler() {
   current_deadline_ = zx::time::infinite();
   dispatcher_->CheckDelayedTasks();
-  driver_context::OnThreadWakeup(GetDispatcherCoordinator());
+  dispatcher_->thread_pool()->OnThreadWakeup();
 }
 
 zx_status_t Dispatcher::PostTask(async_task_t* task) {
@@ -804,7 +813,7 @@ zx_status_t Dispatcher::UnbindIrq(async_irq_t* irq) {
   // Though the irq has been unbound, it's possible that another |process_shared_dispatcher|
   // thread has already pulled an irq packet from the port and may attempt to call the irq
   // handler. Delay destroying our irq wrapper for a bit in case this race condition happens.
-  GetDispatcherCoordinator().CacheUnboundIrq(std::move(unbound_irq));
+  thread_pool_->CacheUnboundIrq(std::move(unbound_irq));
   return ZX_OK;
 }
 
@@ -1371,24 +1380,12 @@ void DispatcherCoordinator::WaitUntilDispatchersDestroyed() {
 }
 
 // static
-bool DispatcherCoordinator::HasManagedThreads() {
-  auto& coordinator = GetDispatcherCoordinator();
-  {
-    fbl::AutoLock lock(&coordinator.lock_);
-    return coordinator.number_threads_ > 0;
-  }
-}
-
-// static
 zx_status_t DispatcherCoordinator::RunUntilIdle() {
-  auto& coordinator = GetDispatcherCoordinator();
-  {
-    fbl::AutoLock lock(&coordinator.lock_);
-    if (coordinator.number_threads_ > 0) {
-      return ZX_ERR_BAD_STATE;
-    }
+  auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
+  if (thread_pool->num_threads() > 0) {
+    return ZX_ERR_BAD_STATE;
   }
-  return coordinator.loop()->RunUntilIdle();
+  return thread_pool->loop()->RunUntilIdle();
 }
 
 // static
@@ -1414,9 +1411,10 @@ zx_status_t DispatcherCoordinator::ShutdownDispatchersAsync(
     async::PostTask(dispatcher->GetAsyncDispatcher(), [=]() { dispatcher->ShutdownAsync(); });
   }
   if (dispatchers.empty()) {
+    auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
     // The dispatchers have already been shutdown and no calls to |NotifyDispatcherShutdown|
     // will occur, so we need to schedule the handler to be called.
-    async::PostTask(GetDispatcherCoordinator().loop()->dispatcher(),
+    async::PostTask(thread_pool->loop()->dispatcher(),
                     [driver, observer]() { observer->handler(driver, observer); });
   }
   return ZX_OK;
@@ -1542,9 +1540,10 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   ZX_ASSERT(driver_state != drivers_.end());
 
   // We need to check the process shared dispatcher matches as tests inject their own.
+  auto thread_pool = dispatcher.thread_pool();
   if (dispatcher.allow_sync_calls() &&
-      dispatcher.process_shared_dispatcher() == loop_.dispatcher()) {
-    dispatcher_threads_needed_--;
+      dispatcher.process_shared_dispatcher() == thread_pool->loop()->dispatcher()) {
+    thread_pool->OnDispatcherRemoved();
   }
   driver_state->RemoveDispatcher(dispatcher);
   // If the driver has completely shutdown, and all dispatchers have been destroyed,
@@ -1557,65 +1556,14 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   }
 }
 
-// static
-void DispatcherCoordinator::CacheUnboundIrq(std::unique_ptr<Dispatcher::AsyncIrq> irq) {
-  DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
-
-  fbl::AutoLock lock(&(coordinator.lock_));
-  coordinator.cached_irqs_.AddIrq(std::move(irq));
-}
-
-// static
-void DispatcherCoordinator::OnThreadWakeup(uint32_t thread_irq_generation_id,
-                                           uint32_t* out_cur_irq_generation_id) {
-  DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
-
-  // Check if we have already tracked this thread wakeup for the current generation of irqs.
-  // |cur_generatiom_id| is atomic - we do not acquire the lock here to avoid unnecessary lock
-  // contention per thread wakeup. If the generation id changes in the meanwhile, the next wakeuup
-  // of this thread can handle that.
-  if (thread_irq_generation_id == coordinator.cached_irqs_.cur_generation_id()) {
-    // Generation id should stay the same.
-    *out_cur_irq_generation_id = thread_irq_generation_id;
-    return;
-  }
-
-  fbl::AutoLock lock(&(coordinator.lock_));
-  // We should set this first, as |cached_irqs_.NewThreadWakeup| may increment the generation id
-  // if it clears the current generation.
-  *out_cur_irq_generation_id = coordinator.cached_irqs_.cur_generation_id();
-  coordinator.cached_irqs_.NewThreadWakeup(coordinator.number_threads_);
-}
-
-zx_status_t DispatcherCoordinator::AddThread() {
-  fbl::AutoLock lock(&lock_);
-  dispatcher_threads_needed_++;
-  // TODO(surajmalhotra): We are clamping number_threads_ to 10 to avoid spawning too many threads.
-  // Technically this can result in a deadlock scenario in a very complex driver host. We need
-  // better support for dynamically starting threads as necessary.
-  if (number_threads_ >= dispatcher_threads_needed_ || number_threads_ == 10) {
-    return ZX_OK;
-  }
-  auto name = "fdf-dispatcher-thread-" + std::to_string(number_threads_);
-  zx_status_t status = loop_.StartThread(name.c_str());
-  if (status == ZX_OK) {
-    number_threads_++;
-  }
-  return status;
-}
-
 zx_status_t DispatcherCoordinator::Start() {
   DispatcherCoordinator& coordinator = GetDispatcherCoordinator();
   fbl::AutoLock lock(&coordinator.lock_);
-  if (coordinator.number_threads_ != 0) {
+  auto thread_pool = coordinator.default_thread_pool();
+  if (thread_pool->num_threads() != 0) {
     return ZX_ERR_BAD_STATE;
   }
-  if (zx_status_t status = coordinator.loop_.StartThread("fdf-dispatcher-0"); status != ZX_OK) {
-    return status;
-  }
-  coordinator.number_threads_++;
-  coordinator.dispatcher_threads_needed_++;
-  return ZX_OK;
+  return thread_pool->AddThread();
 }
 
 // static
@@ -1628,6 +1576,41 @@ void DispatcherCoordinator::Reset() {
   {
     fbl::AutoLock al(&lock_);
     ZX_ASSERT(drivers_.is_empty());
+  }
+
+  default_thread_pool()->Reset();
+}
+
+zx_status_t Dispatcher::ThreadPool::AddThread() {
+  fbl::AutoLock lock(&lock_);
+  dispatcher_threads_needed_++;
+  // TODO(surajmalhotra): We are clamping number_threads_ to 10 to avoid spawning too many threads.
+  // Technically this can result in a deadlock scenario in a very complex driver host. We need
+  // better support for dynamically starting threads as necessary.
+  if (num_threads_ >= dispatcher_threads_needed_ || num_threads_ == 10) {
+    return ZX_OK;
+  }
+  auto name = "fdf-dispatcher-thread-" + std::to_string(num_threads_);
+  if (scheduler_role() != kNoSchedulerRole) {
+    name += ":";
+    name += scheduler_role();
+  }
+  zx_status_t status = loop_.StartThread(name.c_str());
+  if (status == ZX_OK) {
+    num_threads_++;
+  }
+  return status;
+}
+
+void Dispatcher::ThreadPool::OnDispatcherRemoved() {
+  fbl::AutoLock lock(&lock_);
+  ZX_ASSERT(dispatcher_threads_needed_ > 0);
+  dispatcher_threads_needed_--;
+}
+
+void Dispatcher::ThreadPool::Reset() {
+  {
+    fbl::AutoLock lock(&lock_);
     ZX_ASSERT_MSG(dispatcher_threads_needed_ <= 1, "Too many dispatcher threads to reset: %d",
                   dispatcher_threads_needed_);
   }
@@ -1639,12 +1622,34 @@ void DispatcherCoordinator::Reset() {
 
   {
     fbl::AutoLock al(&lock_);
-    number_threads_ = 0;
+    num_threads_ = 0;
     dispatcher_threads_needed_ = 0;
   }
 }
 
-void DispatcherCoordinator::CachedIrqs::AddIrq(std::unique_ptr<Dispatcher::AsyncIrq> irq) {
+void Dispatcher::ThreadPool::CacheUnboundIrq(std::unique_ptr<Dispatcher::AsyncIrq> irq) {
+  fbl::AutoLock lock(&lock_);
+  cached_irqs_.AddIrqLocked(std::move(irq));
+}
+
+void Dispatcher::ThreadPool::OnThreadWakeup() {
+  uint32_t thread_irq_generation_id = driver_context::GetIrqGenerationId();
+  // Check if we have already tracked this thread wakeup for the current generation of irqs.
+  // |cur_generatiom_id| is atomic - we do not acquire the lock here to avoid unnecessary lock
+  // contention per thread wakeup. If the generation id changes in the meanwhile, the next wakeuup
+  // of this thread can handle that.
+  if (thread_irq_generation_id == cached_irqs_.cur_generation_id()) {
+    return;
+  }
+
+  fbl::AutoLock lock(&lock_);
+  // We should set this first, as |cached_irqs_.NewThreadWakeupLocked| may increment the generation
+  // id if it clears the current generation.
+  driver_context::SetIrqGenerationId(cached_irqs_.cur_generation_id());
+  cached_irqs_.NewThreadWakeupLocked(num_threads_);
+}
+
+void Dispatcher::ThreadPool::CachedIrqs::AddIrqLocked(std::unique_ptr<Dispatcher::AsyncIrq> irq) {
   // Check if we are tracking a new generation of irqs.
   if (cur_generation_.is_empty()) {
     IncrementGenerationId();
@@ -1657,7 +1662,7 @@ void DispatcherCoordinator::CachedIrqs::AddIrq(std::unique_ptr<Dispatcher::Async
   }
 }
 
-void DispatcherCoordinator::CachedIrqs::NewThreadWakeup(uint32_t total_number_threads) {
+void Dispatcher::ThreadPool::CachedIrqs::NewThreadWakeupLocked(uint32_t total_number_threads) {
   threads_wakeup_count_++;
   // If all threads have woken up since the current generation of cached irqs was populated,
   // we can be sure that no threads have a pending irq packet that correspond to these unbound irqs.

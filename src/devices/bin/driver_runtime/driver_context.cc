@@ -67,10 +67,8 @@ bool IsDriverInCallStack(const void* driver) {
 
 bool IsCallStackEmpty() { return g_driver_call_stack.empty(); }
 
-void OnThreadWakeup(driver_runtime::DispatcherCoordinator& coordinator) {
-  uint32_t new_irq_generation_id;
-  coordinator.OnThreadWakeup(g_cached_irqs_generation, &new_irq_generation_id);
-  g_cached_irqs_generation = new_irq_generation_id;
-}
+uint32_t GetIrqGenerationId() { return g_cached_irqs_generation; }
+
+void SetIrqGenerationId(uint32_t id) { g_cached_irqs_generation = id; }
 
 }  // namespace driver_context

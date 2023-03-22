@@ -106,6 +106,115 @@ class Dispatcher : public async_dispatcher_t,
     zx_packet_interrupt_t interrupt_packet_ = {};
   };
 
+  class ThreadPool {
+   public:
+    // The default pool is for the dispatchers with no specified scheduler role.
+    static constexpr std::string_view kNoSchedulerRole = "";
+
+    explicit ThreadPool(std::string_view scheduler_role = kNoSchedulerRole)
+        : scheduler_role_(scheduler_role), config_(MakeConfig()), loop_(&config_) {}
+
+    // Starts another thread on |loop_|.
+    zx_status_t AddThread();
+    // Updates the number of threads needed in the thread pool.
+    void OnDispatcherRemoved();
+
+    // Resets to 0 threads.
+    // Must only be called when there are no outstanding dispatchers.
+    // Must not be called from within a driver_runtime managed thread as that will result in a
+    // deadlock.
+    void Reset();
+
+    // Stores |irq| which has been unbound.
+    // This is avoid destroying the irq wrapper immediately after unbinding, as it's possible
+    // another thread in the thread pool has already pulled an irq packet
+    // from the port and may attempt to call the irq handler.
+    void CacheUnboundIrq(std::unique_ptr<driver_runtime::Dispatcher::AsyncIrq> irq);
+
+    // Updates the thread tracking and checks whether to garbage collect the current generation of
+    // irqs.
+    void OnThreadWakeup();
+
+    // Returns the number of threads that have been started on |loop_|.
+    uint32_t num_threads() {
+      fbl::AutoLock al(&lock_);
+      return num_threads_;
+    }
+
+    std::string_view scheduler_role() { return scheduler_role_; }
+    async::Loop* loop() { return &loop_; }
+
+   private:
+    // This stores irqs to avoid destroying them immediately after unbinding.
+    // Even though unbinding an irq will clear all irq packets on a port,
+    // it's possible another thread in the thread pool has already pulled an irq packet
+    // from the port and may attempt to call the irq handler.
+    //
+    // It is safe to destroy a cached irq once we can determine that all threads
+    // have woken up at least once since the irq was unbound.
+    class CachedIrqs {
+     public:
+      // Adds an unbound irq to the cached irqs.
+      void AddIrqLocked(std::unique_ptr<Dispatcher::AsyncIrq> irq) __TA_REQUIRES(&lock_);
+
+      void NewThreadWakeupLocked(uint32_t total_number_threads) __TA_REQUIRES(&lock_);
+
+      // The coordinator can compare the current generation id to a thread's stored generation id to
+      // see if the thread wakeup has not yet been tracked, in which case |NewThreadWakeupLocked|
+      // should be called.
+      uint32_t cur_generation_id() { return cur_generation_id_.load(); }
+
+     private:
+      using List = fbl::DoublyLinkedList<std::unique_ptr<Dispatcher::AsyncIrq>,
+                                         fbl::DefaultObjectTag, fbl::SizeOrder::Constant>;
+
+      void IncrementGenerationId() __TA_REQUIRES(&lock_) {
+        if (cur_generation_id_.fetch_add(1) == UINT32_MAX) {
+          // |fetch_add| returns the value before adding. Avoid using 0 for a new generation id,
+          // since new threads may be spawned with default generation id 0.
+          cur_generation_id_++;
+        }
+      }
+
+      // The current generation of cached irqs to be garbage collected once all threads wakeup.
+      List cur_generation_ __TA_GUARDED(&lock_);
+      // These are the irqs that were unbound after we already tracked a thread wakeup for the
+      // current generation.
+      List next_generation_ __TA_GUARDED(&lock_);
+
+      // The number of threads that have woken up since the irqs in the |cur_generation_| list was
+      // populated.
+      uint32_t threads_wakeup_count_ __TA_GUARDED(&lock_) = 0;
+
+      // This is not locked for reads, so that threads do not need to deal with lock contention if
+      // there are no cached irqs.
+      std::atomic<uint32_t> cur_generation_id_ = 0;
+    };
+
+    static constexpr async_loop_config_t MakeConfig() {
+      async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
+      config.irq_support = true;
+      return config;
+    }
+
+    std::string scheduler_role_;
+
+    fbl::Mutex lock_;
+    // Tracks the number of dispatchers which have sync calls allowed. We will only spawn additional
+    // threads if this number exceeds |number_threads_|.
+    uint32_t dispatcher_threads_needed_ __TA_GUARDED(&lock_) = 0;
+    // Tracks the number of threads we've spawned via |loop_|.
+    uint32_t num_threads_ __TA_GUARDED(&lock_) = 0;
+
+    // Stores unbound irqs which will be garbage collected at a later time.
+    CachedIrqs cached_irqs_;
+
+    async_loop_config_t config_;
+    // |loop_| must be declared last, to ensure that the loop shuts down before
+    // other members are destructed.
+    async::Loop loop_;
+  };
+
   struct TaskDebugInfo {
     async_task_t* ptr;
     async_task_handler_t* handler;
@@ -134,7 +243,8 @@ class Dispatcher : public async_dispatcher_t,
   // Public for std::make_unique.
   // Use |Create| or |CreateWithLoop| instead of calling directly.
   Dispatcher(uint32_t options, std::string_view name, bool unsynchronized, bool allow_sync_calls,
-             const void* owner, async_dispatcher_t* process_shared_dispatcher,
+             const void* owner, ThreadPool* thread_pool,
+             async_dispatcher_t* process_shared_dispatcher,
              fdf_dispatcher_shutdown_observer_t* observer);
 
   // Creates a dispatcher which is backed by |dispatcher|.
@@ -145,8 +255,8 @@ class Dispatcher : public async_dispatcher_t,
   // the dispatcher will be deleted once all callbacks canclled or completed by the dispatcher.
   static zx_status_t CreateWithAdder(uint32_t options, std::string_view name,
                                      std::string_view scheduler_role, const void* owner,
-                                     async_dispatcher_t* dispatcher, ThreadAdder adder,
-                                     fdf_dispatcher_shutdown_observer_t*,
+                                     ThreadPool* thread_pool, async_dispatcher_t* dispatcher,
+                                     ThreadAdder adder, fdf_dispatcher_shutdown_observer_t*,
                                      Dispatcher** out_dispatcher);
 
   // Creates a dispatcher which is backed by |loop|.
@@ -282,6 +392,9 @@ class Dispatcher : public async_dispatcher_t,
 
   // Returns the driver which owns this dispatcher.
   const void* owner() const { return owner_; }
+
+  // Returns the thread pool that backs this dispatcher.
+  ThreadPool* thread_pool() { return thread_pool_; }
 
   const async_dispatcher_t* process_shared_dispatcher() const { return process_shared_dispatcher_; }
 
@@ -518,6 +631,7 @@ class Dispatcher : public async_dispatcher_t,
   // The driver which owns this dispatcher. May be nullptr if undeterminable.
   const void* const owner_;
 
+  ThreadPool* thread_pool_;
   // Global dispatcher shared across all dispatchers in a process.
   async_dispatcher_t* process_shared_dispatcher_;
   EventWaiter* event_waiter_ __TA_GUARDED(&callback_lock_);
@@ -587,14 +701,14 @@ class Dispatcher : public async_dispatcher_t,
 class DispatcherCoordinator {
  public:
   // We default to no threads, and start additional threads when blocking dispatchers are created.
-  DispatcherCoordinator() : config_(MakeConfig()), loop_(&config_) {
-    token_manager_.SetGlobalDispatcher(loop_.dispatcher());
+  DispatcherCoordinator() {
+    auto thread_pool = default_thread_pool();
+    token_manager_.SetGlobalDispatcher(thread_pool->loop()->dispatcher());
   }
 
   static void DestroyAllDispatchers();
   static void WaitUntilDispatchersIdle();
   static void WaitUntilDispatchersDestroyed();
-  static bool HasManagedThreads();
   static zx_status_t RunUntilIdle();
   static zx_status_t ShutdownDispatchersAsync(const void* driver,
                                               fdf_env_driver_shutdown_observer_t* observer);
@@ -612,18 +726,6 @@ class DispatcherCoordinator {
   // Notifies the dispatcher coordinator that a dispatcher has completed shutdown.
   void NotifyShutdown(driver_runtime::Dispatcher& dispatcher);
   void RemoveDispatcher(Dispatcher& dispatcher);
-  // Stores |irq| which has been unbound.
-  // This is avoid destroying the irq wrapper immediately after unbinding, as it's possible
-  // another process dispatcher thread has already pulled an irq packet from the port
-  // and may attempt to call the irq handler.
-  static void CacheUnboundIrq(std::unique_ptr<driver_runtime::Dispatcher::AsyncIrq> irq);
-  // Notifies the coordinator that the current thread has woken up. This will check if there is
-  // cached irq garbage collection to do.
-  // |thread_irq_generation_id| is the generation id seen by the thread at its last wakeup.
-  // |out_cur_irq_generation_id| is the generation id to update the thread to.
-  static void OnThreadWakeup(uint32_t thread_irq_generation_id,
-                             uint32_t* out_cur_irq_generation_id);
-  zx_status_t AddThread();
   static zx_status_t Start();
   static void EnvReset();
 
@@ -633,12 +735,7 @@ class DispatcherCoordinator {
   // deadlock.
   void Reset();
 
-  async::Loop* loop() { return &loop_; }
-
-  uint32_t num_threads() {
-    fbl::AutoLock al(&lock_);
-    return number_threads_;
-  }
+  Dispatcher::ThreadPool* default_thread_pool() { return &default_thread_pool_; }
 
  private:
   static constexpr async_loop_config_t MakeConfig() {
@@ -733,53 +830,6 @@ class DispatcherCoordinator {
     fdf_env_driver_shutdown_observer_t* shutdown_observer_ = nullptr;
   };
 
-  // This stores irqs to avoid destroying them immediately after unbinding.
-  // Even though unbinding an irq will clear all irq packets on a port,
-  // it's possible another process dispatcher thread has already pulled an irq packet
-  // from the port and may attempt to call the irq handler.
-  //
-  // It is safe to destroy a cached irq once we can determine that all threads
-  // have woken up at least once since the irq was unbound.
-  class CachedIrqs {
-   public:
-    // Adds an unbound irq to the cached irqs.
-    void AddIrq(std::unique_ptr<Dispatcher::AsyncIrq> irq) __TA_REQUIRES(&lock_);
-    // Updates the thread tracking and checks whether to garbage collect the current generation of
-    // irqs.
-    void NewThreadWakeup(uint32_t total_threads) __TA_REQUIRES(&lock_);
-
-    // The coordinator can compare the current generation id to a thread's stored generation id to
-    // see if the thread wakeup has not yet been tracked, in which case |NewThreadWakeup| should be
-    // called.
-    uint32_t cur_generation_id() { return cur_generation_id_.load(); }
-
-   private:
-    using List = fbl::DoublyLinkedList<std::unique_ptr<Dispatcher::AsyncIrq>, fbl::DefaultObjectTag,
-                                       fbl::SizeOrder::Constant>;
-
-    void IncrementGenerationId() __TA_REQUIRES(&lock_) {
-      if (cur_generation_id_.fetch_add(1) == UINT32_MAX) {
-        // |fetch_add| returns the value before adding. Avoid using 0 for a new generation id,
-        // since new threads may be spawned with default generation id 0.
-        cur_generation_id_++;
-      }
-    }
-
-    // The current generation of cached irqs to be garbage collected once all threads wakeup.
-    List cur_generation_ __TA_GUARDED(&lock_);
-    // These are the irqs that were unbound after we already tracked a thread wakeup for the
-    // current generation.
-    List next_generation_ __TA_GUARDED(&lock_);
-
-    // The number of threads that have woken up since the irqs in the |cur_generation_| list was
-    // populated.
-    uint32_t threads_wakeup_count_ __TA_GUARDED(&lock_) = 0;
-
-    // This is not locked for reads, so that threads do not need to deal with lock contention if
-    // there are no cached irqs.
-    std::atomic<uint32_t> cur_generation_id_ = 0;
-  };
-
   // Make sure this destructs after |loop_|. This is as dispatchers will remove themselves
   // from this list on shutdown.
   fbl::Mutex lock_;
@@ -788,21 +838,10 @@ class DispatcherCoordinator {
   // Notified when all drivers are destroyed.
   fbl::ConditionVariable drivers_destroyed_event_ __TA_GUARDED(&lock_);
 
-  // Tracks the number of threads we've spawned via |loop_|.
-  uint32_t number_threads_ __TA_GUARDED(&lock_) = 0;
-  // Tracks the number of dispatchers which have sync calls allowed. We will only spawn additional
-  // threads if this number exceeds |number_threads_|.
-  uint32_t dispatcher_threads_needed_ __TA_GUARDED(&lock_) = 0;
-
-  // Stores unbound irqs which will be garbage collected at a later time.
-  CachedIrqs cached_irqs_;
+  // Thread pool which has no scheduler role applied.
+  Dispatcher::ThreadPool default_thread_pool_;
 
   TokenManager token_manager_;
-
-  async_loop_config_t config_;
-  // |loop_| must be declared last, to ensure that the loop shuts down before
-  // other members are destructed.
-  async::Loop loop_;
 };
 
 }  // namespace driver_runtime

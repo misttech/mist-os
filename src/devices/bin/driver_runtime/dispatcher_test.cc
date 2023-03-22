@@ -1662,20 +1662,23 @@ TEST_F(DispatcherTest, IrqCancelOnShutdown) {
 
 // Tests that we get one cancellation callback per irq that is still bound when shutting down.
 TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
-  auto shutdown_observer = std::make_unique<DispatcherShutdownObserver>();
-  driver_runtime::Dispatcher* runtime_dispatcher;
-  ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
-                       0, __func__, "", CreateFakeDriver(), &loop_,
-                       shutdown_observer->fdf_observer(), &runtime_dispatcher));
-  fdf_dispatcher_t* fdf_dispatcher = static_cast<fdf_dispatcher_t*>(runtime_dispatcher);
+  libsync::Completion shutdown_completion;
+  auto shutdown_handler = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion.Signal(); };
 
-  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
+  auto fdf_dispatcher = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      CreateFakeDriver(), {}, "", shutdown_handler);
+  ASSERT_FALSE(fdf_dispatcher.is_error());
+
+  async_dispatcher_t* dispatcher = fdf_dispatcher->async_dispatcher();
   ASSERT_NOT_NULL(dispatcher);
 
   // Create a second dispatcher which allows sync calls to force multiple threads.
-  fdf_dispatcher_t* fdf_dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                           "scheduler_role", CreateFakeDriver(), &fdf_dispatcher2));
+  libsync::Completion shutdown_completion2;
+  auto shutdown_handler2 = [&](fdf_dispatcher_t* dispatcher) { shutdown_completion2.Signal(); };
+  auto fdf_dispatcher2 = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
+      CreateFakeDriver(), fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "",
+      shutdown_handler2);
+  ASSERT_FALSE(fdf_dispatcher2.is_error());
 
   zx::interrupt irq_object;
   ASSERT_EQ(ZX_OK, zx::interrupt::create(zx::resource(0), 0, ZX_INTERRUPT_VIRTUAL, &irq_object));
@@ -1705,19 +1708,20 @@ TEST_F(DispatcherTest, IrqCancelOnShutdownCallbackOnlyOnce) {
   // Make sure the callback request has already been queued by the second global dispatcher thread,
   // by queueing a task after the trigger and waiting for the task's completion.
   libsync::Completion task_complete;
-  ASSERT_OK(async::PostTask(fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2),
-                            [&] { task_complete.Signal(); }));
+  ASSERT_OK(async::PostTask(fdf_dispatcher2->async_dispatcher(), [&] { task_complete.Signal(); }));
   task_complete.Wait();
 
   // This should remove the in-flight irq, unbind the irq and call the handler with ZX_ERR_CANCELED.
-  fdf_dispatcher_shutdown_async(fdf_dispatcher);
+  fdf_dispatcher->ShutdownAsync();
 
   // We can now unblock the first dispatcher.
   complete_task.Signal();
 
-  ASSERT_OK(shutdown_observer->WaitUntilShutdown());
+  shutdown_completion.Wait();
   irq_completion.Wait();
-  fdf_dispatcher_destroy(fdf_dispatcher);
+
+  fdf_dispatcher2->ShutdownAsync();
+  shutdown_completion2.Wait();
 }
 
 // Tests that an irq can be unbound after a dispatcher begins shutting down.
@@ -2943,14 +2947,14 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
     driver_context::PushDriver(driver);
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 1);
+    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 1);
 
     // Create first dispatcher
     driver_runtime::Dispatcher* dispatcher;
     DispatcherShutdownObserver observer;
     ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
                                      "scheduler_role", observer.fdf_observer(), &dispatcher));
-    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 2);
+    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 2);
 
     dispatcher->ShutdownAsync();
     ASSERT_OK(observer.WaitUntilShutdown());
@@ -2961,7 +2965,7 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
     ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
                                      "scheduler_role", observer2.fdf_observer(), &dispatcher));
     // Note that we are still at 2 threads.
-    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 2);
+    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 2);
 
     dispatcher->ShutdownAsync();
     ASSERT_OK(observer2.WaitUntilShutdown());
@@ -2969,11 +2973,11 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
 
     // Ideally we would be back down 1 thread at this point, but that is challenging. A future
     // change may remedy this.
-    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 2);
+    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 2);
   }
 
   driver_runtime::GetDispatcherCoordinator().Reset();
-  ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 0);
+  ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 0);
 }
 
 TEST_F(DispatcherTest, MaximumTenThreads) {
@@ -2982,7 +2986,7 @@ TEST_F(DispatcherTest, MaximumTenThreads) {
     driver_context::PushDriver(driver);
     auto pop_driver = fit::defer([]() { driver_context::PopDriver(); });
 
-    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 1);
+    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 1);
 
     constexpr uint32_t kNumDispatchers = 11;
 
@@ -2992,10 +2996,11 @@ TEST_F(DispatcherTest, MaximumTenThreads) {
       ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
                                        "scheduler_role", observers[i].fdf_observer(),
                                        &dispatchers[i]));
-      ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), std::min(i + 2, 10u));
+      ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(),
+                std::min(i + 2, 10u));
     }
 
-    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().num_threads(), 10);
+    ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 10);
 
     for (uint32_t i = 0; i < kNumDispatchers; i++) {
       dispatchers[i]->ShutdownAsync();
