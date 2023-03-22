@@ -243,7 +243,7 @@ class ServerBindingRefBase {
 
   void Unbind() {
     if (auto binding = ref_.lock()) {
-      binding->StartTeardown(std::move(binding));
+      (void)binding->StartTeardown(std::move(binding));
     }
   }
 

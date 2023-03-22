@@ -110,9 +110,7 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
 
   // |StartTeardownWithInfo| attempts to post exactly one task to drive the
   // teardown process. This enum reflects the result of posting the task.
-  enum class TeardownTaskPostingResult {
-    kOk,
-
+  enum class TeardownTaskPostingError {
     // The binding is already tearing down, so we should not post another.
     kRacedWithInProgressTeardown,
 
@@ -130,19 +128,27 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
     // this is inherently racy i.e. shutting down dispatchers while trying
     // to also bind new channels to the same dispatcher, so we may want to
     // reevaluate whether shutting down the dispatcher is an error whenever
-    // there is any active binding (fxbug.dev/NNNNN).
+    // there is any active binding (fxbug.dev/117969).
     kDispatcherError,
   };
+
+  // A marker to signal that the contained transport could be invalid.
+  using MaybeAnyTransport = AnyTransport;
+
+  // When successful, if the caller is guaranteed to be the unique owner of
+  // the transport (e.g. synchronized client), extracts the transport and
+  // returns it.
+  using TeardownTaskPostingResult = fit::result<TeardownTaskPostingError, MaybeAnyTransport>;
+
+  TeardownTaskPostingResult StartTeardown(std::shared_ptr<AsyncBinding>&& calling_ref)
+      __TA_EXCLUDES(thread_checker_) __TA_EXCLUDES(lock_) {
+    return StartTeardownWithInfo(std::move(calling_ref), ::fidl::UnbindInfo::Unbind());
+  }
 
   // Notifies the binding of an |error| while servicing messages.
   // This may lead to binding teardown.
   void HandleError(std::shared_ptr<AsyncBinding>&& calling_ref, DispatchError error)
       __TA_EXCLUDES(lock_);
-
-  void StartTeardown(std::shared_ptr<AsyncBinding>&& calling_ref) __TA_EXCLUDES(thread_checker_)
-      __TA_EXCLUDES(lock_) {
-    StartTeardownWithInfo(std::move(calling_ref), ::fidl::UnbindInfo::Unbind());
-  }
 
   // Returns true if the binding will teardown at the next iteration of the
   // event loop, or has already torn down and pending deletion.
@@ -199,6 +205,8 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
 
   const DebugOnlySynchronizationChecker& thread_checker() const { return thread_checker_; }
 
+  ThreadingPolicy threading_policy() const { return threading_policy_; }
+
   // Initiates teardown with the provided |info| as reason.
   // This does not have to happen in the context of a dispatcher thread.
   TeardownTaskPostingResult StartTeardownWithInfo(std::shared_ptr<AsyncBinding>&& calling_ref,
@@ -216,6 +224,12 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
   // is destroyed during this function.
   void PerformTeardown(std::optional<UnbindInfo> info) __TA_REQUIRES(thread_checker_)
       __TA_RELEASE(thread_checker_) __TA_EXCLUDES(lock_);
+
+  // Override |ExtractTransportIfUnique| to extract the transport synchronously
+  // during teardown. "Unique" here means there is only one object holding on to
+  // the transport. It does not account for logical uses of the transport, such
+  // as those from pending two-way calls.
+  virtual MaybeAnyTransport ExtractTransportIfUnique() { return MaybeAnyTransport{}; }
 
   // Override |FinishTeardown| to perform cleanup work at the final stage of
   // binding teardown.
@@ -275,6 +289,8 @@ class AsyncBinding : public std::enable_shared_from_this<AsyncBinding> {
   // |thread_checker_| is no-op in release builds, and may be completely
   // optimized out.
   [[no_unique_address]] DebugOnlySynchronizationChecker thread_checker_;
+
+  ThreadingPolicy threading_policy_;
 
   std::shared_ptr<LockedUnbindInfo> shared_unbind_info_;
 
@@ -451,7 +467,7 @@ class AsyncServerBinding : public AsyncBinding {
 
   // Start closing the server connection with an |epitaph|.
   void Close(std::shared_ptr<AsyncBinding>&& calling_ref, zx_status_t epitaph) {
-    StartTeardownWithInfo(std::move(calling_ref), fidl::UnbindInfo::Close(epitaph));
+    (void)StartTeardownWithInfo(std::move(calling_ref), fidl::UnbindInfo::Close(epitaph));
   }
 
   // Do not construct this object outside of this class. This constructor takes
@@ -519,9 +535,14 @@ class AsyncClientBinding final : public AsyncBinding {
   std::optional<DispatchError> Dispatch(fidl::IncomingHeaderAndMessage& msg, bool* binding_released,
                                         internal::MessageStorageViewBase* storage_view) override;
 
+  MaybeAnyTransport ExtractTransportIfUnique() override;
+
   void FinishTeardown(std::shared_ptr<AsyncBinding>&& calling_ref, UnbindInfo info) override;
 
+  // The |transport_| is reference-counted to be vended out to synchronous calls
+  // that will hold on to the transport throughout the duration of a sync call.
   std::shared_ptr<fidl::internal::AnyTransport> transport_;
+
   std::shared_ptr<ClientBase> client_;
   AsyncEventHandler* error_handler_;
   AnyTeardownObserver teardown_observer_;

@@ -48,9 +48,9 @@ TEST(Status, OkDescription) { ASSERT_EQ("FIDL success", fidl::Status::Ok().Forma
 TEST(Status, UnboundDescription) {
   std::string expected = SelectErrorDescription(
       "FIDL operation failed due to user initiated unbind, status: ZX_ERR_CANCELED (-23), "
-      "detail: failed outgoing operation on unbound channel",
+      "detail: unbound endpoint",
       "FIDL operation failed due to user initiated unbind, status: -23, "
-      "detail: failed outgoing operation on unbound channel");
+      "detail: unbound endpoint");
   ASSERT_EQ(expected, fidl::Status::Unbound().FormatDescription());
 }
 

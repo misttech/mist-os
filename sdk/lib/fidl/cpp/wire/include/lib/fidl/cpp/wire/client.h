@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/internal/endpoints.h>
 #include <lib/fidl/cpp/wire/internal/thenable.h>
 #include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
+#include <lib/fit/result.h>
 
 namespace fidl {
 
@@ -250,6 +251,28 @@ class WireClient {
     return internal::Arrow<internal::WireWeakSyncClientImpl<Protocol>>{&get()};
   }
 
+  // Attempts to disassociate the client object from its endpoint and stop
+  // monitoring it for messages. After this call, subsequent operations will
+  // fail with an unbound error.
+  //
+  // If there are pending two-way async calls, the endpoint is closed and this
+  // method will fail with |fidl::Reason::kPendingTwoWayCallPreventsUnbind|. The
+  // caller needs to arrange things such that unbinding happens after any
+  // replies to two-way calls.
+  //
+  // If the endpoint was already closed due to an earlier error, that error will
+  // be returned here.
+  //
+  // Otherwise, returns the client endpoint.
+  fit::result<fidl::Error, fidl::ClientEnd<Protocol>> UnbindMaybeGetEndpoint() {
+    fit::result result = controller_.UnbindMaybeGetEndpoint();
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return fit::ok(
+        fidl::ClientEnd<Protocol>(result.value().release<fidl::internal::ChannelTransport>()));
+  }
+
  private:
   // Allow unit tests to peek into the internals of this class.
   friend ::fidl_testing::ClientChecker;
@@ -341,14 +364,15 @@ fidl::AnyTeardownObserver ShareUntilTeardown(std::shared_ptr<T> object) {
 //
 // ## Thread safety
 //
-// FIDL method calls on this class are thread-safe. |AsyncTeardown| and |Clone|
-// are also thread-safe, and may be invoked in parallel with FIDL method calls.
-// However, those operations must be synchronized with operations that consume
-// or mutate the |WireSharedClient| itself:
+// FIDL method calls on this class are thread-safe. |Clone| may be invoked in
+// parallel with FIDL method calls. However, those operations must be
+// synchronized with operations that consume or mutate the |WireSharedClient|
+// itself:
 //
 // - Assigning a new value to the |WireSharedClient| variable.
 // - Moving the |WireSharedClient| to a different location.
 // - Destroying the |WireSharedClient| variable.
+// - Calling |AsyncTeardown|.
 //
 // When teardown completes, the binding will notify the user from a |dispatcher|
 // thread, unless the user shuts down the |dispatcher| while there are active

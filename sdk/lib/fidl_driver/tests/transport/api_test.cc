@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/test.transport/cpp/driver/wire.h>
+#include <fidl/test.transport/cpp/driver/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <thread>
@@ -277,3 +278,211 @@ INSTANTIATE_TEST_SUITE_P(WireSharedClientTests, WireSharedClient,
                                ZX_PANIC("Invalid index");
                            }
                          });
+
+template <typename T>
+struct ClientUnbindTest : public ::testing::Test {};
+TYPED_TEST_SUITE_P(ClientUnbindTest);
+
+TYPED_TEST_P(ClientUnbindTest, UnbindMaybeGetEndpoint) {
+  using Client = TypeParam;
+
+  fidl_driver_testing::ScopedFakeDriver driver;
+  auto [dispatcher, dispatcher_shutdown] = CreateSyncDispatcher();
+  auto endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
+  ASSERT_OK(endpoints.status_value());
+  fdf_handle_t handle_number = endpoints->client.channel().get();
+
+  zx::result result =
+      fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&, dispatcher = dispatcher.get()] {
+        Client client(std::move(endpoints->client), dispatcher);
+        fit::result<fidl::Error, fdf::ClientEnd<test_transport::TwoWayTest>> result =
+            client.UnbindMaybeGetEndpoint();
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_EQ(handle_number, result.value().channel().get());
+      });
+  ASSERT_OK(result.status_value());
+
+  dispatcher.ShutdownAsync();
+  dispatcher_shutdown->Wait();
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindAfterFatalError) {
+  using Client = TypeParam;
+
+  fidl_driver_testing::ScopedFakeDriver driver;
+  auto [dispatcher, dispatcher_shutdown] = CreateSyncDispatcher();
+  auto endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
+  ASSERT_OK(endpoints.status_value());
+
+  struct EventHandler : public fdf::WireAsyncEventHandler<test_transport::TwoWayTest>,
+                        public fdf::AsyncEventHandler<test_transport::TwoWayTest> {
+    void on_fidl_error(fidl::UnbindInfo info) final { errored.Signal(); }
+    libsync::Completion errored;
+  } event_handler;
+  std::optional<Client> client;
+  {
+    zx::result result =
+        fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&, dispatcher = dispatcher.get()] {
+          client.emplace(std::move(endpoints->client), dispatcher, &event_handler);
+        });
+    ASSERT_OK(result.status_value());
+  }
+
+  {
+    zx::result result =
+        fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&] { endpoints->server.reset(); });
+    ASSERT_OK(result.status_value());
+  }
+
+  {
+    zx::result result = fdf::WaitFor(event_handler.errored);
+    ASSERT_OK(result.status_value());
+  }
+
+  {
+    zx::result result = fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&] {
+      fit::result result = client.value().UnbindMaybeGetEndpoint();
+      ASSERT_TRUE(result.is_error());
+      EXPECT_TRUE(result.error_value().is_peer_closed());
+
+      client.reset();
+    });
+    ASSERT_OK(result.status_value());
+  }
+
+  dispatcher.ShutdownAsync();
+  dispatcher_shutdown->Wait();
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindTwice) {
+  using Client = TypeParam;
+
+  fidl_driver_testing::ScopedFakeDriver driver;
+  auto [dispatcher, dispatcher_shutdown] = CreateSyncDispatcher();
+  auto endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
+  ASSERT_OK(endpoints.status_value());
+
+  zx::result result =
+      fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&, dispatcher = dispatcher.get()] {
+        Client client(std::move(endpoints->client), dispatcher);
+
+        {
+          fit::result result = client.UnbindMaybeGetEndpoint();
+          ASSERT_TRUE(result.is_ok()) << result.error_value();
+        }
+
+        {
+          fit::result result = client.UnbindMaybeGetEndpoint();
+          ASSERT_TRUE(result.is_error());
+          EXPECT_EQ(result.error_value().reason(), fidl::Reason::kUnbind);
+        }
+      });
+  ASSERT_OK(result.status_value());
+
+  dispatcher.ShutdownAsync();
+  dispatcher_shutdown->Wait();
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindWithPendingCallsShouldFail) {
+  using Client = TypeParam;
+
+  fidl_driver_testing::ScopedFakeDriver driver;
+  auto [dispatcher, dispatcher_shutdown] = CreateSyncDispatcher();
+  auto endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
+  ASSERT_OK(endpoints.status_value());
+
+  zx::result result =
+      fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&, dispatcher = dispatcher.get()] {
+        Client client(std::move(endpoints->client), dispatcher);
+        if constexpr (std::is_same_v<Client, fdf::WireClient<test_transport::TwoWayTest>>) {
+          fdf::Arena arena('TEST');
+          client.buffer(arena)->TwoWay({}).ThenExactlyOnce([](auto&) {});
+        } else {
+          client->TwoWay({}).ThenExactlyOnce([](auto&) {});
+        }
+
+        {
+          fit::result result = client.UnbindMaybeGetEndpoint();
+          ASSERT_TRUE(result.is_error());
+          EXPECT_EQ(result.error_value().reason(), fidl::Reason::kPendingTwoWayCallPreventsUnbind);
+        }
+
+        {
+          fit::result result = client.UnbindMaybeGetEndpoint();
+          ASSERT_TRUE(result.is_error());
+          EXPECT_EQ(result.error_value().reason(), fidl::Reason::kUnbind);
+        }
+      });
+  ASSERT_OK(result.status_value());
+
+  dispatcher.ShutdownAsync();
+  dispatcher_shutdown->Wait();
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindAfterACompletedTwoWayCall) {
+  using Client = TypeParam;
+
+  fidl_driver_testing::ScopedFakeDriver driver;
+  auto [dispatcher, dispatcher_shutdown] = CreateSyncDispatcher();
+  auto endpoints = fdf::CreateEndpoints<test_transport::TwoWayTest>();
+  ASSERT_OK(endpoints.status_value());
+  fdf_handle_t handle_number = endpoints->client.channel().get();
+
+  libsync::Completion call_done;
+  std::optional<Client> client;
+  {
+    zx::result result =
+        fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&, dispatcher = dispatcher.get()] {
+          client.emplace(std::move(endpoints->client), dispatcher);
+          if constexpr (std::is_same_v<Client, fdf::WireClient<test_transport::TwoWayTest>>) {
+            fdf::Arena arena('TEST');
+            client.value().buffer(arena)->TwoWay({}).ThenExactlyOnce(
+                [&](auto&) { call_done.Signal(); });
+          } else {
+            client.value()->TwoWay({}).ThenExactlyOnce([&](auto&) { call_done.Signal(); });
+          }
+        });
+    ASSERT_OK(result.status_value());
+  }
+
+  class Server : public fdf::Server<test_transport::TwoWayTest> {
+   public:
+    void TwoWay(TwoWayRequest& request, TwoWayCompleter::Sync& completer) final {
+      completer.Reply({request.payload()});
+    }
+  } server;
+  std::optional<fdf::ServerBinding<test_transport::TwoWayTest>> binding;
+
+  {
+    zx::result result =
+        fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&, dispatcher = dispatcher.get()] {
+          binding.emplace(dispatcher, std::move(endpoints->server), &server,
+                          fidl::kIgnoreBindingClosure);
+        });
+    ASSERT_OK(result.status_value());
+  }
+
+  ASSERT_OK(fdf::WaitFor(call_done).status_value());
+
+  {
+    zx::result result = fdf::RunOnDispatcherSync(dispatcher.async_dispatcher(), [&] {
+      fit::result result = (*client).UnbindMaybeGetEndpoint();
+      ASSERT_TRUE(result.is_ok()) << result.error_value();
+      ASSERT_EQ(handle_number, result.value().channel().get());
+
+      client.reset();
+      binding.reset();
+    });
+    ASSERT_OK(result.status_value());
+  }
+
+  dispatcher.ShutdownAsync();
+  dispatcher_shutdown->Wait();
+}
+
+REGISTER_TYPED_TEST_SUITE_P(ClientUnbindTest, UnbindMaybeGetEndpoint, UnbindAfterFatalError,
+                            UnbindTwice, UnbindWithPendingCallsShouldFail,
+                            UnbindAfterACompletedTwoWayCall);
+using ClientTypes = testing::Types<fdf::Client<test_transport::TwoWayTest>,
+                                   fdf::WireClient<test_transport::TwoWayTest>>;
+INSTANTIATE_TYPED_TEST_SUITE_P(TestPrefix, ClientUnbindTest, ClientTypes);

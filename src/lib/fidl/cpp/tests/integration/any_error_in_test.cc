@@ -5,7 +5,7 @@
 #include <fidl/test.error.methods/cpp/fidl.h>
 #include <lib/fidl/cpp/any_error_in.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 namespace {
 
@@ -66,7 +66,7 @@ TEST(ErrorsInMethod, UnsignedNumberedDomainError) {
   fidl::internal::ErrorsInImpl<uint32_t> error(3);
   EXPECT_FALSE(error.is_framework_error());
   EXPECT_TRUE(error.is_domain_error());
-  EXPECT_EQ(3, error.domain_error());
+  EXPECT_EQ(3u, error.domain_error());
   EXPECT_EQ("FIDL method domain error: uint32_t (value: 3)", error.FormatDescription());
 }
 

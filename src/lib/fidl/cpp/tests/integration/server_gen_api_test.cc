@@ -12,8 +12,10 @@
 #include <thread>
 #include <vector>
 
+#include <gtest/gtest.h>
 #include <sanitizer/lsan_interface.h>
-#include <zxtest/zxtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -149,14 +151,15 @@ TEST(Server, EventSendingOnMovedFromBindingRef) {
       fidl::BindServer(loop.dispatcher(), std::move(endpoints->server), &server);
   fidl::ServerBindingRef<ValueEvent> binding_ref_new = std::move(binding_ref);
 
-  ASSERT_DEATH([&] {
+  auto send_event_on_moved_from_ref = [&] {
 #if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
     // Disable LSAN for this thread while in scope. It is expected to leak by way
     // of a crash.
     __lsan::ScopedDisabler _;
 #endif
     (void)fidl::SendEvent(binding_ref)->OnValueEvent({{.s = "hello"}});
-  });
+  };
+  ASSERT_DEATH(send_event_on_moved_from_ref(), "");
 }
 
 }  // namespace

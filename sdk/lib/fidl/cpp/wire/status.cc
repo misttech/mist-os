@@ -19,8 +19,8 @@ const char* const kErrorInvalidHeader = "invalid header";
 const char* const kErrorUnknownTxId = "unknown txid";
 const char* const kErrorUnknownOrdinal = "unknown ordinal";
 const char* const kErrorTransport = "underlying transport I/O error";
-const char* const kErrorChannelUnbound = "failed outgoing operation on unbound channel";
-const char* const kErrorWaitOneFailed = "zx_channel_wait_one failed";
+const char* const kErrorChannelUnbound = "unbound endpoint";
+const char* const kErrorWaitOneFailed = "failed waiting to read from endpoint";
 const char* const kErrorSyncEventBufferTooSmall =
     "received a larger message than allowed by the events";
 const char* const kErrorSyncEventUnhandledTransitionalEvent = "unhandled transitional event";
@@ -35,6 +35,7 @@ bool IsFatalErrorUniversal(fidl::Reason error) {
     case Reason::__DoNotUse:
     case Reason::kCanceledDueToOtherError:
     case Reason::kUnknownMethod:
+    case Reason::kPendingTwoWayCallPreventsUnbind:
       // These are not concrete errors.
       __builtin_abort();
     case Reason::kUnbind:
@@ -82,6 +83,8 @@ constexpr const char* DescribeReason(Reason reason) {
       return "user initiated unbind";
     case Reason::kClose:
       return "(server) user initiated close with epitaph";
+    case Reason::kPendingTwoWayCallPreventsUnbind:
+      return "pending two-way calls renders unbinding unsafe";
     case Reason::kCanceledDueToOtherError:
       return "being canceled by failure from another operation: ";
     case Reason::kPeerClosedWhileReading:

@@ -61,6 +61,12 @@ enum class Reason : uint16_t {
   // |status| is the result of sending the epitaph.
   kClose,
 
+  // The endpoint expects a reply to a pending two-way call; as such, it cannot
+  // be unbound.
+  //
+  // This reason is only observable when return from a |TryUnbind| call.
+  kPendingTwoWayCallPreventsUnbind,
+
   // Some other operation on this connection experienced an error that requires
   // the runtime to unbind the endpoint and teardown the bindings.
   //
@@ -216,6 +222,10 @@ class [[nodiscard]] Status {
   // (applies to both client and server).
   constexpr static Status Unbound() {
     return Status(ZX_ERR_CANCELED, ::fidl::Reason::kUnbind, ::fidl::internal::kErrorChannelUnbound);
+  }
+
+  constexpr static Status PendingTwoWayCallPreventsUnbind() {
+    return Status(ZX_ERR_BAD_STATE, ::fidl::Reason::kPendingTwoWayCallPreventsUnbind, nullptr);
   }
 
   // Constructs a result indicating that the operation is being canceled due to
@@ -601,8 +611,6 @@ class UnbindInfo : private Status {
   constexpr bool did_send_epitaph() const { return reason() == Reason::kClose; }
 
   // Reinterprets the |UnbindInfo| as the cause of an operation failure.
-  //
-  // TODO(fxbug.dev/87788): Privatize this method since it's only used in tests and confusing.
   constexpr fidl::Error ToError() const {
     if (reason_ == Reason::kUnbind) {
       // See |UnbindInfo::Unbind| for reason behind this conversion.

@@ -8,10 +8,13 @@
 #include <lib/fit/defer.h>
 #include <lib/sync/cpp/completion.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
+using ::fidl_cpp_constraint_protocol_test::Constraint;
 using ::test_basic_protocol::Values;
 
 // An integration-style test that verifies that user-supplied async callbacks
@@ -28,7 +31,7 @@ void ThenWithClientLifetimeTest() {
 
   client->Echo({"foo"}).Then(
       [observer = fit::defer([&] { destroyed = true; })](fidl::Result<Values::Echo>& result) {
-        ADD_FATAL_FAILURE("Should not be invoked");
+        FAIL() << "Should not be invoked";
       });
   // Immediately start cancellation.
   client = {};
@@ -81,7 +84,6 @@ TEST(SharedClient, ThenExactlyOnce) { ThenExactlyOnceTest<fidl::SharedClient<Val
 
 TEST(Client, PropagateEncodeError) {
   using ::fidl_cpp_constraint_protocol_test::Bits;
-  using ::fidl_cpp_constraint_protocol_test::Constraint;
   auto endpoints = fidl::CreateEndpoints<Constraint>();
   ASSERT_OK(endpoints.status_value());
   auto [local, remote] = std::move(*endpoints);
@@ -108,7 +110,6 @@ TEST(Client, PropagateEncodeError) {
 
 TEST(Client, TwoWayRememberErrorAfterUnbinding) {
   using ::fidl_cpp_constraint_protocol_test::Bits;
-  using ::fidl_cpp_constraint_protocol_test::Constraint;
   auto endpoints = fidl::CreateEndpoints<Constraint>();
   ASSERT_OK(endpoints.status_value());
   auto [local, remote] = std::move(*endpoints);
@@ -180,5 +181,125 @@ TEST(Client, OneWayRememberErrorAfterUnbinding) {
   EXPECT_EQ(result.error_value().reason(), fidl::Reason::kCanceledDueToOtherError);
   EXPECT_EQ(result.error_value().underlying_reason().value(), fidl::Reason::kUnexpectedMessage);
 }
+
+template <typename T>
+struct ClientUnbindTest : public ::testing::Test {};
+TYPED_TEST_SUITE_P(ClientUnbindTest);
+
+TYPED_TEST_P(ClientUnbindTest, UnbindMaybeGetEndpoint) {
+  using Client = TypeParam;
+
+  auto endpoints = fidl::CreateEndpoints<Constraint>();
+  ASSERT_OK(endpoints.status_value());
+
+  auto [local, remote] = std::move(*endpoints);
+  zx_handle_t handle_number = local.channel().get();
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Client client(std::move(local), loop.dispatcher());
+
+  fit::result<fidl::Error, fidl::ClientEnd<Constraint>> result = client.UnbindMaybeGetEndpoint();
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  ASSERT_EQ(handle_number, result.value().channel().get());
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindAfterFatalError) {
+  using Client = TypeParam;
+  using ::fidl_cpp_constraint_protocol_test::Bits;
+
+  auto endpoints = fidl::CreateEndpoints<Constraint>();
+  ASSERT_OK(endpoints.status_value());
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Client client(std::move(endpoints->client), loop.dispatcher());
+
+  endpoints->server.Close(ZX_ERR_IO);
+  loop.RunUntilIdle();
+
+  fit::result result = client.UnbindMaybeGetEndpoint();
+  ASSERT_TRUE(result.is_error());
+  EXPECT_TRUE(result.error_value().is_peer_closed());
+  EXPECT_EQ(result.error_value().status(), ZX_ERR_IO);
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindTwice) {
+  using Client = TypeParam;
+
+  auto endpoints = fidl::CreateEndpoints<Constraint>();
+  ASSERT_OK(endpoints.status_value());
+
+  auto [local, remote] = std::move(*endpoints);
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Client client(std::move(local), loop.dispatcher());
+
+  {
+    fit::result result = client.UnbindMaybeGetEndpoint();
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+  }
+
+  {
+    fit::result result = client.UnbindMaybeGetEndpoint();
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().reason(), fidl::Reason::kUnbind);
+  }
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindWithPendingCallsShouldFail) {
+  using Client = TypeParam;
+
+  auto endpoints = fidl::CreateEndpoints<Constraint>();
+  ASSERT_OK(endpoints.status_value());
+
+  auto [local, remote] = std::move(*endpoints);
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  Client client(std::move(local), loop.dispatcher());
+
+  client->Echo({}).ThenExactlyOnce([](auto&) {});
+
+  {
+    fit::result result = client.UnbindMaybeGetEndpoint();
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().reason(), fidl::Reason::kPendingTwoWayCallPreventsUnbind);
+  }
+
+  {
+    fit::result result = client.UnbindMaybeGetEndpoint();
+    ASSERT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value().reason(), fidl::Reason::kUnbind);
+  }
+}
+
+TYPED_TEST_P(ClientUnbindTest, UnbindAfterACompletedTwoWayCall) {
+  using Client = TypeParam;
+
+  auto endpoints = fidl::CreateEndpoints<Constraint>();
+  ASSERT_OK(endpoints.status_value());
+
+  auto [local, remote] = std::move(*endpoints);
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  zx_handle_t handle_number = local.channel().get();
+  Client client(std::move(local), loop.dispatcher());
+
+  client->Echo({}).ThenExactlyOnce([&](auto&) { loop.Quit(); });
+
+  class Server : public fidl::Server<Constraint> {
+   public:
+    void Echo(EchoRequest& request, EchoCompleter::Sync& completer) final {
+      completer.Reply({request.bits()});
+    }
+  } server;
+  fidl::ServerBinding<Constraint> binding{loop.dispatcher(), std::move(remote), &server,
+                                          fidl::kIgnoreBindingClosure};
+  loop.Run();
+
+  fit::result result = client.UnbindMaybeGetEndpoint();
+  ASSERT_TRUE(result.is_ok()) << result.error_value();
+  ASSERT_EQ(handle_number, result.value().channel().get());
+}
+
+REGISTER_TYPED_TEST_SUITE_P(ClientUnbindTest, UnbindMaybeGetEndpoint, UnbindAfterFatalError,
+                            UnbindTwice, UnbindWithPendingCallsShouldFail,
+                            UnbindAfterACompletedTwoWayCall);
+using ClientTypes = testing::Types<fidl::Client<Constraint>, fidl::WireClient<Constraint>>;
+INSTANTIATE_TYPED_TEST_SUITE_P(TestPrefix, ClientUnbindTest, ClientTypes);
 
 }  // namespace

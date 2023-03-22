@@ -276,9 +276,12 @@ class ClientBase final : public std::enable_shared_from_this<ClientBase> {
   ClientBase(ClientBase&& other) = delete;
   ClientBase& operator=(ClientBase&& other) = delete;
 
+  using AsyncTeardownResult = fit::result<fidl::Error, fidl::internal::AnyTransport>;
+
   // Asynchronously unbind the client from the dispatcher. |teardown_observer|
-  // will be notified on a dispatcher thread.
-  void AsyncTeardown();
+  // will be notified on a dispatcher thread. If safe, the managed client
+  // endpoint will be extracted and returned.
+  AsyncTeardownResult AsyncTeardown();
 
   // Makes a two-way synchronous call with the transport that is managed by this
   // client.
@@ -448,7 +451,7 @@ class ClientControlBlock final : public std::enable_shared_from_this<ClientContr
   // |ClientBase| to be released.
   ~ClientControlBlock() {
     if (client_impl_) {
-      client_impl_->AsyncTeardown();
+      (void)client_impl_->AsyncTeardown();
     }
   }
 
@@ -487,6 +490,9 @@ class ClientController {
   //
   // |Bind| must have been called before this.
   void Unbind();
+
+  // Same as |Unbind| but tries to extract the client endpoint if safe to do so.
+  fit::result<fidl::Error, fidl::internal::AnyTransport> UnbindMaybeGetEndpoint();
 
   bool is_valid() const { return static_cast<bool>(client_impl_); }
   explicit operator bool() const { return is_valid(); }

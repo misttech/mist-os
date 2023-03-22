@@ -64,6 +64,7 @@ AsyncBinding::AsyncBinding(async_dispatcher_t* dispatcher, AnyUnownedTransport t
     : dispatcher_(dispatcher),
       transport_(transport),
       thread_checker_(dispatcher, threading_policy),
+      threading_policy_(threading_policy),
       shared_unbind_info_(std::make_shared<LockedUnbindInfo>()) {
   ZX_ASSERT(dispatcher_);
   ZX_ASSERT(transport_.is_valid());
@@ -148,22 +149,22 @@ void AsyncBinding::BeginFirstWait() {
   //   down the event loop until all current incoming events have been
   //   processed.
   //
-  using Result = AsyncBinding::TeardownTaskPostingResult;
-  Result result =
+  using Error = AsyncBinding::TeardownTaskPostingError;
+  fit::result result =
       StartTeardownWithInfo(std::shared_ptr(keep_alive_), UnbindInfo::DispatcherError(status));
-  switch (result) {
-    case Result::kDispatcherError:
-      // We are crashing the process anyways, but clearing |keep_alive_| helps
-      // death-tests pass the leak-sanitizer.
-      keep_alive_ = nullptr;
-      ZX_PANIC(
-          "When binding FIDL connection: "
-          "dispatcher was shutdown, or unsupported dispatcher.");
-    case Result::kRacedWithInProgressTeardown:
-      // Should never happen - the binding was only just created.
-      __builtin_unreachable();
-    case Result::kOk:
-      return;
+  if (result.is_error()) {
+    switch (result.error_value()) {
+      case Error::kDispatcherError:
+        // We are crashing the process anyways, but clearing |keep_alive_| helps
+        // death-tests pass the leak-sanitizer.
+        keep_alive_ = nullptr;
+        ZX_PANIC(
+            "When binding FIDL connection: "
+            "dispatcher was shutdown, or unsupported dispatcher.");
+      case Error::kRacedWithInProgressTeardown:
+        // Should never happen - the binding was only just created.
+        __builtin_unreachable();
+    }
   }
 }
 
@@ -193,7 +194,7 @@ zx_status_t AsyncBinding::CheckForTeardownAndBeginNextWait() {
 
 void AsyncBinding::HandleError(std::shared_ptr<AsyncBinding>&& calling_ref, DispatchError error) {
   if (error.RequiresImmediateTeardown()) {
-    StartTeardownWithInfo(std::move(calling_ref), error.info);
+    (void)StartTeardownWithInfo(std::move(calling_ref), error.info);
   }
 }
 
@@ -207,12 +208,12 @@ auto AsyncBinding::StartTeardownWithInfo(std::shared_ptr<AsyncBinding>&& calling
   ScopedThreadGuard guard(thread_checker_);
   ZX_ASSERT(calling_ref);
   // Move the calling reference into this scope.
-  auto binding = std::move(calling_ref);
+  std::shared_ptr self = std::move(calling_ref);
 
   {
     std::scoped_lock lock(lock_);
     if (lifecycle_.Is(Lifecycle::kMustTeardown) || lifecycle_.Is(Lifecycle::kTorndown))
-      return TeardownTaskPostingResult::kRacedWithInProgressTeardown;
+      return fit::error(TeardownTaskPostingError::kRacedWithInProgressTeardown);
     lifecycle_.TransitionToMustTeardown(info);
   }
 
@@ -333,8 +334,9 @@ auto AsyncBinding::StartTeardownWithInfo(std::shared_ptr<AsyncBinding>&& calling
   // This convoluted dance could be improved if |async_dispatcher_t| supported
   // interrupting a wait with an error passed to the handler, as opposed to
   // silent cancellation.
-  if (TeardownTask::Post(dispatcher_, binding, message_handler_pending) != ZX_OK)
-    return TeardownTaskPostingResult::kDispatcherError;
+  if (TeardownTask::Post(dispatcher_, self, message_handler_pending) != ZX_OK) {
+    return fit::error(TeardownTaskPostingError::kDispatcherError);
+  }
 
   {
     std::scoped_lock lock(lock_);
@@ -348,7 +350,19 @@ auto AsyncBinding::StartTeardownWithInfo(std::shared_ptr<AsyncBinding>&& calling
     }
   }
 
-  return TeardownTaskPostingResult::kOk;
+  // Only extract the transport when the user explicitly requests unbinding.
+  // Keep the transport object alive a bit longer if teardown is triggered
+  // by errors. This is fine since only explicit unbinding APIs might desire
+  // recovering out the endpoint.
+  //
+  // The subtle reason: the |shared_unbind_info| is not populated until the
+  // previously posted |TeardownTask| has run. Unfortunately, that means the
+  // messaging API will not have an error to surface if we both invalidated
+  // the transport and also have yet to populate |shared_unbind_info|.
+  if (info.reason() == fidl::Reason::kUnbind) {
+    return fit::ok(self->ExtractTransportIfUnique());
+  }
+  return fit::ok(MaybeAnyTransport{});
 }
 
 void AsyncBinding::PerformTeardown(std::optional<UnbindInfo> info) {
@@ -478,6 +492,22 @@ std::optional<DispatchError> AsyncClientBinding::Dispatch(
     return DispatchError{*info, fidl::ErrorOrigin::kReceive};
   }
   return std::nullopt;
+}
+
+AsyncBinding::MaybeAnyTransport AsyncClientBinding::ExtractTransportIfUnique() {
+  switch (threading_policy()) {
+    case ThreadingPolicy::kCreateAndTeardownFromAnyThread: {
+      return MaybeAnyTransport{};
+    }
+    case ThreadingPolicy::kCreateAndTeardownFromDispatcherThread: {
+      // If single threaded, by definition, this client cannot have concurrent sync calls due to
+      // threading restriction.
+      ScopedThreadGuard guard(thread_checker());
+      ZX_ASSERT(transport_.unique());
+      // Give up our |transport_|.
+      return std::move(*std::exchange(transport_, nullptr));
+    }
+  }
 }
 
 void AsyncClientBinding::FinishTeardown(std::shared_ptr<AsyncBinding>&& calling_ref,

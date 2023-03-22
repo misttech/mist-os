@@ -41,9 +41,32 @@ void ClientBase::Bind(AnyTransport&& transport, async_dispatcher_t* dispatcher,
   binding->BeginFirstWait();
 }
 
-void ClientBase::AsyncTeardown() {
-  if (auto binding = binding_.lock())
-    binding->StartTeardown(std::move(binding));
+ClientBase::AsyncTeardownResult ClientBase::AsyncTeardown() {
+  auto matchers = MatchVariant{
+      [this](std::shared_ptr<AsyncClientBinding>&& binding) -> AsyncTeardownResult {
+        fit::result teardown_result = binding->StartTeardown(std::move(binding));
+        if (teardown_result.is_error()) {
+          // Already torn down or raced with in-progress teardown.
+          return fit::error(fidl::Status::Unbound());
+        }
+
+        // If there are pending two-way calls, do not allow the user to extract
+        // the client endpoint.
+        std::scoped_lock lock(lock_);
+        if (!contexts_.is_empty()) {
+          return fit::error(fidl::Status::PendingTwoWayCallPreventsUnbind());
+        }
+
+        return teardown_result.take_value();
+      },
+      [](fidl::UnbindInfo info) -> AsyncTeardownResult { return fit::error(info.ToError()); },
+      [](WeakClientBindingRef::Invalid) -> AsyncTeardownResult {
+        // Should not reach here if we check for a valid client before
+        // user initiated teardown.
+        __builtin_abort();
+      },
+  };
+  return std::visit(matchers, binding_.lock_or_error());
 }
 
 void ClientBase::PrepareAsyncTxn(ResponseContext* context) {
@@ -90,10 +113,14 @@ void ClientBase::ReleaseResponseContexts(fidl::UnbindInfo info) {
 void ClientBase::SendTwoWay(fidl::OutgoingMessage& message, ResponseContext* context,
                             fidl::WriteOptions write_options) {
   auto matchers = MatchVariant{
-      [&](const std::shared_ptr<AnyTransport>& transport) {
-        PrepareAsyncTxn(context);
-        message.set_txid(context->Txid());
-        message.Write(*transport, std::move(write_options));
+      [&](std::shared_ptr<AnyTransport>&& transport) {
+        {
+          std::shared_ptr scoped_transport = std::move(transport);
+          PrepareAsyncTxn(context);
+          message.set_txid(context->Txid());
+          message.Write(*scoped_transport, std::move(write_options));
+        }
+        // Handle error without holding onto the transport.
         if (!message.ok()) {
           ForgetAsyncTxn(context);
           TryAsyncDeliverError(message.error(), context);
@@ -108,9 +135,13 @@ void ClientBase::SendTwoWay(fidl::OutgoingMessage& message, ResponseContext* con
 fidl::OneWayStatus ClientBase::SendOneWay(fidl::OutgoingMessage& message,
                                           fidl::WriteOptions write_options) {
   auto matchers = MatchVariant{
-      [&](const std::shared_ptr<AnyTransport>& transport) {
-        message.set_txid(0);
-        message.Write(*transport, std::move(write_options));
+      [&](std::shared_ptr<AnyTransport>&& transport) {
+        {
+          std::shared_ptr scoped_transport = std::move(transport);
+          message.set_txid(0);
+          message.Write(*scoped_transport, std::move(write_options));
+        }
+        // Handle error without holding onto the transport.
         if (!message.ok()) {
           HandleSendError(message.error());
           return fidl::OneWayStatus{message.error()};
@@ -138,7 +169,11 @@ void ClientBase::TryAsyncDeliverError(::fidl::Status error, ResponseContext* con
 ClientBase::TransportOrError ClientBase::GetTransportOrError() {
   auto matchers = MatchVariant{
       [](const std::shared_ptr<AsyncClientBinding>& binding) -> TransportOrError {
-        return binding->GetTransport();
+        if (auto transport = binding->GetTransport(); transport) {
+          return transport;
+        }
+        // If the transport is gone, that means the user explicitly requested unbinding.
+        return fidl::UnbindInfo::Unbind();
       },
       [](fidl::UnbindInfo info) -> TransportOrError { return info; },
       [](WeakClientBindingRef::Invalid) -> TransportOrError {
@@ -202,10 +237,13 @@ void ClientController::Bind(AnyTransport client_end, async_dispatcher_t* dispatc
   *control_ = ClientControlBlock{client_impl_};
 }
 
-void ClientController::Unbind() {
+void ClientController::Unbind() { (void)UnbindMaybeGetEndpoint(); }
+
+fit::result<fidl::Error, fidl::internal::AnyTransport> ClientController::UnbindMaybeGetEndpoint() {
   ZX_ASSERT(client_impl_);
-  control_.reset();
-  client_impl_->ClientBase::AsyncTeardown();
+  // Destroy |control| after |AsyncTeardown|.
+  std::shared_ptr control = std::move(control_);
+  return client_impl_->ClientBase::AsyncTeardown();
 }
 
 }  // namespace internal

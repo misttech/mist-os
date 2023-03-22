@@ -11,6 +11,7 @@
 #include <lib/fidl_driver/cpp/internal/wire_client_details.h>
 #include <lib/fidl_driver/cpp/transport.h>
 #include <lib/fidl_driver/cpp/wire_messaging_declarations.h>
+#include <lib/fit/result.h>
 
 //
 // Maintainer's note: when updating the documentation and function signatures
@@ -184,6 +185,28 @@ class WireClient {
   auto sync() const {
     ZX_ASSERT(is_valid());
     return fdf::internal::WireSyncBufferNeededVeneer<Protocol>(&get());
+  }
+
+  // Attempts to disassociate the client object from its endpoint and stop
+  // monitoring it for messages. After this call, subsequent operations will
+  // fail with an unbound error.
+  //
+  // If there are pending two-way async calls, the endpoint is closed and this
+  // method will fail with |fidl::Reason::kPendingTwoWayCallPreventsUnbind|. The
+  // caller needs to arrange things such that unbinding happens after any
+  // replies to two-way calls.
+  //
+  // If the endpoint was already closed due to an earlier error, that error will
+  // be returned here.
+  //
+  // Otherwise, returns the client endpoint.
+  fit::result<fidl::Error, fdf::ClientEnd<Protocol>> UnbindMaybeGetEndpoint() {
+    fit::result result = controller_.UnbindMaybeGetEndpoint();
+    if (result.is_error()) {
+      return result.take_error();
+    }
+    return fit::ok(
+        fdf::ClientEnd<Protocol>(result.value().release<fidl::internal::DriverTransport>()));
   }
 
  private:
