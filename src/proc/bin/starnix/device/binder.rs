@@ -741,7 +741,9 @@ impl Drop for BinderProcess {
         for command in command_queue {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
-                    sender_thread.lock().enqueue_command(Command::DeadReply);
+                    sender_thread
+                        .lock()
+                        .enqueue_command(Command::DeadReply { pop_transaction: true });
                 }
             }
         }
@@ -1419,7 +1421,7 @@ impl BinderThreadState {
         match transaction {
             TransactionRole::Receiver(peer) => peer.upgrade().ok_or(TransactionError::Dead),
             TransactionRole::Sender(_) => {
-                log_warn!("binder got confused, nothing to reply to!");
+                log_warn!("caller got confused, nothing to reply to!");
                 error!(EINVAL)?
             }
         }
@@ -1433,7 +1435,9 @@ impl Drop for BinderThreadState {
         for command in &self.command_queue {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
-                    sender_thread.lock().enqueue_command(Command::DeadReply);
+                    sender_thread
+                        .lock()
+                        .enqueue_command(Command::DeadReply { pop_transaction: true });
                 }
             }
         }
@@ -1443,7 +1447,9 @@ impl Drop for BinderThreadState {
         for transaction in &self.transactions {
             if let TransactionRole::Receiver(peer) = transaction {
                 if let Some(peer_thread) = peer.thread.upgrade() {
-                    peer_thread.lock().enqueue_command(Command::DeadReply);
+                    peer_thread
+                        .lock()
+                        .enqueue_command(Command::DeadReply { pop_transaction: true });
                 }
             }
         }
@@ -1525,7 +1531,11 @@ enum Command {
     /// more memory available to allocate a buffer.
     FailedReply,
     /// Notifies the initiator of a transaction that the recipient is dead.
-    DeadReply,
+    DeadReply {
+        /// Whether the initiator must pop the `TransactionRole::Sender` from its transaction
+        /// stack.
+        pop_transaction: bool,
+    },
     /// Notifies a binder process that a binder object has died.
     DeadBinder(binder_uintptr_t),
     /// Notifies a binder process that the death notification has been cleared.
@@ -1555,7 +1565,7 @@ impl Command {
                 binder_driver_return_protocol_BR_TRANSACTION_COMPLETE
             }
             Self::FailedReply => binder_driver_return_protocol_BR_FAILED_REPLY,
-            Self::DeadReply => binder_driver_return_protocol_BR_DEAD_REPLY,
+            Self::DeadReply { .. } => binder_driver_return_protocol_BR_DEAD_REPLY,
             Self::DeadBinder(..) => binder_driver_return_protocol_BR_DEAD_BINDER,
             Self::ClearDeathNotificationDone(..) => {
                 binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE
@@ -1653,7 +1663,7 @@ impl Command {
             Self::TransactionComplete
             | Self::OnewayTransactionComplete
             | Self::FailedReply
-            | Self::DeadReply
+            | Self::DeadReply { .. }
             | Self::SpawnLooper => {
                 if buffer.length < std::mem::size_of::<binder_driver_return_protocol>() {
                     return error!(ENOMEM);
@@ -2925,7 +2935,7 @@ impl BinderDriver {
                         let tx = TransactionRole::Receiver(sender);
                         thread_state.transactions.push(tx);
                     }
-                    Command::Reply(..) => {
+                    Command::DeadReply { pop_transaction: true } | Command::Reply(..) => {
                         // The sender got a reply, pop the sender entry from the transaction stac.
                         let transaction =
                             thread_state.transactions.pop().expect("transaction stack underflow!");
@@ -2942,7 +2952,7 @@ impl BinderDriver {
                     | Command::DecRef(..)
                     | Command::Error(..)
                     | Command::FailedReply
-                    | Command::DeadReply
+                    | Command::DeadReply { .. }
                     | Command::DeadBinder(..)
                     | Command::ClearDeathNotificationDone(..)
                     | Command::SpawnLooper => {}
@@ -3543,7 +3553,7 @@ impl TransactionError {
                 Command::Error(err.return_value() as i32)
             }
             TransactionError::Failure => Command::FailedReply,
-            TransactionError::Dead => Command::DeadReply,
+            TransactionError::Dead => Command::DeadReply { pop_transaction: false },
         });
         Ok(())
     }
@@ -5910,7 +5920,10 @@ mod tests {
         assert_matches!(thread.lock().command_queue.pop_front(), Some(Command::FailedReply));
 
         TransactionError::Dead.dispatch(&thread).expect("no error");
-        assert_matches!(thread.lock().command_queue.pop_front(), Some(Command::DeadReply));
+        assert_matches!(
+            thread.lock().command_queue.pop_front(),
+            Some(Command::DeadReply { pop_transaction: false })
+        );
     }
 
     #[fuchsia::test]
@@ -6160,7 +6173,11 @@ mod tests {
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
-        assert_matches!(sender_thread.lock().command_queue.front(), Some(Command::DeadReply));
+        assert_matches!(
+            sender_thread.lock().command_queue.front(),
+            Some(Command::DeadReply { pop_transaction: true })
+        );
+        assert_matches!(sender_thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
     }
 
     #[fuchsia::test]
@@ -6220,7 +6237,11 @@ mod tests {
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
-        assert_matches!(sender_thread.lock().command_queue.front(), Some(Command::DeadReply));
+        assert_matches!(
+            sender_thread.lock().command_queue.front(),
+            Some(Command::DeadReply { pop_transaction: true })
+        );
+        assert_matches!(sender_thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
     }
 
     #[fuchsia::test]
@@ -6295,7 +6316,11 @@ mod tests {
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
-        assert_matches!(sender_thread.lock().command_queue.front(), Some(Command::DeadReply));
+        assert_matches!(
+            sender_thread.lock().command_queue.front(),
+            Some(Command::DeadReply { pop_transaction: true })
+        );
+        assert_matches!(sender_thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
     }
 
     #[fuchsia::test]
