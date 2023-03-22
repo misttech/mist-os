@@ -236,6 +236,11 @@ core_tests("core-tests") {
     "Intel NUC Kit NUC7i5DNHE",
     "Sherlock",
   ]
+
+  # We've observed the ASAN variant of core-tests take as long as 701 seconds
+  # when booted via firmware on certain types of hardware.  Leave a little buffer
+  # for growth.
+  timeout = 840
 }
 
 # If we are building for x64, make sure to run the core tests on a system which
