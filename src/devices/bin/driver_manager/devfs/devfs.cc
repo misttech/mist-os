@@ -486,9 +486,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       "goldfish-control",
       "goldfish-pipe",
 
-      // TODO(https://fxbug.dev/113834): Remove.
-      "light",
-
       // TODO(https://fxbug.dev/113835): Remove.
       "ot-radio",
 
