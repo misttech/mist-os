@@ -440,6 +440,12 @@ Devfs::Devfs(std::optional<Devnode>& root,
   MustAddEntry(pd, "class", class_);
   MustAddEntry(pd, kNullDevName, fbl::MakeRefCounted<BuiltinDevVnode>(true));
   MustAddEntry(pd, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));
+  {
+    fbl::RefPtr builtin = fbl::MakeRefCounted<PseudoDir>();
+    MustAddEntry(*builtin, kNullDevName, fbl::MakeRefCounted<BuiltinDevVnode>(true));
+    MustAddEntry(*builtin, kZeroDevName, fbl::MakeRefCounted<BuiltinDevVnode>(false));
+    MustAddEntry(pd, "builtin", std::move(builtin));
+  }
 
   // Pre-populate the class directories.
   std::random_device rd;

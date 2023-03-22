@@ -1094,11 +1094,14 @@
         },
         {
             directory: [
+                "dev-builtin",
                 "dev-class",
                 "dev-topological",
             ],
             from: "#devfs",
         },
+
+        // TODO(https://fxbug.dev/101092): Remove after soft transition in third_party/go.
         {
             protocol: [
                 "dev-null",

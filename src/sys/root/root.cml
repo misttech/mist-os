@@ -131,6 +131,7 @@
                 "build-info",
                 "config-data",
                 "data",
+                "dev-builtin",
                 "dev-class",
                 "dev-topological",
                 "factory",
@@ -146,6 +147,7 @@
         // Non-zircon services for svchost
         {
             protocol: [
+                // TODO(https://fxbug.dev/101092): Remove dev-{null,zero} after soft transition in third_party/go.
                 "dev-null",
                 "dev-zero",
                 "fuchsia.device.NameProvider",

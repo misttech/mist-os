@@ -213,8 +213,18 @@
     ],
     offer: [
         {
+            // Tests are permitted to use /dev/null and /dev/zero.
+            directory: "dev-builtin",
+            from: "parent",
+            to: [
+                "#starnix-tests",
+                "#system-tests",
+                "#tests",
+            ],
+        },
+        {
             protocol: [
-                // Tests are permitted to use /dev/null and /dev/zero.
+                // TODO(https://fxbug.dev/101092): Remove dev-{null,zero} after soft transition in third_party/go.
                 "dev-null",
                 "dev-zero",
 

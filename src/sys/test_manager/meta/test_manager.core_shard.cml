@@ -24,7 +24,13 @@
     offer: [
         // Needed by test_manager and/or some test runners
         {
+            directory: "dev-builtin",
+            from: "parent",
+            to: "#test_manager",
+        },
+        {
             protocol: [
+                // TODO(https://fxbug.dev/101092): Remove dev-{null,zero} after soft transition in third_party/go.
                 "dev-null",
                 "dev-zero",
                 "fuchsia.boot.ReadOnlyLog",
