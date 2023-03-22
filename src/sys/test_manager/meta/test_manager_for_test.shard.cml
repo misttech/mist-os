@@ -7,7 +7,7 @@
     children: [
         {
             name: "test_manager",
-            url: "#meta/test_manager.cm",
+            url: "test_manager#meta/test_manager.cm",
         },
     ],
     offer: [
@@ -63,7 +63,6 @@
                 "rust-test-runner",
                 "starnix-test-runners",
                 "stress-test-runner",
-                "test_manager",
             ],
         },
     },

@@ -97,8 +97,9 @@ fuchsia_unittest_package("test_manager_test") {
   deps = [
     ":test_manager_test_bin",
     "test_data",
-    "//src/sys/test_manager:test_manager_cmp",
   ]
+
+  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
 
   restricted_features = [ "allow_non_hermetic_packages" ]
 
@@ -125,8 +126,10 @@ fuchsia_unittest_package("test_manager_specified_realm_test") {
     "test_data:echo_test_client",
     "test_data:echo_test_realm",
     "//examples/components/routing/rust/echo_server:echo_server_cmp",
-    "//src/sys/test_manager:test_manager_cmp",
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
   ]
+
+  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
 
   restricted_features = [ "allow_non_hermetic_packages" ]
 }
@@ -137,8 +140,9 @@ fuchsia_unittest_package("test_manager_stress_test") {
   deps = [
     ":test_manager_stress_test_bin",
     "test_data:debug_data_spam_test",
-    "//src/sys/test_manager:test_manager_cmp",
   ]
+
+  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
 }
 
 fuchsia_unittest_package("test_manager_legacy_test") {
@@ -147,8 +151,9 @@ fuchsia_unittest_package("test_manager_legacy_test") {
   deps = [
     ":test_manager_legacy_test_bin",
     "test_data:test_data_v1",
-    "//src/sys/test_manager:test_manager_cmp",
   ]
+
+  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
 
   # There's expected error logs that happen during the test such as not resolving an instance when
   # testing that we fail to execute a test with an unknown URL.

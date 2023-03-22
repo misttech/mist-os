@@ -34,10 +34,9 @@ fuchsia_test_package("stress-runner-integration-test") {
 
   # This includes the `always_fail`, `always_pass`, `timeout` and `echo` stress tests
   # used in this integration test.
-  deps = [
-    "test_data",
-    "//src/sys/test_manager:test_manager_cmp",
-  ]
+  deps = [ "test_data" ]
+
+  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
 
   # TODO(fxbug.dev/114727): Flaky test disabled on coverage.
   # Please fix the flake and remove the condition below.

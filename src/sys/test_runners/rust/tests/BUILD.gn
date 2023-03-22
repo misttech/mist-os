@@ -60,7 +60,7 @@ fuchsia_component("rust_runner_stress_test") {
 
 fuchsia_test_package("rust-runner-integration-test") {
   test_components = [ ":rust_runner_integration_test" ]
-  deps = [ "//src/sys/test_manager:test_manager_cmp" ]
+  subpackages = [ "//src/sys/test_manager:test_manager_pkg" ]
 
   if (!is_coverage) {
     # https://fxbug.dev/77236: This stress test times out on coverage bot.

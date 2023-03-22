@@ -96,15 +96,15 @@
         },
         {
             name: "runner_memfs",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/memfs.cm",
+            url: "#meta/memfs.cm",
         },
         {
             name: "test_tmpfs",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/memfs.cm",
+            url: "#meta/memfs.cm",
         },
         {
             name: "debug_data",
-            url: "fuchsia-pkg://fuchsia.com/test_manager#meta/debug_data_processor.cm",
+            url: "#meta/debug_data_processor.cm",
         },
         {
             name: "early_boot_instrumentation",

@@ -149,6 +149,10 @@ fuchsia_component("test_manager_cmp") {
   component_name = "test_manager"
   deps = [ ":bin" ]
   manifest = "meta/test_manager.cml"
+
+  # Don't package this component as it as relative dependency, instead
+  # subpackage test_manager_pkg in your package to use test manager.
+  visibility = [ ":*" ]
 }
 
 fuchsia_package("test_manager_pkg") {

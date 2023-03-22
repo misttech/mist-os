@@ -60,8 +60,7 @@ use {
 
 const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
 const ARCHIVIST_REALM_NAME: &'static str = "archivist";
-const ARCHIVIST_FOR_EMBEDDING_URL: &'static str =
-    "fuchsia-pkg://fuchsia.com/test_manager#meta/archivist-for-embedding.cm";
+const ARCHIVIST_FOR_EMBEDDING_URL: &'static str = "#meta/archivist-for-embedding.cm";
 
 pub const HERMETIC_RESOLVER_CAPABILITY_NAME: &'static str = "hermetic_resolver";
 

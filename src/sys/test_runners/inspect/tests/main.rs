@@ -35,11 +35,7 @@ async fn run_test(
     let fake = FakeArchiveAccessor::new(&fake_archive_output, None);
     let fake_clone = fake.clone();
     let test_manager = builder
-        .add_child(
-            "test_manager",
-            "fuchsia-pkg://fuchsia.com/inspect-runner-integration-test#meta/test_manager.cm",
-            ChildOptions::new(),
-        )
+        .add_child("test_manager", "test_manager#meta/test_manager.cm", ChildOptions::new())
         .await?;
     let fake_archivist = builder
         .add_local_child(
