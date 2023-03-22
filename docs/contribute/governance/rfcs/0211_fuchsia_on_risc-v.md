@@ -237,7 +237,7 @@ make a later Fuchsia port more painful or prohibitive.
 
 ## Prior art and references
 
-- [Proof of concept branch](https://cs.opensource.google/fuchsia/fuchsia/+/sandbox/revest/riscv64:;bpv=1)
+- [Proof of concept branch](https://fuchsia.googlesource.com/fuchsia/+log/d381548c6aef76926e6203a2ad2265dd510d1e9b)
 - [Linux port to RISC-V](https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/riscv)
 - [LK port to RISC-V](https://github.com/littlekernel/lk/tree/master/arch/riscv)
 - [RISC-V SBI specification](https://github.com/riscv-non-isa/riscv-sbi-doc)
