@@ -6849,7 +6849,7 @@ mod tests {
         },
         test_validate_offers_not_required_invalid_source_service => {
             input = {
-                let mut decl = generate_offer_invalid_source_and_availability_decl(
+                let mut decl = generate_offer_different_source_and_availability_decl(
                     |source, availability, target_name|
                         fdecl::Offer::Service(fdecl::OfferService {
                             source: Some(source),
@@ -6889,7 +6889,7 @@ mod tests {
         },
         test_validate_offers_not_required_invalid_source_protocol => {
             input = {
-                let mut decl = generate_offer_invalid_source_and_availability_decl(
+                let mut decl = generate_offer_different_source_and_availability_decl(
                     |source, availability, target_name|
                         fdecl::Offer::Protocol(fdecl::OfferProtocol {
                             source: Some(source),
@@ -6930,7 +6930,7 @@ mod tests {
         },
         test_validate_offers_not_required_invalid_source_directory => {
             input = {
-                let mut decl = generate_offer_invalid_source_and_availability_decl(
+                let mut decl = generate_offer_different_source_and_availability_decl(
                     |source, availability, target_name|
                         fdecl::Offer::Directory(fdecl::OfferDirectory {
                             source: Some(source),
@@ -8893,7 +8893,9 @@ mod tests {
         },
     }
 
-    fn generate_offer_invalid_source_and_availability_decl(
+    /// Passes different source and availability options to `new_offer` to
+    /// generate a component declaration.
+    fn generate_offer_different_source_and_availability_decl(
         new_offer: impl Fn(fdecl::Ref, fdecl::Availability, &str) -> fdecl::Offer,
     ) -> fdecl::Component {
         let mut decl = new_component_decl();
@@ -8938,8 +8940,8 @@ mod tests {
                 fdecl::Availability::Optional,
                 "fuchsia.examples.Echo3",
             ),
-            // These offers are not fine, offers with a source other than parent or void
-            // must be required.
+            // These offers are fine, offers with a source other than parent or void
+            // can also be optional.
             new_offer(
                 fdecl::Ref::Self_(fdecl::SelfRef {}),
                 fdecl::Availability::Optional,
