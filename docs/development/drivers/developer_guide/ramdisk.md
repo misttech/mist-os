@@ -243,7 +243,7 @@ static void ramdisk_get_info(void* ctx, block_info_t* info) {
     info->block_size = BLOCK_SIZE;
     info->block_count = BLOCK_COUNT;
     // Arbitrarily set, but matches the SATA driver for testing
-    info->max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED;
+    info->max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
     info->flags = ramdev->flags;
 }
 ```

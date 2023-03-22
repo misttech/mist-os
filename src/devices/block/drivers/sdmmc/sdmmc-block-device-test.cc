@@ -5,6 +5,7 @@
 #include "sdmmc-block-device.h"
 
 #include <endian.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fidl/cpp/wire/client.h>
@@ -377,7 +378,7 @@ TEST_F(SdmmcBlockDeviceTest, MultiBlockACmd12) {
 
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_AUTO_CMD12,
-      .max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED,
+      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });
@@ -424,7 +425,7 @@ TEST_F(SdmmcBlockDeviceTest, MultiBlockNoACmd12) {
 
   sdmmc_.set_host_info({
       .caps = 0,
-      .max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED,
+      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });
@@ -514,7 +515,7 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
 
   sdmmc_.set_host_info({
       .caps = 0,
-      .max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED,
+      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });
@@ -532,7 +533,7 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
 
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_AUTO_CMD12,
-      .max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED,
+      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });
@@ -1694,7 +1695,7 @@ TEST_F(SdmmcBlockDeviceTest, InspectCmd12NotDoubleCounted) {
 
   sdmmc_.set_host_info({
       .caps = 0,
-      .max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED,
+      .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });

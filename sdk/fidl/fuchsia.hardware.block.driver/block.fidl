@@ -5,8 +5,6 @@ library fuchsia.hardware.block.driver;
 
 using zx;
 
-const BLOCK_MAX_TRANSFER_UNBOUNDED uint32 = 0xFFFFFFFF;
-
 type BlockInfo = struct {
     /// The number of blocks in this block device.
     block_count uint64;

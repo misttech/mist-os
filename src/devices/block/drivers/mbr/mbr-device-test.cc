@@ -4,6 +4,7 @@
 
 #include "mbr-device.h"
 
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
@@ -27,7 +28,8 @@ namespace {
 
 constexpr uint32_t kBlockSz = 512;
 constexpr uint32_t kBlockCnt = 20;
-const block_info_t kInfo = {kBlockCnt, kBlockSz, BLOCK_MAX_TRANSFER_UNBOUNDED, 0};
+const block_info_t kInfo = {kBlockCnt, kBlockSz,
+                            fuchsia_hardware_block::wire::kMaxTransferUnbounded, 0};
 
 class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
  public:

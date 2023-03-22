@@ -39,7 +39,7 @@ class FakeBlockDevice : public ddk::BlockImplProtocol<FakeBlockDevice> {
     *out_info = {};
     out_info->block_size = kBlockSize;
     out_info->block_count = kDiskSize / out_info->block_size;
-    out_info->max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED;
+    out_info->max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
     *out_block_op_size = sizeof(block_op_t);
   }
 

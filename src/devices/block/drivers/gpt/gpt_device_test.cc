@@ -38,7 +38,7 @@ class FakeBlockDevice : public ddk::BlockProtocol<FakeBlockDevice> {
   FakeBlockDevice() : proto_({&block_protocol_ops_, this}) {
     info_.block_count = kBlockCnt;
     info_.block_size = kBlockSz;
-    info_.max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED;
+    info_.max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
   }
 
   block_protocol_t* proto() { return &proto_; }
@@ -164,7 +164,7 @@ class GptDeviceTest : public zxtest::Test {
 TEST_F(GptDeviceTest, DeviceTooSmall) {
   Init();
 
-  const block_info_t info = {20, 512, BLOCK_MAX_TRANSFER_UNBOUNDED, 0};
+  const block_info_t info = {20, 512, fuchsia_hardware_block::wire::kMaxTransferUnbounded, 0};
   SetInfo(&info);
 
   ASSERT_EQ(ZX_ERR_NO_SPACE, Bind(nullptr, fake_parent_.get()));

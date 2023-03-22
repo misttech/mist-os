@@ -11,6 +11,7 @@
 
 #include "sdhci.h"
 
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
@@ -975,9 +976,9 @@ zx_status_t Sdhci::Init() {
     host_control1.WriteTo(&regs_mmio_buffer_);
   } else {
     // no maximum if only PIO supported
-    info_.max_transfer_size = BLOCK_MAX_TRANSFER_UNBOUNDED;
+    info_.max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
   }
-  info_.max_transfer_size_non_dma = BLOCK_MAX_TRANSFER_UNBOUNDED;
+  info_.max_transfer_size_non_dma = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
 
   // Configure the clock.
   clock.ReadFrom(&regs_mmio_buffer_).set_internal_clock_enable(1);

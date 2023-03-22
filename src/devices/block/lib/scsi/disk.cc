@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <endian.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/scsi/disk.h>
@@ -76,7 +77,7 @@ zx_status_t Disk::AddDisk() {
     return status;
   }
 
-  if (max_transfer_bytes_ == BLOCK_MAX_TRANSFER_UNBOUNDED) {
+  if (max_transfer_bytes_ == fuchsia_hardware_block::wire::kMaxTransferUnbounded) {
     max_transfer_blocks_ = UINT32_MAX;
   } else {
     if (max_transfer_bytes_ % block_size_bytes_ != 0) {

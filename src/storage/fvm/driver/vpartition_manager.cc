@@ -155,8 +155,8 @@ zx_status_t VPartitionManager::DoIoLocked(zx_handle_t vmo, size_t off, size_t le
   size_t dev_offset = off / block_size;
 
   // The operation may need to be chuncked according to the block device's limits. We don't check
-  // explicitly for BLOCK_MAX_TRANSFER_UNBOUNDED because the transfers are still limited to 32-bits
-  // and that constant is the largest 32-bit value.
+  // explicitly for fuchsia_hardware_block::wire::kMaxTransferUnbounded because the transfers are
+  // still limited to 32-bits and that constant is the largest 32-bit value.
   const size_t max_transfer = info_.max_transfer_size / block_size;
   const size_t num_data_txns = fbl::round_up(len_remaining, max_transfer) / max_transfer;
 
