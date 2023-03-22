@@ -7,7 +7,7 @@ use {
         network_config::{
             ConnectFailure, Credential, FailureReason, HiddenProbEvent, NetworkConfig,
             NetworkConfigError, NetworkIdentifier, PastConnectionData, PastConnectionList,
-            SecurityType,
+            SecurityType, HIDDEN_PROBABILITY_HIGH,
         },
         stash_conversion::*,
     },
@@ -576,6 +576,20 @@ pub fn select_subset_potentially_hidden_networks(
             // - hidden_probability of 0 will _never_ be selected
             saved_network.hidden_probability > rand::thread_rng().gen_range(0.0..1.0)
         })
+        .map(|network| types::NetworkIdentifier {
+            ssid: network.ssid,
+            security_type: network.security_type,
+        })
+        .collect()
+}
+
+/// Returns all saved networks which we think have a high probability of being hidden.
+pub fn select_high_probability_hidden_networks(
+    saved_networks: Vec<NetworkConfig>,
+) -> Vec<types::NetworkIdentifier> {
+    saved_networks
+        .into_iter()
+        .filter(|saved_network| saved_network.hidden_probability >= HIDDEN_PROBABILITY_HIGH)
         .map(|network| types::NetworkIdentifier {
             ssid: network.ssid,
             security_type: network.security_type,
@@ -1986,6 +2000,74 @@ mod tests {
         // days between flakes due to this test.
         assert!(maybe_hidden_selection_count > 0);
         assert!(maybe_hidden_selection_count < hidden_selection_count);
+    }
+
+    #[fuchsia::test]
+    async fn test_select_high_probability_hidden_networks() {
+        // Create three networks with 1, 0, 0.5 hidden probability
+        let id_hidden = types::NetworkIdentifier {
+            ssid: types::Ssid::try_from("hidden").unwrap(),
+            security_type: types::SecurityType::Wpa2,
+        };
+        let mut net_config_hidden = NetworkConfig::new(
+            id_hidden.clone(),
+            Credential::Password(b"password".to_vec()),
+            false,
+        )
+        .expect("failed to create network config");
+        net_config_hidden.hidden_probability = 1.0;
+
+        let id_maybe_hidden_high = types::NetworkIdentifier {
+            ssid: types::Ssid::try_from("maybe_hidden_high").unwrap(),
+            security_type: types::SecurityType::Wpa2,
+        };
+        let mut net_config_maybe_hidden_high = NetworkConfig::new(
+            id_maybe_hidden_high.clone(),
+            Credential::Password(b"password".to_vec()),
+            false,
+        )
+        .expect("failed to create network config");
+        net_config_maybe_hidden_high.hidden_probability = 0.8;
+
+        let id_maybe_hidden_low = types::NetworkIdentifier {
+            ssid: types::Ssid::try_from("maybe_hidden_low").unwrap(),
+            security_type: types::SecurityType::Wpa2,
+        };
+        let mut net_config_maybe_hidden_low = NetworkConfig::new(
+            id_maybe_hidden_low.clone(),
+            Credential::Password(b"password".to_vec()),
+            false,
+        )
+        .expect("failed to create network config");
+        net_config_maybe_hidden_low.hidden_probability = 0.7;
+
+        let id_not_hidden = types::NetworkIdentifier {
+            ssid: types::Ssid::try_from("not_hidden").unwrap(),
+            security_type: types::SecurityType::Wpa2,
+        };
+        let mut net_config_not_hidden = NetworkConfig::new(
+            id_not_hidden.clone(),
+            Credential::Password(b"password".to_vec()),
+            false,
+        )
+        .expect("failed to create network config");
+        net_config_not_hidden.hidden_probability = 0.0;
+
+        let selected_networks = select_high_probability_hidden_networks(vec![
+            net_config_hidden.clone(),
+            net_config_maybe_hidden_high.clone(),
+            net_config_maybe_hidden_low.clone(),
+            net_config_not_hidden.clone(),
+        ]);
+
+        // The 1.0 probability should always be picked
+        assert!(selected_networks.contains(&id_hidden));
+        // The high probability should always be picked
+        assert!(selected_networks.contains(&id_maybe_hidden_high));
+        // The low probability should never be picked
+        assert!(!selected_networks.contains(&id_maybe_hidden_low));
+        // The 0 probability should never be picked
+        assert!(!selected_networks.contains(&id_not_hidden));
     }
 
     #[fuchsia::test]

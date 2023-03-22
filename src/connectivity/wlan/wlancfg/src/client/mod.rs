@@ -7,7 +7,8 @@ use {
     crate::{
         client::types as client_types,
         config_management::{
-            Credential, NetworkConfigError, NetworkIdentifier, SaveError, SavedNetworksManagerApi,
+            self, Credential, NetworkConfigError, NetworkIdentifier, SaveError,
+            SavedNetworksManagerApi,
         },
         mode_management::iface_manager_api::{ConnectAttemptRequest, IfaceManagerApi},
         telemetry::{TelemetryEvent, TelemetrySender},
@@ -177,7 +178,12 @@ async fn handle_client_requests(
                 responder.send(response)?
             }
             fidl_policy::ClientControllerRequest::ScanForNetworks { iterator, .. } => {
-                let fut = handle_client_request_scan(scan_requester.clone(), iterator);
+                let fut = handle_client_request_scan(
+                    scan_requester.clone(),
+                    saved_networks.clone(),
+                    telemetry_sender.clone(),
+                    iterator,
+                );
                 // The scan handler is infallible and should not block handling of further request.
                 // Detach the future here so we continue responding to other requests.
                 fuchsia_async::Task::spawn(fut).detach();
@@ -260,12 +266,44 @@ async fn handle_client_request_connect(
 
 async fn handle_client_request_scan(
     scan_requester: Arc<dyn scan::ScanRequestApi>,
+    saved_networks: SavedNetworksPtr,
+    telemetry_sender: TelemetrySender,
     output_iterator: fidl::endpoints::ServerEnd<fidl_fuchsia_wlan_policy::ScanResultIteratorMarker>,
 ) {
-    let results =
-        scan_requester.perform_scan(scan::ScanReason::ClientRequest, vec![], vec![]).await;
+    let get_scan_results = async {
+        let passive_scan_results =
+            scan_requester.perform_scan(scan::ScanReason::ClientRequest, vec![], vec![]).await?;
 
-    match results {
+        let requested_active_scan_ssids: Vec<types::Ssid> =
+            config_management::select_high_probability_hidden_networks(
+                saved_networks.get_networks().await,
+            )
+            .drain(..)
+            .map(|id| id.ssid)
+            .collect();
+
+        info!(
+            "Completed passive scan for API request, {} likely-hidden networks to scan for.",
+            requested_active_scan_ssids.len()
+        );
+        telemetry_sender.send(TelemetryEvent::ActiveScanRequestedViaApi {
+            num_ssids_requested: requested_active_scan_ssids.len(),
+        });
+
+        if requested_active_scan_ssids.is_empty() {
+            Ok(passive_scan_results)
+        } else {
+            scan_requester
+                .perform_scan(scan::ScanReason::ClientRequest, requested_active_scan_ssids, vec![])
+                .await
+                .map(|mut scan_results| {
+                    scan_results.extend(passive_scan_results);
+                    scan_results
+                })
+        }
+    };
+
+    match get_scan_results.await {
         Ok(results) => {
             // Note: for now, we must always present WPA2/3 networks as WPA2 over our external
             // interfaces (i.e. to FIDL consumers of scan results). See b/182209070 for more
@@ -1084,14 +1122,32 @@ mod tests {
         // Currently the FakeScanRequester will panic if a scan is requested and no results
         // are queued, so add something.
         exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![])));
+        // A second scan request for all the likely-hidden networks
+        exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![])));
 
         // Process scan request and verify scan response.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
-        // Check that a scan request was sent to the scan module
-        let scan_request_guard =
-            exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock());
-        assert_eq!(*scan_request_guard, vec![(scan::ScanReason::ClientRequest, vec![], vec![])]);
+        // Check that a scan request was sent to the scan module, including an active scan for the
+        // potentially-hidden networks.
+        let expected_active_ssids = vec![
+            test_values.net_id_wpa2_w_password,
+            test_values.net_id_wpa2_w_psk,
+            test_values.net_id_open,
+        ]
+        .iter()
+        .map(|id| types::Ssid::from_bytes_unchecked(id.ssid.clone()))
+        .collect();
+        exec.run_singlethreaded(test_values.scan_requester.verify_scan_request((
+            scan::ScanReason::ClientRequest,
+            vec![],
+            vec![],
+        )));
+        exec.run_singlethreaded(test_values.scan_requester.verify_scan_request((
+            scan::ScanReason::ClientRequest,
+            expected_active_ssids,
+            vec![],
+        )));
     }
 
     #[fuchsia::test]

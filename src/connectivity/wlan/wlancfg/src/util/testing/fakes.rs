@@ -319,15 +319,16 @@ pub struct FakeScanRequester {
     pub scan_results:
         Arc<Mutex<VecDeque<Result<Vec<client_types::ScanResult>, client_types::ScanError>>>>,
     #[allow(clippy::type_complexity)]
-    pub scan_requests:
-        Arc<Mutex<Vec<(scan::ScanReason, Vec<client_types::Ssid>, Vec<client_types::WlanChan>)>>>,
+    pub scan_requests: Arc<
+        Mutex<VecDeque<(scan::ScanReason, Vec<client_types::Ssid>, Vec<client_types::WlanChan>)>>,
+    >,
 }
 
 impl FakeScanRequester {
     pub fn new() -> Self {
         FakeScanRequester {
             scan_results: Arc::new(Mutex::new(VecDeque::new())),
-            scan_requests: Arc::new(Mutex::new(vec![])),
+            scan_requests: Arc::new(Mutex::new(VecDeque::new())),
         }
     }
     pub async fn add_scan_result(
@@ -335,6 +336,20 @@ impl FakeScanRequester {
         res: Result<Vec<client_types::ScanResult>, client_types::ScanError>,
     ) {
         self.scan_results.lock().await.push_back(res);
+    }
+    pub async fn verify_scan_request(
+        &self,
+        mut expected: (scan::ScanReason, Vec<client_types::Ssid>, Vec<client_types::WlanChan>),
+    ) {
+        let mut actual = self.scan_requests.lock().await.pop_front().unwrap();
+        // Sort SSIDs and channels
+        actual.1.sort();
+        actual.2.sort();
+        expected.1.sort();
+        expected.2.sort();
+        assert_eq!(actual.0, expected.0);
+        assert_eq!(actual.1, expected.1);
+        assert_eq!(actual.2, expected.2);
     }
 }
 
@@ -346,7 +361,7 @@ impl scan::ScanRequestApi for FakeScanRequester {
         ssids: Vec<client_types::Ssid>,
         channels: Vec<client_types::WlanChan>,
     ) -> Result<Vec<client_types::ScanResult>, client_types::ScanError> {
-        self.scan_requests.lock().await.push((scan_reason, ssids, channels));
+        self.scan_requests.lock().await.push_back((scan_reason, ssids, channels));
         self.scan_results.lock().await.pop_front().unwrap()
     }
 }

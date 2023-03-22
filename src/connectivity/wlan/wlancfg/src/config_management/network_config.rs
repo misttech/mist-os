@@ -49,6 +49,12 @@ pub const PROB_HIDDEN_MIN_FROM_NOT_SEEN_ACTIVE: f32 = 0.25;
 /// How much we will lower the probability of scanning for an active network if we don't see the
 /// network in an active scan.
 pub const PROB_HIDDEN_INCREMENT_NOT_SEEN_ACTIVE: f32 = 0.14;
+/// Threshold for saying that a network has "high probability of being hidden".
+// Implementation detail: this is set to PROB_HIDDEN_DEFAULT - PROB_HIDDEN_INCREMENT_NOT_SEEN_ACTIVE
+// to allow for a newly saved network to be scanned at least twice before falling out of the
+// "HIDDEN_PROBABILITY_HIGH" range.
+pub const HIDDEN_PROBABILITY_HIGH: f32 =
+    PROB_HIDDEN_DEFAULT - PROB_HIDDEN_INCREMENT_NOT_SEEN_ACTIVE;
 
 pub type SaveError = fidl_policy::NetworkConfigChangeError;
 

@@ -175,6 +175,10 @@ pub enum TelemetryEvent {
     ActiveScanRequested {
         num_ssids_requested: usize,
     },
+    /// Notify the telemetry event loop of an active scan being requested via Policy API.
+    ActiveScanRequestedViaApi {
+        num_ssids_requested: usize,
+    },
     /// Notify the telemetry event loop that network selection is complete.
     NetworkSelectionDecision {
         /// Type of network selection. If it's undirected and no candidate network is found,
@@ -922,6 +926,11 @@ impl Telemetry {
             TelemetryEvent::ActiveScanRequested { num_ssids_requested } => {
                 self.stats_logger
                     .log_active_scan_requested_cobalt_metrics(num_ssids_requested)
+                    .await
+            }
+            TelemetryEvent::ActiveScanRequestedViaApi { num_ssids_requested } => {
+                self.stats_logger
+                    .log_active_scan_requested_via_api_cobalt_metrics(num_ssids_requested)
                     .await
             }
             TelemetryEvent::NetworkSelectionDecision {
@@ -2234,6 +2243,31 @@ impl StatsLogger {
             self.cobalt_1dot1_proxy,
             log_occurrence,
             metrics::ACTIVE_SCAN_REQUESTED_FOR_NETWORK_SELECTION_MIGRATED_METRIC_ID,
+            1,
+            &[active_scan_ssids_requested_dim as u32],
+        );
+    }
+
+    async fn log_active_scan_requested_via_api_cobalt_metrics(
+        &mut self,
+        num_ssids_requested: usize,
+    ) {
+        use metrics::ActiveScanRequestedForPolicyApiMetricDimensionActiveScanSsidsRequested as ActiveScanSsidsRequested;
+        let active_scan_ssids_requested_dim = match num_ssids_requested {
+            0 => ActiveScanSsidsRequested::Zero,
+            1 => ActiveScanSsidsRequested::One,
+            2..=4 => ActiveScanSsidsRequested::TwoToFour,
+            5..=10 => ActiveScanSsidsRequested::FiveToTen,
+            11..=20 => ActiveScanSsidsRequested::ElevenToTwenty,
+            21..=50 => ActiveScanSsidsRequested::TwentyOneToFifty,
+            51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
+            101..=usize::MAX => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
+            _ => unreachable!(),
+        };
+        log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_occurrence,
+            metrics::ACTIVE_SCAN_REQUESTED_FOR_POLICY_API_METRIC_ID,
             1,
             &[active_scan_ssids_requested_dim as u32],
         );
