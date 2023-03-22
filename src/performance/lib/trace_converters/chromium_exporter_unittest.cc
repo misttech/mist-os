@@ -5,8 +5,8 @@
 #include "src/performance/lib/trace_converters/chromium_exporter.h"
 
 #include <sstream>
+#include <vector>
 
-#include <fbl/vector.h>
 #include <gtest/gtest.h>
 #include <trace-reader/records.h>
 
@@ -14,7 +14,7 @@ namespace {
 
 TEST(ChromiumExporterTest, ValidUtf8) {
   trace::EventData data(trace::EventData::Instant{trace::EventScope::kGlobal});
-  fbl::Vector<trace::Argument> arguments;
+  std::vector<trace::Argument> arguments;
   arguments.push_back(trace::Argument("arg", trace::ArgumentValue::MakeString("foo\xb5\xb3")));
   trace::Record record(trace::Record::Event{1000, trace::ProcessThread(45, 46), "c\342\202at",
                                             "n\301a\205me", std::move(arguments), std::move(data)});
@@ -38,7 +38,7 @@ TEST(ChromiumExporterTest, ValidUtf8) {
 }
 
 TEST(ChromiumExporterTest, UnknownLargeBlobEventDropped) {
-  fbl::Vector<trace::Argument> arguments;
+  std::vector<trace::Argument> arguments;
   arguments.push_back(trace::Argument("arg", trace::ArgumentValue::MakeString("foo")));
   static const char blob[] = "some test blob data";
   trace::Record record(trace::LargeRecordData{trace::LargeRecordData::BlobEvent{
@@ -99,7 +99,7 @@ TEST(ChromiumExporterTest, FidlBlobExported) {
       "BlobName",
       1000,
       trace::ProcessThread(45, 46),
-      fbl::Vector<trace::Argument>(),
+      std::vector<trace::Argument>(),
       blob,
       sizeof(blob),
   }});

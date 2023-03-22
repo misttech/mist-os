@@ -802,18 +802,20 @@ EXPORT_NO_DDK void trace_context_write_context_switch_record(
   trace::Payload payload(context, record_size);
   if (payload) {
     payload
-        .WriteUint64(trace::MakeRecordHeader(trace::RecordType::kContextSwitch, record_size) |
-                     trace::ContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
-                     trace::ContextSwitchRecordFields::OutgoingThreadState::Make(
+        .WriteUint64(trace::MakeRecordHeader(trace::RecordType::kScheduler, record_size) |
+                     trace::LegacyContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
+                     trace::LegacyContextSwitchRecordFields::OutgoingThreadState::Make(
                          ZX_THREAD_STATE_BASIC(outgoing_thread_state)) |
-                     trace::ContextSwitchRecordFields::OutgoingThreadRef::Make(
+                     trace::LegacyContextSwitchRecordFields::OutgoingThreadRef::Make(
                          outgoing_thread_ref->encoded_value) |
-                     trace::ContextSwitchRecordFields::IncomingThreadRef::Make(
+                     trace::LegacyContextSwitchRecordFields::IncomingThreadRef::Make(
                          incoming_thread_ref->encoded_value) |
-                     trace::ContextSwitchRecordFields::OutgoingThreadPriority::Make(
+                     trace::LegacyContextSwitchRecordFields::OutgoingThreadPriority::Make(
                          outgoing_thread_priority) |
-                     trace::ContextSwitchRecordFields::IncomingThreadPriority::Make(
-                         incoming_thread_priority))
+                     trace::LegacyContextSwitchRecordFields::IncomingThreadPriority::Make(
+                         incoming_thread_priority) |
+                     trace::LegacyContextSwitchRecordFields::EventType::Make(
+                         trace::ToUnderlyingType(trace::SchedulerEventType::kLegacyContextSwitch)))
         .WriteUint64(event_time)
         .WriteThreadRef(outgoing_thread_ref)
         .WriteThreadRef(incoming_thread_ref);

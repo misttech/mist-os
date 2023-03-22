@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include <utility>
+#include <vector>
 
 #include <fbl/algorithm.h>
 #include <fbl/string_printf.h>
@@ -641,7 +642,7 @@ TEST(TraceRecords, Record) {
   // event
 
   {
-    fbl::Vector<trace::Argument> args;
+    std::vector<trace::Argument> args;
     args.push_back(trace::Argument("arg1", trace::ArgumentValue::MakeInt32(11)));
     args.push_back(trace::Argument("arg2", trace::ArgumentValue::MakeDouble(-3.14)));
 
@@ -730,7 +731,7 @@ TEST(TraceRecords, Record) {
   // kernel object
 
   {
-    fbl::Vector<trace::Argument> args;
+    std::vector<trace::Argument> args;
     args.push_back(trace::Argument("arg1", trace::ArgumentValue::MakeInt32(11)));
     args.push_back(trace::Argument("arg2", trace::ArgumentValue::MakeDouble(-3.14)));
 
@@ -773,50 +774,170 @@ TEST(TraceRecords, Record) {
         r.ToString().c_str());
   }
 
-  // context switch
+  // legacy context switch
 
   {
-    trace::Record r(trace::Record::ContextSwitch{123, 4, trace::ThreadState::kSuspended,
-                                                 trace::ProcessThread(5, 6),
-                                                 trace::ProcessThread(7, 8), 9, 10});
-    EXPECT_EQ(trace::RecordType::kContextSwitch, r.type());
-    EXPECT_EQ(123, r.GetContextSwitch().timestamp);
-    EXPECT_EQ(4, r.GetContextSwitch().cpu_number);
-    EXPECT_EQ(trace::ThreadState::kSuspended, r.GetContextSwitch().outgoing_thread_state);
-    EXPECT_EQ(5, r.GetContextSwitch().outgoing_thread.process_koid());
-    EXPECT_EQ(6, r.GetContextSwitch().outgoing_thread.thread_koid());
-    EXPECT_EQ(7, r.GetContextSwitch().incoming_thread.process_koid());
-    EXPECT_EQ(8, r.GetContextSwitch().incoming_thread.thread_koid());
-    EXPECT_EQ(9, r.GetContextSwitch().outgoing_thread_priority);
-    EXPECT_EQ(10, r.GetContextSwitch().incoming_thread_priority);
+    trace::Record r(trace::Record::SchedulerEvent{{123, 4, trace::ThreadState::kSuspended,
+                                                   trace::ProcessThread(5, 6),
+                                                   trace::ProcessThread(7, 8), 9, 10}});
+    EXPECT_EQ(trace::RecordType::kScheduler, r.type());
+    EXPECT_EQ(trace::SchedulerEventType::kLegacyContextSwitch, r.GetSchedulerEvent().type());
+    EXPECT_EQ(123, r.GetSchedulerEvent().legacy_context_switch().timestamp);
+    EXPECT_EQ(4, r.GetSchedulerEvent().legacy_context_switch().cpu_number);
+    EXPECT_EQ(trace::ThreadState::kSuspended,
+              r.GetSchedulerEvent().legacy_context_switch().outgoing_thread_state);
+    EXPECT_EQ(5, r.GetSchedulerEvent().legacy_context_switch().outgoing_thread.process_koid());
+    EXPECT_EQ(6, r.GetSchedulerEvent().legacy_context_switch().outgoing_thread.thread_koid());
+    EXPECT_EQ(7, r.GetSchedulerEvent().legacy_context_switch().incoming_thread.process_koid());
+    EXPECT_EQ(8, r.GetSchedulerEvent().legacy_context_switch().incoming_thread.thread_koid());
+    EXPECT_EQ(9, r.GetSchedulerEvent().legacy_context_switch().outgoing_thread_priority);
+    EXPECT_EQ(10, r.GetSchedulerEvent().legacy_context_switch().incoming_thread_priority);
 
     trace::Record m(std::move(r));
-    EXPECT_EQ(trace::RecordType::kContextSwitch, m.type());
-    EXPECT_EQ(123, m.GetContextSwitch().timestamp);
-    EXPECT_EQ(4, m.GetContextSwitch().cpu_number);
-    EXPECT_EQ(trace::ThreadState::kSuspended, m.GetContextSwitch().outgoing_thread_state);
-    EXPECT_EQ(5, m.GetContextSwitch().outgoing_thread.process_koid());
-    EXPECT_EQ(6, m.GetContextSwitch().outgoing_thread.thread_koid());
-    EXPECT_EQ(7, m.GetContextSwitch().incoming_thread.process_koid());
-    EXPECT_EQ(8, m.GetContextSwitch().incoming_thread.thread_koid());
-    EXPECT_EQ(9, m.GetContextSwitch().outgoing_thread_priority);
-    EXPECT_EQ(10, m.GetContextSwitch().incoming_thread_priority);
+    EXPECT_EQ(trace::RecordType::kScheduler, m.type());
+    EXPECT_EQ(trace::SchedulerEventType::kLegacyContextSwitch, m.GetSchedulerEvent().type());
+    EXPECT_EQ(123, m.GetSchedulerEvent().legacy_context_switch().timestamp);
+    EXPECT_EQ(4, m.GetSchedulerEvent().legacy_context_switch().cpu_number);
+    EXPECT_EQ(trace::ThreadState::kSuspended,
+              m.GetSchedulerEvent().legacy_context_switch().outgoing_thread_state);
+    EXPECT_EQ(5, m.GetSchedulerEvent().legacy_context_switch().outgoing_thread.process_koid());
+    EXPECT_EQ(6, m.GetSchedulerEvent().legacy_context_switch().outgoing_thread.thread_koid());
+    EXPECT_EQ(7, m.GetSchedulerEvent().legacy_context_switch().incoming_thread.process_koid());
+    EXPECT_EQ(8, m.GetSchedulerEvent().legacy_context_switch().incoming_thread.thread_koid());
+    EXPECT_EQ(9, m.GetSchedulerEvent().legacy_context_switch().outgoing_thread_priority);
+    EXPECT_EQ(10, m.GetSchedulerEvent().legacy_context_switch().incoming_thread_priority);
 
     r = std::move(m);
-    EXPECT_EQ(trace::RecordType::kContextSwitch, r.type());
-    EXPECT_EQ(123, r.GetContextSwitch().timestamp);
-    EXPECT_EQ(4, r.GetContextSwitch().cpu_number);
-    EXPECT_EQ(trace::ThreadState::kSuspended, r.GetContextSwitch().outgoing_thread_state);
-    EXPECT_EQ(5, r.GetContextSwitch().outgoing_thread.process_koid());
-    EXPECT_EQ(6, r.GetContextSwitch().outgoing_thread.thread_koid());
-    EXPECT_EQ(7, r.GetContextSwitch().incoming_thread.process_koid());
-    EXPECT_EQ(8, r.GetContextSwitch().incoming_thread.thread_koid());
-    EXPECT_EQ(9, r.GetContextSwitch().outgoing_thread_priority);
-    EXPECT_EQ(10, r.GetContextSwitch().incoming_thread_priority);
+    EXPECT_EQ(trace::RecordType::kScheduler, r.type());
+    EXPECT_EQ(trace::SchedulerEventType::kLegacyContextSwitch, r.GetSchedulerEvent().type());
+    EXPECT_EQ(123, r.GetSchedulerEvent().legacy_context_switch().timestamp);
+    EXPECT_EQ(4, r.GetSchedulerEvent().legacy_context_switch().cpu_number);
+    EXPECT_EQ(trace::ThreadState::kSuspended,
+              r.GetSchedulerEvent().legacy_context_switch().outgoing_thread_state);
+    EXPECT_EQ(5, r.GetSchedulerEvent().legacy_context_switch().outgoing_thread.process_koid());
+    EXPECT_EQ(6, r.GetSchedulerEvent().legacy_context_switch().outgoing_thread.thread_koid());
+    EXPECT_EQ(7, r.GetSchedulerEvent().legacy_context_switch().incoming_thread.process_koid());
+    EXPECT_EQ(8, r.GetSchedulerEvent().legacy_context_switch().incoming_thread.thread_koid());
+    EXPECT_EQ(9, r.GetSchedulerEvent().legacy_context_switch().outgoing_thread_priority);
+    EXPECT_EQ(10, r.GetSchedulerEvent().legacy_context_switch().incoming_thread_priority);
 
     EXPECT_STREQ(
         "ContextSwitch(ts: 123, cpu: 4, os: suspended, opt: 5/6, ipt: 7/8, oprio: 9, iprio: 10)",
         r.ToString().c_str());
+  }
+
+  // context switch
+
+  {
+    trace::Record r(trace::Record::SchedulerEvent{
+        {123,
+         4,
+         trace::ThreadState::kSuspended,
+         5,
+         6,
+         {trace::Argument{"incoming_weight", trace::ArgumentValue::MakeInt32(7)},
+          trace::Argument{"outgoing_weight", trace::ArgumentValue::MakeInt32(8)}}}});
+    EXPECT_EQ(trace::RecordType::kScheduler, r.type());
+    EXPECT_EQ(trace::SchedulerEventType::kContextSwitch, r.GetSchedulerEvent().type());
+    EXPECT_EQ(123, r.GetSchedulerEvent().context_switch().timestamp);
+    EXPECT_EQ(4, r.GetSchedulerEvent().context_switch().cpu_number);
+    EXPECT_EQ(trace::ThreadState::kSuspended,
+              r.GetSchedulerEvent().context_switch().outgoing_thread_state);
+    EXPECT_EQ(5, r.GetSchedulerEvent().context_switch().outgoing_tid);
+    EXPECT_EQ(6, r.GetSchedulerEvent().context_switch().incoming_tid);
+    const trace::Argument* incoming_weight =
+        r.GetSchedulerEvent().context_switch().FindArgument("incoming_weight");
+    ASSERT_TRUE(incoming_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, incoming_weight->value().type());
+    EXPECT_EQ(7, incoming_weight->value().GetInt32());
+    const trace::Argument* outgoing_weight =
+        r.GetSchedulerEvent().context_switch().FindArgument("outgoing_weight");
+    ASSERT_TRUE(outgoing_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, outgoing_weight->value().type());
+    EXPECT_EQ(8, outgoing_weight->value().GetInt32());
+
+    trace::Record m(std::move(r));
+    EXPECT_EQ(trace::RecordType::kScheduler, m.type());
+    EXPECT_EQ(trace::SchedulerEventType::kContextSwitch, m.GetSchedulerEvent().type());
+    EXPECT_EQ(123, m.GetSchedulerEvent().context_switch().timestamp);
+    EXPECT_EQ(4, m.GetSchedulerEvent().context_switch().cpu_number);
+    EXPECT_EQ(trace::ThreadState::kSuspended,
+              m.GetSchedulerEvent().context_switch().outgoing_thread_state);
+    EXPECT_EQ(5, m.GetSchedulerEvent().context_switch().outgoing_tid);
+    EXPECT_EQ(6, m.GetSchedulerEvent().context_switch().incoming_tid);
+    incoming_weight = m.GetSchedulerEvent().context_switch().FindArgument("incoming_weight");
+    ASSERT_TRUE(incoming_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, incoming_weight->value().type());
+    EXPECT_EQ(7, incoming_weight->value().GetInt32());
+    outgoing_weight = m.GetSchedulerEvent().context_switch().FindArgument("outgoing_weight");
+    ASSERT_TRUE(outgoing_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, outgoing_weight->value().type());
+    EXPECT_EQ(8, outgoing_weight->value().GetInt32());
+
+    r = std::move(m);
+    EXPECT_EQ(trace::RecordType::kScheduler, r.type());
+    EXPECT_EQ(trace::SchedulerEventType::kContextSwitch, r.GetSchedulerEvent().type());
+    EXPECT_EQ(123, r.GetSchedulerEvent().context_switch().timestamp);
+    EXPECT_EQ(4, r.GetSchedulerEvent().context_switch().cpu_number);
+    EXPECT_EQ(trace::ThreadState::kSuspended,
+              r.GetSchedulerEvent().context_switch().outgoing_thread_state);
+    EXPECT_EQ(5, r.GetSchedulerEvent().context_switch().outgoing_tid);
+    EXPECT_EQ(6, r.GetSchedulerEvent().context_switch().incoming_tid);
+    incoming_weight = r.GetSchedulerEvent().context_switch().FindArgument("incoming_weight");
+    ASSERT_TRUE(incoming_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, incoming_weight->value().type());
+    EXPECT_EQ(7, incoming_weight->value().GetInt32());
+    outgoing_weight = r.GetSchedulerEvent().context_switch().FindArgument("outgoing_weight");
+    ASSERT_TRUE(outgoing_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, outgoing_weight->value().type());
+    EXPECT_EQ(8, outgoing_weight->value().GetInt32());
+
+    EXPECT_STREQ(
+        "ContextSwitch(ts: 123, cpu: 4, os: suspended, ot: 5, it: 6, "
+        "{incoming_weight: int32(7), outgoing_weight: int32(8)})",
+        r.ToString().c_str());
+  }
+
+  // thread wakeup
+
+  {
+    trace::Record r(trace::Record::SchedulerEvent{
+        {123, 4, 5, {trace::Argument{"incoming_weight", trace::ArgumentValue::MakeInt32(6)}}}});
+    EXPECT_EQ(trace::RecordType::kScheduler, r.type());
+    EXPECT_EQ(trace::SchedulerEventType::kThreadWakeup, r.GetSchedulerEvent().type());
+    EXPECT_EQ(123, r.GetSchedulerEvent().thread_wakeup().timestamp);
+    EXPECT_EQ(4, r.GetSchedulerEvent().thread_wakeup().cpu_number);
+    EXPECT_EQ(5, r.GetSchedulerEvent().thread_wakeup().incoming_tid);
+    const trace::Argument* incoming_weight =
+        r.GetSchedulerEvent().thread_wakeup().FindArgument("incoming_weight");
+    ASSERT_TRUE(incoming_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, incoming_weight->value().type());
+    EXPECT_EQ(6, incoming_weight->value().GetInt32());
+
+    trace::Record m(std::move(r));
+    EXPECT_EQ(trace::RecordType::kScheduler, m.type());
+    EXPECT_EQ(trace::SchedulerEventType::kThreadWakeup, m.GetSchedulerEvent().type());
+    EXPECT_EQ(123, m.GetSchedulerEvent().thread_wakeup().timestamp);
+    EXPECT_EQ(4, m.GetSchedulerEvent().thread_wakeup().cpu_number);
+    EXPECT_EQ(5, m.GetSchedulerEvent().thread_wakeup().incoming_tid);
+    incoming_weight = m.GetSchedulerEvent().thread_wakeup().FindArgument("incoming_weight");
+    ASSERT_TRUE(incoming_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, incoming_weight->value().type());
+    EXPECT_EQ(6, incoming_weight->value().GetInt32());
+
+    r = std::move(m);
+    EXPECT_EQ(trace::RecordType::kScheduler, r.type());
+    EXPECT_EQ(trace::SchedulerEventType::kThreadWakeup, r.GetSchedulerEvent().type());
+    EXPECT_EQ(123, r.GetSchedulerEvent().thread_wakeup().timestamp);
+    EXPECT_EQ(4, r.GetSchedulerEvent().thread_wakeup().cpu_number);
+    EXPECT_EQ(5, r.GetSchedulerEvent().thread_wakeup().incoming_tid);
+    incoming_weight = r.GetSchedulerEvent().thread_wakeup().FindArgument("incoming_weight");
+    ASSERT_TRUE(incoming_weight != nullptr);
+    ASSERT_EQ(trace::ArgumentType::kInt32, incoming_weight->value().type());
+    EXPECT_EQ(6, incoming_weight->value().GetInt32());
+
+    EXPECT_STREQ("ThreadWakeup(ts: 123, cpu: 4, it: 5, {incoming_weight: int32(6)})",
+                 r.ToString().c_str());
   }
 
   // log
@@ -854,7 +975,7 @@ TEST(TraceRecords, Record) {
     const char blob[] = "abc";
     const char preview[] = "<61 62 63 00>";
 
-    fbl::Vector<trace::Argument> args;
+    std::vector<trace::Argument> args;
     args.push_back(trace::Argument("arg1", trace::ArgumentValue::MakeInt32(11)));
     args.push_back(trace::Argument("arg2", trace::ArgumentValue::MakeDouble(-3.14)));
 

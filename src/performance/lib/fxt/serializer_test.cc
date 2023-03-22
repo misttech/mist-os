@@ -749,7 +749,7 @@ TEST(Serializer, KernelObjectRecordInlineNames) {
   EXPECT_EQ(bytes[4], uint64_t{0x0000'0000'0067'7261});
 }
 
-TEST(Serializer, ContextSwitchRecord) {
+TEST(Serializer, LegacyContextSwitchRecord) {
   uint64_t event_time = 0xAABB'CCDD'EEFF'0011;
   uint8_t cpu_number = 0xBB;
   zx_thread_state_t outgoing_state = ZX_THREAD_STATE_SUSPENDED;
@@ -763,11 +763,13 @@ TEST(Serializer, ContextSwitchRecord) {
                                                  outgoing_thread, incoming_thread,
                                                  outgoing_thread_pri, incoming_thread_pri));
   // 1 word for the header, 1 for the timestamp
-  EXPECT_EQ(writer.bytes.size(), fxt::WordSize(2).SizeInBytes());
+  ASSERT_EQ(writer.bytes.size(), fxt::WordSize(2).SizeInBytes());
   uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
   uint64_t header = bytes[0];
   // Record type is 8
   EXPECT_EQ(header & 0x0000'0000'0000'000F, uint64_t{0x0000'0000'0000'0008});
+  // Event type is 0
+  EXPECT_EQ(header & 0xF000'0000'0000'0000, uint64_t{0x0000'0000'0000'0000});
   // Size
   EXPECT_EQ(header & 0x0000'0000'0000'FFF0, uint64_t{0x0000'0000'0000'0020});
   // CPU number
@@ -783,6 +785,76 @@ TEST(Serializer, ContextSwitchRecord) {
   // in pri
   EXPECT_EQ(header & 0x0FF0'0000'0000'0000, uint64_t{0x0040'0000'0000'0000});
   EXPECT_EQ(bytes[1], event_time);
+}
+
+TEST(Serializer, ContextSwitchRecord) {
+  uint64_t event_time = 0xAABB'CCDD'EEFF'0011;
+  uint16_t cpu_number = 0xBBBB;
+  zx_thread_state_t outgoing_state = ZX_THREAD_STATE_SUSPENDED;
+  zx_koid_t outgoing_tid = 1;
+  zx_koid_t incoming_tid = 2;
+  fxt::ThreadRef outgoing_thread(0, outgoing_tid);
+  fxt::ThreadRef incoming_thread(0, incoming_tid);
+  fxt::Argument outgoing_thread_weight(fxt::StringRef(1), int32_t{3});
+  fxt::Argument incoming_thread_weight(fxt::StringRef(2), int32_t{4});
+
+  FakeWriter writer;
+  EXPECT_EQ(ZX_OK, fxt::WriteContextSwitchRecord(&writer, event_time, cpu_number, outgoing_state,
+                                                 outgoing_thread, incoming_thread,
+                                                 outgoing_thread_weight, incoming_thread_weight));
+  // 1 word for the header, 1 for the timestamp, 2 for the in/out tids, 2 for the args.
+  ASSERT_EQ(writer.bytes.size(), fxt::WordSize(6).SizeInBytes());
+  uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
+  uint64_t header = bytes[0];
+  // Record type is 8
+  EXPECT_EQ(header & 0x0000'0000'0000'000F, uint64_t{0x0000'0000'0000'0008});
+  // Event type is 1
+  EXPECT_EQ(header & 0xF000'0000'0000'0000, uint64_t{0x1000'0000'0000'0000});
+  // Size
+  EXPECT_EQ(header & 0x0000'0000'0000'FFF0, uint64_t{0x0000'0000'0000'0060});
+  // Argument count
+  EXPECT_EQ(header & 0x0000'0000'000F'0000, uint64_t{0x0000'0000'0002'0000});
+  // CPU number
+  EXPECT_EQ(header & 0x0000'000F'FFF0'0000, uint64_t{0x0000'000B'BBB0'0000});
+  // State
+  EXPECT_EQ(header & 0x0000'00F0'0000'0000, uint64_t{0x0000'0020'0000'0000});
+  EXPECT_EQ(bytes[1], event_time);
+  EXPECT_EQ(bytes[2], outgoing_tid);
+  EXPECT_EQ(bytes[3], incoming_tid);
+  // Outgoing thread weight argument
+  EXPECT_NE(bytes[4], uint64_t{0x0000'0030'0010'0011});
+  // Incoming thread weight argument
+  EXPECT_NE(bytes[5], uint64_t{0x0000'0040'0020'0011});
+}
+
+TEST(Serializer, ThreadWakeupRecord) {
+  uint64_t event_time = 0xAABB'CCDD'EEFF'0011;
+  uint16_t cpu_number = 0xBBBB;
+  zx_koid_t incoming_tid = 2;
+  fxt::ThreadRef incoming_thread(0, incoming_tid);
+  fxt::Argument incoming_thread_weight(fxt::StringRef(2), int32_t{4});
+
+  FakeWriter writer;
+  EXPECT_EQ(ZX_OK, fxt::WriteThreadWakeupRecord(&writer, event_time, cpu_number, incoming_thread,
+                                                incoming_thread_weight));
+  // 1 word for the header, 1 for the timestamp, 1 for the tid, 1 for the arg.
+  ASSERT_EQ(writer.bytes.size(), fxt::WordSize(4).SizeInBytes());
+  uint64_t* bytes = reinterpret_cast<uint64_t*>(writer.bytes.data());
+  uint64_t header = bytes[0];
+  // Record type is 8
+  EXPECT_EQ(header & 0x0000'0000'0000'000F, uint64_t{0x0000'0000'0000'0008});
+  // Event type is 2
+  EXPECT_EQ(header & 0xF000'0000'0000'0000, uint64_t{0x2000'0000'0000'0000});
+  // Size
+  EXPECT_EQ(header & 0x0000'0000'0000'FFF0, uint64_t{0x0000'0000'0000'0040});
+  // Argument count
+  EXPECT_EQ(header & 0x0000'0000'000F'0000, uint64_t{0x0000'0000'0001'0000});
+  // CPU number
+  EXPECT_EQ(header & 0x0000'000F'FFF0'0000, uint64_t{0x0000'000B'BBB0'0000});
+  EXPECT_EQ(bytes[1], event_time);
+  EXPECT_EQ(bytes[2], incoming_tid);
+  // Thread weight argument
+  EXPECT_NE(bytes[3], uint64_t{0x0000'0020'0010'0011});
 }
 
 TEST(Serializer, LogRecord) {

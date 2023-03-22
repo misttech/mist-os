@@ -99,9 +99,9 @@ bool TraceReader::ReadRecords(Chunk& chunk) {
         }
         break;
       }
-      case RecordType::kContextSwitch: {
-        if (!ReadContextSwitchRecord(record, pending_header_)) {
-          ReportError("Failed to read context switch record");
+      case RecordType::kScheduler: {
+        if (!ReadSchedulerRecord(record, pending_header_)) {
+          ReportError("Failed to read scheduler event record");
         }
         break;
       }
@@ -276,7 +276,7 @@ bool TraceReader::ReadEventRecord(Chunk& record, RecordHeader header) {
   ProcessThread process_thread;
   fbl::String category;
   fbl::String name;
-  fbl::Vector<Argument> arguments;
+  std::vector<Argument> arguments;
   if (!DecodeThreadRef(record, thread_ref, &process_thread) ||
       !DecodeStringRef(record, category_ref, &category) ||
       !DecodeStringRef(record, name_ref, &name) ||
@@ -436,7 +436,7 @@ bool TraceReader::ReadKernelObjectRecord(Chunk& record, RecordHeader header) {
   if (!DecodeStringRef(record, name_ref, &name)) {
     return false;
   }
-  fbl::Vector<Argument> arguments;
+  std::vector<Argument> arguments;
   if (!ReadArguments(record, argument_count, &arguments)) {
     return false;
   }
@@ -445,37 +445,99 @@ bool TraceReader::ReadKernelObjectRecord(Chunk& record, RecordHeader header) {
   return true;
 }
 
-bool TraceReader::ReadContextSwitchRecord(Chunk& record, RecordHeader header) {
-  auto cpu_number = ContextSwitchRecordFields::CpuNumber::Get<trace_cpu_number_t>(header);
-  auto outgoing_thread_state =
-      ContextSwitchRecordFields::OutgoingThreadState::Get<ThreadState>(header);
-  auto outgoing_thread_priority =
-      ContextSwitchRecordFields::OutgoingThreadPriority::Get<trace_thread_priority_t>(header);
-  auto incoming_thread_priority =
-      ContextSwitchRecordFields::IncomingThreadPriority::Get<trace_thread_priority_t>(header);
-  auto outgoing_thread_ref =
-      ContextSwitchRecordFields::OutgoingThreadRef::Get<trace_encoded_thread_ref_t>(header);
-  auto incoming_thread_ref =
-      ContextSwitchRecordFields::IncomingThreadRef::Get<trace_encoded_thread_ref_t>(header);
+bool TraceReader::ReadSchedulerRecord(Chunk& record, RecordHeader header) {
+  auto event_type = SchedulerRecordFields::EventType::Get<SchedulerEventType>(header);
+  if (event_type == SchedulerEventType::kLegacyContextSwitch) {
+    auto cpu_number = LegacyContextSwitchRecordFields::CpuNumber::Get<trace_cpu_number_t>(header);
+    auto outgoing_thread_state =
+        LegacyContextSwitchRecordFields::OutgoingThreadState::Get<ThreadState>(header);
+    auto outgoing_thread_priority =
+        LegacyContextSwitchRecordFields::OutgoingThreadPriority::Get<trace_thread_priority_t>(
+            header);
+    auto incoming_thread_priority =
+        LegacyContextSwitchRecordFields::IncomingThreadPriority::Get<trace_thread_priority_t>(
+            header);
+    auto outgoing_thread_ref =
+        LegacyContextSwitchRecordFields::OutgoingThreadRef::Get<trace_encoded_thread_ref_t>(header);
+    auto incoming_thread_ref =
+        LegacyContextSwitchRecordFields::IncomingThreadRef::Get<trace_encoded_thread_ref_t>(header);
 
-  std::optional timestamp_opt = record.ReadUint64();
-  if (!timestamp_opt.has_value()) {
-    return false;
-  }
-  trace_ticks_t timestamp = timestamp_opt.value();
-  ProcessThread outgoing_thread;
-  if (!DecodeThreadRef(record, outgoing_thread_ref, &outgoing_thread)) {
-    return false;
-  }
-  ProcessThread incoming_thread;
-  if (!DecodeThreadRef(record, incoming_thread_ref, &incoming_thread)) {
-    return false;
+    std::optional timestamp_opt = record.ReadUint64();
+    if (!timestamp_opt.has_value()) {
+      return false;
+    }
+    trace_ticks_t timestamp = timestamp_opt.value();
+    ProcessThread outgoing_thread;
+    if (!DecodeThreadRef(record, outgoing_thread_ref, &outgoing_thread)) {
+      return false;
+    }
+    ProcessThread incoming_thread;
+    if (!DecodeThreadRef(record, incoming_thread_ref, &incoming_thread)) {
+      return false;
+    }
+
+    record_consumer_(Record(Record::SchedulerEvent{
+        {timestamp, cpu_number, outgoing_thread_state, outgoing_thread, incoming_thread,
+         outgoing_thread_priority, incoming_thread_priority}}));
+    return true;
   }
 
-  record_consumer_(Record(
-      Record::ContextSwitch{timestamp, cpu_number, outgoing_thread_state, outgoing_thread,
-                            incoming_thread, outgoing_thread_priority, incoming_thread_priority}));
-  return true;
+  if (event_type == SchedulerEventType::kContextSwitch) {
+    auto argument_count = ContextSwitchRecordFields::ArgumentCount::Get<size_t>(header);
+    auto cpu_number = ContextSwitchRecordFields::CpuNumber::Get<trace_cpu_number_t>(header);
+    auto thread_state = ContextSwitchRecordFields::ThreadState::Get<ThreadState>(header);
+
+    std::optional timestamp = record.ReadUint64();
+    if (!timestamp.has_value()) {
+      return false;
+    }
+
+    std::optional outgoing_tid = record.ReadUint64();
+    if (!outgoing_tid.has_value()) {
+      return false;
+    }
+
+    std::optional incoming_tid = record.ReadUint64();
+    if (!incoming_tid.has_value()) {
+      return false;
+    }
+
+    std::vector<Argument> arguments;
+    if (!ReadArguments(record, argument_count, &arguments)) {
+      return false;
+    }
+
+    record_consumer_(
+        Record(Record::SchedulerEvent{{*timestamp, cpu_number, thread_state, *outgoing_tid,
+                                       *incoming_tid, std::move(arguments)}}));
+    return true;
+  }
+
+  if (event_type == SchedulerEventType::kThreadWakeup) {
+    auto argument_count = ContextSwitchRecordFields::ArgumentCount::Get<size_t>(header);
+    auto cpu_number = ContextSwitchRecordFields::CpuNumber::Get<trace_cpu_number_t>(header);
+
+    std::optional timestamp = record.ReadUint64();
+    if (!timestamp.has_value()) {
+      return false;
+    }
+
+    std::optional incoming_tid = record.ReadUint64();
+    if (!incoming_tid.has_value()) {
+      return false;
+    }
+
+    std::vector<Argument> arguments;
+    if (!ReadArguments(record, argument_count, &arguments)) {
+      return false;
+    }
+
+    record_consumer_(Record(
+        Record::SchedulerEvent{{*timestamp, cpu_number, *incoming_tid, std::move(arguments)}}));
+    return true;
+  }
+
+  return false;
 }
 
 bool TraceReader::ReadLogRecord(Chunk& record, RecordHeader header) {
@@ -550,7 +612,7 @@ bool TraceReader::ReadLargeBlob(trace::Chunk& record, trace::RecordHeader header
       if (!DecodeThreadRef(record, thread_ref, &process_thread)) {
         return false;
       }
-      fbl::Vector<Argument> arguments;
+      std::vector<Argument> arguments;
       if (!ReadArguments(record, argument_count, &arguments)) {
         return false;
       }
@@ -617,7 +679,7 @@ bool TraceReader::ReadLargeBlob(trace::Chunk& record, trace::RecordHeader header
   return true;
 }
 
-bool TraceReader::ReadArguments(Chunk& record, size_t count, fbl::Vector<Argument>* out_arguments) {
+bool TraceReader::ReadArguments(Chunk& record, size_t count, std::vector<Argument>* out_arguments) {
   while (count-- > 0) {
     std::optional header_opt = record.ReadUint64();
     if (!header_opt.has_value()) {

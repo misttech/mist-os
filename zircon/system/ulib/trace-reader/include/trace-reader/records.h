@@ -14,12 +14,13 @@
 #include <zircon/types.h>
 
 #include <new>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
 #include <fbl/array.h>
 #include <fbl/macros.h>
 #include <fbl/string.h>
-#include <fbl/vector.h>
 
 namespace trace {
 
@@ -68,128 +69,114 @@ class ProcessThread final {
 class ArgumentValue final {
  public:
   static ArgumentValue MakeNull() { return ArgumentValue(); }
-
-  static ArgumentValue MakeBool(bool value) { return ArgumentValue(value); }
-
+  static ArgumentValue MakeBool(bool value) { return ArgumentValue(Bool{value}); }
   static ArgumentValue MakeInt32(int32_t value) { return ArgumentValue(value); }
-
   static ArgumentValue MakeUint32(uint32_t value) { return ArgumentValue(value); }
-
   static ArgumentValue MakeInt64(int64_t value) { return ArgumentValue(value); }
-
   static ArgumentValue MakeUint64(uint64_t value) { return ArgumentValue(value); }
-
   static ArgumentValue MakeDouble(double value) { return ArgumentValue(value); }
-
   static ArgumentValue MakeString(fbl::String value) { return ArgumentValue(std::move(value)); }
+  static ArgumentValue MakePointer(uint64_t value) { return ArgumentValue(Pointer{value}); }
+  static ArgumentValue MakeKoid(zx_koid_t value) { return ArgumentValue(Koid{value}); }
 
-  static ArgumentValue MakePointer(uint64_t value) { return ArgumentValue(PointerTag(), value); }
+  ~ArgumentValue() = default;
 
-  static ArgumentValue MakeKoid(zx_koid_t value) { return ArgumentValue(KoidTag(), value); }
+  ArgumentValue(const ArgumentValue&) = default;
+  ArgumentValue& operator=(const ArgumentValue&) = default;
 
-  ArgumentValue(ArgumentValue&& other) { MoveFrom(std::move(other)); }
-
-  ~ArgumentValue() { Destroy(); }
-
-  ArgumentValue& operator=(ArgumentValue&& other) {
-    Destroy();
-    MoveFrom(std::move(other));
+  ArgumentValue(ArgumentValue&& other) noexcept { *this = std::move(other); }
+  ArgumentValue& operator=(ArgumentValue&& other) noexcept {
+    if (this != &other) {
+      value_ = std::move(other.value_);
+      other.value_.emplace<Null>();
+    }
     return *this;
   }
 
-  ArgumentType type() const { return type_; }
+  ArgumentType type() const { return static_cast<ArgumentType>(value_.index()); }
 
   uint32_t GetBool() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kBool);
-    return bool_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kBool);
+    return cpp17::get<Bool>(value_).value;
   }
-
   int32_t GetInt32() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kInt32);
-    return int32_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kInt32);
+    return cpp17::get<int32_t>(value_);
   }
-
   uint32_t GetUint32() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kUint32);
-    return uint32_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kUint32);
+    return cpp17::get<uint32_t>(value_);
   }
-
   int64_t GetInt64() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kInt64);
-    return int64_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kInt64);
+    return cpp17::get<int64_t>(value_);
   }
-
   uint64_t GetUint64() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kUint64);
-    return uint64_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kUint64);
+    return cpp17::get<uint64_t>(value_);
   }
-
   double GetDouble() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kDouble);
-    return double_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kDouble);
+    return cpp17::get<double>(value_);
   }
-
   const fbl::String& GetString() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kString);
-    return string_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kString);
+    return cpp17::get<fbl::String>(value_);
   }
-
   uint64_t GetPointer() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kPointer);
-    return pointer_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kPointer);
+    return cpp17::get<Pointer>(value_).value;
   }
-
   zx_koid_t GetKoid() const {
-    ZX_DEBUG_ASSERT(type_ == ArgumentType::kKoid);
-    return koid_;
+    ZX_DEBUG_ASSERT(type() == ArgumentType::kKoid);
+    return cpp17::get<Koid>(value_).value;
   }
 
   fbl::String ToString() const;
 
  private:
-  struct PointerTag {};
-  struct KoidTag {};
-
-  ArgumentValue() : type_(ArgumentType::kNull) {}
-
-  explicit ArgumentValue(bool b) : type_(ArgumentType::kBool), bool_(b) {}
-
-  explicit ArgumentValue(int32_t int32) : type_(ArgumentType::kInt32), int32_(int32) {}
-
-  explicit ArgumentValue(uint32_t uint32) : type_(ArgumentType::kUint32), uint32_(uint32) {}
-
-  explicit ArgumentValue(int64_t int64) : type_(ArgumentType::kInt64), int64_(int64) {}
-
-  explicit ArgumentValue(uint64_t uint64) : type_(ArgumentType::kUint64), uint64_(uint64) {}
-
-  explicit ArgumentValue(double d) : type_(ArgumentType::kDouble), double_(d) {}
-
-  explicit ArgumentValue(fbl::String string) : type_(ArgumentType::kString) {
-    new (&string_) fbl::String(std::move(string));
-  }
-
-  explicit ArgumentValue(PointerTag, uint64_t pointer)
-      : type_(ArgumentType::kPointer), pointer_(pointer) {}
-
-  explicit ArgumentValue(KoidTag, zx_koid_t koid) : type_(ArgumentType::kKoid), koid_(koid) {}
-
-  void Destroy();
-  void MoveFrom(ArgumentValue&& other);
-
-  ArgumentType type_;
-  union {
-    bool bool_;
-    int32_t int32_;
-    uint32_t uint32_;
-    int64_t int64_;
-    uint64_t uint64_;
-    double double_;
-    fbl::String string_;
-    uint64_t pointer_;
-    zx_koid_t koid_;
+  // Strong wrapper types for argument types that have no value or have ambiguous implicit
+  // conversions.
+  struct Null {};
+  struct Bool {
+    bool value;
+  };
+  struct Pointer {
+    uint64_t value;
+  };
+  struct Koid {
+    zx_koid_t value;
   };
 
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(ArgumentValue);
+  ArgumentValue() : value_{Null{}} {}
+  explicit ArgumentValue(Bool b) : value_(b) {}
+  explicit ArgumentValue(int32_t int32) : value_(int32) {}
+  explicit ArgumentValue(uint32_t uint32) : value_(uint32) {}
+  explicit ArgumentValue(int64_t int64) : value_(int64) {}
+  explicit ArgumentValue(uint64_t uint64) : value_(uint64) {}
+  explicit ArgumentValue(double d) : value_(d) {}
+  explicit ArgumentValue(fbl::String string) : value_(std::move(string)) {}
+  explicit ArgumentValue(Pointer pointer) : value_(pointer) {}
+  explicit ArgumentValue(Koid koid) : value_(koid) {}
+
+  using Variant = cpp17::variant<Null, int32_t, uint32_t, int64_t, uint64_t, double, fbl::String,
+                                 Pointer, Koid, Bool>;
+  Variant value_;
+
+  // Ensure the variant size and type order matches the type enum values.
+  template <typename T, size_t I>
+  static constexpr bool TypeIndexCheck =
+      std::is_same_v<T, cpp17::variant_alternative_t<I, Variant>>;
+  static_assert(TypeIndexCheck<Bool, TRACE_ARG_BOOL>);
+  static_assert(TypeIndexCheck<int32_t, TRACE_ARG_INT32>);
+  static_assert(TypeIndexCheck<uint32_t, TRACE_ARG_UINT32>);
+  static_assert(TypeIndexCheck<int64_t, TRACE_ARG_INT64>);
+  static_assert(TypeIndexCheck<uint64_t, TRACE_ARG_UINT64>);
+  static_assert(TypeIndexCheck<double, TRACE_ARG_DOUBLE>);
+  static_assert(TypeIndexCheck<fbl::String, TRACE_ARG_STRING>);
+  static_assert(TypeIndexCheck<Pointer, TRACE_ARG_POINTER>);
+  static_assert(TypeIndexCheck<Koid, TRACE_ARG_KOID>);
+  static_assert(TypeIndexCheck<Bool, TRACE_ARG_BOOL>);
 };
 
 // Named argument and value.
@@ -198,24 +185,30 @@ class Argument final {
   explicit Argument(fbl::String name, ArgumentValue value)
       : name_(std::move(name)), value_(std::move(value)) {}
 
-  Argument(Argument&& other) : name_(std::move(other.name_)), value_(std::move(other.value_)) {}
+  Argument(const Argument&) = default;
+  Argument& operator=(const Argument&) = default;
 
-  Argument& operator=(Argument&& other) {
-    name_ = std::move(other.name_);
-    value_ = std::move(other.value_);
-    return *this;
-  }
+  Argument(Argument&&) = default;
+  Argument& operator=(Argument&&) = default;
 
   const fbl::String& name() const { return name_; }
   const ArgumentValue& value() const { return value_; }
+  ArgumentType type() const { return value_.type(); }
 
   fbl::String ToString() const;
+
+  static const Argument* Find(const fbl::String& name, const std::vector<Argument>& arguments) {
+    for (const Argument& argument : arguments) {
+      if (argument.name() == name) {
+        return &argument;
+      }
+    }
+    return nullptr;
+  }
 
  private:
   fbl::String name_;
   ArgumentValue value_;
-
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(Argument);
 };
 
 // Trace Info type specific data
@@ -526,7 +519,7 @@ class LargeRecordData final {
     fbl::String name;
     trace_ticks_t timestamp;
     ProcessThread process_thread;
-    fbl::Vector<Argument> arguments;
+    std::vector<Argument> arguments;
 
     const void* blob;
     uint64_t blob_size;
@@ -614,7 +607,7 @@ class Record final {
     ProcessThread process_thread;
     fbl::String category;
     fbl::String name;
-    fbl::Vector<Argument> arguments;
+    std::vector<Argument> arguments;
     EventData data;
   };
 
@@ -634,18 +627,72 @@ class Record final {
     zx_koid_t koid;
     zx_obj_type_t object_type;
     fbl::String name;
-    fbl::Vector<Argument> arguments;
+    std::vector<Argument> arguments;
   };
 
-  // Context Switch record data.
-  struct ContextSwitch {
-    trace_ticks_t timestamp;
-    trace_cpu_number_t cpu_number;
-    ThreadState outgoing_thread_state;
-    ProcessThread outgoing_thread;
-    ProcessThread incoming_thread;
-    trace_thread_priority_t outgoing_thread_priority;
-    trace_thread_priority_t incoming_thread_priority;
+  // Scheduler Event record data.
+  struct SchedulerEvent {
+    struct LegacyContextSwitch {
+      trace_ticks_t timestamp;
+      trace_cpu_number_t cpu_number;
+      ThreadState outgoing_thread_state;
+      ProcessThread outgoing_thread;
+      ProcessThread incoming_thread;
+      trace_thread_priority_t outgoing_thread_priority;
+      trace_thread_priority_t incoming_thread_priority;
+    };
+    struct ContextSwitch {
+      trace_ticks_t timestamp;
+      trace_cpu_number_t cpu_number;
+      ThreadState outgoing_thread_state;
+      zx_koid_t outgoing_tid;
+      zx_koid_t incoming_tid;
+      std::vector<Argument> arguments;
+
+      const Argument* FindArgument(const fbl::String& name) const {
+        return Argument::Find(name, arguments);
+      }
+    };
+    struct ThreadWakeup {
+      trace_ticks_t timestamp;
+      trace_cpu_number_t cpu_number;
+      zx_koid_t incoming_tid;
+      std::vector<Argument> arguments;
+
+      const Argument* FindArgument(const fbl::String& name) const {
+        return Argument::Find(name, arguments);
+      }
+    };
+
+    explicit SchedulerEvent(LegacyContextSwitch record)
+        : event_type{SchedulerEventType::kLegacyContextSwitch}, event{std::move(record)} {}
+    explicit SchedulerEvent(ContextSwitch record)
+        : event_type{SchedulerEventType::kContextSwitch}, event{std::move(record)} {}
+    explicit SchedulerEvent(ThreadWakeup record)
+        : event_type{SchedulerEventType::kThreadWakeup}, event{std::move(record)} {}
+
+    SchedulerEvent(const SchedulerEvent&) = default;
+    SchedulerEvent& operator=(const SchedulerEvent&) = default;
+    SchedulerEvent(SchedulerEvent&&) = default;
+    SchedulerEvent& operator=(SchedulerEvent&&) = default;
+
+    SchedulerEventType type() const { return event_type; }
+
+    const LegacyContextSwitch& legacy_context_switch() const {
+      ZX_DEBUG_ASSERT(event_type == SchedulerEventType::kLegacyContextSwitch);
+      return cpp17::get<LegacyContextSwitch>(event);
+    }
+    const ContextSwitch& context_switch() const {
+      ZX_DEBUG_ASSERT(event_type == SchedulerEventType::kContextSwitch);
+      return cpp17::get<ContextSwitch>(event);
+    }
+    const ThreadWakeup& thread_wakeup() const {
+      ZX_DEBUG_ASSERT(event_type == SchedulerEventType::kThreadWakeup);
+      return cpp17::get<ThreadWakeup>(event);
+    }
+
+    SchedulerEventType event_type;
+    cpp17::variant<LegacyContextSwitch, ContextSwitch, ThreadWakeup> event;
   };
 
   // Log record data.
@@ -681,8 +728,8 @@ class Record final {
     new (&kernel_object_) KernelObject(std::move(record));
   }
 
-  explicit Record(ContextSwitch record) : type_(RecordType::kContextSwitch) {
-    new (&context_switch_) ContextSwitch(std::move(record));
+  explicit Record(SchedulerEvent record) : type_(RecordType::kScheduler) {
+    new (&scheduler_event_) SchedulerEvent(std::move(record));
   }
 
   explicit Record(Log record) : type_(RecordType::kLog) { new (&log_) Log(std::move(record)); }
@@ -736,9 +783,9 @@ class Record final {
     return kernel_object_;
   }
 
-  const ContextSwitch& GetContextSwitch() const {
-    ZX_DEBUG_ASSERT(type_ == RecordType::kContextSwitch);
-    return context_switch_;
+  const SchedulerEvent& GetSchedulerEvent() const {
+    ZX_DEBUG_ASSERT(type_ == RecordType::kScheduler);
+    return scheduler_event_;
   }
 
   const Log& GetLog() const {
@@ -770,7 +817,7 @@ class Record final {
     Event event_;
     Blob blob_;
     KernelObject kernel_object_;
-    ContextSwitch context_switch_;
+    SchedulerEvent scheduler_event_;
     Log log_;
     Large large_;
   };

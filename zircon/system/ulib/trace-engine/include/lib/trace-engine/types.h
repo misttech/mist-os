@@ -354,7 +354,7 @@ enum class RecordType {
   kEvent = 4,
   kBlob = 5,
   kKernelObject = 7,
-  kContextSwitch = 8,
+  kScheduler = 8,
   kLog = 9,
 
   // The kLargeRecord uses a 32-bit size field.
@@ -413,6 +413,13 @@ enum class EventType {
   kFlowBegin = 8,
   kFlowStep = 9,
   kFlowEnd = 10,
+};
+
+// SchedulerEventType enumerates all known scheduler event types.
+enum class SchedulerEventType {
+  kLegacyContextSwitch = 0,
+  kContextSwitch = 1,
+  kThreadWakeup = 2,
 };
 
 // Specifies the scope of instant events.

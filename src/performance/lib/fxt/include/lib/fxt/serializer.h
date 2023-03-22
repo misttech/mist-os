@@ -565,12 +565,14 @@ constexpr zx_status_t WriteKernelObjectRecord(
   return res.status_value();
 }
 
-// Write a Context Switch Record using the given Writer
+// Write a Legacy Context Switch Record using the given Writer
 //
 // Describes a context switch during which a CPU handed off control from an
 // outgoing thread to an incoming thread that resumes execution.
 //
-// See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#context-switch-record
+// This format is deprecated in favor of the more flexible context switch format.
+//
+// See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#scheduling-record
 template <typename Writer, internal::EnableIfWriter<Writer> = 0, RefType outgoing_type,
           RefType incoming_type>
 constexpr zx_status_t WriteContextSwitchRecord(Writer* writer, uint64_t event_time,
@@ -583,19 +585,84 @@ constexpr zx_status_t WriteContextSwitchRecord(Writer* writer, uint64_t event_ti
   const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*timestamp*/ +
                                outgoing_thread.PayloadSize() + incoming_thread.PayloadSize();
   const uint64_t header =
-      MakeHeader(RecordType::kContextSwitch, record_size) |
-      ContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
-      ContextSwitchRecordFields::OutgoingThreadState::Make(outgoing_thread_state) |
-      ContextSwitchRecordFields::OutgoingThreadRef::Make(outgoing_thread.HeaderEntry()) |
-      ContextSwitchRecordFields::IncomingThreadRef::Make(incoming_thread.HeaderEntry()) |
-      ContextSwitchRecordFields::OutgoingThreadPriority::Make(outgoing_thread_priority) |
-      ContextSwitchRecordFields::IncomingThreadPriority::Make(incoming_thread_priority);
+      MakeHeader(RecordType::kScheduler, record_size) |
+      LegacyContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
+      LegacyContextSwitchRecordFields::OutgoingThreadState::Make(outgoing_thread_state) |
+      LegacyContextSwitchRecordFields::OutgoingThreadRef::Make(outgoing_thread.HeaderEntry()) |
+      LegacyContextSwitchRecordFields::IncomingThreadRef::Make(incoming_thread.HeaderEntry()) |
+      LegacyContextSwitchRecordFields::OutgoingThreadPriority::Make(outgoing_thread_priority) |
+      LegacyContextSwitchRecordFields::IncomingThreadPriority::Make(incoming_thread_priority) |
+      LegacyContextSwitchRecordFields::EventType::Make(
+          ToUnderlyingType(SchedulerEventType::kLegacyContextSwitch));
 
   zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
   if (res.is_ok()) {
     res->WriteWord(event_time);
     outgoing_thread.Write(*res);
     incoming_thread.Write(*res);
+    res->Commit();
+  }
+  return res.status_value();
+}
+
+// Write a Context Switch Record using the given Writer
+//
+// Describes a context switch during which a CPU handed off control from an
+// outgoing thread to an incoming thread that resumes execution.
+//
+// See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#scheduling-record
+template <typename Writer, ArgumentType... arg_types, RefType... arg_name_types,
+          RefType... arg_val_types, internal::EnableIfWriter<Writer> = 0>
+constexpr zx_status_t WriteContextSwitchRecord(
+    Writer* writer, uint64_t event_time, uint16_t cpu_number, uint32_t outgoing_thread_state,
+    const ThreadRef<RefType::kInline>& outgoing_thread,
+    const ThreadRef<RefType::kInline>& incoming_thread,
+    const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
+  const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*timestamp*/ +
+                               WordSize(1) /*outgoing tid*/ + WordSize(1) /*incoming tid*/
+                               + internal::TotalPayloadSize(args...);
+  const uint64_t header = MakeHeader(RecordType::kScheduler, record_size) |
+                          ContextSwitchRecordFields::ArgumentCount::Make(sizeof...(args)) |
+                          ContextSwitchRecordFields::CpuNumber::Make(cpu_number) |
+                          ContextSwitchRecordFields::ThreadState::Make(outgoing_thread_state) |
+                          ContextSwitchRecordFields::EventType::Make(
+                              ToUnderlyingType(SchedulerEventType::kContextSwitch));
+
+  zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
+  if (res.is_ok()) {
+    res->WriteWord(event_time);
+    res->WriteWord(outgoing_thread.thread().koid);
+    res->WriteWord(incoming_thread.thread().koid);
+    internal::WriteElements(*res, args...);
+    res->Commit();
+  }
+  return res.status_value();
+}
+
+// Write a Thread Wakeup Record using the given Writer
+//
+// Describes a thread waking up on a CPU.
+//
+// See also: https://fuchsia.dev/fuchsia-src/reference/tracing/trace-format#scheduling-record
+template <typename Writer, ArgumentType... arg_types, RefType... arg_name_types,
+          RefType... arg_val_types, internal::EnableIfWriter<Writer> = 0>
+constexpr zx_status_t WriteThreadWakeupRecord(
+    Writer* writer, uint64_t event_time, uint16_t cpu_number,
+    const ThreadRef<RefType::kInline>& incoming_thread,
+    const Argument<arg_types, arg_name_types, arg_val_types>&... args) {
+  const WordSize record_size = WordSize(1) /*header*/ + WordSize(1) /*timestamp*/ +
+                               WordSize(1) /*incoming tid*/ + internal::TotalPayloadSize(args...);
+  const uint64_t header = MakeHeader(RecordType::kScheduler, record_size) |
+                          ThreadWakeupRecordFields::ArgumentCount::Make(sizeof...(args)) |
+                          ThreadWakeupRecordFields::CpuNumber::Make(cpu_number) |
+                          ThreadWakeupRecordFields::EventType::Make(
+                              ToUnderlyingType(SchedulerEventType::kThreadWakeup));
+
+  zx::result<typename internal::WriterTraits<Writer>::Reservation> res = writer->Reserve(header);
+  if (res.is_ok()) {
+    res->WriteWord(event_time);
+    res->WriteWord(incoming_thread.thread().koid);
+    internal::WriteElements(*res, args...);
     res->Commit();
   }
   return res.status_value();

@@ -13,6 +13,7 @@
 #include <string_view>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 #include <fbl/algorithm.h>
 #include <fbl/intrusive_hash_table.h>
@@ -79,9 +80,9 @@ class TraceReader {
   bool ReadEventRecord(Chunk& record, RecordHeader header);
   bool ReadBlobRecord(Chunk& record, RecordHeader header, void** out_ptr);
   bool ReadKernelObjectRecord(Chunk& record, RecordHeader header);
-  bool ReadContextSwitchRecord(Chunk& record, RecordHeader header);
+  bool ReadSchedulerRecord(Chunk& record, RecordHeader header);
   bool ReadLogRecord(Chunk& record, RecordHeader header);
-  bool ReadArguments(Chunk& record, size_t count, fbl::Vector<Argument>* out_arguments);
+  bool ReadArguments(Chunk& record, size_t count, std::vector<Argument>* out_arguments);
 
   bool ReadLargeRecord(Chunk& record, RecordHeader header);
   bool ReadLargeBlob(Chunk& record, RecordHeader header);

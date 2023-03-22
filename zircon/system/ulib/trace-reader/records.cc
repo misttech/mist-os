@@ -134,7 +134,7 @@ fbl::String PreviewBlobData(const void* blob, size_t blob_size) {
   return result.ToString();
 }
 
-fbl::String FormatArgumentList(const fbl::Vector<trace::Argument>& args) {
+fbl::String FormatArgumentList(const std::vector<trace::Argument>& args) {
   fbl::StringBuffer<1024> result;
 
   result.Append('{');
@@ -153,83 +153,29 @@ fbl::String ProcessThread::ToString() const {
   return fbl::StringPrintf("%" PRIu64 "/%" PRIu64, process_koid_, thread_koid_);
 }
 
-void ArgumentValue::Destroy() {
-  switch (type_) {
-    case ArgumentType::kString:
-      string_.~String();
-      break;
-    case ArgumentType::kNull:
-    case ArgumentType::kBool:
-    case ArgumentType::kInt32:
-    case ArgumentType::kUint32:
-    case ArgumentType::kInt64:
-    case ArgumentType::kUint64:
-    case ArgumentType::kDouble:
-    case ArgumentType::kPointer:
-    case ArgumentType::kKoid:
-      break;
-  }
-}
-
-void ArgumentValue::MoveFrom(ArgumentValue&& other) {
-  type_ = other.type_;
-  other.type_ = ArgumentType::kNull;
-  switch (type_) {
-    case ArgumentType::kNull:
-      break;
-    case ArgumentType::kBool:
-      bool_ = other.bool_;
-      break;
-    case ArgumentType::kInt32:
-      int32_ = other.int32_;
-      break;
-    case ArgumentType::kUint32:
-      uint32_ = other.uint32_;
-      break;
-    case ArgumentType::kInt64:
-      int64_ = other.int64_;
-      break;
-    case ArgumentType::kUint64:
-      uint64_ = other.uint64_;
-      break;
-    case ArgumentType::kDouble:
-      double_ = other.double_;
-      break;
-    case ArgumentType::kString:
-      new (&string_) fbl::String(std::move(other.string_));
-      other.string_.~String();  // call destructor because we set other.type_ to kNull
-      break;
-    case ArgumentType::kPointer:
-      pointer_ = other.pointer_;
-      break;
-    case ArgumentType::kKoid:
-      koid_ = other.koid_;
-      break;
-  }
-}
-
 fbl::String ArgumentValue::ToString() const {
-  switch (type_) {
+  switch (type()) {
     case ArgumentType::kNull:
       return "null";
     case ArgumentType::kBool:
-      return fbl::StringPrintf("bool(%s)", bool_ ? "true" : "false");
+      return fbl::StringPrintf("bool(%s)", cpp17::get<Bool>(value_).value ? "true" : "false");
     case ArgumentType::kInt32:
-      return fbl::StringPrintf("int32(%" PRId32 ")", int32_);
+      return fbl::StringPrintf("int32(%" PRId32 ")", cpp17::get<int32_t>(value_));
     case ArgumentType::kUint32:
-      return fbl::StringPrintf("uint32(%" PRIu32 ")", uint32_);
+      return fbl::StringPrintf("uint32(%" PRIu32 ")", cpp17::get<uint32_t>(value_));
     case ArgumentType::kInt64:
-      return fbl::StringPrintf("int64(%" PRId64 ")", int64_);
+      return fbl::StringPrintf("int64(%" PRId64 ")", cpp17::get<int64_t>(value_));
     case ArgumentType::kUint64:
-      return fbl::StringPrintf("uint64(%" PRIu64 ")", uint64_);
+      return fbl::StringPrintf("uint64(%" PRIu64 ")", cpp17::get<uint64_t>(value_));
     case ArgumentType::kDouble:
-      return fbl::StringPrintf("double(%f)", double_);
+      return fbl::StringPrintf("double(%f)", cpp17::get<double>(value_));
     case ArgumentType::kString:
-      return fbl::StringPrintf("string(\"%s\")", string_.c_str());
+      return fbl::StringPrintf("string(\"%s\")", cpp17::get<fbl::String>(value_).c_str());
     case ArgumentType::kPointer:
-      return fbl::StringPrintf("pointer(%p)", reinterpret_cast<void*>(pointer_));
+      return fbl::StringPrintf("pointer(%p)",
+                               reinterpret_cast<void*>(cpp17::get<Pointer>(value_).value));
     case ArgumentType::kKoid:
-      return fbl::StringPrintf("koid(%" PRIu64 ")", koid_);
+      return fbl::StringPrintf("koid(%" PRIu64 ")", cpp17::get<Koid>(value_).value);
   }
   ZX_ASSERT(false);
 }
@@ -498,8 +444,8 @@ void Record::Destroy() {
     case RecordType::kKernelObject:
       kernel_object_.~KernelObject();
       break;
-    case RecordType::kContextSwitch:
-      context_switch_.~ContextSwitch();
+    case RecordType::kScheduler:
+      scheduler_event_.~SchedulerEvent();
       break;
     case RecordType::kLog:
       log_.~Log();
@@ -534,8 +480,8 @@ void Record::MoveFrom(Record&& other) {
     case RecordType::kKernelObject:
       new (&kernel_object_) KernelObject(std::move(other.kernel_object_));
       break;
-    case RecordType::kContextSwitch:
-      new (&context_switch_) ContextSwitch(std::move(other.context_switch_));
+    case RecordType::kScheduler:
+      new (&scheduler_event_) SchedulerEvent(std::move(other.scheduler_event_));
       break;
     case RecordType::kLog:
       new (&log_) Log(std::move(other.log_));
@@ -576,16 +522,37 @@ fbl::String Record::ToString() const {
                                kernel_object_.name.c_str(),
                                FormatArgumentList(kernel_object_.arguments).c_str());
       break;
-    case RecordType::kContextSwitch:
-      return fbl::StringPrintf("ContextSwitch(ts: %" PRIu64 ", cpu: %" PRIu32
-                               ", os: %s, opt: %s, ipt: %s"
-                               ", oprio: %" PRIu32 ", iprio: %" PRIu32 ")",
-                               context_switch_.timestamp, context_switch_.cpu_number,
-                               ThreadStateToString(context_switch_.outgoing_thread_state),
-                               context_switch_.outgoing_thread.ToString().c_str(),
-                               context_switch_.incoming_thread.ToString().c_str(),
-                               context_switch_.outgoing_thread_priority,
-                               context_switch_.incoming_thread_priority);
+    case RecordType::kScheduler:
+      if (scheduler_event_.type() == SchedulerEventType::kLegacyContextSwitch) {
+        auto& context_switch = scheduler_event_.legacy_context_switch();
+        return fbl::StringPrintf("ContextSwitch(ts: %" PRIu64 ", cpu: %" PRIu32
+                                 ", os: %s, opt: %s, ipt: %s"
+                                 ", oprio: %" PRIu32 ", iprio: %" PRIu32 ")",
+                                 context_switch.timestamp, context_switch.cpu_number,
+                                 ThreadStateToString(context_switch.outgoing_thread_state),
+                                 context_switch.outgoing_thread.ToString().c_str(),
+                                 context_switch.incoming_thread.ToString().c_str(),
+                                 context_switch.outgoing_thread_priority,
+                                 context_switch.incoming_thread_priority);
+      }
+      if (scheduler_event_.type() == SchedulerEventType::kContextSwitch) {
+        auto& context_switch = scheduler_event_.context_switch();
+        return fbl::StringPrintf("ContextSwitch(ts: %" PRIu64 ", cpu: %" PRIu32
+                                 ", os: %s, ot: %" PRIu64 ", it: %" PRIu64 ", %s)",
+                                 context_switch.timestamp, context_switch.cpu_number,
+                                 ThreadStateToString(context_switch.outgoing_thread_state),
+                                 context_switch.outgoing_tid, context_switch.incoming_tid,
+                                 FormatArgumentList(context_switch.arguments).c_str());
+      }
+      if (scheduler_event_.type() == SchedulerEventType::kThreadWakeup) {
+        auto& thread_wakeup = scheduler_event_.thread_wakeup();
+        return fbl::StringPrintf(
+            "ThreadWakeup(ts: %" PRIu64 ", cpu: %" PRIu32 ", it: %" PRIu64 ", %s)",
+            thread_wakeup.timestamp, thread_wakeup.cpu_number, thread_wakeup.incoming_tid,
+            FormatArgumentList(thread_wakeup.arguments).c_str());
+      }
+      return fbl::StringPrintf("UnknownSchedulerEvent(type: %d)",
+                               static_cast<int>(scheduler_event_.type()));
     case RecordType::kLog:
       return fbl::StringPrintf("Log(ts: %" PRIu64 ", pt: %s, \"%s\")", log_.timestamp,
                                log_.process_thread.ToString().c_str(), log_.message.c_str());
@@ -602,7 +569,7 @@ std::optional<fbl::String> Record::GetName() const {
     case RecordType::kInitialization:
     case RecordType::kString:
     case RecordType::kThread:
-    case RecordType::kContextSwitch:
+    case RecordType::kScheduler:
     case RecordType::kLog:
     case RecordType::kLargeRecord:
       return std::nullopt;

@@ -70,14 +70,13 @@ std::optional<std::reference_wrapper<const trace::LargeRecordData::BlobEvent>> g
   return {blob_event};
 }
 
-std::optional<uint64_t> get_int64_value(const fbl::Vector<trace::Argument>& arguments,
+std::optional<uint64_t> get_int64_value(const std::vector<trace::Argument>& arguments,
                                         const char* name) {
-  for (auto& argument : arguments) {
-    if (argument.name() == name) {
-      return {argument.value().GetUint64()};
-    }
+  const trace::Argument* argument = trace::Argument::Find(name, arguments);
+  if (argument == nullptr) {
+    return std::nullopt;
   }
-  return std::nullopt;
+  return {argument->value().GetUint64()};
 }
 
 // Builds a set of deallocation events.

@@ -47,7 +47,7 @@ bool IsEventTypeSupported(trace::EventType type) {
   return false;
 }
 
-const trace::ArgumentValue* GetArgumentValue(const fbl::Vector<trace::Argument>& arguments,
+const trace::ArgumentValue* GetArgumentValue(const std::vector<trace::Argument>& arguments,
                                              const char* name) {
   for (const auto& arg : arguments) {
     if (arg.name() == name)
@@ -150,8 +150,8 @@ void ChromiumExporter::Stop() {
     }
   }
 
-  for (const auto& record : context_switch_records_) {
-    ExportContextSwitch(record);
+  for (const auto& record : scheduler_event_records_) {
+    ExportSchedulerEvent(record);
   }
 
   writer_.EndArray();
@@ -203,9 +203,9 @@ void ChromiumExporter::ExportRecord(const trace::Record& record) {
     case trace::RecordType::kLog:
       ExportLog(record.GetLog());
       break;
-    case trace::RecordType::kContextSwitch:
+    case trace::RecordType::kScheduler:
       // We can't emit these into the regular stream, save them for later.
-      context_switch_records_.push_back(record.GetContextSwitch());
+      scheduler_event_records_.emplace_back(record.GetSchedulerEvent());
       break;
     case trace::RecordType::kString:
     case trace::RecordType::kThread:
@@ -440,35 +440,159 @@ void ChromiumExporter::ExportMetadata(const trace::Record::Metadata& metadata) {
   }
 }
 
-void ChromiumExporter::ExportContextSwitch(const trace::Record::ContextSwitch& context_switch) {
-  writer_.StartObject();
-  writer_.Key("ph");
-  writer_.String("k");
-  writer_.Key("ts");
-  writer_.Double(context_switch.timestamp * tick_scale_);
-  writer_.Key("cpu");
-  writer_.Uint(context_switch.cpu_number);
-  writer_.Key("out");
-  writer_.StartObject();
-  writer_.Key("pid");
-  writer_.Uint64(context_switch.outgoing_thread.process_koid());
-  writer_.Key("tid");
-  writer_.Uint64(context_switch.outgoing_thread.thread_koid());
-  writer_.Key("state");
-  writer_.Uint(static_cast<uint32_t>(context_switch.outgoing_thread_state));
-  writer_.Key("prio");
-  writer_.Uint(static_cast<uint32_t>(context_switch.outgoing_thread_priority));
-  writer_.EndObject();
-  writer_.Key("in");
-  writer_.StartObject();
-  writer_.Key("pid");
-  writer_.Uint64(context_switch.incoming_thread.process_koid());
-  writer_.Key("tid");
-  writer_.Uint64(context_switch.incoming_thread.thread_koid());
-  writer_.Key("prio");
-  writer_.Uint(static_cast<uint32_t>(context_switch.incoming_thread_priority));
-  writer_.EndObject();
-  writer_.EndObject();
+void ChromiumExporter::ExportSchedulerEvent(const trace::Record::SchedulerEvent& scheduler_event) {
+  switch (scheduler_event.type()) {
+    case trace::SchedulerEventType::kLegacyContextSwitch: {
+      auto& context_switch = scheduler_event.legacy_context_switch();
+      writer_.StartObject();
+      writer_.Key("ph");
+      writer_.String("k");
+      writer_.Key("ts");
+      writer_.Double(static_cast<double>(context_switch.timestamp) * tick_scale_);
+      writer_.Key("cpu");
+      writer_.Uint(context_switch.cpu_number);
+      writer_.Key("out");
+      writer_.StartObject();
+      writer_.Key("pid");
+      writer_.Uint64(context_switch.outgoing_thread.process_koid());
+      writer_.Key("tid");
+      writer_.Uint64(context_switch.outgoing_thread.thread_koid());
+      writer_.Key("state");
+      writer_.Uint(static_cast<uint32_t>(context_switch.outgoing_thread_state));
+      writer_.Key("prio");
+      writer_.Uint(static_cast<uint32_t>(context_switch.outgoing_thread_priority));
+      writer_.EndObject();
+      writer_.Key("in");
+      writer_.StartObject();
+      writer_.Key("pid");
+      writer_.Uint64(context_switch.incoming_thread.process_koid());
+      writer_.Key("tid");
+      writer_.Uint64(context_switch.incoming_thread.thread_koid());
+      writer_.Key("prio");
+      writer_.Uint(static_cast<uint32_t>(context_switch.incoming_thread_priority));
+      writer_.EndObject();
+      writer_.EndObject();
+      break;
+    }
+    case trace::SchedulerEventType::kContextSwitch: {
+      auto& context_switch = scheduler_event.context_switch();
+      writer_.StartObject();
+      writer_.Key("ph");
+      writer_.String("k");
+      writer_.Key("ts");
+      writer_.Double(static_cast<double>(context_switch.timestamp) * tick_scale_);
+      writer_.Key("cpu");
+      writer_.Uint(context_switch.cpu_number);
+      writer_.Key("out");
+      writer_.StartObject();
+      writer_.Key("tid");
+      writer_.Uint64(context_switch.outgoing_tid);
+      writer_.Key("state");
+      writer_.Uint(static_cast<uint32_t>(context_switch.outgoing_thread_state));
+
+      if (const trace::Argument* outgoing_weight =
+              trace::Argument::Find("outgoing_weight", context_switch.arguments);
+          outgoing_weight != nullptr) {
+        const trace::ArgumentValue& value = outgoing_weight->value();
+        switch (value.type()) {
+          case trace::ArgumentType::kInt32:
+            writer_.Key("prio");
+            writer_.Int(value.GetInt32());
+            break;
+          case trace::ArgumentType::kUint32:
+            writer_.Key("prio");
+            writer_.Uint(value.GetUint32());
+            break;
+          case trace::ArgumentType::kInt64:
+            writer_.Key("prio");
+            writer_.Int64(value.GetInt64());
+            break;
+          case trace::ArgumentType::kUint64:
+            writer_.Key("prio");
+            writer_.Uint64(value.GetUint64());
+            break;
+          default:
+            break;
+        }
+      }
+
+      writer_.EndObject();
+      writer_.Key("in");
+      writer_.StartObject();
+      writer_.Key("tid");
+      writer_.Uint64(context_switch.incoming_tid);
+
+      if (const trace::Argument* incoming_weight =
+              trace::Argument::Find("incoming_weight", context_switch.arguments);
+          incoming_weight != nullptr) {
+        const trace::ArgumentValue& value = incoming_weight->value();
+        switch (value.type()) {
+          case trace::ArgumentType::kInt32:
+            writer_.Key("prio");
+            writer_.Int(value.GetInt32());
+            break;
+          case trace::ArgumentType::kUint32:
+            writer_.Key("prio");
+            writer_.Uint(value.GetUint32());
+            break;
+          case trace::ArgumentType::kInt64:
+            writer_.Key("prio");
+            writer_.Int64(value.GetInt64());
+            break;
+          case trace::ArgumentType::kUint64:
+            writer_.Key("prio");
+            writer_.Uint64(value.GetUint64());
+            break;
+          default:
+            break;
+        }
+      }
+
+      writer_.EndObject();
+      writer_.EndObject();
+      break;
+    }
+    case trace::SchedulerEventType::kThreadWakeup: {
+      auto& thread_wakeup = scheduler_event.thread_wakeup();
+      writer_.StartObject();
+      writer_.Key("ph");
+      writer_.String("w");
+      writer_.Key("ts");
+      writer_.Double(static_cast<double>(thread_wakeup.timestamp) * tick_scale_);
+      writer_.Key("cpu");
+      writer_.Uint(thread_wakeup.cpu_number);
+      writer_.Key("tid");
+      writer_.Uint64(thread_wakeup.incoming_tid);
+
+      if (const trace::Argument* weight = trace::Argument::Find("weight", thread_wakeup.arguments);
+          weight != nullptr) {
+        const trace::ArgumentValue& value = weight->value();
+        switch (value.type()) {
+          case trace::ArgumentType::kInt32:
+            writer_.Key("prio");
+            writer_.Int(value.GetInt32());
+            break;
+          case trace::ArgumentType::kUint32:
+            writer_.Key("prio");
+            writer_.Uint(value.GetUint32());
+            break;
+          case trace::ArgumentType::kInt64:
+            writer_.Key("prio");
+            writer_.Int64(value.GetInt64());
+            break;
+          case trace::ArgumentType::kUint64:
+            writer_.Key("prio");
+            writer_.Uint64(value.GetUint64());
+            break;
+          default:
+            break;
+        }
+      }
+
+      writer_.EndObject();
+      break;
+    }
+  }
 }
 
 void ChromiumExporter::ExportBlob(const trace::LargeRecordData::Blob& data) {
@@ -515,7 +639,7 @@ void ChromiumExporter::ExportFidlBlob(const trace::LargeRecordData::BlobEvent& b
   writer_.EndObject();
 }
 
-void ChromiumExporter::WriteArgs(const fbl::Vector<trace::Argument>& arguments) {
+void ChromiumExporter::WriteArgs(const std::vector<trace::Argument>& arguments) {
   for (const auto& arg : arguments) {
     switch (arg.value().type()) {
       case trace::ArgumentType::kBool:

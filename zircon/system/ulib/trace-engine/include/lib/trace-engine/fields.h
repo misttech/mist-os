@@ -150,13 +150,28 @@ struct KernelObjectRecordFields : RecordFields {
   using ArgumentCount = Field<40, 43>;
 };
 
-struct ContextSwitchRecordFields : RecordFields {
+struct SchedulerRecordFields : RecordFields {
+  using EventType = Field<60, 63>;
+};
+
+struct LegacyContextSwitchRecordFields : SchedulerRecordFields {
   using CpuNumber = Field<16, 23>;
   using OutgoingThreadState = Field<24, 27>;
   using OutgoingThreadRef = Field<28, 35>;
   using IncomingThreadRef = Field<36, 43>;
   using OutgoingThreadPriority = Field<44, 51>;
   using IncomingThreadPriority = Field<52, 59>;
+};
+
+struct ContextSwitchRecordFields : SchedulerRecordFields {
+  using ArgumentCount = Field<16, 19>;
+  using CpuNumber = Field<20, 35>;
+  using ThreadState = Field<36, 39>;
+};
+
+struct ThreadWakeupRecordFields : SchedulerRecordFields {
+  using ArgumentCount = Field<16, 19>;
+  using CpuNumber = Field<20, 35>;
 };
 
 struct LogRecordFields : RecordFields {
