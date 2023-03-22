@@ -29,8 +29,6 @@ pub(crate) struct SocketWorker<Data> {
 /// the stream is a "clone" request). In that case, requests from the
 /// originating stream and any derived streams are multiplexed over a single
 /// handler instance.
-// TODO(https://fxbug.dev/122464): Use #![feature(async_fn_in_trait)] when
-// available.
 pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// The type of request that this worker can handle.
     type Request: Send;
