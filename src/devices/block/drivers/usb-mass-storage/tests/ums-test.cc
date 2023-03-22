@@ -221,7 +221,7 @@ class UmsTest : public zxtest::Test {
   fbl::String last_known_devpath_;
 };
 
-TEST_F(UmsTest, DISABLED_ReconnectTest) {
+TEST_F(UmsTest, ReconnectTest) {
   // Disconnect and re-connect the block device 50 times as a sanity check
   // for race conditions and deadlocks.
   // If the test freezes; or something crashes at this point, it is likely

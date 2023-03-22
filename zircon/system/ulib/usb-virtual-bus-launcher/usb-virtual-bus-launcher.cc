@@ -162,12 +162,6 @@ zx_status_t BusLauncher::ClearPeripheralDeviceFunctions() {
     return result.status();
   }
 
-  auto clear_functions = peripheral_->ClearFunctions();
-  if (clear_functions.status() != ZX_OK) {
-    std::cout << "peripheral_->ClearFunctions(): " << zx_status_get_string(clear_functions.status())
-              << std::endl;
-    return clear_functions.status();
-  }
   const fidl::WireResult result = peripheral_->ClearFunctions();
   if (!result.ok()) {
     std::cout << "peripheral_->ClearFunctions(): " << result.FormatDescription() << std::endl;

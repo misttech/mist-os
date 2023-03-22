@@ -67,7 +67,13 @@ zx_status_t UsbBus::UsbBusInterfaceAddDevice(uint32_t device_id, uint32_t hub_id
 
   // devices_[device_id] must be set before usb_device_add() creates the interface devices
   // so we pass pointer to it here rather than setting it after usb_device_add() returns.
-  return UsbDevice::Create(zxdev(), hci_, device_id, hub_id, speed, &devices_[device_id]);
+  zx_status_t status =
+      UsbDevice::Create(zxdev(), hci_, device_id, hub_id, speed, &devices_[device_id]);
+  if (status == ZX_OK) {
+    // Add an entry into the remove completion list for the new UsbDevice.
+    remove_completion_[devices_[device_id].get()] = {};
+  }
+  return status;
 }
 
 zx_status_t UsbBus::UsbBusInterfaceRemoveDevice(uint32_t device_id) {
@@ -81,8 +87,9 @@ zx_status_t UsbBus::UsbBusInterfaceRemoveDevice(uint32_t device_id) {
     return ZX_ERR_BAD_STATE;
   }
   device->DdkAsyncRemove();
+  remove_completion_[device.get()].Wait();
+  remove_completion_.erase(device.get());
   devices_[device_id].reset();
-
   return ZX_OK;
 }
 
@@ -214,6 +221,15 @@ zx_status_t UsbBus::UsbBusSetHubInterface(/* zx_device_t* */ uint64_t usb_device
 
   usb_dev->SetHubInterface(hub);
   return ZX_OK;
+}
+
+void UsbBus::DdkChildPreRelease(void* child_ctx) {
+  auto it = remove_completion_.find(reinterpret_cast<UsbDevice*>(child_ctx));
+  if (it == remove_completion_.end()) {
+    zxlogf(ERROR, "Cannot find device %p in the device list.", child_ctx);
+    return;
+  }
+  it->second.Signal();
 }
 
 void UsbBus::DdkUnbind(ddk::UnbindTxn txn) {

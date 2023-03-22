@@ -7,6 +7,7 @@
 
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <ddktl/device.h>
 #include <fbl/array.h>
@@ -18,7 +19,7 @@ namespace usb_bus {
 
 class UsbBus;
 class UsbDevice;
-using UsbBusType = ddk::Device<UsbBus, ddk::Unbindable>;
+using UsbBusType = ddk::Device<UsbBus, ddk::Unbindable, ddk::ChildPreReleaseable>;
 
 class UsbBus : public UsbBusType,
                public ddk::UsbBusProtocol<UsbBus, ddk::base_protocol>,
@@ -29,6 +30,7 @@ class UsbBus : public UsbBusType,
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
   // Device protocol implementation.
+  void DdkChildPreRelease(void* child_ctx);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
@@ -62,6 +64,10 @@ class UsbBus : public UsbBusType,
   const ddk::UsbHciProtocolClient hci_;
   // Array of all our USB devices.
   fbl::Array<fbl::RefPtr<UsbDevice>> devices_;
+  // Map for storing sync completion objects for all USB devices.
+  // This will be used to signal USB device remove completion.
+  // The USBDevice* is used just as a key and will not be dereferenced.
+  std::map<UsbDevice*, libsync::Completion> remove_completion_;
 };
 
 }  // namespace usb_bus

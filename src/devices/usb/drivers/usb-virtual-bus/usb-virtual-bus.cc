@@ -246,15 +246,15 @@ void UsbVirtualBus::SetConnected(bool connected) {
           queue.push(std::move(*req));
         }
       }
-      if (bus_intf_.is_valid()) {
-        bus_intf_.RemoveDevice(DEVICE_SLOT_ID);
-      }
-      if (dci_intf_.is_valid()) {
-        dci_intf_.SetConnected(false);
-      }
     }
     for (auto req = queue.pop(); req; req = queue.pop()) {
       req->Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+    }
+    if (bus_intf_.is_valid()) {
+      bus_intf_.RemoveDevice(DEVICE_SLOT_ID);
+    }
+    if (dci_intf_.is_valid()) {
+      dci_intf_.SetConnected(false);
     }
   }
 }
@@ -310,6 +310,12 @@ void UsbVirtualBus::DdkUnbind(ddk::UnbindTxn txn) {
 void UsbVirtualBus::DdkRelease() {
   if (device_thread_started_) {
     thrd_join(device_thread_, nullptr);
+  }
+  if (disconnect_completer_) {
+    thrd_join(disconnect_thread_, nullptr);
+  }
+  if (disable_completer_) {
+    thrd_join(disable_thread_, nullptr);
   }
   delete this;
 }
@@ -404,10 +410,17 @@ void UsbVirtualBus::UsbHciRequestQueue(usb_request_t* req,
     return;
   }
   bool connected;
-  fbl::AutoLock l(&connection_lock_);
+  {
+    fbl::AutoLock _(&connection_lock_);
+    connected = connected_;
+  }
+  if (!connected) {
+    request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
+    return;
+  }
+
   fbl::AutoLock device_lock(&device_lock_);
-  connected = connected_;
-  if (!connected || unbinding_) {
+  if (unbinding_) {
     request.Complete(ZX_ERR_IO_NOT_PRESENT, 0);
     return;
   }
@@ -428,7 +441,6 @@ void UsbVirtualBus::UsbHciRequestQueue(usb_request_t* req,
     // to an I/O thread.
     // We can't hold a lock when responding to a control request
     device_lock.release();
-    l.release();
     HandleControl(std::move(request));
   }
 }
@@ -519,23 +531,43 @@ void UsbVirtualBus::Enable(EnableCompleter::Sync& completer) {
 }
 
 void UsbVirtualBus::Disable(DisableCompleter::Sync& completer) {
-  SetConnected(false);
-  UsbVirtualHost* host;
-  UsbVirtualDevice* device;
-  {
-    fbl::AutoLock lock(&lock_);
-    // Use release() here to avoid double free of these objects.
-    // devmgr will handle freeing them.
-    host = host_.release();
-    device = device_.release();
+  if (disable_completer_) {
+    completer.Reply(ZX_ERR_BAD_STATE);
+    return;
   }
-  if (host) {
-    host->DdkAsyncRemove();
+
+  disable_completer_ = completer.ToAsync();
+
+  int rc = thrd_create_with_name(
+      &disable_thread_,
+      [](void* arg) -> int {
+        auto virtual_bus = reinterpret_cast<UsbVirtualBus*>(arg);
+        virtual_bus->SetConnected(false);
+        UsbVirtualHost* host;
+        UsbVirtualDevice* device;
+        {
+          fbl::AutoLock lock(&virtual_bus->lock_);
+          // Use release() here to avoid double free of these objects.
+          // devmgr will handle freeing them.
+          host = virtual_bus->host_.release();
+          device = virtual_bus->device_.release();
+        }
+        if (host) {
+          host->DdkAsyncRemove();
+        }
+        if (device) {
+          device->DdkAsyncRemove();
+        }
+        virtual_bus->disable_completer_->Reply(ZX_OK);
+        virtual_bus->disable_completer_.reset();
+        return 0;
+      },
+      reinterpret_cast<void*>(this), "usb-virtual-bus-disable-thread");
+
+  if (rc != thrd_success) {
+    disable_completer_->Reply(ZX_ERR_INTERNAL);
+    return;
   }
-  if (device) {
-    device->DdkAsyncRemove();
-  }
-  completer.Reply(ZX_OK);
 }
 
 void UsbVirtualBus::Connect(ConnectCompleter::Sync& completer) {
@@ -549,13 +581,28 @@ void UsbVirtualBus::Connect(ConnectCompleter::Sync& completer) {
 }
 
 void UsbVirtualBus::Disconnect(DisconnectCompleter::Sync& completer) {
-  if (host_ == nullptr || device_ == nullptr) {
+  if (host_ == nullptr || device_ == nullptr || disconnect_completer_) {
     completer.Reply(ZX_ERR_BAD_STATE);
     return;
   }
 
-  SetConnected(false);
-  completer.Reply(ZX_OK);
+  disconnect_completer_ = completer.ToAsync();
+
+  int rc = thrd_create_with_name(
+      &disconnect_thread_,
+      [](void* arg) -> int {
+        auto virtual_bus = reinterpret_cast<UsbVirtualBus*>(arg);
+        virtual_bus->SetConnected(false);
+        virtual_bus->disconnect_completer_->Reply(ZX_OK);
+        virtual_bus->disconnect_completer_.reset();
+        return 0;
+      },
+      reinterpret_cast<void*>(this), "usb-virtual-bus-disconnect-thread");
+
+  if (rc != thrd_success) {
+    disconnect_completer_->Reply(ZX_ERR_INTERNAL);
+    return;
+  }
 }
 
 static zx_status_t usb_virtual_bus_bind(void* ctx, zx_device_t* parent) {

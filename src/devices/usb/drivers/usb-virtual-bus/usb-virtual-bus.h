@@ -138,6 +138,10 @@ class UsbVirtualBus : public UsbVirtualBusType {
   // This is once all pending control requests have completed,
   // and any newly queued requests would be immediately completed with an error.
   fbl::ConditionVariable complete_unbind_signal_ __TA_GUARDED(device_lock_);
+  std::optional<DisconnectCompleter::Async> disconnect_completer_;
+  thrd_t disconnect_thread_;
+  std::optional<DisableCompleter::Async> disable_completer_;
+  thrd_t disable_thread_;
 };
 
 }  // namespace usb_virtual_bus
