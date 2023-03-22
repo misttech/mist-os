@@ -310,3 +310,9 @@
   mov $Phys32Entry, %eax
   jmp *%eax
 .end_function
+
+# Add the in-kernel config file, which is gzipped.
+# Some emulators look for this file using extract-ikconfig before booting.
+.ascii "IKCFG_ST"
+.incbin IKCONFIG_FILE
+.ascii "IKCFG_ED"

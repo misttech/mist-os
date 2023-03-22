@@ -230,6 +230,7 @@ if (current_toolchain == default_toolchain) {
     # environment makes it a Linux x86 (bzImage) compatible kernel image.
     source_set("linuxboot") {
       public = [ "linuxboot.h" ]
+
       sources = [ "linuxboot-header.S" ]
       libs = [ "./linuxboot.ld" ]
       deps = [
@@ -244,6 +245,14 @@ if (current_toolchain == default_toolchain) {
         # linuxboot.h has #include <lib/zircon-internal/e820.h>
         "//zircon/system/ulib/zircon-internal:headers",
       ]
+
+      # This input is a gzipped linux in-kernel config.
+      # To update this file, edit ikconfig.txt in this directory and run:
+      #   gzip zircon/kernel/arch/x86/phys/ikconfig.txt \
+      #        -c zircon/kernel/arch/x86/phys/ikconfig.gz
+      inputs = [ "ikconfig.gz" ]
+      ikconfig_file = rebase_path("ikconfig.gz", root_build_dir)
+      defines = [ "IKCONFIG_FILE=\"$ikconfig_file\"" ]
 
       # This does `#include "linuxboot.h"` but shouldn't link this stuff in
       # (and that would create a circular dependency here anyway).  It's just a
