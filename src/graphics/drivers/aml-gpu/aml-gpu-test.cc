@@ -52,24 +52,24 @@ class TestAmlGpu {
                                       &aml_gpu.gpu_buffer_));
     async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
     loop.StartThread();
-    mock_registers::MockRegistersDevice reset_mock(loop.dispatcher());
+    mock_registers::MockRegisters reset_mock(loop.dispatcher());
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
-    reset_mock.RegistersConnect(endpoints->server.TakeChannel());
+    reset_mock.Init(std::move(endpoints->server));
     aml_gpu.reset_register_ = fidl::WireSyncClient(std::move(endpoints->client));
-    reset_mock.fidl_service()->ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset0_mask_offset,
-                                                     aml_registers::MALI_RESET0_MASK, 0);
-    reset_mock.fidl_service()->ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset0_level_offset,
-                                                     aml_registers::MALI_RESET0_MASK, 0);
-    reset_mock.fidl_service()->ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_mask_offset,
-                                                     aml_registers::MALI_RESET2_MASK, 0);
-    reset_mock.fidl_service()->ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_level_offset,
-                                                     aml_registers::MALI_RESET2_MASK, 0);
-    reset_mock.fidl_service()->ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset0_level_offset,
-                                                     aml_registers::MALI_RESET0_MASK,
-                                                     aml_registers::MALI_RESET0_MASK);
-    reset_mock.fidl_service()->ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_level_offset,
-                                                     aml_registers::MALI_RESET2_MASK,
-                                                     aml_registers::MALI_RESET2_MASK);
+    reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset0_mask_offset,
+                                     aml_registers::MALI_RESET0_MASK, 0);
+    reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset0_level_offset,
+                                     aml_registers::MALI_RESET0_MASK, 0);
+    reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_mask_offset,
+                                     aml_registers::MALI_RESET2_MASK, 0);
+    reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_level_offset,
+                                     aml_registers::MALI_RESET2_MASK, 0);
+    reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset0_level_offset,
+                                     aml_registers::MALI_RESET0_MASK,
+                                     aml_registers::MALI_RESET0_MASK);
+    reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_level_offset,
+                                     aml_registers::MALI_RESET2_MASK,
+                                     aml_registers::MALI_RESET2_MASK);
     aml_gpu.InitClock();
     uint32_t value = aml_gpu.hiu_buffer_->Read32(0x6c << 2);
     // Glitch-free mux should stay unchanged.
@@ -82,7 +82,7 @@ class TestAmlGpu {
     EXPECT_EQ(S905D2_GP0, source);
     EXPECT_TRUE(enabled);
     EXPECT_EQ(1, divisor);
-    EXPECT_OK(reset_mock.fidl_service()->VerifyAll());
+    EXPECT_OK(reset_mock.VerifyAll());
   }
 
   static void TestMetadata() {

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fuchsia/hardware/gpu/mali/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/inspect/cpp/inspect.h>
