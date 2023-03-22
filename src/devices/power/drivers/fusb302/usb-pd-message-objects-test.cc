@@ -195,6 +195,37 @@ TEST(BatteryPowerSupplyDataTest, MaximumPowerMw) {
   }
 }
 
+TEST(SinkFixedPowerSupplyDataTest, VoltageMv) {
+  {
+    SinkFixedPowerSupplyData fixed_power_supply;
+    fixed_power_supply.set_voltage_mv(50);
+    EXPECT_EQ(1, fixed_power_supply.voltage_50mv());
+    EXPECT_EQ(50, fixed_power_supply.voltage_mv());
+  }
+  {
+    SinkFixedPowerSupplyData fixed_power_supply;
+    fixed_power_supply.set_voltage_mv(51'150);
+    EXPECT_EQ(1'023, fixed_power_supply.voltage_50mv());
+    EXPECT_EQ(51'150, fixed_power_supply.voltage_mv());
+  }
+}
+
+TEST(SinkFixedPowerSupplyDataTest, MaximumCurrentMa) {
+  {
+    SinkFixedPowerSupplyData fixed_power_supply;
+    fixed_power_supply.set_maximum_current_ma(10);
+    EXPECT_EQ(1, fixed_power_supply.maximum_current_10ma());
+    EXPECT_EQ(10, fixed_power_supply.maximum_current_ma());
+  }
+  {
+    SinkFixedPowerSupplyData fixed_power_supply;
+    fixed_power_supply.set_maximum_current_ma(10'230);
+    EXPECT_EQ(1'023, fixed_power_supply.maximum_current_10ma());
+    EXPECT_EQ(10'230, fixed_power_supply.maximum_current_ma());
+  }
+}
+
+
 TEST(FixedVariableSupplyPowerRequestDataTest, CreateForPosition) {
   FixedVariableSupplyPowerRequestData request_data1 =
       FixedVariableSupplyPowerRequestData::CreateForPosition(1);

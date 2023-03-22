@@ -90,6 +90,9 @@ enum class PeakCurrentSupport {
 // See `PowerData` for a general description of the PDO (Power Data Object)
 // representation.
 //
+// Sink requirements for a well-regulated power supply are expressed via
+// `SinkFixedPowerSupplyData` instances.
+//
 // usbpd3.1 6.4.1.2.2 "Fixed Supply Power Data Object"
 class FixedPowerSupplyData {
  private:
@@ -211,7 +214,8 @@ class FixedPowerSupplyData {
 // See `PowerData` for a general description of the PDO (Power Data Object)
 // representation.
 //
-// usbpd3.1 6.4.1.2.3 "Variable Supply (non-Battery) Power Data Object"
+// usbpd3.1 6.4.1.2.3 "Variable Supply (non-Battery) Power Data Object" and
+// 6.4.1.3.2 "Variable Supply (non-Battery) Power Data Object".
 class VariablePowerSupplyData {
  private:
   // Needed for the following to compile.
@@ -293,7 +297,8 @@ class VariablePowerSupplyData {
 // See `PowerData` for a general description of the PDO (Power Data Object)
 // representation.
 //
-// usbpd3.1 6.4.1.2.4 "Variable Supply (non-Battery) Power Data Object"
+// usbpd3.1 6.4.1.2.4 "Variable Supply (non-Battery) Power Data Object" and
+// 6.4.1.3.3 "Battery Supply Power Data Object"
 class BatteryPowerSupplyData {
  private:
   // Needed for the following to compile.
@@ -367,6 +372,125 @@ class BatteryPowerSupplyData {
 
  private:
   // Must be kBattery.
+  DEF_ENUM_SUBFIELD(bits_, PowerSupplyType, 31, 30, supply_type);
+};
+
+// Values for `fast_swap_current_requirement` in SinkFixedPowerSupplyData.
+//
+// usbpd3.1 6.4.1.3.1 "Sink Fixed Supply Power Data Object", sub-table inside
+// the "Fast Role Swap required USB Type-C Current" row
+enum class FastSwapCurrentRequirement {
+  kNotSupported = 0b00,
+  kDefaultUsb = 0b01,
+  k1500mA = 0b10,
+  k3000mA = 0b11,
+};
+
+// Well-regulated power supply that maintains a fixed voltage.
+//
+// See `PowerData` for a general description of the PDO (Power Data Object)
+// representation.
+//
+// Source capabilities for a well-regulated power supply are expressed via
+// `FixedPowerSupplyData` instances.
+//
+// usbpd3.1 6.4.1.3.1 "Sink Fixed Supply Power Data Object"
+class SinkFixedPowerSupplyData {
+ private:
+  // Needed for the following to compile.
+  uint32_t bits_;
+
+ public:
+  // Indicates support for the PR_Swap message.
+  //
+  // Only used on the first PDO in a Sink_Capabilities message.
+  DEF_SUBBIT(bits_, 29, supports_dual_role_power);
+
+  // True if the Sink needs more than vSafe5V for full functionality.
+  //
+  // Only used on the first PDO in a Sink_Capabilities message.
+  DEF_SUBBIT(bits_, 28, requires_more_than_5v);
+
+  // True iff the Sink draws power from an "unlimited" power source.
+  //
+  // Only used on the first PDO in a Sink_Capabilities message.
+  DEF_SUBBIT(bits_, 27, has_unconstrained_power);
+
+  // Indicates if the Sink can communicate over a USB data channel.
+  //
+  // The data channels are D+/- introduced in usb2.0 and SS Tx/Rx introduced in
+  // usb3.0.
+  //
+  // Only used on the first PDO in a Sink_Capabilities message.
+  DEF_SUBBIT(bits_, 26, supports_usb_communications);
+
+  // Indicates support for the DR_Swap message.
+  //
+  // Only used on the first PDO in a Sink_Capabilities message.
+  DEF_SUBBIT(bits_, 25, supports_dual_role_data);
+
+  // Current level needed by Sink after a Fast Role Swap.
+  //
+  // If the value is `kNotSupported`, the Source will not initiate a Fast Role
+  // Swap request.
+  //
+  // Only used on the first PDO in a Sink_Capabilities message.
+  DEF_ENUM_SUBFIELD(bits_, FastSwapCurrentRequirement, 24, 23, fast_swap_current_requirement);
+
+  // The power source's fixed voltage, in multiplies of 50 mV.
+  DEF_SUBFIELD(bits_, 19, 10, voltage_50mv);
+
+  // The maximum current offered by the source, in multiples of 10 mA.
+  DEF_SUBFIELD(bits_, 9, 0, maximum_current_10ma);
+
+  // The power source's fixed voltage, in mV (millivolts).
+  int32_t voltage_mv() const {
+    // The multiplication will not overflow (causing UB) because
+    // `voltage_50mv` is a 10-bit field. The maximum product is 51,150.
+    return static_cast<int32_t>(static_cast<int32_t>(voltage_50mv()) * 50);
+  }
+  SinkFixedPowerSupplyData& set_voltage_mv(int32_t voltage_mv) {
+    return set_voltage_50mv(voltage_mv / 50);
+  }
+
+  // The maximum current offered by the source, in mA (milliamperes).
+  int32_t maximum_current_ma() const {
+    // The multiplication will not overflow (causing UB) because
+    // `maximum_current_10ma` is a 10-bit field. The maximum product is 10,240.
+    return static_cast<int32_t>(static_cast<int32_t>(maximum_current_10ma()) * 10);
+  }
+  SinkFixedPowerSupplyData& set_maximum_current_ma(int32_t current_ma) {
+    return set_maximum_current_10ma(current_ma / 10);
+  }
+
+  // Debug-checked casting from PowerData.
+  explicit SinkFixedPowerSupplyData(PowerData power_data) : bits_(power_data.bits) {
+    ZX_DEBUG_ASSERT(supply_type() == PowerSupplyType::kFixedSupply);
+  }
+
+  // Instance with all fields except for type set to zero.
+  //
+  // This is an invalid PDO (power data object). At a minimum, voltage and
+  // maximum current must be set before use in a PD message.
+  SinkFixedPowerSupplyData()
+      : SinkFixedPowerSupplyData(PowerData(0).set_supply_type(PowerSupplyType::kFixedSupply)) {}
+
+  // Value type, copying is allowed.
+  SinkFixedPowerSupplyData(const SinkFixedPowerSupplyData&) = default;
+  SinkFixedPowerSupplyData& operator=(const SinkFixedPowerSupplyData&) = default;
+
+  // Trivially destructible.
+  ~SinkFixedPowerSupplyData() = default;
+
+  // Support explicit casting to uint32_t.
+  explicit operator uint32_t() const { return bits_; }
+
+  // In C++20, equality comparison can be defaulted.
+  bool operator==(const SinkFixedPowerSupplyData& other) const { return bits_ == other.bits_; }
+  bool operator!=(const SinkFixedPowerSupplyData& other) const { return bits_ != other.bits_; }
+
+ private:
+  // Must be kFixedSupply.
   DEF_ENUM_SUBFIELD(bits_, PowerSupplyType, 31, 30, supply_type);
 };
 
