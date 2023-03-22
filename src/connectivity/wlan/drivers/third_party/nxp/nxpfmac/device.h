@@ -17,6 +17,7 @@
 #include <fidl/fuchsia.wlan.phyimpl/cpp/driver/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/ddk/device.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <zircon/types.h>
 
 #include <memory>
@@ -38,8 +39,7 @@ class Device;
 struct DeviceContext;
 class DeviceInspect;
 
-using DeviceType =
-    ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable, ddk::ServiceConnectable>;
+using DeviceType = ::ddk::Device<Device, ddk::Initializable, ddk::Suspendable>;
 
 class Device : public DeviceType,
                public fdf::WireServer<fuchsia_wlan_phyimpl::WlanPhyImpl>,
@@ -52,7 +52,9 @@ class Device : public DeviceType,
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkSuspend(ddk::SuspendTxn txn);
-  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel);
+
+  void WaitForProtocolConnection();
+  zx_status_t ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
   // WlanPhyImpl interface implementation.
   void GetSupportedMacRoles(fdf::Arena& arena,
@@ -125,9 +127,15 @@ class Device : public DeviceType,
   fdf::Dispatcher fidl_dispatcher_;
   sync_completion_t fidl_dispatcher_completion_;
 
+  // Notify the protocol connection completion.
+  libsync::Completion protocol_connected_;
+
   EventRegistration defer_rx_work_event_;
   EventRegistration flush_rx_work_event_;
   EventRegistration defer_handling_event_;
+
+  // Serves fuchsia_wlan_phyimpl::Service.
+  fdf::OutgoingDirectory outgoing_dir_;
 };
 
 }  // namespace wlan::nxpfmac

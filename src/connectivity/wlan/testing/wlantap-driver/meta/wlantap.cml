@@ -1,4 +1,4 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
@@ -9,19 +9,18 @@
     ],
     program: {
         runner: "driver",
-        compat: "driver/iwlwifi.so",
-        bind: "meta/bind/iwlwifi.bindbc",
-        colocate: "false",
+        bind: "meta/bind/wlantapctl.bindbc",
+        colocate: "true",
+        compat: "driver/wlantap.so",
+        default_dispatcher_opts: [ "allow_sync_calls" ],
+        fallback: "false",
     },
     capabilities: [
-        { service: "fuchsia.wlan.softmac.Service" },
-    ],
-    use: [
-        { service: "fuchsia.hardware.pci.Service" },
+        { service: "fuchsia.wlan.phyimpl.Service" },
     ],
     expose: [
         {
-            service: "fuchsia.wlan.softmac.Service",
+            service: "fuchsia.wlan.phyimpl.Service",
             from: "self",
         },
     ],

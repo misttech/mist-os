@@ -38,12 +38,30 @@ zx_status_t PcieDevice::Create(zx_device_t* parent_device) {
   zx_status_t status = ZX_OK;
 
   std::unique_ptr<PcieDevice> device(new PcieDevice(parent_device));
+
+  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (endpoints.is_error()) {
+    IWL_ERR(device->drvdata(), "Failed to create FIDL endpoints: %s", endpoints.status_string());
+    return endpoints.status_value();
+  }
+
+  if ((status = device->ServeWlanPhyImplProtocol(std::move(endpoints->server)) != ZX_OK)) {
+    IWL_ERR(device->drvdata(), "Failed to serve WlanPhyImpl service: %s",
+            zx_status_get_string(status));
+    return status;
+  }
+
+  std::array<const char*, 1> offers{
+      fuchsia_wlan_phyimpl::Service::Name,
+  };
+
   device->driver_inspector_ =
       std::make_unique<DriverInspector>(DriverInspectorOptions{.root_name = "iwlwifi"});
   if ((status = device->DdkAdd(::ddk::DeviceAddArgs("iwlwifi-wlanphyimpl")
                                    .set_proto_id(ZX_PROTOCOL_WLANPHY_IMPL)
-                                   .set_inspect_vmo(device->driver_inspector_->DuplicateVmo()))) !=
-      ZX_OK) {
+                                   .set_inspect_vmo(device->driver_inspector_->DuplicateVmo())
+                                   .set_runtime_service_offers(offers)
+                                   .set_outgoing_dir(endpoints->client.TakeChannel()))) != ZX_OK) {
     IWL_ERR(device->drvdata(), "failed device add: %s", zx_status_get_string(status));
     return status;
   }
@@ -143,6 +161,14 @@ void PcieDevice::DdkUnbind(::ddk::UnbindTxn txn) {
   pci_dev_.dev.bti = ZX_HANDLE_INVALID;
   irq_loop_->Shutdown();
   task_loop_->Shutdown();
+
+  zx::result res =
+      outgoing_dir_.RemoveService<fuchsia_wlan_phyimpl::Service>(fdf::kDefaultInstance);
+  if (res.is_error()) {
+    IWL_ERR(nullptr, "Failed to remove WlanPhyImpl service from outgoing directory: %s\n",
+            res.status_string());
+  }
+
   server_dispatcher_.ShutdownAsync();
 }
 

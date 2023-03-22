@@ -9,6 +9,7 @@ import("//build/drivers.gni")
 driver_bind_rules("wlantapctl_bind") {
   rules = "wlantapctl.bind"
   header_output = "wlantapctl_bind.h"
+  bind_output = "wlantapctl.bindbc"
   tests = "bind_tests.json"
   deps = [ "//src/devices/bind/fuchsia.test" ]
 }
@@ -67,6 +68,6 @@ fuchsia_driver("wlantap_driver-driver") {
 fuchsia_driver_component("wlantap_driver") {
   info = "wlantap_driver-info.json"
   component_name = "wlantap"
+  manifest = "meta/wlantap.cml"
   deps = [ ":wlantap_driver-driver" ]
-  manifest = "meta/wlantap_driver.cml"
 }

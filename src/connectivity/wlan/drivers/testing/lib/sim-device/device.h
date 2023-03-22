@@ -147,6 +147,8 @@ class FakeDevMgr {
   DdkCallState init_state_;
   DdkCallState unbind_state_;
   zx_status_t init_result_;
+  // Make DeviceAsyncRemove() thread-safe.
+  std::mutex async_remove_lock_;
 };
 
 }  // namespace wlan::simulation

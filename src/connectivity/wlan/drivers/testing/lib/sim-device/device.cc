@@ -134,7 +134,7 @@ FakeDevMgr::~FakeDevMgr() {
     return;
   }
 
-  DeviceUnbind(root);
+  DeviceAsyncRemove(root);
   ZX_ASSERT(devices_.empty());
 }
 
@@ -209,7 +209,6 @@ void FakeDevMgr::DeviceUnbind(zx_device_t* device) {
     DBG_PRT("%s device %p does not exist\n", __func__, device);
     return;
   }
-
   auto args = device->DevArgs();
   if (args.ops && args.ops->unbind) {
     unbind_thread_id_ = std::this_thread::get_id();
@@ -259,6 +258,7 @@ std::vector<zx_device_t*> FakeDevMgr::GetChildren(zx_device_t* device) {
 }
 
 void FakeDevMgr::DeviceAsyncRemove(zx_device_t* device) {
+  std::lock_guard<std::mutex> lock(async_remove_lock_);
   if (!ContainsDevice(device)) {
     DBG_PRT("%s device %p does not exist\n", __func__, device);
     return;

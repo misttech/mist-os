@@ -40,7 +40,6 @@ constexpr uint8_t kClientInterfaceId = 0;
 constexpr char kApInterfaceName[] = "brcmfmac-wlan-fullmac-ap";
 constexpr uint8_t kApInterfaceId = 1;
 constexpr uint8_t kMaxBufferParts = 1;
-
 }  // namespace
 
 namespace wlan_llcpp = fuchsia_factory_wlan;
@@ -51,7 +50,8 @@ Device::Device(zx_device_t* parent)
       client_interface_(nullptr),
       ap_interface_(nullptr),
       network_device_(parent, this),
-      parent_(parent) {
+      parent_(parent),
+      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {
   brcmf_pub_->device = this;
   for (auto& entry : brcmf_pub_->if2bss) {
     entry = BRCMF_BSSIDX_INVALID;
@@ -70,7 +70,15 @@ Device::Device(zx_device_t* parent)
   dispatcher_ = std::move(*dispatcher);
 }
 
-Device::~Device() { ShutdownDispatcher(); }
+Device::~Device() {
+  zx::result res =
+      outgoing_dir_.RemoveService<fuchsia_wlan_phyimpl::Service>(fdf::kDefaultInstance);
+  if (res.is_error()) {
+    BRCMF_ERR("Failed to remove WlanPhyImpl service from outgoing directory: %s\n",
+              res.status_string());
+  }
+  ShutdownDispatcher();
+}
 
 zx_status_t Device::Init() {
   zx_status_t status = DeviceInit();
@@ -104,20 +112,46 @@ void Device::DdkSuspend(ddk::SuspendTxn txn) {
   txn.Reply(ZX_OK, txn.requested_state());
 }
 
-zx_status_t Device::DdkServiceConnect(const char* service_name, fdf::Channel channel) {
-  if (std::string_view(service_name) !=
-      fidl::DiscoverableProtocolName<fuchsia_wlan_phyimpl::WlanPhyImpl>) {
-    BRCMF_ERR("Service name doesn't match. Connection request from a wrong device.\n");
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end(std::move(channel));
-  fdf::BindServer(dispatcher_.get(), std::move(server_end), this);
-  return ZX_OK;
-}
-
 brcmf_pub* Device::drvr() { return brcmf_pub_.get(); }
 
 const brcmf_pub* Device::drvr() const { return brcmf_pub_.get(); }
+
+void Device::WaitForProtocolConnection() { protocol_connected_.Wait(); }
+
+zx_status_t Device::ServeWlanPhyImplProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  // This callback will be invoked when this service is being connected.
+  auto protocol = [this](fdf::ServerEnd<fuchsia_wlan_phyimpl::WlanPhyImpl> server_end) mutable {
+    // Return immediately if the dispatcher has already been shutdown.
+    if (completion_.Wait(zx::sec(0)) == ZX_OK) {
+      BRCMF_WARN("Dispatcher has been shutdown, cannot bind fidl server.");
+      return;
+    }
+    fdf::BindServer(dispatcher_.get(), std::move(server_end), this);
+    // Notify that the server end is ready to accept request. Waiting for this signal by other
+    // entity is not necessary, the current use case of it is in SIM tests.
+    protocol_connected_.Signal();
+  };
+
+  // Register the callback to handler.
+  fuchsia_wlan_phyimpl::Service::InstanceHandler handler({.wlan_phy_impl = std::move(protocol)});
+
+  // Add this service to the outgoing directory so that the child driver can connect to by calling
+  // DdkConnectRuntimeProtocol().
+  auto status = outgoing_dir_.AddService<fuchsia_wlan_phyimpl::Service>(std::move(handler));
+  if (status.is_error()) {
+    BRCMF_ERR("%s(): Failed to add service to outgoing directory: %s\n", status.status_string());
+    return status.error_value();
+  }
+
+  // Serve the outgoing directory to the entity that intends to open it, which is DFv1 in this case.
+  auto result = outgoing_dir_.Serve(std::move(server_end));
+  if (result.is_error()) {
+    BRCMF_ERR("%s(): Failed to serve outgoing directory: %s\n", result.status_string());
+    return result.error_value();
+  }
+
+  return ZX_OK;
+}
 
 void Device::GetSupportedMacRoles(fdf::Arena& arena,
                                   GetSupportedMacRolesCompleter::Sync& completer) {
@@ -547,7 +581,6 @@ void Device::DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_statu
     respond(status);
     return;
   }
-
   iface->DdkAsyncRemove([status, respond = std::move(respond)]() mutable { respond(status); });
   *iface_ptr = nullptr;
 }
