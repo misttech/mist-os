@@ -23,6 +23,8 @@ ELFCLASS64 = 2
 EI_DATA = 5
 ELFDATA2LSB = 1
 ELFDATA2MSB = 2
+ET_EXEC = 2
+ET_DYN = 3
 EM_386 = 3
 EM_ARM = 40
 EM_X86_64 = 62
@@ -715,8 +717,12 @@ def get_elf_info(filename, match_notes=False):
         if elf is not None:
             # ELF header leads to program headers.
             ehdr = elf.Ehdr.read(file)
+            if ehdr.e_type not in (ET_EXEC, ET_DYN):
+                # This is an invalid file or an ET_REL file, which don't count
+                # as ELF files for our purposes.
+                return None
             assert ehdr.e_phentsize == elf.Phdr.size, (
-                "%s: invalid e_phentsize" % filename)
+                "%s: invalid e_phentsize %s" % (filename, ehdr.e_phentsize))
             phdrs = list(gen_phdrs(file, elf, ehdr))
             dyn = get_dynamic()
             info = elf_info(
