@@ -10,7 +10,6 @@ use crate::handler::base::{Error, Payload as HandlerPayload, Request};
 use crate::message::base::Audience;
 use crate::service;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_err, fx_log_info};
 use std::collections::HashSet;
 
 /// The Restore Agent is responsible for signaling to all components to restore
@@ -54,7 +53,7 @@ impl RestoreAgent {
                         .next_of::<HandlerPayload>()
                         .await
                         .map_err(|e| {
-                            fx_log_err!("Received error when getting payload: {:?}", e);
+                            tracing::error!("Received error when getting payload: {:?}", e);
                             AgentError::UnexpectedError
                         })?
                         .0;
@@ -69,19 +68,19 @@ impl RestoreAgent {
                                 continue;
                             }
                             Err(Error::UnhandledType(setting_type)) => {
-                                fx_log_info!(
+                                tracing::info!(
                                     "setting not available for restore: {:?}",
                                     setting_type
                                 );
                                 continue;
                             }
                             e => {
-                                fx_log_err!("error during restore for {component:?}: {e:?}");
+                                tracing::error!("error during restore for {component:?}: {e:?}");
                                 return Err(AgentError::UnexpectedError);
                             }
                         }
                     } else {
-                        fx_log_err!("Error because of response: {:?}", response);
+                        tracing::error!("Error because of response: {:?}", response);
                         return Err(AgentError::UnexpectedError);
                     }
                 }

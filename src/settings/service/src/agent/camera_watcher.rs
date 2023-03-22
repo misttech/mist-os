@@ -12,7 +12,6 @@ use crate::message::base::Audience;
 use crate::service_context::ServiceContext;
 use crate::{service, trace, trace_guard};
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_err, fx_log_info};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -58,7 +57,7 @@ impl CameraWatcherAgent {
             }
             drop(guard);
 
-            fx_log_info!("Camera watcher agent done processing requests");
+            tracing::info!("Camera watcher agent done processing requests");
         })
         .detach()
     }
@@ -101,7 +100,7 @@ impl CameraWatcherAgent {
                 Ok(())
             }
             Err(e) => {
-                fx_log_err!("Unable to watch camera device: {:?}", e);
+                tracing::error!("Unable to watch camera device: {:?}", e);
                 Err(AgentError::UnexpectedError)
             }
         }

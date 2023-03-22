@@ -8,7 +8,6 @@ use std::sync::Arc;
 use fuchsia_async as fasync;
 use fuchsia_inspect::{self as inspect, component, Property, StringProperty};
 use fuchsia_inspect_derive::{Inspect, WithInspect};
-use fuchsia_syslog::fx_log_err;
 use futures::StreamExt;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 
@@ -105,7 +104,7 @@ impl SettingValuesInspectAgent {
         {
             Ok(messenger) => messenger,
             Err(err) => {
-                fx_log_err!("could not create inspect: {:?}", err);
+                tracing::error!("could not create inspect: {:?}", err);
                 return;
             }
         };
@@ -179,7 +178,10 @@ impl SettingValuesInspectAgent {
             {
                 self.write_setting_to_inspect(setting_info).await;
             } else {
-                fx_log_err!("Could not fetch initial value for setting type:{:?}", setting_type);
+                tracing::error!(
+                    "Could not fetch initial value for setting type:{:?}",
+                    setting_type
+                );
             }
         }
     }

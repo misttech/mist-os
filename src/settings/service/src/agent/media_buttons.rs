@@ -14,7 +14,6 @@ use crate::service_context::ServiceContext;
 use crate::trace_guard;
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_err, fx_log_info};
 use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use std::collections::HashSet;
@@ -54,7 +53,7 @@ impl MediaButtonsAgent {
                 let _ = client.reply(Payload::Complete(agent.handle(invocation).await).into());
             }
 
-            fx_log_info!("Media buttons agent done processing requests");
+            tracing::info!("Media buttons agent done processing requests");
         })
         .detach()
     }
@@ -72,7 +71,7 @@ impl MediaButtonsAgent {
     ) -> InvocationResult {
         let (input_tx, mut input_rx) = futures::channel::mpsc::unbounded::<MediaButtonsEvent>();
         if let Err(e) = monitor_media_buttons(service_context, input_tx).await {
-            fx_log_err!("Unable to monitor media buttons: {:?}", e);
+            tracing::error!("Unable to monitor media buttons: {:?}", e);
             return Err(AgentError::UnexpectedError);
         }
 
@@ -117,7 +116,7 @@ impl EventHandler {
             0 => VolumeGain::Neutral,
             1 => VolumeGain::Up,
             _ => {
-                fx_log_err!("Invalid volume gain value: {}", volume_gain);
+                tracing::error!("Invalid volume gain value: {}", volume_gain);
                 return;
             }
         };
