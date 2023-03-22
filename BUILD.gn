@@ -939,7 +939,6 @@ group("tool_paths.metadata") {
     "//prebuilt/third_party/go/$host_platform/bin/gofmt",
     "//prebuilt/third_party/goma/$host_platform/goma_ctl.py",
     "//prebuilt/third_party/ninja/$host_platform/ninja",
-    "//prebuilt/third_party/openssh-portable/$host_platform/bin/ssh",
     "//prebuilt/third_party/python3/$host_platform/bin/python3",
     "//prebuilt/third_party/yapf/yapf",
     "//third_party/catapult/tracing/bin/trace2html",
@@ -954,6 +953,31 @@ group("tool_paths.metadata") {
           name = get_path_info(tool, "name")
           os = host_os
           path = rebase_path(tool, root_build_dir)
+        },
+      ]
+    }
+
+    # Add SSH prebuilts to the tool paths. We need both architectures regardless
+    # of the host architectures since it's used on test bots that may be running
+    # ARM64 (even if we built on x64).
+    foreach(arch,
+            [
+              "arm64",
+              "x64",
+            ]) {
+      tool_paths += [
+        {
+          cpu = arch
+          label = get_label_info(
+                  "//prebuilt/third_party/openssh-portable/linux-${arch}/bin/ssh",
+                  "label_with_toolchain")
+          name = get_path_info(
+                  "//prebuilt/third_party/openssh-portable/linux-${arch}/bin/ssh",
+                  "name")
+          os = "linux"
+          path = rebase_path(
+                  "//prebuilt/third_party/openssh-portable/linux-${arch}/bin/ssh",
+                  root_build_dir)
         },
       ]
     }
