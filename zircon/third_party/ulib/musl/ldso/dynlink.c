@@ -571,7 +571,9 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
       case REL_OFFSET:
         addend -= (size_t)reloc_addr;
       case REL_SYMBOLIC:
+#if REL_GOT != REL_SYMBOLIC
       case REL_GOT:
+#endif
       case REL_PLT:
         *reloc_addr = sym_val + addend;
         break;
@@ -1997,6 +1999,8 @@ LIBC_NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
 #define DWARG_REGNO_TP 36  // TPIDR_EL0
 #elif defined(__x86_64__)
 #define DWARG_REGNO_TP 58  // %fs.base
+#elif defined(__riscv)
+#define DWARG_REGNO_TP 4  // tp = x4
 #endif
 
   // This has to be inside some function so that it can use extended asm to

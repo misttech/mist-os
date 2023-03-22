@@ -59,12 +59,15 @@
 // stub depending on the value of a local `_dynlink_runtime` flag.
 
 #ifdef __x86_64__
+
 #define SANITIZER_STUB_ASM_BODY(name) \
   "cmpl $0, _dynlink_runtime(%rip)\n" \
   "jne _dynlink" name                 \
   "\n"                                \
   "ret\n"
+
 #elif defined(__aarch64__)
+
 #if __has_feature(hwaddress_sanitizer)
 // With hwasan instrumentation on globals, _dynlink_runtime can be tagged so we
 // can't get the address directly since its value can be outside the range of
@@ -85,13 +88,33 @@
   "\n"                                        \
   "ret\n"
 #endif
+
+#elif defined(__riscv)
+
+#if __has_feature(hwaddress_sanitizer)
+#define SANITIZER_STUB_ASM_BODY(name)     \
+  "ld t0, _dynlink_runtime+0x100000000\n" \
+  "bnez t0, _dynlink" name                \
+  "\n"                                    \
+  "ret\n"
 #else
-#error unsupported architecture
+#define SANITIZER_STUB_ASM_BODY(name) \
+  "ld t0, _dynlink_runtime\n"         \
+  "ld t0, (t0)\n"                     \
+  "bnez t0, _dynlink" name            \
+  "\n"                                \
+  "ret\n"
 #endif
 
-#ifdef __ASSEMBLER__
+#else
+
+#error unsupported architecture
+
+#endif
+
+#ifdef __ASSEMBLER__  // clang-format off
 .macro sanitizer_stub name
-  .pushsection .text._dynlink\name,"ax",%progbits
+  .pushsection .text._dynlink\name, "ax", %progbits
   .weak \name
   ENTRY(_dynlink\name)
 #ifdef __x86_64__
@@ -100,6 +123,9 @@
     adrp x16, :got:\name
     ldr x16, [x16, #:got_lo12:\name]
     br x16
+#elif defined(__riscv)
+    la t0, \name
+    jr t0
 #else
 #error unsupported architecture
 #endif
@@ -107,6 +133,6 @@
   .hidden _dynlink\name
   .popsection
 .endm
-#endif  // __ASM__
+#endif  // clang-format on
 
 #endif  // ZIRCON_SYSTEM_ULIB_C_SANITIZERS_SANITIZER_STUBS_H_

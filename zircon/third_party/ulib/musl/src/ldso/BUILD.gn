@@ -5,7 +5,6 @@
 import("//build/config/clang/clang_cpu.gni")
 
 source_set("ldso") {
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "${clang_cpu}/tlsdesc.S",
     "dlclose.c",
@@ -14,4 +13,9 @@ source_set("ldso") {
   ]
 
   configs -= [ "//build/config:symbol_visibility_hidden" ]
+
+  deps = [
+    "//zircon/kernel/lib/arch",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
 }
