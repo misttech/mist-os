@@ -342,8 +342,10 @@ impl FilesystemLauncher {
                 let mut device = self.reset_fvm_partition(device, inside_zxcrypt).await?;
                 let new_device = device.as_mut();
                 // Set the max partition size for data
-                if self.config.apply_limits_to_ramdisk
-                    || !new_device.topological_path().starts_with(&self.config.ramdisk_prefix)
+                if self
+                    .ramdisk_prefix
+                    .as_ref()
+                    .map_or(true, |prefix| !new_device.topological_path().starts_with(prefix))
                 {
                     if let Err(e) =
                         set_partition_max_size(new_device, self.config.data_max_bytes).await

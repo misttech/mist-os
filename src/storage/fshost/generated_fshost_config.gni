@@ -95,7 +95,6 @@ template("generated_fshost_config") {
       mbr = false
       netboot = false
       no_zxcrypt = false
-      ramdisk_prefix = "/dev/sys/platform/00:00:2d/ramctl/"
       sandbox_decompression = true
 
       # LINT.ThenChange(//src/lib/assembly/platform_configuration/src/subsystems/storage.rs)

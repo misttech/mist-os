@@ -11,13 +11,6 @@
         // be mounted, but its data and blob filesystems will not be mounted.
         fvm_ramdisk: { type: "bool" },
 
-        // The prefix used to identify a device's topological path as a ramdisk.
-        // Exposed for integration testing.
-        ramdisk_prefix: {
-            type: "string",
-            max_size: 64,
-        },
-
         // Enables all GPT devices.
         gpt_all: { type: "bool" },
 

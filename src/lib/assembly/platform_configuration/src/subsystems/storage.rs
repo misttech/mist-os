@@ -40,7 +40,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("mbr", false)?
                 .field("netboot", false)?
                 .field("no_zxcrypt", false)?
-                .field("ramdisk_prefix", "/dev/sys/platform/00:00:2d/ramctl/")?
                 .field("sandbox_decompression", true)?
                 .field("format_data_on_corruption", true)?
                 .field("blobfs_initial_inodes", 0)?

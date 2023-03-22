@@ -235,10 +235,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     // Fake out the cpp fshost ramdisk checking by providing a nonsense ramdisk prefix. The rust
     // fshost has tighter behavior - it only matches on the ramdisk path it created itself (which
     // is also not this one).
-    builder
-        .fshost()
-        .set_config_value("fvm_ramdisk", true)
-        .set_config_value("ramdisk_prefix", "/not/the/prefix");
+    builder.fshost().set_config_value("fvm_ramdisk", true);
     builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
@@ -550,10 +547,7 @@ async fn shred_data_volume_from_recovery() {
     // a ramdisk it launches, binding the fvm on the "regular" disk but otherwise leaving it alone.
     let mut builder =
         new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
-    builder
-        .fshost()
-        .set_config_value("ramdisk_prefix", "/nada/zip/zilch")
-        .set_config_value("fvm_ramdisk", true);
+    builder.fshost().set_config_value("fvm_ramdisk", true);
     builder.with_zbi_ramdisk();
     let fixture = builder.build().await;
 
