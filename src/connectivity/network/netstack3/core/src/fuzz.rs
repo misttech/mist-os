@@ -27,9 +27,9 @@ use packet_formats::{
 };
 
 use crate::{
-    context::testutil::{handle_timer_helper_with_sc_ref, FakeTimerCtxExt},
-    device::ethernet,
-    Ctx, DeviceId, TimerId,
+    context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt},
+    device::{ethernet, EthernetDeviceId},
+    Ctx, TimerId,
 };
 
 mod print_on_panic {
@@ -314,14 +314,13 @@ fn arbitrary_packet<B: NestedPacketBuilder + core::fmt::Debug>(
 
 fn dispatch(
     Ctx { sync_ctx, non_sync_ctx }: &mut crate::testutil::FakeCtx,
-    device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
+    device_id: &EthernetDeviceId<FakeInstant, ()>,
     action: FuzzAction,
 ) {
     use FuzzAction::*;
     match action {
         ReceiveFrame(ArbitraryFrame { frame_type: _, buf, description: _ }) => {
             crate::device::receive_frame(sync_ctx, non_sync_ctx, device_id, buf)
-                .expect("error receiving frame")
         }
         AdvanceTime(SmallDuration(duration)) => {
             let _: Vec<TimerId<_>> = non_sync_ctx.trigger_timers_for(
@@ -344,9 +343,8 @@ pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
         sync_ctx,
         UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap(),
         ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
-    )
-    .into();
-    crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &device_id);
+    );
+    crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &device_id.clone().into());
 
     log::info!("Processing {} actions", actions.len());
     for action in actions {

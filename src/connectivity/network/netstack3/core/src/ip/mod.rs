@@ -4347,7 +4347,8 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let mut sync_ctx = &sync_ctx;
-        let device: DeviceId<_> = device_ids[0].clone().into();
+        let eth_device = &device_ids[0];
+        let device: DeviceId<_> = eth_device.clone().into();
         let multi_addr = I::get_multicast_addr(3).get();
         let dst_mac = Mac::from(&MulticastAddr::new(multi_addr).unwrap());
         let buf = Buf::new(vec![0; 10], ..)
@@ -4367,8 +4368,7 @@ mod tests {
         // Should not have dispatched the packet since we are not in the
         // multicast group `multi_addr`.
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
 
         // Join the multicast group and receive the packet, we should dispatch
@@ -4388,8 +4388,7 @@ mod tests {
             ),
         }
         assert!(is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
 
         // Leave the multicast group and receive the packet, we should not
@@ -4409,8 +4408,7 @@ mod tests {
             ),
         }
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
     }
 

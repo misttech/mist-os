@@ -142,12 +142,9 @@ impl NetdeviceWorker {
             netstack3_core::device::receive_frame(
                 sync_ctx,
                 non_sync_ctx,
-                &id.into(),
+                &id,
                 packet::Buf::new(&mut buff[..], ..len),
             )
-            .unwrap_or_else(|e| {
-                log::error!("failed to receive frame {:?} on port {:?} {:?}", &buff[..len], port, e)
-            });
         }
     }
 }

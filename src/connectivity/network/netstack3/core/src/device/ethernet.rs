@@ -1612,13 +1612,12 @@ mod tests {
         let config = I::FAKE_CONFIG;
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let device = crate::device::add_ethernet_device(
+        let eth_device = crate::device::add_ethernet_device(
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        )
-        .into();
-
+        );
+        let device = eth_device.clone().into();
         let mut bytes = match I::VERSION {
             IpVersion::V4 => dns_request_v4::ETHERNET_FRAME,
             IpVersion::V6 => dns_request_v6::ETHERNET_FRAME,
@@ -1639,10 +1638,9 @@ mod tests {
         crate::device::receive_frame(
             &mut sync_ctx,
             &mut non_sync_ctx,
-            &device,
+            &eth_device,
             Buf::new(bytes, ..),
-        )
-        .expect("error receiving frame");
+        );
 
         let counter = match I::VERSION {
             IpVersion::V4 => "receive_ipv4_packet",
@@ -1899,7 +1897,8 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(config.clone()).build();
         let mut sync_ctx = &sync_ctx;
-        let device = device_ids[0].clone().into();
+        let eth_device = &device_ids[0];
+        let device = eth_device.clone().into();
         let other_mac = Mac::new([13, 14, 15, 16, 17, 18]);
 
         let buf = Buf::new(Vec::new(), ..)
@@ -1922,15 +1921,13 @@ mod tests {
         // Accept packet destined for this device if promiscuous mode is off.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
 
         // Accept packet destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
 
         let buf = Buf::new(Vec::new(), ..)
@@ -1954,15 +1951,13 @@ mod tests {
         // off.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
 
         // Accept packet not destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
-        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &device, buf.clone())
-            .expect("error receiving frame");
+        crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 3);
     }
 

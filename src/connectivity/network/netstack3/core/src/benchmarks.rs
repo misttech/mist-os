@@ -54,7 +54,8 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V4)
             .build_with(StackStateBuilder::default());
     let mut sync_ctx = &sync_ctx;
-    let device: DeviceId<_> = idx_to_device_id[0].clone().into();
+    let eth_device = idx_to_device_id[0].clone();
+    let device: DeviceId<_> = eth_device.clone().into();
     crate::ip::device::set_routing_enabled::<_, _, Ipv4>(
         &mut sync_ctx,
         &mut non_sync_ctx,
@@ -104,15 +105,12 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
         {
             iters += 1;
         }
-        black_box(
-            receive_frame(
-                black_box(&mut sync_ctx),
-                black_box(&mut non_sync_ctx),
-                black_box(&device),
-                black_box(Buf::new(&mut buf[..], range.clone())),
-            )
-            .expect("error receiving frame"),
-        );
+        black_box(receive_frame(
+            black_box(&mut sync_ctx),
+            black_box(&mut non_sync_ctx),
+            black_box(&eth_device),
+            black_box(Buf::new(&mut buf[..], range.clone())),
+        ));
 
         #[cfg(debug_assertions)]
         {

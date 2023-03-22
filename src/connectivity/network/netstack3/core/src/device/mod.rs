@@ -1735,18 +1735,13 @@ where
 }
 
 /// Receive a device layer frame from the network.
-// TODO(https://fxbug.dev/123461): Take an `EthernetDeviceId` instead of
-// `DeviceId`.
 pub fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
     mut sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx>,
+    device: &EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState>,
     buffer: B,
-) -> Result<(), NotSupportedError> {
-    match device {
-        DeviceId::Ethernet(id) => Ok(self::ethernet::receive_frame(&mut sync_ctx, ctx, id, buffer)),
-        DeviceId::Loopback(LoopbackDeviceId(_)) => Err(NotSupportedError),
-    }
+) {
+    self::ethernet::receive_frame(&mut sync_ctx, ctx, device, buffer)
 }
 
 /// Set the promiscuous mode flag on `device`.
@@ -1973,7 +1968,12 @@ pub(crate) mod testutil {
         device: DeviceId<NonSyncCtx>,
         buffer: B,
     ) {
-        crate::device::receive_frame(sync_ctx, non_sync_ctx, &device, buffer).unwrap()
+        crate::device::receive_frame(
+            sync_ctx,
+            non_sync_ctx,
+            &assert_matches::assert_matches!(device, DeviceId::Ethernet(id) => id),
+            buffer,
+        )
     }
 
     pub fn enable_device<NonSyncCtx: NonSyncContext>(
