@@ -1,8 +1,8 @@
 # Copyright 2020 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
 import("//build/config/build_api_module.gni")
+import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
 import("//sdk/ctf/build/verify_sdk_compatibility.gni")
 
@@ -17,9 +17,7 @@ build_api_module("ctf_artifacts") {
 group("ctf") {
   testonly = true
   deps = [
-    ":host_test_manifest",
-    ":package_archive_manifest",
-    ":test_manifest",
+    ":manifests",
     ":tests",
     ":verify_idk_deps",
   ]
@@ -54,7 +52,6 @@ generated_file("test_manifest") {
   data_keys = [ "test_manifest" ]
   walk_keys = [ "ctf_barrier" ]
   deps = [ "tests" ]
-
   metadata = {
     ctf_artifacts = [ "cts/test_manifest.json" ]
   }
@@ -66,9 +63,31 @@ generated_file("host_test_manifest") {
   output_conversion = "json"
   data_keys = [ "host_test_manifest" ]
   deps = [ "tests/examples/host_tool:tests($host_toolchain)" ]
-
   metadata = {
     ctf_artifacts = [ "cts/host_test_manifest.json" ]
+  }
+}
+
+golden_files("manifests") {
+  testonly = true
+  deps = [
+    ":host_test_manifest",
+    ":package_archive_manifest($target_toolchain)",
+    ":test_manifest($target_toolchain)",
+  ]
+
+  comparisons = []
+  foreach(dep, deps) {
+    _outputs = []
+    _outputs = get_target_outputs(dep)
+    _candidate = _outputs[0]
+    _basename = get_path_info(_candidate, "file")
+    comparisons += [
+      {
+        golden = "//sdk/ctf/goldens/$_basename"
+        candidate = _candidate
+      },
+    ]
   }
 }
 
@@ -77,7 +96,9 @@ _idks = [
   "core_testing",
   "e2e_testing",
 ]
+
 _verify_idk_deps = []
+
 foreach(idk, _idks) {
   golden_file_target = "${idk}_sdk_layout"
   generate_sdk_layout_golden_file(golden_file_target) {
@@ -95,7 +116,6 @@ foreach(idk, _idks) {
   #   golden_file = "//sdk/manifests/layouts/${target_cpu}/sdk_directory_${idk}.golden_layout"
   #   deps = [ "//sdk:${idk}_archive" ]
   # }
-
   _verify_idk_deps += [
     ":$golden_file_target",
     # ":$verify_compatibility_target",

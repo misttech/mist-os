@@ -1,0 +1,12 @@
+[
+  {
+    "args": [
+      "--config",
+      "cts.experimental=true",
+      "cts",
+      "run"
+    ],
+    "binary_path": "host_x64/ffx",
+    "test_name": "ffx_cts_test"
+  }
+]
