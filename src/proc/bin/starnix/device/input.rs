@@ -5,18 +5,20 @@
 use crate::device::DeviceOps;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
+use crate::lock::Mutex;
 use crate::logging::*;
 use crate::mm::MemoryAccessorExt;
 use crate::syscalls::SyscallResult;
 use crate::syscalls::SUCCESS;
-use crate::task::{CurrentTask, EventHandler, WaitKey, Waiter};
+use crate::task::{CurrentTask, EventHandler, WaitKey, WaitQueue, Waiter};
 use crate::types::*;
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
 use fidl::handle::fuchsia_handles::Signals;
-use fidl_fuchsia_ui_pointer::{self as fuipointer, TouchResponse, TouchResponseType};
+use fidl_fuchsia_ui_pointer::{self as fuipointer, TouchEvent, TouchResponse, TouchResponseType};
 use fuchsia_async as fasync;
 use futures::future::{self, Either};
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 pub struct InputFile {
@@ -30,7 +32,13 @@ pub struct InputFile {
     supported_haptics: BitSet<{ min_bytes(FF_CNT) }>, // 'F'orce 'F'eedback
     supported_misc_features: BitSet<{ min_bytes(MSC_CNT) }>,
     properties: BitSet<{ min_bytes(INPUT_PROP_CNT) }>,
-    waiter: Waiter,
+    inner: Mutex<InputFileMutableState>,
+}
+
+// Mutable state of `InputFile`
+struct InputFileMutableState {
+    events: VecDeque<TouchEvent>,
+    waiters: WaitQueue,
 }
 
 impl InputFile {
@@ -59,7 +67,10 @@ impl InputFile {
             supported_haptics: BitSet::new(),           // None supported
             supported_misc_features: BitSet::new(),     // None supported
             properties: touch_properties(),
-            waiter: Waiter::new(),
+            inner: Mutex::new(InputFileMutableState {
+                events: VecDeque::new(),
+                waiters: WaitQueue::default(),
+            }),
         })
     }
 
@@ -70,9 +81,10 @@ impl InputFile {
     /// * `touch_source_proxy`: a connection to the Fuchsia input system, which will provide
     ///   touch events associated with the Fuchsia `View` created by Starnix.
     pub fn start_relay(
-        &self,
+        self: &Arc<Self>,
         touch_source_proxy: fuipointer::TouchSourceProxy,
     ) -> std::thread::JoinHandle<()> {
+        let slf = self.clone();
         std::thread::spawn(move || {
             fasync::LocalExecutor::new().run_singlethreaded(async {
                 let mut previous_event_disposition = vec![];
@@ -84,6 +96,17 @@ impl InputFile {
                     let query_res = match future::select(close_fut, query_fut).await {
                         Either::Left((Ok(Signals::CHANNEL_PEER_CLOSED), _)) => {
                             log_warn!("TouchSource server closed connection; input is stopped");
+                            break;
+                        }
+                        Either::Left((Ok(signals), _))
+                            if signals
+                                == (Signals::CHANNEL_PEER_CLOSED | Signals::CHANNEL_READABLE) =>
+                        {
+                            log_warn!(
+                                "{} {}",
+                                "TouchSource server closed connection and channel is readable",
+                                "input dropped event(s) and stopped"
+                            );
                             break;
                         }
                         Either::Left((on_closed_res, _)) => {
@@ -108,7 +131,9 @@ impl InputFile {
                                     ..TouchResponse::EMPTY
                                 })
                                 .collect();
-                            not_implemented!("?", "process touch events");
+                            let mut inner = slf.inner.lock();
+                            inner.events.extend(touch_events);
+                            inner.waiters.notify_events(FdEvents::POLLIN);
                         }
                         Err(e) => {
                             log_warn!(
@@ -233,22 +258,24 @@ impl FileOps for Arc<InputFile> {
     fn wait_async(
         &self,
         _file: &FileObject,
-        current_task: &CurrentTask,
-        _waiter: &Waiter,
-        _events: FdEvents,
-        _handler: EventHandler,
+        _current_task: &CurrentTask,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
     ) -> Result<WaitKey, Errno> {
-        not_implemented!(current_task, "wait_async() on input device will block forever");
-        Ok(self.waiter.fake_wait())
+        Ok(self.inner.lock().waiters.wait_async_mask(waiter, events.bits(), handler))
     }
 
-    fn cancel_wait(&self, current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {
-        not_implemented!(current_task, "cancel_wait() on input device");
+    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
+        self.inner.lock().waiters.cancel_wait(waiter, key);
     }
 
-    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
-        not_implemented!(current_task, "query_events() on input device");
-        FdEvents::empty()
+    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+        if self.inner.lock().events.is_empty() {
+            FdEvents::empty()
+        } else {
+            FdEvents::POLLIN
+        }
     }
 }
 
@@ -299,7 +326,9 @@ fn touch_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::testing::create_kernel_and_task;
     use assert_matches::assert_matches;
+    use fuchsia_zircon as zx;
     use fuipointer::{TouchEvent, TouchSourceMarker, TouchSourceRequest};
     use futures::StreamExt as _; // for `next()`
 
@@ -365,5 +394,281 @@ mod test {
         // Cleanly tear down the client.
         std::mem::drop(touch_source_stream); // Close Zircon channel.
         relay_thread.join().expect("client thread failed"); // Wait for client thread to finish.
+    }
+
+    #[::fuchsia::test]
+    async fn notifies_polling_waiters_of_new_data() {
+        // Set up input resources.
+        let input_file = InputFile::new();
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let relay_thread = input_file.start_relay(touch_source_proxy);
+
+        // Set up waiter resources.
+        let waiter1 = Waiter::new();
+        let waiter2 = Waiter::new();
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        // Ask `input_file` to notify waiters when data is available to read.
+        [&waiter1, &waiter2].iter().enumerate().for_each(|(i, waiter)| {
+            input_file
+                .wait_async(
+                    &FileObject::new(
+                        Box::new(input_file.clone()),
+                        // The input node doesn't really live at the root of the filesystem.
+                        // But the test doesn't need to be 100% representative of production.
+                        current_task
+                            .lookup_path_from_root(b".")
+                            .expect("failed to get namespace node for root"),
+                        OpenFlags::empty(),
+                    ),
+                    &current_task,
+                    waiter,
+                    FdEvents::POLLIN,
+                    Box::new(|_| ()),
+                )
+                .unwrap_or_else(|_| panic!("wait_async call {i} failed"));
+        });
+        assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
+        assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
+
+        // Reply to first `Watch` request.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending first Watch reply");
+            }
+            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
+        }
+
+        // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
+        // from above.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending second Watch reply");
+            }
+            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
+        }
+
+        // `InputFile` should be done processing the first reply, since it has sent its second
+        // request. And, as part of processing the first reply, `InputFile` should have notified
+        // the interested waiters.
+        assert_eq!(waiter1.wait_until(&current_task, zx::Time::ZERO), Ok(()));
+        assert_eq!(waiter2.wait_until(&current_task, zx::Time::ZERO), Ok(()));
+
+        // Cleanly tear down the `TouchSource` client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
+    }
+
+    #[::fuchsia::test]
+    async fn notifies_blocked_waiter_of_new_data() {
+        // Set up input resources.
+        let input_file = InputFile::new();
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let relay_thread = input_file.start_relay(touch_source_proxy);
+
+        // Set up waiter resources.
+        let waiter = Waiter::new();
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        // Ask `input_file` to notify `waiter` when data is available to read.
+        input_file
+            .wait_async(
+                &FileObject::new(
+                    Box::new(input_file.clone()),
+                    // The input node doesn't really live at the root of the filesystem.
+                    // But the test doesn't need to be 100% representative of production.
+                    current_task
+                        .lookup_path_from_root(b".")
+                        .expect("failed to get namespace node for root"),
+                    OpenFlags::empty(),
+                ),
+                &current_task,
+                &waiter,
+                FdEvents::POLLIN,
+                Box::new(|_| ()),
+            )
+            .expect("wait_async failed");
+
+        let waiter_thread = std::thread::spawn(move || waiter.wait(&current_task));
+        assert!(!waiter_thread.is_finished());
+
+        // Reply to first `Watch` request.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending first Watch reply");
+            }
+            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
+        }
+
+        // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
+        // from above.
+        //
+        // TODO(quiche): Without this, `relay_thread` gets stuck `await`-ing the reply to its
+        // first request. Figure out why that happens, and remove this second reply.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending second Watch reply");
+            }
+            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
+        }
+
+        // Block until `waiter_thread` completes.
+        waiter_thread.join().expect("join() failed").expect("wait() failed");
+
+        // Cleanly tear down the `TouchSource` client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
+    }
+
+    // Note: a user program may also want to be woken if events were already ready at the
+    // time that the program called `epoll_wait()`. However, there's no test for that case
+    // in this module, because:
+    //
+    // 1. Not all programs will want to be woken in such a case. In particular, some programs
+    //    use "edge-triggered" mode instead of "level-tiggered" mode. For details on the
+    //    two modes, see https://man7.org/linux/man-pages/man7/epoll.7.html.
+    // 2. For programs using "level-triggered" mode, the relevant behavior is implemented in
+    //    the `epoll` module, and verified by `epoll::tests::test_epoll_ready_then_wait()`.
+    //
+    // See also: the documentation for `FileOps::wait_async()`.
+
+    #[::fuchsia::test]
+    async fn honors_wait_cancellation() {
+        // Set up input resources.
+        let input_file = InputFile::new();
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let relay_thread = input_file.start_relay(touch_source_proxy);
+
+        // Set up waiter resources.
+        let waiter1 = Waiter::new();
+        let waiter2 = Waiter::new();
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        // Ask `input_file` to notify `waiter` when data is available to read.
+        let waitkeys = [&waiter1, &waiter2]
+            .iter()
+            .enumerate()
+            .map(|(i, waiter)| {
+                input_file
+                    .wait_async(
+                        &FileObject::new(
+                            Box::new(input_file.clone()),
+                            // The input node doesn't really live at the root of the filesystem.
+                            // But the test doesn't need to be 100% representative of production.
+                            current_task
+                                .lookup_path_from_root(b".")
+                                .expect("failed to get namespace node for root"),
+                            OpenFlags::empty(),
+                        ),
+                        &current_task,
+                        waiter,
+                        FdEvents::POLLIN,
+                        Box::new(|_| ()),
+                    )
+                    .unwrap_or_else(|_| panic!("wait_async call {i} failed"))
+            })
+            .collect::<Vec<_>>();
+
+        // Cancel wait for `waiter1`.
+        input_file.cancel_wait(
+            &current_task,
+            &waiter1,
+            waitkeys.into_iter().next().expect("failed to get first waitkey"),
+        );
+
+        // Reply to first `Watch` request.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending first Watch reply");
+            }
+            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
+        }
+
+        // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
+        // from above.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending second Watch reply");
+            }
+            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
+        }
+
+        // `InputFile` should be done processing the first reply, since it has sent its second
+        // request. And, as part of processing the first reply, `InputFile` should have notified
+        // the interested waiters.
+        assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
+        assert_eq!(waiter2.wait_until(&current_task, zx::Time::ZERO), Ok(()));
+
+        // Cleanly tear down the `TouchSource` client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
+    }
+
+    #[::fuchsia::test]
+    async fn query_events() {
+        // Set up resources.
+        let input_file = InputFile::new();
+        let (touch_source_proxy, mut touch_source_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
+                .expect("failed to create TouchSource channel");
+        let relay_thread = input_file.start_relay(touch_source_proxy);
+        let (_kernel, current_task) = create_kernel_and_task();
+
+        // Check initial expectation.
+        assert_eq!(
+            input_file.query_events(&current_task),
+            FdEvents::empty(),
+            "events should be empty before data arrives"
+        );
+
+        // Reply to first `Watch` request.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending first Watch reply");
+            }
+            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
+        }
+
+        // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
+        // from above.
+        match touch_source_stream.next().await {
+            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
+                responder
+                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
+                    .expect("failure sending second Watch reply");
+            }
+            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
+        }
+
+        // Check post-watch expectation.
+        assert_eq!(
+            input_file.query_events(&current_task),
+            FdEvents::POLLIN,
+            "events should be POLLIN after data arrives"
+        );
+
+        // Cleanly tear down the `TouchSource` client.
+        std::mem::drop(touch_source_stream); // Close Zircon channel.
+        relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
     }
 }
