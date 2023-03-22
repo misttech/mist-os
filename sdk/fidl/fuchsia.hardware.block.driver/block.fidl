@@ -219,9 +219,7 @@ const BLOCK_GROUP_ITEM uint32 = 0x00000400;
 const BLOCK_GROUP_LAST uint32 = 0x00000800;
 const BLOCK_FLAG_MASK uint32 = 0x0000FF00;
 
-@transport("Banjo")
-@banjo_layout("ddk-protocol")
-protocol BlockImpl {
+protocol Common {
     /// Obtains the parameters of the block device (`block_info_t`) and the
     /// required size of `block_txn_t`. The `block_txn_t`s submitted via
     /// `Queue()` must have `block_op_size_out - sizeof(block_op_t)` bytes
@@ -248,27 +246,12 @@ protocol BlockImpl {
 
 @transport("Banjo")
 @banjo_layout("ddk-protocol")
-protocol Block {
-    /// Obtains the parameters of the block device (`block_info_t`) and the
-    /// required size of `block_txn_t`. The `block_txn_t`s submitted via
-    /// `Queue()` must have `block_op_size_out - sizeof(block_op_t)` bytes
-    /// available at the end of the structure for the use of the driver.
-    Query() -> (struct {
-        info BlockInfo;
-        block_op_size uint64;
-    });
+protocol BlockImpl {
+    compose Common;
+};
 
-    /// Submits an I/O request for processing. Ownership of `op` is transferred
-    /// to callee until `completion_cb` is invoked. Success or failure will be
-    /// reported via the `completion_cb`. This callback may be called before the
-    /// `Queue()` method returns.
-    @async
-    Queue(resource struct {
-        @in_out
-        txn BlockOp;
-    }) -> (resource struct {
-        status zx.status;
-        @mutable
-        op BlockOp;
-    });
+@transport("Banjo")
+@banjo_layout("ddk-protocol")
+protocol Block {
+    compose Common;
 };
