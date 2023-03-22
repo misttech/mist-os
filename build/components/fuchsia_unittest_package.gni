@@ -79,6 +79,11 @@ import("fuchsia_unittest_component.gni")
 #     but in some cases may offer faster test execution.
 #     Type: boolean
 #
+#   subpackages (optional)
+#     A list of `fuchsia_package` targets. See `fuchsia_package()` for more
+#     details.
+#     Type: list of targets
+#
 #   data_deps
 #   deps
 #   visibility
@@ -121,6 +126,7 @@ template("fuchsia_unittest_package") {
                              [
                                "package_name",
                                "visibility",
+                               "subpackages",
                              ])
       test_specs = _test_specs
       test_components = [ ":$component_target" ]
