@@ -273,8 +273,8 @@
   mov %bx, %fs // Null segment selector for %fs and %gs.
   mov %bx, %gs
 
-  // Now jump to the start32.S entry point at its fixed address.
-  mov $Phys32Entry, %eax
+  // Now jump to the linux entry point.
+  mov $Linux32Entry, %eax
   jmp *%eax
 .end_function
 
@@ -302,3 +302,11 @@
 // needed for the setup_header::syssize field initializer above.
 .balign 512, 0
 .label LINUXBOOT_SETUP_SIZE, global, notype, . - zero_page
+
+// This is the entrypoint for bootloaders using the 32-bit linux boot
+// protocol.
+.function Linux32Entry, nosection=nosection
+  // Jump to the start32.S entry point at its fixed address.
+  mov $Phys32Entry, %eax
+  jmp *%eax
+.end_function
