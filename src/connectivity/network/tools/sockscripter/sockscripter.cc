@@ -14,14 +14,15 @@
 #include <iomanip>
 #include <optional>
 
+#include "addr.h"
+#include "log.h"
+#include "packet.h"
+#include "src/lib/fxl/strings/string_number_conversions.h"
+#include "util.h"
+
 #if PACKET_SOCKETS
 #include <netpacket/packet.h>
 #endif
-
-#include "addr.h"
-#include "log.h"
-#include "src/lib/fxl/strings/string_number_conversions.h"
-#include "util.h"
 
 #define PRINT_SOCK_OPT_VAL(level, name) \
   LOG(INFO) << #level "=" << (level) << " " << #name << "=" << name

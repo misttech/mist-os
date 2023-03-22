@@ -12,6 +12,7 @@ source_set("src") {
     "addr.h",
     "api_abstraction.h",
     "log.h",
+    "packet.h",
     "sockscripter.cc",
     "sockscripter.h",
     "util.cc",

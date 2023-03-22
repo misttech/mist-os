@@ -8,13 +8,7 @@
 #include <string>
 
 #include "api_abstraction.h"
-#include "src/lib/fxl/build_config.h"
-
-#if OS_LINUX
-#define PACKET_SOCKETS 1
-#elif OS_FUCHSIA
-#define PACKET_SOCKETS 1
-#endif
+#include "packet.h"
 
 // {sendto}N=3T=2 1.2.3.4:3445
 // "{<cmd>}[N=<n>][T=<t>]"

@@ -9,9 +9,32 @@
 #include <netdb.h>
 #include <netinet/in.h>
 
+#include <ostream>
+
 #include "lib/fit/defer.h"
 #include "log.h"
+#include "packet.h"
 #include "util.h"
+
+#if PACKET_SOCKETS
+#include <netpacket/packet.h>
+#endif
+
+struct PrintInterface {
+  explicit PrintInterface(unsigned int iface_index) : iface_index(iface_index) {}
+
+  const unsigned int iface_index;
+};
+
+std::ostream& operator<<(std::ostream& out, const PrintInterface& interface) {
+  char ifname[IF_NAMESIZE] = {};
+  char* name = if_indextoname(interface.iface_index, ifname);
+  if (name == nullptr) {
+    LOG(ERROR) << "Error: if_indextoname(" << interface.iface_index << "): " << strerror(errno);
+    return out << interface.iface_index;
+  }
+  return out << name;
+}
 
 std::string Format(const sockaddr_storage& addr) {
   switch (addr.ss_family) {
@@ -31,16 +54,7 @@ std::string Format(const sockaddr_storage& addr) {
       std::stringstream o;
       o << '[' << inet_ntop(addr_in.sin6_family, &addr_in.sin6_addr, buf, sizeof(buf));
       if (addr_in.sin6_scope_id != 0) {
-        o << '%';
-        char ifname[IF_NAMESIZE] = {};
-        char* name = if_indextoname(addr_in.sin6_scope_id, ifname);
-        if (name != nullptr) {
-          o << name;
-        } else {
-          LOG(ERROR) << "Error: if_indextoname(" << addr_in.sin6_scope_id
-                     << "): " << strerror(errno);
-          o << addr_in.sin6_scope_id;
-        }
+        o << '%' << PrintInterface(addr_in.sin6_scope_id);
       }
       o << ']';
       if (addr_in.sin6_port != 0) {
@@ -50,6 +64,22 @@ std::string Format(const sockaddr_storage& addr) {
     }
     case AF_UNSPEC:
       return "<unspec>";
+
+#if PACKET_SOCKETS
+    case AF_PACKET: {
+      const sockaddr_ll& addr_ll = *reinterpret_cast<const sockaddr_ll*>(&addr);
+      std::stringstream o;
+
+      o << ntohs(addr_ll.sll_protocol) << ":";
+      if (addr_ll.sll_ifindex != 0) {
+        o << PrintInterface(addr_ll.sll_ifindex);
+      } else {
+        o << "{no interface}";
+      }
+      return o.str();
+    }
+#endif
+
     default:
       std::stringstream o;
       o << '<' << addr.ss_family << '>';
