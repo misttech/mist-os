@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     InputRequest, InputSetResponder, InputSetResult, InputSettings, InputState as FidlInputState,
     InputWatchResponder,
 };
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use std::convert::TryFrom;
 
 impl ErrorResponder for InputSetResponder {
@@ -53,7 +52,7 @@ fn to_request(fidl_input_states: Vec<FidlInputState>) -> Option<Request> {
 
     // If any devices were filtered out, the args were invalid, so exit.
     if input_states_invalid_args.next().is_some() {
-        fx_log_err!("Failed to parse input request: missing args");
+        tracing::error!("Failed to parse input request: missing args");
         return None;
     }
 
@@ -87,7 +86,7 @@ impl TryFrom<InputRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Input, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", req);
+                tracing::warn!("Received a call to an unsupported API: {:?}", req);
                 Err(JobError::Unsupported)
             }
         }

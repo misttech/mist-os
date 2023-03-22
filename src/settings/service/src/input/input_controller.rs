@@ -21,7 +21,6 @@ use settings_storage::device_storage::{DeviceStorage, DeviceStorageCompatible};
 use settings_storage::storage_factory::StorageAccess;
 
 use async_trait::async_trait;
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use fuchsia_trace as ftrace;
 use futures::lock::Mutex;
 use serde::{Deserialize, Serialize};
@@ -187,7 +186,7 @@ impl InputControllerInner {
             // Camera setup failure should not prevent start of service. This also allows
             // clients to see that the camera may not be useable.
             if let Err(e) = self.push_cam_sw_state(state).await {
-                fx_log_err!("Unable to restore camera state: {e:?}");
+                tracing::error!("Unable to restore camera state: {e:?}");
                 self.set_cam_err_state(state);
             }
         }
@@ -456,13 +455,13 @@ impl controller::Handle for InputController {
                 if buttons.mic_mute.is_some()
                     && !self.has_input_device(InputDeviceType::MICROPHONE).await
                 {
-                    fx_log_warn!("Device does not have a microphone, skipping");
+                    tracing::warn!("Device does not have a microphone, skipping");
                     buttons.set_mic_mute(None);
                 }
                 if buttons.camera_disable.is_some()
                     && !self.has_input_device(InputDeviceType::CAMERA).await
                 {
-                    fx_log_warn!("Device does not have a camera, skipping");
+                    tracing::warn!("Device does not have a camera, skipping");
                     buttons.set_camera_disable(None);
                 }
                 Some(self.inner.lock().await.set_hw_media_buttons_state(buttons).await)

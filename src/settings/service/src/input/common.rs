@@ -15,7 +15,6 @@ use fidl_fuchsia_ui_policy::{
     DeviceListenerRegistryMarker, MediaButtonsListenerMarker, MediaButtonsListenerRequest,
 };
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_syslog::fx_log_err;
 use fuchsia_zircon::Duration;
 use futures::future::Fuse;
 use futures::{self, FutureExt, StreamExt};
@@ -147,7 +146,7 @@ pub(crate) async fn monitor_media_buttons(
     // whether this can be removed or left as-is as part of the linked bug.
     fasync::Task::spawn(async move {
         if let Err(error) = call_async!(presenter_service => register_listener(client_end)).await {
-            fx_log_err!(
+            tracing::error!(
                 "Registering media button listener with presenter service failed {:?}",
                 error
             );
@@ -168,7 +167,7 @@ pub(crate) async fn monitor_media_buttons(
                     // Acknowledge the event.
                     responder
                         .send()
-                        .unwrap_or_else(|_| fx_log_err!("Failed to ack media buttons event"));
+                        .unwrap_or_else(|_| tracing::error!("Failed to ack media buttons event"));
                 }
                 _ => {}
             }
