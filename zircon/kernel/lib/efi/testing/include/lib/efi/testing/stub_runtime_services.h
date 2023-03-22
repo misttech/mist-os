@@ -12,6 +12,7 @@
 #include <vector>
 
 #include <efi/runtime-services.h>
+#include <efi/variable/variable.h>
 #include <fbl/vector.h>
 #include <gmock/gmock.h>
 
@@ -48,18 +49,7 @@ class StubRuntimeServices {
   // Returns the underlying efi_runtime_services struct.
   efi_runtime_services* services() { return &services_; }
 
-  struct VariableName {
-    fbl::Vector<char16_t> var_name;
-    efi_guid guid;
-
-    VariableName(std::u16string_view var_name, const efi_guid& guid);
-    VariableName(const fbl::Vector<char16_t>& var_name, const efi_guid& guid);
-    VariableName(const VariableName& src);
-    VariableName& operator=(const VariableName& src);
-  };
-  using VariableValue = std::vector<uint8_t>;
-
-  void SetVariables(const std::list<std::pair<VariableName, VariableValue>>& vars);
+  void SetVariables(const std::list<Variable>& vars);
   void UnsetVariables();
 
   // EFI function implementations.
@@ -109,8 +99,8 @@ class StubRuntimeServices {
  private:
   efi_runtime_services services_;
 
-  std::optional<std::list<std::pair<VariableName, VariableValue>>> vars_;
-  std::list<std::pair<VariableName, VariableValue>>::const_iterator var_it_;
+  std::optional<std::list<Variable>> vars_;
+  std::list<Variable>::const_iterator var_it_;
 };
 
 // Subclasses StubRuntimeServices to mock out methods using gmock.
@@ -172,13 +162,6 @@ class MockRuntimeServices : public StubRuntimeServices {
                uint64_t* remaining_var_storage_size, uint64_t* max_var_size),
               (override));
 };
-
-bool operator!=(const StubRuntimeServices::VariableName& l,
-                const StubRuntimeServices::VariableName& r);
-bool operator==(const StubRuntimeServices::VariableName& l,
-                const StubRuntimeServices::VariableName& r);
-bool operator<(const StubRuntimeServices::VariableName& l,
-               const StubRuntimeServices::VariableName& r);
 
 }  // namespace efi
 

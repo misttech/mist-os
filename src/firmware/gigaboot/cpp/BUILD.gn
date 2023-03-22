@@ -44,6 +44,7 @@ source_set("lib") {
     "//third_party/tpm2-tss:tss2-rc",
     "//third_party/tpm2-tss:tss2-sys",
     "//zircon/kernel/lib/efi",
+    "//zircon/kernel/lib/efi/variable",
     "//zircon/kernel/phys/efi:main",
     "//zircon/kernel/phys/efi:protocol",
     "//zircon/system/ulib/fbl",

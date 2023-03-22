@@ -21,6 +21,7 @@ source_set("testing") {
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/kernel/lib/efi",
+    "//zircon/kernel/lib/efi/variable",
     "//zircon/system/ulib/fbl",
   ]
 }

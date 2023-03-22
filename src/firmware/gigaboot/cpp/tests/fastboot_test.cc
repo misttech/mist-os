@@ -1302,12 +1302,12 @@ constexpr efi_guid kGuid[] = {
 };
 constexpr size_t kVariableIdSize = std::size(kGuid);
 
-const std::array<EfiVariables::EfiVariableId, kVariableIdSize>& VariableIds() {
-  static std::array<EfiVariables::EfiVariableId, kVariableIdSize>* variable_id =
-      new std::array<EfiVariables::EfiVariableId, kVariableIdSize>{
-          EfiVariables::EfiVariableId{EfiVariables::StrToUcs2("var_0").value(), kGuid[0]},
-          EfiVariables::EfiVariableId{EfiVariables::StrToUcs2("var_1").value(), kGuid[1]},
-          EfiVariables::EfiVariableId{EfiVariables::StrToUcs2("var_2").value(), kGuid[2]},
+const std::array<efi::VariableId, kVariableIdSize>& VariableIds() {
+  static std::array<efi::VariableId, kVariableIdSize>* variable_id =
+      new std::array<efi::VariableId, kVariableIdSize>{
+          efi::VariableId{efi::String("var_0"), kGuid[0]},
+          efi::VariableId{efi::String("var_1"), kGuid[1]},
+          efi::VariableId{efi::String("var_2"), kGuid[2]},
       };
   return *variable_id;
 }

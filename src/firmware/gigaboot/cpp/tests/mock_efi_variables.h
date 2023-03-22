@@ -16,10 +16,10 @@ class MockEfiVariables : public EfiVariables {
   MOCK_METHOD((fit::result<efi_status, EfiVariableInfo>), EfiQueryVariableInfo, (),
               (const, override));
   MOCK_METHOD((fit::result<efi_status, fbl::Vector<uint8_t>>), EfiGetVariable,
-              (const EfiVariables::EfiVariableId&), (const, override));
+              (const efi::VariableId&), (const, override));
   MOCK_METHOD((fit::result<efi_status, efi_guid>), GetGuid, (std::u16string_view var_name),
               (override));
-  MOCK_METHOD(fit::result<efi_status>, EfiGetNextVariableName, (EfiVariables::EfiVariableId&),
+  MOCK_METHOD(fit::result<efi_status>, EfiGetNextVariableName, (efi::VariableId&),
               (const, override));
 };
 

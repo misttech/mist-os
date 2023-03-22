@@ -16,6 +16,7 @@
 #include <algorithm>
 #include <string>
 
+#include <efi/string/string.h>
 #include <efi/types.h>
 #include <fbl/vector.h>
 #include <phys/efi/main.h>
@@ -382,13 +383,8 @@ zx::result<> Fastboot::EfiGetVarNames(std::string_view cmd, fastboot::Transport 
       return SendResponse(ResponseType::kFail, "EfiVariableName iteration failed", transport);
     }
 
-    auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
-    if (v_id_utf8.is_error()) {
-      printer_(xefi_strerror(v_id_utf8.error_value()));
-      continue;
-    }
     const auto &guid = v_id.vendor_guid;
-    printer_("%s %s\n", ToStr(guid).data(), v_id_utf8.value().data());
+    printer_("%s %s\n", ToStr(guid).data(), v_id.name.c_str());
   }
   printer_("\n");
 
@@ -479,13 +475,12 @@ zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *tran
   }
 
   const std::string_view in_var_name = args.args[2];
-  auto res_var_name = efi_variables_->StrToUcs2(in_var_name);
-  if (res_var_name.is_error()) {
+  efi::String var_name = efi::String(in_var_name);
+  if (!var_name.IsValid()) {
     printer_("UTF8->UC2 convertion failed for variable name: '%s'\n", in_var_name.data());
     return SendResponse(ResponseType::kFail, "UTF8->UC2 convertion failed for variable name",
                         transport);
   }
-  fbl::Vector<char16_t> &var_name = res_var_name.value();
 
   efi_guid guid;
   if (args.num_args == 4) {
@@ -501,7 +496,7 @@ zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *tran
     auto res_guid = efi_variables_->GetGuid(var_name);
     if (res_guid.is_error()) {
       printer_("Vendor GUID search failed (%s) for: '%s'\n", xefi_strerror(res_guid.error_value()),
-               in_var_name.data());
+               var_name.c_str());
       if (res_guid.error_value() == EFI_INVALID_PARAMETER) {
         return SendResponse(ResponseType::kFail,
                             "Multiple entries found with specified name. Please provide GUID",
@@ -514,14 +509,13 @@ zx::result<> Fastboot::EfiGetVar(std::string_view cmd, fastboot::Transport *tran
   }
 
   // Print VariableName
-  EfiVariables::EfiVariableId v_id(var_name, guid);
-  auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
-  if (v_id_utf8.is_error()) {
+  efi::VariableId v_id{std::move(var_name), guid};
+  if (!v_id.name.IsValid()) {
     const auto err_str = "Failed to convert UCS2 variable name to UTF8\n";
     printer_(err_str);
     return SendResponse(ResponseType::kFail, err_str, transport);
   }
-  printer_("%s %s:\n", ToStr(guid).data(), v_id_utf8.value().data());
+  printer_("%s %s:\n", ToStr(guid).data(), v_id.name.c_str());
 
   // Get and print Value
   auto res_get_var = efi_variables_->EfiGetVariable(v_id);
@@ -548,13 +542,8 @@ zx::result<> Fastboot::EfiDumpVars(std::string_view cmd, fastboot::Transport *tr
     if (!v_id.IsValid())
       return SendResponse(ResponseType::kFail, "EfiVariableName iteration failed", transport);
 
-    auto v_id_utf8 = efi_variables_->Ucs2ToStr(v_id.name);
-    if (v_id_utf8.is_error()) {
-      printer_("Failed to convert UCS2 variable name to UTF8\n");
-      continue;
-    }
     const auto &guid = v_id.vendor_guid;
-    printer_("%s %s:\n", ToStr(guid).data(), v_id_utf8.value().data());
+    printer_("%s %s:\n", ToStr(guid).data(), v_id.name.c_str());
 
     auto res = efi_variables_->EfiGetVariable(v_id);
     if (res.is_error()) {

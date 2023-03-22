@@ -25,9 +25,6 @@ using ::testing::Return;
 using ::testing::StartsWith;
 using ::testing::UnorderedElementsAreArray;
 
-fbl::Vector<char16_t> EfiCString(const fbl::Vector<char16_t>& v);
-fbl::Vector<char16_t> EfiCString(std::u16string_view sv);
-
 // Creating a second is OK as long as the first has gone out of scope.
 TEST(StubRuntimeServices, CreateTwice) {
   StubRuntimeServices();
@@ -78,9 +75,9 @@ TEST(StubRuntimeServicesTest, SomeVariablesSetAskForBiggerBuffer) {
   uint8_t data[] = {0x00};
   size_t data_size = sizeof(data);
   std::u16string test_var_name = u"test";
-  std::vector<uint8_t> test_var_val{0x00, 0x01};
+  fbl::Vector<uint8_t> test_var_val{0x00, 0x01};
 
-  stub.SetVariables({{{test_var_name, vendor_guid}, test_var_val}});
+  stub.SetVariables({{{String(test_var_name), vendor_guid}, Copy(test_var_val)}});
 
   EXPECT_EQ(stub.GetNextVariableName(&buf_size, buf, &vendor_guid), EFI_BUFFER_TOO_SMALL);
   EXPECT_EQ(buf_size, (test_var_name.size() + 1) * sizeof(test_var_name[0]));
@@ -99,9 +96,9 @@ TEST(StubRuntimeServicesTest, GetOneVariable) {
   std::u16string test_var_name(u"test");
   char16_t buf[5] = {0x0000};
   size_t buf_size = sizeof(buf);
-  std::vector<uint8_t> test_var_val{0x00, 0x01};
+  VariableValue test_var_val{0x00, 0x01};
 
-  stub.SetVariables({{{test_var_name, vendor_guid}, test_var_val}});
+  stub.SetVariables({{{String(test_var_name), vendor_guid}, Copy(test_var_val)}});
 
   EXPECT_EQ(stub.GetNextVariableName(&buf_size, buf, &vendor_guid), EFI_SUCCESS);
   EXPECT_EQ(buf_size, (test_var_name.size() + 1) * sizeof(test_var_name[0]));
@@ -122,9 +119,9 @@ TEST(StubRuntimeServicesTest, GetOneVariableAfterSmallBuffer) {
   std::u16string test_var_name(u"test");
   char16_t buf[5] = {0x0000};
   size_t buf_size = sizeof(buf[0]);
-  std::vector<uint8_t> test_var_val{0x00, 0x01};
+  VariableValue test_var_val{0x00, 0x01};
 
-  stub.SetVariables({{{test_var_name, vendor_guid}, test_var_val}});
+  stub.SetVariables({{{String(test_var_name), vendor_guid}, Copy(test_var_val)}});
 
   // Small buffer fails
   EXPECT_EQ(stub.GetNextVariableName(&buf_size, buf, &vendor_guid), EFI_BUFFER_TOO_SMALL);
@@ -149,21 +146,20 @@ TEST(StubRuntimeServicesTest, GetAllVariableNames) {
   char16_t buf[128] = {0x0000};
   size_t buf_size = sizeof(buf);
   efi_guid vendor_guid = {};
-  std::list<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableValue>>
-      test_vars{
-          {{u"var_1", vendor_guid}, {0x00}},
-          {{u"var_2", vendor_guid}, {0x00, 0x01}},
-          {{u"abcDEF123!@#Δ☹☼", vendor_guid}, {0x01, 0x02, 0x03}},
-          {{u"\xfeff", vendor_guid}, {0xff, 0xf1, 0xf2, 0xf3}},
-          {{u"var_3", vendor_guid}, {0x00}},
-      };
-  std::list<StubRuntimeServices::VariableName> expected_var_names;
+  std::list<Variable> test_vars{
+      {{String(u"var_1"), vendor_guid}, {0x00}},
+      {{String(u"var_2"), vendor_guid}, {0x00, 0x01}},
+      {{String(u"abcDEF123!@#Δ☹☼"), vendor_guid}, {0x01, 0x02, 0x03}},
+      {{String(u"\xfeff"), vendor_guid}, {0xff, 0xf1, 0xf2, 0xf3}},
+      {{String(u"var_3"), vendor_guid}, {0x00}},
+  };
+  std::list<efi::VariableId> expected_var_names;
   std::transform(test_vars.begin(), test_vars.end(), std::back_inserter(expected_var_names),
-                 [](const auto& it) { return it.first; });
+                 [](const auto& it) { return it.id; });
 
   stub.SetVariables(test_vars);
 
-  std::list<StubRuntimeServices::VariableName> processed;
+  std::list<VariableId> processed;
   efi_status res;
   do {
     // Big buffer succeeds
@@ -171,7 +167,7 @@ TEST(StubRuntimeServicesTest, GetAllVariableNames) {
     res = stub.GetNextVariableName(&buf_size, buf, &vendor_guid);
     if (EFI_ERROR(res))
       break;
-    processed.emplace_back(StubRuntimeServices::VariableName{buf, vendor_guid});
+    processed.emplace_back(VariableId{String(buf), vendor_guid});
   } while (true);
 
   EXPECT_THAT(processed, UnorderedElementsAreArray(expected_var_names));
@@ -182,40 +178,39 @@ TEST(StubRuntimeServicesTest, DifferentGuidSameVariableName) {
   char16_t buf[128] = {0x0000};
   size_t buf_size = sizeof(buf);
   efi_guid vendor_guid = {};
-  std::list<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableValue>>
-      test_vars{
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x01, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x01, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x02, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00}}},
-           {0x00}},
-          {{u"var_1", {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a}}},
-           {0x00}},
-      };
-  std::list<StubRuntimeServices::VariableName> expected_var_names;
+  std::list<Variable> test_vars{
+      {{String(u"var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x01, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x01, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x02, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x06, 0x00, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00}}},
+       {0x00}},
+      {{String("var_1"), {0x00, 0x00, 0x00, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a}}},
+       {0x00}},
+  };
+  std::list<VariableId> expected_var_names;
   std::transform(test_vars.begin(), test_vars.end(), std::back_inserter(expected_var_names),
-                 [](const auto& it) { return it.first; });
+                 [](const auto& it) { return it.id; });
 
   stub.SetVariables(test_vars);
 
-  std::list<StubRuntimeServices::VariableName> processed;
+  std::list<VariableId> processed;
   efi_status res;
   do {
     // Big buffer succeeds
@@ -223,7 +218,7 @@ TEST(StubRuntimeServicesTest, DifferentGuidSameVariableName) {
     res = stub.GetNextVariableName(&buf_size, buf, &vendor_guid);
     if (EFI_ERROR(res))
       break;
-    processed.emplace_back(StubRuntimeServices::VariableName{buf, vendor_guid});
+    processed.emplace_back(VariableId{String(buf), vendor_guid});
   } while (true);
 
   EXPECT_THAT(processed, UnorderedElementsAreArray(expected_var_names));
@@ -235,22 +230,21 @@ TEST(StubRuntimeServicesTest, GetCorrectVariableValue) {
   size_t buf_size = sizeof(buf);
   uint32_t attr = 0;
   efi_guid vendor_guid = {};
-  std::list<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableValue>>
-      test_vars{
-          {{u"var_1", vendor_guid}, {0x00}},
-          {{u"var_2", vendor_guid}, {0x00, 0x01}},
-          {{u"var_3", vendor_guid}, {0xff, 0xff, 0xff}},
-      };
+  std::list<Variable> test_vars{
+      {{String(u"var_1"), vendor_guid}, {0x00}},
+      {{String(u"var_2"), vendor_guid}, {0x00, 0x01}},
+      {{String(u"var_3"), vendor_guid}, {0xff, 0xff, 0xff}},
+  };
 
   stub.SetVariables(test_vars);
 
   for (auto& it : test_vars) {
     buf_size = sizeof(buf);
-    EXPECT_EQ(stub.GetVariable(EfiCString(it.first.var_name).data(), &it.first.guid, &attr,
-                               &buf_size, buf),
+    EXPECT_EQ(stub.GetVariable(const_cast<char16_t*>(std::u16string_view(it.id.name).data()),
+                               &it.id.vendor_guid, &attr, &buf_size, buf),
               EFI_SUCCESS);
-    ASSERT_EQ(buf_size, it.second.size());
-    EXPECT_THAT(std::vector<uint8_t>(&buf[0], &buf[buf_size]), ElementsAreArray(it.second));
+    ASSERT_EQ(buf_size, it.value.size());
+    EXPECT_THAT(std::vector<uint8_t>(&buf[0], &buf[buf_size]), ElementsAreArray(it.value));
   }
 }
 
@@ -414,39 +408,43 @@ TEST(EfiGuid, LessThan) {
 TEST(VariableName, LessThan) {
   const struct efi_guid some_guid = {
       0x00010203, 0x0405, 0x0607, {0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f}};
-  const std::vector<std::pair<StubRuntimeServices::VariableName, StubRuntimeServices::VariableName>>
-      variable_names = {
-          {{u"", {0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {u"", {0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}}},
-          {{u"a", {0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {u"a", {0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}}},
-          {{u"a", {0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
-           {u"b", {0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}}},
-          {{u"a1", some_guid}, {u"a2", some_guid}},
-          {{u"", some_guid}, {u"a", some_guid}},
-          {{u"", some_guid}, {u"a", some_guid}},
-          {{u"abcDEF123!@#Δ☹☼1", some_guid}, {u"abcDEF123!@#Δ☹☼2", some_guid}},
-          {{u"abc", some_guid}, {u"abcDEF123!@#Δ☹☼", some_guid}},
-          {{u"", some_guid}, {u"abcDEF123!@#Δ☹☼", some_guid}},
-      };
+  const std::vector<std::pair<VariableId, VariableId>> variable_names = {
+      {{String(u""),
+        {0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {String(u""),
+        {0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}}},
+      {{String(u"a"),
+        {0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {String(u"a"),
+        {0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}}},
+      {{String(u"a"),
+        {0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}},
+       {String(u"b"),
+        {0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}}}},
+      {{String(u"a1"), some_guid}, {String(u"a2"), some_guid}},
+      {{String(u""), some_guid}, {String(u"a"), some_guid}},
+      {{String(u""), some_guid}, {String(u"a"), some_guid}},
+      {{String(u"abcDEF123!@#Δ☹☼1"), some_guid}, {String(u"abcDEF123!@#Δ☹☼2"), some_guid}},
+      {{String(u"abc"), some_guid}, {String(u"abcDEF123!@#Δ☹☼"), some_guid}},
+      {{String(u""), some_guid}, {String(u"abcDEF123!@#Δ☹☼"), some_guid}},
+  };
 
   for (auto& it : variable_names) {
     EXPECT_LT(it.first, it.second);
   }
 }
 
-class VariableNameFixture
-    : public ::testing::TestWithParam<std::list<StubRuntimeServices::VariableName>> {};
+class VariableNameFixture : public ::testing::TestWithParam<std::list<VariableId>> {};
 
 TEST_P(VariableNameFixture, Eq) {
-  std::list<StubRuntimeServices::VariableName> input = GetParam();
+  std::list<VariableId> input = GetParam();
   for (const auto& a : input) {
     EXPECT_EQ(a, a);
   }
 }
 
 TEST_P(VariableNameFixture, Ne) {
-  std::list<StubRuntimeServices::VariableName> input = GetParam();
+  std::list<VariableId> input = GetParam();
   for (auto a = input.begin(); a != input.end(); a++) {
     for (auto b = std::next(a); b != input.end(); b++) {
       EXPECT_NE(*a, *b);
@@ -461,37 +459,18 @@ constexpr efi_guid guid_nz = {
 constexpr efi_guid guid_one = {
     0x01000000, 0x0000, 0x0000, {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}};
 INSTANTIATE_TEST_SUITE_P(VariableNameTest, VariableNameFixture,
-                         ::testing::Values(std::list<StubRuntimeServices::VariableName>{
-                             {EfiCString(u""), guid_zero},
-                             {EfiCString(u""), guid_one},
-                             {EfiCString(u"a"), guid_zero},
-                             {EfiCString(u"a"), guid_one},
-                             {EfiCString(u"a1"), guid_nz},
-                             {EfiCString(u"a2"), guid_nz},
-                             {EfiCString(u"b"), guid_zero},
-                             {EfiCString(u"abcDEF123!@#Δ☹☼"), guid_nz},
-                             {EfiCString(u"abcDEF123!@#Δ☹☼1"), guid_nz},
-                             {EfiCString(u"abcDEF123!@#Δ☹☼2"), guid_nz},
+                         ::testing::Values(std::list<VariableId>{
+                             {String(u""), guid_zero},
+                             {String(u""), guid_one},
+                             {String(u"a"), guid_zero},
+                             {String(u"a"), guid_one},
+                             {String(u"a1"), guid_nz},
+                             {String(u"a2"), guid_nz},
+                             {String(u"b"), guid_zero},
+                             {String(u"abcDEF123!@#Δ☹☼"), guid_nz},
+                             {String(u"abcDEF123!@#Δ☹☼1"), guid_nz},
+                             {String(u"abcDEF123!@#Δ☹☼2"), guid_nz},
                          }));
-
-fbl::Vector<char16_t> ToVector(const std::u16string_view str) {
-  fbl::Vector<char16_t> res;
-  res.resize(str.size());
-  std::copy(str.begin(), str.end(), res.begin());
-  return res;
-}
-
-fbl::Vector<char16_t> EfiCString(const fbl::Vector<char16_t>& v) {
-  return EfiCString(std::u16string_view(v.data(), v.size()));
-}
-
-fbl::Vector<char16_t> EfiCString(std::u16string_view sv) {
-  fbl::Vector<char16_t> res = ToVector(sv);
-  if (res.size() == 0 || res[res.size() - 1] != '\0') {
-    res.push_back('\0');
-  }
-  return res;
-}
 
 }  // namespace
 

@@ -5,14 +5,16 @@
 #include "efi_variables.h"
 
 #include <inttypes.h>
+#include <stdio.h>
 #include <xefi.h>
 
+#include <algorithm>
 #include <string>
+#include <string_view>
 
+#include <efi/variable/variable_id.h>
 #include <fbl/vector.h>
 #include <phys/efi/main.h>
-
-#include "src/lib/utf_conversion/utf_conversion.h"
 
 namespace fbl {
 template <typename T>
@@ -27,27 +29,6 @@ inline bool operator!=(const fbl::Vector<T>& a, const fbl::Vector<T>& b) {
 }  // namespace fbl
 
 namespace gigaboot {
-
-EfiVariables::EfiVariableId::EfiVariableId(const EfiVariableId& src)
-    : EfiVariableId(src.name, src.vendor_guid) {}
-
-EfiVariables::EfiVariableId::EfiVariableId(const fbl::Vector<char16_t>& name_in,
-                                           const efi_guid& vendor_guid_in)
-    : vendor_guid(vendor_guid_in) {
-  name.resize(name_in.size());
-  std::copy(name_in.begin(), name_in.end(), name.begin());
-}
-
-EfiVariables::EfiVariableId& EfiVariables::EfiVariableId::operator=(const EfiVariableId& src) {
-  vendor_guid = src.vendor_guid;
-  name.resize(src.name.size());
-  std::copy(src.name.begin(), src.name.end(), name.begin());
-  return *this;
-}
-
-bool EfiVariables::EfiVariableId::IsValid() const {
-  return name != fbl::Vector<char16_t>({kPreBeginVarNameInit});
-}
 
 fit::result<efi_status, EfiVariables::EfiVariableInfo> EfiVariables::EfiQueryVariableInfo() const {
   efi_status status;
@@ -64,116 +45,48 @@ fit::result<efi_status, EfiVariables::EfiVariableInfo> EfiVariables::EfiQueryVar
   return fit::success(efi_var_info);
 }
 
-fit::result<efi_status> EfiVariables::EfiGetNextVariableName(
-    EfiVariables::EfiVariableId& variable_id) const {
+fit::result<efi_status> EfiVariables::EfiGetNextVariableName(efi::VariableId& variable_id) const {
+  auto [name_utf8, name_ucs2] = variable_id.name.TakeData();
   for (size_t i = 0; i < 2; i++) {
     // Get next variable name
-    size_t variable_name_size = variable_id.name.size() * sizeof(variable_id.name[0]);
+    size_t variable_name_size = name_ucs2.size() * sizeof(name_ucs2[0]);
     efi_status status = gEfiSystemTable->RuntimeServices->GetNextVariableName(
-        &variable_name_size, variable_id.name.data(), &variable_id.vendor_guid);
+        &variable_name_size, name_ucs2.data(), &variable_id.vendor_guid);
     if (EFI_BUFFER_TOO_SMALL == status) {
-      variable_id.name.resize(variable_name_size / sizeof(variable_id.name[0]));
+      name_ucs2.resize(variable_name_size / sizeof(name_ucs2[0]));
       continue;
     }
     if (EFI_ERROR(status)) {
+      variable_id.name = efi::String(std::move(name_utf8));
       return fit::error(status);
     }
 
-    variable_id.name.resize(variable_name_size / sizeof(variable_id.name[0]));
+    name_ucs2.resize(variable_name_size / sizeof(name_ucs2[0]));
+    variable_id.name = efi::String(std::move(name_ucs2));
     return fit::ok();
   }
 
+  variable_id.name = efi::String(std::move(name_utf8));
   return fit::error(EFI_ABORTED);
 }
 
-fit::result<efi_status, fbl::Vector<char>> EfiVariables::Ucs2ToStr(std::u16string_view ucs2) {
-  size_t dst_len = 0;
-
-  size_t variable_name_length = ucs2.size();
-  if (variable_name_length == 0) {
-    return fit::error(EFI_INVALID_PARAMETER);
-  }
-
-  // Don't count terminating '\0' character.
-  --variable_name_length;
-  if (ucs2[variable_name_length] != u'\0') {
-    return fit::error(EFI_INVALID_PARAMETER);
-  }
-
-  if (variable_name_length == 0) {
-    return fit::success(fbl::Vector<char>({'\0'}));
-  }
-
-  // Get required length for dst buffer
-  zx_status_t res = utf16_to_utf8(reinterpret_cast<const uint16_t*>(ucs2.data()),
-                                  variable_name_length, nullptr, &dst_len);
-  if (res != ZX_OK) {
-    return fit::error(EFI_INVALID_PARAMETER);
-  }
-
-  fbl::Vector<char> out;
-  out.resize(dst_len + 1);
-  res = utf16_to_utf8(reinterpret_cast<const uint16_t*>(ucs2.data()), variable_name_length,
-                      reinterpret_cast<uint8_t*>(out.data()), &dst_len);
-  if (res != ZX_OK) {
-    return fit::error(EFI_INVALID_PARAMETER);
-  }
-  out[dst_len] = '\0';
-
-  return fit::success(std::move(out));
-}
-
-fit::result<efi_status, fbl::Vector<char>> EfiVariables::Ucs2ToStr(
-    const fbl::Vector<char16_t>& ucs2) {
-  return Ucs2ToStr(ToU16StringView(ucs2));
-}
-
-fit::result<efi_status, fbl::Vector<char16_t>> EfiVariables::StrToUcs2(std::string_view str) {
-  size_t dst_len = str.size() + 1;
-  fbl::Vector<char16_t> out;
-  out.resize(dst_len, u'\0');
-
-  if (str.empty()) {
-    return fit::success(fbl::Vector<char16_t>{u'\0'});
-  }
-
-  // Get required length for dst buffer
-  zx_status_t res = utf8_to_utf16(reinterpret_cast<const uint8_t*>(str.data()), str.size(),
-                                  reinterpret_cast<uint16_t*>(out.data()), &dst_len);
-  if (res != ZX_OK) {
-    return fit::error(EFI_INVALID_PARAMETER);
-  }
-
-  if (dst_len != str.size()) {
-    printf("UTF8 to UCS-2 convertion produced unexpected length: %zu (%zu expected)\n", dst_len,
-           str.size());
-  }
-
-  return fit::success(std::move(out));
-}
-
-fit::result<efi_status, fbl::Vector<char16_t>> EfiVariables::StrToUcs2(
-    const fbl::Vector<char>& str) {
-  const std::string_view sv(str.data(), str.size());
-  return StrToUcs2(sv);
-}
-
-fit::result<efi_status, fbl::Vector<uint8_t>> EfiVariables::EfiGetVariable(
-    const EfiVariables::EfiVariableId& v_id) const {
-  fbl::Vector<uint8_t> res;
+fit::result<efi_status, efi::VariableValue> EfiVariables::EfiGetVariable(
+    const efi::VariableId& variable_id) const {
+  efi::VariableValue res;
 
   // Get variable length first
   size_t variable_size = 0;
-  efi_guid vendor_guid = v_id.vendor_guid;
+  efi_guid vendor_guid = variable_id.vendor_guid;
+  std::u16string_view name_ucs2 = variable_id.name;
   efi_status status = gEfiSystemTable->RuntimeServices->GetVariable(
-      const_cast<char16_t*>(v_id.name.data()), &vendor_guid, NULL, &variable_size, nullptr);
+      const_cast<char16_t*>(name_ucs2.data()), &vendor_guid, NULL, &variable_size, nullptr);
 
   // Get buffer of the correct size and read into it
   if (EFI_BUFFER_TOO_SMALL == status) {
     res.resize(variable_size);
 
     status = gEfiSystemTable->RuntimeServices->GetVariable(
-        const_cast<char16_t*>(v_id.name.data()), &vendor_guid, NULL, &variable_size, res.data());
+        const_cast<char16_t*>(name_ucs2.data()), &vendor_guid, NULL, &variable_size, res.data());
   }
 
   if (EFI_ERROR(status)) {
@@ -184,9 +97,8 @@ fit::result<efi_status, fbl::Vector<uint8_t>> EfiVariables::EfiGetVariable(
 }
 
 fit::result<efi_status, efi_guid> EfiVariables::GetGuid(std::u16string_view var_name) {
-  auto IsNameMatch = [&var_name](const EfiVariables::EfiVariableId& variable_id) {
-    return std::equal(variable_id.name.begin(), variable_id.name.end(), var_name.begin(),
-                      var_name.end());
+  auto IsNameMatch = [&var_name](const efi::VariableId& variable_id) {
+    return variable_id.name == var_name;
   };
 
   auto res = std::find_if(begin(), end(), IsNameMatch);
@@ -208,17 +120,6 @@ fit::result<efi_status, efi_guid> EfiVariables::GetGuid(std::u16string_view var_
   return fit::success(res.variable_id_.vendor_guid);
 }
 
-fit::result<efi_status, efi_guid> EfiVariables::GetGuid(const fbl::Vector<char16_t>& var_name) {
-  return GetGuid(ToU16StringView(var_name));
-}
-
-bool operator==(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b) {
-  return a.name == b.name && a.vendor_guid == b.vendor_guid;
-}
-bool operator!=(const EfiVariables::EfiVariableId& a, const EfiVariables::EfiVariableId& b) {
-  return !(a == b);
-}
-
 bool EfiVariables::iterator::operator==(const iterator& other) const {
   return (is_end_ == other.is_end_) && (is_end_ || variable_id_ == other.variable_id_);
 }
@@ -235,15 +136,15 @@ EfiVariables::iterator& EfiVariables::iterator::operator++() {  // prefix
     return *this;
   }
 
-  auto v_id = container_->EfiGetNextVariableName(variable_id_);
-  if (v_id.is_error()) {
-    if (v_id.error_value() == EFI_NOT_FOUND) {
+  auto variable_id = container_->EfiGetNextVariableName(variable_id_);
+  if (variable_id.is_error()) {
+    if (variable_id.error_value() == EFI_NOT_FOUND) {
       is_end_ = true;
     } else {
       has_failed_ = true;
       variable_id_.Invalidate();
       printf("Failed to get variable name from EfiGetNextVariableName(): %s",
-             xefi_strerror(v_id.error_value()));
+             xefi_strerror(variable_id.error_value()));
     }
   }
   return *this;
@@ -268,13 +169,6 @@ bool EfiVariables::EfiVariableInfo::operator!=(const EfiVariableInfo& other) con
 
 fbl::Vector<char16_t> ToVector(std::u16string_view str) {
   fbl::Vector<char16_t> res;
-  res.resize(str.size());
-  std::copy(str.begin(), str.end(), res.begin());
-  return res;
-}
-
-fbl::Vector<char> ToVector(std::string_view str) {
-  fbl::Vector<char> res;
   res.resize(str.size());
   std::copy(str.begin(), str.end(), res.begin());
   return res;
