@@ -378,16 +378,19 @@ From //build/images/filesystem_limits.gni:15
 
 ### blobfs_enable_delivery_blobs
 
-Enable writing delivery blobs as described by RFC 0207.  **NOTE:** This feature is still under
-development and should be considered **experimental**.
+Enable delivery blob support by default when mounting Blobfs. Delivery blobs can still be
+enabled via the `allow_delivery_blobs` mount option (e.g. for unit tests).
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:23
+From //src/storage/blobfs/BUILD.gn:11
 
 ### blobfs_enable_streaming_writes
 
-Enable streaming writes by default when mounting Blobfs.
+Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
+by setting the `streaming_writes` option when mounting Blobfs (e.g. for unit tests).
+
+Streaming writes are only supported when writing delivery blobs or when compression is disabled.
 
 **Current value (from the default):** `false`
 
@@ -415,14 +418,13 @@ From //src/storage/bin/blobfs/BUILD.gn:11
 
 ### blobfs_page_in_metrics_recording
 
-Set this to true when configuring gn args to enable blobfs page-in
-metrics recording.
-This will also increase the inspect VMO size for blobfs to 2 MiB,
-to accommodate the large number of metrics entries.
+Set this to true when configuring gn args to enable blobfs page-in metrics recording. This will
+also increase the inspect VMO size for blobfs to 2 MiB, to accommodate the large number of
+metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:23
+From //src/storage/blobfs/BUILD.gn:22
 
 ### blobfs_product_maximum_bytes
 
@@ -8478,7 +8480,7 @@ vboot signing key directory. Must contain `kernel.keyblock` and
 
 **Current value (from the default):** `"//third_party/vboot_reference/tests/devkeys"`
 
-From //build/images/vboot/vboot.gni:15
+From //build/images/vboot/vboot.gni:16
 
 ### vboot_verbose
 
@@ -8486,7 +8488,7 @@ If true, vboot() image builds print out the exact "futility" command line.
 
 **Current value (from the default):** `false`
 
-From //build/images/vboot/vboot.gni:11
+From //build/images/vboot/vboot.gni:12
 
 ### verbose_image_assembly
 
