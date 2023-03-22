@@ -50,3 +50,8 @@ fuchsia_package("memory_sampler") {
 fuchsia_unittest_package("memory_sampler_tests") {
   deps = [ ":bin_test" ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ ":memory_sampler_tests" ]
+}
