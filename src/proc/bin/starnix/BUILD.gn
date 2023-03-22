@@ -377,6 +377,11 @@ loadable_module("vdso") {
   }
   output_name = "libvdso"
   configs += [ ":vdso_config" ]
+  if (is_linux) {
+    # By default, Linux host libraries statically link libc++. Since this library specifies nostdlib
+    # this option is unused and generates a warning.
+    configs -= [ "//build/config/linux:implicit-host-libs" ]
+  }
 
   exclude_toolchain_tags = [ "instrumented" ]
 }
