@@ -213,14 +213,13 @@ impl Waiter {
         key
     }
 
-    pub fn wake_immediately(&self, event_mask: u32, handler: EventHandler) -> WaitKey {
+    pub fn wake_immediately(&self, event_mask: u32, handler: EventHandler) {
         let callback = WaitCallback::EventHandler(handler);
         let key = WaitKey { key: self.register_callback(callback) };
         let mut packet_data = [0u8; 32];
         packet_data[..4].copy_from_slice(&event_mask.to_ne_bytes()[..4]);
 
         self.queue_user_packet_data(&key, zx::sys::ZX_OK, packet_data);
-        key
     }
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be

@@ -3316,14 +3316,12 @@ impl BinderDriver {
     ) -> WaitKey {
         // THREADING: Always acquire the [`BinderThread::state`] lock before the
         // [`BinderProcess::command_queue`] lock or else it may lead to deadlock.
-        let thread_state = binder_thread.lock();
+        let _thread_state = binder_thread.lock();
         let mut proc_command_queue = binder_proc.command_queue.lock();
 
-        if proc_command_queue.commands.is_empty() && thread_state.command_queue.is_empty() {
-            proc_command_queue.waiters.wait_async_events(waiter, events, handler)
-        } else {
-            waiter.wake_immediately(FdEvents::POLLIN.bits(), handler)
-        }
+        // TODO(fxb/124167): This should wait on both the proc command queue and the thread command
+        // queue.
+        proc_command_queue.waiters.wait_async_events(waiter, events, handler)
     }
 
     fn cancel_wait(&self, binder_proc: &Arc<BinderProcess>, waiter: &Waiter, key: WaitKey) {
