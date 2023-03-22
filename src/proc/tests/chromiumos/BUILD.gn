@@ -23,10 +23,11 @@ group("tests") {
 }
 
 group("container_resources") {
+  deps = [ "//src/proc/bin/containers:default_init" ]
+
   if (target_cpu == "x64") {
-    deps = [
+    deps += [
       "//src/proc/bin/containers:data_tmp_target",
-      "//src/proc/bin/containers:default_init",
       "//src/proc/bin/containers/chromiumos:system_image",
     ]
   }

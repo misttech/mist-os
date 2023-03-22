@@ -284,12 +284,13 @@ zip_resource("gvisor_runfiles") {
 }
 
 group("container_resources") {
+  deps = [ "//src/proc/bin/containers:default_init" ]
+
   if (target_cpu == "x64") {
-    deps = [
+    deps += [
       ":gvisor_runfiles",
       "//src/connectivity/network/netstack:component",
       "//src/proc/bin/containers:data_tmp_target",
-      "//src/proc/bin/containers:default_init",
       "//src/proc/bin/containers/bionic:system_image",
       "//src/proc/bin/containers/bionic:testcases_image",
     ]

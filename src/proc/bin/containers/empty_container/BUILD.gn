@@ -10,7 +10,5 @@ fuchsia_package_with_single_component("empty_container") {
   package_name = "starless"
   component_name = "empty_container"
 
-  if (target_cpu == "x64") {
-    deps = [ "//src/proc/bin/containers:default_init" ]
-  }
+  deps = [ "//src/proc/bin/containers:default_init" ]
 }

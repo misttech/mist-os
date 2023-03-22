@@ -403,8 +403,6 @@ fuchsia_package("starnix_kernel_package") {
     ":kernel_config",
     ":starnix_kernel",
     ":starnix_kernel_manifest",
+    "//src/proc/bin/containers:default_init",
   ]
-  if (target_cpu == "x64") {
-    deps += [ "//src/proc/bin/containers:default_init" ]
-  }
 }

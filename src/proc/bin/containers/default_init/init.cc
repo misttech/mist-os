@@ -28,12 +28,25 @@ intptr_t handle_error(intptr_t return_value) {
 // Generic syscall with 4 arguments.
 intptr_t _syscall4(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3,
                    intptr_t arg4) {
-  register intptr_t r10 asm("r10") = arg4;
   intptr_t ret;
+#if defined(__x86_64__)
+  register intptr_t r10 asm("r10") = arg4;
   __asm__ volatile("syscall;"
                    : "=a"(ret)
                    : "a"(syscall_number), "D"(arg1), "S"(arg2), "d"(arg3), "r"(r10)
                    : "rcx", "r11", "memory");
+#elif defined(__aarch64__)
+  register intptr_t x0 asm("x0") = arg1;
+  register intptr_t x1 asm("x1") = arg2;
+  register intptr_t x2 asm("x2") = arg3;
+  register intptr_t x3 asm("x3") = arg4;
+  register intptr_t number asm("x8") = syscall_number;
+
+  __asm__ volatile("svc #0"
+                   : "=r"(ret)
+                   : "0"(x0), "r"(x1), "r"(x2), "r"(x3), "r"(number)
+                   : "memory");
+#endif
   return handle_error(ret);
 }
 
@@ -56,7 +69,10 @@ void main() {
 }  // namespace
 
 extern "C" {
-__attribute__((force_align_arg_pointer)) void _start() {
+#if defined(__x86_64__)
+__attribute__((force_align_arg_pointer))
+#endif
+void _start() {
   main();
   syscall(__NR_exit_group, 0);
   __builtin_unreachable();
