@@ -199,10 +199,10 @@ zx_status_t Controller::Init() {
   AhciEnable();
 
   const uint32_t capabilities = RegRead(kHbaCapabilities);
-  const bool has_command_queue = capabilities & AHCI_CAP_NCQ;
+  const bool use_command_queue = capabilities & AHCI_CAP_NCQ;
   const uint32_t max_command_tag = (capabilities >> 8) & 0x1f;
   inspect_node_ = inspector_.GetRoot().CreateChild(kDriverName);
-  inspect_node_.RecordBool("native_command_queuing", has_command_queue);
+  inspect_node_.RecordBool("native_command_queuing", use_command_queue);
   inspect_node_.RecordUint("max_command_tag", max_command_tag);
 
   // count number of ports
@@ -212,7 +212,7 @@ zx_status_t Controller::Init() {
   for (uint32_t i = 0; i < AHCI_MAX_PORTS; i++) {
     if (!(port_map & (1u << i)))
       continue;  // port not implemented
-    status = ports_[i].Configure(i, bus_.get(), kHbaPorts, has_command_queue, max_command_tag);
+    status = ports_[i].Configure(i, bus_.get(), kHbaPorts, max_command_tag);
     if (status != ZX_OK) {
       zxlogf(ERROR, "ahci: Failed to configure port %u: %s", i, zx_status_get_string(status));
       return status;
@@ -230,7 +230,7 @@ zx_status_t Controller::Init() {
   // this part of port init happens after enabling interrupts in ghc
   for (uint32_t i = 0; i < AHCI_MAX_PORTS; i++) {
     Port* port = &ports_[i];
-    if (!(port->is_implemented()))
+    if (!(port->port_implemented()))
       continue;
 
     // enable port
@@ -244,9 +244,9 @@ zx_status_t Controller::Init() {
 
     // FIXME proper layering?
     if (port->RegRead(kPortSataStatus) & AHCI_PORT_SSTS_DET_PRESENT) {
-      port->set_present(true);
+      port->set_device_present(true);
       if (port->RegRead(kPortSignature) == AHCI_PORT_SIG_SATA) {
-        zx_status_t status = SataDevice::Bind(this, port->num());
+        zx_status_t status = SataDevice::Bind(this, port->num(), use_command_queue);
         if (status != ZX_OK) {
           zxlogf(ERROR, "ahci: Failed to add SATA device at port %u: %s", port->num(),
                  zx_status_get_string(status));

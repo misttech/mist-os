@@ -44,7 +44,7 @@ zx_status_t FakeBus::IoBufferInit(ddk::IoBuffer* buffer_, size_t size, uint32_t 
 zx_status_t FakeBus::BtiPin(uint32_t options, const zx::unowned_vmo& vmo, uint64_t offset,
                             uint64_t size, zx_paddr_t* addrs, size_t addrs_count,
                             zx::pmt* pmt_out) {
-  return ZX_ERR_IO_NOT_PRESENT;
+  return ZX_OK;
 }
 
 // Read registers in the Host Bus Adapter.
@@ -54,7 +54,7 @@ zx_status_t FakeBus::HbaRead(size_t offset, uint32_t* val_out) {
       *val_out = ghc_;
       return ZX_OK;
     case kHbaCapabilities: {
-      *val_out = (0u << 30) |              // Supports native command queue.
+      *val_out = (1u << 30) |              // Supports native command queue.
                  ((slots_ - 1) << 8) |     // Number of command slots (0-based).
                  ((num_ports_ - 1) << 0);  // Number of ports (0-based).
       return ZX_OK;
@@ -209,6 +209,10 @@ zx_status_t FakePort::Write(size_t offset, uint32_t val) {
 
     case kPortCommandIssue:
       reg.ci |= val;  // Set additional command bits without clearing existing.
+      return ZX_OK;
+
+    case kPortSataActive:
+      // Just ack'ing.
       return ZX_OK;
 
     default:

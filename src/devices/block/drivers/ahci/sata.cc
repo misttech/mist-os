@@ -65,14 +65,15 @@ zx_status_t SataDevice::Init() {
 
   sync_completion_t completion;
   SataTransaction txn = {};
+  txn.bop.rw.command = BLOCK_OP_READ;
   txn.bop.rw.vmo = vmo.get();
   txn.bop.rw.length = 1;
   txn.bop.rw.offset_dev = 0;
   txn.bop.rw.offset_vmo = 0;
-  txn.cmd = SATA_CMD_IDENTIFY_DEVICE;
-  txn.device = 0;
   txn.completion_cb = SataIdentifyDeviceComplete;
   txn.cookie = &completion;
+  txn.cmd = SATA_CMD_IDENTIFY_DEVICE;
+  txn.device = 0;
 
   controller_->Queue(port_, &txn);
   sync_completion_wait(&completion, ZX_TIME_INFINITE);
@@ -222,17 +223,31 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
         return;
       }
 
-      if (BLOCK_OP(bop->command) == BLOCK_OP_READ) {
-        txn->cmd = SATA_CMD_READ_DMA_EXT;
-      } else {
-        txn->cmd = (BLOCK_FLAGS(bop->command) & BLOCK_FL_FORCE_ACCESS) ? SATA_CMD_WRITE_DMA_FUA_EXT
-                                                                       : SATA_CMD_WRITE_DMA_EXT;
-      }
       txn->device = 0x40;
+      if (BLOCK_OP(bop->command) == BLOCK_OP_READ) {
+        if (use_command_queue_) {
+          txn->cmd = SATA_CMD_READ_FPDMA_QUEUED;
+        } else {
+          txn->cmd = SATA_CMD_READ_DMA_EXT;
+        }
+      } else {
+        if (use_command_queue_) {
+          txn->cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
+          if (BLOCK_FLAGS(bop->command) & BLOCK_FL_FORCE_ACCESS) {
+            txn->device |= 1 << 7;  // Set FUA
+          }
+        } else {
+          txn->cmd = (BLOCK_FLAGS(bop->command) & BLOCK_FL_FORCE_ACCESS)
+                         ? SATA_CMD_WRITE_DMA_FUA_EXT
+                         : SATA_CMD_WRITE_DMA_EXT;
+        }
+      }
 
       zxlogf(DEBUG, "sata: queue op 0x%x txn %p", bop->command, txn);
       break;
     case BLOCK_OP_FLUSH:
+      txn->cmd = SATA_CMD_FLUSH_EXT;
+      txn->device = 0x00;
       zxlogf(DEBUG, "sata: queue FLUSH txn %p", txn);
       break;
     default:
@@ -243,10 +258,11 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
   controller_->Queue(port_, txn);
 }
 
-zx_status_t SataDevice::Bind(Controller* controller, uint32_t port) {
+zx_status_t SataDevice::Bind(Controller* controller, uint32_t port, bool use_command_queue) {
   // initialize the device
   fbl::AllocChecker ac;
-  auto device = fbl::make_unique_checked<SataDevice>(&ac, controller->zxdev(), controller, port);
+  auto device = fbl::make_unique_checked<SataDevice>(&ac, controller->zxdev(), controller, port,
+                                                     use_command_queue);
   if (!ac.check()) {
     zxlogf(ERROR, "sata: Failed to allocate memory for SATA device at port %u.", port);
     return ZX_ERR_NO_MEMORY;

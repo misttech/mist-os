@@ -17,14 +17,6 @@
 
 namespace ahci {
 
-// port is implemented by the controller
-constexpr uint32_t kPortFlagImplemented = (1u << 0);
-// a device is present on port
-constexpr uint32_t kPortFlagPresent = (1u << 1);
-// port is paused (no queued transactions will be processed)
-// until pending transactions are done
-constexpr uint32_t kPortFlagSyncPaused = (1u << 2);
-
 // Command table for a port.
 struct ahci_command_tab_t {
   ahci_ct_t ct;
@@ -50,8 +42,7 @@ class Port {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Port);
 
   // Configure a port for use.
-  zx_status_t Configure(uint32_t num, Bus* bus, size_t reg_base, bool has_command_queue,
-                        uint32_t max_command_tag);
+  zx_status_t Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t max_command_tag);
 
   uint32_t RegRead(size_t offset);
   void RegWrite(size_t offset, uint32_t val);
@@ -75,25 +66,20 @@ class Port {
   // Returns true if a transaction was handled.
   bool HandleIrq();
 
-  uint32_t num() { return num_; }
+  uint32_t num() const { return num_; }
 
   // These flag-access functions should require holding the port lock.
   // In their current use, they frequently access them unlocked. This
   // will be fixed and thread annotations will be added in future CLs.
 
-  bool is_implemented() { return flags_ & kPortFlagImplemented; }
+  bool port_implemented() const { return port_implemented_; }
 
-  bool is_present() { return flags_ & kPortFlagPresent; }
-  void set_present(bool present) {
-    present ? flags_ |= kPortFlagPresent : flags_ &= ~kPortFlagPresent;
-  }
+  bool device_present() const { return device_present_; }
+  void set_device_present(bool device_present) { device_present_ = device_present; }
 
-  bool is_valid() {
-    uint32_t valid_flags = kPortFlagImplemented | kPortFlagPresent;
-    return (flags_ & valid_flags) == valid_flags;
-  }
+  bool is_valid() const { return port_implemented_ && device_present_; }
 
-  bool is_paused() { return (flags_ & kPortFlagSyncPaused); }
+  bool paused_cmd_issuing() const { return paused_cmd_issuing_; }
 
   // Test functions
 
@@ -109,17 +95,20 @@ class Port {
   uint32_t num_ = 0;  // 0-based
   // Pointer to controller's bus provider. Pointer is not owned.
   Bus* bus_ = nullptr;
-  // Whether the controller supports Native Command Queuing.
-  bool has_command_queue_ = false;
   // Largest command tag (= maximum number of simultaneous commands minus 1).
   uint32_t max_command_tag_ = 0;
 
   fbl::Mutex lock_;
-  uint32_t flags_ = 0;
+  // Whether this port is implemented by the controller.
+  bool port_implemented_ = false;
+  // Whether a device is present on this port.
+  bool device_present_ = false;
+  // Whether this port is paused (not processing queued transactions) until commands that have been
+  // issued to the device are complete.
+  bool paused_cmd_issuing_ = false;
   list_node_t txn_list_{};
-  uint32_t running_ = 0;             // bitmask of running commands
-  uint32_t completed_ = 0;           // bitmask of completed commands
-  SataTransaction* sync_ = nullptr;  // FLUSH command in flight
+  uint32_t running_ = 0;    // bitmask of running commands
+  uint32_t completed_ = 0;  // bitmask of completed commands
 
   ddk::IoBuffer buffer_{};
   size_t reg_base_ = 0;

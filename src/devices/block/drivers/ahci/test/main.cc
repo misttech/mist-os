@@ -15,48 +15,38 @@
 namespace ahci {
 
 class AhciTestFixture : public zxtest::Test {
- public:
  protected:
-  void SetUp() override {}
-  void TearDown() override;
+  void TearDown() override { fake_bus_.reset(); }
 
-  void PortEnable(Bus* bus, Port* port);
-  void BusAndPortEnable(Port* port);
+  void PortEnable(Bus* bus, Port* port) {
+    uint32_t cap;
+    EXPECT_OK(bus->RegRead(kHbaCapabilities, &cap));
+    const uint32_t max_command_tag = (cap >> 8) & 0x1f;
+    EXPECT_OK(port->Configure(0, bus, kHbaPorts, max_command_tag));
+    EXPECT_OK(port->Enable());
+
+    // Fake detect of device.
+    port->set_device_present(true);
+
+    EXPECT_TRUE(port->device_present());
+    EXPECT_TRUE(port->port_implemented());
+    EXPECT_TRUE(port->is_valid());
+    EXPECT_FALSE(port->paused_cmd_issuing());
+  }
+
+  void BusAndPortEnable(Port* port) {
+    zx_device_t* fake_parent = nullptr;
+    std::unique_ptr<FakeBus> bus(new FakeBus());
+    EXPECT_OK(bus->Configure(fake_parent));
+
+    PortEnable(bus.get(), port);
+
+    fake_bus_ = std::move(bus);
+  }
 
   // If non-null, this pointer is owned by Controller::bus_
   std::unique_ptr<FakeBus> fake_bus_;
-
- private:
 };
-
-void AhciTestFixture::TearDown() { fake_bus_.reset(); }
-
-void AhciTestFixture::PortEnable(Bus* bus, Port* port) {
-  uint32_t cap;
-  EXPECT_OK(bus->RegRead(kHbaCapabilities, &cap));
-  const bool has_command_queue = cap & AHCI_CAP_NCQ;
-  const uint32_t max_command_tag = (cap >> 8) & 0x1f;
-  EXPECT_OK(port->Configure(0, bus, kHbaPorts, has_command_queue, max_command_tag));
-  EXPECT_OK(port->Enable());
-
-  // Fake detect of device.
-  port->set_present(true);
-
-  EXPECT_TRUE(port->is_present());
-  EXPECT_TRUE(port->is_implemented());
-  EXPECT_TRUE(port->is_valid());
-  EXPECT_FALSE(port->is_paused());
-}
-
-void AhciTestFixture::BusAndPortEnable(Port* port) {
-  zx_device_t* fake_parent = nullptr;
-  std::unique_ptr<FakeBus> bus(new FakeBus());
-  EXPECT_OK(bus->Configure(fake_parent));
-
-  PortEnable(bus.get(), port);
-
-  fake_bus_ = std::move(bus);
-}
 
 TEST(SataTest, SataStringFixTest) {
   // Nothing to do.
@@ -327,6 +317,150 @@ TEST_F(AhciTestFixture, ShutdownWaitsForTransactionsInFlight) {
 
   // Set by completion callback.
   EXPECT_EQ(status, ZX_ERR_TIMED_OUT);
+}
+
+TEST_F(AhciTestFixture, FlushWhenCommandQueueEmpty) {
+  Port port;
+  BusAndPortEnable(&port);
+
+  SataDeviceInfo di;
+  di.block_size = 512;
+  di.max_cmd = 31;
+  port.SetDevInfo(&di);
+
+  zx_status_t status = ZX_ERR_IO;  // Value to be overwritten by callback.
+
+  SataTransaction txn = {};
+  txn.bop = {.command = BLOCK_OP_FLUSH};
+  txn.completion_cb = cb_status;
+  txn.cookie = &status;
+  txn.cmd = SATA_CMD_FLUSH_EXT;
+
+  // Queue txn.
+  port.Queue(&txn);  // Sets txn.timeout.
+
+  // Process txn while the port has paused command issuing.
+  EXPECT_TRUE(port.ProcessQueued());
+  EXPECT_TRUE(port.paused_cmd_issuing());
+
+  // Clear the running bit in the bus.
+  fake_bus_->PortRegOverride(0, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(0, kPortCommandIssue, 0);
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(0, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  // Invoke interrupt handler.
+  port.HandleIrq();
+
+  // There are no more running commands (txn complete), and the port has unpaused.
+  EXPECT_FALSE(port.Complete());
+  EXPECT_FALSE(port.paused_cmd_issuing());
+  EXPECT_EQ(status, ZX_OK);
+
+  // There are no more commands to process.
+  EXPECT_FALSE(port.ProcessQueued());
+  EXPECT_FALSE(port.paused_cmd_issuing());
+}
+
+TEST_F(AhciTestFixture, FlushWhenWritePrecedingAndReadFollowing) {
+  Port port;
+  BusAndPortEnable(&port);
+
+  SataDeviceInfo di;
+  di.block_size = 512;
+  di.max_cmd = 31;
+  port.SetDevInfo(&di);
+
+  zx_status_t write_status = ZX_ERR_IO;  // Value to be overwritten by callback.
+
+  SataTransaction write_txn = {};
+  write_txn.bop = {.command = BLOCK_OP_WRITE};
+  write_txn.completion_cb = cb_status;
+  write_txn.cookie = &write_status;
+  write_txn.cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
+
+  // Queue write_txn.
+  port.Queue(&write_txn);
+
+  zx_status_t flush_status = ZX_ERR_IO;  // Value to be overwritten by callback.
+
+  SataTransaction flush_txn = {};
+  flush_txn.bop = {.command = BLOCK_OP_FLUSH};
+  flush_txn.completion_cb = cb_status;
+  flush_txn.cookie = &flush_status;
+  flush_txn.cmd = SATA_CMD_FLUSH_EXT;
+
+  // Queue flush_txn.
+  port.Queue(&flush_txn);
+
+  zx_status_t read_status = ZX_ERR_IO;  // Value to be overwritten by callback.
+
+  SataTransaction read_txn = {};
+  read_txn.bop = {.command = BLOCK_OP_READ};
+  read_txn.completion_cb = cb_status;
+  read_txn.cookie = &read_status;
+  read_txn.cmd = SATA_CMD_READ_FPDMA_QUEUED;
+
+  // Queue read_txn.
+  port.Queue(&read_txn);
+
+  // Process write_txn while the port has paused command issuing.
+  EXPECT_TRUE(port.ProcessQueued());
+  EXPECT_TRUE(port.paused_cmd_issuing());
+
+  // Clear the running bit in the bus.
+  fake_bus_->PortRegOverride(0, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(0, kPortCommandIssue, 0);
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(0, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  // Invoke interrupt handler.
+  port.HandleIrq();
+
+  // There are no more running commands (write_txn complete), and the port has unpaused.
+  EXPECT_FALSE(port.Complete());
+  EXPECT_FALSE(port.paused_cmd_issuing());
+  EXPECT_EQ(write_status, ZX_OK);
+
+  // Process flush_txn while the port has paused command issuing.
+  EXPECT_TRUE(port.ProcessQueued());
+  EXPECT_TRUE(port.paused_cmd_issuing());
+
+  // Clear the running bit in the bus.
+  fake_bus_->PortRegOverride(0, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(0, kPortCommandIssue, 0);
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(0, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  // Invoke interrupt handler.
+  port.HandleIrq();
+
+  // There are no more running commands (flush_txn complete), and the port has unpaused.
+  EXPECT_FALSE(port.Complete());
+  EXPECT_FALSE(port.paused_cmd_issuing());
+  EXPECT_EQ(flush_status, ZX_OK);
+
+  // Process read_txn. The port remains unpaused.
+  EXPECT_TRUE(port.ProcessQueued());
+  EXPECT_FALSE(port.paused_cmd_issuing());
+
+  // Clear the running bit in the bus.
+  fake_bus_->PortRegOverride(0, kPortSataActive, 0);
+  fake_bus_->PortRegOverride(0, kPortCommandIssue, 0);
+
+  // Set interrupt for successful transfer completion.
+  fake_bus_->PortRegOverride(0, kPortInterruptStatus, AHCI_PORT_INT_DP);
+  // Invoke interrupt handler.
+  port.HandleIrq();
+
+  // There are no more running commands (read_txn complete).
+  EXPECT_FALSE(port.Complete());
+  EXPECT_FALSE(port.paused_cmd_issuing());
+  EXPECT_EQ(read_status, ZX_OK);
+
+  // There are no more commands to process.
+  EXPECT_FALSE(port.ProcessQueued());
+  EXPECT_FALSE(port.paused_cmd_issuing());
 }
 
 }  // namespace ahci

@@ -24,6 +24,7 @@
 #define SATA_CMD_WRITE_DMA_EXT 0x35
 #define SATA_CMD_WRITE_DMA_FUA_EXT 0x3D
 #define SATA_CMD_WRITE_FPDMA_QUEUED 0x61
+#define SATA_CMD_FLUSH_EXT 0xea
 
 #define SATA_DEVINFO_SERIAL_LEN 20
 #define SATA_DEVINFO_FW_REV_LEN 8
@@ -185,11 +186,14 @@ using SataDeviceType = ddk::Device<SataDevice, ddk::Initializable>;
 class SataDevice : public SataDeviceType,
                    public ddk::BlockImplProtocol<SataDevice, ddk::base_protocol> {
  public:
-  SataDevice(zx_device_t* parent, Controller* controller, uint32_t port)
-      : SataDeviceType(parent), controller_(controller), port_(port) {}
+  SataDevice(zx_device_t* parent, Controller* controller, uint32_t port, bool use_command_queue)
+      : SataDeviceType(parent),
+        controller_(controller),
+        port_(port),
+        use_command_queue_(use_command_queue) {}
 
   // Create a SATA device on |controller| at |port|.
-  static zx_status_t Bind(Controller* controller, uint32_t port);
+  static zx_status_t Bind(Controller* controller, uint32_t port, bool use_command_queue);
   fbl::String DriverName() const { return fbl::StringPrintf("sata%u", port_); }
 
   void DdkInit(ddk::InitTxn txn);
@@ -208,6 +212,8 @@ class SataDevice : public SataDeviceType,
 
   Controller* const controller_;
   const uint32_t port_;
+  // Whether to use Native Command Queuing.
+  const bool use_command_queue_;
 
   block_info_t info_{};
 };

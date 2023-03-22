@@ -26,31 +26,13 @@ constexpr uint32_t hi32(uint64_t val) { return static_cast<uint32_t>(val >> 32);
 constexpr uint32_t lo32(uint64_t val) { return static_cast<uint32_t>(val); }
 
 // Calculate the physical base of a virtual address.
-zx_paddr_t vtop(zx_paddr_t phys_base, void* virt_base, void* virt_addr) {
+static zx_paddr_t vtop(zx_paddr_t phys_base, void* virt_base, void* virt_addr) {
   uintptr_t addr = reinterpret_cast<uintptr_t>(virt_addr);
   uintptr_t base = reinterpret_cast<uintptr_t>(virt_base);
   return phys_base + (addr - base);
 }
 
-bool cmd_is_read(uint8_t cmd) {
-  if (cmd == SATA_CMD_READ_DMA || cmd == SATA_CMD_READ_DMA_EXT ||
-      cmd == SATA_CMD_READ_FPDMA_QUEUED) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool cmd_is_write(uint8_t cmd) {
-  if (cmd == SATA_CMD_WRITE_DMA || cmd == SATA_CMD_WRITE_DMA_EXT ||
-      cmd == SATA_CMD_WRITE_FPDMA_QUEUED || cmd == SATA_CMD_WRITE_DMA_FUA_EXT) {
-    return true;
-  } else {
-    return false;
-  }
-}
-
-bool cmd_is_queued(uint8_t cmd) {
+static bool IsNcqCommand(uint8_t cmd) {
   return (cmd == SATA_CMD_READ_FPDMA_QUEUED) || (cmd == SATA_CMD_WRITE_FPDMA_QUEUED);
 }
 
@@ -72,15 +54,15 @@ bool Port::SlotBusyLocked(uint32_t slot) {
          (commands_[slot] != nullptr) || (running_ & (1u << slot)) || (completed_ & (1u << slot));
 }
 
-zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, bool has_command_queue,
-                            uint32_t max_command_tag) {
+zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, uint32_t max_command_tag) {
   fbl::AutoLock lock(&lock_);
   num_ = num;
-  has_command_queue_ = has_command_queue;
   max_command_tag_ = max_command_tag;
   bus_ = bus;
   reg_base_ = reg_base + (num * sizeof(ahci_port_reg_t));
-  flags_ = kPortFlagImplemented;
+  port_implemented_ = true;
+  device_present_ = false;
+  paused_cmd_issuing_ = false;
   uint32_t cmd = RegRead(kPortCommand);
   if (cmd & (AHCI_PORT_CMD_ST | AHCI_PORT_CMD_FRE | AHCI_PORT_CMD_CR | AHCI_PORT_CMD_FR)) {
     zxlogf(ERROR, "ahci.%u: port busy", num_);
@@ -93,7 +75,7 @@ zx_status_t Port::Configure(uint32_t num, Bus* bus, size_t reg_base, bool has_co
   zx_status_t status = bus_->IoBufferInit(&buffer_, sizeof(ahci_port_mem_t),
                                           IO_BUFFER_RW | IO_BUFFER_CONTIG, &phys_base, &virt_base);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ahci.%u: error %d allocating dma memory", num_, status);
+    zxlogf(ERROR, "ahci.%u: error allocating dma memory: %s", num_, zx_status_get_string(status));
     return status;
   }
   mem_ = static_cast<ahci_port_mem_t*>(virt_base);
@@ -266,15 +248,8 @@ bool Port::Complete() {
     txn_complete[complete_count] = txn;
     complete_count++;
   }
-
-  SataTransaction* sync_op = nullptr;
-  // resume the port if paused for sync and no outstanding transactions
-  if ((is_paused()) && !running_) {
-    flags_ &= ~kPortFlagSyncPaused;
-    if (sync_) {
-      sync_op = sync_;
-      sync_ = nullptr;
-    }
+  if (!running_) {
+    paused_cmd_issuing_ = false;
   }
   lock.release();
 
@@ -291,64 +266,63 @@ bool Port::Complete() {
     }
   }
 
-  if (sync_op != nullptr) {
-    sync_op->Complete(ZX_OK);
-  }
   return active_txns;
 }
 
 bool Port::ProcessQueued() {
   lock_.Acquire();
-  if ((!is_valid()) || is_paused()) {
+  if (!is_valid()) {
     lock_.Release();
     return false;
   }
 
   bool added_txns = false;
-  for (;;) {
+  // If (running_ && paused_cmd_issuing_), commands that have been issued to the device are still
+  // running, and we wait for them to complete.
+  while (!(running_ && paused_cmd_issuing_)) {
     SataTransaction* txn = list_peek_head_type(&txn_list_, SataTransaction, node);
     if (!txn) {
+      break;  // No queued commands to process.
+    }
+
+    // Native Command Queuing (NCQ) commands cannot run concurrently on the device with non-NCQ
+    // commands. To issue a non-NCQ command, wait for active commands on the device to complete.
+    // Furthermore, after issuing a non-NCQ command, pause further command issuing to prevent NCQ
+    // commands from running simultaneously on the device.
+    paused_cmd_issuing_ = !IsNcqCommand(txn->cmd);
+    if (running_ && paused_cmd_issuing_) {
+      // Unable to issue non-NCQ command now due to commands currently running on the device.
       break;
     }
 
-    // find a free command tag
-    uint32_t max = std::min(devinfo_.max_cmd, max_command_tag_);
-    uint32_t i = 0;
-    for (i = 0; i <= max; i++) {
-      if (!SlotBusyLocked(i))
-        break;
-    }
-    if (i > max) {
-      break;
+    uint32_t slot;
+    if (paused_cmd_issuing_) {
+      slot = 0;
+      ZX_DEBUG_ASSERT_MSG(!SlotBusyLocked(slot), "Command slot 0 is busy for non-NCQ command.");
+    } else {
+      // find a free command tag
+      uint32_t max = std::min(devinfo_.max_cmd, max_command_tag_);
+      for (slot = 0; slot <= max; slot++) {
+        if (!SlotBusyLocked(slot))
+          break;
+      }
+      if (slot > max) {
+        break;  // No command slots available on the device.
+      }
     }
 
     list_delete(&txn->node);
 
-    if (BLOCK_OP(txn->bop.command) == BLOCK_OP_FLUSH) {
-      if (running_) {
-        ZX_DEBUG_ASSERT(sync_ == nullptr);
-        // pause the port if FLUSH command
-        flags_ |= kPortFlagSyncPaused;
-        sync_ = txn;
-        added_txns = true;
-      } else {
-        // complete immediately if nothing in flight
-        lock_.Release();
-        txn->Complete(ZX_OK);
-        lock_.Acquire();
-      }
-    } else {
-      // run the transaction
-      zx_status_t st = TxnBeginLocked(i, txn);
-      // complete the transaction with if it failed during processing
-      if (st != ZX_OK) {
-        lock_.Release();
-        txn->Complete(st);
-        lock_.Acquire();
-        continue;
-      }
-      added_txns = true;
+    // Issue the command to the device.
+    zx_status_t st = TxnBeginLocked(slot, txn);
+    // complete the transaction if it failed during processing
+    if (st != ZX_OK) {
+      lock_.Release();
+      txn->Complete(st);
+      lock_.Acquire();
+      continue;
     }
+    added_txns = true;
   }
   lock_.Release();
   return added_txns;
@@ -384,17 +358,20 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  zx::unowned_vmo vmo(txn->bop.rw.vmo);
-  bool is_write = cmd_is_write(txn->cmd);
-  uint32_t options = is_write ? ZX_BTI_PERM_READ : ZX_BTI_PERM_WRITE;
-  zx::pmt pmt;
-  zx_status_t st = bus_->BtiPin(options, vmo, offset_vmo & ~AHCI_PAGE_MASK,
-                                pagecount * AHCI_PAGE_SIZE, pages, pagecount, &pmt);
-  if (st != ZX_OK) {
-    zxlogf(TRACE, "ahci.%u: failed to pin pages, err = %d", num_, st);
-    return st;
+  const auto opcode = BLOCK_OP(txn->bop.command);
+  const bool is_write = opcode == BLOCK_OP_WRITE;
+  if (opcode != BLOCK_OP_FLUSH) {
+    zx::unowned_vmo vmo(txn->bop.rw.vmo);
+    uint32_t options = is_write ? ZX_BTI_PERM_READ : ZX_BTI_PERM_WRITE;
+    zx::pmt pmt;
+    zx_status_t st = bus_->BtiPin(options, vmo, offset_vmo & ~AHCI_PAGE_MASK,
+                                  pagecount * AHCI_PAGE_SIZE, pages, pagecount, &pmt);
+    if (st != ZX_OK) {
+      zxlogf(TRACE, "ahci.%u: failed to pin pages, err = %d", num_, st);
+      return st;
+    }
+    txn->pmt = pmt.release();
   }
-  txn->pmt = pmt.release();
 
   phys_iter_buffer_t physbuf = {};
   physbuf.phys = pages;
@@ -409,18 +386,6 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
   uint8_t device = txn->device;
   uint64_t lba = txn->bop.rw.offset_dev;
   uint64_t count = txn->bop.rw.length;
-
-  // use queued command if available
-  if (has_command_queue_) {
-    if (cmd == SATA_CMD_READ_DMA_EXT) {
-      cmd = SATA_CMD_READ_FPDMA_QUEUED;
-    } else if (cmd == SATA_CMD_WRITE_DMA_EXT) {
-      cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
-    } else if (cmd == SATA_CMD_WRITE_DMA_FUA_EXT) {
-      cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
-      device |= 1 << 7;  // Set FUA
-    }
-  }
 
   // build the command
   ahci_cl_t* cl = &mem_->cl[slot];
@@ -448,7 +413,7 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
     cfis[10] = (lba >> 40) & 0xff;
     cfis[12] = count & 0xff;
     cfis[13] = (count >> 8) & 0xff;
-  } else if (cmd_is_queued(cmd)) {
+  } else if (IsNcqCommand(cmd)) {
     cfis[4] = lba & 0xff;
     cfis[5] = (lba >> 8) & 0xff;
     cfis[6] = (lba >> 16) & 0xff;
@@ -497,7 +462,7 @@ zx_status_t Port::TxnBeginLocked(uint32_t slot, SataTransaction* txn) {
   }
 
   // start command
-  if (cmd_is_queued(cmd)) {
+  if (IsNcqCommand(cmd)) {
     RegWrite(kPortSataActive, (1u << slot));
   }
   RegWrite(kPortCommandIssue, (1u << slot));
