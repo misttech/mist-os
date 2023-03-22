@@ -41,6 +41,13 @@ template("_boot_test") {
   toolchain = "//build/toolchain:host_${invoker.cpu_for_host}"
   test_script = "$root_out_dir/$main_target.sh"
 
+  timeout_secs = 600
+  if (defined(invoker.timeout)) {
+    if (invoker.timeout != false) {
+      timeout_secs = invoker.timeout
+    }
+  }
+
   action(script_target) {
     visibility = [ ":*" ]
     testonly = true
@@ -55,6 +62,8 @@ template("_boot_test") {
       rebase_path(inputs[0], root_build_dir),
       "-success-str",
       boot_test_success_string,
+      "-timeout",
+      "${timeout_secs}s",
     ]
 
     metadata = {
@@ -79,13 +88,7 @@ template("_boot_test") {
                              "visibility",
                            ])
 
-    if (defined(invoker.timeout)) {
-      if (invoker.timeout != false) {
-        timeout_secs = invoker.timeout
-      }
-    } else {
-      timeout_secs = 600
-    }
+    timeout_secs = timeout_secs
 
     deps = [ ":$script_target" ]
 
