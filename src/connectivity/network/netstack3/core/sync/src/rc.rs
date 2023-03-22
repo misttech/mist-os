@@ -29,9 +29,7 @@ struct Inner<T> {
 }
 
 impl<T> Inner<T> {
-    fn pre_drop_check(&mut self) {
-        let Inner { marked_for_destruction, data: _ } = self;
-
+    fn pre_drop_check(marked_for_destruction: &AtomicBool) {
         // `Ordering::Acquire` because we want to synchronize with with the
         // `Ordering::Release` write to `marked_for_destruction` so that all
         // memory writes before the reference was marked for destruction is
@@ -42,7 +40,8 @@ impl<T> Inner<T> {
 
 impl<T> Drop for Inner<T> {
     fn drop(&mut self) {
-        self.pre_drop_check()
+        let Inner { marked_for_destruction, data: _ } = self;
+        Self::pre_drop_check(marked_for_destruction)
     }
 }
 
@@ -171,15 +170,30 @@ impl<T> Primary<T> {
                 // `core::mem::forget` `inner` to prevent `inner` from being
                 // destroyed which will result in `data` being destroyed as
                 // well.
-                let Inner { marked_for_destruction: _, data } = &inner;
+                let Inner { marked_for_destruction, data } = &mut inner;
 
-                // Safe because we know the reference points to a valid object.
-                let data = unsafe { core::ptr::read(data) };
+                // Make sure that `inner` is in a valid state for destruction.
+                //
+                // Note that we do not actually destroy all of `inner` here; we
+                // decompose it into its parts, keeping what we need & throwing
+                // away what we don't. Regardless, we perform the same checks.
+                Inner::<T>::pre_drop_check(marked_for_destruction);
+
+                // Safe since we know the reference (`inner`) points to a valid
+                // object and `inner` is forgotten below so the destructor for
+                // `inner` (and its fields) will not be run as a result of
+                // `inner` being dropped.
+                let data = unsafe {
+                    // Explicitly drop since we do not need this anymore.
+                    core::ptr::drop_in_place(marked_for_destruction);
+
+                    // Read the data to return to the caller.
+                    core::ptr::read(data)
+                };
 
                 // Forget inner now to prevent its `Drop::drop` impl from being
                 // run which will attempt to destroy `data` but still perform
                 // pre-drop checks on `Inner`'s state.
-                inner.pre_drop_check();
                 core::mem::forget(inner);
 
                 // We now own `data` and its destructor will not run (until
