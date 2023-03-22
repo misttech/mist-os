@@ -330,15 +330,15 @@ where
             conn.acceptor = Some(Acceptor::Ready(listener_id));
             listener_id
         });
-        let acceptor = sockets.get_listener_by_id_mut(acceptor_id).expect("orphaned acceptee");
-        let pos = acceptor
-            .pending
+        let Listener { pending, ready, backlog: _, buffer_sizes: _, socket_options: _ } =
+            sockets.get_listener_by_id_mut(acceptor_id).expect("orphaned acceptee");
+        let pos = pending
             .iter()
             .position(|x| MaybeClosedConnectionId::from(*x) == conn_id)
             .expect("acceptee is not found in acceptor's pending queue");
-        let conn = acceptor.pending.swap_remove(pos);
-        acceptor.ready.push_back((conn, passive_open));
-        ctx.on_new_connection(acceptor_id);
+        let conn = pending.swap_remove(pos);
+        ready.push_back((conn, passive_open));
+        ctx.on_waiting_connections_change(acceptor_id, ready.len());
     }
 
     // We found a valid connection for the segment.

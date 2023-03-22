@@ -38,10 +38,6 @@
                 "AllInetTests/TcpSocketTest.GetSocketAcceptConnListener/*",
                 "AllInetTests/TcpSocketTest.GetSocketAcceptConnNonListener/*",
 
-                // TODO(https://fxbug.dev/124030): Enable this test once it is
-                // passing.
-                "AllInetTests/SimpleTcpSocketTest.PollAroundAccept/*",
-
                 // These tests fail because we don't support dual-stack socket yet.
                 "AllTCPSockets/TCPSocketPairTest.TCPKeepidleDefault/*",
                 "AllTCPSockets/TCPSocketPairTest.TCPKeepintvlDefault/*",

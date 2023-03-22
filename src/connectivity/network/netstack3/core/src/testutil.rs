@@ -218,9 +218,10 @@ impl NonSyncContext for FakeNonSyncCtx {
 
     type ProvidedBuffers = ();
 
-    fn on_new_connection<I: Ip>(
+    fn on_waiting_connections_change<I: Ip>(
         &mut self,
         _listener: crate::transport::tcp::socket::ListenerId<I>,
+        _count: usize,
     ) {
     }
 

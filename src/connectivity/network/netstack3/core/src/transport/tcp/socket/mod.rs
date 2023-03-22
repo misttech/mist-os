@@ -139,8 +139,14 @@ pub trait NonSyncContext: TimerContext<TimerId> {
     /// The buffer sizes to use when creating new sockets.
     fn default_buffer_sizes() -> BufferSizes;
 
-    /// A new connection is ready to be accepted on the listener.
-    fn on_new_connection<I: Ip>(&mut self, listener: ListenerId<I>);
+    /// Called when the number of available connections on a listener changes.
+    ///
+    /// This method is called when a connection is established and becomes
+    /// available for accepting, or an established connection is closed before
+    /// being accepted. `count` provides the current number of waiting
+    /// connections for `listener`.
+    fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize);
+
     /// Creates new buffers and returns the object that Bindings need to
     /// read/write from/into the created buffers.
     fn new_passive_open_buffers(
@@ -1255,21 +1261,25 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
 
     fn accept(
         &mut self,
-        _ctx: &mut C,
+        ctx: &mut C,
         id: ListenerId<I>,
     ) -> Result<
         (ConnectionId<I>, SocketAddr<I::Addr, Self::WeakDeviceId>, C::ReturnedBuffers),
         AcceptError,
     > {
         self.with_tcp_sockets_mut(|sockets| {
-            let listener = sockets.get_listener_by_id_mut(id).expect("invalid listener id");
-            let (conn_id, client_buffers) =
-                listener.ready.pop_front().ok_or(AcceptError::WouldBlock)?;
+            let Listener { ready, backlog: _, buffer_sizes: _, pending: _, socket_options: _ } =
+                sockets.get_listener_by_id_mut(id).expect("invalid listener id");
+            let (conn_id, client_buffers) = ready.pop_front().ok_or(AcceptError::WouldBlock)?;
+
+            ctx.on_waiting_connections_change(id, ready.len());
+
             let (conn, _, conn_addr): (_, SharingState, _) =
                 conn_id.get_from_socketmap_mut(&mut sockets.socketmap);
             conn.acceptor = None;
             let ConnAddr { ip: ConnIpAddr { local: _, remote }, device } = conn_addr;
             let (remote_ip, remote_port) = *remote;
+
             Ok((
                 conn_id,
                 SocketAddr { ip: maybe_zoned(remote_ip, device), port: remote_port },
@@ -3166,7 +3176,13 @@ mod tests {
         type ReturnedBuffers = ClientBuffers;
         type ProvidedBuffers = WriteBackClientBuffers;
 
-        fn on_new_connection<I: Ip>(&mut self, _listener: ListenerId<I>) {}
+        fn on_waiting_connections_change<I: Ip>(
+            &mut self,
+            _listener: ListenerId<I>,
+            _count: usize,
+        ) {
+        }
+
         fn new_passive_open_buffers(
             buffer_sizes: BufferSizes,
         ) -> (Self::ReceiveBuffer, Self::SendBuffer, Self::ReturnedBuffers) {

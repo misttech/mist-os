@@ -83,6 +83,9 @@ enum SocketId<I: Ip> {
     Listener(ListenerId<I>),
 }
 
+#[derive(Debug)]
+pub(crate) struct ListenerState(zx::Socket);
+
 pub(crate) trait SocketWorkerDispatcher:
     tcp::socket::NonSyncContext<
     ProvidedBuffers = LocalZirconSocketAndNotifier,
@@ -94,6 +97,7 @@ pub(crate) trait SocketWorkerDispatcher:
     /// # Panics
     /// Panics if `id` is already registered.
     fn register_listener<I: Ip>(&mut self, id: ListenerId<I>, socket: zx::Socket);
+
     /// Unregisters an existing listener when it is about to be closed.
     ///
     /// Returns the zircon socket that used to be registered.
@@ -101,23 +105,43 @@ pub(crate) trait SocketWorkerDispatcher:
     /// # Panics
     /// Panics if `id` is non-existent.
     fn unregister_listener<I: Ip>(&mut self, id: ListenerId<I>) -> zx::Socket;
+
+    /// Returns a mutable reference to state for an existing listener.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` does not correspond to a listener.
+    fn get_listener_mut<I: Ip>(&mut self, id: ListenerId<I>) -> &mut ListenerState;
 }
 
 impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
     fn register_listener<I: Ip>(&mut self, id: ListenerId<I>, socket: zx::Socket) {
+        let state = ListenerState(socket);
         match I::VERSION {
-            IpVersion::V4 => assert_matches!(self.tcp_v4_listeners.insert(id.into(), socket), None),
-            IpVersion::V6 => assert_matches!(self.tcp_v6_listeners.insert(id.into(), socket), None),
+            IpVersion::V4 => assert_matches!(self.tcp_v4_listeners.insert(id.into(), state), None),
+            IpVersion::V6 => assert_matches!(self.tcp_v6_listeners.insert(id.into(), state), None),
         }
     }
 
     fn unregister_listener<I: Ip>(&mut self, id: ListenerId<I>) -> zx::Socket {
-        match I::VERSION {
+        let ListenerState(socket) = match I::VERSION {
             IpVersion::V4 => {
                 self.tcp_v4_listeners.remove(id.into()).expect("invalid v4 ListenerId")
             }
             IpVersion::V6 => {
                 self.tcp_v6_listeners.remove(id.into()).expect("invalid v6 ListenerId")
+            }
+        };
+        socket
+    }
+
+    fn get_listener_mut<I: Ip>(&mut self, id: ListenerId<I>) -> &mut ListenerState {
+        match I::VERSION {
+            IpVersion::V4 => {
+                self.tcp_v4_listeners.get_mut(id.into()).expect("invalid v4 ListenerId")
+            }
+            IpVersion::V6 => {
+                self.tcp_v6_listeners.get_mut(id.into()).expect("invalid v6 ListenerId")
             }
         }
     }
@@ -170,14 +194,14 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
     type ReturnedBuffers = PeerZirconSocketAndWatcher;
     type ProvidedBuffers = LocalZirconSocketAndNotifier;
 
-    fn on_new_connection<I: Ip>(&mut self, listener: ListenerId<I>) {
-        let socket = match I::VERSION {
-            IpVersion::V4 => self.tcp_v4_listeners.get(listener.into()).expect("invalid listener"),
-            IpVersion::V6 => self.tcp_v6_listeners.get(listener.into()).expect("invalid listener"),
-        };
-        socket
-            .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-            .expect("failed to signal that the new connection is available");
+    fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize) {
+        let ListenerState(socket) = self.get_listener_mut(listener);
+        if count == 0 {
+            socket.signal_peer(ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE)
+        } else {
+            socket.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
+        }
+        .expect("failed to signal for available connections");
     }
 
     fn new_passive_open_buffers(
@@ -1541,7 +1565,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use net_types::ip::Ipv6Addr;
     use test_case::test_case;
+
+    use crate::bindings::integration_tests::{StackSetupBuilder, TestSetupBuilder, TestStack};
+    use crate::bindings::socket::testutil::TestSockAddr;
 
     use super::*;
 
@@ -1690,5 +1718,74 @@ mod tests {
             let _: usize = peer.write(TEST_BYTES).expect("can write");
             sbuf.poll();
         }
+    }
+
+    async fn get_socket<A: TestSockAddr>(
+        test_stack: &mut TestStack,
+    ) -> fposix_socket::StreamSocketProxy {
+        let socket_provider = test_stack.connect_socket_provider().unwrap();
+        socket_provider
+            .stream_socket(A::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
+            .await
+            .unwrap()
+            .expect("Socket succeeds")
+            .into_proxy()
+            .expect("conversion succeeds")
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn accept_clears_available_signal() {
+        // create a stack and add a single endpoint to it so we have the interface
+        // id:
+        let mut t = TestSetupBuilder::new()
+            .add_endpoint()
+            .add_stack(StackSetupBuilder::new())
+            .build()
+            .await
+            .unwrap();
+        let mut test_stack = t.get(0);
+
+        let socket = get_socket::<fnet::Ipv6SocketAddress>(&mut test_stack).await;
+
+        const PORT: u16 = 200;
+        socket
+            .bind(&mut fnet::Ipv6SocketAddress::create(Ipv6Addr::default(), PORT))
+            .await
+            .expect("FIDL succeeds")
+            .expect("can bind");
+        socket.listen(1).await.expect("FIDL succeeds").expect("can listen");
+
+        let fposix_socket::StreamSocketDescribeResponse { socket: zx_socket, .. } =
+            socket.describe().await.expect("FIDL succeeds");
+        let zx_socket = zx_socket.expect("has socket");
+
+        assert_eq!(
+            zx_socket.wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE_PAST),
+            Err(zx::Status::TIMED_OUT)
+        );
+
+        let connector = get_socket::<fnet::Ipv6SocketAddress>(&mut test_stack).await;
+
+        while let Err(e) = connector
+            .connect(&mut fnet::Ipv6SocketAddress::create(*Ipv6::LOOPBACK_ADDRESS, PORT))
+            .await
+            .expect("FIDL succeeds")
+        {
+            assert_eq!(e, fposix::Errno::Einprogress);
+        }
+
+        assert_matches!(
+            zx_socket.wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE_PAST),
+            Ok(_)
+        );
+
+        // Once the connection is accepted, the signal should no longer be set.
+        let _: (Option<Box<fnet::SocketAddress>>, ClientEnd<fposix_socket::StreamSocketMarker>) =
+            socket.accept(false).await.expect("FIDL succeeds").expect("has connection");
+
+        assert_eq!(
+            zx_socket.wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE_PAST),
+            Err(zx::Status::TIMED_OUT)
+        );
     }
 }

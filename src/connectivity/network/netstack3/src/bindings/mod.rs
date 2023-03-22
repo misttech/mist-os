@@ -133,8 +133,8 @@ pub(crate) struct BindingsNonSyncCtxImpl {
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
     icmp_echo_sockets: IcmpEchoSockets,
     udp_sockets: UdpSockets,
-    tcp_v4_listeners: IdMap<zx::Socket>,
-    tcp_v6_listeners: IdMap<zx::Socket>,
+    tcp_v4_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,
+    tcp_v6_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,
     route_update_dispatcher: routes_fidl_worker::RouteUpdateDispatcher,
 }
 

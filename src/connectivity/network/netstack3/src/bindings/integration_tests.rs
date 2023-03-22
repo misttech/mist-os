@@ -509,7 +509,7 @@ impl StackSetupBuilder {
 
     /// Adds endpoint number  `index` with optional address configuration
     /// `address` to the builder.
-    fn add_endpoint(self, index: usize, address: Option<AddrSubnetEither>) -> Self {
+    pub(crate) fn add_endpoint(self, index: usize, address: Option<AddrSubnetEither>) -> Self {
         self.add_named_endpoint(test_ep_name(index), address)
     }
 
