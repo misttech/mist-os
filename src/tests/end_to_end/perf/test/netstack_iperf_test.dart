@@ -78,17 +78,13 @@ void main(List<String> args) {
       // receiver information from server-output.
       var serverOutput = iperfResults['server_output_json'];
       receiver = serverOutput['end']['sum'];
-      // server output summary contains only the sent-bytes, but
-      // the interval data has the bytes transferred which we can
-      // use to compute the received bit rate.
+      // TODO(https://github.com/esnet/iperf/issues/754): Remove the following
+      // once iperf calculates throughput correctly when the server is the
+      // receiver. In the meantime, derive the value from the other stats.
       if (!receiver['sender']) {
-        var intervals = serverOutput['intervals'];
-        int bytesTransferred = 0;
-        for (var i in intervals) {
-          bytesTransferred += i['sum']['bytes'];
-        }
-        receiver['bits_per_second'] =
-            (bytesTransferred * 8) / receiver['seconds'];
+        receiver['bits_per_second'] = (msgSize * 8) *
+            (receiver['packets'] - receiver['lost_packets']) /
+            receiver['seconds'];
       }
     }
 
