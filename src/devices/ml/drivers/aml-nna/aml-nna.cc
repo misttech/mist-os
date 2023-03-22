@@ -65,9 +65,15 @@ zx_status_t AmlNnaDevice::Init() {
     // set bit[12]=0
     auto clear_result = reset_->WriteRegister32(nna_block_.nna_regs.reset_level2_offset,
                                                 aml_registers::NNA_RESET2_LEVEL_MASK, 0);
-    if ((clear_result.status() != ZX_OK) || clear_result->is_error()) {
-      zxlogf(ERROR, "Clear Reset Write failed");
-      return ZX_ERR_INTERNAL;
+    if (!clear_result.ok()) {
+      zxlogf(ERROR, "Failed to send request to clear reset register: %s",
+             clear_result.status_string());
+      return clear_result.status();
+    }
+    if (clear_result->is_error()) {
+      zxlogf(ERROR, "Failed to clear reset register: %s",
+             zx_status_get_string(clear_result->error_value()));
+      return clear_result->error_value();
     }
 
     power_mmio_.ClearBits32(nna_block_.nna_regs.domain_power_iso_bits,
@@ -77,9 +83,14 @@ zx_status_t AmlNnaDevice::Init() {
     auto set_result = reset_->WriteRegister32(nna_block_.nna_regs.reset_level2_offset,
                                               aml_registers::NNA_RESET2_LEVEL_MASK,
                                               aml_registers::NNA_RESET2_LEVEL_MASK);
-    if ((set_result.status() != ZX_OK) || set_result->is_error()) {
-      zxlogf(ERROR, "Set Reset Write failed");
-      return ZX_ERR_INTERNAL;
+    if (!set_result.ok()) {
+      zxlogf(ERROR, "Failed to send request to set reset register: %s", set_result.status_string());
+      return set_result.status();
+    }
+    if (set_result->is_error()) {
+      zxlogf(ERROR, "Failed to set reset register: %s",
+             zx_status_get_string(set_result->error_value()));
+      return set_result->error_value();
     }
   }
   // Setup Clocks.
