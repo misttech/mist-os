@@ -5,15 +5,28 @@
 use anyhow::{Context, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_hardware_light::{Info, LightError, LightMarker, LightProxy};
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_fs::{directory::open_in_namespace, OpenFlags};
 use fuchsia_syslog::fx_log_info;
+use futures::TryStreamExt;
 
-fn open_light() -> Result<LightProxy, Error> {
+async fn open_light() -> Result<LightProxy, Error> {
     eprintln!("Opening light");
-    let (proxy, server) =
-        fidl::endpoints::create_proxy::<LightMarker>().context("Failed to create light proxy")?;
-    fdio::service_connect("/dev/class/light/000", server.into_channel())
-        .context("Failed to connect built-in service")?;
-    Ok(proxy)
+    // Wait for the first node.
+    const LIGHT_PATH: &str = "/dev/class/light";
+    let dir = open_in_namespace(LIGHT_PATH, OpenFlags::empty())
+        .with_context(|| format!("Opening {}", LIGHT_PATH))?;
+    let path = device_watcher::watch_for_files(&dir)
+        .await
+        .with_context(|| format!("Watching for files in {}", LIGHT_PATH))?
+        .try_next()
+        .await
+        .with_context(|| format!("Getting a file from {}", LIGHT_PATH))?;
+    let path = path.ok_or(anyhow::anyhow!("Could not find {}", LIGHT_PATH))?;
+    let path =
+        path.to_str().ok_or(anyhow::anyhow!("Could not find a valid str for {}", LIGHT_PATH))?;
+    connect_to_named_protocol_at_dir_root::<LightMarker>(&dir, path)
+        .context("Failed to connect built-in service")
 }
 
 pub struct Led {
@@ -23,7 +36,7 @@ pub struct Led {
 impl Led {
     pub async fn new() -> Result<Led, Error> {
         fx_log_info!("Opening LEDs");
-        let proxy = open_light()?;
+        let proxy = open_light().await?;
 
         Ok(Led { proxy })
     }
