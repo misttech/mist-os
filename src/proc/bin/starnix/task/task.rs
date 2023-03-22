@@ -243,7 +243,7 @@ pub struct Task {
     pub thread: RwLock<Option<zx::Thread>>,
 
     /// The file descriptor table for this task.
-    pub files: Arc<FdTable>,
+    pub files: FdTable,
 
     /// The memory manager for this task.
     pub mm: Arc<MemoryManager>,
@@ -303,7 +303,7 @@ impl Task {
         command: CString,
         thread_group: Arc<ThreadGroup>,
         thread: Option<zx::Thread>,
-        files: Arc<FdTable>,
+        files: FdTable,
         mm: Arc<MemoryManager>,
         // The only case where fs should be None if when building the initial task that is the
         // used to build the initial FsContext.
@@ -728,6 +728,11 @@ impl Task {
                 }
             }
         }
+
+        // Release the fd table.
+        // TODO(fxb/122600) This will be unneeded once the live state of a task is deleted as soon
+        // as the task dies, instead of relying on Drop.
+        self.files.drop_local();
     }
 
     pub fn get_task(&self, pid: pid_t) -> Option<Arc<Task>> {
