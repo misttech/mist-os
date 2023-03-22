@@ -219,8 +219,8 @@ impl AsyncWrite for AsyncInterface {
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<std::io::Result<usize>> {
-        let buffer = buf[..].to_vec();
         if self.task.is_none() {
+            let buffer = buf[..].to_vec();
             let serial_clone = self.serial.clone();
             self.task.replace(Box::pin(unblock(move || {
                 let read_guard = IFACE_REGISTRY
