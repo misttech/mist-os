@@ -6,6 +6,10 @@
 
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/metadata.h>
@@ -105,6 +109,11 @@ class FakePDev : public ddk::PDevProtocol<FakePDev, ddk::base_protocol> {
   pdev_protocol_t pdev_;
 };
 
+struct IncomingNamespace {
+  mock_registers::MockRegisters registers{async_get_default_dispatcher()};
+  component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
+};
+
 // Fixture that supports tests of AmlUsbCrgPhy::Create.
 class AmlUsbCrgPhyTest : public zxtest::Test {
  public:
@@ -114,19 +123,35 @@ class AmlUsbCrgPhyTest : public zxtest::Test {
     static constexpr uint32_t kMagicNumbers[8] = {};
     root_device_->SetMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers, sizeof(kMagicNumbers));
 
-    loop_.StartThread();
-    registers_device_ = std::make_unique<mock_registers::MockRegistersDevice>(loop_.dispatcher());
+    loop_.StartThread("incoming-ns-thread");
+
+    zx::result registers_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(registers_endpoints);
+    incoming_.SyncCall([registers_server = std::move(registers_endpoints->server)](
+                           IncomingNamespace* incoming) mutable {
+      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
+          incoming->registers.GetInstanceHandler()));
+      ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
+    });
+    ASSERT_NO_FATAL_FAILURE();
+    root_device_->AddFidlService(fuchsia_hardware_registers::Service::Name,
+                                 std::move(registers_endpoints->client), "register-reset");
 
     root_device_->AddProtocol(ZX_PROTOCOL_PDEV, pdev_.proto()->ops, pdev_.proto()->ctx, "pdev");
-    root_device_->AddProtocol(ZX_PROTOCOL_REGISTERS, registers_device_->proto()->ops,
-                              registers_device_->proto()->ctx, "register-reset");
 
-    registers()->ExpectWrite<uint32_t>(RESET0_LEVEL_OFFSET, aml_registers::A5_USB_RESET0_LEVEL_MASK,
-                                       aml_registers::A5_USB_RESET0_LEVEL_MASK);
-    registers()->ExpectWrite<uint32_t>(RESET0_REGISTER_OFFSET, aml_registers::A5_USB_RESET0_MASK,
-                                       aml_registers::A5_USB_RESET0_MASK);
-    registers()->ExpectWrite<uint32_t>(RESET0_LEVEL_OFFSET, aml_registers::A5_USB_RESET0_LEVEL_MASK,
-                                       aml_registers::A5_USB_RESET0_LEVEL_MASK);
+    incoming_.SyncCall([](IncomingNamespace* incoming) {
+      incoming->registers.ExpectWrite<uint32_t>(RESET0_LEVEL_OFFSET,
+                                                aml_registers::A5_USB_RESET0_LEVEL_MASK,
+                                                aml_registers::A5_USB_RESET0_LEVEL_MASK);
+      incoming->registers.ExpectWrite<uint32_t>(RESET0_REGISTER_OFFSET,
+                                                aml_registers::A5_USB_RESET0_MASK,
+                                                aml_registers::A5_USB_RESET0_MASK);
+      incoming->registers.ExpectWrite<uint32_t>(RESET0_LEVEL_OFFSET,
+                                                aml_registers::A5_USB_RESET0_LEVEL_MASK,
+                                                aml_registers::A5_USB_RESET0_LEVEL_MASK);
+    });
+    ASSERT_NO_FATAL_FAILURE();
+
     ASSERT_OK(AmlUsbCrgPhy::Create(nullptr, parent()));
     ASSERT_EQ(1, parent()->child_count());
     mock_dev_ = parent()->GetLatestChild();
@@ -137,21 +162,20 @@ class AmlUsbCrgPhyTest : public zxtest::Test {
   }
 
   void TearDown() override {
-    EXPECT_OK(registers()->VerifyAll());
-    loop_.Shutdown();
+    incoming_.SyncCall([](IncomingNamespace* incoming) { incoming->registers.VerifyAll(); });
+    ASSERT_NO_FATAL_FAILURE();
   }
 
   zx_device_t* parent() { return root_device_.get(); }
 
-  mock_registers::MockRegisters* registers() { return registers_device_->fidl_service(); }
-
  protected:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   std::shared_ptr<MockDevice> root_device_;
   AmlUsbCrgPhy* dut_;
   MockDevice* mock_dev_;
   FakePDev pdev_;
-  std::unique_ptr<mock_registers::MockRegistersDevice> registers_device_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{loop_.dispatcher(),
+                                                                   std::in_place};
 };
 
 TEST_F(AmlUsbCrgPhyTest, SetMode) {
