@@ -48,5 +48,6 @@ group("tests") {
   deps = [
     "string:tests",
     "testing:efi_testing_test($host_toolchain)",
+    "variable:tests",
   ]
 }
