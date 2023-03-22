@@ -38,6 +38,7 @@ template("assemble_network_conformance_system") {
   assembled_system(target_name) {
     testonly = true
     product_assembly_config_label = ":${target_name}.product_assembly_config"
+    allow_eng_platform_bundle_use = true
 
     base_packages = [
       "//src/developer/sshd-host",
