@@ -41,11 +41,14 @@ pub trait Filesystem: Send {
 pub struct MountedFilesystem {
     /// Path to an existing filesystem.
     dir: PathBuf,
+
+    /// Name of the filesystem that backs `dir`.
+    name: String,
 }
 
 impl MountedFilesystem {
-    pub fn new<P: Into<PathBuf>>(dir: P) -> Self {
-        Self { dir: dir.into() }
+    pub fn new<P: Into<PathBuf>>(dir: P, name: String) -> Self {
+        Self { dir: dir.into(), name }
     }
 }
 
@@ -65,7 +68,7 @@ impl FilesystemConfig for MountedFilesystem {
     }
 
     fn name(&self) -> String {
-        self.dir.to_str().unwrap().to_owned()
+        self.name.clone()
     }
 }
 

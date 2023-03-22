@@ -400,28 +400,28 @@ mod tests {
     fn benchmark_filters() {
         let config = BenchmarkConfig {
             benchmark: Box::new(TestBenchmark { name: "read_warm" }),
-            filesystem_config: Arc::new(MountedFilesystem::new("filesystem")),
+            filesystem_config: Arc::new(MountedFilesystem::new("path", "fs-name".into())),
         };
         // Accepted patterns.
         assert!(config.matches(&RegexSet::empty()));
         assert!(config.matches(&RegexSet::new([r""]).unwrap()));
-        assert!(config.matches(&RegexSet::new([r"filesystem"]).unwrap()));
-        assert!(config.matches(&RegexSet::new([r"/filesystem"]).unwrap()));
+        assert!(config.matches(&RegexSet::new([r"fs-name"]).unwrap()));
+        assert!(config.matches(&RegexSet::new([r"/fs-name"]).unwrap()));
         assert!(config.matches(&RegexSet::new([r"read_warm"]).unwrap()));
         assert!(config.matches(&RegexSet::new([r"read_warm/"]).unwrap()));
-        assert!(config.matches(&RegexSet::new([r"read_warm/filesystem"]).unwrap()));
+        assert!(config.matches(&RegexSet::new([r"read_warm/fs-name"]).unwrap()));
         assert!(config.matches(&RegexSet::new([r"warm"]).unwrap()));
 
         // Rejected patterns.
         assert!(!config.matches(&RegexSet::new([r"cold"]).unwrap()));
         assert!(!config.matches(&RegexSet::new([r"fxfs"]).unwrap()));
-        assert!(!config.matches(&RegexSet::new([r"^filesystem"]).unwrap()));
+        assert!(!config.matches(&RegexSet::new([r"^fs-name"]).unwrap()));
         assert!(!config.matches(&RegexSet::new([r"read_warm$"]).unwrap()));
 
         // Matches "warm".
         assert!(config.matches(&RegexSet::new([r"warm", r"cold"]).unwrap()));
         // Matches both.
-        assert!(config.matches(&RegexSet::new([r"warm", r"filesystem"]).unwrap()));
+        assert!(config.matches(&RegexSet::new([r"warm", r"fs-name"]).unwrap()));
         // Matches neither.
         assert!(!config.matches(&RegexSet::new([r"cold", r"fxfs"]).unwrap()));
     }

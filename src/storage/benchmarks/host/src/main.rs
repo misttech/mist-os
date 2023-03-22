@@ -4,7 +4,7 @@
 
 use {
     regex::{Regex, RegexSetBuilder},
-    std::{path::PathBuf, sync::Arc, vec::Vec},
+    std::{fs::OpenOptions, path::PathBuf, sync::Arc, vec::Vec},
     storage_benchmarks::{
         block_device::PanickingBlockDeviceFactory,
         directory_benchmarks::{
@@ -23,6 +23,10 @@ use {
 /// Fuchsia Filesystem Benchmarks
 #[derive(argh::FromArgs)]
 struct Args {
+    /// path to write the fuchsiaperf formatted benchmark results to.
+    #[argh(option)]
+    output_fuchsiaperf: Option<PathBuf>,
+
     /// outputs a summary of the benchmark results in csv format.
     #[argh(switch)]
     output_csv: bool,
@@ -38,10 +42,14 @@ struct Args {
     /// Warning: the contents of the directory may be deleted by the benchmarks.
     #[argh(option)]
     benchmark_dir: PathBuf,
+
+    /// name of the filesystem, used for outputting results.
+    #[argh(option, default = "String::from(\"host\")")]
+    filesystem_name: String,
 }
 
-fn build_benchmark_set(dir: PathBuf) -> BenchmarkSet {
-    let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(MountedFilesystem::new(dir))];
+fn build_benchmark_set(fs: MountedFilesystem) -> BenchmarkSet {
+    let filesystems: Vec<Arc<dyn FilesystemConfig>> = vec![Arc::new(fs)];
     const OP_SIZE: usize = 8 * 1024;
     const OP_COUNT: usize = 1024;
 
@@ -81,11 +89,16 @@ async fn main() {
     let filter = filter.build().unwrap();
 
     let block_device_factory = PanickingBlockDeviceFactory::new();
-    let benchmark_suite = build_benchmark_set(args.benchmark_dir);
+    let benchmark_suite =
+        build_benchmark_set(MountedFilesystem::new(args.benchmark_dir, args.filesystem_name));
     let results = benchmark_suite.run(&block_device_factory, &filter).await;
 
     results.write_table(std::io::stdout());
     if args.output_csv {
         results.write_csv(std::io::stdout())
+    }
+    if let Some(path) = args.output_fuchsiaperf {
+        let file = OpenOptions::new().write(true).create(true).open(path).unwrap();
+        results.write_fuchsia_perf_json(file);
     }
 }
