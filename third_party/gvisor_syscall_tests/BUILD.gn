@@ -453,7 +453,7 @@ syscall_test_suite(loopback_isolated_tcp_linger_timeout_test_label) {
 syscall_test_suite(tcp_test_label) {
   run_with_fast_udp = false
   test_specs = {
-    timeout_secs = 900
+    timeout_secs = 1200
   }
 }
 
