@@ -37,17 +37,6 @@ type BlockInfo = struct {
     };
 };
 
-type BlockStats = struct {
-    /// Total number of block ops processed.
-    total_ops uint64;
-    /// Total number of blocks processed.
-    total_blocks uint64;
-    total_reads uint64;
-    total_blocks_read uint64;
-    total_writes uint64;
-    total_blocks_written uint64;
-};
-
 alias Vmoid = uint16;
 
 // Dummy vmoid value reserved for "invalid". Will never be allocated; can be
