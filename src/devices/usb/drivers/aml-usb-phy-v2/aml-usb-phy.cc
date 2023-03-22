@@ -396,19 +396,15 @@ zx_status_t AmlUsbPhy::Init() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  ddk::RegistersProtocolClient reset_register(parent(), "register-reset");
-  if (!reset_register.is_valid()) {
+  zx::result reset_register_client =
+      DdkConnectFragmentFidlProtocol<fuchsia_hardware_registers::Service::Device>(parent(),
+                                                                                  "register-reset");
+  if (reset_register_client.is_error() || !reset_register_client.value().is_valid()) {
     zxlogf(ERROR, "%s: could not get reset_register fragment", __func__);
     return ZX_ERR_NO_RESOURCES;
   }
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "%s: could not create channel %s\n", __func__, endpoints.status_string());
-    return status;
-  }
-  auto& [register_client_end, register_server_end] = endpoints.value();
-  reset_register.Connect(register_server_end.TakeChannel());
-  reset_register_.Bind(std::move(register_client_end));
+
+  reset_register_.Bind(std::move(reset_register_client.value()));
 
   size_t actual;
   status = DdkGetMetadata(DEVICE_METADATA_PRIVATE, pll_settings_, sizeof(pll_settings_), &actual);

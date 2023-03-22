@@ -72,6 +72,7 @@ class FakeMmio {
 
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
+  mock_registers::MockRegisters registers{async_get_default_dispatcher()};
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
@@ -82,9 +83,6 @@ class AmlUsbPhyTest : public zxtest::Test {
     static constexpr uint32_t kMagicNumbers[8] = {};
     root_->SetMetadata(DEVICE_METADATA_PRIVATE, &kMagicNumbers, sizeof(kMagicNumbers));
 
-    loop_.StartThread("aml-usb-phy-test-thread");
-    registers_device_ = std::make_unique<mock_registers::MockRegistersDevice>(loop_.dispatcher());
-
     fake_pdev::FakePDevFidl::Config config;
     config.irqs[0] = {};
     ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &config.irqs[0]));
@@ -94,42 +92,51 @@ class AmlUsbPhyTest : public zxtest::Test {
     config.mmios[2] = mmio_[2].mmio();
     zx::result outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(outgoing_endpoints);
+    zx::result registers_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(registers_endpoints);
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server)](
-                           IncomingNamespace* infra) mutable {
-      infra->pdev_server.SetConfig(std::move(config));
-      ASSERT_OK(infra->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          infra->pdev_server.GetInstanceHandler()));
-      ASSERT_OK(infra->outgoing.Serve(std::move(server)));
+    incoming_.SyncCall([config = std::move(config), server = std::move(outgoing_endpoints->server),
+                        registers_server = std::move(registers_endpoints->server)](
+                           IncomingNamespace* incoming) mutable {
+      incoming->pdev_server.SetConfig(std::move(config));
+      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+          incoming->pdev_server.GetInstanceHandler()));
+      ASSERT_OK(incoming->outgoing.Serve(std::move(server)));
+
+      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
+          incoming->registers.GetInstanceHandler()));
+      ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
     });
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                           std::move(outgoing_endpoints->client), "pdev");
+    root_->AddFidlService(fuchsia_hardware_registers::Service::Name,
+                          std::move(registers_endpoints->client), "register-reset");
 
-    root_->AddProtocol(ZX_PROTOCOL_REGISTERS, registers_device_->proto()->ops,
-                       registers_device_->proto()->ctx, "register-reset");
+    incoming_.SyncCall([](IncomingNamespace* incoming) {
+      incoming->registers.ExpectWrite<uint32_t>(RESET1_LEVEL_OFFSET,
+                                                aml_registers::USB_RESET1_LEVEL_MASK,
+                                                aml_registers::USB_RESET1_LEVEL_MASK);
+      incoming->registers.ExpectWrite<uint32_t>(RESET1_REGISTER_OFFSET,
+                                                aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK,
+                                                aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK);
+      incoming->registers.ExpectWrite<uint32_t>(RESET1_REGISTER_OFFSET,
+                                                aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+                                                aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK);
+      incoming->registers.ExpectWrite<uint32_t>(RESET1_REGISTER_OFFSET,
+                                                aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
+                                                aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK);
+    });
+    ASSERT_NO_FATAL_FAILURE();
 
-    registers()->ExpectWrite<uint32_t>(RESET1_LEVEL_OFFSET, aml_registers::USB_RESET1_LEVEL_MASK,
-                                       aml_registers::USB_RESET1_LEVEL_MASK);
-    registers()->ExpectWrite<uint32_t>(RESET1_REGISTER_OFFSET,
-                                       aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK,
-                                       aml_registers::USB_RESET1_REGISTER_UNKNOWN_1_MASK);
-    registers()->ExpectWrite<uint32_t>(RESET1_REGISTER_OFFSET,
-                                       aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
-                                       aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK);
-    registers()->ExpectWrite<uint32_t>(RESET1_REGISTER_OFFSET,
-                                       aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK,
-                                       aml_registers::USB_RESET1_REGISTER_UNKNOWN_2_MASK);
     ASSERT_OK(AmlUsbPhy::Create(nullptr, root_.get()));
   }
 
   void TearDown() override {
-    EXPECT_OK(registers()->VerifyAll());
-
-    loop_.Shutdown();
+    incoming_.SyncCall([](IncomingNamespace* incoming) { incoming->registers.VerifyAll(); });
+    ASSERT_NO_FATAL_FAILURE();
   }
 
-  mock_registers::MockRegisters* registers() { return registers_device_->fidl_service(); }
   void TriggerInterrupt(ddk::PDevFidl& pdev, AmlUsbPhy::UsbMode mode) {
     std::optional<fdf::MmioBuffer> usbctrl_mmio;
     ASSERT_OK(pdev.MapMmio(0, &usbctrl_mmio));
@@ -147,13 +154,11 @@ class AmlUsbPhyTest : public zxtest::Test {
   std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
 
  private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
   FakeMmio mmio_[kRegisterBanks];
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
   zx::unowned_interrupt irq_;
-  std::unique_ptr<mock_registers::MockRegistersDevice> registers_device_;
 };
 
 TEST_F(AmlUsbPhyTest, SetMode) {
