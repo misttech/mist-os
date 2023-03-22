@@ -153,10 +153,7 @@ impl EpollFileObject {
             &self.waiter,
             wait_object.events,
             self.new_wait_handler(key),
-        );
-        if wait_object.cancel_key == WaitKey::empty() {
-            return error!(EPERM);
-        }
+        )?;
         Ok(())
     }
 
@@ -477,8 +474,8 @@ impl FileOps for EpollFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        self.state.write().waiters.wait_async_mask(waiter, events.bits(), handler)
+    ) -> Result<WaitKey, Errno> {
+        Ok(self.state.write().waiters.wait_async_mask(waiter, events.bits(), handler))
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
@@ -625,7 +622,9 @@ mod tests {
             let handler = move |_observed: FdEvents| {
                 callback_count_clone.fetch_add(1, Ordering::Relaxed);
             };
-            let key = event.wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler));
+            let key = event
+                .wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler))
+                .expect("wait_async");
             if do_cancel {
                 event.cancel_wait(&current_task, &waiter, key);
             }

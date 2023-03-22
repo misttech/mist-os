@@ -7,7 +7,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::{FdEvents, FileObject, FileOps, FsNode, NamespaceNode, SeekOrigin};
 use crate::mm::{DesiredAddress, MappedVmo, MappingOptions};
 use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::{CurrentTask, EventHandler, WaitKey, Waiter};
+use crate::task::{CurrentTask, Waiter};
 use crate::types::{error, off_t, uapi, DeviceType, Errno, OpenFlags, UserAddress};
 use fuchsia_zircon as zx;
 use std::sync::Arc;
@@ -51,19 +51,6 @@ impl FileOps for RemoteBinderConnection {
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::empty()
     }
-
-    fn wait_async(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _waiter: &Waiter,
-        _events: FdEvents,
-        _handler: EventHandler,
-    ) -> WaitKey {
-        WaitKey::empty()
-    }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
 
     fn ioctl(
         &self,

@@ -237,9 +237,9 @@ impl FileOps for Arc<InputFile> {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> WaitKey {
+    ) -> Result<WaitKey, Errno> {
         not_implemented!(current_task, "wait_async() on input device will block forever");
-        self.waiter.fake_wait()
+        Ok(self.waiter.fake_wait())
     }
 
     fn cancel_wait(&self, current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {

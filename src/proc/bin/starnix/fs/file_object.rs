@@ -185,7 +185,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
     }
 
     /// Establish a one-shot, edge-triggered, asynchronous wait for the given FdEvents for the
-    /// given file and task. Returns WaitKey::empty() if this file does not support blocking waits.
+    /// given file and task. Returns error!(EPERM) if this file does not support blocking waits.
     ///
     /// Active events are not considered. This is similar to the semantics of the
     /// ZX_WAIT_ASYNC_EDGE flag on zx_wait_async. To avoid missing events, the caller must call
@@ -199,8 +199,8 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> WaitKey {
-        WaitKey::empty()
+    ) -> Result<WaitKey, Errno> {
+        error!(EPERM)
     }
 
     /// Cancel a wait set up by wait_async.
@@ -665,7 +665,7 @@ impl FileObject {
         let waiter = Waiter::new();
         loop {
             // Register the waiter before running the operation to prevent a race.
-            self.ops().wait_async(self, current_task, &waiter, events, WaitCallback::none());
+            self.ops().wait_async(self, current_task, &waiter, events, WaitCallback::none())?;
             let result = op();
             if !is_partial(&result) {
                 return result.map(BlockableOpsResult::value);
@@ -890,7 +890,7 @@ impl FileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> Result<WaitKey, Errno> {
         self.ops().wait_async(self, current_task, waiter, events, handler)
     }
 

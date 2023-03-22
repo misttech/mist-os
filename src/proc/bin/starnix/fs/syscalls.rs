@@ -1840,7 +1840,7 @@ fn poll(
         let sought_events = FdEvents::from_bits_truncate(poll_descriptor.events as u32)
             | FdEvents::POLLERR
             | FdEvents::POLLHUP;
-        file.wait_async(current_task, &waiter, sought_events, Box::new(handler));
+        file.wait_async(current_task, &waiter, sought_events, Box::new(handler))?;
         let events = file.query_events(current_task) & sought_events;
         if !events.is_empty() {
             ready_items.lock().push(ReadyPollItem { index, events });
