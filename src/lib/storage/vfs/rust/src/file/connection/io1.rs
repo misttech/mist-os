@@ -677,10 +677,10 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
                     if let Some(request) = request {
                         request
                     } else {
-                        return;
+                        break;
                     }
                 },
-                _ = shutdown => return,
+                _ = shutdown => break,
             };
 
             let state = match request {
@@ -706,8 +706,11 @@ impl<T: 'static + File + IoOpHandler + CloneFile> FileConnection<T> {
             }
         }
 
-        // If the file is still open at this point, it will get closed when the OpenFile is
-        // dropped.
+        // When `file` is dropped at the end of this function it makes sure that `close` gets
+        // called. `close` is async and `Drop::drop` is sync so the implementation has to spawn a
+        // new task in order to call `close` if it hadn't been already. Calling `close` here while
+        // still in an async context avoids spawning the new task.
+        let _ = self.file.close().await;
     }
 
     fn node_info(&self) -> Result<fio::NodeInfoDeprecated, Status> {
