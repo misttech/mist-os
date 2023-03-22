@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, format_err, Context as _, Error},
+    anyhow::{anyhow, format_err, Context as _, Error, Result},
     async_trait::async_trait,
-    fidl_fuchsia_component::{self as fcomponent, CreateChildArgs, RealmMarker, RealmProxy},
+    fidl_fuchsia_component::{
+        self as fcomponent, ChildIteratorMarker, CreateChildArgs, RealmMarker, RealmProxy,
+    },
     fidl_fuchsia_component_decl::{Child, ChildRef, CollectionRef, StartupMode},
     fidl_fuchsia_io::DirectoryProxy,
     fidl_fuchsia_time_external::{
@@ -128,6 +130,12 @@ impl From<DestroyChildError> for anyhow::Error {
     }
 }
 
+impl From<anyhow::Error> for DestroyChildError {
+    fn from(value: anyhow::Error) -> Self {
+        Self::Internal(value)
+    }
+}
+
 impl TimeSourceLauncher {
     /// Creates new launcher.
     pub fn new<S>(component_url: S, name: S) -> Self
@@ -189,17 +197,44 @@ impl TimeSourceLauncher {
             name: self.name.clone(),
             collection: Some(String::from(TIMESOURCE_COLLECTION_NAME)),
         };
-        realm
-            .destroy_child(&mut child_ref)
-            .await
-            .map_err(|e| DestroyChildError::Internal(e.into()))?
-            .or_else(|err: fcomponent::Error| match err {
-                fcomponent::Error::InstanceNotFound => Err(DestroyChildError::NotFound),
-                _ => Err(DestroyChildError::Internal(format_err!(
-                    "Error destroying child {:?}",
-                    err
-                ))),
-            })
+
+        // Realm::DestroyChild is not quite idempotent: attempting to destroy
+        // a child that does not exist results in log spam. So we only actually
+        // call DestroyChild if there was indication that such a child existed.
+        // It is still possible that such a child stops existing between the
+        // check and the call, but that should be a rare event.
+        if self.has_child(realm, &child_ref).await? {
+            realm
+                .destroy_child(&mut child_ref)
+                .await
+                .map_err(|e| DestroyChildError::Internal(e.into()))?
+                .or_else(|err: fcomponent::Error| match err {
+                    fcomponent::Error::InstanceNotFound => Err(DestroyChildError::NotFound),
+                    _ => Err(DestroyChildError::Internal(format_err!(
+                        "Error destroying child {:?}",
+                        err
+                    ))),
+                })
+        } else {
+            Ok(())
+        }
+    }
+
+    // Returns true if the `realm` contains the child referenced by `child_ref`.
+    async fn has_child(&self, realm: &RealmProxy, child_ref: &ChildRef) -> Result<bool> {
+        let (iter_proxy, server_end) = fidl::endpoints::create_proxy::<ChildIteratorMarker>()?;
+        let mut collection = CollectionRef { name: TIMESOURCE_COLLECTION_NAME.into() };
+        let _response = realm.list_children(&mut collection, server_end).await?;
+        loop {
+            let children = iter_proxy.next().await?;
+            if children.is_empty() {
+                break;
+            }
+            if children.into_iter().find(|e| *e == *child_ref).is_some() {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 
