@@ -121,7 +121,7 @@ zx_status_t WlanInterface::WlanFullmacImplStart(const wlan_fullmac_impl_ifc_prot
                                                 zx::channel* out_mlme_channel) {
   std::lock_guard lock(mutex_);
   if (!mlme_channel_.is_valid()) {
-    NXPF_ERR("%s IF already bound", __func__);
+    NXPF_ERR("IF already bound");
     return ZX_ERR_ALREADY_BOUND;
   }
 
@@ -386,11 +386,11 @@ void WlanInterface::WlanFullmacImplConnectReq(const wlan_fullmac_connect_req_t* 
 }
 
 void WlanInterface::WlanFullmacImplReconnectReq(const wlan_fullmac_reconnect_req_t* req) {
-  NXPF_ERR("%s", __func__);
+  NXPF_ERR("%s called", __func__);
 }
 
 void WlanInterface::WlanFullmacImplAuthResp(const wlan_fullmac_auth_resp_t* resp) {
-  NXPF_ERR("%s", __func__);
+  NXPF_ERR("%s called", __func__);
 }
 
 void WlanInterface::WlanFullmacImplDeauthReq(const wlan_fullmac_deauth_req_t* req) {
@@ -427,11 +427,11 @@ void WlanInterface::WlanFullmacImplDeauthReq(const wlan_fullmac_deauth_req_t* re
 }
 
 void WlanInterface::WlanFullmacImplAssocResp(const wlan_fullmac_assoc_resp_t* resp) {
-  NXPF_ERR("%s", __func__);
+  NXPF_ERR("%s called", __func__);
 }
 
 void WlanInterface::WlanFullmacImplDisassocReq(const wlan_fullmac_disassoc_req_t* req) {
-  NXPF_ERR("%s", __func__);
+  NXPF_ERR("%s called", __func__);
   std::lock_guard lock(mutex_);
 
   auto on_disconnect = [this](IoctlStatus io_status) __TA_EXCLUDES(mutex_) {
@@ -465,7 +465,7 @@ void WlanInterface::WlanFullmacImplDisassocReq(const wlan_fullmac_disassoc_req_t
 }
 
 void WlanInterface::WlanFullmacImplResetReq(const wlan_fullmac_reset_req_t* req) {
-  NXPF_ERR("%s", __func__);
+  NXPF_ERR("%s called", __func__);
 }
 
 void WlanInterface::WlanFullmacImplStartReq(const wlan_fullmac_start_req_t* req) {
@@ -778,7 +778,7 @@ void WlanInterface::ConfirmDeauth() {
 }
 
 void WlanInterface::ConfirmDisassoc(zx_status_t status) {
-  NXPF_ERR("%s", __func__);
+  NXPF_ERR("%s called", __func__);
   const wlan_fullmac_disassoc_confirm_t resp{.status = status};
   std::lock_guard lock(fullmac_ifc_mutex_);
   fullmac_ifc_.DisassocConf(&resp);

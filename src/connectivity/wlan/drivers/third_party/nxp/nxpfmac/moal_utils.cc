@@ -174,7 +174,7 @@ zx_status_t process_hostcmd_cfg(IoctlAdapter *ioctl_adapter, char *data, uint32_
       /* fire the hostcommand from here */
       status = priv_hostcmd(ioctl_adapter, buf, kHostCmdBufLen);
       if (status != ZX_OK) {
-        NXPF_ERR("%s priv_hostcmd failed status: %d", __func__, status);
+        NXPF_ERR("priv_hostcmd failed status: %d", status);
         return status;
       }
       memset(buf + strlen(kHostCmdStr), 0, kHostCmdBufLen - strlen(kHostCmdStr));

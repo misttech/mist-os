@@ -151,16 +151,14 @@ bool InternalMemAllocator::Free(void* mem_ptr) {
   if (head_md->signature != kMetaDataSignature) {
     num_free_fails_++;
     // The header signature is corrupted. Cannot trust the region pointer.
-    ZX_PANIC("%s: Buffer: %p header signature: 0x%lx is corrupt", __func__, mem_ptr,
-             head_md->signature);
+    ZX_PANIC("Buffer: %p header signature: 0x%lx is corrupt", mem_ptr, head_md->signature);
     return true;
   }
   auto tail_md =
       reinterpret_cast<TailMetaData*>(reinterpret_cast<uint64_t>(mem_ptr) - sizeof(HeadMetaData) +
                                       head_md->region->size - sizeof(TailMetaData));
   if (tail_md->signature != kMetaDataSignature) {
-    NXPF_ERR("%s: Buffer: %p tail signature: 0x%llx is corrupt", __func__, mem_ptr,
-             tail_md->signature);
+    NXPF_ERR("Buffer: %p tail signature: 0x%llx is corrupt", mem_ptr, tail_md->signature);
     num_free_fails_++;
   }
   head_md->region.reset();

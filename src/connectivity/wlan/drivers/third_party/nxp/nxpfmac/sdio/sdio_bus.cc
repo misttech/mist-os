@@ -197,7 +197,7 @@ zx_status_t SdioBus::PrepareVmo(uint32_t vmo_id, zx::vmo&& vmo) {
     NXPF_ERR("Failed to register VMO with SDIO bus: %s", zx_status_get_string(status));
     return status;
   }
-  NXPF_INFO("%s: vmo id: %d registered", __func__, vmo_id);
+  NXPF_INFO("vmo id: %d registered", vmo_id);
 
   return ZX_OK;
 }

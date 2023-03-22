@@ -395,7 +395,7 @@ zx_status_t Device::SetCountryCodeInFw(char country[3]) {
   status = process_hostcmd_cfg(context_->ioctl_adapter_, (char *)txpwr_data.data(),
                                (t_size)txpwr_data.size());
   if (status != ZX_OK) {
-    NXPF_ERR("%s process hostcmd failed", __func__);
+    NXPF_ERR("process hostcmd failed");
     return status;
   }
 
