@@ -47,9 +47,9 @@ uint64_t Blob::FileSize() const {
   return 0;
 }
 
-Blob::Blob(Blobfs& blobfs, const digest::Digest& digest, CompressionAlgorithm data_format)
+Blob::Blob(Blobfs& blobfs, const digest::Digest& digest, bool is_delivery_blob)
     : CacheNode(*blobfs.vfs(), digest), blobfs_(blobfs) {
-  writer_ = std::make_unique<Blob::Writer>(*this, data_format);
+  writer_ = std::make_unique<Blob::Writer>(*this, is_delivery_blob);
 }
 
 Blob::Blob(Blobfs& blobfs, uint32_t node_index, const Inode& inode)

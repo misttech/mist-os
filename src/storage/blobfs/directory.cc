@@ -20,6 +20,7 @@
 #include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/blobfs/delivery_blob.h"
 
 namespace blobfs {
 
@@ -64,6 +65,15 @@ zx_status_t Directory::Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out
       return ZX_OK;
     }
 
+    // Special case: If this is a delivery blob, we have to strip the prefix.
+    if (name.length() > kDeliveryBlobPrefix.length() &&
+        name.substr(0, kDeliveryBlobPrefix.length()) == kDeliveryBlobPrefix) {
+      if (!blobfs_->allow_delivery_blobs()) {
+        return ZX_ERR_NOT_SUPPORTED;
+      }
+      name.remove_prefix(kDeliveryBlobPrefix.length());
+    }
+
     Digest digest;
     if (zx_status_t status = digest.Parse(name.data(), name.length()); status != ZX_OK) {
       return status;
@@ -95,28 +105,24 @@ zx_status_t Directory::Create(std::string_view name, uint32_t mode, fbl::RefPtr<
   TRACE_DURATION("blobfs", "Directory::Create", "name", name, "mode", mode);
   assert(memchr(name.data(), '/', name.length()) == nullptr);
 
-  CompressionAlgorithm data_format = CompressionAlgorithm::kUncompressed;
-  // Handle case where this is a pre-compressed blob.
-  {
-    auto found_pos = name.rfind(kChunkedFileExtension);
-    if (found_pos != std::string_view::npos) {
-      // Ensure offline compression is enabled, otherwise disallow the request.
-      if (!blobfs_->allow_offline_compression()) {
-        return ZX_ERR_NOT_SUPPORTED;
-      }
-      data_format = CompressionAlgorithm::kChunked;
-      // Remove extension from hash.
-      name = name.substr(0, found_pos);
-    }
-  }
-
   return blobfs_->node_operations().create.Track([&] {
+    bool is_delivery_blob = false;
+    // Special case: If this is a delivery blob, we have to strip the prefix.
+    if (name.length() > kDeliveryBlobPrefix.length() &&
+        name.substr(0, kDeliveryBlobPrefix.length()) == kDeliveryBlobPrefix) {
+      name.remove_prefix(kDeliveryBlobPrefix.length());
+      is_delivery_blob = true;
+    }
+    if (is_delivery_blob && !blobfs_->allow_delivery_blobs()) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
     Digest digest;
     if (zx_status_t status = digest.Parse(name.data(), name.length()); status != ZX_OK) {
       return status;
     }
 
-    fbl::RefPtr<Blob> vn = fbl::AdoptRef(new Blob(*blobfs_, digest, data_format));
+    fbl::RefPtr<Blob> vn = fbl::AdoptRef(new Blob(*blobfs_, digest, is_delivery_blob));
     if (zx_status_t status = blobfs_->GetCache().Add(vn); status != ZX_OK) {
       return status;
     }

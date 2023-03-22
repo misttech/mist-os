@@ -86,6 +86,7 @@ test("blobfs_integration") {
 
   sources = [
     "blobfs_integration_test.cc",
+    "delivery_blob_integration_test.cc",
     "multithreaded_smoke_test.cc",
   ]
   deps = [

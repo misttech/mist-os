@@ -70,10 +70,10 @@ struct MountOptions {
 #endif
   };
 
-  // [EXPERIMENTAL] Enable support for offline compression. Allows writing pre-compressed blobs.
-  // Does not require streaming writes, but is suggested to reduce memory consumption.
-  bool offline_compression = {
-#ifdef BLOBFS_OFFLINE_COMPRESSION_ENABLED_DEFAULT
+  // [EXPERIMENTAL] Enable support for delivery blobs. Allows writing blobs in the format specified
+  // by RFC 0207. Does not require streaming writes, but is suggested to reduce memory consumption.
+  bool allow_delivery_blobs = {
+#ifdef BLOBFS_DELIVERY_BLOBS_ENABLED_DEFAULT
       true
 #else
       false

@@ -7,6 +7,8 @@
 #include <lib/cksum.h>
 #include <zircon/assert.h>
 
+#include "src/lib/chunked-compression/chunked-compressor.h"
+#include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/delivery_blob_private.h"
 
 #ifndef __APPLE__
@@ -14,6 +16,7 @@
 #else
 #include <machine/endian.h>
 #endif
+#include <filesystem>
 #include <type_traits>
 
 #include <safemath/safe_conversions.h>
@@ -70,10 +73,16 @@ zx::result<DeliveryBlobHeader> DeliveryBlobHeader::FromBuffer(cpp20::span<const 
   return zx::ok(header);
 }
 
+const DeliveryBlobHeader MetadataType1::kHeader =
+    DeliveryBlobHeader::Create(DeliveryBlobType::kType1, sizeof(MetadataType1));
+
 bool MetadataType1::IsValid(const DeliveryBlobHeader& header) const {
+  constexpr size_t kExpectedHeaderLength = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
   return
       // Validate header.
       header.IsValid()
+      // Validate header length.
+      && (header.header_length == kExpectedHeaderLength)
       // Validate CRC.
       && (checksum == Checksum(header))
       // Validate flags.
@@ -116,6 +125,54 @@ zx::result<MetadataType1> MetadataType1::FromBuffer(cpp20::span<const uint8_t> b
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
   return zx::ok(metadata);
+}
+
+std::string GetDeliveryBlobPath(const std::string_view& path) {
+  std::filesystem::path fs_path(path);
+  const std::string new_filename = std::string(kDeliveryBlobPrefix) + fs_path.filename().string();
+  return fs_path.replace_filename(new_filename);
+}
+
+zx::result<std::vector<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
+                                                           std::optional<bool> compress) {
+  constexpr size_t kPayloadOffset = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
+
+  std::vector<uint8_t> delivery_blob;
+  size_t compressed_size = 0;
+
+  if (compress.value_or(true) && !data.empty()) {
+    // WARNING: If we use different compression parameters here, the `compressed_file_size` in the
+    // blob info JSON file will be incorrect.
+    const chunked_compression::CompressionParams params =
+        blobfs::GetDefaultChunkedCompressionParams(data.size_bytes());
+    chunked_compression::ChunkedCompressor compressor(params);
+
+    const size_t output_limit = params.ComputeOutputSizeLimit(data.size_bytes());
+    delivery_blob.resize(kPayloadOffset + output_limit);
+
+    const chunked_compression::Status status =
+        compressor.Compress(data.data(), data.size_bytes(), delivery_blob.data() + kPayloadOffset,
+                            output_limit, &compressed_size);
+    if (status != chunked_compression::kStatusOk) {
+      return zx::error(chunked_compression::ToZxStatus(status));
+    }
+  }
+
+  const bool use_compressed_result =
+      compress.value_or(compressed_size > 0 && (compressed_size < data.size_bytes()));
+  const size_t payload_length = use_compressed_result ? compressed_size : data.size_bytes();
+  // Ensure the returned buffer's size reflects the actual payload length.
+  delivery_blob.resize(kPayloadOffset + payload_length);
+  // Write delivery blob header and metadata.
+  std::memcpy(delivery_blob.data(), &MetadataType1::kHeader, sizeof MetadataType1::kHeader);
+  const MetadataType1 metadata = MetadataType1::Create(MetadataType1::kHeader, payload_length,
+                                                       compress.value_or(use_compressed_result));
+  std::memcpy(delivery_blob.data() + sizeof MetadataType1::kHeader, &metadata, sizeof metadata);
+  // Overwrite payload with original data if we aren't compressing the blob or aborted compression.
+  if (!use_compressed_result && !data.empty()) {
+    std::memcpy(delivery_blob.data() + kPayloadOffset, data.data(), data.size_bytes());
+  }
+  return zx::ok(delivery_blob);
 }
 
 }  // namespace blobfs

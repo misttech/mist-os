@@ -9,6 +9,7 @@
 #error Fuchsia-only Header
 #endif
 
+#include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
 #include <zircon/status.h>
@@ -16,6 +17,7 @@
 #include <optional>
 
 #include <fbl/macros.h>
+#include <safemath/checked_math.h>
 
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
@@ -26,6 +28,8 @@
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/compression/blob_compressor.h"
 #include "src/storage/blobfs/compression/streaming_chunked_decompressor.h"
+#include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/blobfs/delivery_blob_private.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
 #include "src/storage/blobfs/transaction.h"
 
@@ -35,9 +39,9 @@ namespace blobfs {
 // moved into an error state and removed from the cache so that a client may attempt another write.
 class Blob::Writer {
  public:
-  // Construct a new blob writer where incoming data being written is in `data_format`. `blob` must
-  // outlive this object.
-  explicit Writer(const Blob& blob, CompressionAlgorithm data_format);
+  // Construct a new blob writer. `blob` must outlive this object. If `is_delivery_blob` is set,
+  // data being written must conform to the format specified by RFC 0207.
+  explicit Writer(const Blob& blob, bool is_delivery_blob);
 
   // Not copyable or movable because merkle_tree_creator_ has a pointer to digest.
   Writer(const Writer&) = delete;
@@ -48,7 +52,7 @@ class Blob::Writer {
   // created using.
   //
   // *WARNING*: Upon failures of this function the associated blob should be evicted from the cache.
-  // The failure reason can be obtained again by calling |status()|.
+  // The failure reason can be obtained again by calling `status()`.
   zx::result<> Prepare(Blob& blob, uint64_t data_size);
 
   // Write blob data into memory (or stream to disk) and update Merkle tree. When all data has been
@@ -56,7 +60,7 @@ class Blob::Writer {
   // `blob` should be the same object this writer was created using.
   //
   // *WARNING*: Upon failures of this function the associated blob should be evicted from the cache.
-  // The failure reason can be obtained again by calling |status()|.
+  // The failure reason can be obtained again by calling `status()`.
   zx::result<std::optional<WrittenBlob>> Write(Blob& blob, const void* data, size_t len,
                                                size_t* actual) __TA_REQUIRES(blob.mutex_);
 
@@ -65,7 +69,7 @@ class Blob::Writer {
   // transactions are scheduled. `blob` should be the same object this writer was created using.
   //
   // *WARNING*: Upon failures of this function the associated blob should be evicted from the cache.
-  // The failure reason can be obtained again by calling |status()|.
+  // The failure reason can be obtained again by calling `status()`.
   zx::result<WrittenBlob> WriteNullBlob(Blob& blob);
 
   // Set the status of this writer. Used by the parent blob to store any errors when moving the blob
@@ -88,7 +92,7 @@ class Blob::Writer {
   // Initialize seek table and decompressor when streaming precompressed blobs.
   // Returns decompressed blob size on success. If not enough data is buffered to decode the seek
   // table, returns ZX_ERR_BUFF_TOO_SMALL.
-  zx::result<uint64_t> InitializeDecompressor(size_t buff_pos);
+  zx::result<uint64_t> InitializeDecompressor();
 
   // If successful, allocates Blob Node and Blocks (in-memory) and sets `allocated_space_` to true.
   // Should not be called if `allocated_space_` is true.
@@ -98,10 +102,8 @@ class Blob::Writer {
   zx::result<std::optional<WrittenBlob>> WriteInternal(Blob& blob, const void* data, size_t len,
                                                        size_t* actual) __TA_REQUIRES(blob.mutex_);
 
-  // Stream as much outstanding data as possible when performing streaming writes. `buff_pos` refers
-  // to the offset of the last byte which was buffered in the write buffer VMO. Some data may be
-  // flushed to disk to save memory, but this is not guaranteed.
-  zx::result<> StreamBufferedData(size_t buff_pos);
+  // Stream as much outstanding data as possible when performing streaming writes.
+  zx::result<> StreamBufferedData();
 
   // Write `block_count` blocks at `block_offset` using the data from `producer` into `streamer`.
   zx::result<> WriteDataBlocks(uint64_t block_count, uint64_t block_offset,
@@ -122,6 +124,12 @@ class Blob::Writer {
   // guaranteed to persist on return. Metadata may still remain in cache until next journal flush.
   zx::result<> FlushData(Blob& blob) __TA_REQUIRES(blob.mutex_);
 
+  // Helper function to decode `header_` and `metadata_` from buffered data.
+  zx::result<> ParseDeliveryBlob();
+
+  // Filesystem backing this blob.
+  Blobfs& blobfs() const { return blob_.blobfs_; }
+
   // Pointer to the beginning of the Merkle tree. As the tree may overlap with some of the blob's
   // data, there will always be at least `block_size_` bytes of padding before the returned pointer.
   // Can only be called after `Initialize()` has succeeded.
@@ -130,8 +138,20 @@ class Blob::Writer {
     return merkle_tree_buffer_.get() + block_size_;
   }
 
-  // Filesystem backing this blob.
-  Blobfs& blobfs() const { return blob_.blobfs_; }
+  // Pointer within `buffer` where the actual data payload to be persisted on disk starts.
+  uint8_t* payload() const {
+    return static_cast<uint8_t*>(buffer_.start()) + header_.header_length;
+  }
+
+  // Size of the payload to be persisted on disk.
+  size_t payload_length() const {
+    return is_delivery_blob_ ? metadata_.payload_length : data_size_;
+  }
+
+  // Amount of the payload written into `Write()` so far.
+  size_t payload_written() const {
+    return safemath::CheckSub(total_written_, header_.header_length).ValueOrDie();
+  }
 
   // Blob we're writing. Must outlive this object and be the same blob passed to any public methods.
   //
@@ -190,12 +210,16 @@ class Blob::Writer {
   // blob (i.e. the blob is compressed).
   std::unique_ptr<BlobLayout> blob_layout_ = nullptr;
 
-  // Bytes of data written into this writer via `Write()` so far.
+  // Bytes of data written into this writer via `Write()` so far, including headers.
+  // We expect that when `total_written_ == `data_size_` this blob is complete.
   uint64_t total_written_ = 0;
+
+  // Amount of the payload that has been processed so far.
+  uint64_t payload_processed_ = 0;
 
   // Bytes of data persisted to disk thus far (always <= `total_written_`). Will always be 0 if
   // streaming writes has been disabled.
-  uint64_t total_persisted_ = 0;
+  uint64_t payload_persisted_ = 0;
 
   // True once `SpaceAllocate()` has been called and has succeeded.
   bool allocated_space_ = false;
@@ -212,6 +236,20 @@ class Blob::Writer {
 
   // Status of the writer, used to latch any write errors. See `error()` for details.
   zx::result<> status_ = zx::ok();
+
+  // Delivery Blob (RFC 0207) Related Fields
+
+  // True if this is a delivery blob in the format specified by RFC 0207, false otherwise.
+  const bool is_delivery_blob_;
+
+  // True if `header_` and `metadata_` have been decoded, false otherwise.
+  bool header_complete_ = false;
+
+  // Delivery blob header as specified by RFC 0207.
+  DeliveryBlobHeader header_ = {};
+
+  // Delivery blob metadata (currently only type 1 blobs are supported).
+  MetadataType1 metadata_ = {};
 };
 
 }  // namespace blobfs
