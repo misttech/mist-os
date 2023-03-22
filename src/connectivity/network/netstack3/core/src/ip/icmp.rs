@@ -3775,7 +3775,7 @@ mod tests {
         });
 
         net.run_until_idle(
-            crate::device::testutil::receive_frame_or_panic,
+            crate::device::testutil::receive_frame,
             |Ctx { sync_ctx, non_sync_ctx }, _, id| {
                 crate::handle_timer(&mut &*sync_ctx, non_sync_ctx, id);
                 handle_queued_rx_packets(sync_ctx, non_sync_ctx);

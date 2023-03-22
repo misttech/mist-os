@@ -311,7 +311,7 @@ pub(crate) mod testutil {
     use super::*;
     use crate::{
         data_structures::ref_counted_hash_map::{RefCountedHashSet, RemoveResult},
-        device::{DeviceId, EthernetWeakDeviceId},
+        device::{EthernetDeviceId, EthernetWeakDeviceId},
         testutil::FakeCryptoRng,
         Instant,
     };
@@ -1645,17 +1645,12 @@ pub(crate) mod testutil {
     }
 
     impl<CtxId, Links>
-        FakeNetwork<
-            CtxId,
-            DeviceId<crate::testutil::FakeNonSyncCtx>,
-            crate::testutil::FakeCtx,
-            Links,
-        >
+        FakeNetwork<CtxId, EthernetDeviceId<FakeInstant, ()>, crate::testutil::FakeCtx, Links>
     where
         CtxId: Eq + Hash + Copy + Debug,
         Links: FakeNetworkLinks<
             EthernetWeakDeviceId<FakeInstant, ()>,
-            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            EthernetDeviceId<FakeInstant, ()>,
             CtxId,
         >,
     {
@@ -1734,17 +1729,17 @@ pub(crate) mod testutil {
     pub(crate) fn new_legacy_simple_fake_network<CtxId: Copy + Debug + Hash + Eq>(
         a_id: CtxId,
         a: crate::testutil::FakeCtx,
-        a_device_id: DeviceId<crate::testutil::FakeNonSyncCtx>,
+        a_device_id: EthernetDeviceId<FakeInstant, ()>,
         b_id: CtxId,
         b: crate::testutil::FakeCtx,
-        b_device_id: DeviceId<crate::testutil::FakeNonSyncCtx>,
+        b_device_id: EthernetDeviceId<FakeInstant, ()>,
     ) -> FakeNetwork<
         CtxId,
-        DeviceId<crate::testutil::FakeNonSyncCtx>,
+        EthernetDeviceId<FakeInstant, ()>,
         crate::testutil::FakeCtx,
         impl FakeNetworkLinks<
             EthernetWeakDeviceId<FakeInstant, ()>,
-            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            EthernetDeviceId<FakeInstant, ()>,
             CtxId,
         >,
     > {

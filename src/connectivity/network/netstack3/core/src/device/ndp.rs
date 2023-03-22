@@ -67,9 +67,8 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress,
-            testutil::receive_frame_or_panic, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
-            FrameDestination, Mtu,
+            add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress, testutil::receive_frame,
+            DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, Mtu,
         },
         ip::{
             device::{
@@ -160,11 +159,11 @@ mod tests {
     fn setup_net() -> (
         FakeNetwork<
             &'static str,
-            DeviceId<crate::testutil::FakeNonSyncCtx>,
+            EthernetDeviceId<FakeInstant, ()>,
             crate::testutil::FakeCtx,
             impl FakeNetworkLinks<
                 EthernetWeakDeviceId<FakeInstant, ()>,
-                DeviceId<crate::testutil::FakeNonSyncCtx>,
+                EthernetDeviceId<FakeInstant, ()>,
                 &'static str,
             >,
         >,
@@ -179,17 +178,17 @@ mod tests {
         let (remote, remote_device_ids) = remote.build();
 
         let local_eth_device_id = local_device_ids[local_dev_idx].clone();
-        let remote_device_id: DeviceId<_> = remote_device_ids[remote_dev_idx].clone().into();
+        let remote_eth_device_id = remote_device_ids[remote_dev_idx].clone();
         let net = crate::context::testutil::new_legacy_simple_fake_network(
             "local",
             local,
-            local_eth_device_id.clone().into(),
+            local_eth_device_id.clone(),
             "remote",
             remote,
-            remote_device_id.clone(),
+            remote_eth_device_id.clone(),
         );
 
-        (net, local_eth_device_id, remote_device_id)
+        (net, local_eth_device_id, remote_eth_device_id.into())
     }
 
     #[test]
@@ -249,7 +248,7 @@ mod tests {
             assert_eq!(non_sync_ctx.timer_ctx().timers().len(), 1);
         });
 
-        let _: StepResult = net.step(receive_frame_or_panic, handle_timer);
+        let _: StepResult = net.step(receive_frame, handle_timer);
         assert_eq!(
             get_counter_val(net.non_sync_ctx("remote"), "ndp::rx_neighbor_solicitation"),
             1,
@@ -258,7 +257,7 @@ mod tests {
         assert_eq!(net.non_sync_ctx("remote").frames_sent().len(), 1);
 
         // Forward advertisement response back to local.
-        let _: StepResult = net.step(receive_frame_or_panic, handle_timer);
+        let _: StepResult = net.step(receive_frame, handle_timer);
 
         assert_eq!(
             get_counter_val(net.non_sync_ctx("local"), "ndp::rx_neighbor_advertisement"),
@@ -274,7 +273,7 @@ mod tests {
             // sent out.
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
-        let _: StepResult = net.step(receive_frame_or_panic, handle_timer);
+        let _: StepResult = net.step(receive_frame, handle_timer);
         assert_eq!(
             get_counter_val(net.non_sync_ctx("remote"), "<IcmpIpTransportContext as BufferIpTransportContext<Ipv6>>::receive_ip_packet::echo_request"),
             1
@@ -301,9 +300,8 @@ mod tests {
         let make_ctx_and_dev = || {
             let mut ctx = crate::testutil::FakeCtx::default();
             let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-            let device_id: DeviceId<_> =
-                crate::device::add_ethernet_device(sync_ctx, mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE)
-                    .into();
+            let device_id =
+                crate::device::add_ethernet_device(sync_ctx, mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
             (ctx, device_id)
         };
 
@@ -317,10 +315,8 @@ mod tests {
             remote,
             remote_device_id.clone(),
         );
-        // Make sure the (strongly referenced) device IDs are dropped before
-        // `net`.
-        let local_device_id = local_device_id;
-        let remote_device_id = remote_device_id;
+        let local_device_id = local_device_id.into();
+        let remote_device_id = remote_device_id.into();
 
         // Create the devices (will start DAD at the same time).
         let update = |ipv6_config: &mut Ipv6DeviceConfiguration| {
@@ -352,7 +348,7 @@ mod tests {
         assert!(is_in_ip_multicast(net.sync_ctx("local"), &local_device_id, multicast_addr));
         assert!(is_in_ip_multicast(net.sync_ctx("remote"), &remote_device_id, multicast_addr));
 
-        let _: StepResult = net.step(receive_frame_or_panic, handle_timer);
+        let _: StepResult = net.step(receive_frame, handle_timer);
 
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
@@ -448,7 +444,7 @@ mod tests {
         assert!(is_in_ip_multicast(net.sync_ctx("local"), &local_device_id, multicast_addr));
         assert!(is_in_ip_multicast(net.sync_ctx("remote"), &remote_device_id, multicast_addr));
 
-        let _: StepResult = net.step(receive_frame_or_panic, handle_timer);
+        let _: StepResult = net.step(receive_frame, handle_timer);
 
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
@@ -624,7 +620,7 @@ mod tests {
         assert_eq!(net.non_sync_ctx("local").frames_sent().len(), 3);
         assert_eq!(net.non_sync_ctx("remote").frames_sent().len(), 1);
 
-        let _: StepResult = net.step(receive_frame_or_panic, handle_timer);
+        let _: StepResult = net.step(receive_frame, handle_timer);
 
         // Let's make sure that all timers are cancelled properly.
         net.with_context("local", |Ctx { sync_ctx: _, non_sync_ctx }| {

@@ -1031,7 +1031,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeNetwork, FakeNetworkLinks},
-        device::testutil::receive_frame_or_panic,
+        device::testutil::receive_frame,
         ip::{
             socket::{BufferIpSocketHandler, DefaultSendOptions},
             BufferIpLayerHandler,
@@ -1083,11 +1083,11 @@ mod tests {
         });
 
         // Send from Alice to Bob.
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).frames_sent, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).frames_sent, 1);
         // Respond from Bob to Alice.
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).frames_sent, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).frames_sent, 1);
         // Should've starved all events.
-        assert!(net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(net.step(receive_frame, handle_timer).is_idle());
     }
 
     #[test]
@@ -1138,28 +1138,28 @@ mod tests {
         // No timers fired before.
         assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 0);
         assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 0);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 1 should have fired.
         assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 1);
         assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 0);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 2 should have fired.
         assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 1);
         assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 1);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 2 should have fired.
         assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 1);
         assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 2);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         // Only timer in context 1 should have fired.
         assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 2);
         assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 2);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 2);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 2);
         // Both timers have fired at the same time.
         assert_eq!(get_counter_val(net.non_sync_ctx(1), "timer::nop"), 3);
         assert_eq!(get_counter_val(net.non_sync_ctx(2), "timer::nop"), 3);
 
-        assert!(net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(net.step(receive_frame, handle_timer).is_idle());
         // Check that current time on contexts tick together.
         let t1 = net.with_context(1, |Ctx { sync_ctx: _, non_sync_ctx }| non_sync_ctx.now());
         let t2 = net.with_context(2, |Ctx { sync_ctx: _, non_sync_ctx }| non_sync_ctx.now());
@@ -1198,13 +1198,13 @@ mod tests {
             );
         });
 
-        while !net.step(receive_frame_or_panic, handle_timer).is_idle()
+        while !net.step(receive_frame, handle_timer).is_idle()
             && (get_counter_val(net.non_sync_ctx(1), "timer::nop") < 1
                 || get_counter_val(net.non_sync_ctx(2), "timer::nop") < 1)
         {}
         // Assert that we stopped before all times were fired, meaning we can
         // step again.
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
     }
 
     #[test]
@@ -1214,8 +1214,8 @@ mod tests {
         let latency = Duration::from_millis(5);
         let (alice_ctx, alice_device_ids) = FAKE_CONFIG_V4.into_builder().build();
         let (bob_ctx, bob_device_ids) = FAKE_CONFIG_V4.swap().into_builder().build();
-        let alice_device_id: DeviceId<_> = alice_device_ids[0].clone().into();
-        let bob_device_id: DeviceId<_> = bob_device_ids[0].clone().into();
+        let alice_device_id = alice_device_ids[0].clone();
+        let bob_device_id = bob_device_ids[0].clone();
         core::mem::drop((alice_device_ids, bob_device_ids));
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx)],
@@ -1285,11 +1285,11 @@ mod tests {
             'a,
             L: FakeNetworkLinks<
                 EthernetWeakDeviceId<FakeInstant, ()>,
-                DeviceId<FakeNonSyncCtx>,
+                EthernetDeviceId<FakeInstant, ()>,
                 &'a str,
             >,
         >(
-            net: &mut FakeNetwork<&'a str, DeviceId<FakeNonSyncCtx>, FakeCtx, L>,
+            net: &mut FakeNetwork<&'a str, EthernetDeviceId<FakeInstant, ()>, FakeCtx, L>,
             alice_nop: usize,
             bob_nop: usize,
             bob_echo_request: usize,
@@ -1308,19 +1308,19 @@ mod tests {
             );
         }
 
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         assert_full_state(&mut net, 1, 0, 0, 0);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).frames_sent, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).frames_sent, 1);
         assert_full_state(&mut net, 1, 0, 1, 0);
-        assert_eq!(net.step(receive_frame_or_panic, handle_timer).timers_fired, 1);
+        assert_eq!(net.step(receive_frame, handle_timer).timers_fired, 1);
         assert_full_state(&mut net, 1, 1, 1, 0);
-        let step = net.step(receive_frame_or_panic, handle_timer);
+        let step = net.step(receive_frame, handle_timer);
         assert_eq!(step.frames_sent, 1);
         assert_eq!(step.timers_fired, 1);
         assert_full_state(&mut net, 1, 2, 1, 1);
 
         // Should've starved all events.
-        assert!(net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(net.step(receive_frame, handle_timer).is_idle());
     }
 
     fn send_packet<'a, A: IpAddress>(
@@ -1389,9 +1389,9 @@ mod tests {
         let (alice_ctx, alice_device_ids) = alice.build();
         let (bob_ctx, bob_device_ids) = bob.build();
         let (calvin_ctx, calvin_device_ids) = calvin.build();
-        let alice_device_id: DeviceId<_> = alice_device_ids[alice_device_idx].clone().into();
-        let bob_device_id: DeviceId<_> = bob_device_ids[bob_device_idx].clone().into();
-        let calvin_device_id: DeviceId<_> = calvin_device_ids[calvin_device_idx].clone().into();
+        let alice_device_id = alice_device_ids[alice_device_idx].clone();
+        let bob_device_id = bob_device_ids[bob_device_idx].clone();
+        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         let mut net = FakeNetwork::new(
             [("alice", alice_ctx), ("bob", bob_ctx), ("calvin", calvin_ctx)],
             move |net: &'static str, _device_id: EthernetWeakDeviceId<FakeInstant, ()>| match net {
@@ -1404,9 +1404,9 @@ mod tests {
                 _ => unreachable!(),
             },
         );
-        let alice_device_id = alice_device_ids[alice_device_idx].clone().into();
-        let bob_device_id = bob_device_ids[bob_device_idx].clone().into();
-        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone().into();
+        let alice_device_id = alice_device_ids[alice_device_idx].clone();
+        let bob_device_id = bob_device_ids[bob_device_idx].clone();
+        let calvin_device_id = calvin_device_ids[calvin_device_idx].clone();
         core::mem::drop((alice_device_ids, bob_device_ids, calvin_device_ids));
 
         net.collect_frames();
@@ -1418,7 +1418,7 @@ mod tests {
         // Bob and Calvin should get any packet sent by Alice.
 
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_a, ip_b, &alice_device_id);
+            send_packet(sync_ctx, non_sync_ctx, ip_a, ip_b, &alice_device_id.clone().into());
         });
         assert_eq!(net.non_sync_ctx("alice").frames_sent().len(), 1);
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());
@@ -1441,7 +1441,7 @@ mod tests {
 
         net.drop_pending_frames();
         net.with_context("bob", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_b, ip_a, &bob_device_id);
+            send_packet(sync_ctx, non_sync_ctx, ip_b, ip_a, &bob_device_id.clone().into());
         });
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
         assert_eq!(net.non_sync_ctx("bob").frames_sent().len(), 1);
@@ -1460,7 +1460,7 @@ mod tests {
 
         net.drop_pending_frames();
         net.with_context("calvin", |Ctx { sync_ctx, non_sync_ctx }| {
-            send_packet(sync_ctx, non_sync_ctx, ip_c, ip_a, &calvin_device_id);
+            send_packet(sync_ctx, non_sync_ctx, ip_c, ip_a, &calvin_device_id.clone().into());
         });
         assert_empty(net.non_sync_ctx("alice").frames_sent().iter());
         assert_empty(net.non_sync_ctx("bob").frames_sent().iter());

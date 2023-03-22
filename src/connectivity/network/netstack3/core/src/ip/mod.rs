@@ -3131,7 +3131,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
-        device::{receive_frame, testutil::receive_frame_or_panic, FrameDestination, WeakDeviceId},
+        device::{self, FrameDestination, WeakDeviceId},
         ip::{
             device::set_routing_enabled,
             testutil::is_in_ip_multicast,
@@ -3753,7 +3753,7 @@ mod tests {
             );
         });
         // Make sure the packet got sent from alice to bob
-        assert!(!net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(!net.step(device::testutil::receive_frame, handle_timer).is_idle());
 
         // Process fragment #1
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
@@ -3766,7 +3766,7 @@ mod tests {
                 3,
             );
         });
-        assert!(!net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(!net.step(device::testutil::receive_frame, handle_timer).is_idle());
 
         // Make sure no packets got dispatched yet.
         assert_eq!(
@@ -3789,7 +3789,7 @@ mod tests {
                 3,
             );
         });
-        assert!(!net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(!net.step(device::testutil::receive_frame, handle_timer).is_idle());
 
         // Make sure the packet finally got dispatched now that the final
         // fragment has been received by bob.
@@ -3803,7 +3803,7 @@ mod tests {
         );
 
         // Make sure there are no more events.
-        assert!(net.step(receive_frame_or_panic, handle_timer).is_idle());
+        assert!(net.step(device::testutil::receive_frame, handle_timer).is_idle());
     }
 
     #[test]
@@ -4368,7 +4368,7 @@ mod tests {
         // Should not have dispatched the packet since we are not in the
         // multicast group `multi_addr`.
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
+        device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 0);
 
         // Join the multicast group and receive the packet, we should dispatch
@@ -4388,7 +4388,7 @@ mod tests {
             ),
         }
         assert!(is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
+        device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
 
         // Leave the multicast group and receive the packet, we should not
@@ -4408,7 +4408,7 @@ mod tests {
             ),
         }
         assert!(!is_in_ip_multicast(&sync_ctx, &device, multi_addr));
-        receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
+        device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
     }
 

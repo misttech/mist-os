@@ -1962,18 +1962,13 @@ pub(crate) mod testutil {
     use super::*;
     use crate::Ctx;
 
-    /// Calls [`receive_frame`], panicking on error.
-    pub(crate) fn receive_frame_or_panic<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
+    /// Calls [`receive_frame`], with a [`Ctx`].
+    pub(crate) fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
         Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<NonSyncCtx>,
-        device: DeviceId<NonSyncCtx>,
+        device: EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState>,
         buffer: B,
     ) {
-        crate::device::receive_frame(
-            sync_ctx,
-            non_sync_ctx,
-            &assert_matches::assert_matches!(device, DeviceId::Ethernet(id) => id),
-            buffer,
-        )
+        crate::device::receive_frame(sync_ctx, non_sync_ctx, &device, buffer)
     }
 
     pub fn enable_device<NonSyncCtx: NonSyncContext>(
