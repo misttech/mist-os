@@ -828,7 +828,10 @@ TEST_F(ReorderTimeoutTest, ReleaseExpiredFrames) {
   }
 }
 
-TEST_F(ReorderTimeoutTest, NoFramesReleasedIfFramesNotExpired) {
+// TODO(fxb/124174); This test is disabled due to flakiness.
+// To remove the flaky behavior, we will probably need to refactor tests to use a fake clock
+// so that we can have greater control over when the timer function runs.
+TEST_F(ReorderTimeoutTest, DISABLED_NoFramesReleasedIfFramesNotExpired) {
   constexpr uint8_t kNumPackets = 30;
   std::vector<WlanRxPacket> packets{kNumPackets};
 
@@ -842,6 +845,8 @@ TEST_F(ReorderTimeoutTest, NoFramesReleasedIfFramesNotExpired) {
 
   // Stop the timer that gets setup by the Reorder call normally so that we can be sure
   // the next time the timer callback runs it's because of iwl_mvm_reorder_timer_expired.
+  // NOTE: it is possible that enough time passes between the last call to Reorder() and now that
+  // the timer fires and that this call to iwl_irq_timer_stop() fails.
   iwl_irq_timer_stop(GetReorderBuf().reorder_timer);
 
   ASSERT_EQ(kNumPackets, GetReorderBuf().num_stored);
@@ -850,6 +855,8 @@ TEST_F(ReorderTimeoutTest, NoFramesReleasedIfFramesNotExpired) {
   // This will also restart the reorder timer.
   iwl_mvm_reorder_timer_expired(&GetReorderBuf());
 
+  // NOTE: it is possible that enough time passes between the above line and this check that the
+  // timer callback runs and the packets are received by ctx_.
   ASSERT_TRUE(ctx_.received.empty());
 
   // Then actually wait for the timer and see that frames get released next time
