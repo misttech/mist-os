@@ -27,6 +27,14 @@ LIBC_NO_SAFESTACK NO_ASAN static pthread_t prestart(void* arg, void* caller) {
   // end marker similar to how CFI unwinding marks the base frame by having its
   // return address column compute zero.
   __asm__ volatile("stp xzr, %0, [x18], #16" : : "r"(caller));
+#elif defined(__riscv)
+  __asm__ volatile("ld s2, %0" : : "m"(self->shadow_call_stack.iov_base));
+  __asm__ volatile(
+      "add s2, s2, 16\n"
+      "sd zero, -16(s2)\n"
+      "sd %0, -8(s2)\n"
+      :
+      : "r"(caller));
 #endif
 
   zxr_tp_set(zxr_thread_get_handle(&self->zxr_thread), pthread_to_tp(self));
@@ -192,6 +200,14 @@ static NO_ASAN _Noreturn void finish_exit(pthread_t self) {
       "add sp, %[base], %[len]\n"
       "mov x0, %[self]\n"
       "bl final_exit"
+      :
+      : [base] "r"(self->tcb_region.iov_base), [len] "r"(self->tcb_region.iov_len - PAGE_SIZE),
+        [self] "r"(self));
+#elif defined(__riscv)
+  __asm__(
+      "add sp, %[base], %[len]\n"
+      "mv a0, %[self]\n"
+      "call final_exit"
       :
       : [base] "r"(self->tcb_region.iov_base), [len] "r"(self->tcb_region.iov_len - PAGE_SIZE),
         [self] "r"(self));

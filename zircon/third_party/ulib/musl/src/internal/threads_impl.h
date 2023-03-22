@@ -48,7 +48,7 @@ struct tls_dtor;
 // shadow call stack ABI so that other code might use it.  This is an
 // aspect of the Fuchsia ABI for the machine.  That is an implementation
 // detail of a particular build of the C library code.
-#ifdef __aarch64__
+#if defined(__aarch64__) || defined(__riscv)
 #define HAVE_SHADOW_CALL_STACK 1
 #else
 #define HAVE_SHADOW_CALL_STACK 0

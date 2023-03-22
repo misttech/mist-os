@@ -36,21 +36,31 @@ struct start_params {
 __asan_weak_ref("memcpy")
 __asan_weak_ref("memset")
 
+#if defined(__aarch64__)
+#define SHADOW_CALL_STACK_DWARF_REGNO 18
+#define SHADOW_CALL_STACK_INIT "str %[ra], [x18], #8\n"
+#elif defined(__riscv)
+#define SHADOW_CALL_STACK_DWARF_REGNO 18
+#define SHADOW_CALL_STACK_INIT \
+  "add s2, s2, 8\n"            \
+  "sd %[ra], -8(s2)\n"
+#endif
+
 // This gets called via inline assembly below, after switching onto
 // the newly-allocated (safe) stack.
 static _Noreturn void start_main(const struct start_params*) __asm__("start_main")
     __attribute__((used));
 static void start_main(const struct start_params* p) {
-#if defined(__aarch64__) && !__has_feature(shadow_call_stack)
-  // Ensure shadow-call-stack backtraces consistent with the frame pointer
-  // backtraces for the initial frames, so they will stay consistent if main
-  // and its callees use shadow-call-stack.
+#if defined(SHADOW_CALL_STACK_INIT) && !__has_feature(shadow_call_stack)
   __asm__ volatile(
-      "str %0, [x18], #8\n"
-      // DW_CFA_val_expression 18, { DW_OP_breg18 -8 }
-      ".cfi_escape 0x16, 18, 2, 0x70 + 18, (-8 & 0x7f)"
+      // Ensure shadow-call-stack backtraces consistent with the frame pointer
+      // backtraces for the initial frames, so they will stay consistent if
+      // main and its callees use shadow-call-stack.
+      SHADOW_CALL_STACK_INIT
+      // DW_CFA_val_expression <regno>, { DW_OP_breg<regno> -8 }
+      ".cfi_escape 0x16, %c[regno], 2, 0x70 + %c[regno], (-8 & 0x7f)"
       :
-      : "r"(__builtin_return_address(0)));
+      : [regno] "i"(SHADOW_CALL_STACK_DWARF_REGNO), [ra] "r"(__builtin_return_address(0)));
 #endif
 
   // Run the __sanitizer_module_loaded hook on all loaded libraries as early as
@@ -334,6 +344,66 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t 
           "m"(p),  // Tell the compiler p's fields are all still alive.
           [arg] "r"(&p)
         : "x28");
+#elif defined(__riscv)
+    __asm__ volatile(
+        // Adjust the CFI to track the existing CFA via a different call-saved
+        // register so unwinding will work after we reset the FP below.  Since
+        // __builtin_frame_address(0) returns the value of the FP register (as
+        // documented in the GCC manual), and the RISC-V calling convention
+        // defines the FP to match the CFA (SP on function entry), this value
+        // should match.  The compiler will tell us the value of the FP with
+        // the built-in, but it won't tell us how it's calculating the CFA.
+        // Since we force frame pointers on when compiling this function, we
+        // assume that the compiler will have defined its CFA rule to point to
+        // the FP register.
+        "mv s1, %[frame_address]\n"
+        ".cfi_def_cfa s1, 0\n"
+
+        // Switch to the new machine stack.
+        "add sp, %[base], %[len]\n"
+
+        // Synthesize a backtrace frame on the new stack.  Backtrace collection
+        // would ignore the original real frame _start pushed because that FP
+        // value is not in the recorded bounds of the thread's machine stack.
+        "add sp, sp, -16\n"
+        "sd %[return_address], 0(sp)\n"
+        "sd zero, 8(sp)\n"
+        // Since we force frame pointers on when compiling this function, we
+        // assume that the compiler will have defined its CFI rule for the
+        // caller's FP register in terms of the CFA, so that's still correct
+        // after we clobber it here.
+        "mv fp, sp\n"
+
+        // Save the caller's s2 in another call-saved register.
+        "mv s3, s2\n"
+        ".cfi_register s2, s3\n"
+
+        // Switch to the new shadow call stack.  Then push our own return
+        // address on the shadow call stack so it appears in a backtrace just
+        // as it would if this function itself were using the normal shadow
+        // call stack protocol.  Before that, push a zero return address as an
+        // end marker similar to how CFI unwinding marks the base frame by
+        // having its return address column compute zero.
+        "add s2, %[shadow_call_stack], 16\n"
+        "sd zero, -16(s2)\n"
+        "sd %[return_address], -8(s2)\n"
+
+        // Neither sp, fp, nor s2 might be used as an input operand, but a0
+        // might be.  So clobber a0 last.  We don't need to declare it to the
+        // compiler as a clobber since we'll never come back and it's fine if
+        // it's used as an input operand.
+        "mv a0, %[arg]\n"
+        "call start_main\n"
+        "unimp"
+        :
+        : [base] "r"(p.td->safe_stack.iov_base), [len] "r"(p.td->safe_stack.iov_len),
+          // Shadow call stack grows up.
+          [shadow_call_stack] "r"(p.td->shadow_call_stack.iov_base),
+          [return_address] "r"(__builtin_return_address(0)),
+          [frame_address] "r"(__builtin_frame_address(0)),
+          "m"(p),  // Tell the compiler p's fields are all still alive.
+          [arg] "r"(&p)
+        : "s1", "s3");
 #else
 #error what architecture?
 #endif
