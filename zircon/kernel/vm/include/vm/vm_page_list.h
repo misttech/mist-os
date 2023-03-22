@@ -37,6 +37,15 @@
 //                  two will be empty. If the interval spans a single page, it will be represented
 //                  as a Slot sentinel, which is conceptually the same as both a Start and an End
 //                  sentinel.
+//
+// There are certain invariants that the page list tries to maintain at all times. It might not
+// always be possible to enforce these as the checks involved might be expensive, however it is
+// important that any code that manipulates the page list abide by them, primarily to keep the
+// memory occupied by the page list nodes in check.
+// 1. Page list nodes cannot be completely empty i.e. they must contain at least one non-empty slot.
+// 2. Any intervals in the page list should span a maximal range. In other words, there should not
+// be consecutive intervals in the page list which it would have been possible to represent with a
+// single interval instead.
 class VmPageOrMarker {
  public:
   // A PageType that otherwise holds a null pointer is considered to be Empty.
@@ -291,6 +300,8 @@ class VmPageOrMarker {
   using IntervalDirtyState = ZeroRange::DirtyState;
 
   // Only support creation of zero interval type for now.
+  // TODO(fxbug.dev/122842): Make this private and only expose it to VmPageList so that an external
+  // caller cannot arbitrarily create interval sentinels.
   [[nodiscard]] static VmPageOrMarker ZeroInterval(IntervalSentinel sentinel,
                                                    IntervalDirtyState state) {
     uint64_t sentinel_bits = static_cast<uint64_t>(sentinel) << kIntervalSentinelShift;
@@ -893,6 +904,18 @@ class VmPageList final {
   // zero interval with existing intervals to the left and/or right, if the dirty_state allows it.
   zx_status_t AddZeroInterval(uint64_t start_offset, uint64_t end_offset,
                               VmPageOrMarker::IntervalDirtyState dirty_state);
+
+  // Populates individual interval slots in the range [start_offset, end_offset) that falls inside a
+  // sparse interval. The intent of this function is to allow the caller to prepare the range for
+  // overwriting (replacing with pages) by populating the required slots upfront, so that slot
+  // lookup does not fail after this call. Essentially simulates interval splits
+  // (LookupOrAllocateCheckForInterval) for every offset in the specified range, but does so more
+  // efficiently, instead of having to search the tree repeatedly for every single offset.
+  zx_status_t PopulateSlotsInInterval(uint64_t start_offset, uint64_t end_offset);
+
+  // Helper to return an unused interval slot so that it can be merged back into the interval it was
+  // populated/split from.
+  void ReturnIntervalSlot(uint64_t offset);
 
  private:
   // Returns true if the specified offset falls in a sparse page interval.

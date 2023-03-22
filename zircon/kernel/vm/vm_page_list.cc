@@ -489,6 +489,160 @@ ktl::pair<VmPageOrMarker*, bool> VmPageList::LookupOrAllocateCheckForInterval(ui
   return {slot, true};
 }
 
+void VmPageList::ReturnIntervalSlot(uint64_t offset) {
+  // We should be able to lookup a pre-existing interval slot.
+  auto slot = LookupOrAllocate(offset);
+  DEBUG_ASSERT(slot);
+  DEBUG_ASSERT(slot->IsIntervalSlot());
+
+  // We only support zero intervals for now. If more interval types are added in the future, handle
+  // them here.
+  DEBUG_ASSERT(slot->IsIntervalZero());
+  auto dirty_state = slot->GetZeroIntervalDirtyState();
+  // Temporarily free up the slot and then add a zero interval back in at the same spot using
+  // AddZeroInterval, which will ensure that the slot is merged to the left and/or right as
+  // applicable.
+  *slot = VmPageOrMarker::Empty();
+  [[maybe_unused]] zx_status_t status = AddZeroInterval(offset, offset + PAGE_SIZE, dirty_state);
+  DEBUG_ASSERT(status == ZX_OK);
+}
+
+zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t end_offset) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
+  DEBUG_ASSERT(end_offset > start_offset);
+  // Change the end_offset to an inclusive offset for convenience.
+  end_offset -= PAGE_SIZE;
+
+#if DEBUG_ASSERT_IMPLEMENTED
+  // The start_offset and end_offset should lie in an interval.
+  ASSERT(IsOffsetInInterval(start_offset));
+  ASSERT(IsOffsetInInterval(end_offset));
+  // All the remaining offsets should be empty and lie in the same interval. So we should find no
+  // pages or gaps in the range [start_offset + PAGE_SIZE, end_offset - PAGE_SIZE].
+  if (start_offset + PAGE_SIZE < end_offset) {
+    zx_status_t status =
+        ForEveryPageAndGapInRange([](auto* p, uint64_t off) { return ZX_ERR_BAD_STATE; },
+                                  [](uint64_t start, uint64_t end) { return ZX_ERR_BAD_STATE; },
+                                  start_offset + PAGE_SIZE, end_offset);
+    ASSERT(status == ZX_OK);
+  }
+#endif
+
+  // First allocate slots at start_offset and end_offset, splitting the interval around them if
+  // required. If any of the subsequent operations fail, we should return these interval slots. This
+  // function should either be able to populate all the slots requested, or the interval should be
+  // returned to its original state before the call.
+  auto [start_slot, is_start_in_interval] = LookupOrAllocateCheckForInterval(start_offset, true);
+  if (!start_slot) {
+    return ZX_ERR_NO_MEMORY;
+  }
+  DEBUG_ASSERT(is_start_in_interval);
+  DEBUG_ASSERT(start_slot->IsIntervalSlot());
+  // If only asked to populate single slot, nothing more to do.
+  if (start_offset == end_offset) {
+    return ZX_OK;
+  }
+
+  auto [end_slot, is_end_in_interval] = LookupOrAllocateCheckForInterval(end_offset, true);
+  if (!end_slot) {
+    // Return the start slot before returning.
+    ReturnIntervalSlot(start_offset);
+    return ZX_ERR_NO_MEMORY;
+  }
+  DEBUG_ASSERT(is_end_in_interval);
+  DEBUG_ASSERT(end_slot->IsIntervalSlot());
+
+  // If there are no more empty slots to consider between start and end, return early.
+  if (end_offset == start_offset + PAGE_SIZE) {
+    return ZX_OK;
+  }
+
+  // Now we need to walk all page offsets from start_offset to end_offset and convert them all to
+  // interval slots. Before we can do that, we will first allocate any page list nodes required in
+  // the middle. After splitting the interval around start_offset, we know that the node containing
+  // |start_offset + PAGE_SIZE| will be populated in order for it to hold the interval start
+  // sentinel at that offset. Similarly, we know that the node containing |end_offset - PAGE_SIZE|
+  // will be populated. So all the unpopulated nodes (if any) will lie between these two nodes.
+  const uint64_t first_node_offset = offset_to_node_offset(start_offset + PAGE_SIZE, list_skew_);
+  const size_t first_node_index = offset_to_node_index(start_offset + PAGE_SIZE, list_skew_);
+  const uint64_t last_node_offset = offset_to_node_offset(end_offset - PAGE_SIZE, list_skew_);
+  const size_t last_node_index = offset_to_node_index(end_offset - PAGE_SIZE, list_skew_);
+  DEBUG_ASSERT(last_node_offset >= first_node_offset);
+  if (last_node_offset > first_node_offset + VmPageListNode::kPageFanOut * PAGE_SIZE) {
+    const uint64_t first_unpopulated = first_node_offset + VmPageListNode::kPageFanOut * PAGE_SIZE;
+    const uint64_t last_unpopulated = last_node_offset - VmPageListNode::kPageFanOut * PAGE_SIZE;
+    for (uint64_t node_offset = first_unpopulated; node_offset <= last_unpopulated;
+         node_offset += VmPageListNode::kPageFanOut * PAGE_SIZE) {
+      fbl::AllocChecker ac;
+      ktl::unique_ptr<VmPageListNode> pl =
+          ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(node_offset));
+      if (!ac.check()) {
+        // If allocating a new node fails, clean up all the new nodes we might have installed until
+        // this point, which is all the empty nodes starting at first_unpopulated to before the node
+        // that failed.
+        for (uint64_t off = first_unpopulated; off < node_offset;
+             off += VmPageListNode::kPageFanOut * PAGE_SIZE) {
+          [[maybe_unused]] auto node = list_.erase(off);
+          DEBUG_ASSERT(node->IsEmpty());
+        }
+        // Also return the start and end slots that we split above.
+        ReturnIntervalSlot(start_offset);
+        ReturnIntervalSlot(end_offset);
+        return ZX_ERR_NO_MEMORY;
+      }
+      list_.insert(ktl::move(pl));
+    }
+  }
+
+  // Helper to mint new slot sentinels to insert. Currently we only support zero intervals. If we
+  // support other page interval types in the future, we will need to modify this to support them.
+  const VmPageOrMarker* start = start_slot;
+  const VmPageOrMarker* end = end_slot;
+  auto mint_new_slot = [start, end]() -> VmPageOrMarker {
+    DEBUG_ASSERT(start->IsIntervalZero());
+    DEBUG_ASSERT(end->IsIntervalZero());
+    DEBUG_ASSERT(start->GetZeroIntervalDirtyState() == end->GetZeroIntervalDirtyState());
+    return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Slot,
+                                        start->GetZeroIntervalDirtyState());
+  };
+
+  // Now that all allocations have succeeded, we know that the rest of the operation cannot fail.
+  // Walk all offsets after start_offset and before end_offset, overwriting all the slots as
+  // interval slots.
+  uint64_t node_offset = first_node_offset;
+  auto pln = list_.find(node_offset);
+  while (node_offset <= last_node_offset) {
+    DEBUG_ASSERT(pln.IsValid());
+    DEBUG_ASSERT(pln->offset() == node_offset);
+    for (size_t index = (node_offset == first_node_offset ? first_node_index : 0);
+         index <=
+         (node_offset == last_node_offset ? last_node_index : VmPageListNode::kPageFanOut - 1);
+         index++) {
+      pln->Lookup(index) = mint_new_slot();
+    }
+    pln++;
+    node_offset += VmPageListNode::kPageFanOut * PAGE_SIZE;
+  }
+
+#if DEBUG_ASSERT_IMPLEMENTED
+  // All offsets in the range [start_offset, end_offset] should contain interval slots.
+  uint64_t next_off = start_offset;
+  zx_status_t status = ForEveryPageInRange(
+      [&next_off](auto* p, uint64_t off) {
+        if (off != next_off || !p->IsIntervalSlot()) {
+          return ZX_ERR_BAD_STATE;
+        }
+        next_off += PAGE_SIZE;
+        return ZX_ERR_NEXT;
+      },
+      start_offset, end_offset + PAGE_SIZE);
+  ASSERT(status == ZX_OK);
+#endif
+
+  return ZX_OK;
+}
+
 bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
   // Find the node that would contain this offset.
   const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
@@ -707,18 +861,21 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
   }
 
   // If we ended up removing the prev_slot or next_slot, return the now empty slots.
-  bool returned_prev_slot = false;
-  if (merge_with_prev && prev_slot->IsEmpty()) {
+  bool return_prev_slot = merge_with_prev && prev_slot->IsEmpty();
+  bool return_next_slot = merge_with_next && next_slot->IsEmpty();
+  if (return_prev_slot) {
     ReturnEmptySlot(prev_offset);
-    returned_prev_slot = true;
-  }
-  if (merge_with_next && next_slot->IsEmpty()) {
     // next_slot and prev_slot could have come from the same node, in which case we've already
-    // freed up the node when returning prev_slot.
-    if (!returned_prev_slot || offset_to_node_offset(prev_offset, list_skew_) !=
-                                   offset_to_node_offset(next_offset, list_skew_)) {
-      ReturnEmptySlot(next_offset);
+    // freed up the node containing next_slot when returning prev_slot.
+    if (return_next_slot && offset_to_node_offset(prev_offset, list_skew_) ==
+                                offset_to_node_offset(next_offset, list_skew_)) {
+      return_next_slot = false;
     }
+  }
+  if (return_next_slot) {
+    DEBUG_ASSERT(!return_prev_slot || offset_to_node_offset(prev_offset, list_skew_) !=
+                                          offset_to_node_offset(next_offset, list_skew_));
+    ReturnEmptySlot(next_offset);
   }
 
   return ZX_OK;
