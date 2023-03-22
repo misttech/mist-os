@@ -217,6 +217,9 @@ pub struct TaskMutableState {
     /// We use UtsNamespaceHandle because the UTS properties can be modified
     /// by any other thread that shares this namespace.
     pub uts_ns: UtsNamespaceHandle,
+
+    /// The address and size of the mapped restricted state VMO.
+    pub restricted_state_addr_and_size: Option<(usize, usize)>,
 }
 
 pub enum ExceptionResult {
@@ -341,6 +344,7 @@ impl Task {
                 priority,
                 scheduler_policy: Default::default(),
                 uts_ns,
+                restricted_state_addr_and_size: None,
             }),
         };
         #[cfg(any(test, debug_assertions))]
@@ -714,6 +718,16 @@ impl Task {
     pub fn destroy_do_not_use_outside_of_drop_if_possible(self: &Arc<Self>) {
         let _ignored = self.clear_child_tid_if_needed();
         self.thread_group.remove(self);
+
+        // If the task has a mapping for its restricted state VMO, unmap it.
+        {
+            let task_state = self.write();
+            if let Some((addr, size)) = task_state.restricted_state_addr_and_size {
+                unsafe {
+                    fuchsia_runtime::vmar_root_self().unmap(addr, size).expect("unmap");
+                }
+            }
+        }
     }
 
     pub fn get_task(&self, pid: pid_t) -> Option<Arc<Task>> {

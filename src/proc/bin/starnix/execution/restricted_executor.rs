@@ -36,11 +36,14 @@ extern "C" {
     /// information.
     fn restricted_return();
 
-    /// `zx_restricted_write_state` system call.
-    fn zx_restricted_write_state(buffer: *const u8, buffer_size: usize) -> zx::sys::zx_status_t;
+    /// `zx_restricted_bind_state` system call.
+    fn zx_restricted_bind_state(
+        options: u32,
+        out_vmo_handle: *mut zx::sys::zx_handle_t,
+    ) -> zx::sys::zx_status_t;
 
-    /// `zx_restricted_read_state` system call.
-    fn zx_restricted_read_state(buffer: *mut u8, buffer_size: usize) -> zx::sys::zx_status_t;
+    /// `zx_restricted_unbind_state` system call.
+    fn zx_restricted_unbind_state(options: u32) -> zx::sys::zx_status_t;
 
     /// Sets the process handle used to create new threads, for the current thread.
     fn thrd_set_zx_process(handle: zx::sys::zx_handle_t) -> zx::sys::zx_handle_t;
@@ -59,6 +62,10 @@ extern "C" {
 ///   4. Dispatch the system call.
 ///   5. Handle pending signals.
 ///   6. Goto 1.
+///
+/// TODO(https://fxbug.dev/117302): Note, cross-process shared resources allocated in this function
+/// that aren't freed by the Zircon kernel upon thread and/or process termination (like mappings in
+/// the shared region) should be freed in `Task::destroy_do_not_use_outside_of_drop_if_possible()`.
 fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
 
@@ -79,32 +86,53 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
     // This tracks the last failing system call for debugging purposes.
     let mut error_context = None;
 
+    // Allocate a VMO and bind it to this thread.
+    let mut out_vmo_handle = 0;
+    let status = unsafe { zx_restricted_bind_state(0, &mut out_vmo_handle) };
+    match { status } {
+        zx::sys::ZX_OK => {
+            // We've successfully attached the VMO to the current thread. This VMO will be mapped
+            // and used for the kernel to store restricted mode register state as it enters and
+            // exits restricted mode.
+        }
+        _ => return Err(format_err!("failed restricted_bind_state: {:?}", status)),
+    }
+    let state_vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(out_vmo_handle)) };
+
+    // Unbind when we leave this scope to avoid unnecessarily retaining the VMO via this thread's
+    // binding.  Of course, we'll still have to remove any mappings and close any handles that refer
+    // to the VMO to ensure it will be destroyed.  See note about preventing resource leaks in this
+    // function's documentation.
+    scopeguard::defer! {
+        unsafe { zx_restricted_unbind_state(0); }
+    }
+
+    // Map the restricted state VMO and arrange for it to be unmapped later.
+    let state_vmo_size = state_vmo.get_size()? as usize;
+    let state_address = fuchsia_runtime::vmar_root_self()
+        .map(0, &state_vmo, 0, state_vmo_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
+        .unwrap();
+    // TODO(https://fxbug.dev/117302): Normally, we'd use scopeguard::defer! to unmap as we leave
+    // this function, but instead we'll stash the `state_address` and `state_vmo_size` so that
+    // `Task::destroy_do_not_use_outside_of_drop_if_possible()` can remove this mapping later.
+    {
+        let mut task_state = current_task.write();
+        task_state.restricted_state_addr_and_size = Some((state_address, state_vmo_size));
+    }
+
+    let bound_state = unsafe {
+        std::slice::from_raw_parts_mut(
+            state_address as *mut u8,
+            std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
+        )
+    };
+
     let mut syscall_decl = SyscallDecl::from_number(u64::MAX);
     loop {
         let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.registers);
-        match unsafe {
-            zx_restricted_write_state(
-                restricted_state_as_bytes(&mut state).as_ptr(),
-                std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
-            )
-        } {
-            zx::sys::ZX_OK => {
-                // Wrote restricted state successfully.
-            }
-            _ => {
-                fuchsia_trace::duration_end!(
-                    trace_category_starnix!(),
-                    trace_name_run_task_loop!(),
-                    trace_arg_name!() => syscall_decl.name
-                );
-                return Err(format_err!("failed to zx_restricted_write_state: {:?}", state));
-            }
-        }
-        fuchsia_trace::duration_end!(
-            trace_category_starnix!(),
-            trace_name_run_task_loop!(),
-            trace_arg_name!() => syscall_decl.name
-        );
+
+        // Copy the register state into the mapped VMO.
+        bound_state.copy_from_slice(restricted_state_as_bytes(&mut state));
 
         fuchsia_trace::duration_begin!(trace_category_starnix!(), trace_name_user_space!());
         let status = unsafe { restricted_enter(0, restricted_return_ptr as usize) };
@@ -123,24 +151,9 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             trace_name_run_task_loop!(),
             trace_arg_name!() => syscall_decl.name
         );
-        match unsafe {
-            zx_restricted_read_state(
-                restricted_state_as_bytes(&mut state).as_mut_ptr(),
-                std::mem::size_of::<zx::sys::zx_restricted_state_t>(),
-            )
-        } {
-            zx::sys::ZX_OK => {
-                // Read restricted state successfully.
-            }
-            _ => {
-                fuchsia_trace::duration_end!(
-                    trace_category_starnix!(),
-                    trace_name_run_task_loop!(),
-                    trace_arg_name!() => syscall_decl.name
-                );
-                return Err(format_err!("failed to zx_restricted_read_state: {:?}", state));
-            }
-        }
+
+        // Copy the register state out of the VMO.
+        restricted_state_as_bytes(&mut state).copy_from_slice(bound_state);
 
         // Store the new register state in the current task before dispatching the system call.
         current_task.registers = zx::sys::zx_thread_state_general_regs_t::from(&state).into();

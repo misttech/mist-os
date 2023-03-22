@@ -119,6 +119,7 @@ if (toolchain_environment == "physmem" ||
       "perf_mon.cc",
       "periphmap.cc",
       "registers.cc",
+      "restricted.cc",
       "smccc.S",
       "spinlock.cc",
       "start.S",

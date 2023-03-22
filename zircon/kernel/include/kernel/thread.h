@@ -1258,17 +1258,6 @@ struct Thread {
       return Thread::Current::Get()->memory_allocation_state_;
     }
 
-    static zx_status_t AllocateRestrictedState() {
-      Thread* t = Thread::Current::Get();
-      DEBUG_ASSERT(t->restricted_state_ == nullptr);
-      fbl::AllocChecker ac;
-      t->restricted_state_ = ktl::make_unique<RestrictedState>(&ac);
-      if (!ac.check()) {
-        return ZX_ERR_NO_MEMORY;
-      }
-      return ZX_OK;
-    }
-
     static RestrictedState* restricted_state() {
       return Thread::Current::Get()->restricted_state();
     }
@@ -1481,6 +1470,9 @@ struct Thread {
 #endif
 
   RestrictedState* restricted_state() { return restricted_state_.get(); }
+  void set_restricted_state(ktl::unique_ptr<RestrictedState> restricted_state) {
+    restricted_state_ = ktl::move(restricted_state);
+  }
 
   arch_thread& arch() { return arch_; }
   const arch_thread& arch() const { return arch_; }

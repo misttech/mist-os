@@ -18,6 +18,7 @@
 #include <kernel/thread.h>
 #include <object/process_dispatcher.h>
 #include <object/thread_dispatcher.h>
+#include <object/vm_object_dispatcher.h>
 #include <vm/vm.h>
 
 #define LOCAL_TRACE 0
@@ -28,19 +29,14 @@
 
 // Dispatched directly from arch-specific syscall handler. Called after saving state
 // on the stack, but before trying to dispatch as a zircon syscall.
-extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs);
 extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs) {
   LTRACEF("regs %p\n", regs);
 
+  DEBUG_ASSERT(regs);
   DEBUG_ASSERT(arch_ints_disabled());
 
   RestrictedState* rs = Thread::Current::restricted_state();
   DEBUG_ASSERT(rs != nullptr);
-
-  // get a handle to the arch specific buffer
-  zx::result<ArchRestrictedState*> _arch = rs->GetArchState();
-  ASSERT_MSG(_arch.is_ok(), "unable to get handle to arch state\n");
-  ArchRestrictedState* arch = *_arch;
 
   // assert that some things make sense
   DEBUG_ASSERT(rs->in_restricted() == true);
@@ -51,16 +47,18 @@ extern "C" [[noreturn]] void syscall_from_restricted(const syscall_regs_t* regs)
   arch_set_restricted_flag(false);
 
   // save the restricted state
-  arch->SaveRestrictedSyscallState(regs);
+  zx_restricted_state_t* state = rs->state_ptr();
+  DEBUG_ASSERT(state);
+  RestrictedState::ArchSaveRestrictedSyscallState(*state, *regs);
 
-  LTRACEF("returning to normal mode at vector %#lx, contex %#lx\n", rs->vector_ptr(),
+  LTRACEF("returning to normal mode at vector %#lx, context %#lx\n", rs->vector_ptr(),
           rs->context());
 
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   vmm_set_active_aspace(up->normal_aspace_ptr());
 
   // bounce into normal mode
-  arch->EnterFull(rs->vector_ptr(), rs->context(), 0);
+  RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(), 0);
 
   __UNREACHABLE;
 }
@@ -71,151 +69,73 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   LTRACEF("options %#x vector %#" PRIx64 " context %#" PRIx64 "\n", options, vector_table_ptr,
           context);
 
-  ArchRestrictedState* arch;
-
-  // open a new scope in case there are any RAII variables we want cleaned
-  // up before heading towards the NO_RETURN portion of this function
-  {
-    // no options defined for the moment
-    if (options != 0) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    // validate the vector table pointer
-    if (!is_user_accessible(vector_table_ptr)) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-
-    // load the restricted state buffer
-    RestrictedState* rs = Thread::Current::restricted_state();
-    if (rs == nullptr) {
-      zx_status_t status = Thread::Current::AllocateRestrictedState();
-      if (status != ZX_OK) {
-        return status;
-      }
-      rs = Thread::Current().restricted_state();
-    }
-
-    DEBUG_ASSERT(!rs->in_restricted());
-
-    // get a handle to the arch specific buffer
-    zx::result<ArchRestrictedState*> _arch = rs->GetArchState();
-    if (unlikely(_arch.is_error())) {
-      return _arch.error_value();
-    }
-    arch = *_arch;
-
-#if LOCAL_TRACE
-    arch->Dump();
-#endif
-
-    // validate the user state is valid (PC is in user space, etc)
-    if (unlikely(!arch->ValidatePreRestrictedEntry())) {
-      return ZX_ERR_BAD_STATE;
-    }
-
-    // from now on out we're committed, disable interrupts so we can do this
-    // without being interrupted as we save/restore state
-    arch_disable_ints();
-
-    // no more errors or interrupts, so we can switch the active aspace
-    // without worrying about ending up in a situation where the thread is
-    // set to normal with the restricted aspace active.
-    ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
-    VmAspace* restricted_aspace = up->restricted_aspace();
-    // This check can be removed once the restricted mode tests can and do run with a restricted
-    // aspace.
-    if (restricted_aspace) {
-      vmm_set_active_aspace(restricted_aspace);
-    }
-
-    // save the vector table pointer for return from restricted mode
-    rs->set_vector_ptr(vector_table_ptr);
-
-    // save the context ptr for return from restricted mode
-    rs->set_context(context);
-
-    // set our state to restricted enabled at the thread and arch level
-    rs->set_in_restricted(true);
-    arch_set_restricted_flag(true);
-  }
-  // no more RAII from here on out since we're heading towards a NO_RETURN
-  // function.
-
-  // get a chance to save some state before we enter normal mode
-  arch->SaveStatePreRestrictedEntry();
-
-  // enter restricted mode
-  arch->EnterRestricted();
-
-  // does not return
-}
-
-zx_status_t RestrictedWriteState(user_in_ptr<const void> data, size_t data_size) {
-  LTRACEF("data_size %zu\n", data_size);
-
-  // we only support writing the entire state at once
-  if (data_size != sizeof(zx_restricted_state)) {
+  // no options defined for the moment
+  if (options != 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // copy the data in
-  zx_restricted_state state{};
-  zx_status_t status = data.reinterpret<const zx_restricted_state>().copy_from_user(&state);
-  if (status != ZX_OK) {
+  // validate the vector table pointer
+  if (!is_user_accessible(vector_table_ptr)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  // has the state buffer been previously bound to this thread?
+  RestrictedState* rs = Thread::Current::restricted_state();
+  if (rs == nullptr) {
+    return ZX_ERR_BAD_STATE;
+  }
+  DEBUG_ASSERT(!rs->in_restricted());
+  const zx_restricted_state_t* state_buffer = rs->state_ptr();
+  if (!state_buffer) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  // copy out of the buffer here to local object so the state can be
+  // pre-validated and used without a possibility of user space manipulating it.
+  zx_restricted_state_t state;
+  state = *state_buffer;
+
+  if constexpr (LOCAL_TRACE) {
+    RestrictedState::ArchDump(state);
+  }
+
+  // validate the user state is valid (PC is in user space, etc)
+  zx_status_t status = RestrictedState::ArchValidateStatePreRestrictedEntry(state);
+  if (unlikely(status != ZX_OK)) {
     return status;
   }
 
-  // successful, overwrite our saved state
-  RestrictedState* rs = Thread::Current::restricted_state();
-  if (rs == nullptr) {
-    status = Thread::Current::AllocateRestrictedState();
-    if (status != ZX_OK) {
-      return status;
-    }
-    rs = Thread::Current().restricted_state();
+  // from now on out we're committed, disable interrupts so we can do this
+  // without being interrupted as we save/restore state
+  arch_disable_ints();
+
+  // no more errors or interrupts, so we can switch the active aspace
+  // without worrying about ending up in a situation where the thread is
+  // set to normal with the restricted aspace active.
+  ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
+  VmAspace* restricted_aspace = up->restricted_aspace();
+  // This check can be removed once the restricted mode tests can and do run with a restricted
+  // aspace.
+  if (restricted_aspace) {
+    vmm_set_active_aspace(restricted_aspace);
   }
 
-  // get a handle to the arch specific buffer
-  zx::result<ArchRestrictedState*> _arch = rs->GetArchState();
-  if (_arch.is_error()) {
-    return _arch.error_value();
-  }
-  ArchRestrictedState* arch = *_arch;
+  // save the vector table pointer for return from restricted mode
+  rs->set_vector_ptr(vector_table_ptr);
 
-  // copy the entire state. validation will be done at restricted enter time
-  arch->SetState(state);
+  // save the context ptr for return from restricted mode
+  rs->set_context(context);
 
-  return ZX_OK;
+  // set our state to restricted enabled at the thread and arch level
+  rs->set_in_restricted(true);
+  arch_set_restricted_flag(true);
+
+  // get a chance to save some state before we enter normal mode
+  RestrictedState::ArchSaveStatePreRestrictedEntry(rs->arch_normal_state());
+
+  // enter restricted mode
+  RestrictedState::ArchEnterRestricted(state);
+
+  // does not return
+  __UNREACHABLE;
 }
-
-zx_status_t RestrictedReadState(user_out_ptr<void> data, size_t data_size) {
-  LTRACEF("data_size %zu\n", data_size);
-
-  // we only support reading the entire state at once
-  if (data_size != sizeof(zx_restricted_state)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // get a handle to the arch specific buffer
-  RestrictedState* rs = Thread::Current::restricted_state();
-  if (rs == nullptr) {
-    zx_status_t status = Thread::Current::AllocateRestrictedState();
-    if (status != ZX_OK) {
-      return status;
-    }
-    rs = Thread::Current().restricted_state();
-  }
-
-  zx::result<ArchRestrictedState*> _arch = rs->GetArchState();
-  if (_arch.is_error()) {
-    return _arch.error_value();
-  }
-  ArchRestrictedState* arch = *_arch;
-  const zx_restricted_state& state = arch->state();
-
-  // copy out to user space
-  return data.reinterpret<zx_restricted_state>().copy_to_user(state);
-}
-
-RestrictedState::RestrictedState() = default;

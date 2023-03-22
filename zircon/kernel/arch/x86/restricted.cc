@@ -13,66 +13,106 @@
 #include <arch/vm.h>
 #include <arch/x86.h>
 #include <arch/x86/descriptor.h>
+#include <arch/x86/feature.h>
 #include <kernel/restricted.h>
+#include <vm/vm_address_region.h>
 
 #define LOCAL_TRACE 0
 
-void X86ArchRestrictedState::Dump() {
-  printf("ArchRestrictedState %p:\n", this);
-  printf(" RIP: %#18" PRIx64 "  FL: %#18" PRIx64 "\n", state_.ip, state_.flags);
+void RestrictedState::ArchDump(const zx_restricted_state_t& state) {
+  printf(" RIP: %#18" PRIx64 "  FL: %#18" PRIx64 "\n", state.ip, state.flags);
   printf(" RAX: %#18" PRIx64 " RBX: %#18" PRIx64 " RCX: %#18" PRIx64 " RDX: %#18" PRIx64 "\n",
-         state_.rax, state_.rbx, state_.rcx, state_.rdx);
+         state.rax, state.rbx, state.rcx, state.rdx);
   printf(" RSI: %#18" PRIx64 " RDI: %#18" PRIx64 " RBP: %#18" PRIx64 " RSP: %#18" PRIx64 "\n",
-         state_.rsi, state_.rdi, state_.rbp, state_.rsp);
+         state.rsi, state.rdi, state.rbp, state.rsp);
   printf("  R8: %#18" PRIx64 "  R9: %#18" PRIx64 " R10: %#18" PRIx64 " R11: %#18" PRIx64 "\n",
-         state_.r8, state_.r9, state_.r10, state_.r11);
+         state.r8, state.r9, state.r10, state.r11);
   printf(" R12: %#18" PRIx64 " R13: %#18" PRIx64 " R14: %#18" PRIx64 " R15: %#18" PRIx64 "\n",
-         state_.r12, state_.r13, state_.r14, state_.r15);
-  printf("fs base %#18" PRIx64 " gs base %#18" PRIx64 "\n", state_.fs_base, state_.gs_base);
+         state.r12, state.r13, state.r14, state.r15);
+  printf("fs base %#18" PRIx64 " gs base %#18" PRIx64 "\n", state.fs_base, state.gs_base);
 }
 
-bool X86ArchRestrictedState::ValidatePreRestrictedEntry() {
+zx_status_t RestrictedState::ArchValidateStatePreRestrictedEntry(
+    const zx_restricted_state_t& state) {
   // validate that RIP is within user space
-  if (!is_user_accessible(state_.ip)) {
-    TRACEF("fail due to bad ip %#" PRIx64 "\n", state_.ip);
-    return false;
+  if (unlikely(!is_user_accessible(state.ip))) {
+    LTRACEF("fail due to bad ip %#" PRIx64 "\n", state.ip);
+    return ZX_ERR_BAD_STATE;
   }
 
   // validate that the rflags saved only contain user settable flags
-  if ((state_.flags & ~X86_FLAGS_USER) != 0) {
-    TRACEF("fail due to flags outside of X86_FLAGS_USER set (%#" PRIx64 ")\n", state_.flags);
-    return false;
+  if (unlikely((state.flags & ~X86_FLAGS_USER) != 0)) {
+    LTRACEF("fail due to flags outside of X86_FLAGS_USER set (%#" PRIx64 ")\n", state.flags);
+    return ZX_ERR_BAD_STATE;
   }
 
   // fs and gs base must be canonical
-  if (!x86_is_vaddr_canonical(state_.fs_base)) {
-    TRACEF("fail due to bad fs base %#" PRIx64 "\n", state_.fs_base);
-    return false;
+  if (unlikely(!x86_is_vaddr_canonical(state.fs_base))) {
+    LTRACEF("fail due to bad fs base %#" PRIx64 "\n", state.fs_base);
+    return ZX_ERR_BAD_STATE;
   }
-  if (!x86_is_vaddr_canonical(state_.gs_base)) {
-    TRACEF("fail due to bad gs base %#" PRIx64 "\n", state_.gs_base);
-    return false;
+  if (unlikely(!x86_is_vaddr_canonical(state.gs_base))) {
+    LTRACEF("fail due to bad gs base %#" PRIx64 "\n", state.gs_base);
+    return ZX_ERR_BAD_STATE;
   }
 
   // everything else can be whatever value it wants to be. worst case it immediately faults
   // in restricted mode and that's okay.
-  return true;
+  return ZX_OK;
 }
 
-void X86ArchRestrictedState::SaveStatePreRestrictedEntry() {
-  // save the normal mode fs/gs base which we'll reload on the way back
-  normal_fs_base_ = read_msr(X86_MSR_IA32_FS_BASE);
-  normal_gs_base_ = read_msr(X86_MSR_IA32_KERNEL_GS_BASE);
-}
+namespace {
 
-void X86ArchRestrictedState::EnterRestricted() {
+// helper routines to read/write user fs and gs base registers using the optimal
+// mechanism. must be called with interrupts disabled around the swapgs sequence.
+void get_fsgsbase(uint64_t* fsbase, uint64_t* gsbase) {
   DEBUG_ASSERT(arch_ints_disabled());
-  DEBUG_ASSERT(x86_is_vaddr_canonical(state_.fs_base));
-  DEBUG_ASSERT(x86_is_vaddr_canonical(state_.gs_base));
+
+  // read the fs/gs base out of the MSRs
+  if (likely(x86_feature_test(X86_FEATURE_FSGSBASE))) {
+    *fsbase = _readfsbase_u64();
+    // the user and kernel base have been swapped, use swapgs to temporarily
+    // gain access to the gs register.
+    __asm__ __volatile__("swapgs\n");
+    uint64_t temp = _readgsbase_u64();
+    __asm__ __volatile__("swapgs\n");
+    *gsbase = temp;
+  } else {
+    *fsbase = read_msr(X86_MSR_IA32_FS_BASE);
+    *gsbase = read_msr(X86_MSR_IA32_KERNEL_GS_BASE);
+  }
+}
+
+void set_fsgsbase(uint64_t fsbase, uint64_t gsbase) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  DEBUG_ASSERT(x86_is_vaddr_canonical(fsbase));
+  DEBUG_ASSERT(x86_is_vaddr_canonical(gsbase));
+  if (likely(x86_feature_test(X86_FEATURE_FSGSBASE))) {
+    _writefsbase_u64(fsbase);
+    // the user and kernel base have been swapped, use swapgs to temporarily
+    // gain access to the gs register.
+    __asm__ __volatile__("swapgs\n");
+    _writegsbase_u64(gsbase);
+    __asm__ __volatile__("swapgs\n");
+  } else {
+    write_msr(X86_MSR_IA32_FS_BASE, fsbase);
+    write_msr(X86_MSR_IA32_KERNEL_GS_BASE, gsbase);
+  }
+}
+
+}  // namespace
+
+void RestrictedState::ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& arch_state) {
+  // save the normal mode fs/gs base which we'll reload on the way back
+  get_fsgsbase(&arch_state.normal_fs_base_, &arch_state.normal_gs_base_);
+}
+
+[[noreturn]] void RestrictedState::ArchEnterRestricted(const zx_restricted_state_t& state) {
+  DEBUG_ASSERT(arch_ints_disabled());
 
   // load the user fs/gs base from restricted mode
-  write_msr(X86_MSR_IA32_FS_BASE, state_.fs_base);
-  write_msr(X86_MSR_IA32_KERNEL_GS_BASE, state_.gs_base);
+  set_fsgsbase(state.fs_base, state.gs_base);
 
   // copy to a kernel iframe_t
   // struct iframe_t {
@@ -84,25 +124,25 @@ void X86ArchRestrictedState::EnterRestricted() {
   //   uint64_t user_sp, user_ss;                      // pushed by interrupt
   // };
   iframe_t iframe{};
-  iframe.rdi = state_.rdi;
-  iframe.rsi = state_.rsi;
-  iframe.rbp = state_.rbp;
-  iframe.rbx = state_.rbx;
-  iframe.rdx = state_.rdx;
-  iframe.rcx = state_.rcx;
-  iframe.rax = state_.rax;
-  iframe.r8 = state_.r8;
-  iframe.r9 = state_.r9;
-  iframe.r10 = state_.r10;
-  iframe.r11 = state_.r11;
-  iframe.r12 = state_.r12;
-  iframe.r13 = state_.r13;
-  iframe.r14 = state_.r14;
-  iframe.r15 = state_.r15;
-  iframe.ip = state_.ip;
+  iframe.rdi = state.rdi;
+  iframe.rsi = state.rsi;
+  iframe.rbp = state.rbp;
+  iframe.rbx = state.rbx;
+  iframe.rdx = state.rdx;
+  iframe.rcx = state.rcx;
+  iframe.rax = state.rax;
+  iframe.r8 = state.r8;
+  iframe.r9 = state.r9;
+  iframe.r10 = state.r10;
+  iframe.r11 = state.r11;
+  iframe.r12 = state.r12;
+  iframe.r13 = state.r13;
+  iframe.r14 = state.r14;
+  iframe.r15 = state.r15;
+  iframe.ip = state.ip;
   iframe.cs = USER_CODE_64_SELECTOR;
-  iframe.flags = state_.flags | X86_FLAGS_IF;
-  iframe.user_sp = state_.rsp;
+  iframe.flags = state.flags | X86_FLAGS_IF;
+  iframe.user_sp = state.rsp;
   iframe.user_ss = USER_DATA_SELECTOR;
   iframe.vector = iframe.err_code = 0;  // iframe.vector/err_code are unused
 
@@ -112,38 +152,41 @@ void X86ArchRestrictedState::EnterRestricted() {
   __UNREACHABLE;
 }
 
-void X86ArchRestrictedState::SaveRestrictedSyscallState(const syscall_regs_t *regs) {
+void RestrictedState::ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,
+                                                     const syscall_regs_t& regs) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
   // copy state syscall_regs_t to zx_restricted_state
-  state_.rdi = regs->rdi;
-  state_.rsi = regs->rsi;
-  state_.rbp = regs->rbp;
-  state_.rbx = regs->rbx;
-  state_.rdx = regs->rdx;
-  state_.rcx = regs->rcx;
-  state_.rax = regs->rax;
-  state_.rsp = regs->rsp;
-  state_.r8 = regs->r8;
-  state_.r9 = regs->r9;
-  state_.r10 = regs->r10;
-  state_.r11 = regs->r11;
-  state_.r12 = regs->r12;
-  state_.r13 = regs->r13;
-  state_.r14 = regs->r14;
-  state_.r15 = regs->r15;
-  state_.ip = regs->rip;
-  state_.flags = regs->rflags & X86_FLAGS_USER;
+  state.rdi = regs.rdi;
+  state.rsi = regs.rsi;
+  state.rbp = regs.rbp;
+  state.rbx = regs.rbx;
+  state.rdx = regs.rdx;
+  state.rcx = regs.rcx;
+  state.rax = regs.rax;
+  state.rsp = regs.rsp;
+  state.r8 = regs.r8;
+  state.r9 = regs.r9;
+  state.r10 = regs.r10;
+  state.r11 = regs.r11;
+  state.r12 = regs.r12;
+  state.r13 = regs.r13;
+  state.r14 = regs.r14;
+  state.r15 = regs.r15;
+  state.ip = regs.rip;
+  state.flags = regs.rflags & X86_FLAGS_USER;
 
   // read the fs/gs base out of the MSRs
-  state_.fs_base = read_msr(X86_MSR_IA32_FS_BASE);
-  state_.gs_base = read_msr(X86_MSR_IA32_KERNEL_GS_BASE);
+  get_fsgsbase(&state.fs_base, &state.gs_base);
 }
 
-void X86ArchRestrictedState::EnterFull(uintptr_t vector_table, uintptr_t context, uint64_t code) {
+[[noreturn]] void RestrictedState::ArchEnterFull(const ArchSavedNormalState& arch_state,
+                                                 uintptr_t vector_table, uintptr_t context,
+                                                 uint64_t code) {
+  DEBUG_ASSERT(arch_ints_disabled());
+
   // load the user fs/gs base from normal mode
-  DEBUG_ASSERT(x86_is_vaddr_canonical(normal_fs_base_));
-  DEBUG_ASSERT(x86_is_vaddr_canonical(normal_gs_base_));
-  write_msr(X86_MSR_IA32_FS_BASE, normal_fs_base_);
-  write_msr(X86_MSR_IA32_KERNEL_GS_BASE, normal_gs_base_);
+  set_fsgsbase(arch_state.normal_fs_base_, arch_state.normal_gs_base_);
 
   // set up a mostly blank iframe and return back to normal mode
   iframe_t iframe{};

@@ -20,6 +20,7 @@ source_set("kernel") {
     "owned_wait_queue.cc",
     "percpu.cc",
     "restricted.cc",
+    "restricted_state.cc",
     "scheduler.cc",
     "scheduler_pi.cc",
     "scheduler_state.cc",

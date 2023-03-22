@@ -12,95 +12,89 @@
 
 #include <arch/regs.h>
 #include <fbl/macros.h>
+#include <fbl/ref_ptr.h>
 #include <ktl/unique_ptr.h>
 
 // Per thread state to support restricted mode.
 // Intentionally kept simple to keep the amount of kernel/thread.h dependencies to a minimum.
 
-// Architecture specific state base class, final specialized in in arch/<arch>/restricted.h below.
-class ArchRestrictedStateImpl {
- public:
-  ArchRestrictedStateImpl() = default;
-  virtual ~ArchRestrictedStateImpl() = default;
-  DISALLOW_COPY_ASSIGN_AND_MOVE(ArchRestrictedStateImpl);
+class VmObjectPaged;
+class VmMapping;
 
-  // Prior to entering restricted mode, ask the arch layer to validate the saved register state is
-  // valid. Return true if valid.
-  //
-  // Possible invalid states: program counter outside of user space, invalid processor flags, etc.
-  virtual bool ValidatePreRestrictedEntry() = 0;
-
-  // Just prior to entering restricted mode, give the arch layer a chance to save any state it
-  // may need for the return trip back to normal mode.
-  // For example, the GS/FS base is saved here for x86.
-  virtual void SaveStatePreRestrictedEntry() = 0;
-
-  // Use an architcturally-specific mechanism to directly enter user space in restricted mode.
-  // Does not return.
-  [[noreturn]] virtual void EnterRestricted() = 0;
-
-  // Having just exited from restricted mode via a syscall, save the necessary restricted mode
-  // state from a pointer to the syscall state saved by the exception handler.
-  virtual void SaveRestrictedSyscallState(const syscall_regs_t* regs) = 0;
-
-  // Enter normal mode at the address pointed to by vector_table with arguments code and context
-  // in an architecturally specific register in an architecturally specific way.
-  [[noreturn]] virtual void EnterFull(uintptr_t vector_table, uintptr_t context, uint64_t code) = 0;
-
-  virtual void Dump() = 0;
-
-  void SetState(const zx_restricted_state& state) { state_ = state; }
-  const zx_restricted_state& state() const { return state_; }
-
- protected:
-  zx_restricted_state state_{};
-};
-
-// Arch-specific restricted.h must provide ArchRestrictedState.
-// It should inherit and override everything in ArchRestrictedStateImpl, mark it final,
-// name the resulting class ArchRestrictedState, or another name and set an alias with using.
+// Must provide a definition of struct ArchSavedNormalState
 #include <arch/restricted.h>
 
-// Per thread restricted state.
-// Mostly just a wrapper around ArchRestrictedState to try to lazy allocate the
-// expensive register state.
+// Encapsulates a thread's restricted mode state.
+//
+// Note everything in this class should be accessed only by the thread that it belongs to,
+// since there is no internal locking for efficiency reasons.
 class RestrictedState {
  public:
-  RestrictedState();
-  ~RestrictedState() = default;
+  static zx::result<ktl::unique_ptr<RestrictedState>> Create();
+
+  ~RestrictedState();
   DISALLOW_COPY_ASSIGN_AND_MOVE(RestrictedState);
 
   bool in_restricted() const { return in_restricted_; }
   uintptr_t vector_ptr() const { return vector_ptr_; }
   uintptr_t context() const { return context_; }
+  const ArchSavedNormalState& arch_normal_state() const { return arch_; }
+  ArchSavedNormalState& arch_normal_state() { return arch_; }
+  zx_restricted_state_t* state_ptr() const {
+    return reinterpret_cast<zx_restricted_state_t*>(state_mapping_ptr_);
+  }
+
+  fbl::RefPtr<VmObjectPaged> vmo() const;
 
   void set_in_restricted(bool r) { in_restricted_ = r; }
   void set_vector_ptr(uintptr_t v) { vector_ptr_ = v; }
   void set_context(uintptr_t c) { context_ = c; }
 
-  // Accessor for the arch restricted state member.
-  // Will allocate on first call.
-  zx::result<ArchRestrictedState*> GetArchState() {
-    // If we've already allocated it, just return the existing pointer.
-    if (likely(arch_)) {
-      return zx::ok(arch_.get());
-    }
+  // Each arch must fill out the following routines prefixed with Arch:
+  //
+  // Prior to entering restricted mode, ask the arch layer to validate the saved register state is
+  // valid. Return ZX_OK if valid.
+  // Possible invalid states: program counter outside of user space, invalid processor flags, etc.
+  static zx_status_t ArchValidateStatePreRestrictedEntry(const zx_restricted_state_t& state);
 
-    // Allocate a new restricted arch state on demand.
-    fbl::AllocChecker ac;
-    arch_ = ktl::make_unique<ArchRestrictedState>(&ac);
-    if (!ac.check()) {
-      return zx::error(ZX_ERR_NO_MEMORY);
-    }
+  // Just prior to entering restricted mode, give the arch layer a chance to save any state it
+  // may need for the return trip back to normal mode into the ArchSavedNormalState state argument.
+  // For example, the GS/FS base is saved here for x86.
+  static void ArchSaveStatePreRestrictedEntry(ArchSavedNormalState& state);
 
-    return zx::ok(arch_.get());
-  }
+  // Use an architcturally-specific mechanism to directly enter user space in restricted mode.
+  // Does not return.
+  [[noreturn]] static void ArchEnterRestricted(const zx_restricted_state_t& state);
+
+  // Having just exited from restricted mode via a syscall, save the necessary restricted mode
+  // state from a pointer to the syscall state saved by the exception handler.
+  static void ArchSaveRestrictedSyscallState(zx_restricted_state_t& state,
+                                             const syscall_regs_t& regs);
+
+  // Enter normal mode at the address pointed to by vector_table with arguments code and context
+  // in an architecturally specific register in an architecturally specific way.
+  [[noreturn]] static void ArchEnterFull(const ArchSavedNormalState& arch_state,
+                                         uintptr_t vector_table, uintptr_t context, uint64_t code);
+
+  // Dump the architecturally specific state out of the restricted mode state
+  static void ArchDump(const zx_restricted_state_t& state);
 
  private:
+  RestrictedState(fbl::RefPtr<VmObjectPaged> state_vmo, fbl::RefPtr<VmMapping> state_mapping);
+
   bool in_restricted_ = false;
   uintptr_t vector_ptr_ = 0;
   uintptr_t context_ = 0;
-  ktl::unique_ptr<ArchRestrictedState> arch_;  // allocated on demand to save space
+
+  // Ref pointer to a vmo holding the restricted state and a kernel mapping of the first page.
+  const fbl::RefPtr<VmObjectPaged> state_vmo_;
+  const fbl::RefPtr<VmMapping> state_mapping_;
+
+  // Cached pointer to the mapping, to avoid needing to deref the mapping on every access.
+  void* const state_mapping_ptr_ = nullptr;
+
+  // Arch specific part of the save state
+  ArchSavedNormalState arch_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_RESTRICTED_STATE_H_

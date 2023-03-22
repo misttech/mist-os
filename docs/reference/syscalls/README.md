@@ -208,9 +208,9 @@
 + [mtrace_control](mtrace_control.md)
 
 ## Restricted Mode (Work in progress)
++ [restricted_bind_state](restricted_bind_state.md)
++ [restricted_unbind_state](restricted_unbind_state.md)
 + [restricted_enter](restricted_enter.md)
-+ [restricted_read_state](restricted_read_state.md)
-+ [restricted_write_state](restricted_write_state.md)
 
 ## Others/Work in progress
 + [ioports_release](ioports_release.md)

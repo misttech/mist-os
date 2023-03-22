@@ -66,17 +66,16 @@ protocol Restricted {
     /// **ZX_ERR_INVALID_ARGS** *vector_table_ptr* is not a valid user address or *options*
     /// is non-zero.
     ///
-    /// **ZX_ERR_BAD_STATE** restricted mode register state is invalid. See
-    /// [`zx_restricted_write_state()`] for details.
+    /// **ZX_ERR_BAD_STATE** restricted mode register state is invalid.
     ///
     /// ## See also
     ///
-    /// - [`zx_restricted_write_state()`]
-    /// - [`zx_restricted_read_state()`]
+    /// - [`zx_restricted_bind_state()`]
+    /// - [`zx_restricted_unbind_state()`]
     /// - [`zx_process_create_shared()`]
     ///
-    /// [`zx_restricted_write_state()`]: restricted_write_state.md
-    /// [`zx_restricted_read_state()`]: restricted_read_state.md
+    /// [`zx_restricted_bind_state()`]: restricted_bind_state.md
+    /// [`zx_restricted_unbind_state()`]: restricted_unbind_state.md
     /// [`zx_process_create_shared()`]: process_create_shared.md
     /// [address spaces]: /docs/concepts/memory/address_spaces.md
     @next
@@ -88,127 +87,127 @@ protocol Restricted {
 
     /// ## Summary
     ///
-    /// Set restricted mode state on the current thread.
+    /// Create and bind a restricted state VMO to the current thread.
     ///
     /// ## Declaration
     ///
     /// ```c
     /// #include <zircon/syscalls-next.h>
     ///
-    /// zx_status_t zx_restricted_write(const void *state,
-    ///                                 size_t state_size);
+    /// zx_status_t zx_restricted_bind_state(uint32_t options, zx_handle_t* out_vmo);
     /// ```
     ///
     /// ## Description
     ///
-    /// Sets the restricted mode register state on the current thread according
-    /// to the structure passed.
+    /// Create a VMO to hold a `zx_restricted_state_t`.  Bind the VMO to the current
+    /// thread so that subsequent calls to [`zx_restricted_enter()`] will use it to
+    /// restore/save the restricted mode state upon entering/leaving restricted mode.
     ///
-    /// The state structure is defined below (and in syscalls-next.h)
-    /// ```c
-    ///    typedef struct zx_restricted_state {
-    /// #if __aarch64__
-    ///      uint64_t x[31];
-    ///      uint64_t sp;
-    ///      // Contains only the user-controllable upper 4-bits (NZCV).
-    ///      uint32_t cpsr;
-    ///      uint8_t padding1[4];
-    /// #elif __x86_64__
-    ///      // User space active registers
-    ///      uint64_t rdi, rsi, rbp, rbx, rdx, rcx, rax, rsp;
-    ///      uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
-    ///      uint64_t ip, flags;
+    /// While the returned VMO, `out_vmo`, is similar to one created by
+    /// [`zx_vmo_create()`], some operations are unsupported and may fail with an error.
+    /// For example, resizing and creating a child VMO are unsupported.  Mapping,
+    /// unmapping, and reading/writing via [`zx_vmo_read()`]/[`zx_vmo_write()`] are
+    /// supported.
     ///
-    ///      uint64_t fs_base, gs_base;
-    /// #endif
-    ///    } zx_restricted_state_t;
-    /// ```
+    /// Only one restricted state VMO may be bound to a thread at a time.  Attempting to
+    /// bind another one will replace the already bound VMO.
+    ///
+    /// A bound VMO will be destroyed only after the last user handle is closed, the
+    /// last user mapping is removed, and one of the following occur:
+    ///
+    ///   - It is replaced via `zx_restricted_bind_state()`.
+    ///
+    ///   - It is explicitly removed via [`zx_restricted_unbind_state()`].
+    ///
+    ///   - The thread is destroyed.
+    ///
+    /// Like any other VMO, once the VMO has been mapped it will be retained by its
+    /// mapping so the caller may close the handle and access the memory directly via
+    /// the mapping.
+    ///
+    /// Upon entering restricted mode `zx_restricted_state_t` at offset 0 of the VMO
+    /// will be loaded and execution will resume accordingly.  Upon leaving restricted
+    /// mode, the thread's restricted state will be saved at offset 0 of VMO.
+    ///
+    /// *options* must be zero.
+    ///
+    /// Note: If a handle to the newly created VMO cannot be returned because `out_vmo`
+    /// is an invalid pointer, the VMO may still be bound to the thread even when the
+    /// call returns **ZX_ERR_INVALID_ARGS**.  A caller can recover from this state by
+    /// calling [`zx_restricted_unbind_state()`] or calling
+    /// [zx_restricted_bind_state()`] again with a valid `out_vmo`.
     ///
     /// ## Rights
     ///
-    /// None
-    ///
-    /// ## Return value
-    ///
-    /// In the event of failure, a negative error value is returned.
+    /// Caller's job policy must allow **ZX_POL_NEW_VMO**.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS** Invalid pointer to state or length is incorrect.
+    /// **ZX_ERR_INVALID_ARGS**  *out_vmo* is an invalid pointer or NULL, or *options*
+    /// is any value other than 0.
+    ///
+    /// **ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+    /// There is no good way for userspace to handle this (unlikely) error.
+    /// In a future build this error will no longer occur.
     ///
     /// ## See also
     ///
     /// - [`zx_restricted_enter()`]
-    /// - [`zx_restricted_read_state()`]
+    ///
+    /// - [`zx_restricted_unbind_state()`]
     ///
     /// [`zx_restricted_enter()`]: restricted_enter.md
-    /// [`zx_restricted_read_state()`]: restricted_read_state.md
+    /// [`zx_restricted_unbind_state()`]: restricted_unbind_state.md
+    /// [`zx_vmo_create()`]: vmo_create.md
+    /// [`zx_vmo_read()`]: vmo_read.md
+    /// [`zx_vmo_write()`]: vmo_write.md
     @next
-    WriteState(struct {
-        @voidptr
-        buffer vector<byte>;
-    }) -> () error status;
+    BindState(resource struct {
+        options uint32;
+    }) -> (resource struct {
+        out handle:VMO;
+    }) error status;
 
     /// ## Summary
     ///
-    /// Set restricted mode state on the current thread.
+    /// Unbind a restricted state VMO from the current thread.
     ///
     /// ## Declaration
     ///
     /// ```c
     /// #include <zircon/syscalls-next.h>
     ///
-    /// zx_status_t zx_restricted_read(void *state,
-    ///                                size_t state_size);
+    /// zx_status_t zx_restricted_unbind_state(uint32_t options);
     /// ```
     ///
     /// ## Description
     ///
-    /// Sets the restricted mode register state on the current thread according
-    /// to the structure passed.
+    /// Unbind any restricted state VMO that may be bound to the calling thread.
     ///
-    /// The state structure is defined below (and in syscalls-next.h)
-    /// ```c
-    ///    typedef struct zx_restricted_state {
-    /// #if __aarch64__
-    ///      uint64_t x[31];
-    ///      uint64_t sp;
-    ///      // Contains only the user-controllable upper 4-bits (NZCV).
-    ///      uint32_t cpsr;
-    ///      uint8_t padding1[4];
-    /// #elif __x86_64__
-    ///      // User space active registers
-    ///      uint64_t rdi, rsi, rbp, rbx, rdx, rcx, rax, rsp;
-    ///      uint64_t r8, r9, r10, r11, r12, r13, r14, r15;
-    ///      uint64_t ip, flags;
+    /// See also [`zx_restricted_bind_state`].
     ///
-    ///      uint64_t fs_base, gs_base;
-    /// #endif
-    ///    } zx_restricted_state_t;
-    /// ```
+    /// It is not an error to call unbind on a thread that has no bound VMO.
+    ///
+    /// *options* must be zero.
     ///
     /// ## Rights
     ///
-    /// None
-    ///
-    /// ## Return value
-    ///
-    /// In the event of failure, a negative error value is returned.
+    /// None.
     ///
     /// ## Errors
     ///
-    /// **ZX_ERR_INVALID_ARGS** Invalid pointer to state or length is incorrect.
+    /// **ZX_ERR_INVALID_ARGS**  *options* is any value other than 0.
     ///
     /// ## See also
     ///
     /// - [`zx_restricted_enter()`]
-    /// - [`zx_restricted_write_state()`]
+    ///
+    /// - [`zx_restricted_bind_state()`]
     ///
     /// [`zx_restricted_enter()`]: restricted_enter.md
-    /// [`zx_restricted_write_state()`]: restricted_write_state.md
+    /// [`zx_restricted_bind_state()`]: restricted_bind_state.md
     @next
-    ReadState() -> (struct {
-        @voidptr
-        buffer vector<byte>;
-    }) error status;
+    UnbindState(resource struct {
+        options uint32;
+    }) -> () error status;
 };

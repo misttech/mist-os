@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/zx/vmo.h>
 #include <zircon/status.h>
 #include <zircon/syscalls-next.h>
 #include <zircon/syscalls.h>
@@ -93,14 +94,20 @@ extern "C" zx_status_t restricted_enter_wrapper(uint32_t options, uintptr_t vect
 class RestrictedState {
  public:
   RestrictedState() {
+    // Create a VMO and bind it to the current thread.
+    zx::vmo vmo;
+    ASSERT_OK(zx_restricted_bind_state(0, vmo.reset_and_get_address()));
+
     state_.ip = (uint64_t)bounce;
     state_.flags = 0;
     state_.fs_base = (uintptr_t)&fs_val_;
     state_.gs_base = (uintptr_t)&gs_val_;
 
-    // set the state
-    ASSERT_OK(zx_restricted_write_state(&state_, sizeof(state_)));
+    // Set the state
+    ASSERT_OK(vmo.write(&state_, 0, sizeof(state_)));
   }
+
+  ~RestrictedState() { ASSERT_OK(zx_restricted_unbind_state(0)); }
 
  private:
   uint64_t fs_val_ = 0;

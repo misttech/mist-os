@@ -72,16 +72,15 @@ No return value on success, since the current thread indirectly returns via
 **ZX_ERR_INVALID_ARGS** *vector_table_ptr* is not a valid user address or *options*
 is non-zero.
 
-**ZX_ERR_BAD_STATE** restricted mode register state is invalid. See
-[`zx_restricted_write_state()`] for details.
+**ZX_ERR_BAD_STATE** restricted mode register state is invalid.
 
 ## See also
 
-- [`zx_restricted_write_state()`]
-- [`zx_restricted_read_state()`]
+- [`zx_restricted_bind_state()`]
+- [`zx_restricted_unbind_state()`]
 - [`zx_process_create_shared()`]
 
-[`zx_restricted_write_state()`]: restricted_write_state.md
-[`zx_restricted_read_state()`]: restricted_read_state.md
+[`zx_restricted_bind_state()`]: restricted_bind_state.md
+[`zx_restricted_unbind_state()`]: restricted_unbind_state.md
 [`zx_process_create_shared()`]: process_create_shared.md
 [address spaces]: /docs/concepts/memory/address_spaces.md
