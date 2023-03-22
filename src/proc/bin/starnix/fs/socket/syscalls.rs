@@ -527,7 +527,7 @@ pub fn sys_recvfrom(
     let info = socket_ops.recvmsg(
         current_task,
         &file,
-        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, user_buffer, buffer_length),
+        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, user_buffer, buffer_length)?,
         flags,
         None,
     )?;
@@ -681,7 +681,7 @@ pub fn sys_sendto(
 
     let dest_address =
         maybe_parse_socket_address(current_task, user_dest_address, dest_address_length as usize)?;
-    let mut data = UserBuffersInputBuffer::new_at(&current_task.mm, user_buffer, buffer_length);
+    let mut data = UserBuffersInputBuffer::new_at(&current_task.mm, user_buffer, buffer_length)?;
 
     let flags = SocketMessageFlags::from_bits_truncate(flags);
     let socket_ops = file.downcast_file::<SocketFile>().unwrap();

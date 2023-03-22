@@ -33,8 +33,11 @@ pub fn sys_read(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    file.read(current_task, &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length))
-        .map_eintr(errno!(ERESTARTSYS))
+    file.read(
+        current_task,
+        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length)?,
+    )
+    .map_eintr(errno!(ERESTARTSYS))
 }
 
 pub fn sys_write(
@@ -44,8 +47,11 @@ pub fn sys_write(
     length: usize,
 ) -> Result<usize, Errno> {
     let file = current_task.files.get(fd)?;
-    file.write(current_task, &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length))
-        .map_eintr(errno!(ERESTARTSYS))
+    file.write(
+        current_task,
+        &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length)?,
+    )
+    .map_eintr(errno!(ERESTARTSYS))
 }
 
 pub fn sys_close(current_task: &CurrentTask, fd: FdNumber) -> Result<(), Errno> {
@@ -133,7 +139,7 @@ pub fn sys_pread64(
     file.read_at(
         current_task,
         offset,
-        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length),
+        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length)?,
     )
 }
 
@@ -149,7 +155,7 @@ pub fn sys_pwrite64(
     file.write_at(
         current_task,
         offset,
-        &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length),
+        &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length)?,
     )
 }
 

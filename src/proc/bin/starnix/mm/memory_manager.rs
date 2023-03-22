@@ -1067,6 +1067,9 @@ pub struct MemoryManager {
 
     /// Whether this address space is dumpable.
     pub dumpable: Mutex<DumpPolicy>,
+
+    /// Maximum valid user address for this vmar.
+    pub maximum_valid_user_address: UserAddress,
 }
 
 impl MemoryManager {
@@ -1093,6 +1096,9 @@ impl MemoryManager {
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.
             dumpable: Mutex::new(DumpPolicy::User),
+            maximum_valid_user_address: UserAddress::from_ptr(
+                user_vmar_info.base + user_vmar_info.len,
+            ),
         })
     }
 

@@ -10,6 +10,8 @@ use crate::types::{error, Errno, UserAddress, UserBuffer};
 pub type OutputBufferCallback<'a> = dyn FnMut(&mut [u8]) -> Result<usize, Errno> + 'a;
 
 /// The OutputBuffer allows for writing bytes to a buffer.
+/// A single OutputBuffer will only write up to MAX_RW_COUNT bytes which is the maximum size of a
+/// single operation.
 pub trait OutputBuffer: std::fmt::Debug {
     /// Calls `callback` for each segment to write data for. `callback` must returns the number of
     /// bytes actually written. When it returns less than the size of the input buffer, the write
@@ -69,7 +71,9 @@ pub trait OutputBuffer: std::fmt::Debug {
 
 pub type InputBufferCallback<'a> = dyn FnMut(&[u8]) -> Result<usize, Errno> + 'a;
 
-/// The InputBuffer allows for writing bytes to a buffer.
+/// The InputBuffer allows for reading bytes from a buffer.
+/// A single InputBuffer will only read up to MAX_RW_COUNT bytes which is the maximum size of a
+/// single operation.
 pub trait InputBuffer: std::fmt::Debug {
     /// Calls `callback` for each segment to peek data from. `callback` must returns the number of
     /// bytes actually peeked. When it returns less than the size of the output buffer, the read
@@ -84,8 +88,8 @@ pub trait InputBuffer: std::fmt::Debug {
     /// Returns the number of bytes already read from the buffer.
     fn bytes_read(&self) -> usize;
 
-    /// Clear the remaining content in the buffer. Returns the number of bytes swallowed. After
-    /// this method returns, `available()` will returns 0.
+    /// Clear the remaining content in the buffer. Returns the number of bytes swallowed. After this
+    /// method returns, `available()` will returns 0. This does not touch the data in the buffer.
     fn drain(&mut self) -> usize;
 
     /// Consumes `length` bytes of data from this buffer.
@@ -170,20 +174,20 @@ impl<'a> std::fmt::Debug for UserBuffersOutputBuffer<'a> {
 }
 
 impl<'a> UserBuffersOutputBuffer<'a> {
-    pub fn new(mm: &'a MemoryManager, mut buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+    pub fn new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+        let (mut buffers, available) =
+            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_user_address, buffers)?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
-        let available = UserBuffer::get_total_length(&buffers)?;
         Ok(Self { mm, buffers, available, bytes_written: 0 })
     }
 
-    pub fn new_at(mm: &'a MemoryManager, address: UserAddress, length: usize) -> Self {
-        Self {
-            mm,
-            buffers: vec![UserBuffer { address, length }],
-            available: length,
-            bytes_written: 0,
-        }
+    pub fn new_at(
+        mm: &'a MemoryManager,
+        address: UserAddress,
+        length: usize,
+    ) -> Result<Self, Errno> {
+        Self::new(mm, vec![UserBuffer { address, length }])
     }
 }
 
@@ -238,15 +242,20 @@ impl<'a> std::fmt::Debug for UserBuffersInputBuffer<'a> {
 }
 
 impl<'a> UserBuffersInputBuffer<'a> {
-    pub fn new(mm: &'a MemoryManager, mut buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+    pub fn new(mm: &'a MemoryManager, buffers: Vec<UserBuffer>) -> Result<Self, Errno> {
+        let (mut buffers, available) =
+            UserBuffer::cap_buffers_to_max_rw_count(mm.maximum_valid_user_address, buffers)?;
         // Reverse the buffers as the element will be removed as they are handled.
         buffers.reverse();
-        let available = UserBuffer::get_total_length(&buffers)?;
         Ok(Self { mm, buffers, available, bytes_read: 0 })
     }
 
-    pub fn new_at(mm: &'a MemoryManager, address: UserAddress, length: usize) -> Self {
-        Self { mm, buffers: vec![UserBuffer { address, length }], available: length, bytes_read: 0 }
+    pub fn new_at(
+        mm: &'a MemoryManager,
+        address: UserAddress,
+        length: usize,
+    ) -> Result<Self, Errno> {
+        Self::new(mm, vec![UserBuffer { address, length }])
     }
 }
 

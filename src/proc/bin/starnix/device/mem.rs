@@ -35,10 +35,27 @@ impl FileOps for DevNull {
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        data.read_each(&mut |bytes| {
-            log_info!(current_task, "write to devnull: {:?}", String::from_utf8_lossy(bytes));
-            Ok(bytes.len())
-        })
+        // Writes to /dev/null on Linux treat the input buffer in an unconventional way. The actual
+        // data is not touched and if the input parameters are plausible the device claims to
+        // successfully write up to MAX_RW_COUNT bytes.  If the input parameters are outside of the
+        // user accessible address space, writes will return EFAULT.
+
+        // For debugging log up to 4096 bytes from the input buffer. We don't care about errors when
+        // trying to read data to log. The amount of data logged is chosen arbitrarily.
+        let bytes_to_log = std::cmp::min(4096, data.available());
+        let mut log_buffer = vec![0; bytes_to_log];
+        let bytes_logged = match data.read(&mut log_buffer) {
+            Ok(bytes) => {
+                log_info!(
+                    current_task,
+                    "write to devnull: {:?}",
+                    String::from_utf8_lossy(&log_buffer[0..bytes])
+                );
+                bytes
+            }
+            Err(_) => 0,
+        };
+        Ok(bytes_logged + data.drain())
     }
 
     fn read_at(

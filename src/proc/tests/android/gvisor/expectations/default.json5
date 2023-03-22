@@ -749,9 +749,6 @@
                 "ReadaheadTest.InvalidSize",
                 "ReadaheadTest.CrossesEnd",
 
-                // readv_test
-                "ReadvTestNoFixture.TruncatedAtMax",
-
                 // rlimits_test
                 "RlimitTest.UnprivilegedSetRlimit",
                 "RlimitTest.SetSoftRlimitAboveHard",

@@ -4,7 +4,9 @@
 
 use zerocopy::{AsBytes, FromBytes};
 
+use crate::mm::PAGE_SIZE;
 use crate::types::*;
+use once_cell::sync::Lazy;
 
 /// Matches iovec_t.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, AsBytes, FromBytes)]
@@ -14,18 +16,42 @@ pub struct UserBuffer {
     pub length: usize,
 }
 
+pub static MAX_RW_COUNT: Lazy<usize> = Lazy::new(|| ((1 << 31) - *PAGE_SIZE) as usize);
+
 impl UserBuffer {
-    pub fn get_total_length(buffers: &[UserBuffer]) -> Result<usize, Errno> {
-        let mut total: usize = 0;
-        for buffer in buffers {
-            total = total.checked_add(buffer.length).ok_or_else(|| errno!(EINVAL))?;
+    pub fn cap_buffers_to_max_rw_count(
+        max_address: UserAddress,
+        buffers: Vec<UserBuffer>,
+    ) -> Result<(Vec<UserBuffer>, usize), Errno> {
+        // Linux checks all buffers for plausibility, even those past the MAX_RW_COUNT threshold.
+        if buffers
+            .iter()
+            .any(|buffer| buffer.address > max_address || buffer.length > max_address.ptr())
+        {
+            return error!(EFAULT);
         }
-        // The docs say we should return EINVAL if "the sum of the iov_len
-        // values overflows an ssize_t value."
-        if total > isize::MAX as usize {
-            return error!(EINVAL);
-        }
-        Ok(total)
+        let mut total = 0;
+        let buffers = buffers
+            .into_iter()
+            .map_while(|mut buffer| {
+                if total == *MAX_RW_COUNT {
+                    None
+                } else {
+                    total = match total.checked_add(buffer.length).ok_or_else(|| errno!(EINVAL)) {
+                        Ok(total) => total,
+                        Err(e) => {
+                            return Some(Err(e));
+                        }
+                    };
+                    if total > *MAX_RW_COUNT {
+                        buffer.length = total - *MAX_RW_COUNT;
+                        total = *MAX_RW_COUNT;
+                    }
+                    Some(Ok(buffer))
+                }
+            })
+            .collect::<Result<Vec<_>, Errno>>()?;
+        Ok((buffers, total))
     }
 
     pub fn advance(&mut self, length: usize) -> Result<(), Errno> {
