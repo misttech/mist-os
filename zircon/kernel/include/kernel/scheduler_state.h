@@ -18,6 +18,7 @@
 #include <kernel/cpu.h>
 #include <kernel/spinlock.h>
 #include <kernel/thread_lock.h>
+#include <ktl/limits.h>
 #include <ktl/move.h>
 #include <ktl/pair.h>
 
@@ -401,6 +402,12 @@ class SchedulerState {
   const SchedTime finish_time() const { return finish_time_; }
   cpu_mask_t hard_affinity() const { return hard_affinity_; }
   cpu_mask_t soft_affinity() const { return soft_affinity_; }
+
+  int32_t weight() const TA_REQ(thread_lock) {
+    return discipline() == SchedDiscipline::Fair
+               ? static_cast<int32_t>(effective_profile_.fair.weight.raw_value())
+               : ktl::numeric_limits<int32_t>::max();
+  }
 
   cpu_num_t curr_cpu() const { return curr_cpu_; }
   cpu_num_t last_cpu() const { return last_cpu_; }

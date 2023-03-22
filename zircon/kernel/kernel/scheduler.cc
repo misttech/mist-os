@@ -35,6 +35,7 @@
 #include <kernel/thread_lock.h>
 #include <ktl/algorithm.h>
 #include <ktl/forward.h>
+#include <ktl/limits.h>
 #include <ktl/move.h>
 #include <ktl/pair.h>
 #include <ktl/span.h>
@@ -56,6 +57,49 @@ constexpr SchedWeight kReciprocalMinWeight = 1 / kMinWeight;
 constexpr zx_time_t& operator+=(zx_time_t& value, SchedDuration delta) {
   value += delta.raw_value();
   return value;
+}
+
+inline zx_thread_state_t UserThreadState(const Thread* thread) {
+  switch (thread->state()) {
+    case THREAD_INITIAL:
+    case THREAD_READY:
+      return ZX_THREAD_STATE_NEW;
+    case THREAD_RUNNING:
+      return ZX_THREAD_STATE_RUNNING;
+    case THREAD_BLOCKED:
+    case THREAD_BLOCKED_READ_LOCK:
+    case THREAD_SLEEPING:
+      return ZX_THREAD_STATE_BLOCKED;
+    case THREAD_SUSPENDED:
+      return ZX_THREAD_STATE_SUSPENDED;
+    case THREAD_DEATH:
+      return ZX_THREAD_STATE_DEAD;
+    default:
+      return UINT32_MAX;
+  }
+}
+
+constexpr int32_t kIdleWeight = ktl::numeric_limits<int32_t>::min();
+
+// Writes a context switch record to the ktrace buffer. This is always enabled
+// so that user mode tracing can track which threads are running.
+inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_thread,
+                               cpu_num_t current_cpu) TA_REQ(thread_lock) {
+  const SchedulerState& current_state = current_thread->scheduler_state();
+  const SchedulerState& next_state = next_thread->scheduler_state();
+  KTRACE_CONTEXT_SWITCH(
+      "kernel:sched", current_cpu, UserThreadState(current_thread), current_thread->fxt_ref(),
+      next_thread->fxt_ref(),
+      ("outgoing_weight", current_thread->IsIdle() ? kIdleWeight : current_state.weight()),
+      ("incoming_weight", next_thread->IsIdle() ? kIdleWeight : next_state.weight()));
+}
+
+// Writes a thread wakeup record to the ktrace buffer. This is always enabled
+// so that user mode tracing can track which threads are waking.
+inline void TraceWakeup(const Thread* thread, cpu_num_t target_cpu) TA_REQ(thread_lock) {
+  const SchedulerState& state = thread->scheduler_state();
+  KTRACE_THREAD_WAKEUP("kernel:sched", target_cpu, thread->fxt_ref(),
+                       ("weight", thread->IsIdle() ? kIdleWeight : state.weight()));
 }
 
 // Returns a delta value to additively update a predictor. Compares the given
@@ -117,36 +161,6 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
         ((eligible ? 1 : 0) << 29);
 
     ktrace_probe(TraceAlways, TraceContext::Cpu, name, arg0, arg1);
-  }
-}
-
-// Writes a context switch record to the ktrace buffer. This is always enabled
-// so that user mode tracing can track which threads are running.
-inline void Scheduler::TraceContextSwitch(const Thread* current_thread, const Thread* next_thread,
-                                          cpu_num_t current_cpu) {
-  if (unlikely(ktrace_category_enabled("kernel:sched"_category))) {
-    zx_thread_state_t user_thread_state = [](thread_state ts) {
-      switch (ts) {
-        case THREAD_INITIAL:
-        case THREAD_READY:
-          return ZX_THREAD_STATE_NEW;
-        case THREAD_RUNNING:
-          return ZX_THREAD_STATE_RUNNING;
-        case THREAD_BLOCKED:
-        case THREAD_BLOCKED_READ_LOCK:
-        case THREAD_SLEEPING:
-          return ZX_THREAD_STATE_BLOCKED;
-        case THREAD_SUSPENDED:
-          return ZX_THREAD_STATE_SUSPENDED;
-        case THREAD_DEATH:
-          return ZX_THREAD_STATE_DEAD;
-        default:
-          return UINT32_MAX;
-      }
-    }(current_thread->state());
-    fxt_context_switch(current_ticks(), static_cast<uint8_t>(current_cpu), user_thread_state,
-                       fxt::ThreadRef(current_thread->pid(), current_thread->tid()),
-                       fxt::ThreadRef(next_thread->pid(), next_thread->tid()), 0, 0);
   }
 }
 
@@ -1657,6 +1671,7 @@ void Scheduler::Unblock(Thread* thread) {
   Scheduler* const target = Get(target_cpu);
 
   thread->set_ready();
+  TraceWakeup(thread, target_cpu);
   {
     Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
     target->Insert(now, thread);
@@ -1681,6 +1696,7 @@ void Scheduler::Unblock(Thread::UnblockList list) {
     Scheduler* const target = Get(target_cpu);
 
     thread->set_ready();
+    TraceWakeup(thread, target_cpu);
     {
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard_{&target->queue_lock_, SOURCE_TAG};
       target->Insert(now, thread);

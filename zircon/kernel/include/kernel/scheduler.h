@@ -474,10 +474,6 @@ class Scheduler {
   // Update trace counters which track the total number of runnable threads for a CPU
   inline void TraceTotalRunnableThreads() const TA_REQ(queue_lock_);
 
-  // Trace a context switch event.
-  static inline void TraceContextSwitch(const Thread* current_thread, const Thread* next_thread,
-                                        cpu_num_t current_cpu) TA_REQ(thread_lock);
-
   // Returns a new flow id when flow tracing is enabled, zero otherwise.
   inline static uint64_t NextFlowId();
 

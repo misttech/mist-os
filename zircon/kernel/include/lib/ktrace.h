@@ -550,6 +550,35 @@
                    ##__VA_ARGS__)
 
 //
+// ## CONTEXT_SWITCH
+//
+
+// Writes a context switch record for the given threads.
+#define KTRACE_CONTEXT_SWITCH(category, cpu, outgoing_state, outgoing_thread_ref,                  \
+                              incoming_thread_ref, ...)                                            \
+  do {                                                                                             \
+    if (unlikely(ktrace_category_enabled(FXT_INTERN_CATEGORY(category)))) {                        \
+      fxt::WriteContextSwitchRecord(&KTRACE_STATE, ktrace_timestamp(), static_cast<uint16_t>(cpu), \
+                                    outgoing_state, outgoing_thread_ref, incoming_thread_ref,      \
+                                    FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__));          \
+    }                                                                                              \
+  } while (false)
+
+//
+// ## THREAD_WAKEUP
+//
+
+// Writes a thread wakeup record for the given thread.
+#define KTRACE_THREAD_WAKEUP(category, cpu, thread_ref, ...)                                      \
+  do {                                                                                            \
+    if (unlikely(ktrace_category_enabled(FXT_INTERN_CATEGORY(category)))) {                       \
+      fxt::WriteThreadWakeupRecord(&KTRACE_STATE, ktrace_timestamp(), static_cast<uint16_t>(cpu), \
+                                   thread_ref,                                                    \
+                                   FXT_MAP_LIST_ARGS(FXT_MAKE_ARGUMENT, ##__VA_ARGS__));          \
+    }                                                                                             \
+  } while (false)
+
+//
 // # Kernel tracing state and low level API
 //
 
@@ -573,15 +602,15 @@ inline void fxt_kernel_object(
   fxt::WriteKernelObjectRecord(&KTRACE_STATE, fxt::Koid(koid), obj_type, name_arg, args...);
 }
 
-template <fxt::RefType outgoing_type, fxt::RefType incoming_type>
-inline void fxt_context_switch(uint64_t timestamp, uint8_t cpu_number,
-                               zx_thread_state_t outgoing_thread_state,
-                               const fxt::ThreadRef<outgoing_type>& outgoing_thread,
-                               const fxt::ThreadRef<incoming_type>& incoming_thread,
-                               uint8_t outgoing_thread_priority, uint8_t incoming_thread_priority) {
+template <fxt::ArgumentType... arg_types, fxt::RefType... arg_name_types,
+          fxt::RefType... arg_val_types>
+inline void fxt_context_switch(
+    uint64_t timestamp, uint16_t cpu_number, zx_thread_state_t outgoing_thread_state,
+    const fxt::ThreadRef<fxt::RefType::kInline>& outgoing_thread,
+    const fxt::ThreadRef<fxt::RefType::kInline>& incoming_thread,
+    const fxt::Argument<arg_types, arg_name_types, arg_val_types>&... args) {
   fxt::WriteContextSwitchRecord(&KTRACE_STATE, timestamp, cpu_number, outgoing_thread_state,
-                                outgoing_thread, incoming_thread, outgoing_thread_priority,
-                                incoming_thread_priority);
+                                outgoing_thread, incoming_thread, args...);
 }
 
 inline void fxt_string_record(uint16_t index, const char* string, size_t string_length) {
