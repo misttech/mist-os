@@ -89,8 +89,6 @@ class Device : public std::enable_shared_from_this<Device>,
   zx_status_t ConnectRuntime(const char* service_name, const char* protocol_name,
                              fdf::Channel request);
 
-  fpromise::promise<void, zx_status_t> RebindToLibname(std::string_view libname);
-
   fpromise::promise<void, zx_status_t> WaitForInitToComplete();
 
   zx_status_t CreateNode();
@@ -198,7 +196,6 @@ class Device : public std::enable_shared_from_this<Device>,
   zx_status_t init_status_ __TA_GUARDED(init_lock_) = ZX_OK;
   std::vector<fpromise::completer<void, zx_status_t>> init_waiters_ __TA_GUARDED(init_lock_);
 
-  bool pending_rebind_ = false;
   bool pending_removal_ = false;
 
   // Completed when unbind is replied to.

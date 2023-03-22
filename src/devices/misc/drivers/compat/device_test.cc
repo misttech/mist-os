@@ -669,10 +669,10 @@ TEST_F(DeviceTest, TestBind) {
 
   ASSERT_EQ(node.children().count("second-device"), 1ul);
   const fdf_testing::TestNode& child_node = node.children().at("second-device");
-  std::vector properties = child_node.GetProperties();
-  ASSERT_EQ(2ul, properties.size());
-  ASSERT_EQ(properties[1].key().string_value().value(), "fuchsia.compat.LIBNAME");
-  ASSERT_EQ(properties[1].value().string_value().value(), "gpt.so");
+  std::vector bind_data = child_node.GetBindData();
+  ASSERT_EQ(1ul, bind_data.size());
+  ASSERT_FALSE(bind_data[0].force_rebind);
+  ASSERT_EQ(bind_data[0].driver_url_suffix, "gpt.so");
 }
 
 TEST_F(DeviceTest, TestBindAlreadyBound) {
@@ -689,18 +689,20 @@ TEST_F(DeviceTest, TestBindAlreadyBound) {
   zx_device_t* second_device;
   device_add_args_t args{
       .name = "second-device",
+      .flags = DEVICE_ADD_NON_BINDABLE,
   };
   device.Add(&args, &second_device);
+  ASSERT_EQ(ZX_OK, second_device->CreateNode());
 
   // create another device.
   zx_device_t* third_device;
   second_device->Add(&args, &third_device);
-  ASSERT_EQ(ZX_OK, second_device->CreateNode());
+  ASSERT_EQ(ZX_OK, third_device->CreateNode());
 
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), &device);
+  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), second_device);
   fidl::WireClient client{std::move(dev_endpoints->client), test_loop().dispatcher()};
 
   bool got_reply = false;
@@ -760,42 +762,10 @@ TEST_F(DeviceTest, TestRebind) {
   ASSERT_TRUE(got_reply);
 
   const fdf_testing::TestNode& child_node = node.children().at("second-device");
-  std::vector properties = child_node.GetProperties();
-  ASSERT_EQ(2ul, properties.size());
-  ASSERT_EQ(properties[1].key().string_value().value(), "fuchsia.compat.LIBNAME");
-  ASSERT_EQ(properties[1].value().string_value().value(), "gpt.so");
-}
-
-TEST_F(DeviceTest, DeviceRebind) {
-  fdf_testing::TestNode node("root", dispatcher());
-  zx::result node_client = node.CreateNodeChannel();
-  ASSERT_EQ(ZX_OK, node_client.status_value());
-
-  // Create a device.
-  zx_protocol_device_t ops{};
-  compat::Device device(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
-                        dispatcher());
-  device.Bind({std::move(node_client.value()), dispatcher()});
-
-  zx_device_t* second_device;
-  device_add_args_t args{
-      .name = "second-device",
-  };
-  ASSERT_EQ(ZX_OK, device.Add(&args, &second_device));
-  ASSERT_EQ(ZX_OK, second_device->CreateNode());
-
-  second_device->executor().schedule_task(
-      second_device->RebindToLibname({}).then([](fpromise::result<void, zx_status_t>& status) {
-        ASSERT_TRUE(status.is_ok()) << zx_status_get_string(status.error());
-      }));
-  ASSERT_TRUE(test_loop().RunUntilIdle());
-
-  ASSERT_EQ(node.children().count("second-device"), 1ul);
-  const fdf_testing::TestNode& child_node = node.children().at("second-device");
-  std::vector properties = child_node.GetProperties();
-  ASSERT_EQ(2ul, properties.size());
-  ASSERT_EQ(properties[1].key().string_value().value(), "fuchsia.compat.LIBNAME");
-  ASSERT_EQ(properties[1].value().string_value().value(), "");
+  std::vector bind_data = child_node.GetBindData();
+  ASSERT_EQ(1ul, bind_data.size());
+  ASSERT_TRUE(bind_data[0].force_rebind);
+  ASSERT_EQ(bind_data[0].driver_url_suffix, "gpt.so");
 }
 
 TEST_F(DeviceTest, CreateNodeProperties) {

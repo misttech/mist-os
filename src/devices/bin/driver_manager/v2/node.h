@@ -211,6 +211,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void Kill(KillCompleter::Sync& completer) override;
   // fidl::WireServer<fuchsia_driver_framework::NodeController>
   void Remove(RemoveCompleter::Sync& completer) override;
+  void RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) override;
   // fidl::WireServer<fuchsia_driver_framework::Node>
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;
 
@@ -265,6 +266,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<NodeId> removal_id_;
   NodeRemovalTracker* removal_tracker_ = nullptr;
   bool node_restarting_ = false;
+  std::optional<std::string> restart_driver_url_suffix_;
 
   // Invoked when the node has been fully removed.
   fit::callback<void()> remove_complete_callback_;

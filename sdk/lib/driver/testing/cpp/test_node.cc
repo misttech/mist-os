@@ -114,6 +114,28 @@ void TestNode::AddChild(AddChildRequestView request, AddChildCompleter::Sync& co
   completer.ReplySuccess();
 }
 
+void TestNode::RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) {
+  std::lock_guard guard(checker_);
+  bool force_rebind = false;
+  if (request->has_force_rebind()) {
+    force_rebind = request->force_rebind();
+  }
+  std::string driver_url_suffix;
+  if (request->has_driver_url_suffix()) {
+    driver_url_suffix = std::string(request->driver_url_suffix().get());
+  }
+
+  bind_data_.push_back(BindData{
+      .force_rebind = force_rebind,
+      .driver_url_suffix = std::move(driver_url_suffix),
+  });
+  if (!children_.empty() && !force_rebind) {
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+    return;
+  }
+  completer.ReplySuccess();
+}
+
 void TestNode::SetParent(TestNode* parent,
                          fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller) {
   std::lock_guard guard(checker_);

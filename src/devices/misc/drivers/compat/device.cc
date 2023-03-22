@@ -445,7 +445,7 @@ zx_status_t Device::CreateNode() {
                      (ptr)->topological_path_.data());
           }
           // Only remove us if the driver requested it (normally via device_async_remove)
-          if (ptr->pending_removal_ && !ptr->pending_rebind_) {
+          if (ptr->pending_removal_) {
             ptr->UnbindAndRelease();
           }
         }
@@ -726,48 +726,6 @@ fpromise::promise<void, zx_status_t> Device::WaitForInitToComplete() {
   return bridge.consumer.promise_or(fpromise::error(ZX_ERR_UNAVAILABLE));
 }
 
-constexpr char kCompatKey[] = "fuchsia.compat.LIBNAME";
-fpromise::promise<void, zx_status_t> Device::RebindToLibname(std::string_view libname) {
-  if (controller_teardown_finished_ == std::nullopt) {
-    FDF_LOG(ERROR, "Calling rebind before device is set up?");
-    return fpromise::make_error_promise(ZX_ERR_BAD_STATE);
-  }
-  InsertOrUpdateProperty(
-      fdf::wire::NodePropertyKey::WithStringValue(arena_,
-                                                  fidl::StringView::FromExternal(kCompatKey)),
-      fdf::wire::NodePropertyValue::WithStringValue(arena_, fidl::StringView(arena_, libname)));
-  // Once the controller teardown is finished (and the device is safely deleted),
-  // we re-create the device.
-  pending_rebind_ = true;
-  auto promise =
-      std::move(controller_teardown_finished_.value())
-          .or_else([]() -> fpromise::result<void, zx_status_t> {
-            ZX_ASSERT_MSG(false, "Unbind should always succeed");
-          })
-          .and_then([weak = weak_from_this()]() mutable -> fpromise::result<void, zx_status_t> {
-            auto ptr = weak.lock();
-            if (!ptr) {
-              return fpromise::error(ZX_ERR_CANCELED);
-            }
-            // Reset FIDL clients so they don't complain when rebound.
-            ptr->controller_ = {};
-            ptr->node_ = {};
-            zx_status_t status = ptr->CreateNode();
-            ptr->pending_rebind_ = false;
-            ptr->pending_removal_ = false;
-            if (status != ZX_OK) {
-              FDF_LOGL(ERROR, ptr->logger(), "Failed to recreate node: %s",
-                       zx_status_get_string(status));
-              return fpromise::error(status);
-            }
-
-            return fpromise::ok();
-          })
-          .wrap_with(scope_);
-  Remove();
-  return promise;
-}
-
 zx_status_t Device::ConnectFragmentFidl(const char* fragment_name, const char* service_name,
                                         const char* protocol_name, zx::channel request) {
   if (std::string_view(fragment_name) != "default") {
@@ -949,7 +907,7 @@ void Device::Connect(ConnectRequestView request, ConnectCompleter::Sync& complet
 void Device::LogError(const char* error) {
   FDF_LOG(ERROR, "%s: %s", topological_path_.c_str(), error);
 }
-bool Device::IsUnbound() { return pending_removal_ && !pending_rebind_; }
+bool Device::IsUnbound() { return pending_removal_; }
 
 void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                                  ConnectToDeviceFidlCompleter::Sync& completer) {
@@ -957,23 +915,20 @@ void Device::ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
 }
 
 void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
-  if (HasChildren()) {
-    // A DFv1 driver will add a child device once it's bound. If the device has any children, refuse
-    // the Bind() call.
-    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
-    return;
-  }
-  auto promise = RebindToLibname(request->driver.get())
-                     .then([completer = completer.ToAsync()](
-                               fpromise::result<void, zx_status_t>& result) mutable {
-                       if (result.is_ok()) {
-                         completer.ReplySuccess();
-                       } else {
-                         completer.ReplyError(result.take_error());
-                       }
-                     });
-
-  executor().schedule_task(std::move(promise));
+  fidl::Arena arena;
+  auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)
+                          .force_rebind(false)
+                          .driver_url_suffix(request->driver);
+  controller_->RequestBind(bind_request.Build())
+      .ThenExactlyOnce(
+          [completer = completer.ToAsync()](
+              fidl::WireUnownedResult<fdf::NodeController::RequestBind>& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+              return;
+            }
+            completer.Reply(result.value());
+          });
 }
 
 void Device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
@@ -981,17 +936,20 @@ void Device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Syn
 }
 
 void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
-  auto promise = RebindToLibname(request->driver.get())
-                     .then([completer = completer.ToAsync()](
-                               fpromise::result<void, zx_status_t>& result) mutable {
-                       if (result.is_ok()) {
-                         completer.ReplySuccess();
-                       } else {
-                         completer.ReplyError(result.take_error());
-                       }
-                     });
-
-  executor().schedule_task(std::move(promise));
+  fidl::Arena arena;
+  auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)
+                          .force_rebind(true)
+                          .driver_url_suffix(request->driver);
+  controller_->RequestBind(bind_request.Build())
+      .ThenExactlyOnce(
+          [completer = completer.ToAsync()](
+              fidl::WireUnownedResult<fdf::NodeController::RequestBind>& result) mutable {
+            if (!result.ok()) {
+              completer.ReplyError(result.status());
+              return;
+            }
+            completer.Reply(result.value());
+          });
 }
 
 void Device::UnbindChildren(UnbindChildrenCompleter::Sync& completer) {

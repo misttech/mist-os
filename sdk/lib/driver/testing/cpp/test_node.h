@@ -13,6 +13,10 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
                  public fidl::WireServer<fuchsia_driver_framework::Node> {
  public:
   using ChildrenMap = std::unordered_map<std::string, TestNode>;
+  struct BindData {
+    bool force_rebind;
+    std::string driver_url_suffix;
+  };
 
   struct CreateStartArgsResult {
     fuchsia_driver_framework::DriverStartArgs start_args;
@@ -49,6 +53,10 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
     std::lock_guard guard(checker_);
     return properties_;
   }
+  std::vector<BindData> GetBindData() const {
+    std::lock_guard guard(checker_);
+    return bind_data_;
+  }
 
   async_dispatcher_t* dispatcher() const { return dispatcher_; }
 
@@ -56,6 +64,7 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
   void AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) override;
 
   void Remove(RemoveCompleter::Sync& completer) override { RemoveFromParent(); }
+  void RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) override;
 
   void SetParent(TestNode* parent,
                  fidl::ServerEnd<fuchsia_driver_framework::NodeController> controller);
@@ -72,6 +81,7 @@ class TestNode : public fidl::WireServer<fuchsia_driver_framework::NodeControlle
 
   async_dispatcher_t* dispatcher_;
   std::vector<fuchsia_driver_framework::NodeProperty> properties_ __TA_GUARDED(checker_);
+  std::vector<BindData> bind_data_ __TA_GUARDED(checker_);
   std::string name_ __TA_GUARDED(checker_);
   std::optional<std::reference_wrapper<TestNode>> parent_ __TA_GUARDED(checker_);
   ChildrenMap children_ __TA_GUARDED(checker_);

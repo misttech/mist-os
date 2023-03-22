@@ -803,6 +803,33 @@ void Node::Remove(RemoveCompleter::Sync& completer) {
   Remove(RemovalSet::kAll, nullptr);
 }
 
+void Node::RequestBind(RequestBindRequestView request, RequestBindCompleter::Sync& completer) {
+  constexpr char kCompatKey[] = "fuchsia.compat.LIBNAME";
+  bool force_rebind = false;
+  if (request->has_force_rebind()) {
+    force_rebind = request->force_rebind();
+  }
+  if (driver_component_.has_value() && !force_rebind) {
+    completer.ReplyError(ZX_ERR_ALREADY_BOUND);
+  }
+
+  std::string driver_url_suffix;
+  if (request->has_driver_url_suffix()) {
+    driver_url_suffix = std::string(request->driver_url_suffix().get());
+    properties_.push_back(fdf::MakeProperty(arena_, kCompatKey, driver_url_suffix));
+  }
+
+  if (driver_component_.has_value()) {
+    restart_driver_url_suffix_ = driver_url_suffix;
+    RestartNode();
+    completer.ReplySuccess();
+    return;
+  }
+
+  node_manager_.value()->Bind(*this, nullptr);
+  completer.ReplySuccess();
+}
+
 void Node::AddChild(AddChildRequestView request, AddChildCompleter::Sync& completer) {
   AddChild(fidl::ToNatural(request->args), std::move(request->controller), std::move(request->node),
            [completer = completer.ToAsync()](
