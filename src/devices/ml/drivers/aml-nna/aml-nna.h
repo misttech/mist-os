@@ -26,7 +26,8 @@ namespace aml_nna {
 class AmlNnaDevice;
 using AmlNnaDeviceType = ddk::Device<AmlNnaDevice, ddk::GetProtocolable>;
 
-class AmlNnaDevice : public AmlNnaDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_NNA> {
+class AmlNnaDevice : public AmlNnaDeviceType,
+                     public ddk::PDevProtocol<AmlNnaDevice, ddk::base_protocol> {
  public:
   struct NnaPowerDomainBlock {
     // Power Domain MMIO.
@@ -61,8 +62,8 @@ class AmlNnaDevice : public AmlNnaDeviceType, public ddk::EmptyProtocol<ZX_PROTO
 
   explicit AmlNnaDevice(zx_device_t* parent, fdf::MmioBuffer hiu_mmio, fdf::MmioBuffer power_mmio,
                         fdf::MmioBuffer memory_pd_mmio,
-                        fidl::ClientEnd<fuchsia_hardware_registers::Device> reset, ddk::PDev pdev,
-                        NnaBlock nna_block, zx::resource smc_monitor)
+                        fidl::ClientEnd<fuchsia_hardware_registers::Device> reset,
+                        ddk::PDevFidl pdev, NnaBlock nna_block, zx::resource smc_monitor)
       : AmlNnaDeviceType(parent),
         pdev_(std::move(pdev)),
         hiu_mmio_(std::move(hiu_mmio)),
@@ -70,10 +71,9 @@ class AmlNnaDevice : public AmlNnaDeviceType, public ddk::EmptyProtocol<ZX_PROTO
         memory_pd_mmio_(std::move(memory_pd_mmio)),
         reset_(std::move(reset)),
         nna_block_(nna_block),
-        smc_monitor_(std::move(smc_monitor)) {
-    pdev_.GetProto(&parent_pdev_);
-  }
+        smc_monitor_(std::move(smc_monitor)) {}
   static zx_status_t Create(void* ctx, zx_device_t* parent);
+
   zx_status_t Init();
 
   zx_status_t PowerDomainControl(bool turn_on);
@@ -82,14 +82,23 @@ class AmlNnaDevice : public AmlNnaDeviceType, public ddk::EmptyProtocol<ZX_PROTO
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkRelease();
 
+  // Platform device protocol implementation.
+  // TODO(fxbug.dev/124172): Remove implementation of PDevProtocol and
+  // ddk::GetProtocolable. Update child drivers to use the PlatformDevice FIDL
+  // instead.
+  zx_status_t PDevGetMmio(uint32_t index, pdev_mmio_t* out_mmio);
+  zx_status_t PDevGetInterrupt(uint32_t index, uint32_t flags, zx::interrupt* out_irq);
+  zx_status_t PDevGetBti(uint32_t index, zx::bti* out_handle);
+  zx_status_t PDevGetSmc(uint32_t index, zx::resource* out_resource);
+  zx_status_t PDevGetDeviceInfo(pdev_device_info_t* out_info);
+  zx_status_t PDevGetBoardInfo(pdev_board_info_t* out_info);
+
  private:
-  ddk::PDev pdev_;
+  ddk::PDevFidl pdev_;
   fdf::MmioBuffer hiu_mmio_;
   fdf::MmioBuffer power_mmio_;
   fdf::MmioBuffer memory_pd_mmio_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_;
-
-  pdev_protocol_t parent_pdev_;
 
   NnaBlock nna_block_;
 

@@ -16,5 +16,6 @@
     },
     use: [
         { service: "fuchsia.hardware.registers.Service" },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }
