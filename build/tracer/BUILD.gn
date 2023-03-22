@@ -10,6 +10,7 @@ group("tests") {
   deps = [
     ":action_tracer_test($host_toolchain)",
     ":output_cacher_test($host_toolchain)",
+    ":restat_cacher_test($host_toolchain)",
     ":tracer_test",
 
     # There are known platforms where fsatrace_test fails.
@@ -80,5 +81,9 @@ if (is_host) {
   python_host_test("output_cacher_test") {
     main_source = "output_cacher_test.py"
     sources = [ "output_cacher.py" ]
+  }
+  python_host_test("restat_cacher_test") {
+    main_source = "restat_cacher_test.py"
+    sources = [ "restat_cacher.py" ]
   }
 }
