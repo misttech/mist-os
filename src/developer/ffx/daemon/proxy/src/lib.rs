@@ -8,7 +8,7 @@ use async_utils::async_once::Once;
 use errors::{ffx_bail, ffx_error, FfxError};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
-use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path};
+use ffx_daemon::{get_daemon_proxy_single_link, is_daemon_running_at_path, DaemonConfig};
 use ffx_metrics::add_ffx_rcs_protocol_event;
 use ffx_target::{get_remote_proxy, open_target_with_fut, TargetKind};
 use ffx_writer::{Format, Writer};
@@ -74,7 +74,7 @@ impl Injection {
     async fn init_remote_proxy(&self) -> Result<RemoteControlProxy> {
         let daemon_proxy = self.daemon_factory().await?;
         let target = self.target.clone();
-        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         get_remote_proxy(target, self.is_default_target(), daemon_proxy, proxy_timeout).await
     }
 
@@ -86,7 +86,7 @@ impl Injection {
             target,
             self.is_default_target(),
             daemon_proxy.clone(),
-            self.env_context.load().await?.get_proxy_timeout()?,
+            self.env_context.get_proxy_timeout().await?,
         )?;
         target_proxy_fut.await?;
         let (fastboot_proxy, fastboot_server_end) = create_proxy::<FastbootMarker>()?;
@@ -102,7 +102,7 @@ impl Injection {
             target,
             self.is_default_target(),
             daemon_proxy.clone(),
-            self.env_context.load().await?.get_proxy_timeout()?,
+            self.env_context.get_proxy_timeout().await?,
         )?;
         target_proxy_fut.await?;
         Ok(target_proxy)
@@ -155,7 +155,7 @@ impl Injector for Injection {
     async fn fastboot_factory(&self) -> Result<FastbootProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
-        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.fastboot_factory_inner()).await.map_err(|_| {
             tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
             timeout_error
@@ -166,7 +166,7 @@ impl Injector for Injection {
     async fn target_factory(&self) -> Result<TargetProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
-        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         timeout(proxy_timeout, self.target_factory_inner()).await.map_err(|_| {
             tracing::warn!("Timed out getting fastboot proxy for: {:?}", target);
             timeout_error
@@ -177,7 +177,7 @@ impl Injector for Injection {
     async fn remote_factory(&self) -> Result<RemoteControlProxy> {
         let target = self.target.clone();
         let timeout_error = self.daemon_timeout_error().await?;
-        let proxy_timeout = self.env_context.load().await?.get_proxy_timeout()?;
+        let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         let proxy = timeout(proxy_timeout, async {
             self.remote_once
                 .get_or_try_init(self.init_remote_proxy())
@@ -240,7 +240,7 @@ async fn init_daemon_proxy(
     context: EnvironmentContext,
     version_check: DaemonVersionCheck,
 ) -> Result<DaemonProxy> {
-    let ascendd_path = context.load().await?.get_ascendd_path()?;
+    let ascendd_path = context.get_ascendd_path().await?;
 
     if cfg!(not(test)) && !is_daemon_running_at_path(&ascendd_path) {
         if autostart == DaemonStart::DoNotAutoStart {
@@ -258,17 +258,16 @@ async fn init_daemon_proxy(
     // Spawn off the link task, so that FIDL functions can be called (link IO makes progress).
     let link_task = fuchsia_async::Task::local(link.map(|_| ()));
 
-    let daemon_version_info =
-        timeout(context.load().await?.get_proxy_timeout()?, proxy.get_version_info())
-            .await
-            .context("timeout")
-            .map_err(|_| {
-                ffx_error!(
-                    "ffx was unable to query the version of the running ffx daemon. \
+    let daemon_version_info = timeout(context.get_proxy_timeout().await?, proxy.get_version_info())
+        .await
+        .context("timeout")
+        .map_err(|_| {
+            ffx_error!(
+                "ffx was unable to query the version of the running ffx daemon. \
                                  Run `ffx doctor --restart-daemon` and try again."
-                )
-            })?
-            .context("Getting hash from daemon")?;
+            )
+        })?
+        .context("Getting hash from daemon")?;
 
     // Check the version against the given comparison scheme.
     tracing::debug!("Checking daemon version: {version_check:?}");
@@ -344,7 +343,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_proxy_link_lost() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let sockpath = test_env.load().await.get_ascendd_path().expect("No ascendd path");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
 
         // Start a listener that accepts and immediately closes the socket..
         let listener = UnixListener::bind(sockpath.to_owned()).unwrap();
@@ -369,7 +368,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_proxy_timeout_no_connection() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let sockpath = test_env.load().await.get_ascendd_path().expect("No ascendd path");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
 
         // Start a listener that never accepts the socket.
         let _listener = UnixListener::bind(sockpath.to_owned()).unwrap();
@@ -474,7 +473,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_proxy_hash_matches() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let sockpath = test_env.load().await.get_ascendd_path().expect("No ascendd path");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
         let local_hoist = Hoist::new().unwrap();
 
         let sockpath1 = sockpath.to_owned();
@@ -497,7 +496,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_proxy_upgrade() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let sockpath = test_env.load().await.get_ascendd_path().expect("No ascendd path");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
         let local_hoist = Hoist::new().unwrap();
 
         let sockpath1 = sockpath.to_owned();
@@ -532,7 +531,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_blocked_for_4s_succeeds() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let sockpath = test_env.load().await.get_ascendd_path().expect("No ascendd path");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
         let local_hoist = Hoist::new().unwrap();
 
         // Spawn two daemons, the first out of date, the second is up to date.
@@ -556,7 +555,7 @@ mod test {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_init_daemon_blocked_for_6s_timesout() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
-        let sockpath = test_env.load().await.get_ascendd_path().expect("No ascendd path");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
         let local_hoist = Hoist::new().unwrap();
 
         // Spawn two daemons, the first out of date, the second is up to date.

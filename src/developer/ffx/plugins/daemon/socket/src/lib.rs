@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use ffx_core::ffx_plugin;
-use ffx_daemon::SocketDetails;
+use ffx_daemon::{DaemonConfig, SocketDetails};
 use ffx_daemon_socket_args::SocketCommand;
 use ffx_writer::Writer;
 
@@ -14,9 +14,8 @@ pub async fn daemon_socket(
     #[ffx(machine = SocketDetails)] writer: Writer,
 ) -> Result<()> {
     let context = ffx_config::global_env_context().context("Loading global environment context")?;
-    let env = context.load().await?;
 
-    let socket_path = env.get_ascendd_path()?;
+    let socket_path = context.get_ascendd_path().await?;
 
     let details = SocketDetails::new(socket_path);
 

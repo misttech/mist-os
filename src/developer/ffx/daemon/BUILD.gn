@@ -53,6 +53,7 @@ if (is_host) {
     ]
 
     sources = [
+      "src/config.rs",
       "src/constants.rs",
       "src/daemon.rs",
       "src/lib.rs",

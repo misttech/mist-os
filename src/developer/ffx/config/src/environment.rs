@@ -598,33 +598,6 @@ impl Environment {
         Ok(())
     }
 
-    /// Returns the path to the configured daemon socket, or the default for this environment
-    /// if none is configured.
-    ///
-    /// Note that this loads configuration, so if you have already loaded config you should
-    /// probably go directly to [`crate::storage::Config::ascendd_path`] and fall back on the
-    /// default from [`EnvironmentContext::default_ascendd_path`].
-    pub fn get_ascendd_path(&self) -> Result<PathBuf> {
-        let config = crate::storage::Config::from_env(self)?;
-        match config.get_ascendd_path() {
-            Some(path) => Ok(path),
-            None => self.context.get_default_ascendd_path(),
-        }
-    }
-
-    /// Returns the proxy timeout as defined in the config under "proxy.timeout_secs"
-    ///
-    /// Will return an error if this value is not found in the config.
-    ///
-    /// Note: this loads the config and then derives the value from there. If you require
-    /// "proxy.timeout_secs" from an already-loaded config then you should instead use
-    /// [crate::storage::Config::get_proxy_timeout] with [Duration::from_secs_f64].
-    pub fn get_proxy_timeout(&self) -> Result<Duration> {
-        let config = crate::storage::Config::from_env(self)?;
-        let t = config.get_proxy_timeout().ok_or(ffx_error!("Unable to load proxy timeout"))?;
-        Ok(Duration::from_secs_f64(t))
-    }
-
     fn display_user(&self) -> String {
         self.files
             .user

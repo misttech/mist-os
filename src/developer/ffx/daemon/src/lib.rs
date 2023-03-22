@@ -17,9 +17,12 @@ use std::{
     time::Duration,
 };
 
+mod config;
 mod constants;
 mod daemon;
 mod socket;
+
+pub use config::*;
 
 pub use constants::LOG_FILE_PREFIX;
 
@@ -122,12 +125,7 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
     use std::process::Stdio;
 
     let mut cmd = context.rerun_prefix().await?;
-    let socket_path = context
-        .load()
-        .await
-        .context("Loading environment")?
-        .get_ascendd_path()
-        .context("No socket path configured")?;
+    let socket_path = context.get_ascendd_path().await.context("No socket path configured")?;
     tracing::info!("Starting new ffx background daemon from {:?}", &cmd.get_program());
 
     let mut stdout = Stdio::null();

@@ -279,18 +279,6 @@ impl Config {
         file.remove(key)
     }
 
-    /// Convenience method for getting the configured daemon socket, if any.
-    pub fn get_ascendd_path(&self) -> Option<PathBuf> {
-        self.get("overnet.socket", SelectMode::First)
-            .as_ref()
-            .and_then(Value::as_str)
-            .map(PathBuf::from)
-    }
-
-    pub fn get_proxy_timeout(&self) -> Option<f64> {
-        self.get("proxy.timeout_secs", SelectMode::First).as_ref().and_then(Value::as_f64)
-    }
-
     fn iter(&self) -> PriorityIterator<'_> {
         PriorityIterator { curr: None, config: self }
     }

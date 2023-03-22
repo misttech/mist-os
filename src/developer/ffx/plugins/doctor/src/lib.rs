@@ -7,12 +7,13 @@ use anyhow::{anyhow, Context, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
 use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
-use errors::ffx_bail;
+use errors::{ffx_bail, ffx_error};
 use ffx_config::{
     environment::EnvironmentContext, get, global_env_context, keys::TARGET_DEFAULT_KEY,
     print_config,
 };
 use ffx_core::ffx_plugin;
+use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
 use fidl::{endpoints::create_proxy, prelude::*};
 use fidl_fuchsia_developer_ffx::{
@@ -218,7 +219,9 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     // todo(fxb/108692) remove this use of the global hoist when we put the main one in the environment context
     // instead.
     let hoist = hoist::hoist();
-    let ascendd_path = ffx_config::global_env().await?.get_ascendd_path()?;
+    let context = ffx_config::global_env_context()
+        .with_context(|| ffx_error!("No environment context loaded"))?;
+    let ascendd_path = context.get_ascendd_path().await?;
     let daemon_manager = DefaultDaemonManager::new(hoist.clone(), ascendd_path);
     let delay = Duration::from_millis(cmd.retry_delay);
 
