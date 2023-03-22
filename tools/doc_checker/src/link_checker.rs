@@ -562,8 +562,8 @@ pub(crate) fn is_intree_link(
                 return Ok(None);
             }
         }
-        // skip over any branch spec. The first part is empty.
-        if parts.len() > 3 && (parts[2] == "+" || parts[2] == "+show") {
+        // skip over any branch spec. The first part is empty. It is +, or +show, or +log, etc.
+        if parts.len() > 3 && parts[2].starts_with('+') {
             let filepath = PathBuf::from("/");
             if parts[3] == "refs" && parts[4] == "heads" {
                 return Ok(Some(filepath.join(parts[6..].join("/"))));
@@ -947,7 +947,9 @@ mod tests {
     ("https://fuchsia.googlesource.com/fuchsia/+/7461d8882167e7a9d1b494e3b1734d2c063830fc/build/package.gni#604", None),
     ("https://fuchsia.googlesource.com/fuchsia/+show/HEAD/docs/concepts/kernel/_toc.yaml", Some(PathBuf::from("/docs/concepts/kernel/_toc.yaml"))),
     ("https://fuchsia.googlesource.com/fuchsia", None),
-    ("https://fuchsia.googlesource.com/fuchsia/", None)
+    ("https://fuchsia.googlesource.com/fuchsia/", None),
+    // Since this is not to the /docs dir, it should not be an in-tree link.
+    ("https://fuchsia.googlesource.com/fuchsia/+log/d381548c6aef76926e6203a2ad2265dd510d1e9b", None)
 
   ];
         for (link_to_check, expected) in test_cases {
