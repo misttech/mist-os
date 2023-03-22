@@ -21,13 +21,17 @@ sdk_source_set("unwinder") {
     "dwarf_cfi.h",
     "dwarf_cfi_parser.h",
     "dwarf_expr.h",
+    "dwarf_unwinder.h",
+    "scs_unwinder.h",
   ]
   sources = [
     "dwarf_cfi.cc",
     "dwarf_cfi_parser.cc",
     "dwarf_expr.cc",
+    "dwarf_unwinder.cc",
     "memory.cc",
     "registers.cc",
+    "scs_unwinder.cc",
     "unwind.cc",
   ]
   public_deps = [ "//src/lib/fxl" ]

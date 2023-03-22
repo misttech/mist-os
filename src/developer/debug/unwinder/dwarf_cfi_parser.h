@@ -59,6 +59,7 @@ class DwarfCfiParser {
   const uint64_t code_alignment_factor_;
   const int64_t data_alignment_factor_;
 
+  // CFA can only be retrieved from *($reg+offset).
   struct CfaLocation {
     RegisterID reg = RegisterID::kInvalid;
     uint64_t offset = -1;

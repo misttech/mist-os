@@ -14,7 +14,8 @@
 
 namespace unwinder {
 
-// Load the DWARF Call Frame Information from the .eh_frame / .debug_frame section of an ELF image.
+// Represents the DWARF CFI (Call Frame Information) from the .eh_frame and/or .debug_frame section
+// of one ELF file.
 //
 // This class doesn't cache the memory so if repeated lookups are required, it's recommended to use
 // a cached Memory implementation.
