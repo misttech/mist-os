@@ -43,8 +43,8 @@ exclude = [
     "MacSublayerSupport",
     "SecuritySupport",
     "SpectrumManagementSupport",
-    "WlanSoftmacActiveScanArgs",
-    "WlanSoftmacPassiveScanArgs",
+    "WlanSoftmacStartActiveScanRequest",
+    "WlanSoftmacStartPassiveScanRequest",
     "WlanAssocCtx",
     "WlanChannel",
     "WlanIndication",
@@ -74,8 +74,8 @@ exclude = [
 "MacSublayerSupport" = "mac_sublayer_support_t"
 "SecuritySupport" = "security_support_t"
 "SpectrumManagementSupport" = "spectrum_management_support_t"
-"WlanSoftmacActiveScanArgs" = "wlan_softmac_start_active_scan_request_t"
-"WlanSoftmacPassiveScanArgs" = "wlan_softmac_passive_scan_args_t"
+"WlanSoftmacStartActiveScanRequest" = "wlan_softmac_start_active_scan_request_t"
+"WlanSoftmacStartPassiveScanRequest" = "wlan_softmac_start_passive_scan_request_t"
 "WlanAssocCtx" = "wlan_assoc_ctx_t"
 "WlanChannel" = "wlan_channel_t"
 "WlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"
