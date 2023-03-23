@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context as _, Result};
-use ffx_config::{EnvironmentContext, SdkRoot};
+use ffx_config::{global_env_context, EnvironmentContext, SdkRoot};
 use fuchsia_async;
 use sdk::FfxSdkConfig;
 use serde::Serialize;
+use serde_json::Value;
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -89,6 +90,7 @@ impl Isolate {
         name: &str,
         search: SearchContext,
         ssh_key: PathBuf,
+        env_context: &EnvironmentContext,
     ) -> Result<Isolate> {
         let tmpdir = tempfile::Builder::new().prefix(name).tempdir()?;
         let search_paths = env_search_paths(&search);
@@ -117,6 +119,12 @@ impl Isolate {
         } else {
             tmpdir.path().join("log")
         };
+        // Propagate log configuration information to the isolate.
+        // TODO(slgrady): we should propagate _all_ log values,
+        // except possibly log.dir (which may be set above from
+        // FUCHSIA_TEST_OUTDIR)
+        let log_level = env_context.query("log.level").get().await?;
+        let log_target_levels = env_context.query("log.target_levels").get().await?;
 
         std::fs::create_dir_all(&log_dir)?;
         let metrics_path = tmpdir.path().join("metrics_home/.fuchsia/metrics");
@@ -139,6 +147,8 @@ impl Isolate {
         }
         let user_config = UserConfig::for_test(
             log_dir.to_string_lossy(),
+            log_level,
+            log_target_levels,
             target_addr,
             mdns_discovery,
             search_paths,
@@ -202,7 +212,8 @@ impl Isolate {
     /// [`Isolate::new_in_test`] if you can.
     pub async fn new(name: &str, ffx_path: PathBuf, ssh_key: PathBuf) -> Result<Self> {
         let search = SearchContext::Runtime { ffx_path, sdk_root: None };
-        Self::new_with_search(name, search, ssh_key).await
+        let env_context = global_env_context().context("No global context")?;
+        Self::new_with_search(name, search, ssh_key, &env_context).await
     }
 
     /// Use this when building an isolation environment from within an ffx subtool
@@ -218,14 +229,20 @@ impl Isolate {
 
         let sdk_root = context.get_sdk_root().await.ok();
 
-        Self::new_with_search(name, SearchContext::Runtime { ffx_path, sdk_root }, ssh_key).await
+        Self::new_with_search(name, SearchContext::Runtime { ffx_path, sdk_root }, ssh_key, context)
+            .await
     }
 
     /// Use this when building an isolation environment from within a unit test
     /// in the fuchsia tree. This will make the isolated ffx look for subtools
     /// in the appropriate places in the build tree.
-    pub async fn new_in_test(name: &str, build_root: PathBuf, ssh_key: PathBuf) -> Result<Self> {
-        Self::new_with_search(name, SearchContext::Build { build_root }, ssh_key).await
+    pub async fn new_in_test(
+        name: &str,
+        build_root: PathBuf,
+        ssh_key: PathBuf,
+        context: &EnvironmentContext,
+    ) -> Result<Self> {
+        Self::new_with_search(name, SearchContext::Build { build_root }, ssh_key, context).await
     }
 
     pub fn ascendd_path(&self) -> PathBuf {
@@ -270,6 +287,15 @@ struct UserConfig<'a> {
 #[derive(Serialize, Debug)]
 struct UserConfigLog<'a> {
     enabled: bool,
+    level: Option<String>,
+    // For target_levels, we'd like to use a HashMap<String, String> or even
+    // a serde_json::Map<String, String>, but ffx_config doesn't returning
+    // support maps -- TODO(fxb/124260). So for now we're stuck with getting a
+    // serde_json::Value directly, and hoping it's the right type.  At least
+    // we're no worse off than our caller is, since if target_levels isn't a
+    // String=>String map, then nothing using this config entry was going to
+    // work anyway.
+    target_levels: Option<Value>,
     dir: Cow<'a, str>,
 }
 
@@ -302,7 +328,9 @@ struct UserConfigMdns {
 
 impl<'a> UserConfig<'a> {
     fn for_test(
-        dir: Cow<'a, str>,
+        log_dir: Cow<'a, str>,
+        log_level: Option<String>,
+        log_target_levels: Option<Value>,
         target: Option<Cow<'a, str>>,
         discovery: bool,
         subtool_search_paths: Vec<Cow<'a, Path>>,
@@ -313,7 +341,12 @@ impl<'a> UserConfig<'a> {
             manual_targets.insert(target.unwrap(), None);
         }
         Self {
-            log: UserConfigLog { enabled: true, dir },
+            log: UserConfigLog {
+                enabled: true,
+                level: log_level,
+                target_levels: log_target_levels,
+                dir: log_dir,
+            },
             test: UserConfigTest { is_isolated: true },
             targets: UserConfigTargets { manual: manual_targets },
             discovery: UserConfigDiscovery { mdns: UserConfigMdns { enabled: discovery } },

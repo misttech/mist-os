@@ -150,9 +150,11 @@ where
     let ssh_path = std::env::var("FUCHSIA_SSH_KEY").unwrap().into();
     let build_root =
         std::env::current_exe().unwrap().canonicalize().unwrap().parent().unwrap().to_owned();
-    let isolate = ffx_isolate::Isolate::new_in_test(case_name, build_root, ssh_path)
-        .await
-        .expect("create isolate");
+    let test_env = ffx_config::test_init().await.expect("Setting up test environment");
+    let isolate =
+        ffx_isolate::Isolate::new_in_test(case_name, build_root, ssh_path, &test_env.context)
+            .await
+            .expect("create isolate");
 
     // Ensure that the address is formatted properly, and include port is if it available.
     // Without this formatting, the connection does not work when using a remote workflow.
