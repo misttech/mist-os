@@ -225,7 +225,6 @@ TEST(SinkFixedPowerSupplyDataTest, MaximumCurrentMa) {
   }
 }
 
-
 TEST(FixedVariableSupplyPowerRequestDataTest, CreateForPosition) {
   FixedVariableSupplyPowerRequestData request_data1 =
       FixedVariableSupplyPowerRequestData::CreateForPosition(1);
