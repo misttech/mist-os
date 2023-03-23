@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVICES_POWER_DRIVERS_FUSB302_STATE_MACHINE_BASE_H_
-#define SRC_DEVICES_POWER_DRIVERS_FUSB302_STATE_MACHINE_BASE_H_
+#ifndef SRC_DEVICES_POWER_DRIVERS_FUSB302_STATE_MACHINE_BASE_V1_H_
+#define SRC_DEVICES_POWER_DRIVERS_FUSB302_STATE_MACHINE_BASE_V1_H_
 
 #include <lib/ddk/debug.h>
 #include <lib/zx/timer.h>
@@ -31,15 +31,16 @@ struct Event {
   explicit Event(uint8_t val) : value(val) {}
 };
 
+// TODO(fxbug.dev/122113): Migrate dependencies to StateMachineBase and remove.
 template <class States, class Device>
-class StateMachineBase {
+class StateMachineBaseV1 {
  public:
-  explicit StateMachineBase(Device* device, States init_state, inspect::Node& inspect_root,
-                            const std::string& name)
+  explicit StateMachineBaseV1(Device* device, States init_state, inspect::Node& inspect_root,
+                              const std::string& name)
       : device_(device),
         inspect_state_machine_(inspect_root.CreateChild(name)),
         state_(InspectableUint<States>(&inspect_state_machine_, "State", init_state)) {}
-  virtual ~StateMachineBase() = default;
+  virtual ~StateMachineBaseV1() = default;
 
   zx_status_t Run(Event event, std::shared_ptr<PdMessage> message) {
     bool entry;
@@ -83,4 +84,4 @@ class StateMachineBase {
 
 }  // namespace fusb302
 
-#endif  // SRC_DEVICES_POWER_DRIVERS_FUSB302_STATE_MACHINE_BASE_H_
+#endif  // SRC_DEVICES_POWER_DRIVERS_FUSB302_STATE_MACHINE_BASE_V1_H_

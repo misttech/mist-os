@@ -17,7 +17,7 @@
 #include "src/devices/power/drivers/fusb302/fusb302-identity.h"
 #include "src/devices/power/drivers/fusb302/inspectable-types.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
-#include "src/devices/power/drivers/fusb302/state-machine-base.h"
+#include "src/devices/power/drivers/fusb302/state-machine-base-v1.h"
 
 namespace fusb302 {
 
@@ -54,10 +54,10 @@ enum SinkPolicyEngineStates : uint32_t {
 };
 
 // SinkPolicyEngine: Sink Policy Engine state machine for USB-PD Protocol.
-class SinkPolicyEngine : public StateMachineBase<SinkPolicyEngineStates, Fusb302> {
+class SinkPolicyEngine : public StateMachineBaseV1<SinkPolicyEngineStates, Fusb302> {
  public:
   SinkPolicyEngine(Fusb302* device, bool initialized, inspect::Node& inspect_root)
-      : StateMachineBase(device, pe_snk_startup, inspect_root, "SinkPolicyEngine"),
+      : StateMachineBaseV1(device, pe_snk_startup, inspect_root, "SinkPolicyEngine"),
         initialized_(initialized) {}
   ~SinkPolicyEngine() = default;
 
@@ -97,10 +97,10 @@ enum HwDrpStates : uint32_t {
 
 // StateMachine: HW DRP (Dual Role Port) state machine that configures the HW correctly based on
 // which state is found and runs the correct policy engine state machine when in the correct state.
-class StateMachine : public StateMachineBase<HwDrpStates, Fusb302> {
+class StateMachine : public StateMachineBaseV1<HwDrpStates, Fusb302> {
  public:
   StateMachine(Fusb302* device, bool initialized, inspect::Node& inspect_root)
-      : StateMachineBase(device, disabled, inspect_root, "StateMachine"),
+      : StateMachineBaseV1(device, disabled, inspect_root, "StateMachine"),
         sink_policy_engine_(device, initialized, inspect_root) {}
   ~StateMachine() = default;
 
