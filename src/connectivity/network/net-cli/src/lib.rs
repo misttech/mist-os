@@ -14,11 +14,14 @@ use fidl_fuchsia_net_interfaces_ext as finterfaces_ext;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
 use fidl_fuchsia_net_neighbor_ext as fneighbor_ext;
+use fidl_fuchsia_net_routes as froutes;
+use fidl_fuchsia_net_routes_ext as froutes_ext;
 use fidl_fuchsia_net_stack as fstack;
 use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use fuchsia_zircon_status as zx;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use log::info;
+use log::{info, warn};
+use net_types::ip::{Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
 use serde_json::{json, value::Value};
@@ -62,6 +65,8 @@ pub trait NetCliDepsConnector:
     + ServiceConnector<fneighbor::ViewMarker>
     + ServiceConnector<fstack::LogMarker>
     + ServiceConnector<fstack::StackMarker>
+    + ServiceConnector<froutes::StateV4Marker>
+    + ServiceConnector<froutes::StateV6Marker>
     + ServiceConnector<fname::LookupMarker>
 {
 }
@@ -75,6 +80,8 @@ impl<O> NetCliDepsConnector for O where
         + ServiceConnector<fneighbor::ViewMarker>
         + ServiceConnector<fstack::LogMarker>
         + ServiceConnector<fstack::StackMarker>
+        + ServiceConnector<froutes::StateV4Marker>
+        + ServiceConnector<froutes::StateV6Marker>
         + ServiceConnector<fname::LookupMarker>
 {
 }
@@ -694,38 +701,10 @@ async fn do_route<C: NetCliDepsConnector>(
     cmd: opts::RouteEnum,
     connector: &C,
 ) -> Result<(), Error> {
-    let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
     match cmd {
-        opts::RouteEnum::List(opts::RouteList {}) => {
-            let response = stack
-                .get_forwarding_table_deprecated()
-                .await
-                .context("error retrieving forwarding table")?;
-            if out.is_machine() {
-                let response: Vec<_> = response
-                    .into_iter()
-                    .map(fstack_ext::ForwardingEntry::from)
-                    .map(ser::ForwardingEntry::from)
-                    .collect();
-                out.machine(&response).context("serialize")?;
-            } else {
-                let mut t = Table::new();
-                t.set_format(format::FormatBuilder::new().padding(2, 2).build());
-
-                t.set_titles(row!["Destination", "Gateway", "NICID", "Metric"]);
-                for entry in response {
-                    let fstack_ext::ForwardingEntry { subnet, device_id, next_hop, metric } =
-                        entry.into();
-                    let next_hop = next_hop.map(|next_hop| next_hop.to_string());
-                    let next_hop = next_hop.as_ref().map_or("-", |s| s.as_str());
-                    let () = add_row(&mut t, row![subnet, next_hop, device_id, metric]);
-                }
-
-                let _lines_printed: usize = t.print(out)?;
-                out.line("")?;
-            }
-        }
+        opts::RouteEnum::List(opts::RouteList {}) => do_route_list(out, connector).await?,
         opts::RouteEnum::Add(route) => {
+            let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let nicid = route.interface.find_u32_nicid(connector).await?;
             let mut entry = route.into_route_table_entry(nicid);
             let () = fstack_ext::exec_fidl!(
@@ -734,6 +713,7 @@ async fn do_route<C: NetCliDepsConnector>(
             )?;
         }
         opts::RouteEnum::Del(route) => {
+            let stack = connect_with_context::<fstack::StackMarker, _>(connector).await?;
             let nicid = route.interface.find_u32_nicid(connector).await?;
             let mut entry = route.into_route_table_entry(nicid);
             let () = fstack_ext::exec_fidl!(
@@ -741,6 +721,84 @@ async fn do_route<C: NetCliDepsConnector>(
                 "error removing forwarding entry"
             )?;
         }
+    }
+    Ok(())
+}
+
+async fn do_route_list<C: NetCliDepsConnector>(
+    out: &mut ffx_writer::Writer,
+    connector: &C,
+) -> Result<(), Error> {
+    let ipv4_route_event_stream = {
+        let state_v4 = connect_with_context::<froutes::StateV4Marker, _>(connector)
+            .await
+            .context("failed to connect to fuchsia.net.routes/StateV4")?;
+        froutes_ext::event_stream_from_state::<Ipv4>(&state_v4)
+            .context("failed to initialize a `WatcherV4` client")?
+            .fuse()
+    };
+    let ipv6_route_event_stream = {
+        let state_v6 = connect_with_context::<froutes::StateV6Marker, _>(connector)
+            .await
+            .context("failed to connect to fuchsia.net.routes/StateV6")?;
+        froutes_ext::event_stream_from_state::<Ipv6>(&state_v6)
+            .context("failed to initialize a `WatcherV6` client")?
+            .fuse()
+    };
+    futures::pin_mut!(ipv4_route_event_stream, ipv6_route_event_stream);
+    let (v4_routes, v6_routes) = futures::future::join(
+        froutes_ext::collect_routes_until_idle::<_, Vec<_>>(ipv4_route_event_stream),
+        froutes_ext::collect_routes_until_idle::<_, Vec<_>>(ipv6_route_event_stream),
+    )
+    .await;
+    let v4_routes = v4_routes.context("failed to collect all existing IPv4 routes")?;
+    let v6_routes = v6_routes.context("failed to collect all existing IPv6 routes")?;
+    if out.is_machine() {
+        fn to_ser<I: net_types::ip::Ip>(
+            route: froutes_ext::InstalledRoute<I>,
+        ) -> Option<ser::ForwardingEntry> {
+            route.try_into().map_err(|e| warn!("failed to convert route: {:?}", e)).ok()
+        }
+        let routes = v4_routes
+            .into_iter()
+            .filter_map(to_ser)
+            .chain(v6_routes.into_iter().filter_map(to_ser))
+            .collect::<Vec<_>>();
+        out.machine(&routes).context("serialize")?;
+    } else {
+        let mut t = Table::new();
+        t.set_format(format::FormatBuilder::new().padding(2, 2).build());
+
+        t.set_titles(row!["Destination", "Gateway", "NICID", "Metric"]);
+        fn write_route<I: net_types::ip::Ip>(t: &mut Table, route: froutes_ext::InstalledRoute<I>) {
+            let froutes_ext::InstalledRoute {
+                route: froutes_ext::Route { destination, action, properties: _ },
+                effective_properties: froutes_ext::EffectiveRouteProperties { metric },
+            } = route;
+            let (device_id, next_hop) = match action {
+                froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
+                    outbound_interface,
+                    next_hop,
+                }) => (outbound_interface, next_hop),
+                froutes_ext::RouteAction::Unknown => {
+                    warn!("observed route with unknown RouteAction.");
+                    return;
+                }
+            };
+            let next_hop = next_hop.map(|next_hop| next_hop.to_string());
+            let next_hop = next_hop.as_ref().map_or("-", |s| s.as_str());
+            let () = add_row(t, row![destination, next_hop, device_id, metric]);
+        }
+
+        for route in v4_routes {
+            write_route(&mut t, route);
+        }
+        for route in v6_routes {
+            write_route(&mut t, route);
+        }
+
+        let _lines_printed: usize = t.print(out)?;
+        out.line("")?;
     }
     Ok(())
 }
@@ -1322,6 +1380,8 @@ mod tests {
     use assert_matches::assert_matches;
     use fidl::endpoints::ProtocolMarker;
     use fidl_fuchsia_hardware_network as fhardware_network;
+    use fidl_fuchsia_net_routes as froutes;
+    use fidl_fuchsia_net_routes_ext as froutes_ext;
     use fuchsia_async::{self as fasync, TimeoutExt as _};
     use net_declare::{fidl_ip, fidl_ip_v4};
     use std::{convert::TryInto as _, fmt::Debug};
@@ -1339,6 +1399,8 @@ mod tests {
         dhcpd: Option<fdhcp::Server_Proxy>,
         interfaces_state: Option<finterfaces::StateProxy>,
         stack: Option<fstack::StackProxy>,
+        routes_v4: Option<froutes::StateV4Proxy>,
+        routes_v6: Option<froutes::StateV6Proxy>,
         name_lookup: Option<fname::LookupProxy>,
     }
 
@@ -1410,6 +1472,30 @@ mod tests {
     impl ServiceConnector<fstack::StackMarker> for TestConnector {
         async fn connect(&self) -> Result<<fstack::StackMarker as ProtocolMarker>::Proxy, Error> {
             self.stack.as_ref().cloned().ok_or(anyhow::anyhow!("connector has no stack instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froutes::StateV4Marker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<froutes::StateV4Marker as ProtocolMarker>::Proxy, Error> {
+            self.routes_v4
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow::anyhow!("connector has no routes_v4 instance"))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl ServiceConnector<froutes::StateV6Marker> for TestConnector {
+        async fn connect(
+            &self,
+        ) -> Result<<froutes::StateV6Marker as ProtocolMarker>::Proxy, Error> {
+            self.routes_v6
+                .as_ref()
+                .cloned()
+                .ok_or(anyhow::anyhow!("connector has no routes_v6 instance"))
         }
     }
 
@@ -2422,35 +2508,50 @@ mac             -
     fn wanted_route_list_json() -> String {
         json!([
             {
-                "destination":{"addr":"1.1.1.1","prefix_len":24},
+                "destination":{"addr":"1.1.1.0","prefix_len":24},
                 "gateway":"1.1.1.2",
                 "metric":4,
                 "nicid":3
             },
             {
-                "destination":{"addr":"10.10.10.10","prefix_len":24},
+                "destination":{"addr":"10.10.10.0","prefix_len":24},
                 "gateway":"10.10.10.20",
                 "metric":40,
                 "nicid":30
+            },
+            {
+                "destination":{"addr":"fe80::","prefix_len":64},
+                "gateway":serde_json::Value::Null,
+                "metric":400,
+                "nicid":300
             }
+
         ])
         .to_string()
     }
 
     fn wanted_route_list_tabular() -> String {
-        "Destination       Gateway        NICID    Metric
-         1.1.1.1/24        1.1.1.2        3        4
-         10.10.10.10/24    10.10.10.20    30       40"
-            .to_string()
+        "Destination      Gateway        NICID    Metric
+         1.1.1.0/24       1.1.1.2        3        4
+         10.10.10.0/24    10.10.10.20    30       40
+         fe80::/64        -              300      400
+         "
+        .to_string()
     }
 
     #[test_case(true, wanted_route_list_json() ; "in json format")]
     #[test_case(false, wanted_route_list_tabular() ; "in tabular format")]
     #[fasync::run_singlethreaded(test)]
     async fn route_list(json: bool, wanted_output: String) {
-        let (stack_controller, mut stack_requests) =
-            fidl::endpoints::create_proxy_and_stream::<fstack::StackMarker>().unwrap();
-        let connector = TestConnector { stack: Some(stack_controller), ..Default::default() };
+        let (routes_v4_controller, mut routes_v4_state_stream) =
+            fidl::endpoints::create_proxy_and_stream::<froutes::StateV4Marker>().unwrap();
+        let (routes_v6_controller, mut routes_v6_state_stream) =
+            fidl::endpoints::create_proxy_and_stream::<froutes::StateV6Marker>().unwrap();
+        let connector = TestConnector {
+            routes_v4: Some(routes_v4_controller),
+            routes_v6: Some(routes_v6_controller),
+            ..Default::default()
+        };
 
         let mut output = if json {
             ffx_writer::Writer::new_test(Some(ffx_writer::Format::Json))
@@ -2461,48 +2562,92 @@ mac             -
         let do_route_fut =
             do_route(&mut output, opts::RouteEnum::List(opts::RouteList {}), &connector);
 
-        let requests_fut = async {
-            let responder = stack_requests
-                .try_next()
-                .await
-                .expect("stack FIDL error")
-                .expect("request stream should not have ended")
-                .into_get_forwarding_table_deprecated()
-                .expect("request should be of type GetForwardingTableDeprecated");
-            let () = responder
-                .send(
-                    &mut vec![
-                        fstack::ForwardingEntry {
-                            subnet: fnet::Subnet {
-                                addr: fnet_ext::IpAddress::from_str("1.1.1.1")?.into(),
-                                prefix_len: 24,
-                            },
-                            device_id: 3,
-                            next_hop: Some(Box::new(
-                                fnet_ext::IpAddress::from_str("1.1.1.2")?.into(),
-                            )),
-                            metric: 4,
-                        },
-                        fstack::ForwardingEntry {
-                            subnet: fnet::Subnet {
-                                addr: fnet_ext::IpAddress::from_str("10.10.10.10")?.into(),
-                                prefix_len: 24,
-                            },
-                            device_id: 30,
-                            next_hop: Some(Box::new(
-                                fnet_ext::IpAddress::from_str("10.10.10.20")?.into(),
-                            )),
-                            metric: 40,
-                        },
-                    ]
-                    .iter_mut(),
-                )
-                .expect("responder.send should succeed");
-            Ok(())
-        };
-        let ((), ()) = futures::future::try_join(do_route_fut, requests_fut)
-            .await
-            .expect("listing forwarding table entries should succeed");
+        let v4_route_events = vec![
+            froutes::EventV4::Existing(froutes::InstalledRouteV4 {
+                route: Some(froutes::RouteV4 {
+                    destination: net_declare::fidl_ip_v4_with_prefix!("1.1.1.0/24"),
+                    action: froutes::RouteActionV4::Forward(froutes::RouteTargetV4 {
+                        outbound_interface: 3,
+                        next_hop: Some(Box::new(net_declare::fidl_ip_v4!("1.1.1.2"))),
+                    }),
+                    properties: froutes::RoutePropertiesV4 {
+                        specified_properties: Some(froutes::SpecifiedRouteProperties {
+                            metric: Some(froutes::SpecifiedMetric::ExplicitMetric(4)),
+                            ..froutes::SpecifiedRouteProperties::EMPTY
+                        }),
+                        ..froutes::RoutePropertiesV4::EMPTY
+                    },
+                }),
+                effective_properties: Some(froutes::EffectiveRouteProperties {
+                    metric: Some(4),
+                    ..froutes::EffectiveRouteProperties::EMPTY
+                }),
+                ..froutes::InstalledRouteV4::EMPTY
+            }),
+            froutes::EventV4::Existing(froutes::InstalledRouteV4 {
+                route: Some(froutes::RouteV4 {
+                    destination: net_declare::fidl_ip_v4_with_prefix!("10.10.10.0/24"),
+                    action: froutes::RouteActionV4::Forward(froutes::RouteTargetV4 {
+                        outbound_interface: 30,
+                        next_hop: Some(Box::new(net_declare::fidl_ip_v4!("10.10.10.20"))),
+                    }),
+                    properties: froutes::RoutePropertiesV4 {
+                        specified_properties: Some(froutes::SpecifiedRouteProperties {
+                            metric: Some(froutes::SpecifiedMetric::ExplicitMetric(40)),
+                            ..froutes::SpecifiedRouteProperties::EMPTY
+                        }),
+                        ..froutes::RoutePropertiesV4::EMPTY
+                    },
+                }),
+                effective_properties: Some(froutes::EffectiveRouteProperties {
+                    metric: Some(40),
+                    ..froutes::EffectiveRouteProperties::EMPTY
+                }),
+                ..froutes::InstalledRouteV4::EMPTY
+            }),
+            froutes::EventV4::Idle(froutes::Empty),
+        ];
+        let v6_route_events = vec![
+            froutes::EventV6::Existing(froutes::InstalledRouteV6 {
+                route: Some(froutes::RouteV6 {
+                    destination: net_declare::fidl_ip_v6_with_prefix!("fe80::/64"),
+                    action: froutes::RouteActionV6::Forward(froutes::RouteTargetV6 {
+                        outbound_interface: 300,
+                        next_hop: None,
+                    }),
+                    properties: froutes::RoutePropertiesV6 {
+                        specified_properties: Some(froutes::SpecifiedRouteProperties {
+                            metric: Some(froutes::SpecifiedMetric::ExplicitMetric(400)),
+                            ..froutes::SpecifiedRouteProperties::EMPTY
+                        }),
+                        ..froutes::RoutePropertiesV6::EMPTY
+                    },
+                }),
+                effective_properties: Some(froutes::EffectiveRouteProperties {
+                    metric: Some(400),
+                    ..froutes::EffectiveRouteProperties::EMPTY
+                }),
+                ..froutes::InstalledRouteV6::EMPTY
+            }),
+            froutes::EventV6::Idle(froutes::Empty),
+        ];
+
+        let route_v4_fut = routes_v4_state_stream.select_next_some().then(|request| {
+            froutes_ext::testutil::serve_state_request::<Ipv4>(
+                request,
+                futures::stream::once(futures::future::ready(v4_route_events)),
+            )
+        });
+        let route_v6_fut = routes_v6_state_stream.select_next_some().then(|request| {
+            froutes_ext::testutil::serve_state_request::<Ipv6>(
+                request,
+                futures::stream::once(futures::future::ready(v6_route_events)),
+            )
+        });
+
+        let ((), (), ()) =
+            futures::try_join!(do_route_fut, route_v4_fut.map(Ok), route_v6_fut.map(Ok))
+                .expect("listing forwarding table entries should succeed");
 
         let got_output = output.test_output().unwrap();
 

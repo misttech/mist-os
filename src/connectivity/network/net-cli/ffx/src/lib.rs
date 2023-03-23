@@ -16,6 +16,7 @@ use fidl_fuchsia_net_filter as ffilter;
 use fidl_fuchsia_net_interfaces as finterfaces;
 use fidl_fuchsia_net_name as fname;
 use fidl_fuchsia_net_neighbor as fneighbor;
+use fidl_fuchsia_net_routes as froutes;
 use fidl_fuchsia_net_stack as fstack;
 
 const DEBUG_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.debug.Interfaces";
@@ -28,6 +29,8 @@ const NEIGHBOR_CONTROLLER_SELECTOR_SUFFIX: &str =
 const NEIGHBOR_VIEW_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.neighbor.View";
 const LOG_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.stack.Log";
 const STACK_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.stack.Stack";
+const ROUTES_V4_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.routes.StateV4";
+const ROUTES_V6_SELECTOR_SUFFIX: &str = "/netstack:expose:fuchsia.net.routes.StateV6";
 const NETWORK_REALM: &str = "core/network";
 
 struct FfxConnector<'a> {
@@ -129,6 +132,24 @@ impl net_cli::ServiceConnector<fstack::StackMarker> for FfxConnector<'_> {
         &self,
     ) -> Result<<fstack::StackMarker as ProtocolMarker>::Proxy, anyhow::Error> {
         self.remotecontrol_connect::<fstack::StackMarker>(STACK_SELECTOR_SUFFIX).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<froutes::StateV4Marker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<froutes::StateV4Marker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<froutes::StateV4Marker>(ROUTES_V4_SELECTOR_SUFFIX).await
+    }
+}
+
+#[async_trait::async_trait]
+impl net_cli::ServiceConnector<froutes::StateV6Marker> for FfxConnector<'_> {
+    async fn connect(
+        &self,
+    ) -> Result<<froutes::StateV6Marker as ProtocolMarker>::Proxy, anyhow::Error> {
+        self.remotecontrol_connect::<froutes::StateV6Marker>(ROUTES_V6_SELECTOR_SUFFIX).await
     }
 }
 

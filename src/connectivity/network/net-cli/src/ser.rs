@@ -6,6 +6,10 @@
 //! JSON serialization to avoid coupling too closely to particular FIDL
 //! protocols.
 
+use fidl_fuchsia_net_routes_ext as froutes_ext;
+use net_types::{ip::IpAddress as _, Witness as _};
+use thiserror::Error;
+
 #[derive(serde::Serialize)]
 pub(crate) struct Subnet<T> {
     pub(crate) addr: T,
@@ -18,6 +22,14 @@ impl From<fidl_fuchsia_net_ext::Subnet> for Subnet<std::net::IpAddr> {
             addr: fidl_fuchsia_net_ext::IpAddress(addr),
             prefix_len,
         } = ext;
+        Subnet { addr, prefix_len }
+    }
+}
+
+impl<A: net_types::ip::IpAddress> From<net_types::ip::Subnet<A>> for Subnet<std::net::IpAddr> {
+    fn from(sub: net_types::ip::Subnet<A>) -> Subnet<std::net::IpAddr> {
+        let addr = sub.network().to_ip_addr().into();
+        let prefix_len = sub.prefix();
         Subnet { addr, prefix_len }
     }
 }
@@ -137,13 +149,33 @@ pub struct ForwardingEntry {
     metric: u32,
 }
 
-impl From<fidl_fuchsia_net_stack_ext::ForwardingEntry> for ForwardingEntry {
-    fn from(
-        fidl_fuchsia_net_stack_ext::ForwardingEntry { subnet, device_id, next_hop, metric }: fidl_fuchsia_net_stack_ext::ForwardingEntry,
-    ) -> Self {
-        let subnet = subnet.into();
-        let next_hop = next_hop.map(|fidl_fuchsia_net_ext::IpAddress(next_hop)| next_hop);
-        Self { subnet, device_id, next_hop, metric }
+/// Errors returned when converting from [`froutes_ext::InstalledRoute`]
+/// to [`ForwardingEntry`].
+#[derive(Debug, Error)]
+pub enum ForwardingEntryConversionError {
+    #[error("the route's action was unknown")]
+    UnknownRouteAction,
+}
+
+impl<I: net_types::ip::Ip> TryFrom<froutes_ext::InstalledRoute<I>> for ForwardingEntry {
+    type Error = ForwardingEntryConversionError;
+    fn try_from(route: froutes_ext::InstalledRoute<I>) -> Result<Self, Self::Error> {
+        let froutes_ext::InstalledRoute {
+            route: froutes_ext::Route { destination, action, properties: _ },
+            effective_properties: froutes_ext::EffectiveRouteProperties { metric },
+        } = route;
+        let (device_id, next_hop) = match action {
+            froutes_ext::RouteAction::Forward(froutes_ext::RouteTarget {
+                outbound_interface,
+                next_hop,
+            }) => (outbound_interface, next_hop),
+            froutes_ext::RouteAction::Unknown => {
+                return Err(ForwardingEntryConversionError::UnknownRouteAction)
+            }
+        };
+        let subnet = destination.into();
+        let next_hop = next_hop.map(|next_hop| next_hop.get().to_ip_addr().into());
+        Ok(Self { subnet, device_id, next_hop, metric })
     }
 }
 
