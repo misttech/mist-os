@@ -56,6 +56,7 @@ dual_mode_plugins = [
   "//src/developer/ffx/plugins/setui:ffx_setui",
   "//src/developer/ffx/plugins/sl4f:ffx_sl4f_plugin",
   "//src/developer/ffx/plugins/starnix:ffx_starnix",
+  "//src/developer/ffx/plugins/trace:ffx_trace",
   "//src/developer/ffx/plugins/triage:ffx_triage",
   "//src/developer/ffx/plugins/wlan:ffx_wlan",
   "//src/storage/ffx:ffx_storage",
@@ -70,6 +71,7 @@ dual_mode_defaults = [
   "//src/developer/ffx/plugins/product/data/config.json",
   "//src/developer/ffx/plugins/repository/data/config.json",
   "//src/developer/ffx/plugins/sdk/data/config.json",
+  "//src/developer/ffx/plugins/trace/data/config.json",
 ]
 
 # The same list as `dual_mode_plugins`, but with the normal suffix for plugins converted to

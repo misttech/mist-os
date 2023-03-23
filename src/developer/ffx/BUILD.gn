@@ -53,7 +53,6 @@ if (is_host) {
       "//src/developer/ffx/plugins/doctor:ffx_doctor",
       "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
       "//src/developer/ffx/plugins/test:ffx_test",
-      "//src/developer/ffx/plugins/trace:ffx_trace",
     ]
 
     # Any plugins that can be built in dual mode should be listed here, and that

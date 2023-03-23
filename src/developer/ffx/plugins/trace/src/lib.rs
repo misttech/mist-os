@@ -5,9 +5,8 @@
 use anyhow::{anyhow, Context, Result};
 use errors::ffx_bail;
 use ffx_config::keys::TARGET_DEFAULT_KEY;
-use ffx_core::ffx_plugin;
 use ffx_trace_args::{TraceCommand, TraceSubCommand};
-use ffx_writer::Writer;
+use fho::{daemon_protocol, deferred, selector, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_ffx::{self as ffx, RecordingError, TracingProxy};
 use fidl_fuchsia_tracing::KnownCategory;
 use fidl_fuchsia_tracing_controller::{ControllerProxy, ProviderInfo, ProviderSpec, TraceConfig};
@@ -220,7 +219,7 @@ fn map_categories_to_providers(categories: &Vec<String>) -> TraceConfig {
 
 // Print as a grid that fills the width of the terminal. Falls back to one value
 // per line if any value is wider than the terminal.
-fn print_grid(writer: &Writer, values: Vec<String>) -> Result<()> {
+fn print_grid(writer: &mut Writer, values: Vec<String>) -> Result<()> {
     let mut grid = Grid::new(term_grid::GridOptions {
         direction: term_grid::Direction::TopToBottom,
         filling: term_grid::Filling::Spaces(2),
@@ -238,20 +237,40 @@ fn print_grid(writer: &Writer, values: Vec<String>) -> Result<()> {
     Ok(())
 }
 
-// OPTIMIZATION: Only grab a tracing controller proxy only when necessary.
-#[ffx_plugin(
-    TracingProxy = "daemon::protocol",
-    ControllerProxy = "core/trace_manager:expose:fuchsia.tracing.controller.Controller"
-)]
+type Writer = MachineWriter<TraceOutput>;
+#[derive(FfxTool)]
+pub struct TraceTool {
+    #[with(daemon_protocol())]
+    proxy: TracingProxy,
+    #[with(deferred(selector(
+        "core/trace_manager:expose:fuchsia.tracing.controller.Controller"
+    )))]
+    controller: fho::Deferred<ControllerProxy>,
+    #[command]
+    cmd: TraceCommand,
+}
+
+fho::embedded_plugin!(TraceTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for TraceTool {
+    type Writer = Writer;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        trace(self.proxy, self.controller, writer, self.cmd).await.map_err(Into::into)
+    }
+}
+
 pub async fn trace(
     proxy: TracingProxy,
-    controller: ControllerProxy,
-    #[ffx(machine = TraceOutput)] writer: Writer,
+    controller: fho::Deferred<ControllerProxy>,
+    mut writer: Writer,
     cmd: TraceCommand,
 ) -> Result<()> {
     let default_target: Option<String> = ffx_config::get(TARGET_DEFAULT_KEY).await?;
     match cmd.sub_cmd {
         TraceSubCommand::ListCategories(_) => {
+            let controller = controller.await?;
             let mut categories = handle_fidl_error(controller.get_known_categories().await)?;
             categories.sort_unstable();
             if writer.is_machine() {
@@ -263,12 +282,13 @@ pub async fn trace(
                 writer.machine(&TraceOutput::ListCategories(categories))?;
             } else {
                 print_grid(
-                    &writer,
+                    &mut writer,
                     categories.into_iter().map(|category| category.name).collect(),
                 )?;
             }
         }
         TraceSubCommand::ListProviders(_) => {
+            let controller = controller.await?;
             let mut providers = handle_fidl_error(controller.get_providers().await)?
                 .into_iter()
                 .map(TraceProviderInfo::from)
@@ -278,7 +298,10 @@ pub async fn trace(
                 writer.machine(&TraceOutput::ListProviders(providers))?;
             } else {
                 writer.line("Trace providers:")?;
-                print_grid(&writer, providers.into_iter().map(|provider| provider.name).collect())?;
+                print_grid(
+                    &mut writer,
+                    providers.into_iter().map(|provider| provider.name).collect(),
+                )?;
             }
         }
         TraceSubCommand::ListCategoryGroups(_) => {
@@ -326,7 +349,7 @@ pub async fn trace(
                 )
                 .await?;
             let target = handle_recording_result(res, &output).await?;
-            writer.write(format!(
+            writer.print(format!(
                 "Tracing started successfully on \"{}\" for categories: [ {} ].\nWriting to {}",
                 target.nodename.or(target.serial_number).as_deref().unwrap_or("<UNKNOWN>"),
                 expanded_categories.join(","),
@@ -366,7 +389,7 @@ pub async fn trace(
     Ok(())
 }
 
-async fn status(proxy: &TracingProxy, writer: Writer) -> Result<()> {
+async fn status(proxy: &TracingProxy, mut writer: Writer) -> Result<()> {
     let (iter_proxy, server) = fidl::endpoints::create_proxy::<ffx::TracingStatusIteratorMarker>()?;
     proxy.status(server).await?;
     let mut res = Vec::new();
@@ -433,7 +456,7 @@ async fn status(proxy: &TracingProxy, writer: Writer) -> Result<()> {
     Ok(())
 }
 
-async fn stop_tracing(proxy: &TracingProxy, output: String, writer: Writer) -> Result<()> {
+async fn stop_tracing(proxy: &TracingProxy, output: String, mut writer: Writer) -> Result<()> {
     let res = proxy.stop_recording(&output).await?;
     let target = handle_recording_result(res, &output).await?;
     // TODO(awdavies): Make a clickable link that auto-uploads the trace file if possible.
@@ -545,7 +568,7 @@ mod tests {
     use super::*;
     use errors::ResultExt as _;
     use ffx_trace_args::{ListCategories, ListProviders, Start, Status, Stop};
-    use ffx_writer::Format;
+    use ffx_writer::{Format, TestBuffers};
     use fidl::endpoints::{ControlHandle, Responder};
     use fidl_fuchsia_developer_ffx as ffx;
     use fidl_fuchsia_tracing as tracing;
@@ -586,9 +609,10 @@ mod tests {
 
     #[test]
     fn test_print_grid_too_wide() {
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let mut writer = Writer::new_test(None, &test_buffers);
         print_grid(
-            &writer,
+            &mut writer,
             vec![
                 "really_really_really_really\
                 _really_really_really_really\
@@ -599,7 +623,7 @@ mod tests {
             ],
         )
         .unwrap();
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let want = "really_really_really_really\
                           _really_really_really_really\
                           _really_really_long_category\n\
@@ -609,7 +633,7 @@ mod tests {
     }
 
     fn setup_fake_service() -> TracingProxy {
-        setup_fake_proxy(|req| match req {
+        fho::testing::fake_proxy(|req| match req {
             ffx::TracingRequest::StartRecording { responder, .. } => responder
                 .send(&mut Ok(ffx::TargetInfo {
                     nodename: Some("foo".to_owned()),
@@ -672,8 +696,8 @@ mod tests {
         })
     }
 
-    fn setup_fake_controller_proxy() -> ControllerProxy {
-        setup_fake_controller(|req| match req {
+    fn setup_fake_controller_proxy() -> fho::Deferred<ControllerProxy> {
+        fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
             tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
                 let mut categories = fake_known_categories();
                 responder.send(categories.iter_mut().by_ref()).expect("should respond");
@@ -683,7 +707,7 @@ mod tests {
                 responder.send(&mut providers.drain(..)).expect("should respond");
             }
             r => panic!("unsupported req: {:?}", r),
-        })
+        })))
     }
 
     fn fake_known_categories() -> Vec<tracing::KnownCategory> {
@@ -734,8 +758,8 @@ mod tests {
         infos
     }
 
-    fn setup_closed_fake_controller_proxy() -> ControllerProxy {
-        setup_fake_controller(|req| match req {
+    fn setup_closed_fake_controller_proxy() -> fho::Deferred<ControllerProxy> {
+        fho::Deferred::from_output(Ok(fho::testing::fake_proxy(|req| match req {
             tracing_controller::ControllerRequest::GetKnownCategories { responder, .. } => {
                 responder.control_handle().shutdown();
             }
@@ -743,7 +767,7 @@ mod tests {
                 responder.control_handle().shutdown();
             }
             r => panic!("unsupported req: {:?}", r),
-        })
+        })))
     }
 
     async fn run_trace_test(cmd: TraceCommand, writer: Writer) {
@@ -755,13 +779,14 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let want = "input  kernel  kernel:arch  kernel:ipc\n\n";
         assert_eq!(want, output);
     }
@@ -769,13 +794,14 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories_machine() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(Some(Format::Json), &test_buffers);
         run_trace_test(
             TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let want = serde_json::to_string(
             &fake_known_categories()
                 .into_iter()
@@ -789,26 +815,28 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_categories_peer_closed() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         let proxy = setup_fake_service();
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand { sub_cmd: TraceSubCommand::ListCategories(ListCategories {}) };
-        let res = trace(proxy, controller, writer.clone(), cmd).await.unwrap_err();
+        let res = trace(proxy, controller, writer, cmd).await.unwrap_err();
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("This can happen if tracing is not"));
-        assert!(writer.test_output().unwrap().is_empty());
+        assert!(test_buffers.into_stdout_str().is_empty());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_providers() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let want = "Trace providers:\n\
                    bar  foo  unknown\n\n"
             .to_string();
@@ -818,26 +846,28 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_providers_peer_closed() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         let proxy = setup_fake_service();
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) };
-        let res = trace(proxy, controller, writer.clone(), cmd).await.unwrap_err();
+        let res = trace(proxy, controller, writer, cmd).await.unwrap_err();
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("This can happen if tracing is not"));
-        assert!(writer.test_output().unwrap().is_empty());
+        assert!(test_buffers.into_stdout_str().is_empty());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_list_providers_machine() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(Some(Format::Json));
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(Some(Format::Json), &test_buffers);
         run_trace_test(
             TraceCommand { sub_cmd: TraceSubCommand::ListProviders(ListProviders {}) },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let want = serde_json::to_string(&fake_trace_provider_infos()).unwrap();
         assert_eq!(want, output.trim_end());
     }
@@ -845,7 +875,8 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
@@ -858,10 +889,10 @@ mod tests {
                     trigger: vec![],
                 }),
             },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         // This doesn't find `/.../foo.txt` for the tracing status, since the faked
         // proxy has no state.
         let regex_str = "Tracing started successfully on \"foo\" for categories: \\[ beaver,platypus \\].\nWriting to /([^/]+/)+?foo.txt
@@ -886,13 +917,10 @@ Current tracing status:
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_status() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
-        run_trace_test(
-            TraceCommand { sub_cmd: TraceSubCommand::Status(Status {}) },
-            writer.clone(),
-        )
-        .await;
-        let output = writer.test_output().unwrap();
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
+        run_trace_test(TraceCommand { sub_cmd: TraceSubCommand::Status(Status {}) }, writer).await;
+        let output = test_buffers.into_stdout_str();
         let want = "- foo:
   - Output file: /foo/bar.fxt
   - Duration: indefinite
@@ -911,15 +939,16 @@ Current tracing status:
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stop() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand {
                 sub_cmd: TraceSubCommand::Stop(Stop { output: Some("foo.txt".to_string()) }),
             },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let regex_str = "Tracing stopped successfully on \"foo\".\nResults written to /([^/]+/)+?foo.txt\nUpload to https://ui.perfetto.dev/#!/ to view.";
         let want = Regex::new(regex_str).unwrap();
         assert!(want.is_match(&output), "\"{}\" didn't match regex /{}/", output, regex_str);
@@ -928,7 +957,8 @@ Current tracing status:
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_with_duration() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
@@ -941,10 +971,10 @@ Current tracing status:
                     trigger: vec![],
                 }),
             },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let regex_str =
             "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt for 5.2 seconds.";
         let want = Regex::new(regex_str).unwrap();
@@ -954,7 +984,8 @@ Current tracing status:
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_with_duration_foreground() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
@@ -967,10 +998,10 @@ Current tracing status:
                     trigger: vec![],
                 }),
             },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let regex_str =
             "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt for 0.8 seconds.\n\
             Waiting for 0.8 seconds.\n\
@@ -984,7 +1015,8 @@ Current tracing status:
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_start_foreground() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         run_trace_test(
             TraceCommand {
                 sub_cmd: TraceSubCommand::Start(Start {
@@ -997,10 +1029,10 @@ Current tracing status:
                     trigger: vec![],
                 }),
             },
-            writer.clone(),
+            writer,
         )
         .await;
-        let output = writer.test_output().unwrap();
+        let output = test_buffers.into_stdout_str();
         let regex_str =
             "Tracing started successfully on \"foo\" for categories: \\[  \\].\nWriting to /([^/]+/)+?foober.fxt\n\
             Press <enter> to stop trace.\n\
@@ -1014,7 +1046,8 @@ Current tracing status:
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_large_buffer() {
         let _env = ffx_config::test_init().await.unwrap();
-        let writer = Writer::new_test(None);
+        let test_buffers = TestBuffers::default();
+        let writer = Writer::new_test(None, &test_buffers);
         let proxy = setup_fake_service();
         let controller = setup_closed_fake_controller_proxy();
         let cmd = TraceCommand {
@@ -1028,10 +1061,10 @@ Current tracing status:
                 trigger: vec![],
             }),
         };
-        let res = trace(proxy, controller, writer.clone(), cmd).await.unwrap_err();
+        let res = trace(proxy, controller, writer, cmd).await.unwrap_err();
         assert!(res.ffx_error().is_some());
         assert!(res.to_string().contains("Error: Requested buffer size of"));
-        assert!(writer.test_output().unwrap().is_empty());
+        assert!(test_buffers.into_stdout_str().is_empty());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

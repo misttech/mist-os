@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_trace") {
   version = "0.1.0"
@@ -21,10 +22,11 @@ ffx_plugin("ffx_trace") {
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:blocking",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:lazy_static",
@@ -41,7 +43,19 @@ ffx_plugin("ffx_trace") {
   ]
 
   test_deps = [
+    "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:regex",
   ]
+}
+
+ffx_tool("ffx_trace_tool") {
+  edition = "2021"
+  output_name = "ffx-trace"
+  deps = [
+    ":ffx_trace",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }
