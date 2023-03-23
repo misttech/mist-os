@@ -917,6 +917,14 @@ class VmPageList final {
   // populated/split from.
   void ReturnIntervalSlot(uint64_t offset);
 
+  // Clips an interval from the start by len, i.e. moves the start from interval_start to
+  // interval_start + len. The total length of the interval must be larger than len.
+  zx_status_t ClipIntervalStart(uint64_t interval_start, uint64_t len);
+
+  // Clips an interval from the end by len, i.e. moves the end from interval_end to
+  // interval_end - len. The total length of the interval must be larger than len.
+  zx_status_t ClipIntervalEnd(uint64_t interval_end, uint64_t len);
+
  private:
   // Returns true if the specified offset falls in a sparse page interval.
   bool IsOffsetInInterval(uint64_t offset) const;

@@ -881,6 +881,100 @@ zx_status_t VmPageList::AddZeroInterval(uint64_t start_offset, uint64_t end_offs
   return ZX_OK;
 }
 
+zx_status_t VmPageList::ClipIntervalStart(uint64_t interval_start, uint64_t len) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(interval_start));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  if (len == 0) {
+    return ZX_OK;
+  }
+  uint64_t new_interval_start;
+  ASSERT(!add_overflow(interval_start, len, &new_interval_start));
+
+  const VmPageOrMarker* old_start = Lookup(interval_start);
+  DEBUG_ASSERT(old_start->IsIntervalStart());
+
+#if DEBUG_ASSERT_IMPLEMENTED
+  // There should only be empty slots between the old and new start.
+  zx_status_t status =
+      ForEveryPageAndGapInRange([](auto* p, uint64_t off) { return ZX_ERR_BAD_STATE; },
+                                [](uint64_t start, uint64_t end) { return ZX_ERR_BAD_STATE; },
+                                interval_start + PAGE_SIZE, new_interval_start);
+  ASSERT(status == ZX_OK);
+#endif
+
+  VmPageOrMarker* new_start = LookupOrAllocate(new_interval_start);
+  if (!new_start) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Helper to create the new start sentinel using the old start sentinel.
+  auto create_new_start = [old_start]() -> VmPageOrMarker {
+    // We only support zero intervals for now.
+    DEBUG_ASSERT(old_start->IsIntervalZero());
+    return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::Start,
+                                        old_start->GetZeroIntervalDirtyState());
+  };
+
+  // It is possible that we are moving the start all the way to the end, leaving behind a single
+  // interval slot.
+  if (new_start->IsIntervalEnd()) {
+    new_start->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+  } else {
+    DEBUG_ASSERT(new_start->IsEmpty());
+    *new_start = create_new_start();
+  }
+  // Free up the old start.
+  RemoveContent(interval_start);
+  return ZX_OK;
+}
+
+zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(interval_end));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
+  if (len == 0) {
+    return ZX_OK;
+  }
+  uint64_t new_interval_end;
+  ASSERT(!sub_overflow(interval_end, len, &new_interval_end));
+
+  const VmPageOrMarker* old_end = Lookup(interval_end);
+  DEBUG_ASSERT(old_end->IsIntervalEnd());
+
+#if DEBUG_ASSERT_IMPLEMENTED
+  // There should only be empty slots between the new and old end.
+  zx_status_t status =
+      ForEveryPageAndGapInRange([](auto* p, uint64_t off) { return ZX_ERR_BAD_STATE; },
+                                [](uint64_t start, uint64_t end) { return ZX_ERR_BAD_STATE; },
+                                new_interval_end + PAGE_SIZE, interval_end);
+  ASSERT(status == ZX_OK);
+#endif
+
+  VmPageOrMarker* new_end = LookupOrAllocate(new_interval_end);
+  if (!new_end) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  // Helper to create the new end sentinel using the old end sentinel.
+  auto create_new_end = [old_end]() -> VmPageOrMarker {
+    // We only support zero intervals for now.
+    DEBUG_ASSERT(old_end->IsIntervalZero());
+    return VmPageOrMarker::ZeroInterval(VmPageOrMarker::IntervalSentinel::End,
+                                        old_end->GetZeroIntervalDirtyState());
+  };
+
+  // It is possible that we are moving the end all the way to the start, leaving behind a single
+  // interval slot.
+  if (new_end->IsIntervalStart()) {
+    new_end->ChangeIntervalSentinel(VmPageOrMarker::IntervalSentinel::Slot);
+  } else {
+    DEBUG_ASSERT(new_end->IsEmpty());
+    *new_end = create_new_end();
+  }
+  // Free up the old end.
+  RemoveContent(interval_end);
+  return ZX_OK;
+}
+
 void VmPageList::MergeFrom(
     VmPageList& other, const uint64_t offset, const uint64_t end_offset,
     fit::inline_function<void(VmPageOrMarker&&, uint64_t offset), 3 * sizeof(void*)> release_fn,
