@@ -16,10 +16,9 @@ namespace fsl {
 
 DeviceWatcher::DeviceWatcher(async_dispatcher_t* dispatcher,
                              fidl::ClientEnd<fuchsia_io::Directory> dir,
-                             fidl::ClientEnd<fuchsia_io::DirectoryWatcher> dir_watcher,
+                             fidl::Endpoints<fuchsia_io::DirectoryWatcher> dir_watcher,
                              ExistsCallback exists_callback, IdleCallback idle_callback)
-    : dir_(std::move(dir)),
-      dir_watcher_(std::move(dir_watcher)),
+    : dir_watcher_(std::move(dir_watcher.client)),
       exists_callback_(std::move(exists_callback)),
       idle_callback_(std::move(idle_callback)),
       wait_(this, dir_watcher_.channel().get(), ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED),
@@ -27,8 +26,36 @@ DeviceWatcher::DeviceWatcher(async_dispatcher_t* dispatcher,
   if (dispatcher == nullptr) {
     dispatcher = async_get_default_dispatcher();
   }
-  zx_status_t status = wait_.Begin(dispatcher);
-  FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
+  fidl::WireClient<fuchsia_io::Directory> client(std::move(dir), dispatcher);
+  client
+      ->Watch(fio::wire::WatchMask::kAdded | fio::wire::WatchMask::kExisting |
+                  fio::wire::WatchMask::kIdle,
+              0, std::move(dir_watcher.server))
+      .Then([client = std::move(client), weak = weak_ptr_factory_.GetWeakPtr(), dispatcher](
+                const fidl::WireUnownedResult<fuchsia_io::Directory::Watch>& result) mutable {
+        if (!result.ok()) {
+          FX_PLOGS(ERROR, result.status()) << "Failed to create device watcher";
+          return;
+        }
+        const fidl::WireResponse response = result.value();
+        if (response.s != ZX_OK) {
+          FX_PLOGS(ERROR, response.s) << "Failed to create device watcher";
+          return;
+        }
+        fit::result dir = client.UnbindMaybeGetEndpoint();
+        if (dir.is_error()) {
+          FX_LOGS(ERROR) << "Failed to unbind directory client "
+                         << dir.error_value().FormatDescription();
+          return;
+        }
+        DeviceWatcher* self = weak.get();
+        if (self == nullptr) {
+          return;
+        }
+        self->dir_ = std::move(dir.value());
+        zx_status_t status = self->wait_.Begin(dispatcher);
+        FX_DCHECK(status == ZX_OK) << zx_status_get_string(status);
+      });
 }
 
 std::unique_ptr<DeviceWatcher> DeviceWatcher::Create(const std::string& directory_path,
@@ -57,21 +84,8 @@ std::unique_ptr<DeviceWatcher> DeviceWatcher::CreateWithIdleCallback(
   if (endpoints.is_error()) {
     return nullptr;
   }
-  fio::wire::WatchMask mask =
-      fio::wire::WatchMask::kAdded | fio::wire::WatchMask::kExisting | fio::wire::WatchMask::kIdle;
-  const fidl::WireResult result = fidl::WireCall(dir)->Watch(mask, 0, std::move(endpoints->server));
-  if (!result.ok()) {
-    FX_PLOGS(ERROR, result.status()) << "Failed to create device watcher";
-    return nullptr;
-  }
-  const fidl::WireResponse response = result.value();
-  if (response.s != ZX_OK) {
-    FX_PLOGS(ERROR, response.s) << "Failed to create device watcher";
-    return nullptr;
-  }
-
   return std::unique_ptr<DeviceWatcher>(
-      new DeviceWatcher(dispatcher, std::move(dir), std::move(endpoints->client),
+      new DeviceWatcher(dispatcher, std::move(dir), std::move(endpoints.value()),
                         std::move(exists_callback), std::move(idle_callback)));
 }
 
