@@ -367,14 +367,6 @@ impl WaiterRef {
     pub fn access<R>(&self, f: impl FnOnce(Option<&Waiter>) -> R) -> R {
         f(self.0.upgrade().map(Waiter).as_ref())
     }
-
-    /// Take the Waiter out of this `WaiterRef`.
-    ///
-    /// This has the side effect of invalidating the `WaiterRef`.
-    pub fn take(&mut self) -> Option<Waiter> {
-        let waiter_impl = self.0.upgrade().take();
-        waiter_impl.map(Waiter)
-    }
 }
 
 impl std::fmt::Debug for WaiterRef {
@@ -549,6 +541,13 @@ impl WaitQueue {
     pub fn transfer(&self, other: &WaitQueue) {
         let mut other_entries = std::mem::take(other.waiters.lock().deref_mut());
         self.waiters.lock().append(&mut other_entries);
+    }
+
+    /// Returns whether there is no active waiters waiting on this `WaitQueue`.
+    pub fn is_empty(&self) -> bool {
+        let mut waiters = self.waiters.lock();
+        waiters.retain(|entry| entry.waiter.is_valid());
+        waiters.is_empty()
     }
 }
 

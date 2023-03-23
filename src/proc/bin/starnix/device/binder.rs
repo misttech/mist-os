@@ -23,10 +23,7 @@ use crate::mm::{
 };
 use crate::mutable_state::Guard;
 use crate::syscalls::{SyscallResult, SUCCESS};
-use crate::task::{
-    CurrentTask, EventHandler, Kernel, Task, WaitCallback, WaitCanceler, WaitQueue, Waiter,
-    WaiterRef,
-};
+use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter};
 use crate::types::*;
 use bitflags::bitflags;
 use derivative::Derivative;
@@ -41,6 +38,7 @@ use std::collections::{
     VecDeque,
 };
 use std::ffi::CString;
+use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
@@ -112,8 +110,17 @@ impl Drop for BinderConnection {
 }
 
 impl FileOps for BinderConnection {
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        FdEvents::POLLIN | FdEvents::POLLOUT
+    fn query_events(&self, current_task: &CurrentTask) -> FdEvents {
+        match self.proc(current_task) {
+            Ok(proc) => {
+                let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
+                let mut thread_state = binder_thread.lock();
+                let mut proc_command_queue = proc.command_queue.lock();
+                BinderDriver::get_active_queue(&mut thread_state, &mut proc_command_queue)
+                    .query_events()
+            }
+            Err(_) => FdEvents::POLLERR,
+        }
     }
 
     fn wait_async(
@@ -252,6 +259,46 @@ struct BinderProcessState {
 struct CommandQueueWithWaitQueue {
     commands: VecDeque<Command>,
     waiters: WaitQueue,
+}
+
+impl CommandQueueWithWaitQueue {
+    fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+
+    fn pop_front(&mut self) -> Option<Command> {
+        self.commands.pop_front()
+    }
+
+    fn push_back(&mut self, command: Command) {
+        self.commands.push_back(command);
+        self.waiters.notify_events(FdEvents::POLLIN);
+    }
+
+    fn has_waiters(&self) -> bool {
+        !self.waiters.is_empty()
+    }
+
+    fn query_events(&self) -> FdEvents {
+        if self.is_empty() {
+            FdEvents::POLLOUT
+        } else {
+            FdEvents::POLLIN | FdEvents::POLLOUT
+        }
+    }
+
+    fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
+        self.waiters.wait_async(waiter)
+    }
+
+    fn wait_async_events(
+        &self,
+        waiter: &Waiter,
+        events: FdEvents,
+        handler: EventHandler,
+    ) -> WaitCanceler {
+        self.waiters.wait_async_events(waiter, events, handler)
+    }
 }
 
 /// An active binder transaction.
@@ -612,9 +659,7 @@ impl<'a> BinderProcessGuard<'a> {
 
     /// Enqueues `command` for the process and wakes up any thread that is waiting for commands.
     fn enqueue_process_command(&mut self, command: Command) {
-        let mut queue = self.base.command_queue.lock();
-        queue.commands.push_back(command);
-        queue.waiters.notify_events(FdEvents::POLLIN);
+        self.base.command_queue.lock().push_back(command);
     }
 
     /// Return the `BinderThread` with the given `tid`, creating it if it doesn't exist.
@@ -1304,15 +1349,15 @@ struct BinderThread {
 }
 
 impl BinderThread {
-    fn new(binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> Self {
-        let state = Mutex::new(BinderThreadState::new(tid, binder_proc.base));
+    fn new(_binder_proc: &BinderProcessGuard<'_>, tid: pid_t) -> Self {
+        let state = Mutex::new(BinderThreadState::new(tid));
         #[cfg(any(test, debug_assertions))]
         {
             // The state must be acquired after the mutable state from the `BinderProcess` and before
             // `command_queue`. `binder_proc` being a guard, the mutable state of `BinderProcess` is
             // already locked.
             let _l1 = state.lock();
-            let _l2 = binder_proc.base.command_queue.lock();
+            let _l2 = _binder_proc.base.command_queue.lock();
         }
         Self { tid, state }
     }
@@ -1327,29 +1372,22 @@ impl BinderThread {
 #[derive(Debug)]
 struct BinderThreadState {
     tid: pid_t,
-    /// The process this thread belongs to.
-    process: Weak<BinderProcess>,
     /// The registered state of the thread.
     registration: RegistrationState,
     /// The stack of transactions that are active for this thread.
     transactions: Vec<TransactionRole>,
     /// The binder driver uses this queue to communicate with a binder thread. When a binder thread
     /// issues a [`uapi::BINDER_WRITE_READ`] ioctl, it will read from this command queue.
-    command_queue: VecDeque<Command>,
-    /// The [`Waiter`] object the binder thread is waiting on when there are no commands in the
-    /// command queue. If empty, the binder thread is not currently waiting.
-    waiter: WaiterRef,
+    command_queue: CommandQueueWithWaitQueue,
 }
 
 impl BinderThreadState {
-    fn new(tid: pid_t, binder_proc: &Arc<BinderProcess>) -> Self {
+    fn new(tid: pid_t) -> Self {
         Self {
             tid,
-            process: Arc::downgrade(binder_proc),
             registration: RegistrationState::empty(),
-            transactions: Vec::new(),
-            command_queue: VecDeque::new(),
-            waiter: WaiterRef::empty(),
+            transactions: Default::default(),
+            command_queue: Default::default(),
         }
     }
 
@@ -1366,7 +1404,7 @@ impl BinderThreadState {
             log_trace!("thread {:?} has non empty queue", self.tid);
             return false;
         }
-        if !self.waiter.is_valid() {
+        if !self.command_queue.has_waiters() {
             log_trace!("thread {:?} is not waiting", self.tid);
             return false;
         }
@@ -1397,14 +1435,6 @@ impl BinderThreadState {
     /// Enqueues `command` for the thread and wakes it up if necessary.
     pub fn enqueue_command(&mut self, command: Command) {
         self.command_queue.push_back(command);
-        if let Some(waiter) = self.waiter.take() {
-            // Wake up the thread that is waiting.
-            waiter.wake_immediately(FdEvents::POLLIN.bits(), WaitCallback::none());
-        }
-        // Notify any threads that are waiting on events from the binder driver FD.
-        if let Some(binder_proc) = self.process.upgrade() {
-            binder_proc.command_queue.lock().waiters.notify_events(FdEvents::POLLIN);
-        }
     }
 
     /// Get the binder process and thread to reply to, or fail if there is no ongoing transaction or
@@ -1427,7 +1457,7 @@ impl Drop for BinderThreadState {
     fn drop(&mut self) {
         // If there are any transactions queued, we need to tell the caller that this thread is now
         // dead.
-        for command in &self.command_queue {
+        for command in &self.command_queue.commands {
             if let Command::Transaction { sender, .. } = command {
                 if let Some(sender_thread) = sender.thread.upgrade() {
                     sender_thread
@@ -2885,7 +2915,20 @@ impl BinderDriver {
         Ok(())
     }
 
-    /// Dequeues a command from the thread's command queue, or blocks until commands are available.
+    /// Select which command queue to read from, preferring the thread-local one.
+    /// If a transaction is pending, deadlocks can happen if reading from the process queue.
+    fn get_active_queue<'a>(
+        thread_state: &'a mut BinderThreadState,
+        proc_command_queue: &'a mut CommandQueueWithWaitQueue,
+    ) -> &'a mut CommandQueueWithWaitQueue {
+        if !thread_state.command_queue.is_empty() || !thread_state.transactions.is_empty() {
+            &mut thread_state.command_queue
+        } else {
+            proc_command_queue
+        }
+    }
+
+    /// Dequeues a command from the thread's commands' queue, or blocks until commands are available.
     fn handle_thread_read(
         &self,
         current_task: &CurrentTask,
@@ -2912,13 +2955,7 @@ impl BinderDriver {
 
             // Select which command queue to read from, preferring the thread-local one.
             // If a transaction is pending, deadlocks can happen if reading from the process queue.
-            let command_queue = if !thread_state.command_queue.is_empty()
-                || !thread_state.transactions.is_empty()
-            {
-                &mut thread_state.command_queue
-            } else {
-                &mut proc_command_queue.commands
-            };
+            let command_queue = Self::get_active_queue(&mut thread_state, &mut proc_command_queue);
 
             if let Some(command) = command_queue.pop_front() {
                 // Attempt to write the command to the thread's buffer.
@@ -2956,18 +2993,15 @@ impl BinderDriver {
                 return Ok(bytes_written);
             }
 
-            // No commands readily available to read. Wait for work.
+            // No commands readily available to read. Wait for work. The thread will wait on both
+            // the thread queue and the process queue, and loop back to check whether some work is
+            // available.
             let waiter = Waiter::new();
-            thread_state.waiter = waiter.weak();
-            let wait_canceler = proc_command_queue.waiters.wait_async(&waiter);
+            proc_command_queue.wait_async(&waiter);
+            thread_state.command_queue.wait_async(&waiter);
             drop(thread_state);
             drop(proc_command_queue);
-
             // Put this thread to sleep.
-            scopeguard::defer! {
-                binder_thread.lock().waiter = WaiterRef::empty();
-                wait_canceler.cancel();
-            }
             waiter.wait(current_task)?;
         }
     }
@@ -3311,12 +3345,16 @@ impl BinderDriver {
     ) -> WaitCanceler {
         // THREADING: Always acquire the [`BinderThread::state`] lock before the
         // [`BinderProcess::command_queue`] lock or else it may lead to deadlock.
-        let _thread_state = binder_thread.lock();
+        let thread_state = binder_thread.lock();
         let proc_command_queue = binder_proc.command_queue.lock();
 
-        // TODO(fxb/124167): This should wait on both the proc command queue and the thread command
-        // queue.
-        proc_command_queue.waiters.wait_async_events(waiter, events, handler)
+        let old_handler = Arc::new(Mutex::new(handler));
+        let handler = Box::new(move |e| {
+            std::mem::replace(old_handler.lock().deref_mut(), Box::new(|_| {}))(e)
+        });
+        let w1 = thread_state.command_queue.wait_async_events(waiter, events, handler.clone());
+        let w2 = proc_command_queue.waiters.wait_async_events(waiter, events, handler);
+        WaitCanceler::new(move || w1.cancel() || w2.cancel())
     }
 }
 
@@ -4718,7 +4756,7 @@ mod tests {
         // Verify that a strong acquire command is sent to the sender process (on the same thread
         // that sent the transaction).
         assert_matches!(
-            test.sender_thread.lock().command_queue.front(),
+            test.sender_thread.lock().command_queue.commands.front(),
             Some(Command::AcquireRef(BINDER_OBJECT))
         );
     }
@@ -5653,7 +5691,7 @@ mod tests {
         {
             let mut client_state = client_thread.lock();
             client_state.registration = RegistrationState::MAIN;
-            client_state.waiter = fake_waiter.weak();
+            client_state.command_queue.wait_async(&fake_waiter);
         }
 
         // Now the owner process dies.
@@ -5662,7 +5700,7 @@ mod tests {
 
         // The client thread should have a notification waiting.
         assert_matches!(
-            client_thread.lock().command_queue.front(),
+            client_thread.lock().command_queue.commands.front(),
             Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
         );
     }
@@ -5756,7 +5794,7 @@ mod tests {
         {
             let mut client_state = client_thread.lock();
             client_state.registration = RegistrationState::MAIN;
-            client_state.waiter = fake_waiter.weak();
+            client_state.command_queue.wait_async(&fake_waiter);
         }
 
         // Now the owner process dies.
@@ -6163,7 +6201,7 @@ mod tests {
 
         // Check that there is a dead reply command for the sending thread.
         assert_matches!(
-            sender_thread.lock().command_queue.front(),
+            sender_thread.lock().command_queue.commands.front(),
             Some(Command::DeadReply { pop_transaction: true })
         );
         assert_matches!(sender_thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
@@ -6197,7 +6235,7 @@ mod tests {
         {
             let mut thread_state = receiver_thread.lock();
             thread_state.registration = RegistrationState::MAIN;
-            thread_state.waiter = fake_waiter.weak();
+            thread_state.command_queue.wait_async(&fake_waiter);
         }
 
         // Submit the transaction.
@@ -6215,7 +6253,7 @@ mod tests {
 
         // Check that the receiving thread has a transaction scheduled.
         assert_matches!(
-            receiver_thread.lock().command_queue.front(),
+            receiver_thread.lock().command_queue.commands.front(),
             Some(Command::Transaction { .. })
         );
 
@@ -6227,7 +6265,7 @@ mod tests {
 
         // Check that there is a dead reply command for the sending thread.
         assert_matches!(
-            sender_thread.lock().command_queue.front(),
+            sender_thread.lock().command_queue.commands.front(),
             Some(Command::DeadReply { pop_transaction: true })
         );
         assert_matches!(sender_thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
@@ -6261,7 +6299,7 @@ mod tests {
         {
             let mut thread_state = receiver_thread.lock();
             thread_state.registration = RegistrationState::MAIN;
-            thread_state.waiter = fake_waiter.weak();
+            thread_state.command_queue.wait_async(&fake_waiter);
         }
 
         // Submit the transaction.
@@ -6279,7 +6317,7 @@ mod tests {
 
         // Check that the receiving thread has a transaction scheduled.
         assert_matches!(
-            receiver_thread.lock().command_queue.front(),
+            receiver_thread.lock().command_queue.commands.front(),
             Some(Command::Transaction { .. })
         );
 
@@ -6306,7 +6344,7 @@ mod tests {
 
         // Check that there is a dead reply command for the sending thread.
         assert_matches!(
-            sender_thread.lock().command_queue.front(),
+            sender_thread.lock().command_queue.commands.front(),
             Some(Command::DeadReply { pop_transaction: true })
         );
         assert_matches!(sender_thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
