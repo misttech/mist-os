@@ -40,7 +40,6 @@ arch/arm64/sysroot/include/bits/aarch64/endian.h
 arch/arm64/sysroot/include/bits/aarch64/fenv.h
 arch/arm64/sysroot/include/bits/aarch64/io.h
 arch/arm64/sysroot/include/bits/aarch64/ipc.h
-arch/arm64/sysroot/include/bits/aarch64/reg.h
 arch/arm64/sysroot/include/bits/aarch64/setjmp.h
 arch/arm64/sysroot/include/bits/aarch64/stat.h
 arch/arm64/sysroot/include/bits/alltypes.h
@@ -55,7 +54,6 @@ arch/arm64/sysroot/include/bits/msg.h
 arch/arm64/sysroot/include/bits/null.h
 arch/arm64/sysroot/include/bits/poll.h
 arch/arm64/sysroot/include/bits/posix.h
-arch/arm64/sysroot/include/bits/reg.h
 arch/arm64/sysroot/include/bits/resource.h
 arch/arm64/sysroot/include/bits/sem.h
 arch/arm64/sysroot/include/bits/setjmp.h
@@ -68,7 +66,6 @@ arch/arm64/sysroot/include/bits/x86_64/endian.h
 arch/arm64/sysroot/include/bits/x86_64/fenv.h
 arch/arm64/sysroot/include/bits/x86_64/io.h
 arch/arm64/sysroot/include/bits/x86_64/ipc.h
-arch/arm64/sysroot/include/bits/x86_64/reg.h
 arch/arm64/sysroot/include/bits/x86_64/setjmp.h
 arch/arm64/sysroot/include/bits/x86_64/stat.h
 arch/arm64/sysroot/include/byteswap.h
@@ -153,7 +150,6 @@ arch/arm64/sysroot/include/sys/mtio.h
 arch/arm64/sysroot/include/sys/param.h
 arch/arm64/sysroot/include/sys/poll.h
 arch/arm64/sysroot/include/sys/random.h
-arch/arm64/sysroot/include/sys/reg.h
 arch/arm64/sysroot/include/sys/select.h
 arch/arm64/sysroot/include/sys/sem.h
 arch/arm64/sysroot/include/sys/shm.h
