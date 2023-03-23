@@ -224,10 +224,6 @@
         },
         {
             protocol: [
-                // TODO(https://fxbug.dev/101092): Remove dev-{null,zero} after soft transition in third_party/go.
-                "dev-null",
-                "dev-zero",
-
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.process.Launcher",

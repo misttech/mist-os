@@ -1100,15 +1100,6 @@
             ],
             from: "#devfs",
         },
-
-        // TODO(https://fxbug.dev/101092): Remove after soft transition in third_party/go.
-        {
-            protocol: [
-                "dev-null",
-                "dev-zero",
-            ],
-            from: "#devfs",
-        },
         {
             directory: [
                 "blob",

@@ -30,9 +30,6 @@
         },
         {
             protocol: [
-                // TODO(https://fxbug.dev/101092): Remove dev-{null,zero} after soft transition in third_party/go.
-                "dev-null",
-                "dev-zero",
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.boot.WriteOnlyLog",

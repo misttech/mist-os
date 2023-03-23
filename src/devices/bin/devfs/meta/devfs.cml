@@ -35,20 +35,6 @@
             rights: [ "rw*" ],
             path: "/dev/builtin",
         },
-
-        // TODO(https://fxbug.dev/101092): Remove after soft transition in third_party/go.
-        {
-            protocol: "dev-null",
-            rights: [ "rw*" ],
-            path: "/dev/null",
-        },
-
-        // TODO(https://fxbug.dev/101092): Remove after soft transition in third_party/go.
-        {
-            protocol: "dev-zero",
-            rights: [ "rw*" ],
-            path: "/dev/zero",
-        },
     ],
     use: [
         { protocol: "fuchsia.device.fs.lifecycle.Lifecycle" },
@@ -70,15 +56,6 @@
                 "dev-builtin",
                 "dev-class",
                 "dev-topological",
-            ],
-            from: "self",
-        },
-
-        // TODO(https://fxbug.dev/101092): Remove after soft transition in third_party/go.
-        {
-            protocol: [
-                "dev-null",
-                "dev-zero",
             ],
             from: "self",
         },
