@@ -287,11 +287,12 @@ class RegionList final {
     }
     // Subregion size should never be zero unless during unmapping which should never overlap with
     // this operation.
-    DEBUG_ASSERT(itr->size() > 0);
+    AssertHeld(itr->lock_ref());
+    DEBUG_ASSERT(itr->size_locked() > 0);
     vaddr_t region_end;
-    bool overflowed = add_overflow(itr->base(), itr->size() - 1, &region_end);
+    bool overflowed = add_overflow(itr->base_locked(), itr->size_locked() - 1, &region_end);
     ASSERT(!overflowed);
-    if (itr->base() > addr || addr > region_end) {
+    if (itr->base_locked() > addr || addr > region_end) {
       return nullptr;
     }
 
@@ -313,9 +314,12 @@ class RegionList final {
     itr--;
     if (!itr.IsValid()) {
       itr = regions_.begin();
-    } else if (base >= itr->base() && base - itr->base() >= itr->size()) {
-      // If *base* isn't in this region, ignore it.
-      ++itr;
+    } else {
+      AssertHeld(itr->lock_ref());
+      if (base >= itr->base_locked() && base - itr->base_locked() >= itr->size_locked()) {
+        // If *base* isn't in this region, ignore it.
+        ++itr;
+      }
     }
     return itr;
   }
@@ -335,7 +339,8 @@ class RegionList final {
 
     if (prev.IsValid()) {
       vaddr_t prev_last_byte;
-      if (add_overflow(prev->base(), prev->size() - 1, &prev_last_byte)) {
+      AssertHeld(prev->lock_ref());
+      if (add_overflow(prev->base_locked(), prev->size_locked() - 1, &prev_last_byte)) {
         return false;
       }
       if (prev_last_byte >= base) {
@@ -348,7 +353,8 @@ class RegionList final {
       if (add_overflow(base, size - 1, &last_byte)) {
         return false;
       }
-      if (next->base() <= last_byte) {
+      AssertHeld(next->lock_ref());
+      if (next->base_locked() <= last_byte) {
         return false;
       }
     }
@@ -427,13 +433,14 @@ class RegionList final {
     // all gaps reported will be for aligned ranges.
     vaddr_t prev_region_end = ROUNDUP(parent_base, align);
     for (const auto& region : regions_) {
-      if (region.base() > prev_region_end) {
-        const size_t gap = region.base() - prev_region_end;
+      AssertHeld(region.lock_ref());
+      if (region.base_locked() > prev_region_end) {
+        const size_t gap = region.base_locked() - prev_region_end;
         if (!func(prev_region_end, gap)) {
           return;
         }
       }
-      if (add_overflow(region.base(), region.size(), &prev_region_end)) {
+      if (add_overflow(region.base_locked(), region.size_locked(), &prev_region_end)) {
         // This region is already the last region.
         return;
       }

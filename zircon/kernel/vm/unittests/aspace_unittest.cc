@@ -1623,40 +1623,74 @@ static bool vm_kernel_region_test() {
   END_TEST;
 }
 
+class TestRegionList;
+
 class TestRegion : public fbl::RefCounted<TestRegion>,
                    public fbl::WAVLTreeContainable<fbl::RefPtr<TestRegion>> {
  public:
-  TestRegion(vaddr_t base, size_t size) : base_(base), size_(size) {}
+  TestRegion(vaddr_t base, size_t size, TestRegionList const& list)
+      : list_(list), base_(base), size_(size) {}
   ~TestRegion() = default;
+
   vaddr_t base() const { return base_; }
   size_t size() const { return size_; }
   vaddr_t GetKey() const { return base(); }
 
+  vaddr_t base_locked() const { return base_; }
+  size_t size_locked() const { return size_; }
+
+  Lock<CriticalMutex>* lock() const;
+  Lock<CriticalMutex>& lock_ref() const;
+
  private:
+  friend class TestRegionList;
+  // Simulates aspace for templated code
+  TestRegionList const& list_;
   vaddr_t base_;
   size_t size_;
 };
 
-static void insert_region(RegionList<TestRegion>* regions, vaddr_t base, size_t size) {
-  fbl::AllocChecker ac;
-  auto test_region = fbl::AdoptRef(new (&ac) TestRegion(base, size));
-  ASSERT(ac.check());
-  regions->InsertRegion(ktl::move(test_region));
-}
+class TestRegionList : public fbl::RefCounted<TestRegionList> {
+ public:
+  TestRegionList() : guard_(&lock_) {}
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
-static bool remove_region(RegionList<TestRegion>* regions, vaddr_t base) {
-  auto region = regions->FindRegion(base);
-  if (region == nullptr) {
-    return false;
+  RegionList<TestRegion>* get_regions() { return &regions_; }
+
+  void insert_region(vaddr_t base, size_t size) {
+    fbl::AllocChecker ac;
+    auto test_region = fbl::AdoptRef(new (&ac) TestRegion(base, size, *this));
+    ASSERT(ac.check());
+    regions_.InsertRegion(ktl::move(test_region));
   }
-  regions->RemoveRegion(region);
-  return true;
+
+  bool remove_region(vaddr_t base) {
+    auto region = regions_.FindRegion(base);
+    if (region == nullptr) {
+      return false;
+    }
+    regions_.RemoveRegion(region);
+    return true;
+  }
+
+ private:
+  friend class TestRegion;
+  mutable DECLARE_CRITICAL_MUTEX(TestRegionList) lock_;
+  Guard<CriticalMutex> guard_;
+  RegionList<TestRegion> regions_;
+};
+
+Lock<CriticalMutex>* TestRegion::lock() const TA_RET_CAP(list_.lock()) { return list_.lock(); }
+Lock<CriticalMutex>& TestRegion::lock_ref() const TA_RET_CAP(list_.lock()) {
+  return list_.lock_ref();
 }
 
 static bool region_list_get_alloc_spot_test() {
   BEGIN_TEST;
 
-  RegionList<TestRegion> regions;
+  TestRegionList test_list;
+  auto regions = test_list.get_regions();
   vaddr_t base = 0xFFFF000000000000;
   vaddr_t size = 0x0001000000000000;
   vaddr_t alloc_spot = 0;
@@ -1664,47 +1698,48 @@ static bool region_list_get_alloc_spot_test() {
   uint8_t align_pow2 = 12;
   // Allocate 1 page, should be allocated at [+0, +0x1000].
   size_t alloc_size = 0x1000;
-  zx_status_t status = regions.GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size,
-                                            base, size, /*prng=*/nullptr);
+  zx_status_t status = regions->GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size,
+                                             base, size, /*prng=*/nullptr);
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(base, alloc_spot);
-  insert_region(&regions, alloc_spot, alloc_size);
+
+  test_list.insert_region(alloc_spot, alloc_size);
 
   // Manually insert a sub region at [+0x2000, 0x3000].
-  insert_region(&regions, base + 0x2000, alloc_size);
+  test_list.insert_region(base + 0x2000, alloc_size);
 
   // Try to allocate 2 page, since the gap is too small, we would allocate at [0x3000, 0x5000].
   alloc_size = 0x2000;
-  status = regions.GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
-                                /*prng=*/nullptr);
+  status = regions->GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
+                                 /*prng=*/nullptr);
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(base + 0x3000, alloc_spot);
-  insert_region(&regions, alloc_spot, alloc_size);
+  test_list.insert_region(alloc_spot, alloc_size);
 
-  EXPECT_TRUE(remove_region(&regions, base + 0x2000));
+  EXPECT_TRUE(test_list.remove_region(base + 0x2000));
 
   // After we remove the region, we now have a gap at [0x1000, 0x3000].
   alloc_size = 0x2000;
-  status = regions.GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
-                                /*prng=*/nullptr);
+  status = regions->GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
+                                 /*prng=*/nullptr);
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(base + 0x1000, alloc_spot);
-  insert_region(&regions, alloc_spot, alloc_size);
+  test_list.insert_region(alloc_spot, alloc_size);
 
   // Now we have fill all the gaps, next region should start at 0x5000.
   alloc_size = 0x1000;
-  status = regions.GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
-                                /*prng=*/nullptr);
+  status = regions->GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
+                                 /*prng=*/nullptr);
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(base + 0x5000, alloc_spot);
-  insert_region(&regions, alloc_spot, alloc_size);
+  test_list.insert_region(alloc_spot, alloc_size);
 
   // Test for possible overflow cases. We try to allocate all the rest of the spaces. The last
   // region should be from [0x6000, base + size - 1], we should be able to find this region and
   // allocate all the size from it.
   alloc_size = size - 0x6000;
-  status = regions.GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
-                                /*prng=*/nullptr);
+  status = regions->GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
+                                 /*prng=*/nullptr);
   EXPECT_EQ(ZX_OK, status);
   EXPECT_EQ(base + 0x6000, alloc_spot);
 
@@ -1714,21 +1749,22 @@ static bool region_list_get_alloc_spot_test() {
 static bool region_list_get_alloc_spot_no_memory_test() {
   BEGIN_TEST;
 
-  RegionList<TestRegion> regions;
+  TestRegionList test_list;
+  auto regions = test_list.get_regions();
   vaddr_t base = 0xFFFF000000000000;
   vaddr_t size = 0x0001000000000000;
   // Set the align to be 0x1000.
   uint8_t align_pow2 = 12;
 
-  insert_region(&regions, base, size - 0x1000);
+  test_list.insert_region(base, size - 0x1000);
 
   size_t alloc_size = 0x2000;
   vaddr_t alloc_spot = 0;
   // There is only a 1 page gap, and we are asking for two pages, so ZX_ERR_NO_RESOURCES should be
   // returned.
   zx_status_t status =
-      regions.GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
-                           /*prng=*/nullptr);
+      regions->GetAllocSpot(&alloc_spot, align_pow2, /*entropy=*/0, alloc_size, base, size,
+                            /*prng=*/nullptr);
   EXPECT_EQ(ZX_ERR_NO_RESOURCES, status);
 
   END_TEST;
@@ -1737,18 +1773,19 @@ static bool region_list_get_alloc_spot_no_memory_test() {
 static bool region_list_find_region_test() {
   BEGIN_TEST;
 
-  RegionList<TestRegion> regions;
+  TestRegionList test_list;
+  auto regions = test_list.get_regions();
   vaddr_t base = 0xFFFF000000000000;
 
-  auto region = regions.FindRegion(base);
+  auto region = regions->FindRegion(base);
   EXPECT_EQ(region, nullptr);
 
-  insert_region(&regions, base + 0x1000, 0x1000);
+  test_list.insert_region(base + 0x1000, 0x1000);
 
-  region = regions.FindRegion(base + 1);
+  region = regions->FindRegion(base + 1);
   EXPECT_EQ(region, nullptr);
 
-  region = regions.FindRegion(base + 0x1001);
+  region = regions->FindRegion(base + 0x1001);
   EXPECT_NE(region, nullptr);
   EXPECT_EQ(base + 0x1000, region->base());
   EXPECT_EQ((size_t)0x1000, region->size());
@@ -1759,22 +1796,23 @@ static bool region_list_find_region_test() {
 static bool region_list_include_or_higher_test() {
   BEGIN_TEST;
 
-  RegionList<TestRegion> regions;
+  TestRegionList test_list;
+  auto regions = test_list.get_regions();
   vaddr_t base = 0xFFFF000000000000;
 
-  insert_region(&regions, base + 0x1000, 0x1000);
+  test_list.insert_region(base + 0x1000, 0x1000);
 
-  auto itr = regions.IncludeOrHigher(base + 1);
+  auto itr = regions->IncludeOrHigher(base + 1);
   EXPECT_TRUE(itr.IsValid());
   EXPECT_EQ(base + 0x1000, itr->base());
   EXPECT_EQ((size_t)0x1000, itr->size());
 
-  itr = regions.IncludeOrHigher(base + 0x1001);
+  itr = regions->IncludeOrHigher(base + 0x1001);
   EXPECT_TRUE(itr.IsValid());
   EXPECT_EQ(base + 0x1000, itr->base());
   EXPECT_EQ((size_t)0x1000, itr->size());
 
-  itr = regions.IncludeOrHigher(base + 0x2000);
+  itr = regions->IncludeOrHigher(base + 0x2000);
   EXPECT_FALSE(itr.IsValid());
 
   END_TEST;
@@ -1783,17 +1821,18 @@ static bool region_list_include_or_higher_test() {
 static bool region_list_upper_bound_test() {
   BEGIN_TEST;
 
-  RegionList<TestRegion> regions;
+  TestRegionList test_list;
+  auto regions = test_list.get_regions();
   vaddr_t base = 0xFFFF000000000000;
 
-  insert_region(&regions, base + 0x1000, 0x1000);
+  test_list.insert_region(base + 0x1000, 0x1000);
 
-  auto itr = regions.UpperBound(base + 0xFFF);
+  auto itr = regions->UpperBound(base + 0xFFF);
   EXPECT_TRUE(itr.IsValid());
   EXPECT_EQ(base + 0x1000, itr->base());
   EXPECT_EQ((size_t)0x1000, itr->size());
 
-  itr = regions.UpperBound(base + 0x1000);
+  itr = regions->UpperBound(base + 0x1000);
   EXPECT_FALSE(itr.IsValid());
 
   END_TEST;
@@ -1802,20 +1841,21 @@ static bool region_list_upper_bound_test() {
 static bool region_list_is_range_available_test() {
   BEGIN_TEST;
 
-  RegionList<TestRegion> regions;
+  TestRegionList test_list;
+  auto regions = test_list.get_regions();
   vaddr_t base = 0xFFFF000000000000;
 
-  insert_region(&regions, base + 0x1000, 0x1000);
-  insert_region(&regions, base + 0x3000, 0x1000);
+  test_list.insert_region(base + 0x1000, 0x1000);
+  test_list.insert_region(base + 0x3000, 0x1000);
 
-  EXPECT_TRUE(regions.IsRangeAvailable(base, 0x1000));
-  EXPECT_FALSE(regions.IsRangeAvailable(base, 0x1001));
-  EXPECT_FALSE(regions.IsRangeAvailable(base + 1, 0x1000));
-  EXPECT_TRUE(regions.IsRangeAvailable(base + 0x2000, 1));
-  EXPECT_FALSE(regions.IsRangeAvailable(base + 0x1FFF, 0x2000));
+  EXPECT_TRUE(regions->IsRangeAvailable(base, 0x1000));
+  EXPECT_FALSE(regions->IsRangeAvailable(base, 0x1001));
+  EXPECT_FALSE(regions->IsRangeAvailable(base + 1, 0x1000));
+  EXPECT_TRUE(regions->IsRangeAvailable(base + 0x2000, 1));
+  EXPECT_FALSE(regions->IsRangeAvailable(base + 0x1FFF, 0x2000));
 
-  EXPECT_TRUE(regions.IsRangeAvailable(0xFFFFFFFFFFFFFFFF, 1));
-  EXPECT_FALSE(regions.IsRangeAvailable(base, 0x0001000000000000));
+  EXPECT_TRUE(regions->IsRangeAvailable(0xFFFFFFFFFFFFFFFF, 1));
+  EXPECT_FALSE(regions->IsRangeAvailable(base, 0x0001000000000000));
 
   END_TEST;
 }
