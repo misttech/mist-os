@@ -16,8 +16,8 @@ TEST(SwBreakpointTest, Int3CompactGeneratesSigTrap) {
     };
     segv_act.sa_flags = SA_SIGINFO;
     SAFE_SYSCALL(sigaction(SIGTRAP, &segv_act, nullptr));
-    asm(".byte 0xcc\r\n");
-    ADD_FAILURE() << "Expected to generate SIGTRAP on compact int3.";
+    __builtin_debugtrap();
+    ADD_FAILURE() << "Expected to generate SIGTRAP.";
     exit(EXIT_FAILURE);
   });
   ASSERT_TRUE(helper.WaitForChildren());
