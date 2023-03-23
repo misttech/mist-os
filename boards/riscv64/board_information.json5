@@ -5,5 +5,7 @@
 // BoardInformation for ProductAssembly
 {
     name: "qemu-riscv64",
-    provided_features: [],
+    provided_features: [
+        "fuchsia::network_require_netstack3",
+    ],
 }
