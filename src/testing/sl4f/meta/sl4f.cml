@@ -66,6 +66,7 @@
                 "fuchsia.lowpan.device.DeviceExtraConnector",
                 "fuchsia.lowpan.test.DeviceTestConnector",
                 "fuchsia.media.ProfileProvider",
+                "fuchsia.media.sessions2.ActiveSession",
                 "fuchsia.media.sounds.Player",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.metricslogger.test.MetricsLogger",

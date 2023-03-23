@@ -112,6 +112,12 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.media.sessions2.ActiveSession",
+            from: "#mediasession",
+            to: "#sl4f",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.media.sounds.Player",
             from: "#soundplayer",
             to: "#sl4f",

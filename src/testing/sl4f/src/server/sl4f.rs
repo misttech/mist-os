@@ -84,6 +84,9 @@ use crate::location::regulatory_region_facade::RegulatoryRegionFacade;
 // Logging related includes
 use crate::logging::facade::LoggingFacade;
 
+// Media session related includes
+use crate::media_session::facade::MediaSessionFacade;
+
 // Netstack related includes
 use crate::netstack::facade::NetstackFacade;
 
@@ -200,6 +203,7 @@ impl Sl4f {
                 "location_emergency_provider_facade" => EmergencyProviderFacade::new()?,
                 "location_regulatory_region_facade" => RegulatoryRegionFacade::new()?,
                 "logging_facade" => LoggingFacade::new(),
+                "media_session_facade" => MediaSessionFacade::new(),
                 "netstack_facade" => NetstackFacade::default(),
                 "rfcomm_facade" => RfcommFacade::new()?,
                 "paver" => PaverFacade::new(),

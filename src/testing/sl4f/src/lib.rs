@@ -24,6 +24,7 @@ pub mod hwinfo;
 pub mod input;
 pub mod location;
 pub mod logging;
+pub mod media_session;
 pub mod modular;
 pub mod netstack;
 pub mod paver;
