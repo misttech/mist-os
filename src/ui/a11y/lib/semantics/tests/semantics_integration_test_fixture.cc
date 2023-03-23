@@ -9,12 +9,13 @@
 #include <fuchsia/fonts/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/intl/cpp/fidl.h>
-#include <fuchsia/kernel/cpp/fidl.h>
 #include <fuchsia/memorypressure/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sys/cpp/fidl.h>
+#include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
@@ -31,7 +32,6 @@
 
 #include <cmath>
 
-#include "fuchsia/sysmem/cpp/fidl.h"
 #include "lib/sys/component/cpp/testing/realm_builder_types.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/a11y/lib/view/a11y_view_semantics.h"
@@ -43,6 +43,7 @@ namespace {
 using ScenicEvent = fuchsia::ui::scenic::Event;
 using GfxEvent = fuchsia::ui::gfx::Event;
 
+using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Protocol;
 using component_testing::Route;
@@ -75,6 +76,14 @@ void SemanticsManagerProxy::RegisterViewForSemantics(
 
 std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfigurationsToTest() {
   std::vector<ui_testing::UITestRealm::Config> configs;
+  const std::vector<component_testing::Capability> passthrough_capabilities = {
+      Protocol{fuchsia::sys::Environment::Name_},
+      Protocol{fuchsia::process::Launcher::Name_},
+      Directory{
+          .name = "root-ssl-certificates",
+          .type = fuchsia::component::decl::DependencyType::STRONG,
+      },
+  };
 
   // GFX x root presenter
   {
@@ -84,11 +93,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
     config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::ROOT_PRESENTER;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
 
-    config.passthrough_capabilities = {
-        {
-            Protocol{fuchsia::sys::Environment::Name_},
-        },
-    };
+    config.passthrough_capabilities = passthrough_capabilities;
     configs.push_back(config);
   }
 
@@ -100,11 +105,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
     config.scene_owner = ui_testing::UITestRealm::SceneOwnerType::SCENE_MANAGER;
     config.ui_to_client_services = {fuchsia::ui::scenic::Scenic::Name_};
 
-    config.passthrough_capabilities = {
-        {
-            Protocol{fuchsia::sys::Environment::Name_},
-        },
-    };
+    config.passthrough_capabilities = passthrough_capabilities;
     configs.push_back(config);
   }
 
@@ -119,11 +120,7 @@ std::vector<ui_testing::UITestRealm::Config> SemanticsIntegrationTestV2::UIConfi
                                     fuchsia::ui::composition::Flatland::Name_,
                                     fuchsia::ui::scenic::Scenic::Name_};
 
-    config.passthrough_capabilities = {
-        {
-            Protocol{fuchsia::sys::Environment::Name_},
-        },
-    };
+    config.passthrough_capabilities = passthrough_capabilities;
     configs.push_back(config);
   }
 

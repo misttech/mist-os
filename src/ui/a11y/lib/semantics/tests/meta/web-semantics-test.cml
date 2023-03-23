@@ -24,6 +24,7 @@
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
                 "fuchsia.logger.LogSink",
+                "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
@@ -35,9 +36,13 @@
             to: "#realm_builder",
         },
         {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
             directory: "config-data",
             from: "parent",
-            as: "config-data",
             to: "#realm_builder",
             subdir: "web-semantics-test",
         },

@@ -13,6 +13,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
@@ -37,6 +38,7 @@
 #include <gtest/gtest.h>
 
 #include "constants.h"
+#include "fuchsia/component/decl/cpp/fidl.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/ui/testing/util/portable_ui_test.h"
 #include "src/ui/testing/util/screenshot_helper.h"
@@ -47,7 +49,6 @@ using component_testing::ChildRef;
 using component_testing::Directory;
 using component_testing::ParentRef;
 using component_testing::Protocol;
-using component_testing::Realm;
 using component_testing::Route;
 
 constexpr zx::duration kScreenshotTimeout = zx::sec(10);
@@ -256,6 +257,23 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
             {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
              .source = ChildRef{kBuildInfoProvider},
              .targets = {target, ChildRef{kWebContextProvider}}},
+            {
+                .capabilities = {Directory{
+                    .name = "root-ssl-certificates",
+                    .type = fuchsia::component::decl::DependencyType::STRONG,
+                }},
+                .source = ParentRef{},
+                .targets = {ChildRef{kWebContextProvider}},
+            },
+            {
+                .capabilities =
+                    {
+                        Protocol{fuchsia::process::Launcher::Name_},
+                        Protocol{fuchsia::vulkan::loader::Loader::Name_},
+                    },
+                .source = ParentRef{},
+                .targets = {ChildRef{kWebClient}},
+            },
             {.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
              .source = ChildRef{kIntl},
              .targets = {target}},

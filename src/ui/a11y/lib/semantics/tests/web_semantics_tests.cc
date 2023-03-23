@@ -13,6 +13,7 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/net/interfaces/cpp/fidl.h>
 #include <fuchsia/posix/socket/cpp/fidl.h>
+#include <fuchsia/process/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
@@ -158,9 +159,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
                        .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
                                         Protocol{fuchsia::logger::LogSink::Name_},
-                                        Directory{.name = "config-data",
-                                                  .rights = fuchsia::io::R_STAR_DIR,
-                                                  .path = "/config/data"}},
+                                        Directory{.name = "config-data"}},
                        .source = ParentRef(),
                        .targets = {ChildRef{kFontsProvider}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::ui::input::ImeService::Name_}},
@@ -203,12 +202,24 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
                        .source = ChildRef{kBuildInfoProvider},
                        .targets = {ChildRef{kWebView}, ChildRef{kWebContextProvider}}});
+
+    realm()->AddRoute({.capabilities = {Directory{
+                           .name = "root-ssl-certificates",
+                           .type = fuchsia::component::decl::DependencyType::STRONG,
+                       }},
+                       .source = ParentRef(),
+                       .targets = {ChildRef{kWebContextProvider}}});
+    realm()->AddRoute({.capabilities = {Protocol{fuchsia::process::Launcher::Name_}},
+                       .source = ParentRef(),
+                       .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::intl::PropertyProvider::Name_}},
                        .source = ChildRef{kIntl},
                        .targets = {ChildRef{kWebView}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
                        .source = ChildRef{kWebView},
                        .targets = {ParentRef()}});
+    // TODO(crbug.com/1280703): Remove "fuchsia.sys.Environment" after
+    // successful transition to CFv2.
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::sys::Environment::Name_}},
                        .source = ParentRef(),
                        .targets = {ChildRef{kWebContextProvider}, ChildRef{kWebView}}});
