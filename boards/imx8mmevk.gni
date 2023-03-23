@@ -24,13 +24,14 @@ max_zedboot_zbi_size = 33554432  # 32 MiB
 
 # You'll put kernel command line arguments and driver dependencies here later.
 _common_bootfs_deps = [
-  "//bundles/drivers:bootstrap-dfv2",
   "//src/devices/bin/driver_host2",
   "//src/devices/block/drivers/imx8m-sdmmc",
   "//src/devices/board/drivers/imx8mmevk",
   "//src/devices/gpio/drivers/imx8m-gpio",
   "//src/devices/i2c/drivers/imx8m-i2c",
 ]
+
+board_information_for_assembly = "//boards/imx8mmevk/board_information.json5"
 
 board_bootfs_labels += _common_bootfs_deps
 board_zedboot_bootfs_labels += _common_bootfs_deps
