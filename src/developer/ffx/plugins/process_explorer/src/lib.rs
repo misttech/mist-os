@@ -9,9 +9,8 @@ mod processes_data;
 mod write_human_readable_output;
 
 use anyhow::Result;
-use ffx_core::ffx_plugin;
 use ffx_process_explorer_args::{Args, QueryCommand};
-use ffx_writer::Writer;
+use fho::{selector, AvailabilityFlag, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_buildinfo::BuildInfo;
 use fidl_fuchsia_buildinfo::ProviderProxy;
 use fidl_fuchsia_process_explorer::QueryProxy;
@@ -24,18 +23,39 @@ use write_human_readable_output::{
     pretty_print_invalid_koids, pretty_print_processes_data, pretty_print_processes_name_and_koid,
 };
 
+pub(crate) type Writer = MachineWriter<processed::ProcessesData>;
+
 // TODO(fxbug.dev/107973): The plugin must remain experimental until the FIDL API is strongly typed.
-#[ffx_plugin(
-    "ffx_process_explorer",
-    QueryProxy = "core/process_explorer:expose:fuchsia.process.explorer.Query",
-    ProviderProxy = "core/build-info:expose:fuchsia.buildinfo.Provider"
-)]
+#[derive(FfxTool)]
+#[check(AvailabilityFlag("ffx_process_explorer"))]
+pub struct ProcessExplorerTool {
+    #[with(selector("core/process_explorer:expose:fuchsia.process.explorer.Query"))]
+    query_proxy: QueryProxy,
+    #[with(selector("core/build-info:expose:fuchsia.buildinfo.Provider"))]
+    provider_proxy: ProviderProxy,
+    #[command]
+    cmd: QueryCommand,
+}
+
+fho::embedded_plugin!(ProcessExplorerTool);
+
+#[async_trait::async_trait(?Send)]
+impl FfxMain for ProcessExplorerTool {
+    type Writer = Writer;
+
+    async fn main(self, writer: Self::Writer) -> fho::Result<()> {
+        print_processes_data(self.query_proxy, self.provider_proxy, self.cmd, writer)
+            .await
+            .map_err(Into::into)
+    }
+}
+
 /// Prints processes data.
 pub async fn print_processes_data(
     query_proxy: QueryProxy,
     buildinfo_provider_proxy: ProviderProxy,
     cmd: QueryCommand,
-    #[ffx(machine = processed::ProcessesData)] writer: Writer,
+    writer: MachineWriter<processed::ProcessesData>,
 ) -> Result<()> {
     let processes_data = get_processes_data(query_proxy).await?;
     let output = processed::ProcessesData::from(processes_data);
@@ -108,7 +128,7 @@ fn filter_by_process_koids(
 }
 
 fn list_subcommand(
-    w: Writer,
+    mut w: Writer,
     processes_data: processed::ProcessesData,
     verbose: bool,
 ) -> Result<()> {
@@ -214,7 +234,7 @@ mod tests {
 
     /// Returns a fake query service that writes `EXPECTED_PROCESSES_DATA` serialized to JSON to the socket when `WriteJsonProcessesData` is called.
     fn setup_fake_query_svc() -> QueryProxy {
-        setup_fake_query_proxy(|request| match request {
+        fho::testing::fake_proxy(|request| match request {
             QueryRequest::WriteJsonProcessesData { socket, .. } => {
                 let mut s = fidl::AsyncSocket::from_socket(socket).unwrap();
                 fuchsia_async::Task::local(async move {

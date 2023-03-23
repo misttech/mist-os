@@ -3,18 +3,20 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/build/ffx_tool.gni")
 
 ffx_plugin("ffx_process_explorer") {
-  version = "0.1.0"
+  version = "0.2.0"
   edition = "2021"
 
   deps = [
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer_rust",
-    "//src/developer/ffx/lib/writer:lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon-types",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
@@ -35,4 +37,15 @@ ffx_plugin("ffx_process_explorer") {
     "//third_party/rust_crates:lazy_static",
     "//third_party/rust_crates:pretty_assertions",
   ]
+}
+
+ffx_tool("ffx_process_explorer_tool") {
+  edition = "2021"
+  output_name = "ffx-process-explorer"
+  deps = [
+    ":ffx_process_explorer",
+    "//src/developer/ffx/lib/fho:lib",
+    "//src/lib/fuchsia-async",
+  ]
+  sources = [ "src/main.rs" ]
 }
