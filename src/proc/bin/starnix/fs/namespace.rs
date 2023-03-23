@@ -573,10 +573,10 @@ impl FileOps for ProcMountsFile {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> WaitKey {
+    ) -> Option<WaitKey> {
         // Polling this file gives notifications when any change to mounts occurs. This is not
         // implemented yet, but stubbed for Android init.
-        waiter.fake_wait()
+        Some(waiter.fake_wait())
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}

@@ -338,8 +338,8 @@ impl FileOps for PipeFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        self.pipe.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
+    ) -> Option<WaitKey> {
+        Some(self.pipe.lock().waiters.wait_async_mask(waiter, events.bits(), handler))
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {

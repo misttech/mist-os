@@ -50,8 +50,8 @@ impl FileOps for InotifyFileObject {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> WaitKey {
-        waiter.fake_wait()
+    ) -> Option<WaitKey> {
+        Some(waiter.fake_wait())
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}

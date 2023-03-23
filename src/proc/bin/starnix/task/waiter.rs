@@ -524,7 +524,8 @@ mod tests {
             COUNTER.store(FINAL_VAL, Ordering::Relaxed);
         });
         let waiter = Waiter::new();
-        pipe.wait_async(&current_task, &waiter, FdEvents::POLLIN, report_packet);
+        pipe.wait_async(&current_task, &waiter, FdEvents::POLLIN, report_packet)
+            .expect("wait_async");
         let test_string_clone = test_string.clone();
 
         let thread = std::thread::spawn(move || {
@@ -559,7 +560,9 @@ mod tests {
             let handler = move |_observed: FdEvents| {
                 callback_count_clone.fetch_add(1, Ordering::Relaxed);
             };
-            let key = event.wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler));
+            let key = event
+                .wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler))
+                .expect("wait_async");
             if do_cancel {
                 event.cancel_wait(&current_task, &waiter, key);
             }

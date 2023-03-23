@@ -285,8 +285,8 @@ impl FileOps for DevPtmxFile {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        self.terminal.main_wait_async(waiter, events, handler)
+    ) -> Option<WaitKey> {
+        Some(self.terminal.main_wait_async(waiter, events, handler))
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
@@ -392,8 +392,8 @@ impl FileOps for DevPtsFile {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        self.terminal.replica_wait_async(waiter, events, handler)
+    ) -> Option<WaitKey> {
+        Some(self.terminal.replica_wait_async(waiter, events, handler))
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {

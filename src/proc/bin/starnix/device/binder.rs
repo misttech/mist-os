@@ -122,15 +122,15 @@ impl FileOps for BinderConnection {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> Option<WaitKey> {
         match self.proc(current_task) {
             Ok(proc) => {
                 let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
-                self.driver.wait_async(&proc, &binder_thread, waiter, events, handler)
+                Some(self.driver.wait_async(&proc, &binder_thread, waiter, events, handler))
             }
             Err(_) => {
                 handler(FdEvents::POLLERR);
-                waiter.fake_wait()
+                Some(waiter.fake_wait())
             }
         }
     }
