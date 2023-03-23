@@ -25,6 +25,7 @@ pub fn generate_manifest(
     font_info_loader: impl FontInfoLoader,
     font_dir: impl AsRef<Path>,
     verbose: bool,
+    target_asset_dir: impl AsRef<Path>,
 ) -> Result<FontManifestWrapper, Error> {
     let service_settings = product_config.settings.clone();
 
@@ -35,6 +36,7 @@ pub fn generate_manifest(
         product_config,
         font_info_loader,
         font_dir,
+        target_asset_dir,
     )?;
 
     let mut errors: Vec<GeneratorError> = vec![];
@@ -207,6 +209,7 @@ mod tests {
     use {
         super::*,
         crate::{
+            constants,
             font_catalog::{Asset, Family, Typeface, TypefaceInAssetIndex},
             font_pkgs::FontPackageEntry,
             font_sets::{FontSet, FontSets},
@@ -365,6 +368,7 @@ mod tests {
             font_info_loader,
             font_dir,
             false,
+            constants::LOCAL_ASSET_DIRECTORY,
         );
 
         assert_matches!(result, Err(_));
@@ -415,6 +419,7 @@ mod tests {
             font_info_loader,
             font_dir,
             false,
+            constants::LOCAL_ASSET_DIRECTORY,
         );
 
         assert_matches!(result, Ok(_));
@@ -456,6 +461,7 @@ mod tests {
             font_info_loader,
             font_dir,
             false,
+            constants::LOCAL_ASSET_DIRECTORY,
         );
 
         assert_matches!(result, Err(_));
@@ -505,6 +511,7 @@ mod tests {
             font_info_loader,
             font_dir,
             false,
+            constants::LOCAL_ASSET_DIRECTORY,
         );
 
         assert_matches!(result, Ok(_));

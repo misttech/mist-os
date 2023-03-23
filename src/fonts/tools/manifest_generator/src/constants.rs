@@ -6,4 +6,5 @@
 pub const PKG_URL_PREFIX: &str = "fuchsia-pkg://fuchsia.com/font-package-";
 
 /// All local font files will be stored in this directory.
+#[cfg(test)]
 pub const LOCAL_ASSET_DIRECTORY: &str = "/config/data/assets";

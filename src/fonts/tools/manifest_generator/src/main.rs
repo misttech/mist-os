@@ -113,6 +113,14 @@ struct Args {
         help = "Optional path to output file ending in .font_manifest.json. If omitted, writes to STDOUT."
     )]
     output: Option<PathBuf>,
+
+    #[structopt(
+        long = "target-asset-dir",
+        value_name = "DIR",
+        help = "The directory to store local font files asset into",
+        default_value = "/config/data/assets"
+    )]
+    target_asset_dir: PathBuf,
 }
 
 /// Required because Rust can't create trait objects (`dyn FontInfoLoader`) with generic methods.
@@ -167,6 +175,7 @@ fn main() -> Result<(), Error> {
             font_info_loader,
             args.font_dir.unwrap(),
             args.verbose,
+            args.target_asset_dir,
         )?
     };
 
