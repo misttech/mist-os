@@ -588,7 +588,7 @@ class PowerRequestData {
   //
   // This is most likely an invalid RDO. At a minimum, power consumption must be
   // set before use in a PD message.
-  explicit PowerRequestData(int32_t related_power_data_object_position, PositionTag) {
+  explicit PowerRequestData(int32_t related_power_data_object_position, PositionTag) : bits_(0) {
     ZX_DEBUG_ASSERT(related_power_data_object_position > 0);
     set_related_power_data_object_position(related_power_data_object_position);
   }
