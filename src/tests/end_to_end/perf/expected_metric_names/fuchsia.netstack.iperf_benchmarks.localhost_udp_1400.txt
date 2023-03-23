@@ -1,5 +1,0 @@
-fuchsia.netstack.iperf_benchmarks: UDP/loopback/1400bytes/CPU
-fuchsia.netstack.iperf_benchmarks: UDP/loopback/1400bytes/bits_per_second
-fuchsia.netstack.iperf_benchmarks: UDP/loopback/1400bytes/jitter_ms
-fuchsia.netstack.iperf_benchmarks: UDP/loopback/1400bytes/lost_packets
-fuchsia.netstack.iperf_benchmarks: UDP/loopback/1400bytes/lost_percent

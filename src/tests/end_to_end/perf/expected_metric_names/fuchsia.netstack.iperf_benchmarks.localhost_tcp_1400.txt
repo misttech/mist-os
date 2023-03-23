@@ -1,2 +1,0 @@
-fuchsia.netstack.iperf_benchmarks: TCP/loopback/1400bytes/CPU
-fuchsia.netstack.iperf_benchmarks: TCP/loopback/1400bytes/bits_per_second
