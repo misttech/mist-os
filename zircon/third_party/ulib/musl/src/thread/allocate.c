@@ -17,28 +17,45 @@
 __asan_weak_ref("memcpy")
 __asan_weak_ref("memset")
 
-#ifdef __aarch64__
-// Clang's <arm_acle.h> has __yield() but GCC doesn't (nor the intrinsic).
-LIBC_NO_SAFESTACK static inline void relax(void) { __asm__("yield"); }
-#elif defined(__x86_64__)
-// GCC's <x86intrin.h> has __pause() but not Clang though it has the intrinsic.
-LIBC_NO_SAFESTACK static inline void relax(void) { __builtin_ia32_pause(); }
-#else
-LIBC_NO_SAFESTACK static inline void relax(void) {}
-#endif
+enum lock_state {
+  LOCK_UNLOCKED,
+  LOCK_LOCKED,
+  LOCK_CONTENDED,
+};
 
 static struct pthread* all_threads;
-static atomic_flag all_threads_lock = ATOMIC_FLAG_INIT;
+static zx_futex_t all_threads_lock = LOCK_UNLOCKED;
 
 LIBC_NO_SAFESTACK struct pthread** __thread_list_acquire(void) {
-  while (atomic_flag_test_and_set_explicit(&all_threads_lock, memory_order_acquire)) {
-    relax();
+  // Fast path: LOCK_UNLOCKED -> LOCK_LOCKED
+  int expected = LOCK_UNLOCKED;
+  if (atomic_compare_exchange_strong_explicit(&all_threads_lock, &expected, LOCK_LOCKED,
+                                              memory_order_acquire, memory_order_relaxed)) {
+    return &all_threads;
   }
+
+  // Slow path: bring all states to LOCK_CONTENDED, success if the previous state was LOCK_UNLOCKED
+  while (true) {
+    int observed =
+        atomic_exchange_explicit(&all_threads_lock, LOCK_CONTENDED, memory_order_acquire);
+    if (observed == LOCK_UNLOCKED) {
+      break;
+    }
+    if (observed != LOCK_LOCKED && observed != LOCK_CONTENDED) {
+      // Lock memory was corrupted.
+      __builtin_trap();
+    }
+    _zx_futex_wait(&all_threads_lock, LOCK_CONTENDED, ZX_HANDLE_INVALID, ZX_TIME_INFINITE);
+  }
+
   return &all_threads;
 }
 
 LIBC_NO_SAFESTACK void __thread_list_release(void) {
-  atomic_flag_clear_explicit(&all_threads_lock, memory_order_release);
+  int old = atomic_exchange_explicit(&all_threads_lock, LOCK_UNLOCKED, memory_order_release);
+  if (old == LOCK_CONTENDED) {
+    _zx_futex_wake(&all_threads_lock, 1);
+  }
 }
 
 // A detached thread has to remove itself from the list.
