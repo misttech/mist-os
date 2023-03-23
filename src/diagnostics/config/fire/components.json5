@@ -614,4 +614,14 @@
         label: "Internationalization Services",
         moniker: "core/intl",
     },
+    {
+        id: 227,
+        label: "Detect",
+        moniker: "core/diagnostics/detect",
+    },
+    {
+        id: 228,
+        label: "Diagnostics Persistence",
+        moniker: "core/diagnostics/persistence",
+    },
 ]
