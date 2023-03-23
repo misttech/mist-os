@@ -20,6 +20,18 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
+  // Wait for perfetto bridge to attach
+  int retries = 0;
+  while (retries++ < 5) {
+    fidl::Result<fuchsia_tracing_controller::Controller::GetProviders> providers =
+        client->GetProviders();
+    ASSERT_TRUE(providers.is_ok());
+    if (providers->providers().size() == 1) {
+      break;
+    }
+    sleep(1);
+  }
+
   zx::socket in_socket;
   zx::socket outgoing_socket;
 
@@ -31,7 +43,7 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   ASSERT_TRUE(init_response.is_ok());
 
   client->StartTracing({});
-  loop.Run(zx::deadline_after(zx::sec(2)));
+  loop.Run(zx::deadline_after(zx::sec(1)));
   client->StopTracing({{{.write_results = true}}});
 
   uint8_t buffer[1024];

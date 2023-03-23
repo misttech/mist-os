@@ -168,7 +168,6 @@ void OnTraceStateUpdate() {
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
-  trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "perfetto_producer");
 
   trace::TraceObserver trace_observer;
   trace_observer.Start(dispatcher, OnTraceStateUpdate);
