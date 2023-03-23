@@ -175,13 +175,8 @@ impl Terminal {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        self.write().main_wait_async(waiter, events, handler)
-    }
-
-    /// `cancel_wait` implementation of the main side of the terminal.
-    pub fn main_cancel_wait(self: &Arc<Self>, waiter: &Waiter, key: WaitKey) -> bool {
-        self.write().main_cancel_wait(waiter, key)
+    ) -> WaitCanceler {
+        self.read().main_wait_async(waiter, events, handler)
     }
 
     /// `query_events` implementation of the main side of the terminal.
@@ -227,13 +222,8 @@ impl Terminal {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        self.write().replica_wait_async(waiter, events, handler)
-    }
-
-    /// `cancel_wait` implementation of the replica side of the terminal.
-    pub fn replica_cancel_wait(self: &Arc<Self>, waiter: &Waiter, key: WaitKey) -> bool {
-        self.write().replica_cancel_wait(waiter, key)
+    ) -> WaitCanceler {
+        self.read().replica_wait_async(waiter, events, handler)
     }
 
     /// `query_events` implementation of the replica side of the terminal.
@@ -408,17 +398,12 @@ impl TerminalMutableState<Base = Terminal> {
 
     /// `wait_async` implementation of the main side of the terminal.
     fn main_wait_async(
-        &mut self,
+        &self,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         self.main_wait_queue.wait_async_events(waiter, events, handler)
-    }
-
-    /// `cancel_wait` implementation of the main side of the terminal.
-    fn main_cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) -> bool {
-        self.main_wait_queue.cancel_wait(waiter, key)
     }
 
     /// `query_events` implementation of the main side of the terminal.
@@ -471,17 +456,12 @@ impl TerminalMutableState<Base = Terminal> {
 
     /// `wait_async` implementation of the replica side of the terminal.
     fn replica_wait_async(
-        &mut self,
+        &self,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         self.replica_wait_queue.wait_async_events(waiter, events, handler)
-    }
-
-    /// `cancel_wait` implementation of the replica side of the terminal.
-    fn replica_cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) -> bool {
-        self.replica_wait_queue.cancel_wait(waiter, key)
     }
 
     /// `query_events` implementation of the replica side of the terminal.

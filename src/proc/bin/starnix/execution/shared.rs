@@ -387,7 +387,7 @@ pub fn block_while_stopped(current_task: &CurrentTask) {
 
     let waiter = Waiter::new_ignoring_signals();
     loop {
-        current_task.thread_group.write().stopped_waiters.wait_async(&waiter);
+        current_task.thread_group.read().stopped_waiters.wait_async(&waiter);
         if current_task.read().exit_status.is_some() {
             return;
         }

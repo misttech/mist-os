@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 use std::collections::HashMap;
+use std::ops::DerefMut;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 
@@ -22,14 +23,55 @@ pub enum WaitCallback {
     EventHandler(EventHandler),
 }
 
+/// Return values for wait_async methods. Calling `cancel` will cancel any running wait.
+pub struct WaitCanceler {
+    canceler: Box<dyn Fn() -> bool + Send + Sync>,
+}
+
+impl WaitCanceler {
+    pub fn new<F>(canceler: F) -> Self
+    where
+        F: Fn() -> bool + Send + Sync + 'static,
+    {
+        Self { canceler: Box::new(canceler) }
+    }
+
+    /// Cancel the pending wait. Returns `true` if a wait has been cancelled. It is valid to call
+    /// this function multiple times.
+    pub fn cancel(&self) -> bool {
+        (self.canceler)()
+    }
+}
+
+/// Return values for wait_async methods that monitor the state of a handle. Calling `cancel` will
+/// cancel any running wait.
+pub struct HandleWaitCanceler {
+    canceler: Box<dyn Fn(zx::HandleRef<'_>) -> bool + Send + Sync>,
+}
+
+impl HandleWaitCanceler {
+    pub fn new<F>(canceler: F) -> Self
+    where
+        F: Fn(zx::HandleRef<'_>) -> bool + Send + Sync + 'static,
+    {
+        Self { canceler: Box::new(canceler) }
+    }
+
+    /// Cancel the pending wait. Returns `true` if a wait has been cancelled. It is valid to call
+    /// this function multiple times.
+    pub fn cancel(&self, handle: zx::HandleRef<'_>) -> bool {
+        (self.canceler)(handle)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct WaitKey {
+struct WaitKey {
     key: u64,
 }
 
 impl WaitKey {
     /// an empty key means no associated handler
-    pub fn empty() -> WaitKey {
+    fn empty() -> WaitKey {
         WaitKey { key: 0 }
     }
 }
@@ -224,12 +266,14 @@ impl Waiter {
 
     /// Establish an asynchronous wait for the signals on the given Zircon handle (not to be
     /// confused with POSIX signals), optionally running a FnOnce.
+    ///
+    /// Returns a `HandleWaitCanceler` that can be used to cancel the wait.
     pub fn wake_on_zircon_signals(
         &self,
         handle: &dyn zx::AsHandleRef,
         zx_signals: zx::Signals,
         handler: SignalHandler,
-    ) -> Result<WaitKey, zx::Status> {
+    ) -> Result<HandleWaitCanceler, zx::Status> {
         let callback = WaitCallback::SignalHandler(handler);
         let key = self.register_callback(callback);
         handle.wait_async_handle(
@@ -238,30 +282,30 @@ impl Waiter {
             zx_signals,
             zx::WaitAsyncOpts::EDGE_TRIGGERED,
         )?;
-        Ok(WaitKey { key })
+        let waiter_impl = Arc::downgrade(&self.0);
+        Ok(HandleWaitCanceler::new(move |handle_ref| {
+            if let Some(waiter_impl) = waiter_impl.upgrade() {
+                waiter_impl.port.cancel(&handle_ref, key).is_ok()
+            } else {
+                false
+            }
+        }))
     }
 
-    /// Return a WaitKey representing a wait that will never complete. Useful for stub
+    /// Return a WaitCanceler representing a wait that will never complete. Useful for stub
     /// implementations that should block forever even though a real implementation would wake up
     /// eventually.
-    ///
-    /// This is intended for use in a FileObject::wait_async implementation to distinguish an
-    /// infinite wait from a file that doesn't support blocking and returns EPERM when used in
-    /// epoll (represented by WaitKey::empty()).
-    ///
-    /// TODO(tbodt): Figure out a less messy way to do this. This is necessary because wait_async
-    /// returns a WaitKey. There is probably a better way to design the waiting trait methods to
-    /// avoid this.
-    pub fn fake_wait(&self) -> WaitKey {
-        // This key will never be woken up because we never register it on a wait queue or port.
-        WaitKey { key: self.0.next_key.fetch_add(1, Ordering::Relaxed) }
-    }
-
-    pub fn cancel_signal_wait<H>(&self, handle: &H, key: WaitKey) -> bool
-    where
-        H: zx::AsHandleRef,
-    {
-        self.0.port.cancel(handle, key.key).is_ok()
+    pub fn fake_wait(&self) -> WaitCanceler {
+        let has_run = Mutex::new(false);
+        WaitCanceler::new(move || {
+            let mut has_run = has_run.lock();
+            if !*has_run {
+                *has_run = true;
+                true
+            } else {
+                false
+            }
+        })
     }
 
     fn wake_on_events(&self, handler: EventHandler) -> WaitKey {
@@ -348,7 +392,7 @@ impl std::fmt::Debug for WaiterRef {
 #[derive(Default, Debug)]
 pub struct WaitQueue {
     /// The list of waiters.
-    waiters: Vec<WaitEntry>,
+    waiters: Arc<Mutex<Vec<WaitEntry>>>,
 }
 
 /// An entry in a WaitQueue.
@@ -387,15 +431,40 @@ impl WaitQueue {
     ///
     /// This function does not actually block the waiter. To block the waiter,
     /// call the [`Waiter::wait`] function on the waiter.
+    ///
+    /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async_mask(
-        &mut self,
+        &self,
         waiter: &Waiter,
         events: u32,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         let key = waiter.wake_on_events(handler);
-        self.waiters.push(WaitEntry { waiter: waiter.weak(), events, persistent: false, key });
-        key
+        self.waiters.lock().push(WaitEntry {
+            waiter: waiter.weak(),
+            events,
+            persistent: false,
+            key,
+        });
+        let waiter = waiter.weak();
+        let waiters = Arc::downgrade(&self.waiters);
+        WaitCanceler::new(move || {
+            if let Some(waiters) = waiters.upgrade() {
+                let mut cancelled = false;
+                // TODO(steveaustin) Maybe make waiters a map to avoid linear search
+                waiters.lock().retain(|entry| {
+                    if entry.waiter.0.as_ptr() == waiter.0.as_ptr() && entry.key == key {
+                        cancelled = true;
+                        false
+                    } else {
+                        true
+                    }
+                });
+                cancelled
+            } else {
+                false
+            }
+        })
     }
 
     /// Establish a wait for any event.
@@ -404,7 +473,9 @@ impl WaitQueue {
     ///
     /// This function does not actually block the waiter. To block the waiter,
     /// call the [`Waiter::wait`] function on the waiter.
-    pub fn wait_async(&mut self, waiter: &Waiter) -> WaitKey {
+    ///
+    /// Returns a `WaitCanceler` that can be used to cancel the wait.
+    pub fn wait_async(&self, waiter: &Waiter) -> WaitCanceler {
         self.wait_async_mask(waiter, u32::MAX, WaitCallback::none())
     }
 
@@ -414,12 +485,14 @@ impl WaitQueue {
     ///
     /// This function does not actually block the waiter. To block the waiter,
     /// call the [`Waiter::wait`] function on the waiter.
+    ///
+    /// Returns a `WaitCanceler` that can be used to cancel the wait.
     pub fn wait_async_events(
-        &mut self,
+        &self,
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         self.wait_async_mask(waiter, events.bits(), handler)
     }
 
@@ -433,9 +506,9 @@ impl WaitQueue {
     /// They are not called synchronously by this function.
     ///
     /// Returns the number of waiters woken.
-    pub fn notify_mask_count(&mut self, events: u32, mut limit: usize) -> usize {
+    pub fn notify_mask_count(&self, events: u32, mut limit: usize) -> usize {
         let mut woken = 0;
-        self.waiters.retain(|entry| {
+        self.waiters.lock().retain(|entry| {
             entry.waiter.access(|waiter| {
                 // Drop entries whose waiter no longer exists.
                 let waiter = if let Some(waiter) = waiter {
@@ -457,40 +530,25 @@ impl WaitQueue {
         woken
     }
 
-    pub fn cancel_wait(&mut self, waiter: &Waiter, key: WaitKey) -> bool {
-        let mut cancelled = false;
-        // TODO(steveaustin) Maybe make waiters a map to avoid linear search
-        self.waiters.retain(|entry| {
-            if entry.waiter.0.as_ptr() == Arc::as_ptr(&waiter.0) && entry.key == key {
-                cancelled = true;
-                false
-            } else {
-                true
-            }
-        });
-        cancelled
-    }
-
-    pub fn notify_mask(&mut self, events: u32) {
+    pub fn notify_mask(&self, events: u32) {
         self.notify_mask_count(events, usize::MAX);
     }
 
-    pub fn notify_events(&mut self, events: FdEvents) {
+    pub fn notify_events(&self, events: FdEvents) {
         self.notify_mask(events.bits());
     }
 
-    pub fn notify_count(&mut self, limit: usize) {
+    pub fn notify_count(&self, limit: usize) {
         self.notify_mask_count(u32::MAX, limit);
     }
 
-    pub fn notify_all(&mut self) {
+    pub fn notify_all(&self) {
         self.notify_count(usize::MAX);
     }
 
-    pub fn transfer(&mut self, other: &mut WaitQueue) {
-        for entry in other.waiters.drain(..) {
-            self.waiters.push(entry);
-        }
+    pub fn transfer(&self, other: &WaitQueue) {
+        let mut other_entries = std::mem::take(other.waiters.lock().deref_mut());
+        self.waiters.lock().append(&mut other_entries);
     }
 }
 
@@ -560,11 +618,11 @@ mod tests {
             let handler = move |_observed: FdEvents| {
                 callback_count_clone.fetch_add(1, Ordering::Relaxed);
             };
-            let key = event
+            let wait_canceler = event
                 .wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler))
                 .expect("wait_async");
             if do_cancel {
-                event.cancel_wait(&current_task, &waiter, key);
+                wait_canceler.cancel();
             }
             let add_val = 1u64;
             assert_eq!(
@@ -589,11 +647,11 @@ mod tests {
     #[::fuchsia::test]
     fn single_waiter_multiple_waits_cancel_one_waiter_still_notified() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mut wait_queue = WaitQueue::default();
+        let wait_queue = WaitQueue::default();
         let waiter = Waiter::new();
         let wk1 = wait_queue.wait_async(&waiter);
         let _wk2 = wait_queue.wait_async(&waiter);
-        assert!(wait_queue.cancel_wait(&waiter, wk1));
+        assert!(wk1.cancel());
         wait_queue.notify_all();
         assert!(waiter.wait_until(&current_task, zx::Time::ZERO).is_ok());
     }
@@ -601,12 +659,12 @@ mod tests {
     #[::fuchsia::test]
     fn multiple_waiters_cancel_one_other_still_notified() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mut wait_queue = WaitQueue::default();
+        let wait_queue = WaitQueue::default();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
         let wk1 = wait_queue.wait_async(&waiter1);
         let _wk2 = wait_queue.wait_async(&waiter2);
-        assert!(wait_queue.cancel_wait(&waiter1, wk1));
+        assert!(wk1.cancel());
         wait_queue.notify_all();
         assert!(waiter1.wait_until(&current_task, zx::Time::ZERO).is_err());
         assert!(waiter2.wait_until(&current_task, zx::Time::ZERO).is_ok());
@@ -615,7 +673,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_wait_queue() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mut queue = WaitQueue::default();
+        let queue = WaitQueue::default();
 
         let waiter0 = Waiter::new();
         let waiter1 = Waiter::new();
@@ -644,7 +702,7 @@ mod tests {
     #[::fuchsia::test]
     fn test_wait_queue_mask() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mut queue = WaitQueue::default();
+        let queue = WaitQueue::default();
 
         let waiter0 = Waiter::new();
         let waiter1 = Waiter::new();

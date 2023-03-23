@@ -21,7 +21,7 @@ pub struct FutexTable {
     /// The futexes associated with each address in each VMO.
     ///
     /// This HashMap is populated on-demand when futexes are used.
-    state: Mutex<HashMap<FutexKey, Arc<Mutex<WaitQueue>>>>,
+    state: Mutex<HashMap<FutexKey, Arc<WaitQueue>>>,
 }
 
 #[derive(Eq, Hash, PartialEq)]
@@ -48,17 +48,12 @@ impl FutexTable {
         let offset = key.offset;
 
         let waiter = Waiter::new();
-        {
-            let waiters = self.get_waiters(key);
-            let mut waiters = waiters.lock();
-            // TODO: This read should be atomic.
-            let mut buf = [0u8; 4];
-            vmo.read(&mut buf, offset).map_err(impossible_error)?;
-            if u32::from_ne_bytes(buf) != value {
-                return error!(EAGAIN);
-            }
-
-            waiters.wait_async_mask(&waiter, mask, WaitCallback::none());
+        self.get_waiters(key).wait_async_mask(&waiter, mask, WaitCallback::none());
+        // TODO: This read should be atomic.
+        let mut buf = [0u8; 4];
+        vmo.read(&mut buf, offset).map_err(impossible_error)?;
+        if u32::from_ne_bytes(buf) != value {
+            return error!(EAGAIN);
         }
         // TODO(tbodt): Delete the wait queue from the hashmap when it becomes empty. Not doing
         // this is a memory leak.
@@ -77,7 +72,7 @@ impl FutexTable {
         mask: u32,
     ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(task, addr)?;
-        Ok(self.get_waiters(key).lock().notify_mask_count(mask, count))
+        Ok(self.get_waiters(key).notify_mask_count(mask, count))
     }
 
     /// Requeue the waiters to another address.
@@ -92,13 +87,12 @@ impl FutexTable {
     ) -> Result<usize, Errno> {
         let (_, key) = self.get_vmo_and_key(current_task, addr)?;
         let (_, new_key) = self.get_vmo_and_key(current_task, new_addr)?;
-        let mut waiters = WaitQueue::default();
+        let waiters = WaitQueue::default();
         if let Some(old_waiters) = self.state.lock().remove(&key) {
-            waiters.transfer(&mut old_waiters.lock());
+            waiters.transfer(&old_waiters);
         }
         let woken = waiters.notify_mask_count(FUTEX_BITSET_MATCH_ANY, count);
-        let new_waiters = self.get_waiters(new_key);
-        new_waiters.lock().transfer(&mut waiters);
+        self.get_waiters(new_key).transfer(&waiters);
         Ok(woken)
     }
 
@@ -113,7 +107,7 @@ impl FutexTable {
     }
 
     /// Returns the WaitQueue for a given address.
-    fn get_waiters(&self, key: FutexKey) -> Arc<Mutex<WaitQueue>> {
+    fn get_waiters(&self, key: FutexKey) -> Arc<WaitQueue> {
         let mut state = self.state.lock();
         let waiters = state.entry(key).or_default();
         Arc::clone(waiters)

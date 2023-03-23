@@ -29,7 +29,7 @@ struct WaitObject {
     target: Weak<FileObject>,
     events: FdEvents,
     data: u64,
-    cancel_key: WaitKey,
+    wait_canceler: Option<WaitCanceler>,
 }
 
 impl WaitObject {
@@ -137,7 +137,11 @@ impl EpollFileObject {
         let events = target.query_events(current_task);
         if !(events & wait_object.events).is_empty() {
             self.waiter.wake_immediately(events.bits(), self.new_wait_handler(key));
-            target.cancel_wait(current_task, &self.waiter, wait_object.cancel_key);
+            wait_object
+                .wait_canceler
+                .as_ref()
+                .expect("canceler must have been set by `wait_on_file_edge_triggered`")
+                .cancel();
         }
         Ok(())
     }
@@ -148,10 +152,15 @@ impl EpollFileObject {
         key: EpollKey,
         wait_object: &mut WaitObject,
     ) -> Result<(), Errno> {
-        wait_object.cancel_key = wait_object
-            .target()?
-            .wait_async(current_task, &self.waiter, wait_object.events, self.new_wait_handler(key))
-            .ok_or_else(|| errno!(EPERM))?;
+        wait_object.wait_canceler = wait_object.target()?.wait_async(
+            current_task,
+            &self.waiter,
+            wait_object.events,
+            self.new_wait_handler(key),
+        );
+        if wait_object.wait_canceler.is_none() {
+            return error!(EPERM);
+        }
         Ok(())
     }
 
@@ -211,7 +220,7 @@ impl EpollFileObject {
                     target: Arc::downgrade(file),
                     events: FdEvents::from_bits_truncate(epoll_event.events),
                     data: epoll_event.data,
-                    cancel_key: WaitKey::empty(),
+                    wait_canceler: None,
                 });
                 self.wait_on_file(current_task, key, wait_object)
             }
@@ -234,11 +243,9 @@ impl EpollFileObject {
         match state.wait_objects.entry(key) {
             Entry::Occupied(mut entry) => {
                 let wait_object = entry.get_mut();
-                wait_object.target()?.cancel_wait(
-                    current_task,
-                    &self.waiter,
-                    wait_object.cancel_key,
-                );
+                if let Some(wait_canceler) = wait_object.wait_canceler.take() {
+                    wait_canceler.cancel();
+                }
                 wait_object.events = FdEvents::from_bits_truncate(epoll_event.events);
                 self.wait_on_file(current_task, key, wait_object)
             }
@@ -248,11 +255,13 @@ impl EpollFileObject {
 
     /// Cancel an asynchronous wait on an object. Events triggered before
     /// calling this will still be delivered.
-    pub fn delete(&self, current_task: &CurrentTask, file: &FileHandle) -> Result<(), Errno> {
+    pub fn delete(&self, file: &FileHandle) -> Result<(), Errno> {
         let mut state = self.state.write();
         let key = as_epoll_key(file);
-        if let Some(wait_object) = state.wait_objects.remove(&key) {
-            wait_object.target()?.cancel_wait(current_task, &self.waiter, wait_object.cancel_key);
+        if let Some(mut wait_object) = state.wait_objects.remove(&key) {
+            if let Some(wait_canceler) = wait_object.wait_canceler.take() {
+                wait_canceler.cancel();
+            }
             state.rearm_list.retain(|x| x.key != key);
             Ok(())
         } else {
@@ -472,12 +481,8 @@ impl FileOps for EpollFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
-        Some(self.state.write().waiters.wait_async_mask(waiter, events.bits(), handler))
-    }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        self.state.write().waiters.cancel_wait(waiter, key);
+    ) -> Option<WaitCanceler> {
+        Some(self.state.read().waiters.wait_async_mask(waiter, events.bits(), handler))
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
@@ -612,7 +617,7 @@ mod tests {
                 .unwrap();
 
             if do_cancel {
-                epoll_file.delete(&current_task, &event).unwrap();
+                epoll_file.delete(&event).unwrap();
             }
 
             let callback_count = Arc::new(AtomicU64::new(0));
@@ -620,11 +625,11 @@ mod tests {
             let handler = move |_observed: FdEvents| {
                 callback_count_clone.fetch_add(1, Ordering::Relaxed);
             };
-            let key = event
+            let wait_canceler = event
                 .wait_async(&current_task, &waiter, FdEvents::POLLIN, Box::new(handler))
                 .expect("wait_async");
             if do_cancel {
-                event.cancel_wait(&current_task, &waiter, key);
+                wait_canceler.cancel();
             }
 
             let add_val = 1u64;
@@ -742,7 +747,7 @@ mod tests {
         );
 
         // Remove the thing
-        epoll_file.delete(&current_task, &event).unwrap();
+        epoll_file.delete(&event).unwrap();
 
         // Wait for new notifications
         assert_eq!(

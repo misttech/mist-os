@@ -10,7 +10,7 @@ use crate::logging::*;
 use crate::mm::MemoryAccessorExt;
 use crate::syscalls::SyscallResult;
 use crate::syscalls::SUCCESS;
-use crate::task::{CurrentTask, EventHandler, WaitKey, WaitQueue, Waiter};
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use crate::types::*;
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
@@ -262,12 +262,8 @@ impl FileOps for Arc<InputFile> {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         Some(self.inner.lock().waiters.wait_async_mask(waiter, events.bits(), handler))
-    }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        self.inner.lock().waiters.cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
@@ -579,11 +575,7 @@ mod test {
             .collect::<Vec<_>>();
 
         // Cancel wait for `waiter1`.
-        input_file.cancel_wait(
-            &current_task,
-            &waiter1,
-            waitkeys.into_iter().next().expect("failed to get first waitkey"),
-        );
+        waitkeys.into_iter().next().expect("failed to get first waitkey").cancel();
 
         // Reply to first `Watch` request.
         match touch_source_stream.next().await {

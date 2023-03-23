@@ -5,6 +5,7 @@
 use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
+use std::sync::Arc;
 use zerocopy::AsBytes;
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
@@ -25,7 +26,7 @@ pub enum TimerFileClock {
 /// blocking reads, waiting for the timer to trigger.
 pub struct TimerFile {
     /// The timer that is used to wait for blocking reads.
-    timer: zx::Timer,
+    timer: Arc<zx::Timer>,
 
     /// The type of clock this file was created with.
     clock: TimerFileClock,
@@ -47,7 +48,7 @@ impl TimerFile {
         clock: TimerFileClock,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno> {
-        let timer = zx::Timer::create();
+        let timer = Arc::new(zx::Timer::create());
 
         Ok(Anon::new_file(
             current_task,
@@ -231,24 +232,26 @@ impl FileOps for TimerFile {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         let signal_handler = move |signals: zx::Signals| {
             let events = TimerFile::get_events_from_signals(signals);
             handler(events);
         };
-        Some(
-            waiter
-                .wake_on_zircon_signals(
-                    &self.timer,
-                    TimerFile::get_signals_from_events(events),
-                    Box::new(signal_handler),
-                )
-                .unwrap(),
-        ) // TODO return error
-    }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        waiter.cancel_signal_wait(&self.timer, key);
+        let canceler = waiter
+            .wake_on_zircon_signals(
+                self.timer.as_ref(),
+                TimerFile::get_signals_from_events(events),
+                Box::new(signal_handler),
+            )
+            .unwrap(); // TODO return error
+        let timer = Arc::downgrade(&self.timer);
+        Some(WaitCanceler::new(move || {
+            if let Some(timer) = timer.upgrade() {
+                canceler.cancel(timer.as_handle_ref())
+            } else {
+                false
+            }
+        }))
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

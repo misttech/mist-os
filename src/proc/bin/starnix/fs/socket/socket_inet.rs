@@ -213,18 +213,8 @@ impl SocketOps for InetSocket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         zxio_wait_async(&self.zxio, waiter, events, handler)
-    }
-
-    fn cancel_wait(
-        &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
-        waiter: &Waiter,
-        key: WaitKey,
-    ) {
-        zxio_cancel_wait(&self.zxio, waiter, key);
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {

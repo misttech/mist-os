@@ -165,7 +165,7 @@ impl FileOps for ProcKmsgFile {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         Some(waiter.fake_wait())
     }
 
@@ -295,7 +295,7 @@ impl FileOps for PressureFile {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         Some(waiter.fake_wait())
     }
 

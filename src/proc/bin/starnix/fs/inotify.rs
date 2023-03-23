@@ -5,7 +5,7 @@
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::logging::not_implemented;
-use crate::task::{CurrentTask, EventHandler, WaitKey, Waiter};
+use crate::task::{CurrentTask, EventHandler, WaitCanceler, Waiter};
 use crate::types::*;
 use fuchsia_zircon as zx;
 
@@ -50,11 +50,9 @@ impl FileOps for InotifyFileObject {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         Some(waiter.fake_wait())
     }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::empty()

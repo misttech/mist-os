@@ -525,19 +525,8 @@ impl SocketOps for UnixSocket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         self.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
-    }
-
-    fn cancel_wait(
-        &self,
-        _socket: &Socket,
-        _current_task: &CurrentTask,
-        waiter: &Waiter,
-        key: WaitKey,
-    ) {
-        let mut inner = self.lock();
-        inner.waiters.cancel_wait(waiter, key);
     }
 
     fn query_events(&self, _socket: &Socket, _current_task: &CurrentTask) -> FdEvents {

@@ -107,8 +107,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     ///             calling Waiter::wait_until.
     /// - `events`: The events that will trigger the waiter to wake up.
     /// - `handler`: A handler that will be called on wake-up.
-    /// Returns a WaitKey that can be used to cancel the wait with
-    /// `cancel_wait`
+    /// Returns a WaitCanceler that can be used to cancel the wait.
     fn wait_async(
         &self,
         socket: &Socket,
@@ -116,18 +115,7 @@ pub trait SocketOps: Send + Sync + AsAny {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey;
-
-    /// Cancel a wait previously set up with `wait_async`.
-    /// Returns `true` if the wait was actually cancelled.
-    /// If the wait has already been triggered, this returns `false`.
-    fn cancel_wait(
-        &self,
-        socket: &Socket,
-        current_task: &CurrentTask,
-        waiter: &Waiter,
-        key: WaitKey,
-    );
+    ) -> WaitCanceler;
 
     /// Return the events that are currently active on the `socket`.
     fn query_events(&self, socket: &Socket, current_task: &CurrentTask) -> FdEvents;
@@ -430,12 +418,8 @@ impl Socket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         self.ops.wait_async(self, current_task, waiter, events, handler)
-    }
-
-    pub fn cancel_wait(&self, current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        self.ops.cancel_wait(self, current_task, waiter, key)
     }
 
     pub fn query_events(&self, current_task: &CurrentTask) -> FdEvents {

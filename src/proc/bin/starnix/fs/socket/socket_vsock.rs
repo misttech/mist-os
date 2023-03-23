@@ -212,30 +212,14 @@ impl SocketOps for VsockSocket {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
-        let mut inner = self.lock();
+    ) -> WaitCanceler {
+        let inner = self.lock();
         match &inner.state {
             VsockSocketState::Connected(file) => file
                 .wait_async(current_task, waiter, events, handler)
                 .expect("vsock socket should be connected to a file that can be waited on"),
             _ => inner.waiters.wait_async_mask(waiter, events.bits(), handler),
         }
-    }
-
-    fn cancel_wait(
-        &self,
-        _socket: &Socket,
-        current_task: &CurrentTask,
-        waiter: &Waiter,
-        key: WaitKey,
-    ) {
-        let mut inner = self.lock();
-        match &inner.state {
-            VsockSocketState::Connected(file) => file.cancel_wait(current_task, waiter, key),
-            _ => {
-                inner.waiters.cancel_wait(waiter, key);
-            }
-        };
     }
 
     fn query_events(&self, _socket: &Socket, current_task: &CurrentTask) -> FdEvents {

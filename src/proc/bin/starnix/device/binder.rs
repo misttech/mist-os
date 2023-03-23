@@ -24,7 +24,8 @@ use crate::mm::{
 use crate::mutable_state::Guard;
 use crate::syscalls::{SyscallResult, SUCCESS};
 use crate::task::{
-    CurrentTask, EventHandler, Kernel, Task, WaitCallback, WaitKey, WaitQueue, Waiter, WaiterRef,
+    CurrentTask, EventHandler, Kernel, Task, WaitCallback, WaitCanceler, WaitQueue, Waiter,
+    WaiterRef,
 };
 use crate::types::*;
 use bitflags::bitflags;
@@ -122,7 +123,7 @@ impl FileOps for BinderConnection {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         match self.proc(current_task) {
             Ok(proc) => {
                 let binder_thread = proc.lock().find_or_register_thread(current_task.get_tid());
@@ -132,12 +133,6 @@ impl FileOps for BinderConnection {
                 handler(FdEvents::POLLERR);
                 Some(waiter.fake_wait())
             }
-        }
-    }
-
-    fn cancel_wait(&self, current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        if let Ok(proc) = self.proc(current_task) {
-            self.driver.cancel_wait(&proc, waiter, key)
         }
     }
 
@@ -2428,7 +2423,7 @@ impl BinderDriver {
         current_task: &CurrentTask,
     ) -> Result<(Arc<BinderObject>, Arc<BinderProcess>), Errno> {
         let context_manager = loop {
-            let mut state = self.context_manager_and_queue.lock();
+            let state = self.context_manager_and_queue.lock();
             if let Some(context_manager) = state.context_manager.as_ref().cloned() {
                 break context_manager;
             }
@@ -2964,14 +2959,14 @@ impl BinderDriver {
             // No commands readily available to read. Wait for work.
             let waiter = Waiter::new();
             thread_state.waiter = waiter.weak();
-            let wait_key = proc_command_queue.waiters.wait_async(&waiter);
+            let wait_canceler = proc_command_queue.waiters.wait_async(&waiter);
             drop(thread_state);
             drop(proc_command_queue);
 
             // Put this thread to sleep.
             scopeguard::defer! {
                 binder_thread.lock().waiter = WaiterRef::empty();
-                binder_proc.command_queue.lock().waiters.cancel_wait(&waiter, wait_key);
+                wait_canceler.cancel();
             }
             waiter.wait(current_task)?;
         }
@@ -3313,19 +3308,15 @@ impl BinderDriver {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> WaitKey {
+    ) -> WaitCanceler {
         // THREADING: Always acquire the [`BinderThread::state`] lock before the
         // [`BinderProcess::command_queue`] lock or else it may lead to deadlock.
         let _thread_state = binder_thread.lock();
-        let mut proc_command_queue = binder_proc.command_queue.lock();
+        let proc_command_queue = binder_proc.command_queue.lock();
 
         // TODO(fxb/124167): This should wait on both the proc command queue and the thread command
         // queue.
         proc_command_queue.waiters.wait_async_events(waiter, events, handler)
-    }
-
-    fn cancel_wait(&self, binder_proc: &Arc<BinderProcess>, waiter: &Waiter, key: WaitKey) {
-        binder_proc.command_queue.lock().waiters.cancel_wait(waiter, key);
     }
 }
 

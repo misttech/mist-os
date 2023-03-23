@@ -304,7 +304,7 @@ pub fn zxio_wait_async(
     waiter: &Waiter,
     events: FdEvents,
     handler: EventHandler,
-) -> WaitKey {
+) -> WaitCanceler {
     let zxio_clone = zxio.clone();
     let signal_handler = move |signals: zx::Signals| {
         let observed_zxio_signals = zxio_clone.wait_end(signals);
@@ -314,14 +314,19 @@ pub fn zxio_wait_async(
 
     let (handle, signals) = zxio.wait_begin(get_zxio_signals_from_events(events));
     // unwrap OK here as errors are only generated from misuse
-    waiter.wake_on_zircon_signals(&handle, signals, Box::new(signal_handler)).unwrap()
-}
-
-pub fn zxio_cancel_wait(zxio: &Arc<Zxio>, waiter: &Waiter, key: WaitKey) -> bool {
-    let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
-    let did_cancel = waiter.cancel_signal_wait(&handle, key);
-    zxio.wait_end(signals);
-    did_cancel
+    let zxio = Arc::downgrade(zxio);
+    let canceler =
+        waiter.wake_on_zircon_signals(&handle, signals, Box::new(signal_handler)).unwrap();
+    WaitCanceler::new(move || {
+        if let Some(zxio) = zxio.upgrade() {
+            let (handle, signals) = zxio.wait_begin(ZxioSignals::NONE.bits());
+            let did_cancel = canceler.cancel(handle);
+            zxio.wait_end(signals);
+            did_cancel
+        } else {
+            false
+        }
+    })
 }
 
 pub fn zxio_query_events(zxio: &Arc<Zxio>) -> FdEvents {
@@ -553,12 +558,8 @@ impl FileOps for RemoteFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         Some(zxio_wait_async(&self.zxio, waiter, events, handler))
-    }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        zxio_cancel_wait(&self.zxio, waiter, key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
@@ -626,12 +627,8 @@ impl FileOps for RemotePipeObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         Some(zxio_wait_async(&self.zxio, waiter, events, handler))
-    }
-
-    fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        zxio_cancel_wait(&self.zxio, waiter, key);
     }
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {

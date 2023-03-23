@@ -199,15 +199,9 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         _waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         None
     }
-
-    /// Cancel a wait set up by wait_async.
-    /// Returns true if the wait has not been activated and has been cancelled.
-    ///
-    /// If your file does not support blocking waits, leave this as the default implementation.
-    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::POLLIN | FdEvents::POLLOUT
@@ -890,13 +884,8 @@ impl FileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Option<WaitKey> {
+    ) -> Option<WaitCanceler> {
         self.ops().wait_async(self, current_task, waiter, events, handler)
-    }
-
-    // Cancel a wait set up with wait_async
-    pub fn cancel_wait(&self, current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
-        self.ops().cancel_wait(current_task, waiter, key);
     }
 
     // Return the events currently active
