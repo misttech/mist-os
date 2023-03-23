@@ -373,6 +373,7 @@ impl PagedObjectHandle {
             self.collect_modified_ranges().context("collect_modified_ranges failed")?;
 
         let mut flush_batches = FlushBatches::default();
+        let mut last_end = 0;
         for modified_range in modified_ranges {
             // Skip ranges entirely past the content size.  It might be tempting to consider
             // flushing the range anyway and making up some value for content size, but that's not
@@ -390,6 +391,9 @@ impl PagedObjectHandle {
             }
 
             if let Some(range) = range {
+                // Ranges must be returned in order.
+                assert!(range.start >= last_end);
+                last_end = range.end;
                 flush_batches
                     .add_range(FlushRange { range, is_zero_range: modified_range.is_zero_range() });
             }
@@ -401,12 +405,11 @@ impl PagedObjectHandle {
     async fn add_metadata_to_transaction<'a>(
         &'a self,
         transaction: &mut Transaction<'a>,
-        content_size: u64,
-        previous_content_size: u64,
+        content_size: Option<u64>,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
     ) -> Result<(), Error> {
-        if previous_content_size != content_size {
+        if let Some(content_size) = content_size {
             transaction.add_with_object(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -440,8 +443,7 @@ impl PagedObjectHandle {
         let mut transaction = self.new_transaction(None).await?;
         self.add_metadata_to_transaction(
             &mut transaction,
-            content_size,
-            previous_content_size,
+            if content_size == previous_content_size { None } else { Some(content_size) },
             crtime,
             mtime,
         )
@@ -450,7 +452,9 @@ impl PagedObjectHandle {
         if let Some(batch) = flush_batch {
             assert!(batch.dirty_byte_count == 0);
             batch.writeback_begin(self.vmo(), self.pager());
-            batch.add_to_transaction(&mut transaction, &self.buffer, &self.handle).await?;
+            batch
+                .add_to_transaction(&mut transaction, &self.buffer, &self.handle, content_size)
+                .await?;
         }
         transaction.commit().await.context("Failed to commit transaction")?;
         if let Some(batch) = flush_batch {
@@ -463,8 +467,8 @@ impl PagedObjectHandle {
         &self,
         reservation: &Reservation,
         mut reservation_guard: ScopeGuard<u64, T>,
-        content_size: u64,
-        previous_content_size: u64,
+        mut content_size: u64,
+        mut previous_content_size: u64,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
         flush_batches: Vec<FlushBatch>,
@@ -472,38 +476,60 @@ impl PagedObjectHandle {
         let pager = self.pager();
         let vmo = self.vmo();
 
-        let mut is_first_transaction = true;
-        for batch in flush_batches {
+        let last_batch_index = flush_batches.len() - 1;
+        for (i, batch) in flush_batches.into_iter().enumerate() {
+            let first_batch = i == 0;
+            let last_batch = i == last_batch_index;
+
             let mut transaction = self.new_transaction(Some(&reservation)).await?;
-            if is_first_transaction {
-                // TODO(fxbug.dev/102659): Advance the content size incrementally with each
-                // transaction. Advancing the content size all the way to the end in the first
-                // transactions has the potential to expose zeros at the end of the file if one of
-                // the subsequent transactions fails.
-                self.add_metadata_to_transaction(
-                    &mut transaction,
-                    content_size,
-                    previous_content_size,
-                    crtime,
-                    mtime,
-                )
-                .await?;
-            }
             batch.writeback_begin(vmo, pager);
+
+            let size = if last_batch {
+                if batch.end() > content_size {
+                    // Now that we've called writeback_begin, get the content size again.  If the
+                    // content size has increased (it can't decrease because we hold a lock on
+                    // truncation), it's possible that it grew before we called writeback_begin in
+                    // which case, the kernel won't mark the tail page dirty again so we must
+                    // increase the content size, but no further than the end of the tail page.
+                    let new_content_size =
+                        self.vmo().get_content_size().context("get_content_size failed")?;
+
+                    assert!(new_content_size >= content_size);
+
+                    content_size = std::cmp::min(new_content_size, batch.end())
+                }
+                Some(content_size)
+            } else if batch.end() > previous_content_size {
+                Some(batch.end())
+            } else {
+                None
+            }
+            .filter(|s| {
+                let changed = *s != previous_content_size;
+                previous_content_size = *s;
+                changed
+            });
+
+            self.add_metadata_to_transaction(
+                &mut transaction,
+                size,
+                if first_batch { crtime } else { None },
+                if first_batch { mtime } else { None },
+            )
+            .await?;
+
             batch
-                .add_to_transaction(&mut transaction, &self.buffer, &self.handle)
+                .add_to_transaction(&mut transaction, &self.buffer, &self.handle, content_size)
                 .await
                 .context("batch add_to_transaction failed")?;
             transaction.commit().await.context("Failed to commit transaction")?;
             *reservation_guard -= batch.page_count();
-            if is_first_transaction {
+            if first_batch {
                 self.inner.lock().unwrap().end_flush();
             }
 
             batch.writeback_end(vmo, pager);
             self.owner().report_pager_clean(batch.dirty_byte_count);
-
-            is_first_transaction = false;
         }
 
         // Before releasing the reservation, mark those pages as cleaned, since they weren't used.
@@ -831,6 +857,7 @@ impl FlushBatch {
         transaction: &mut Transaction<'a>,
         vmo_data_buffer: &VmoDataBuffer,
         handle: &'a StoreObjectHandle<FxVolume>,
+        content_size: u64,
     ) -> Result<(), Error> {
         for range in &self.ranges {
             if range.is_zero_range {
@@ -851,11 +878,17 @@ impl FlushBatch {
                     continue;
                 }
                 let range = range.range.clone();
-                let (head, tail) =
-                    slice.split_at_mut((range.end - range.start).try_into().unwrap());
-                // TODO(fxb/88676): Zero out the portion of the block beyond the content size.
+                let (head, tail) = slice.split_at_mut(
+                    (std::cmp::min(range.end, content_size) - range.start).try_into().unwrap(),
+                );
                 vmo_data_buffer.raw_read(range.start, head);
                 slice = tail;
+                // Zero out the tail.
+                if range.end > content_size {
+                    let (head, tail) = slice.split_at_mut((range.end - content_size) as usize);
+                    head.fill(0);
+                    slice = tail;
+                }
                 dirty_ranges.push(range);
             }
             handle
@@ -865,6 +898,10 @@ impl FlushBatch {
         }
 
         Ok(())
+    }
+
+    fn end(&self) -> u64 {
+        self.ranges.last().map(|r| r.range.end).unwrap_or(0)
     }
 }
 

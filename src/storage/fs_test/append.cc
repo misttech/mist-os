@@ -202,6 +202,7 @@ TEST_P(AppendAtomicTest, MultiThreadedTest) {
   std::vector<int> counts(thread_count() + 1);
   for (size_t i = 0; i < sizeof(buf); i += kWriteLength) {
     size_t val = static_cast<size_t>(buf[i]);
+    EXPECT_NE(val, 0u) << "Found zeroes at offset " << i;
     ASSERT_LE(val, counts.size()) << "Read unexpected value from file";
     counts[val]++;
     char tmp[kWriteLength];
@@ -211,7 +212,7 @@ TEST_P(AppendAtomicTest, MultiThreadedTest) {
   }
 
   for (size_t i = 1; i < counts.size(); i++) {
-    ASSERT_EQ(counts[i], kNumWrites) << "Unexpected number of writes from thread " << i;
+    EXPECT_EQ(counts[i], kNumWrites) << "Unexpected number of writes from thread " << i;
   }
 
   ASSERT_EQ(close(fd.release()), 0);
