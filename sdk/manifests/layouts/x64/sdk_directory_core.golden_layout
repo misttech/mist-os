@@ -46,7 +46,6 @@ arch/x64/sysroot/include/bits/aarch64/stat.h
 arch/x64/sysroot/include/bits/alltypes.h
 arch/x64/sysroot/include/bits/endian.h
 arch/x64/sysroot/include/bits/errno.h
-arch/x64/sysroot/include/bits/fcntl.h
 arch/x64/sysroot/include/bits/fenv.h
 arch/x64/sysroot/include/bits/io.h
 arch/x64/sysroot/include/bits/ioctl.h

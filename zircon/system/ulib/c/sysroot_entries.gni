@@ -128,7 +128,6 @@ sysroot_uninstrumented_libc_entries = [
         "bits/aarch64/setjmp.h",
         "bits/alltypes.h",
         "bits/errno.h",
-        "bits/fcntl.h",
         "bits/fenv.h",
         "bits/io.h",
         "bits/ioctl.h",
