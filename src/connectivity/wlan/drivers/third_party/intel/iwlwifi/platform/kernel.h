@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 #include <zircon/assert.h>
 #include <zircon/listnode.h>
 #include <zircon/syscalls.h>
@@ -257,6 +258,34 @@ static inline void msleep(int msec) {
 struct list_head {
   char dummy;
 };
+
+
+// Returns the size of the given struct 'str' and its tailing variant-length array 'member' (which
+// the element count is 'count').
+#define struct_size(str, member, count) (sizeof(*str) + sizeof(*((str)->member)) * count)
+
+
+// Fuchsia dones't support spin lock. We use the mutex lock as the workaround.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wthread-safety-analysis"
+static inline void spin_lock(mtx_t* lock) {
+  mtx_lock(lock);
+}
+
+static inline void spin_unlock(mtx_t* lock) {
+  mtx_unlock(lock);
+}
+
+// flags is not needed in Fuchsia. Discard it.
+#define spin_lock_irqsave(lock, flags) do {  \
+  mtx_lock(lock);                            \
+} while (0)
+
+#define spin_unlock_irqrestore(lock, flags) do {  \
+  mtx_unlock(lock);                               \
+} while (0)
+#pragma GCC diagnostic pop
+
 
 #if defined(__cplusplus)
 }  // extern "C"
