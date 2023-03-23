@@ -47,8 +47,8 @@ impl FileOps for SocketFile {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Result<WaitKey, Errno> {
-        Ok(self.socket.wait_async(current_task, waiter, events, handler))
+    ) -> WaitKey {
+        self.socket.wait_async(current_task, waiter, events, handler)
     }
 
     fn cancel_wait(&self, current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {

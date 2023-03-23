@@ -133,8 +133,8 @@ impl FileOps for EventFdFileObject {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Result<WaitKey, Errno> {
-        Ok(self.inner.lock().wait_queue.wait_async_mask(waiter, events.bits(), handler))
+    ) -> WaitKey {
+        self.inner.lock().wait_queue.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {

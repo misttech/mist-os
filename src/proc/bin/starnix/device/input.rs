@@ -262,8 +262,8 @@ impl FileOps for Arc<InputFile> {
         waiter: &Waiter,
         events: FdEvents,
         handler: EventHandler,
-    ) -> Result<WaitKey, Errno> {
-        Ok(self.inner.lock().waiters.wait_async_mask(waiter, events.bits(), handler))
+    ) -> WaitKey {
+        self.inner.lock().waiters.wait_async_mask(waiter, events.bits(), handler)
     }
 
     fn cancel_wait(&self, _current_task: &CurrentTask, waiter: &Waiter, key: WaitKey) {
@@ -411,24 +411,22 @@ mod test {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Ask `input_file` to notify waiters when data is available to read.
-        [&waiter1, &waiter2].iter().enumerate().for_each(|(i, waiter)| {
-            input_file
-                .wait_async(
-                    &FileObject::new(
-                        Box::new(input_file.clone()),
-                        // The input node doesn't really live at the root of the filesystem.
-                        // But the test doesn't need to be 100% representative of production.
-                        current_task
-                            .lookup_path_from_root(b".")
-                            .expect("failed to get namespace node for root"),
-                        OpenFlags::empty(),
-                    ),
-                    &current_task,
-                    waiter,
-                    FdEvents::POLLIN,
-                    Box::new(|_| ()),
-                )
-                .unwrap_or_else(|_| panic!("wait_async call {i} failed"));
+        [&waiter1, &waiter2].iter().enumerate().for_each(|(_i, waiter)| {
+            input_file.wait_async(
+                &FileObject::new(
+                    Box::new(input_file.clone()),
+                    // The input node doesn't really live at the root of the filesystem.
+                    // But the test doesn't need to be 100% representative of production.
+                    current_task
+                        .lookup_path_from_root(b".")
+                        .expect("failed to get namespace node for root"),
+                    OpenFlags::empty(),
+                ),
+                &current_task,
+                waiter,
+                FdEvents::POLLIN,
+                Box::new(|_| ()),
+            );
         });
         assert_matches!(waiter1.wait_until(&current_task, zx::Time::ZERO), Err(_));
         assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
@@ -479,23 +477,21 @@ mod test {
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Ask `input_file` to notify `waiter` when data is available to read.
-        input_file
-            .wait_async(
-                &FileObject::new(
-                    Box::new(input_file.clone()),
-                    // The input node doesn't really live at the root of the filesystem.
-                    // But the test doesn't need to be 100% representative of production.
-                    current_task
-                        .lookup_path_from_root(b".")
-                        .expect("failed to get namespace node for root"),
-                    OpenFlags::empty(),
-                ),
-                &current_task,
-                &waiter,
-                FdEvents::POLLIN,
-                Box::new(|_| ()),
-            )
-            .expect("wait_async failed");
+        input_file.wait_async(
+            &FileObject::new(
+                Box::new(input_file.clone()),
+                // The input node doesn't really live at the root of the filesystem.
+                // But the test doesn't need to be 100% representative of production.
+                current_task
+                    .lookup_path_from_root(b".")
+                    .expect("failed to get namespace node for root"),
+                OpenFlags::empty(),
+            ),
+            &current_task,
+            &waiter,
+            FdEvents::POLLIN,
+            Box::new(|_| ()),
+        );
 
         let waiter_thread = std::thread::spawn(move || waiter.wait(&current_task));
         assert!(!waiter_thread.is_finished());
@@ -562,24 +558,22 @@ mod test {
         let waitkeys = [&waiter1, &waiter2]
             .iter()
             .enumerate()
-            .map(|(i, waiter)| {
-                input_file
-                    .wait_async(
-                        &FileObject::new(
-                            Box::new(input_file.clone()),
-                            // The input node doesn't really live at the root of the filesystem.
-                            // But the test doesn't need to be 100% representative of production.
-                            current_task
-                                .lookup_path_from_root(b".")
-                                .expect("failed to get namespace node for root"),
-                            OpenFlags::empty(),
-                        ),
-                        &current_task,
-                        waiter,
-                        FdEvents::POLLIN,
-                        Box::new(|_| ()),
-                    )
-                    .unwrap_or_else(|_| panic!("wait_async call {i} failed"))
+            .map(|(_i, waiter)| {
+                input_file.wait_async(
+                    &FileObject::new(
+                        Box::new(input_file.clone()),
+                        // The input node doesn't really live at the root of the filesystem.
+                        // But the test doesn't need to be 100% representative of production.
+                        current_task
+                            .lookup_path_from_root(b".")
+                            .expect("failed to get namespace node for root"),
+                        OpenFlags::empty(),
+                    ),
+                    &current_task,
+                    waiter,
+                    FdEvents::POLLIN,
+                    Box::new(|_| ()),
+                )
             })
             .collect::<Vec<_>>();
 

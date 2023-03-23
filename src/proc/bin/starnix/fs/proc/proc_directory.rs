@@ -165,9 +165,11 @@ impl FileOps for ProcKmsgFile {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> Result<WaitKey, Errno> {
-        Ok(waiter.fake_wait())
+    ) -> WaitKey {
+        waiter.fake_wait()
     }
+
+    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::empty()
@@ -295,9 +297,11 @@ impl FileOps for PressureFile {
         waiter: &Waiter,
         _events: FdEvents,
         _handler: EventHandler,
-    ) -> Result<WaitKey, Errno> {
-        Ok(waiter.fake_wait())
+    ) -> WaitKey {
+        waiter.fake_wait()
     }
+
+    fn cancel_wait(&self, _current_task: &CurrentTask, _waiter: &Waiter, _key: WaitKey) {}
 
     fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
         FdEvents::empty()
