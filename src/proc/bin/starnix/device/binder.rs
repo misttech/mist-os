@@ -491,6 +491,11 @@ impl BinderProcess {
         }
     }
 
+    /// Enqueues `command` for the process and wakes up any thread that is waiting for commands.
+    pub fn enqueue_command(&self, command: Command) {
+        self.command_queue.lock().push_back(command);
+    }
+
     /// A binder thread is done reading a buffer allocated to a transaction. The binder
     /// driver can reclaim this buffer.
     fn handle_free_buffer(self: &Arc<Self>, buffer_ptr: UserAddress) -> Result<(), Errno> {
@@ -513,7 +518,7 @@ impl BinderProcess {
                     drop(object_state);
 
                     // Schedule the transaction
-                    self.lock().enqueue_command(Command::OnewayTransaction(transaction));
+                    self.enqueue_command(Command::OnewayTransaction(transaction));
                 } else {
                     // No more oneway transactions queued, mark the queue handling as done.
                     object_state.handling_oneway_transaction = false;
@@ -587,7 +592,7 @@ impl BinderProcess {
             // cannot handle the notification, in case it is holding some mutex while processing a
             // oneway transaction (where its transaction stack will be empty). It is currently not
             // a problem, because enqueue_command never schedule on the current thread.
-            self.lock().enqueue_command(Command::DeadBinder(cookie));
+            self.enqueue_command(Command::DeadBinder(cookie));
         }
         Ok(())
     }
@@ -602,7 +607,7 @@ impl BinderProcess {
         let proxy = match handle {
             Handle::SpecialServiceManager => {
                 not_implemented!(current_task, "clear death notification for service manager");
-                self.lock().enqueue_command(Command::ClearDeathNotificationDone(cookie));
+                self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
                 return Ok(());
             }
             Handle::Object { index } => {
@@ -619,7 +624,7 @@ impl BinderProcess {
                 owner.death_subscribers.swap_remove(idx);
             }
         }
-        self.lock().enqueue_command(Command::ClearDeathNotificationDone(cookie));
+        self.enqueue_command(Command::ClearDeathNotificationDone(cookie));
         // The client is not interested in the notification anymore, release the weak reference
         // that was taken when registering the notification.
         self.handle_refcount_operation(
@@ -644,24 +649,6 @@ impl BinderProcess {
 }
 
 impl<'a> BinderProcessGuard<'a> {
-    /// Enqueues `command` on the first available thread. If none are available, enqueues it on the
-    /// process queue where it will be handled once a thread is available.
-    ///
-    /// To be noted: this will never enqueue the command on the current running thread, as it is
-    /// not currently waiting for new commands.
-    pub fn enqueue_command(&mut self, command: Command) {
-        if let Some(mut thread) = self.thread_pool.find_available_thread() {
-            thread.enqueue_command(command);
-            return;
-        }
-        self.enqueue_process_command(command);
-    }
-
-    /// Enqueues `command` for the process and wakes up any thread that is waiting for commands.
-    fn enqueue_process_command(&mut self, command: Command) {
-        self.base.command_queue.lock().push_back(command);
-    }
-
     /// Return the `BinderThread` with the given `tid`, creating it if it doesn't exist.
     fn find_or_register_thread(&mut self, tid: pid_t) -> Arc<BinderThread> {
         if let Some(thread) = self.thread_pool.0.get(&tid) {
@@ -771,7 +758,7 @@ impl Drop for BinderProcess {
         let death_subscribers = std::mem::take(&mut self.state.lock().death_subscribers);
         for (proc, cookie) in death_subscribers {
             if let Some(target_proc) = proc.upgrade() {
-                target_proc.lock().enqueue_command(Command::DeadBinder(cookie));
+                target_proc.enqueue_command(Command::DeadBinder(cookie));
             }
         }
 
@@ -1041,18 +1028,6 @@ impl<'a, T: AsBytes> SharedBuffer<'a, T> {
 struct ThreadPool(BTreeMap<pid_t, Arc<BinderThread>>);
 
 impl ThreadPool {
-    /// Finds the first available binder thread that is registered with the driver, is not in the
-    /// middle of a transaction, and has no work to do.
-    fn find_available_thread(&self) -> Option<MutexGuard<'_, BinderThreadState>> {
-        for thread in self.0.values() {
-            let thread_state = thread.lock();
-            if thread_state.is_available() {
-                return Some(thread_state);
-            }
-        }
-        None
-    }
-
     fn has_available_thread(&self) -> bool {
         self.0.values().any(|t| t.lock().is_available())
     }
@@ -1220,13 +1195,13 @@ impl RefCountAction {
         match self {
             Self::Acquire(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
-                    binder_process.lock().enqueue_command(Command::AcquireRef(object.local));
+                    binder_process.enqueue_command(Command::AcquireRef(object.local));
                 }
             }
             Self::Release(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
                     let mut process_state = binder_process.lock();
-                    process_state.enqueue_command(Command::ReleaseRef(object.local));
+                    binder_process.enqueue_command(Command::ReleaseRef(object.local));
                     if !object.has_ref() {
                         process_state.objects.remove(&object.local.weak_ref_addr);
                     }
@@ -1234,13 +1209,13 @@ impl RefCountAction {
             }
             Self::IncRefs(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
-                    binder_process.lock().enqueue_command(Command::IncRef(object.local));
+                    binder_process.enqueue_command(Command::IncRef(object.local));
                 }
             }
             Self::DecRefs(object) => {
                 if let Some(binder_process) = object.owner.upgrade() {
                     let mut process_state = binder_process.lock();
-                    process_state.enqueue_command(Command::DecRef(object.local));
+                    binder_process.enqueue_command(Command::DecRef(object.local));
                     if !object.has_ref() {
                         process_state.objects.remove(&object.local.weak_ref_addr);
                     }
@@ -2858,7 +2833,7 @@ impl BinderDriver {
         if let Some(target_thread) = caller_thread {
             target_thread.lock().enqueue_command(command);
         } else {
-            target_proc.lock().enqueue_command(command);
+            target_proc.enqueue_command(command);
         }
         Ok(())
     }
@@ -5664,7 +5639,7 @@ mod tests {
         let driver = BinderDriver::new();
 
         let (owner_proc, owner_thread) = driver.create_process_and_thread(1);
-        let (client_proc, client_thread) = driver.create_process_and_thread(2);
+        let client_proc = driver.create_local_process(2);
 
         // Register an object with the owner.
         let object = owner_proc.lock().find_or_register_object(
@@ -5686,21 +5661,13 @@ mod tests {
             .handle_request_death_notification(&current_task, handle, DEATH_NOTIFICATION_COOKIE)
             .expect("request death notification");
 
-        // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
-        let fake_waiter = Waiter::new();
-        {
-            let mut client_state = client_thread.lock();
-            client_state.registration = RegistrationState::MAIN;
-            client_state.command_queue.wait_async(&fake_waiter);
-        }
-
         // Now the owner process dies.
         driver.procs.write().remove(&owner_proc.identifier);
         drop(owner_proc);
 
-        // The client thread should have a notification waiting.
+        // The client process should have a notification waiting.
         assert_matches!(
-            client_thread.lock().command_queue.commands.front(),
+            client_proc.command_queue.lock().commands.front(),
             Some(Command::DeadBinder(DEATH_NOTIFICATION_COOKIE))
         );
     }
@@ -6227,17 +6194,6 @@ mod tests {
             buffers_size: 0,
         };
 
-        // Create a thread for the receiver, and make it look eligible for transactions.
-        // Pretend the client thread is waiting for commands, so that it can be scheduled commands.
-        let receiver_thread =
-            test.receiver_proc.lock().find_or_register_thread(test.receiver_proc.pid);
-        let fake_waiter = Waiter::new();
-        {
-            let mut thread_state = receiver_thread.lock();
-            thread_state.registration = RegistrationState::MAIN;
-            thread_state.command_queue.wait_async(&fake_waiter);
-        }
-
         // Submit the transaction.
         test.driver
             .handle_transaction(
@@ -6251,16 +6207,15 @@ mod tests {
         // Check that there are no commands waiting for the sending thread.
         assert!(test.sender_thread.lock().command_queue.is_empty());
 
-        // Check that the receiving thread has a transaction scheduled.
+        // Check that the receiving process has a transaction scheduled.
         assert_matches!(
-            receiver_thread.lock().command_queue.commands.front(),
+            test.receiver_proc.command_queue.lock().commands.front(),
             Some(Command::Transaction { .. })
         );
 
         // Drop the receiving process and thread.
         let TranslateHandlesTestFixture { sender_thread, receiver_proc, .. } = test;
         test.driver.procs.write().remove(&receiver_proc.identifier);
-        drop(receiver_thread);
         drop(receiver_proc);
 
         // Check that there is a dead reply command for the sending thread.
@@ -6315,9 +6270,9 @@ mod tests {
         // Check that there are no commands waiting for the sending thread.
         assert!(test.sender_thread.lock().command_queue.is_empty());
 
-        // Check that the receiving thread has a transaction scheduled.
+        // Check that the receiving process has a transaction scheduled.
         assert_matches!(
-            receiver_thread.lock().command_queue.commands.front(),
+            test.receiver_proc.command_queue.lock().commands.front(),
             Some(Command::Transaction { .. })
         );
 
