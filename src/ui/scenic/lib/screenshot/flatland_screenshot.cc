@@ -82,6 +82,7 @@ FlatlandScreenshot::FlatlandScreenshot(
   buffer_collection->SetConstraints(
       true, utils::CreateDefaultConstraints(/*buffer_count=*/1, display_size_.width,
                                             display_size_.height));
+  buffer_collection->SetName(/*priority=*/11u, "FlatlandScreenshotMemory");
 
   // Initialize Flatland allocator state.
   fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
