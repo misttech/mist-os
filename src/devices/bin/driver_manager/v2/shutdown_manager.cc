@@ -255,7 +255,8 @@ void ShutdownManager::OnBootShutdownComplete() {
 
 void ShutdownManager::UnregisterSystemStorageForShutdown(
     UnregisterSystemStorageForShutdownCompleter::Sync& completer) {
-  SignalPackageShutdown(ToCallback(completer));
+  SignalPackageShutdown(
+      [completer = completer.ToAsync()](zx_status_t status) mutable { completer.Reply(status); });
 }
 
 void ShutdownManager::SignalPackageShutdown(fit::callback<void(zx_status_t)> cb) {
