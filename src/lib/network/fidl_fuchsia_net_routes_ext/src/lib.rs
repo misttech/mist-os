@@ -12,8 +12,7 @@
 
 #![deny(missing_docs)]
 
-#[cfg(test)]
-mod testutil;
+pub mod testutil;
 
 use async_utils::fold;
 use fidl_fuchsia_net as fnet;
@@ -718,7 +717,7 @@ pub async fn collect_routes_until_idle<
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testutil;
+    use crate::testutil::{self, internal as internal_testutil};
     use assert_matches::assert_matches;
     use fidl_fuchsia_net as _;
     use fuchsia_zircon_status as zx_status;
@@ -1304,7 +1303,9 @@ mod tests {
             futures::channel::mpsc::unbounded::<Vec<I::WatchEvent>>();
         for batch_shape in &test_shape {
             batches_sender
-                .unbounded_send(testutil::generate_events_in_range::<I>(batch_shape.clone()))
+                .unbounded_send(internal_testutil::generate_events_in_range::<I>(
+                    batch_shape.clone(),
+                ))
                 .expect("failed to send event batch");
         }
 
@@ -1337,7 +1338,7 @@ mod tests {
                         let actual_event = event
                             .expect("event stream unexpectedly empty")
                             .expect("error processing event");
-                        let expected_event = testutil::generate_event::<I>(event_idx)
+                        let expected_event = internal_testutil::generate_event::<I>(event_idx)
                                 .try_into()
                                 .expect("test event is unexpectedly invalid");
                         assert_eq!(actual_event, expected_event);
@@ -1368,9 +1369,9 @@ mod tests {
     ) {
         // Events for 3 watchers. Each receives one batch containing 10 events.
         let test_data = vec![
-            vec![testutil::generate_events_in_range::<I>(0..10)],
-            vec![testutil::generate_events_in_range::<I>(10..20)],
-            vec![testutil::generate_events_in_range::<I>(20..30)],
+            vec![internal_testutil::generate_events_in_range::<I>(0..10)],
+            vec![internal_testutil::generate_events_in_range::<I>(10..20)],
+            vec![internal_testutil::generate_events_in_range::<I>(20..30)],
         ];
 
         // Instantiate the fake Watcher implementations.
@@ -1459,11 +1460,11 @@ mod tests {
 
         let batch = std::iter::once(bad_event)
             // Optionally append a known good event to the batch.
-            .chain(trailing_event.then(|| testutil::generate_event::<I>(0)).into_iter())
+            .chain(trailing_event.then(|| internal_testutil::generate_event::<I>(0)).into_iter())
             .collect::<Vec<_>>();
         let batches = std::iter::once(batch)
             // Optionally append a known good batch to the sequence of batches.
-            .chain(trailing_batch.then(|| vec![testutil::generate_event::<I>(1)]))
+            .chain(trailing_batch.then(|| vec![internal_testutil::generate_event::<I>(1)]))
             .collect::<Vec<_>>();
 
         // Instantiate the fake Watcher implementation.
@@ -1504,7 +1505,7 @@ mod tests {
     ) {
         let batches = std::iter::once(Vec::new())
             // Optionally append a known good batch to the sequence of batches.
-            .chain(trailing_batch.then(|| vec![testutil::generate_event::<I>(0)]))
+            .chain(trailing_batch.then(|| vec![internal_testutil::generate_event::<I>(0)]))
             .collect::<Vec<_>>();
 
         // Instantiate the fake Watcher implementation.

@@ -3,12 +3,15 @@
 // found in the LICENSE file.
 
 //! Test Utilities for the fuchsia.net.routes FIDL library.
+//!
+//! This library defines a mix of internal and external test utilities,
+//! supporting tests of this `fidl_fuchsia_net_routes_ext` crate and tests
+//! of clients of the `fuchsia.net.routes` FIDL library, respectively.
 
 use crate::FidlRouteIpExt;
 
 use fidl_fuchsia_net_routes as fnet_routes;
 use futures::{Future, Stream, StreamExt as _};
-use net_declare::{fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix};
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 
 // Responds to the given `Watch` request with the given batch of events.
@@ -109,74 +112,80 @@ pub async fn serve_state_request<'a, I: FidlRouteIpExt>(
     watcher_fut.await
 }
 
-// Generates an arbitrary `I::WatchEvent` that is unique for the given `seed`.
-pub(crate) fn generate_event<I: FidlRouteIpExt>(seed: u32) -> I::WatchEvent {
-    #[derive(GenericOverIp)]
-    struct BuildEventOutput<I: Ip + FidlRouteIpExt>(I::WatchEvent);
-    let BuildEventOutput(event) = I::map_ip(
-        IpInvariant(seed),
-        |IpInvariant(seed)| {
-            BuildEventOutput(fnet_routes::EventV4::Added(fnet_routes::InstalledRouteV4 {
-                route: Some(fnet_routes::RouteV4 {
-                    destination: fidl_ip_v4_with_prefix!("192.168.0.0/24"),
-                    action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
-                        outbound_interface: 1,
-                        next_hop: None,
-                    }),
-                    properties: fnet_routes::RoutePropertiesV4 {
-                        specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
-                            metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(seed)),
-                            ..fnet_routes::SpecifiedRouteProperties::EMPTY
-                        }),
-                        ..fnet_routes::RoutePropertiesV4::EMPTY
-                    },
-                }),
-                effective_properties: Some(fnet_routes::EffectiveRouteProperties {
-                    metric: Some(seed),
-                    ..fnet_routes::EffectiveRouteProperties::EMPTY
-                }),
-                ..fnet_routes::InstalledRouteV4::EMPTY
-            }))
-        },
-        |IpInvariant(seed)| {
-            BuildEventOutput(fnet_routes::EventV6::Added(fnet_routes::InstalledRouteV6 {
-                route: Some(fnet_routes::RouteV6 {
-                    destination: fidl_ip_v6_with_prefix!("fe80::0/64"),
-                    action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
-                        outbound_interface: 1,
-                        next_hop: None,
-                    }),
-                    properties: fnet_routes::RoutePropertiesV6 {
-                        specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
-                            metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(seed)),
-                            ..fnet_routes::SpecifiedRouteProperties::EMPTY
-                        }),
-                        ..fnet_routes::RoutePropertiesV6::EMPTY
-                    },
-                }),
-                effective_properties: Some(fnet_routes::EffectiveRouteProperties {
-                    metric: Some(seed),
-                    ..fnet_routes::EffectiveRouteProperties::EMPTY
-                }),
-                ..fnet_routes::InstalledRouteV6::EMPTY
-            }))
-        },
-    );
-    event
-}
+#[cfg(test)]
+pub(crate) mod internal {
+    use super::*;
+    use net_declare::{fidl_ip_v4_with_prefix, fidl_ip_v6_with_prefix};
 
-// Same as `generate_event()` except that it operates over a range of `seeds`,
-// producing `n` `I::WatchEvents` where `n` is the size of the range.
-pub(crate) fn generate_events_in_range<I: FidlRouteIpExt>(
-    seeds: std::ops::Range<u32>,
-) -> Vec<I::WatchEvent> {
-    seeds.into_iter().map(|seed| generate_event::<I>(seed)).collect()
+    // Generates an arbitrary `I::WatchEvent` that is unique for the given `seed`.
+    pub(crate) fn generate_event<I: FidlRouteIpExt>(seed: u32) -> I::WatchEvent {
+        #[derive(GenericOverIp)]
+        struct BuildEventOutput<I: Ip + FidlRouteIpExt>(I::WatchEvent);
+        let BuildEventOutput(event) = I::map_ip(
+            IpInvariant(seed),
+            |IpInvariant(seed)| {
+                BuildEventOutput(fnet_routes::EventV4::Added(fnet_routes::InstalledRouteV4 {
+                    route: Some(fnet_routes::RouteV4 {
+                        destination: fidl_ip_v4_with_prefix!("192.168.0.0/24"),
+                        action: fnet_routes::RouteActionV4::Forward(fnet_routes::RouteTargetV4 {
+                            outbound_interface: 1,
+                            next_hop: None,
+                        }),
+                        properties: fnet_routes::RoutePropertiesV4 {
+                            specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
+                                metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(seed)),
+                                ..fnet_routes::SpecifiedRouteProperties::EMPTY
+                            }),
+                            ..fnet_routes::RoutePropertiesV4::EMPTY
+                        },
+                    }),
+                    effective_properties: Some(fnet_routes::EffectiveRouteProperties {
+                        metric: Some(seed),
+                        ..fnet_routes::EffectiveRouteProperties::EMPTY
+                    }),
+                    ..fnet_routes::InstalledRouteV4::EMPTY
+                }))
+            },
+            |IpInvariant(seed)| {
+                BuildEventOutput(fnet_routes::EventV6::Added(fnet_routes::InstalledRouteV6 {
+                    route: Some(fnet_routes::RouteV6 {
+                        destination: fidl_ip_v6_with_prefix!("fe80::0/64"),
+                        action: fnet_routes::RouteActionV6::Forward(fnet_routes::RouteTargetV6 {
+                            outbound_interface: 1,
+                            next_hop: None,
+                        }),
+                        properties: fnet_routes::RoutePropertiesV6 {
+                            specified_properties: Some(fnet_routes::SpecifiedRouteProperties {
+                                metric: Some(fnet_routes::SpecifiedMetric::ExplicitMetric(seed)),
+                                ..fnet_routes::SpecifiedRouteProperties::EMPTY
+                            }),
+                            ..fnet_routes::RoutePropertiesV6::EMPTY
+                        },
+                    }),
+                    effective_properties: Some(fnet_routes::EffectiveRouteProperties {
+                        metric: Some(seed),
+                        ..fnet_routes::EffectiveRouteProperties::EMPTY
+                    }),
+                    ..fnet_routes::InstalledRouteV6::EMPTY
+                }))
+            },
+        );
+        event
+    }
+
+    // Same as `generate_event()` except that it operates over a range of `seeds`,
+    // producing `n` `I::WatchEvents` where `n` is the size of the range.
+    pub(crate) fn generate_events_in_range<I: FidlRouteIpExt>(
+        seeds: std::ops::Range<u32>,
+    ) -> Vec<I::WatchEvent> {
+        seeds.into_iter().map(|seed| generate_event::<I>(seed)).collect()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{get_watcher, watch};
+    use crate::{get_watcher, testutil::internal as internal_testutil, watch};
     use assert_matches::assert_matches;
     use fuchsia_zircon_status as zx_status;
     use futures::FutureExt;
@@ -202,7 +211,9 @@ mod tests {
             futures::channel::mpsc::unbounded::<Vec<I::WatchEvent>>();
         for batch_shape in &test_shape {
             event_stream_sender
-                .unbounded_send(generate_events_in_range::<I>(batch_shape.clone()))
+                .unbounded_send(internal_testutil::generate_events_in_range::<I>(
+                    batch_shape.clone(),
+                ))
                 .expect("failed to send event batch");
         }
 
@@ -230,7 +241,7 @@ mod tests {
                  () = watcher_fut => panic!("fake watcher implementation unexpectedly finished"),
                 events = watch::<I>(&watcher).fuse() => assert_eq!(
                     events.expect("failed to watch for events"),
-                    generate_events_in_range::<I>(batch_shape.clone())));
+                    internal_testutil::generate_events_in_range::<I>(batch_shape.clone())));
         }
 
         // Close the event_stream_sender and observe the watcher_impl finish.
