@@ -1790,7 +1790,7 @@ void iwl_pcie_hcmd_complete(struct iwl_trans* trans, struct iwl_rx_cmd_buffer* r
     clear_bit(STATUS_SYNC_HCMD_ACTIVE, &trans->status);
     IWL_DEBUG_INFO(trans, "Clearing HCMD_ACTIVE for command %s\n",
                    iwl_get_cmd_string(trans, cmd_id));
-    sync_completion_signal(&trans_pcie->wait_command_queue);
+    sync_completion_signal(&trans_pcie->trans->wait_command_queue);
   }
 
   if (meta->flags & CMD_MAKE_TRANS_IDLE) {
@@ -1860,7 +1860,7 @@ static zx_status_t iwl_pcie_send_hcmd_sync(struct iwl_trans* trans, struct iwl_h
     }
 #endif  // NEEDS_PORTING
 
-  sync_completion_reset(&trans_pcie->wait_command_queue);
+  sync_completion_reset(&trans_pcie->trans->wait_command_queue);
 
   int cmd_idx;
   zx_status_t status = iwl_pcie_enqueue_hcmd(trans, cmd, &cmd_idx);
@@ -1871,7 +1871,7 @@ static zx_status_t iwl_pcie_send_hcmd_sync(struct iwl_trans* trans, struct iwl_h
     return status;
   }
 
-  status = sync_completion_wait(&trans_pcie->wait_command_queue, HOST_COMPLETE_TIMEOUT);
+  status = sync_completion_wait(&trans_pcie->trans->wait_command_queue, HOST_COMPLETE_TIMEOUT);
   if (status != ZX_OK) {
     IWL_ERR(trans, "Error sending %s: time out after %ldms (%s).\n",
             iwl_get_cmd_string(trans, cmd->id),

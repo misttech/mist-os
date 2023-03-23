@@ -197,12 +197,13 @@ class PcieTest : public zxtest::Test {
     trans_cfg_.base_params = &base_params_;
     trans_ = iwl_trans_alloc(sizeof(struct iwl_trans_pcie_wrapper), &pci_dev_.dev, &trans_ops_,
                              &trans_cfg_);
-    trans_->cfg = &cfg_;
     ASSERT_NE(trans_, nullptr);
+    trans_->cfg = &cfg_;
     auto wrapper = reinterpret_cast<iwl_trans_pcie_wrapper*>(IWL_TRANS_GET_PCIE_TRANS(trans_));
     wrapper->test = this;
     trans_pcie_ = &wrapper->trans_pcie;
     trans_pcie_->pci_dev = &pci_dev_;
+    trans_pcie_->trans = trans_;
 
     // Setup the op_mode and its ops. Note that we re-define the 'op_mode_specific' filed to pass
     // the test object reference into the mock function.
@@ -900,8 +901,8 @@ TEST_F(TxTest, SyncTwoFragmentsWithFirstNocopy) {
 // + iwl_pcie_send_hcmd_sync() then calls iwl_pcie_enqueue_hcmd(), which triggers
 //   GenerateFakeEchoResponse().
 // + A fake response is generated to call iwl_pcie_hcmd_complete().
-// + trans_pcie->wait_command_queue is then signaled in iwl_pcie_hcmd_complete().
-// + iwl_pcie_send_hcmd_sync() checks the values after trans_pcie->wait_command_queue.
+// + trans_pcie->trans->wait_command_queue is then signaled in iwl_pcie_hcmd_complete().
+// + iwl_pcie_send_hcmd_sync() checks the values after trans_pcie->trans->wait_command_queue.
 // + ZX_OK if everything looks good.
 //
 TEST_F(TxTest, SyncHostCommandEmpty) {

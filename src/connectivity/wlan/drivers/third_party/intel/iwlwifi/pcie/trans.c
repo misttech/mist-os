@@ -3357,7 +3357,7 @@ struct iwl_trans* iwl_trans_pcie_alloc(struct iwl_pci_dev* pdev,
            ent->subdevice);
 
   /* Initialize the wait queue for commands */
-  trans_pcie->wait_command_queue = SYNC_COMPLETION_INIT;
+  trans_pcie->trans->wait_command_queue = SYNC_COMPLETION_INIT;
 
 #if 0   // NEEDS_PORTING
     init_waitqueue_head(&trans_pcie->d0i3_waitq);
