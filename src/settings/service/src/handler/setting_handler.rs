@@ -12,7 +12,6 @@ use crate::{trace, trace_guard};
 use async_trait::async_trait;
 use core::convert::TryFrom;
 use fuchsia_async as fasync;
-use fuchsia_syslog::fx_log_err;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
 use settings_storage::storage_factory::StorageFactory as StorageFactoryTrait;
@@ -267,7 +266,7 @@ impl ClientImpl {
                         match state {
                             State::Startup => {
                                 if let Some(Err(e)) = controller.change_state(state).await {
-                                    fx_log_err!(
+                                    tracing::error!(
                                         "Failed startup phase for SettingType {:?} {}",
                                         setting_type,
                                         e
@@ -284,7 +283,7 @@ impl ClientImpl {
                             }
                             State::Teardown => {
                                 if let Some(Err(e)) = controller.change_state(state).await {
-                                    fx_log_err!(
+                                    tracing::error!(
                                         "Failed teardown phase for SettingType {:?} {}",
                                         setting_type,
                                         e
@@ -498,7 +497,7 @@ pub mod persist {
                     }
 
                     return result.map_err(|e| {
-                        fx_log_err!("Failed to write setting: {:?}", e);
+                        tracing::error!("Failed to write setting: {:?}", e);
                         ControllerError::WriteFailure(setting_type)
                     });
                 }

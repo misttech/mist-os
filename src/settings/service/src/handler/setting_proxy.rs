@@ -21,7 +21,6 @@ use crate::message::base::{Audience, MessageEvent, MessengerType, Status};
 use crate::{clock, event, service, trace, trace_guard};
 use anyhow::Error;
 use fuchsia_async as fasync;
-use fuchsia_syslog::fx_log_err;
 use fuchsia_trace as ftrace;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::UnboundedSender;
@@ -814,7 +813,7 @@ impl SettingProxy {
 
         // Wait for the teardown phase to be over before continuing.
         if controller_receptor.next().await != Some(MessageEvent::Status(Status::Received)) {
-            fx_log_err!("Failed to tear down {:?} controller", self.setting_type);
+            tracing::error!("Failed to tear down {:?} controller", self.setting_type);
         }
 
         // This ensures that the client event loop for the corresponding controller is
