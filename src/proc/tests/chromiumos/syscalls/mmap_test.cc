@@ -6,10 +6,13 @@
 #include <lib/stdcompat/string_view.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <atomic>
 #include <string>
+#include <thread>
 
 #include <gtest/gtest.h>
 
@@ -594,6 +597,100 @@ TEST(Mprotect, ProtGrowsdownOnNonGrowsdownMapping) {
   ASSERT_NE(rv, MAP_FAILED) << "mmap failed: " << strerror(errno) << "(" << errno << ")";
   EXPECT_EQ(mprotect(rv, page_size, PROT_READ | PROT_GROWSDOWN), -1);
   EXPECT_EQ(errno, EINVAL);
+}
+
+inline int MemFdCreate(const char *name, unsigned int flags) {
+  return static_cast<int>(syscall(SYS_memfd_create, name, flags));
+}
+
+// Attempts to read a byte from the given memory address.
+// Returns whether the read succeeded or not.
+bool TryRead(uintptr_t addr) {
+  ScopedFD mem_fd(MemFdCreate("try_read", O_WRONLY));
+  if (!mem_fd) {
+    return false;
+  }
+
+  return write(mem_fd.get(), reinterpret_cast<void*>(addr), 1) == 1;
+}
+
+// Attempts to write a zero byte to the given memory address.
+// Returns whether the write succeeded or not.
+bool TryWrite(uintptr_t addr) {
+  ScopedFD zero_fd(open("/dev/zero", O_RDONLY));
+  if (!zero_fd) {
+    return false;
+  }
+
+  return read(zero_fd.get(), reinterpret_cast<void*>(addr), 1) == 1;
+}
+
+TEST_F(MMapProcTest, MProtectIsThreadSafe) {
+  ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    const size_t kPageSize = sysconf(_SC_PAGE_SIZE);
+    const size_t kMmapSize = kPageSize * 3;
+    // Map 3 pages, with PROT_READ, so once we change the permissions in the
+    // middle one it will be singled out in /proc/self/maps.
+    void* mmap1 = mmap(NULL, kMmapSize, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ASSERT_NE(mmap1, MAP_FAILED);
+    uintptr_t addr = reinterpret_cast<uintptr_t>(mmap1) + kPageSize;
+    ASSERT_TRUE(TryRead(addr));
+    ASSERT_FALSE(TryWrite(addr));
+
+    std::string address_formatted = fxl::StringPrintf("%8lx", addr);
+    std::atomic<bool> start = false;
+    std::atomic<int> count = 2;
+
+    std::thread protect_rw([addr, &start, &count, kPageSize]() {
+      count -= 1;
+      while (!start) {}
+      ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), kPageSize, PROT_READ | PROT_WRITE));
+    });
+
+    std::thread protect_none([addr, &start, &count, kPageSize]() {
+      count -= 1;
+      while (!start) {}
+      ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), kPageSize, PROT_NONE));
+    });
+
+    while (count != 0) {}
+    start = true;
+    protect_none.join();
+    protect_rw.join();
+
+    std::string maps;
+
+    ASSERT_TRUE(files::ReadFileToString(proc_path() + "/self/maps", &maps));
+    std::vector<std::string_view> lines =
+        fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+    std::string perms = "";
+    for (auto line : lines) {
+      if (cpp20::starts_with(line, address_formatted)) {
+        std::vector<std::string_view> parts =
+            fxl::SplitString(line, " ", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
+        perms = parts[1];
+      }
+    }
+    ASSERT_FALSE(perms.empty());
+
+    if (cpp20::starts_with(std::string_view(perms), "---p")) {
+      // protect_none was the last one. We should not be able to read nor
+      // write in this mapping.
+      EXPECT_FALSE(TryRead(addr));
+      EXPECT_FALSE(TryWrite(addr));
+    } else if (cpp20::starts_with(std::string_view(perms), "rw-p")) {
+      // protect_rw was the last one. We should be able to read and write
+      // in this mapping.
+      EXPECT_TRUE(TryRead(addr));
+      EXPECT_TRUE(TryWrite(addr));
+      volatile uint8_t* ptr = reinterpret_cast<volatile uint8_t*>(addr);
+      *ptr = 5;
+      EXPECT_EQ(*ptr, 5);
+    } else {
+      ASSERT_FALSE(true);
+    }
+  });
 }
 
 }  // namespace
