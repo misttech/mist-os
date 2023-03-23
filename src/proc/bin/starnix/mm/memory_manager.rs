@@ -1185,15 +1185,21 @@ impl MemoryManager {
     }
 
     pub fn snapshot_to(&self, target: &MemoryManager) -> Result<(), Errno> {
-        fn clone_vmo(vmo: &Arc<zx::Vmo>, rights: zx::Rights) -> Result<Arc<zx::Vmo>, Errno> {
-            // TODO(fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed
-            // VMOs we can remove the hack below (which also won't be performant). For now, as a
-            // workaround, we use SNAPSHOT_AT_LEAST_ON_WRITE and then eagerly copy the whole
-            // VMO. These VMOs should generally be small.
+        // TODO(fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
+        // we can remove the hack below (which also won't be performant). For now, as a workaround,
+        // we use SNAPSHOT_AT_LEAST_ON_WRITE and then eagerly copy the mapped regions. These
+        // mappings should generally be small.
+
+        // Returns the target VMO and a bool indicating whether or not the mapping needs to be
+        // eagerly copied.
+        fn clone_vmo(
+            vmo: &Arc<zx::Vmo>,
+            rights: zx::Rights,
+        ) -> Result<(Arc<zx::Vmo>, bool), Errno> {
             let vmo_info = vmo.info().map_err(impossible_error)?;
             let pager_backed = vmo_info.flags.contains(zx::VmoInfoFlags::PAGER_BACKED);
-            let cloned_vmo = if pager_backed && !rights.contains(zx::Rights::WRITE) {
-                vmo.clone()
+            Ok(if pager_backed && !rights.contains(zx::Rights::WRITE) {
+                (vmo.clone(), false)
             } else {
                 let mut cloned_vmo = vmo
                     .create_child(
@@ -1206,28 +1212,18 @@ impl MemoryManager {
                         vmo_info.size_bytes,
                     )
                     .map_err(MemoryManager::get_errno_for_map_err)?;
-                if pager_backed {
-                    cloned_vmo
-                        .write(
-                            &vmo.read_to_vec(0, vmo_info.size_bytes).map_err(impossible_error)?,
-                            0,
-                        )
-                        .map_err(impossible_error)?;
-                }
                 if rights.contains(zx::Rights::EXECUTE) {
                     cloned_vmo = cloned_vmo
                         .replace_as_executable(&VMEX_RESOURCE)
                         .map_err(impossible_error)?;
                 }
-                Arc::new(cloned_vmo)
-            };
-
-            Ok(cloned_vmo)
+                (Arc::new(cloned_vmo), pager_backed)
+            })
         }
 
         let state = self.state.read();
         let mut target_state = target.state.write();
-        let mut vmos = HashMap::<zx::Koid, Arc<zx::Vmo>>::new();
+        let mut vmos = HashMap::<zx::Koid, (Arc<zx::Vmo>, bool)>::new();
 
         for (range, mapping) in state.mappings.iter() {
             let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
@@ -1236,19 +1232,28 @@ impl MemoryManager {
             let length = range.end - range.start;
 
             let target_vmo = if mapping.options.contains(MappingOptions::SHARED) {
-                mapping.vmo.clone()
+                &mapping.vmo
             } else {
-                match vmos.entry(basic_info.koid) {
-                    Entry::Occupied(o) => o.get().clone(),
-                    Entry::Vacant(v) => {
-                        v.insert(clone_vmo(&mapping.vmo, basic_info.rights)?).clone()
-                    }
+                let (vmo, needs_copy) = match vmos.entry(basic_info.koid) {
+                    Entry::Occupied(o) => o.into_mut(),
+                    Entry::Vacant(v) => v.insert(clone_vmo(&mapping.vmo, basic_info.rights)?),
+                };
+                if *needs_copy {
+                    vmo.write(
+                        &mapping
+                            .vmo
+                            .read_to_vec(vmo_offset, length as u64)
+                            .map_err(impossible_error)?,
+                        vmo_offset,
+                    )
+                    .map_err(impossible_error)?;
                 }
+                vmo
             };
 
             target_state.map(
                 range.start - target.base_addr,
-                target_vmo,
+                target_vmo.clone(),
                 vmo_offset,
                 length,
                 mapping.permissions | zx::VmarFlags::SPECIFIC,
