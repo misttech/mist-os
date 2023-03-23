@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{HyperConnectorFuture, TcpOptions, TcpStream},
+    crate::{parse_ip_addr, HyperConnectorFuture, TcpOptions, TcpStream},
     async_net as net,
     futures::io,
     http::uri::{Scheme, Uri},
@@ -77,13 +77,42 @@ impl HyperConnector {
             _ => return Err(io::Error::new(io::ErrorKind::Other, "missing host in Uri")),
         };
 
-        let addr = (host, port).to_socket_addrs()?.next().ok_or_else(|| {
-            io::Error::new(io::ErrorKind::Other, "destination resolved to no address")
-        })?;
+        let addr = parse_ip_addr(host, port, |_| async {
+            Err(io::Error::new(io::ErrorKind::Other, "does not yet support non-integer zone ids"))
+        })
+        .await?;
 
-        let stream = net::TcpStream::connect(addr).await?;
+        let stream = if let Some(addr) = addr {
+            net::TcpStream::connect(addr).await?
+        } else {
+            resolve_host_port(host, port).await?
+        };
+
         // TODO: figure out how to apply tcp options
         Ok(TcpStream { stream })
+    }
+}
+
+/// Resolve a hostname into an address.
+async fn resolve_host_port(host: &str, port: u16) -> Result<net::TcpStream, io::Error> {
+    // TODO(fxbug.dev/124222): Implement happy eyeballs algorithm to make this
+    // more efficient.
+    let mut last_err = None;
+    for addr in (host, port).to_socket_addrs()? {
+        match net::TcpStream::connect(addr).await {
+            Ok(stream) => {
+                return Ok(stream);
+            }
+            Err(err) => {
+                last_err = Some(err);
+            }
+        }
+    }
+
+    if let Some(err) = last_err {
+        Err(err)
+    } else {
+        Err(io::Error::new(io::ErrorKind::Other, "destination resolved to no address"))
     }
 }
 

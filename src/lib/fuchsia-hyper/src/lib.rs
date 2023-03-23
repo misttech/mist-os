@@ -15,8 +15,13 @@ use {
         },
         Body,
     },
-    std::net::Shutdown,
-    std::pin::Pin,
+    std::{
+        net::{
+            AddrParseError, Ipv4Addr, Ipv6Addr, Shutdown, SocketAddr, SocketAddrV4, SocketAddrV6,
+        },
+        num::ParseIntError,
+        pin::Pin,
+    },
     tokio::io::ReadBuf,
 };
 
@@ -194,4 +199,129 @@ pub fn new_rustls_client_config() -> rustls::ClientConfig {
     // value is assumed to be a sufficient default here as well.
     config.set_persistence(session_cache::C4CapableSessionCache::new(32));
     config
+}
+
+pub(crate) async fn parse_ip_addr<'a, F, Fut>(
+    host: &'a str,
+    port: u16,
+    interface_name_to_index: F,
+) -> Result<Option<SocketAddr>, io::Error>
+where
+    F: Fn(&'a str) -> Fut + 'a,
+    Fut: Future<Output = Result<u32, io::Error>> + 'a,
+{
+    match host.parse::<Ipv4Addr>() {
+        Ok(addr) => {
+            return Ok(Some(SocketAddr::V4(SocketAddrV4::new(addr, port))));
+        }
+        Err(AddrParseError { .. }) => {}
+    }
+
+    // IPv6 literals are always enclosed in [].
+    if !host.starts_with("[") || !host.ends_with(']') {
+        return Ok(None);
+    }
+
+    let host = &host[1..host.len() - 1];
+
+    // IPv6 addresses with zones always contain "%25", which is "%" URL encoded.
+    let (host, zone_id) = if let Some((host, zone_id)) = host.split_once("%25") {
+        (host, Some(zone_id))
+    } else {
+        (host, None)
+    };
+
+    let addr = match host.parse::<Ipv6Addr>() {
+        Ok(addr) => addr,
+        Err(AddrParseError { .. }) => {
+            return Ok(None);
+        }
+    };
+
+    let scope_id = if let Some(zone_id) = zone_id {
+        // rfc6874 section 4 states:
+        //
+        //     The security considerations from the URI syntax specification
+        //     [RFC3986] and the IPv6 Scoped Address Architecture specification
+        //     [RFC4007] apply.  In particular, this URI format creates a specific
+        //     pathway by which a deceitful zone index might be communicated, as
+        //     mentioned in the final security consideration of the Scoped Address
+        //     Architecture specification.  It is emphasised that the format is
+        //     intended only for debugging purposes, but of course this intention
+        //     does not prevent misuse.
+        //
+        //     To limit this risk, implementations MUST NOT allow use of this format
+        //     except for well-defined usages, such as sending to link-local
+        //     addresses under prefix fe80::/10.  At the time of writing, this is
+        //     the only well-defined usage known.
+        //
+        // Since the only known use-case of IPv6 Zone Identifiers on Fuchsia is to communicate
+        // with link-local devices, restrict addresses to link-local zone identifiers.
+        //
+        // TODO: use Ipv6Addr::is_unicast_link_local_strict when available in stable rust.
+        if addr.segments()[..4] != [0xfe80, 0, 0, 0] {
+            return Err(io::Error::new(
+                io::ErrorKind::Other,
+                "zone_id is only usable with link local addresses",
+            ));
+        }
+
+        // TODO: validate that the value matches rfc6874 grammar `ZoneID = 1*( unreserved / pct-encoded )`.
+        match zone_id.parse::<u32>() {
+            Ok(scope_id) => scope_id,
+            Err(ParseIntError { .. }) => interface_name_to_index(zone_id).await?,
+        }
+    } else {
+        0
+    };
+
+    Ok(Some(SocketAddr::V6(SocketAddrV6::new(addr, port, 0, scope_id))))
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::*,
+        assert_matches::assert_matches,
+        fuchsia_async::{self as fasync},
+    };
+
+    async fn unsupported(_name: &str) -> Result<u32, io::Error> {
+        panic!("should not have happened")
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_parse_ipv4_addr() {
+        let expected = "1.2.3.4:8080".parse::<SocketAddr>().unwrap();
+        assert_matches!(
+            parse_ip_addr("1.2.3.4", 8080, unsupported).await,
+            Ok(Some(addr)) if addr == expected);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_parse_invalid_addresses() {
+        assert_matches!(parse_ip_addr("1.2.3", 8080, unsupported).await, Ok(None));
+        assert_matches!(parse_ip_addr("1.2.3.4.5", 8080, unsupported).await, Ok(None));
+        assert_matches!(parse_ip_addr("localhost", 8080, unsupported).await, Ok(None));
+        assert_matches!(parse_ip_addr("[fe80::1:2:3:4", 8080, unsupported).await, Ok(None));
+        assert_matches!(parse_ip_addr("[[fe80::1:2:3:4]", 8080, unsupported).await, Ok(None));
+        assert_matches!(parse_ip_addr("[]", 8080, unsupported).await, Ok(None));
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_parse_ipv6_addr() {
+        let expected = "[fe80::1:2:3:4]:8080".parse::<SocketAddr>().unwrap();
+        assert_matches!(
+            parse_ip_addr("[fe80::1:2:3:4]", 8080, unsupported).await,
+            Ok(Some(addr)) if addr == expected
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_parse_ipv6_addr_with_zone_must_be_local() {
+        assert_matches!(
+            parse_ip_addr("[fe81::1:2:3:4%252]", 8080, unsupported).await,
+            Err(err) if err.kind() == io::ErrorKind::Other
+        );
+    }
 }
