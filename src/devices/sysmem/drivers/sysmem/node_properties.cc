@@ -79,20 +79,23 @@ void NodeProperties::RemoveFromTreeAndDelete() {
   ZX_DEBUG_ASSERT(child_count() == 0);
   // This also deletes "this".
   if (parent_) {
-    // Set parent_ to nullptr before "this" is deleted, just in case it makes any use-after-free
-    // quicker to track down.
-    auto local_parent = parent_;
-    parent_ = nullptr;
-    auto shared_this = this->shared_from_this();
+    // As we keep a shared_ptr of `this` in the scope, `parent_` is guaranteed
+    // to be valid till the end of the block.
+    //
+    // It could be tempting to detach `this` from `parent_` here. However,
+    // `parent_` of the NodeProperties must not be changed until it's destroyed
+    // because it is used to propagate the node counters on the tree on
+    // NodeProperties destructor.
+    std::shared_ptr<NodeProperties> shared_this = this->shared_from_this();
     Children::iterator iter;
     // typically called to remove last child, so search from end of vector
-    for (iter = local_parent->children_.end() - 1;; --iter) {
+    for (iter = parent_->children_.end() - 1;; --iter) {
       if (*iter == shared_this) {
         break;
       }
-      ZX_DEBUG_ASSERT(iter != local_parent->children_.begin());
+      ZX_DEBUG_ASSERT(iter != parent_->children_.begin());
     }
-    local_parent->children_.erase(iter);
+    parent_->children_.erase(iter);
   } else {
     logical_buffer_collection_->DeleteRoot();
   }
