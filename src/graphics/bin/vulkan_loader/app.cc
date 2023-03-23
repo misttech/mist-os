@@ -109,8 +109,7 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
       },
       [gpu_watcher_token = std::move(gpu_watcher_token)]() {
         // Idle callback and gpu_watcher_token will be destroyed on idle.
-      },
-      dispatcher_);
+      });
   if (!gpu_watcher_)
     return ZX_ERR_INTERNAL;
   auto goldfish_watcher_token = GetPendingActionToken();
@@ -127,8 +126,7 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
       },
       [goldfish_watcher_token = std::move(goldfish_watcher_token)]() {
         // Idle callback and goldfish_watcher_token will be destroyed on idle.
-      },
-      dispatcher_);
+      });
   if (!goldfish_watcher_)
     return ZX_ERR_INTERNAL;
   return ZX_OK;

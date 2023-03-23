@@ -84,7 +84,7 @@ class FXL_EXPORT DeviceWatcher {
 
  private:
   DeviceWatcher(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_io::Directory> dir,
-                fidl::Endpoints<fuchsia_io::DirectoryWatcher> dir_watcher,
+                fidl::ClientEnd<fuchsia_io::DirectoryWatcher> dir_watcher,
                 ExistsCallback exists_callback, IdleCallback idle_callback);
 
   void Handler(async_dispatcher_t* dispatcher, async::WaitBase* wait, zx_status_t status,

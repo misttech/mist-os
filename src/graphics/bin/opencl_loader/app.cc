@@ -107,8 +107,7 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
       },
       [gpu_watcher_token = std::move(gpu_watcher_token)]() {
         // Idle callback and gpu_watcher_token will be destroyed on idle.
-      },
-      dispatcher_);
+      });
   if (!gpu_watcher_)
     return ZX_ERR_INTERNAL;
 

@@ -253,7 +253,10 @@ class FakeMagmaDependencyInjection
     return bindings_.GetHandler(this);
   }
 
-  bool GotMemoryPressureProvider() const { return got_memory_pressure_provider_; }
+  void WaitForMemoryPressureProvider() {
+    std::unique_lock lock(mutex_);
+    condition_.wait(lock, [this]() { return got_memory_pressure_provider_; });
+  }
 
   void CloseAll() { bindings_.CloseAll(); }
 
@@ -265,20 +268,26 @@ class FakeMagmaDependencyInjection
   void SetMemoryPressureProvider(
       fidl::InterfaceHandle<fuchsia::memorypressure::Provider> provider) override {
     if (provider.is_valid()) {
+      std::lock_guard lock(mutex_);
       got_memory_pressure_provider_ = true;
+      condition_.notify_one();
     }
   }
 
   fidl::BindingSet<fuchsia::gpu::magma::DependencyInjection> bindings_;
+  std::condition_variable condition_;
+  std::mutex mutex_;
   bool got_memory_pressure_provider_ = false;
 };
 
 TEST_F(LoaderUnittest, MagmaDependencyInjection) {
-  sys::testing::ComponentContextProvider context_provider(dispatcher());
+  async::Loop server_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  server_loop.StartThread("context-server-loop");
+  sys::testing::ComponentContextProvider context_provider(server_loop.dispatcher());
   FakeMemoryPressureProvider provider;
   context_provider.service_directory_provider()->AddService(provider.GetHandler());
 
-  fs::SynchronousVfs vfs(dispatcher());
+  fs::SynchronousVfs vfs(server_loop.dispatcher());
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
 
   FakeMagmaDependencyInjection magma_dependency_injection;
@@ -304,7 +313,7 @@ TEST_F(LoaderUnittest, MagmaDependencyInjection) {
   EXPECT_EQ(ZX_OK, dependency_injection.Initialize());
 
   // Wait for the GPU dependency injection code to detect the device and call the method on it.
-  RunLoopUntil([&magma_dependency_injection]() {
-    return magma_dependency_injection.GotMemoryPressureProvider();
-  });
+  RunLoopUntilIdle();
+  magma_dependency_injection.WaitForMemoryPressureProvider();
+  server_loop.Shutdown();
 }
