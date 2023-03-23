@@ -353,6 +353,7 @@ mod tests {
         blobfs_ramdisk::{BlobfsRamdisk, Ramdisk},
         fuchsia_async as fasync,
         fuchsia_merkle::MerkleTree,
+        fuchsia_pkg_testing::generate_delivery_blob,
         maplit::hashset,
         rand::prelude::*,
     };
@@ -468,6 +469,32 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
+    async fn write_read_small_delivery_blob() {
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        let contents = [3; 1024];
+        let hash = MerkleTree::from_reader(&contents[..]).unwrap().root();
+        let delivery_blob_content = generate_delivery_blob(&contents, 1).await.unwrap();
+
+        let blob = client.open_blob_for_write(&hash, fpkg::BlobType::Delivery).await.unwrap();
+        let blob =
+            blob.truncate(delivery_blob_content.len() as u64).await.unwrap().unwrap_needs_data();
+        let blob = blob.write(&delivery_blob_content[..]).await.unwrap().unwrap_done();
+
+        // New connections can now read the blob, even with the original proxy still open.
+        let also_blob = client.open_blob_for_read(&hash).await.unwrap();
+        assert_eq!(contents, fuchsia_fs::file::read(&also_blob).await.unwrap().as_slice());
+
+        let blob = blob.reopen_for_read().await.unwrap();
+
+        let actual = fuchsia_fs::file::read(&blob).await.unwrap();
+        assert_eq!(contents, actual.as_slice());
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
     async fn write_small_blob_slowly() {
         let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
@@ -494,6 +521,35 @@ mod tests {
     }
 
     #[fasync::run_singlethreaded(test)]
+    async fn write_small_delivery_blob_slowly() {
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        let contents = [4; 1024];
+        let hash = MerkleTree::from_reader(&contents[..]).unwrap().root();
+        let delivery_blob_content = generate_delivery_blob(&contents, 1).await.unwrap();
+
+        let blob = client.open_blob_for_write(&hash, fpkg::BlobType::Delivery).await.unwrap();
+        let mut blob =
+            blob.truncate(delivery_blob_content.len() as u64).await.unwrap().unwrap_needs_data();
+        // verify Blob does correct accounting of written data and forwards small writes correctly
+        // by issuing more than 1 write call instead of 1 big call.
+        let mut chunks = delivery_blob_content.chunks(1);
+        let last_chunk = chunks.next_back().unwrap();
+        for chunk in chunks {
+            blob = blob.write(chunk).await.unwrap().unwrap_more_to_write();
+        }
+        let blob = blob.write(last_chunk).await.unwrap().unwrap_done();
+
+        let blob = blob.reopen_for_read().await.unwrap();
+
+        let actual = fuchsia_fs::file::read(&blob).await.unwrap();
+        assert_eq!(contents, actual.as_slice());
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
     async fn write_large_blob() {
         let blobfs = BlobfsRamdisk::start().await.unwrap();
         let client = Client::for_ramdisk(&blobfs);
@@ -504,6 +560,28 @@ mod tests {
         let blob = client.open_blob_for_write(&hash, fpkg::BlobType::Uncompressed).await.unwrap();
         let blob = blob.truncate(contents.len() as u64).await.unwrap().unwrap_needs_data();
         let blob = blob.write(&contents[..]).await.unwrap().unwrap_done();
+
+        let blob = blob.reopen_for_read().await.unwrap();
+
+        let actual = fuchsia_fs::file::read(&blob).await.unwrap();
+        assert_eq!(contents, actual.as_slice());
+
+        blobfs.stop().await.unwrap();
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn write_large_delivery_blob() {
+        let blobfs = BlobfsRamdisk::start().await.unwrap();
+        let client = Client::for_ramdisk(&blobfs);
+
+        let contents = (0u8..=255u8).cycle().take(1_000_000).collect::<Vec<u8>>();
+        let hash = MerkleTree::from_reader(&contents[..]).unwrap().root();
+        let delivery_blob_content = generate_delivery_blob(&contents, 1).await.unwrap();
+
+        let blob = client.open_blob_for_write(&hash, fpkg::BlobType::Delivery).await.unwrap();
+        let blob =
+            blob.truncate(delivery_blob_content.len() as u64).await.unwrap().unwrap_needs_data();
+        let blob = blob.write(&delivery_blob_content[..]).await.unwrap().unwrap_done();
 
         let blob = blob.reopen_for_read().await.unwrap();
 
