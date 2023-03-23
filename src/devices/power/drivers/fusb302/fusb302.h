@@ -8,16 +8,24 @@
 #include <fidl/fuchsia.hardware.i2c/cpp/wire.h>
 #include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <lib/zx/interrupt.h>
+#include <lib/zx/result.h>
+#include <lib/zx/timer.h>
 #include <threads.h>
 
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <ddktl/protocol/empty-protocol.h>
 
+#include "src/devices/power/drivers/fusb302/fusb302-controls.h"
+#include "src/devices/power/drivers/fusb302/fusb302-fifos.h"
 #include "src/devices/power/drivers/fusb302/fusb302-identity.h"
+#include "src/devices/power/drivers/fusb302/fusb302-protocol.h"
+#include "src/devices/power/drivers/fusb302/fusb302-sensors.h"
+#include "src/devices/power/drivers/fusb302/fusb302-signals.h"
 #include "src/devices/power/drivers/fusb302/inspectable-types.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
 #include "src/devices/power/drivers/fusb302/state-machine-base-v1.h"
+#include "src/devices/power/drivers/fusb302/usb-pd-sink-policy.h"
 
 namespace fusb302 {
 
@@ -123,7 +131,14 @@ class Fusb302 : public DeviceType {
       : DeviceType(parent),
         i2c_(std::move(i2c)),
         irq_(std::move(irq)),
-        identity_(i2c_, inspect_.GetRoot().CreateChild("Identity")) {}
+        identity_(i2c_, inspect_.GetRoot().CreateChild("Identity")),
+        sensors_(i2c_, inspect_.GetRoot().CreateChild("Sensors")),
+        fifos_(i2c_),
+        protocol_(fifos_),
+        signals_(i2c_, sensors_, protocol_),
+        controls_(i2c_, sensors_, inspect_.GetRoot().CreateChild("Controls")),
+        sink_policy_({.min_voltage_mv = 5'000, .max_voltage_mv = 12'000, .max_power_mw = 24'000}) {}
+
   ~Fusb302() override {
     irq_.destroy();
     if (is_thread_running_) {
@@ -147,6 +162,16 @@ class Fusb302 : public DeviceType {
     completer.Reply(ZX_ERR_NOT_SUPPORTED, {});
   }
 
+  Fusb302Sensors& sensors() { return sensors_; }
+  Fusb302Protocol& protocol() { return protocol_; }
+  Fusb302Controls& controls() { return controls_; }
+
+  // Asynchronously waits for a timer to be signaled once.
+  //
+  // When the timer is signaled, the state machines connected to this instance
+  // will be run with an indication that a timer was signaled.
+  zx::result<> WaitAsyncForTimer(zx::timer& timer);
+
  private:
   friend class Fusb302Test;
   friend class StateMachine;
@@ -169,6 +194,13 @@ class Fusb302 : public DeviceType {
   inspect::Node inspect_hw_drp_ = inspect_.GetRoot().CreateChild("HardwareDRP");
 
   Fusb302Identity identity_;
+  Fusb302Sensors sensors_;
+  Fusb302Fifos fifos_;
+  Fusb302Protocol protocol_;
+  Fusb302Signals signals_;
+  Fusb302Controls controls_;
+
+  usb_pd::SinkPolicy sink_policy_;
 
   // state_machine_: HW DRP (Dual Role Port) state machine which will run the policy engine state
   // machines when in the correct attached states.

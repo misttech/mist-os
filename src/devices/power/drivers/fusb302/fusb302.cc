@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/result.h>
+#include <lib/zx/timer.h>
 #include <zircon/threads.h>
 
 #include <fbl/alloc_checker.h>
@@ -620,6 +621,15 @@ zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
   [[maybe_unused]] auto* dummy = device.release();
 
   return ZX_OK;
+}
+
+zx::result<> Fusb302::WaitAsyncForTimer(zx::timer& timer) {
+  const zx_status_t status =
+      timer.wait_async(port_, PortPacketType::kTimer, ZX_TIMER_SIGNALED, /*options=*/0);
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "Failed to wait on timer: %s", zx_status_get_string(status));
+  }
+  return zx::make_result(status);
 }
 
 }  // namespace fusb302
