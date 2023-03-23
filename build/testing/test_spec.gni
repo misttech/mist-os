@@ -306,7 +306,8 @@ template("test_spec") {
       "QEMU",
       "GCE",
     ]
-  } else if (board_name == "qemu-arm64") {
+  } else if (board_name == "qemu-riscv64" || board_name == "riscv64" ||
+             board_name == "qemu-arm64") {
     allowed_device_types += [ "QEMU" ]
   } else if (board_name == "qemu-x64") {
     allowed_device_types += [
