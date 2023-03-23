@@ -3,7 +3,7 @@
 ## Set up
 1. Configure example test to be built.
 ```shell
-$ fx set core.qemu-x64 --with-host //src/testing/end_to_end/mobly_driver/tests/functional_tests/smoke_test
+$ fx set workstation_eng.qemu-x64 --with-host //src/testing/end_to_end/mobly_driver/tests/functional_tests:tests
 
 $ fx build
 ```
@@ -20,8 +20,8 @@ $ fx serve
 $ ffx emu start --net tap --headless
 
 $ ffx target list
-NAME                SERIAL       TYPE             STATE      ADDRS/IP                           RCS
-fuchsia-emulator    <unknown>    core.qemu-x64    Product    [fe80::3373:a179:8b4:b9bc%qemu]    Y
+NAME                SERIAL       TYPE                        STATE      ADDRS/IP                           RCS
+fuchsia-emulator    <unknown>    workstation_eng.qemu-x64    Product    [fe80::963:275a:eeb8:2f47%qemu]    Y
 ````
 
 
@@ -30,6 +30,7 @@ The majority of users will be using this local test execution method for test
 development.
 ```shell
 $ fx test //src/testing/end_to_end/mobly_driver/tests/functional_tests/smoke_test --e2e --output
+$ fx test //src/testing/end_to_end/mobly_driver/tests/functional_tests/test_honeydew_integration --e2e --output
 ```
 
 ## Infra mode

@@ -1,0 +1,6 @@
+TestBeds:
+  - Name: LocalTestbed
+    Controllers:
+      FuchsiaDevice:
+        - nodename: "fuchsia-emulator"
+          ssh_private_key: ~/.ssh/fuchsia_ed25519
