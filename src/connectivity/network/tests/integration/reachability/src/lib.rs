@@ -497,11 +497,12 @@ async fn accelerate_fake_clock(fake_clock: &ftesting::FakeClockControlProxy) -> 
     // Pause the fake clock.
     fake_clock.pause().await.expect("failed to pause the clock");
 
-    // Fast increment speed after pausing.
+    // Fast increment speed after pausing. Acceleration past 5x doesn't reduce test runtime,
+    // because it is dominated by setup/teardown.
     fake_clock
         .resume_with_increments(
             zx::Duration::from_millis(1).into_nanos(),
-            &mut ftesting::Increment::Determined(zx::Duration::from_seconds(10).into_nanos()),
+            &mut ftesting::Increment::Determined(zx::Duration::from_millis(5).into_nanos()),
         )
         .await
         .expect("resume with increment failed")
@@ -763,10 +764,10 @@ impl<'a> ReachabilityTestHelper<'a> {
         }
     }
 
-    // Due to the DNS lookup probe running separately from the interface
-    // watcher, there may be one more Some(false) response due to the DNS
-    // probe causing a Snapshot update. This helper function is useful in
-    // situations with internet state updates where DNS could interfere.
+    // Due to the DNS lookup probe running independently from the network check probes,
+    // intermediary states may be inconsistently present depending on the test environment. The
+    // integration tests specify the network configuration under test, and these helper functions
+    // assume that the condition is eventually met.
     async fn next_snapshot_with_internet(
         &mut self,
         is_available: bool,
@@ -779,11 +780,6 @@ impl<'a> ReachabilityTestHelper<'a> {
         }
     }
 
-    // Within the internet to gateway test, there may be an additional
-    // Snapshot that has a value of internet and gateway state as
-    // false. This is an intermediary state due to the separate probes
-    // and is expected to resolve on the next update to a Some(true)
-    // gateway state.
     async fn next_snapshot_with_gateway(
         &mut self,
         is_reachable: bool,
@@ -818,13 +814,6 @@ async fn test_internet_available<N: Netstack>(name: &str, state1: State, state2:
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
-    // The first call to wait() always returns a snapshot with no internet.
-    // We expect both this and a subsequent snapshot with the actual internet
-    // available state.
-    let snapshot = helper.next_snapshot().await;
-    assert_eq!(snapshot.gateway_reachable, Some(false));
-    assert_eq!(snapshot.internet_available, Some(false));
-
     let snapshot = helper.next_snapshot_with_internet(true).await;
     // Gateway reachability is a condition of internet availability,
     // therefore, when internet is available, a gateway is reachable.
@@ -845,10 +834,6 @@ async fn test_internet_comes_up<N: Netstack>(name: &str, state1: State, state2: 
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
-    let snapshot = helper.next_snapshot().await;
-    assert_eq!(snapshot.gateway_reachable, Some(false));
-    assert_eq!(snapshot.internet_available, Some(false));
-
     helper.set_iface_states(vec![state1, state2]);
     let snapshot = helper.next_snapshot_with_internet(true).await;
     assert_eq!(snapshot.gateway_reachable, Some(true));
@@ -866,10 +851,6 @@ async fn test_internet_goes_down<N: Netstack>(name: &str, state1: State, state2:
         (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Internet),
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
-
-    let snapshot = helper.next_snapshot().await;
-    assert_eq!(snapshot.gateway_reachable, Some(false));
-    assert_eq!(snapshot.internet_available, Some(false));
 
     let snapshot = helper.next_snapshot_with_internet(true).await;
     assert_eq!(snapshot.gateway_reachable, Some(true));
@@ -892,16 +873,12 @@ async fn test_gateway_goes_down<N: Netstack>(name: &str, state1: State, state2: 
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
 
-    let snapshot = helper.next_snapshot().await;
-    assert_eq!(snapshot.gateway_reachable, Some(false));
-    assert_eq!(snapshot.internet_available, Some(false));
-
-    let snapshot = helper.next_snapshot().await;
+    let snapshot = helper.next_snapshot_with_gateway(true).await;
     assert_eq!(snapshot.gateway_reachable, Some(true));
     assert_eq!(snapshot.internet_available, Some(false));
 
     helper.set_iface_states(vec![State::Up, State::Up]);
-    let snapshot = helper.next_snapshot().await;
+    let snapshot = helper.next_snapshot_with_gateway(false).await;
     assert_eq!(snapshot.gateway_reachable, Some(false));
     assert_eq!(snapshot.internet_available, Some(false));
 }
@@ -915,10 +892,6 @@ async fn test_internet_to_gateway_state<N: Netstack>(name: &str) {
         (InterfaceConfig::new_secondary(HIGHER_METRIC), State::Gateway),
     ];
     let mut helper = ReachabilityTestHelper::new(name, &env, configs).await;
-
-    let snapshot = helper.next_snapshot().await;
-    assert_eq!(snapshot.gateway_reachable, Some(false));
-    assert_eq!(snapshot.internet_available, Some(false));
 
     let snapshot = helper.next_snapshot_with_internet(true).await;
     assert_eq!(snapshot.gateway_reachable, Some(true));

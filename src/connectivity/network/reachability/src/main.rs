@@ -7,8 +7,8 @@
 
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::component;
-use futures::{FutureExt as _, StreamExt as _};
-use reachability_core::Monitor;
+use futures::{channel::mpsc::unbounded, FutureExt as _, StreamExt as _};
+use reachability_core::{Monitor, NetworkCheckAction, NetworkCheckCookie};
 use reachability_handler::ReachabilityHandler;
 use tracing::info;
 
@@ -33,11 +33,12 @@ fn main() {
 
     let fs = fs.take_and_serve_directory_handle().expect("failed to serve ServiceFS directory");
 
-    let mut monitor = Monitor::new().expect("failed to create reachability monitor");
+    let (sender, receiver) = unbounded::<(NetworkCheckAction, NetworkCheckCookie)>();
+    let mut monitor = Monitor::new(sender).expect("failed to create reachability monitor");
     let () = monitor.set_inspector(inspector);
 
     info!("monitoring");
-    let mut eventloop = EventLoop::new(monitor, handler, inspector);
+    let mut eventloop = EventLoop::new(monitor, handler, receiver, inspector);
     let eventloop_fut = eventloop.run().fuse();
     let serve_fut = fs.fuse().collect();
     futures::pin_mut!(eventloop_fut, serve_fut);

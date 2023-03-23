@@ -17,16 +17,18 @@ use {
     fuchsia_async::{self as fasync},
     fuchsia_inspect::{health::Reporter, Inspector},
     fuchsia_zircon as zx,
-    futures::{future::FusedFuture, pin_mut, prelude::*, select},
+    futures::{channel::mpsc, future::FusedFuture, pin_mut, prelude::*, select},
     named_timer::NamedTimeoutExt,
     reachability_core::{
+        ping::Ping,
         route_table::RouteTable,
         telemetry::{self, TelemetryEvent, TelemetrySender},
-        watchdog, InterfaceView, Monitor, NeighborCache, FIDL_TIMEOUT_ID,
+        watchdog, InterfaceView, Monitor, NeighborCache, NetworkCheckAction, NetworkCheckCookie,
+        NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
     },
     reachability_handler::ReachabilityHandler,
     std::collections::{HashMap, HashSet},
-    tracing::{debug, error, warn},
+    tracing::{debug, error, info, warn},
 };
 
 const REPORT_PERIOD: zx::Duration = zx::Duration::from_seconds(60);
@@ -139,7 +141,6 @@ async fn dns_lookup(
         .map_err(|e: anyhow::Error| anyhow!("{:?}", e))?
         .map_err(|e: fnet_name::LookupError| anyhow!("lookup failed: {:?}", e))
 }
-
 /// The event loop.
 pub struct EventLoop {
     monitor: Monitor,
@@ -150,6 +151,7 @@ pub struct EventLoop {
     routes: RouteTable,
     latest_dns_addresses: Vec<fnet::IpAddress>,
     telemetry_sender: Option<TelemetrySender>,
+    network_check_receiver: mpsc::UnboundedReceiver<(NetworkCheckAction, NetworkCheckCookie)>,
     inspector: &'static Inspector,
 }
 
@@ -158,6 +160,7 @@ impl EventLoop {
     pub fn new(
         monitor: Monitor,
         handler: ReachabilityHandler,
+        network_check_receiver: mpsc::UnboundedReceiver<(NetworkCheckAction, NetworkCheckCookie)>,
         inspector: &'static Inspector,
     ) -> Self {
         fuchsia_inspect::component::health().set_starting_up();
@@ -170,6 +173,7 @@ impl EventLoop {
             routes: Default::default(),
             latest_dns_addresses: Vec::new(),
             telemetry_sender: None,
+            network_check_receiver,
             inspector,
         }
     }
@@ -257,6 +261,7 @@ impl EventLoop {
         };
 
         let mut probe_futures = futures::stream::FuturesUnordered::new();
+        let mut ping_futures = futures::stream::FuturesUnordered::new();
         let report_stream = fasync::Interval::new(REPORT_PERIOD).fuse();
         let dns_interval_timer = fasync::Interval::new(DNS_PROBE_PERIOD).fuse();
 
@@ -289,13 +294,13 @@ impl EventLoop {
 
         fuchsia_inspect::component::health().set_ok();
 
+        // TODO(https://fxbug.dev/124258): Create helper functions for select! branches
         loop {
             select! {
                 if_watcher_res = if_watcher_stream.try_next() => {
                     match if_watcher_res {
                         Ok(Some(event)) => {
-                            let discovered_id = self
-                                .handle_interface_watcher_event(event)
+                            let discovered_id = self.handle_interface_watcher_event(event)
                                 .await
                                 .context("failed to handle interface watcher event")?;
                             if let Some(id) = discovered_id {
@@ -303,17 +308,17 @@ impl EventLoop {
                                     .push(fasync::Interval::new(PROBE_PERIOD)
                                     .map(move |()| id)
                                     .into_future());
-                            }
-                            if let Some(telemetry_sender) = &self.telemetry_sender {
-                                let has_default_ipv4_route = self.interface_properties.values().any(|p| p.has_default_ipv4_route);
-                                let has_default_ipv6_route = self.interface_properties.values().any(|p| p.has_default_ipv6_route);
-                                telemetry_sender.send(TelemetryEvent::NetworkConfig { has_default_ipv4_route, has_default_ipv6_route });
+                                if let Some(telemetry_sender) = &self.telemetry_sender {
+                                    let has_default_ipv4_route = self.interface_properties.values().any(|p| p.has_default_ipv4_route);
+                                    let has_default_ipv6_route = self.interface_properties.values().any(|p| p.has_default_ipv6_route);
+                                    telemetry_sender.send(TelemetryEvent::NetworkConfig { has_default_ipv4_route, has_default_ipv6_route });
+                                }
                             }
                         }
-                        Ok(None) => {
-                            return Err(anyhow!("interface watcher stream unexpectedly ended"));
-                        }
+                        Ok(None) =>
+                            return Err(anyhow!("interface watcher stream unexpectedly ended")),
                         Err(e) => return Err(anyhow!("interface watcher stream error: {}", e)),
+
                     }
                 },
                 neigh_res = neigh_watcher_stream.try_next() => {
@@ -335,32 +340,59 @@ impl EventLoop {
                     let () = report.context("periodic timer for reporting unexpectedly ended")?;
                     let () = self.monitor.report_state();
                 },
-                probe = probe_futures.next() => {
+                probe = probe_futures.select_next_some() => {
                     match probe {
-                        Some((Some(id), stream)) => {
+                        (Some(id), stream) => {
                             if let Some(properties) = self.interface_properties.get(&id) {
-                                Self::compute_state(
+                                let () = Self::begin_network_check(
                                     &mut self.monitor,
                                     &mut self.watchdog,
+                                    &mut self.handler,
                                     properties,
                                     &self.routes,
                                     &self.neighbor_cache
                                 ).await;
+
                                 let () = probe_futures.push(stream.into_future());
-                                self.handler.update_state(|state| {
-                                    state.internet_available = self.monitor.state().system_has_internet();
-                                    state.gateway_reachable = self.monitor.state().system_has_gateway();
-                                }).await;
                             }
                         }
-                        Some((None, _)) => {
+                        (None, _) => {
                             return Err(anyhow!(
-                                "periodic timer for probing reachability unexpectedly ended"
+                                "period timer for probing reachability unexpectedly ended"
                             ));
                         }
-                        // None is returned when there are no periodic timers in the
-                        // FuturesUnordered collection.
-                        None => {}
+                    }
+                },
+                msg = self.network_check_receiver.next() => {
+                    let (action, cookie) = msg.expect("network check receiver unexpectedly closed");
+                    match action {
+                        NetworkCheckAction::Ping { interface_name, addr } => {
+                            ping_futures.push(async move {
+                                let success = reachability_core::ping::Pinger.ping(
+                                    &interface_name, addr
+                                ).await;
+                                (cookie, success)
+                            });
+                        }
+                    }
+                },
+                ping_res = ping_futures.select_next_some() => {
+                    let (cookie, success) = ping_res;
+                    match self.monitor.resume(cookie, success).await {
+                        Ok(NetworkCheckerOutcome::MustResume) => {},
+                        Ok(NetworkCheckerOutcome::Complete) => {
+                            let (system_internet, system_gateway) = {
+                                let monitor_state = self.monitor.state();
+                                (monitor_state.system_has_internet(),
+                                monitor_state.system_has_gateway())
+                            };
+
+                            self.handler.update_state(|state| {
+                                state.internet_available = system_internet;
+                                state.gateway_reachable = system_gateway;
+                            }).await;
+                        },
+                        Err(e) => error!("resume network check error: {:?}", e),
                     }
                 },
                 () = dns_interval_timer.select_next_some() => {
@@ -416,16 +448,23 @@ impl EventLoop {
         {
             fnet_interfaces_ext::UpdateResult::Added(properties)
             | fnet_interfaces_ext::UpdateResult::Existing(properties) => {
+                if !Self::should_monitor_interface(&properties) {
+                    return Ok(None);
+                }
+
                 let id = properties.id;
                 debug!("setting timer for interface {}", id);
-                Self::compute_state(
+
+                let () = Self::begin_network_check(
                     &mut self.monitor,
                     &mut self.watchdog,
+                    &mut self.handler,
                     properties,
                     &self.routes,
                     &self.neighbor_cache,
                 )
                 .await;
+
                 return Ok(Some(id));
             }
             fnet_interfaces_ext::UpdateResult::Changed {
@@ -464,9 +503,10 @@ impl EventLoop {
                         previous.ne(current)
                     })
                 {
-                    Self::compute_state(
+                    let () = Self::begin_network_check(
                         &mut self.monitor,
                         &mut self.watchdog,
+                        &mut self.handler,
                         properties,
                         &self.routes,
                         &self.neighbor_cache,
@@ -481,6 +521,16 @@ impl EventLoop {
             fnet_interfaces_ext::UpdateResult::NoChange => {}
         }
         Ok(None)
+    }
+
+    /// Determine whether an interface should be monitored or not.
+    fn should_monitor_interface(
+        &fnet_interfaces_ext::Properties { device_class, .. }: &fnet_interfaces_ext::Properties,
+    ) -> bool {
+        return match PortType::from(device_class) {
+            PortType::Loopback => false,
+            PortType::Unknown | PortType::Ethernet | PortType::WiFi | PortType::SVI => true,
+        };
     }
 
     /// Handles events observed by the route watchers by adding/removing routes
@@ -515,9 +565,10 @@ impl EventLoop {
         }
     }
 
-    async fn compute_state(
+    async fn begin_network_check(
         monitor: &mut Monitor,
         watchdog: &mut Watchdog,
+        handler: &mut ReachabilityHandler,
         properties: &fnet_interfaces_ext::Properties,
         routes: &RouteTable,
         neighbor_cache: &NeighborCache,
@@ -528,12 +579,31 @@ impl EventLoop {
             neighbors: neighbor_cache.get_interface_neighbors(properties.id),
         };
 
-        let monitor_fut = monitor.compute_state(view);
+        // TODO(fxbug.dev/123564): Move watchdog into its own future in the eventloop to prevent
+        // network check reliance on the watchdog completing.
+        let () = watchdog
+            .check_interface_state(zx::Time::get_monotonic(), &SystemDispatcher {}, view)
+            .await;
 
-        let watchdog_fut =
-            watchdog.check_interface_state(zx::Time::get_monotonic(), &SystemDispatcher {}, view);
+        let (system_internet, system_gateway) = {
+            match monitor.begin(view) {
+                Ok(NetworkCheckerOutcome::MustResume) => return,
+                Ok(NetworkCheckerOutcome::Complete) => {
+                    (monitor.state().system_has_internet(), monitor.state().system_has_gateway())
+                }
+                Err(e) => {
+                    info!("begin network check error: {:?}", e);
+                    return;
+                }
+            }
+        };
 
-        let ((), ()) = futures::future::join(monitor_fut, watchdog_fut).await;
+        handler
+            .update_state(|state| {
+                state.internet_available = system_internet;
+                state.gateway_reachable = system_gateway;
+            })
+            .await;
     }
 }
 
