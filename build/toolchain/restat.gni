@@ -8,7 +8,7 @@
 # re-client supports this behavior directly with
 # --preserve_unchanged_output_mtime (which suppresses downloading over
 # unchanged files), so this script is only needed for non-RBE build actions.
-restat_wrapper = "//build/tracer/output_cacher.py"
+restat_wrapper = "//build/tracer/restat_cacher.py"
 
 # The following script helps pack the restat_wrapper invocation
 # into a single token that rewrapper --local_wrapper can accept.

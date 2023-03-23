@@ -134,7 +134,8 @@ template("clang_toolchain") {
                         "-S",
                         rebase_path(restat_wrapper, root_build_dir),
                       ])
-      _restat_cmd_args = "$_restat_rust_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
+      _restat_cmd_args =
+          "$_restat_rust_wrapper --outputs {{output}} {{DEPFILE}} -- "
       if (rust_rbe_enable) {
         # To make sure local and remote execution consistently preserve
         # output timestamps, we need to stage local execution outputs to
@@ -160,7 +161,8 @@ template("clang_toolchain") {
                         "-S",
                         rebase_path(restat_wrapper, root_build_dir),
                       ])
-      _restat_cc_prefix = "$_restat_cc_wrapper --outputs substitute_after:-o:{{output}} {{DEPFILE}} -- "
+      _restat_cc_prefix =
+          "$_restat_cc_wrapper --outputs {{output}} {{DEPFILE}} -- "
     }
 
     if (enable_rust) {
