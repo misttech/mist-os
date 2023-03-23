@@ -12,6 +12,7 @@ use fidl_fuchsia_media as media;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
 use futures::{task::Context, FutureExt};
+use media::AudioDeviceEnumeratorProxy;
 use tracing::{info, warn};
 
 use super::*;
@@ -36,12 +37,8 @@ impl AudioSession {
 }
 
 impl InbandAudioControl {
-    pub fn create() -> Result<Self, AudioError> {
-        let audio_core = fuchsia_component::client::connect_to_protocol::<
-            media::AudioDeviceEnumeratorMarker,
-        >()
-        .or(Err(AudioError::AudioCore { source: format_err!("Failed to connect to protocol") }))?;
-        Ok(Self { audio_core, session_task: None })
+    pub fn create(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, AudioError> {
+        Ok(Self { audio_core: proxy, session_task: None })
     }
 
     fn is_running(&mut self) -> bool {

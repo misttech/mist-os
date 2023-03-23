@@ -8,6 +8,7 @@ use fidl_fuchsia_hardware_audio::{self as audio, DaiFormat, PcmFormat};
 use fidl_fuchsia_media as media;
 use fuchsia_audio_dai::{self as dai, DaiAudioDevice, DigitalAudioInterface};
 use fuchsia_bluetooth::types::{peer_audio_stream_id, PeerId, Uuid};
+use media::AudioDeviceEnumeratorProxy;
 use tracing::{info, warn};
 
 use super::*;
@@ -20,12 +21,8 @@ pub struct DaiAudioControl {
 }
 
 impl DaiAudioControl {
-    pub async fn discover() -> Result<Self, AudioError> {
+    pub async fn discover(proxy: AudioDeviceEnumeratorProxy) -> Result<Self, AudioError> {
         let devices = dai::find_devices().await.or(Err(AudioError::DiscoveryFailed))?;
-        let proxy = fuchsia_component::client::connect_to_protocol::<
-            media::AudioDeviceEnumeratorMarker,
-        >()
-        .or(Err(AudioError::AudioCore { source: format_err!("Failed to connect to protocol") }))?;
         Self::setup(devices, proxy).await
     }
 

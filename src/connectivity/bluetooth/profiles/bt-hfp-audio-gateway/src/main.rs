@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 #![recursion_limit = "1024"]
 
-use {
-    anyhow::{format_err, Error},
-    battery_client::BatteryClient,
-    fuchsia_component::server::ServiceFs,
-    fuchsia_inspect_derive::Inspect,
-    futures::{channel::mpsc, future, pin_mut},
-    tracing::{debug, error, info, warn},
-};
+use anyhow::{format_err, Context, Error};
+use battery_client::BatteryClient;
+use fidl_fuchsia_media as media;
+use fuchsia_component::server::ServiceFs;
+use fuchsia_inspect_derive::Inspect;
+use futures::{channel::mpsc, future, pin_mut};
+use tracing::{debug, error, info, warn};
 
 use crate::{
     audio::AudioControl, config::AudioGatewayFeatureSupport, fidl_service::run_services, hfp::Hfp,
@@ -29,6 +28,17 @@ mod peer;
 mod profile;
 mod sco_connector;
 mod service_definitions;
+
+async fn setup_audio(
+    in_band_sco: bool,
+    audio_proxy: media::AudioDeviceEnumeratorProxy,
+) -> Result<Box<dyn AudioControl>, audio::AudioError> {
+    if in_band_sco {
+        Ok(Box::from(audio::InbandAudioControl::create(audio_proxy)?))
+    } else {
+        Ok(Box::from(audio::DaiAudioControl::discover(audio_proxy).await?))
+    }
+}
 
 #[fuchsia::main(logging_tags = ["hfp-ag"])]
 async fn main() -> Result<(), Error> {
@@ -58,22 +68,15 @@ async fn main() -> Result<(), Error> {
     let (call_manager_sender, call_manager_receiver) = mpsc::channel(1);
     let (test_request_sender, test_request_receiver) = mpsc::channel(1);
 
-    let audio: Box<dyn AudioControl> = if in_band_sco {
-        match audio::DaiAudioControl::discover().await {
-            Err(e) => {
-                error!(?e, "Couldn't setup DAI audio");
-                return Err(format_err!("DAI failed"));
-            }
-            Ok(audio) => Box::new(audio),
+    let audio_proxy =
+        fuchsia_component::client::connect_to_protocol::<media::AudioDeviceEnumeratorMarker>()
+            .with_context(|| format!("Error connecting to audio_core"))?;
+    let audio = match setup_audio(in_band_sco, audio_proxy).await {
+        Err(e) => {
+            error!(?e, "Couldn't setup audio");
+            return Err(format_err!("Audio setup failed: {e:?}"));
         }
-    } else {
-        match audio::InbandAudioControl::create() {
-            Err(e) => {
-                error!(?e, "Couldn't setup inband audio");
-                return Err(format_err!("Inband failed: {e:?}"));
-            }
-            Ok(audio) => Box::new(audio),
-        }
+        Ok(audio) => audio,
     };
 
     let mut hfp = Hfp::new(
@@ -103,15 +106,30 @@ async fn main() -> Result<(), Error> {
             warn!("Service FS directory handle closed. Exiting.");
         }
         future::Either::Left((Err(e), _)) => {
-            error!("Error encountered running Service FS: {}. Exiting", e);
+            error!("Error encountered running Service FS: {e}. Exiting");
         }
         future::Either::Right((Ok(()), _)) => {
             warn!("All HFP related connections to this component have been disconnected. Exiting.");
         }
         future::Either::Right((Err(e), _)) => {
-            error!("Error encountered running main HFP loop: {}. Exiting.", e);
+            error!("Error encountered running main HFP loop: {e}. Exiting.");
         }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[fuchsia::test]
+    async fn setup_audio_chooses_wisely() {
+        // This should not panic, inband audio doesn't need to connect to anything other than the
+        // proxy.
+        // Dai Audio does, and will panic this test.
+        let proxy =
+            fidl::endpoints::create_proxy::<media::AudioDeviceEnumeratorMarker>().unwrap().0;
+        let _ = setup_audio(true, proxy).await.unwrap();
+    }
 }
