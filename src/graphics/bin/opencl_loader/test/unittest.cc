@@ -149,12 +149,12 @@ TEST(Icd, BadManifest) {
 class FakeMemoryPressureProvider : public fuchsia::memorypressure::testing::Provider_TestBase {
  public:
   void NotImplemented_(const std::string& name) override { EXPECT_TRUE(false) << name; }
-  void RegisterWatcher(
-      ::fidl::InterfaceHandle<::fuchsia::memorypressure::Watcher> watcher) override {
+  void RegisterWatcher(fidl::InterfaceHandle<::fuchsia::memorypressure::Watcher> watcher) override {
     fuchsia::memorypressure::WatcherSyncPtr watcher_sync;
     watcher_sync.Bind(std::move(watcher));
     watcher_sync->OnLevelChanged(fuchsia::memorypressure::Level::CRITICAL);
   }
+
   fidl::InterfaceRequestHandler<fuchsia::memorypressure::Provider> GetHandler() {
     return bindings_.GetHandler(this);
   }
@@ -173,15 +173,12 @@ class FakeMagmaDependencyInjection
   void SetMemoryPressureProvider(
       fidl::InterfaceHandle<fuchsia::memorypressure::Provider> provider) override {
     if (provider.is_valid()) {
-      std::lock_guard lock(mutex_);
       got_memory_pressure_provider_ = true;
-      condition_.notify_one();
     }
   }
-  void WaitForMemoryPressureProvider() {
-    std::unique_lock lock(mutex_);
-    condition_.wait(lock, [this]() { return got_memory_pressure_provider_; });
-  }
+
+  bool GotMemoryPressureProvider() const { return got_memory_pressure_provider_; }
+
   fidl::InterfaceRequestHandler<fuchsia::gpu::magma::DependencyInjection> GetHandler() {
     return bindings_.GetHandler(this);
   }
@@ -190,19 +187,15 @@ class FakeMagmaDependencyInjection
 
  private:
   fidl::BindingSet<fuchsia::gpu::magma::DependencyInjection> bindings_;
-  std::condition_variable condition_;
-  std::mutex mutex_;
   bool got_memory_pressure_provider_ = false;
 };
 
 TEST_F(LoaderUnittest, MagmaDependencyInjection) {
-  async::Loop server_loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  server_loop.StartThread("context-server-loop");
-  sys::testing::ComponentContextProvider context_provider(server_loop.dispatcher());
+  sys::testing::ComponentContextProvider context_provider(dispatcher());
   FakeMemoryPressureProvider provider;
   context_provider.service_directory_provider()->AddService(provider.GetHandler());
 
-  fs::SynchronousVfs vfs(server_loop.dispatcher());
+  fs::SynchronousVfs vfs(dispatcher());
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
 
   FakeMagmaDependencyInjection magma_dependency_injection;
@@ -228,7 +221,7 @@ TEST_F(LoaderUnittest, MagmaDependencyInjection) {
   EXPECT_EQ(ZX_OK, dependency_injection.Initialize());
 
   // Wait for the GPU dependency injection code to detect the device and call the method on it.
-  RunLoopUntilIdle();
-  magma_dependency_injection.WaitForMemoryPressureProvider();
-  server_loop.Shutdown();
+  RunLoopUntil([&magma_dependency_injection]() {
+    return magma_dependency_injection.GotMemoryPressureProvider();
+  });
 }
