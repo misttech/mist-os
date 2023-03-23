@@ -11,6 +11,7 @@
 #include <unwindstack/Memory.h>
 
 #include "src/developer/debug/unwinder/memory.h"
+#include "src/developer/debug/unwinder/module.h"
 #include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 
 namespace benchmark {
@@ -22,7 +23,7 @@ class MinidumpMemory : public unwindstack::Memory, public unwinder::Memory {
   explicit MinidumpMemory(const crashpad::ProcessSnapshotMinidump& minidump);
 
   // Used by UnwindFromUnwinder.
-  const std::map<uint64_t, unwinder::Memory*>& module_map() const { return module_map_; }
+  const std::vector<unwinder::Module>& unwinder_modules() const { return unwinder_modules_; }
 
   // Implementation of unwindstack::Memory and unwinder::Memory.
   size_t Read(uint64_t addr, void* dst, size_t size) override;
@@ -50,7 +51,7 @@ class MinidumpMemory : public unwindstack::Memory, public unwinder::Memory {
 
  private:
   std::vector<std::unique_ptr<MemoryRegion>> regions_;
-  std::map<uint64_t, unwinder::Memory*> module_map_;
+  std::vector<unwinder::Module> unwinder_modules_;
   Statistics statistics_;
 };
 

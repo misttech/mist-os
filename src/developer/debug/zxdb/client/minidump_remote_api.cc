@@ -14,6 +14,7 @@
 #include "src/developer/debug/ipc/unwinder_support.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
+#include "src/developer/debug/unwinder/unwind.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/lib/fxl/strings/string_printf.h"
@@ -323,6 +324,7 @@ const crashpad::ThreadSnapshot* MinidumpRemoteAPI::GetThreadById(uint64_t id) {
 void MinidumpRemoteAPI::CollectMemory() {
   memory_ = std::make_unique<MinidumpMemory>(*minidump_,
                                              session_->system().GetSymbols()->build_id_index());
+  unwinder_ = std::make_unique<unwinder::Unwinder>(memory_->GetUnwinderModules());
 }
 
 void MinidumpRemoteAPI::OnDownloadsStopped(size_t num_succeeded, size_t num_failed) {
@@ -751,9 +753,7 @@ void MinidumpRemoteAPI::ThreadStatus(
       return;
   }
 
-  // TODO(dangyi): consider having a new unwinder interface so that the index of .debug_frame could
-  // be cached.
-  auto frames = unwinder::Unwind(stack_memory, memory_->GetDebugModuleMap(), regs);
+  auto frames = unwinder_->Unwind(stack_memory, regs);
   reply.record.frames = debug_ipc::ConvertFrames(frames);
   Succeed(std::move(cb), reply);
 }

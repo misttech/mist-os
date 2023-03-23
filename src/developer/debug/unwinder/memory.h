@@ -30,8 +30,7 @@ class Memory {
 
   template <class Type>
   [[nodiscard]] Error Read(const uint64_t& addr, Type& res) {
-    uint64_t mut = addr;
-    return Read(mut, res);
+    return ReadBytes(addr, sizeof(res), &res);
   }
 
   [[nodiscard]] Error ReadSLEB128(uint64_t& addr, int64_t& res);
@@ -50,15 +49,12 @@ class LocalMemory : public Memory {
   }
 };
 
-// Bounded local memory to avoid segmentation fault.
-class BoundedLocalMemory : public LocalMemory {
+// A memory that fails any reads.
+class UnavailableMemory : public Memory {
  public:
-  ~BoundedLocalMemory() override = default;
-  void AddRegion(uint64_t base, uint64_t size);
-  Error ReadBytes(uint64_t addr, uint64_t size, void* dst) override;
-
- private:
-  std::map<uint64_t, uint64_t> regions_;
+  Error ReadBytes(uint64_t addr, uint64_t size, void* dst) override {
+    return Error("Unavailable memory");
+  }
 };
 
 }  // namespace unwinder

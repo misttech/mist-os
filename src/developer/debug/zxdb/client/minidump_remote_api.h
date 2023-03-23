@@ -21,6 +21,10 @@
 #include "third_party/crashpad/src/snapshot/memory_snapshot.h"
 #include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 
+namespace unwinder {
+class Unwinder;
+}
+
 namespace zxdb {
 
 class Session;
@@ -29,7 +33,7 @@ class Session;
 class MinidumpRemoteAPI : public RemoteAPI, public DownloadObserver {
  public:
   explicit MinidumpRemoteAPI(Session* session);
-  ~MinidumpRemoteAPI();
+  ~MinidumpRemoteAPI() override;
 
   Err Open(const std::string& path);
   Err Close();
@@ -104,6 +108,8 @@ class MinidumpRemoteAPI : public RemoteAPI, public DownloadObserver {
   // MinidumpMemory holds the pointer to objects in minidump_. It's important to destruct or reset
   // memory_ before minidump_.
   std::unique_ptr<MinidumpMemory> memory_;
+
+  std::unique_ptr<unwinder::Unwinder> unwinder_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(MinidumpRemoteAPI);
 };

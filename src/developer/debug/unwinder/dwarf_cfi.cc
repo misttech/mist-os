@@ -15,6 +15,7 @@
 
 #include "src/developer/debug/unwinder/dwarf_cfi_parser.h"
 #include "src/developer/debug/unwinder/error.h"
+#include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/unwinder/registers.h"
 
 namespace unwinder {
@@ -132,7 +133,11 @@ Error DwarfCfi::Load() {
       return err;
     }
     if (phdr.p_type == PT_GNU_EH_FRAME) {
-      eh_frame_hdr_ptr_ = elf_ptr_ + phdr.p_vaddr;
+      if (address_mode_ == Module::AddressMode::kProcess) {
+        eh_frame_hdr_ptr_ = elf_ptr_ + phdr.p_vaddr;
+      } else {
+        eh_frame_hdr_ptr_ = elf_ptr_ + phdr.p_offset;
+      }
     } else if (phdr.p_type == PT_LOAD && phdr.p_flags & PF_X) {
       pc_begin_ = std::min(pc_begin_, elf_ptr_ + phdr.p_vaddr);
       pc_end_ = std::max(pc_end_, elf_ptr_ + phdr.p_vaddr + phdr.p_memsz);
@@ -185,18 +190,24 @@ Error DwarfCfi::Load() {
   // ==============================================================================================
   debug_frame_ptr_ = 0;
   debug_frame_end_ = 0;
+
+  // Section headers and .debug_frame section are not loaded.
+  if (address_mode_ == Module::AddressMode::kProcess) {
+    return Success();
+  }
+
   // if ehdr.e_shstrndx is 0, it means there's no section info, i.e., the binary is stripped.
   if (!ehdr.e_shstrndx) {
     return Success();
   }
+
   uint64_t shstr_hdr_ptr =
       elf_ptr_ + ehdr.e_shoff + static_cast<uint64_t>(ehdr.e_shentsize) * ehdr.e_shstrndx;
   Elf64_Shdr shstr_hdr;
-  // Even when the binary is not stripped, the .shstrtab and .debug_frame sections are by default
-  // not loaded.
   if (elf_->Read(shstr_hdr_ptr, shstr_hdr).has_err()) {
     return Success();
   }
+
   for (uint64_t i = 0; i < ehdr.e_shnum; i++) {
     Elf64_Shdr shdr;
     if (elf_->Read(elf_ptr_ + ehdr.e_shoff + ehdr.e_shentsize * i, shdr).has_err()) {

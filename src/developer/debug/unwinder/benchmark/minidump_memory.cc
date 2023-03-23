@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "lib/syslog/cpp/macros.h"
+#include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
 
 namespace benchmark {
@@ -128,7 +129,8 @@ MinidumpMemory::MinidumpMemory(const crashpad::ProcessSnapshotMinidump& minidump
     FX_CHECK(!path.empty()) << "Cannot find symbol file for " << build_id;
     auto elf_region =
         std::make_unique<ElfMemoryRegion>(path, module->Address(), module->Size(), &statistics_);
-    module_map_.emplace(module->Address(), elf_region.get());
+    unwinder_modules_.emplace_back(module->Address(), elf_region.get(),
+                                   unwinder::Module::AddressMode::kFile);
     regions_.push_back(std::move(elf_region));
   }
 

@@ -11,6 +11,7 @@
 
 #include "src/developer/debug/ipc/records.h"
 #include "src/developer/debug/unwinder/memory.h"
+#include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
 #include "third_party/crashpad/src/snapshot/memory_snapshot.h"
 #include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
@@ -64,14 +65,14 @@ class MinidumpMemory {
 
   // Used by the unwinder.
   Region* GetMemoryRegion(uint64_t address);
-  std::map<uint64_t, Region*> GetDebugModuleMap();
+  std::vector<unwinder::Module> GetUnwinderModules();
 
  private:
   // regions_ include the stacks and the modules. Using shared_ptr here because multiple regions
   // could be provided with the same module.
   std::vector<std::tuple<uint64_t, uint64_t, std::shared_ptr<Region>>> regions_;
 
-  // debug_modules_ are used to provide the module_map for the unwinder.
+  // debug_modules_ are used to provide the unwinder modules for the unwinder.
   std::map<uint64_t, FileMemoryRegion> debug_modules_;
 };
 

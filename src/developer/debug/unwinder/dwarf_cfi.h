@@ -10,6 +10,7 @@
 
 #include "src/developer/debug/unwinder/error.h"
 #include "src/developer/debug/unwinder/memory.h"
+#include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/unwinder/registers.h"
 
 namespace unwinder {
@@ -22,7 +23,8 @@ namespace unwinder {
 class DwarfCfi {
  public:
   // Caller must ensure elf to outlive us.
-  DwarfCfi(Memory* elf, uint64_t elf_ptr) : elf_(elf), elf_ptr_(elf_ptr) {}
+  DwarfCfi(Memory* elf, uint64_t elf_ptr, Module::AddressMode address_mode)
+      : elf_(elf), elf_ptr_(elf_ptr), address_mode_(address_mode) {}
 
   // Load the CFI from the ELF file.
   [[nodiscard]] Error Load();
@@ -68,9 +70,10 @@ class DwarfCfi {
   // trust level.
   [[nodiscard]] Error StepPLT(Memory* stack, const Registers& current, Registers& next);
 
-  // Use const to prevent accidental modification.
-  Memory* const elf_ = nullptr;
-  const uint64_t elf_ptr_ = 0;
+  // Inputs. Use const to prevent accidental modification.
+  Memory* const elf_;
+  const uint64_t elf_ptr_;
+  const Module::AddressMode address_mode_;
 
   // Marks the executable section so that we don't need to find the FDE to know a PC is wrong.
   uint64_t pc_begin_ = 0;  // inclusive

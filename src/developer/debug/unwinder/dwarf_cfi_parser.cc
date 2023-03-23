@@ -378,13 +378,13 @@ Error DwarfCfiParser::Step(Memory* stack, RegisterID return_address_register,
         }
         break;
       case RegisterLocation::Type::kOffset:
-        if (uint64_t val; stack && stack->Read(cfa + location.offset, val).ok()) {
+        if (uint64_t val; stack->Read(cfa + location.offset, val).ok()) {
           next.Set(reg, val);
         }
         break;
       case RegisterLocation::Type::kExpression:
         if (uint64_t loc; location.expression.Eval(stack, current, cfa, loc).ok()) {
-          if (uint64_t val; stack && stack->Read(loc, val).ok()) {
+          if (uint64_t val; stack->Read(loc, val).ok()) {
             next.Set(reg, val);
           }
         }

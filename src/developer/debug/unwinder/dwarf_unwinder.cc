@@ -5,10 +5,19 @@
 #include "src/developer/debug/unwinder/dwarf_unwinder.h"
 
 #include <cinttypes>
+#include <cstdint>
+#include <vector>
 
 namespace unwinder {
 
-Error DwarfUnwinder::Step(Registers current, Registers& next, bool is_return_address) {
+DwarfUnwinder::DwarfUnwinder(const std::vector<Module>& modules) {
+  for (const auto& module : modules) {
+    module_map_.emplace(module.load_address, module);
+  }
+}
+
+Error DwarfUnwinder::Step(Memory* stack, Registers current, Registers& next,
+                          bool is_return_address) {
   uint64_t pc;
   if (auto err = current.GetPC(pc); err.has_err()) {
     return err;
@@ -33,15 +42,17 @@ Error DwarfUnwinder::Step(Registers current, Registers& next, bool is_return_add
   }
   module_it--;
   uint64_t module_address = module_it->first;
+  Module& module = module_it->second;
 
   auto cfi_it = cfi_map_.find(module_address);
   if (cfi_it == cfi_map_.end()) {
-    cfi_it = cfi_map_.emplace(module_address, DwarfCfi(module_it->second, module_address)).first;
+    DwarfCfi dwarf_cfi(module.memory, module_address, module.mode);
+    cfi_it = cfi_map_.emplace(module_address, dwarf_cfi).first;
     if (auto err = cfi_it->second.Load(); err.has_err()) {
       return err;
     }
   }
-  if (auto err = cfi_it->second.Step(stack_, current, next); err.has_err()) {
+  if (auto err = cfi_it->second.Step(stack, current, next); err.has_err()) {
     return err;
   }
   return Success();

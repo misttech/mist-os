@@ -7,21 +7,20 @@
 
 #include "src/developer/debug/unwinder/dwarf_cfi.h"
 #include "src/developer/debug/unwinder/memory.h"
+#include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/unwinder/registers.h"
 
 namespace unwinder {
 
 class DwarfUnwinder {
  public:
-  DwarfUnwinder(Memory* stack, std::map<uint64_t, Memory*> module_map)
-      : stack_(stack), module_map_(std::move(module_map)) {}
+  explicit DwarfUnwinder(const std::vector<Module>& modules);
 
-  Error Step(Registers current, Registers& next, bool is_return_address);
+  Error Step(Memory* stack, Registers current, Registers& next, bool is_return_address);
 
  private:
   // Inputs.
-  Memory* stack_;
-  std::map<uint64_t, Memory*> module_map_;
+  std::map<uint64_t, Module> module_map_;
 
   // Lazy-initialized CFI of each module.
   std::map<uint64_t, DwarfCfi> cfi_map_;

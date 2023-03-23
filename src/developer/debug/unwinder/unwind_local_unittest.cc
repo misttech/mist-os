@@ -26,11 +26,6 @@ constexpr size_t kFunctionSize = 0x80;
 }  // namespace
 
 TEST(Unwinder, UnwindLocal) {
-  // TODO(fxbug.dev/80656): fix the global-buffer-overflow when running on Linux with ASan.
-#if defined(__linux__) && __has_feature(address_sanitizer)
-  return;
-#endif
-
   auto frames = f3();
 
   for (auto& frame : frames) {

@@ -75,7 +75,7 @@ std::vector<unwinder::Frame> UnwindFromUnwinder(
     const std::vector<const crashpad::ModuleSnapshot*>& modules,
     const crashpad::ThreadSnapshot* thread) {
   auto registers = ParseMinidumpContext(*thread->Context());
-  return unwinder::Unwind(memory.get(), memory->module_map(), registers);
+  return unwinder::Unwinder(memory->unwinder_modules()).Unwind(memory.get(), registers);
 }
 
 int Main(int argc, const char** argv) {

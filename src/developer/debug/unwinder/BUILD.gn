@@ -14,6 +14,7 @@ sdk_source_set("unwinder") {
     "dwarf_expr.h",
     "error.h",
     "memory.h",
+    "module.h",
     "registers.h",
     "unwind.h",
   ]

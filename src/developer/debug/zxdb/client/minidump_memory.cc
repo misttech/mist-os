@@ -6,6 +6,7 @@
 
 #include <memory>
 
+#include "src/developer/debug/unwinder/module.h"
 #include "src/lib/elflib/elflib.h"
 
 namespace zxdb {
@@ -136,10 +137,11 @@ unwinder::Memory* MinidumpMemory::GetMemoryRegion(uint64_t address) {
   return nullptr;
 }
 
-std::map<uint64_t, unwinder::Memory*> MinidumpMemory::GetDebugModuleMap() {
-  std::map<uint64_t, unwinder::Memory*> res;
+std::vector<unwinder::Module> MinidumpMemory::GetUnwinderModules() {
+  std::vector<unwinder::Module> res;
+  res.reserve(debug_modules_.size());
   for (auto& [addr, memory] : debug_modules_) {
-    res.emplace(addr, &memory);
+    res.emplace_back(addr, &memory, unwinder::Module::AddressMode::kFile);
   }
   return res;
 }
