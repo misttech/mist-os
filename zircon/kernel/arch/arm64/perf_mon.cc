@@ -560,7 +560,7 @@ static zx_status_t arm64_perfmon_map_buffers_locked(PerfmonState* state, Guard<M
       break;
     }
     data->buffer_start =
-        reinterpret_cast<perfmon::BufferHeader*>(data->buffer_mapping->base() + vmo_offset);
+        reinterpret_cast<perfmon::BufferHeader*>(data->buffer_mapping->base_locking() + vmo_offset);
     data->buffer_end = reinterpret_cast<char*>(data->buffer_start) + size;
     data->pinned_buffer = ktl::move(buf_pin);
     LTRACEF("buffer mapped: cpu %u, start %p, end %p\n", cpu, data->buffer_start, data->buffer_end);

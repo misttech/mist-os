@@ -201,11 +201,11 @@ bool GetBacktraceFromDapStateTest() {
 
   // Create a VMO of two pages and map it in the middle.
   //
-  //         mapping.base()
+  //         mapping.base_locking()
   //         V
   // [-hole-][page-1][page-2][-hole-]
   // ^
-  // vmar.base()
+  // vmar.base_locking()
   //
   fbl::RefPtr<VmObjectPaged> vmo;
   ASSERT_OK(
@@ -219,7 +219,7 @@ bool GetBacktraceFromDapStateTest() {
 
   // Fill the two middle pages with some "return addresses".
   const size_t num_elements = kVmoSize / sizeof(vaddr_t);
-  auto* p = reinterpret_cast<vaddr_t*>(mapping->base());
+  auto* p = reinterpret_cast<vaddr_t*>(mapping->base_locking());
   for (uint64_t i = 0; i < num_elements; ++i) {
     p[i] = i;
   }
@@ -233,7 +233,7 @@ bool GetBacktraceFromDapStateTest() {
     state.pc = kPc;
     state.r[30] = kLr;
     state.edscr = kEdscrEl1;
-    state.r[18] = vmar->base() + 64;
+    state.r[18] = vmar->base_locking() + 64;
     ASSERT_TRUE(is_kernel_address(state.r[18]));
     Backtrace bt;
     ASSERT_EQ(ZX_ERR_NOT_FOUND, lockup_internal::GetBacktraceFromDapState(state, bt));
@@ -253,7 +253,7 @@ bool GetBacktraceFromDapStateTest() {
     state.pc = kPc;
     state.r[30] = kLr;
     state.edscr = kEdscrEl1;
-    state.r[18] = vmar->base() + PAGE_SIZE * 3;
+    state.r[18] = vmar->base_locking() + PAGE_SIZE * 3;
     ASSERT_TRUE(is_kernel_address(state.r[18]));
     Backtrace bt;
     // See that we get a full backtrace.  The fact that SCSP pointed at an unmapped page didn't
@@ -272,7 +272,7 @@ bool GetBacktraceFromDapStateTest() {
     state.pc = kPc;
     state.r[30] = kLr;
     state.edscr = kEdscrEl1;
-    state.r[18] = vmar->base() + PAGE_SIZE * 2 + 16;
+    state.r[18] = vmar->base_locking() + PAGE_SIZE * 2 + 16;
     ASSERT_TRUE(is_kernel_address(state.r[18]));
     Backtrace bt;
     ASSERT_EQ(ZX_OK, lockup_internal::GetBacktraceFromDapState(state, bt));
@@ -289,7 +289,7 @@ bool GetBacktraceFromDapStateTest() {
     state.pc = kPc;
     state.r[30] = kLr;
     state.edscr = kEdscrEl1;
-    state.r[18] = vmar->base() + PAGE_SIZE + 16;
+    state.r[18] = vmar->base_locking() + PAGE_SIZE + 16;
     ASSERT_TRUE(is_kernel_address(state.r[18]));
     Backtrace bt;
     ASSERT_EQ(ZX_OK, lockup_internal::GetBacktraceFromDapState(state, bt));

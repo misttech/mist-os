@@ -569,7 +569,10 @@ void VmAddressRegion::Activate() {
   // Look for a region in the parent starting from our desired base. If any region is found, make
   // sure we do not intersect with it.
   auto candidate = parent_->subregions_.IncludeOrHigher(base_);
-  ASSERT(candidate == parent_->subregions_.end() || candidate->base_ >= base_ + size_);
+  if (candidate != parent_->subregions_.end()) {
+    AssertHeld(candidate->lock_ref());
+    ASSERT(candidate->base_ >= base_ + size_);
+  }
 
   parent_->subregions_.InsertRegion(fbl::RefPtr<VmAddressRegionOrMapping>(this));
 }
@@ -1062,7 +1065,7 @@ zx_status_t VmAddressRegion::ReserveSpace(const char* name, vaddr_t base, size_t
   if (!is_in_range(base, size)) {
     return ZX_ERR_INVALID_ARGS;
   }
-  size_t offset = base - base_;
+  size_t offset = base - this->base();
   // We need a zero-length VMO to pass into CreateVmMapping so that a VmMapping would be created.
   // The VmMapping is already mapped to physical pages in start.S.
   // We would never call MapRange on the VmMapping, thus the VMO would never actually allocate any

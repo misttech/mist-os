@@ -104,9 +104,6 @@ class VmAddressRegionOrMapping
   virtual zx_status_t Destroy();
 
   // accessors
-  // TODO(fxbug.dev/121897) deprecate unsafe base & size accessors
-  vaddr_t base() const { return base_; }
-  size_t size() const { return size_; }
   vaddr_t base_locked() const TA_REQ(lock()) { return base_; }
   size_t size_locked() const TA_REQ(lock()) { return size_; }
   vaddr_t base_locking() const TA_EXCL(lock()) {
@@ -567,6 +564,11 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
   fbl::RefPtr<VmAddressRegionOrMapping> FindRegion(vaddr_t addr);
   fbl::RefPtr<VmAddressRegionOrMapping> FindRegionLocked(vaddr_t addr) TA_REQ(lock());
 
+  // Base & size accessors
+  // Lock not required as base & size will never change in VmAddressRegion
+  vaddr_t base() const TA_NO_THREAD_SAFETY_ANALYSIS { return base_; }
+  size_t size() const TA_NO_THREAD_SAFETY_ANALYSIS { return size_; }
+
   enum class RangeOpType {
     Commit,
     Decommit,
@@ -868,6 +870,13 @@ class VmMapping final : public VmAddressRegionOrMapping,
       TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
     return object_offset_;
   }
+  vaddr_t base_locked_object() const TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+    return base_;
+  }
+  size_t size_locked_object() const TA_REQ(object_->lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+    return size_;
+  }
+
   // Intended to be used from VmEnumerator callbacks where the aspace_->lock() will be held.
   fbl::RefPtr<VmObject> vmo_locked() const TA_REQ(lock()) { return object_; }
   fbl::RefPtr<VmObject> vmo() const TA_EXCL(lock());
