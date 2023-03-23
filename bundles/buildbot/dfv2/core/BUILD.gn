@@ -44,8 +44,6 @@ group("core") {
   # pass with DFv2 enabled.
   # TODO(fxbug.dev/108569): Add //src/tests/oom:tests when all tests in
   # //src/tests/oom:tests pass with DFv2 enabled.
-  # TODO(fxbug.dev/108571): Add //src/tests/reboot:tests when all tests in
-  # //src/tests/reboot:tests pass with DFv2 enabled.
   # TODO(fxbug.dev/108572): Add //src/tests/shutdown:tests when all tests in
   # //src/tests/shutdown:tests pass with DFv2 enabled.
   deps += [
@@ -67,5 +65,6 @@ group("core") {
     "//src/tests/kernel_panic:tests",
     "//src/tests/limited_netsvc:tests",
     "//src/tests/microbenchmarks:tests",
+    "//src/tests/reboot:tests",
   ]
 }
