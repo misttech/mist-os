@@ -8,6 +8,8 @@
 #include <threads.h>
 #include <zircon/assert.h>
 
+#include <mutex>
+
 namespace async_patterns::internal {
 
 std::shared_ptr<TaskQueue> TaskQueue::Create(async_dispatcher_t* dispatcher,
