@@ -473,7 +473,9 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       // not found errors get very noisy.
       zx_status_t match_error = result->error_value();
       if (!result_tracker || match_error != ZX_ERR_NOT_FOUND) {
-        LOGF(WARNING, "Failed to match Node '%s': %s", driver_node->name().c_str(),
+        // TODO(fxb/123392): We're logging the topological path to debug test flakes. Once that's
+        // resolved, we should just log the name.
+        LOGF(WARNING, "Failed to match Node '%s': %s", driver_node->MakeTopologicalPath().c_str(),
              zx_status_get_string(match_error));
       }
 
