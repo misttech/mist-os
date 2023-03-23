@@ -193,7 +193,7 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
 class FakeSystemStateTransition final
     : public fidl::WireServer<fuchsia_device_manager::SystemStateTransition> {
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
-    completer.Reply(fuchsia_device_manager::SystemPowerState::kReboot);
+    completer.Reply(fuchsia_device_manager::SystemPowerState::kFullyOn);
   }
   void GetMexecZbis(GetMexecZbisCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);

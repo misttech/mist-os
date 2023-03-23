@@ -32,6 +32,7 @@ class Driver : public fdf::DriverBase {
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
+  void Stop() override;
 
   // Returns the context that DFv1 driver provided.
   void* Context() const;
@@ -115,6 +116,9 @@ class Driver : public fdf::DriverBase {
   std::unique_ptr<fdf::Logger> inner_logger_;
   Device device_;
 
+  fuchsia_device_manager::wire::SystemPowerState system_state_ =
+      fuchsia_device_manager::wire::SystemPowerState::kFullyOn;
+
   std::unique_ptr<fs::SynchronousVfs> diagnostics_vfs_;
   fbl::RefPtr<fs::PseudoDir> diagnostics_dir_ = fbl::MakeRefCounted<fs::PseudoDir>();
 
@@ -130,6 +134,9 @@ class Driver : public fdf::DriverBase {
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;
+
+  // Set to true during shutdown and reboot flows.
+  bool skip_release_ = false;
 
   // NOTE: Must be the last member.
   fpromise::scope scope_;

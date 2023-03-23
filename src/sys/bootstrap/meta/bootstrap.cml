@@ -822,7 +822,12 @@
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "#shutdown_shim",
-            to: "#driver_manager",
+            to: [
+                "#boot-drivers",
+                "#driver_manager",
+                "#full-pkg-drivers",
+                "#pkg-drivers",
+            ],
         },
         {
             protocol: [ "fuchsia.hardware.power.statecontrol.Admin" ],

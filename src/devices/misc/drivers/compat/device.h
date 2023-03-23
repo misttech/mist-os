@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_MISC_DRIVERS_COMPAT_DEVICE_H_
 #define SRC_DEVICES_MISC_DRIVERS_COMPAT_DEVICE_H_
 
+#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <fidl/fuchsia.driver.framework.deprecated/cpp/wire.h>
@@ -58,11 +59,20 @@ class Device : public std::enable_shared_from_this<Device>,
   // Unbinds a device from a DFv2 node.
   void Unbind();
 
+  // Call Unbind or Suspend based on the power state.
+  fpromise::promise<void> HandleStopSignal(fuchsia_device_manager::wire::SystemPowerState state);
+
   // Call the Unbind op for the device.
   fpromise::promise<void> UnbindOp();
 
+  // Call the Suspend op for the device.
+  fpromise::promise<void> SuspendOp(fuchsia_device_manager::wire::SystemPowerState state);
+
   // Removes all of the child devices.
   fpromise::promise<void> RemoveChildren();
+
+  // Suspends all of the child devices.
+  fpromise::promise<void> SuspendChildren(fuchsia_device_manager::wire::SystemPowerState state);
 
   const char* Name() const;
   bool HasChildren() const;
@@ -93,8 +103,8 @@ class Device : public std::enable_shared_from_this<Device>,
 
   zx_status_t CreateNode();
 
-  void PerformUnbind();
   void CompleteUnbind();
+  void CompleteSuspend();
 
   // Serves the |fuchsia_driver_framework_deprecated::RuntimeConnector| protocol,
   // used for supporting v1 of driver runtime protocol discovery.
@@ -200,6 +210,11 @@ class Device : public std::enable_shared_from_this<Device>,
 
   // Completed when unbind is replied to.
   fpromise::completer<void> unbind_completer_;
+
+  // Completed when suspend is replied to.
+  fpromise::completer<void> suspend_completer_;
+  fuchsia_device_manager::SystemPowerState system_power_state_ =
+      fuchsia_device_manager::SystemPowerState::kFullyOn;
 
   // The default protocol of the device.
   device_t compat_symbol_;

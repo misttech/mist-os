@@ -119,6 +119,14 @@
             to: [ "#driver_manager" ],
         },
         {
+            protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
+            from: "parent",
+            to: [
+                "#boot-drivers",
+                "#pkg-drivers",
+            ],
+        },
+        {
             protocol: [
                 "fuchsia.driver.development.DriverIndex",
                 "fuchsia.driver.index.DriverIndex",

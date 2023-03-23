@@ -7,6 +7,7 @@
 #include <dirent.h>
 #include <fidl/fuchsia.boot/cpp/wire_test_base.h>
 #include <fidl/fuchsia.device.fs/cpp/wire_test_base.h>
+#include <fidl/fuchsia.device.manager/cpp/wire_test_base.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire_test_base.h>
 #include <fidl/fuchsia.io/cpp/wire_test_base.h>
 #include <fidl/fuchsia.logger/cpp/wire_test_base.h>
@@ -191,6 +192,18 @@ class TestProfileProvider : public fidl::testing::WireTestBase<fuchsia_scheduler
   std::function<void(SetProfileByRoleRequestView&)> set_profile_by_role_callback_;
 };
 
+class TestSystemStateTransition
+    : public fidl::testing::WireTestBase<fuchsia_device_manager::SystemStateTransition> {
+ public:
+  void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
+    completer.Reply(fuchsia_device_manager::wire::SystemPowerState::kReboot);
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: SystemStateTransition::%s", name.data());
+  }
+};
+
 class TestExporter : public fidl::testing::WireTestBase<fuchsia_device_fs::Exporter> {
  public:
   void Export(ExportRequestView request, ExportCompleter::Sync& completer) override {
@@ -365,6 +378,15 @@ class DriverTest : public testing::Test {
             return ZX_OK;
           }));
 
+      svc->AddEntry(fidl::DiscoverableProtocolName<fuchsia_device_manager::SystemStateTransition>,
+                    fbl::MakeRefCounted<fs::Service>([this](zx::channel server) {
+                      fidl::ServerEnd<fuchsia_device_manager::SystemStateTransition> server_end(
+                          std::move(server));
+                      fidl::BindServer(fidl_loop_.dispatcher(), std::move(server_end),
+                                       &system_state_transition_);
+                      return ZX_OK;
+                    }));
+
       auto compat_dir = fbl::MakeRefCounted<fs::PseudoDir>();
       auto compat_default_dir = fbl::MakeRefCounted<fs::PseudoDir>();
       compat_default_dir->AddEntry(
@@ -461,6 +483,7 @@ class DriverTest : public testing::Test {
   TestFile firmware_file_;
   TestDirectory pkg_directory_;
   TestExporter exporter_;
+  TestSystemStateTransition system_state_transition_;
   std::optional<fs::ManagedVfs> vfs_;
   fdf::TestSynchronizedDispatcher driver_dispatcher_;
   std::optional<fdf_testing::TestNode> node_;

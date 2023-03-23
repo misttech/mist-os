@@ -4,6 +4,7 @@
 
 #include "src/devices/misc/drivers/compat/driver.h"
 
+#include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -27,6 +28,7 @@ using namespace fuchsia_driver_framework;
 }
 namespace fio = fuchsia_io;
 namespace fldsvc = fuchsia_ldsvc;
+namespace fdm = fuchsia_device_manager;
 
 using fpromise::bridge;
 using fpromise::error;
@@ -139,7 +141,7 @@ Driver::Driver(fdf::DriverStartArgs start_args,
 }
 
 Driver::~Driver() {
-  if (record_ != nullptr && record_->ops->release != nullptr) {
+  if (record_ != nullptr && record_->ops->release != nullptr && skip_release_ == false) {
     record_->ops->release(context_);
   }
   dlclose(library_);
@@ -245,10 +247,37 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
 }
 
 void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
-  // TODO(http://fxbug.dev/97457): Query whether we should call suspend or unbind.
+  zx::result client =
+      this->context().incoming()->Connect<fuchsia_device_manager::SystemStateTransition>();
+  if (client.is_error()) {
+    FDF_SLOG(ERROR, "failed to connect to fuchsia.device.manager/SystemStateTransition",
+             KV("status", client.status_value()));
+    completer(client.take_error());
+    return;
+  }
+  fidl::WireResult result = fidl::WireCall(client.value())->GetTerminationSystemState();
+  if (!result.ok()) {
+    FDF_SLOG(ERROR, "failed to get termination state", KV("status", client.status_value()));
+    completer(zx::error(result.error().status()));
+    return;
+  }
+
+  system_state_ = result->state;
+
   executor_.schedule_task(
-      device_.UnbindOp().then([completer = std::move(completer)](
-                                  fpromise::result<void>& init) mutable { completer(zx::ok()); }));
+      device_.HandleStopSignal(result->state)
+          .then([completer = std::move(completer)](fpromise::result<void>& init) mutable {
+            completer(zx::ok());
+          }));
+}
+
+void Driver::Stop() {
+  if (system_state_ != fdm::SystemPowerState::kFullyOn) {
+    // We purposefully leak here to emulate DFv1 shutdown. The fdf::Node client should have been
+    // torn down by the driver runtime canceling all outstanding waits by the time stop has been
+    // called, allowing shutdown to proceed.
+    skip_release_ = true;
+  }
 }
 
 promise<zx::resource, zx_status_t> Driver::GetRootResource(

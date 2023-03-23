@@ -11,7 +11,6 @@
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.index/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
-#include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/binding.h>

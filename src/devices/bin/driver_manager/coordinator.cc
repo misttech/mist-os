@@ -279,8 +279,6 @@ zx_status_t BindDriverToDevice(const fbl::RefPtr<Device>& dev, const Driver& dri
 
 }  // namespace
 
-namespace statecontrol_fidl = fuchsia_hardware_power_statecontrol;
-
 Coordinator::Coordinator(CoordinatorConfig config, InspectManager* inspect_manager,
                          async_dispatcher_t* dispatcher, async_dispatcher_t* firmware_dispatcher)
     : config_(std::move(config)),

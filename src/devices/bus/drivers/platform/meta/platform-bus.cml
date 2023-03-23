@@ -25,6 +25,7 @@
                 "fuchsia.boot.Items",
                 "fuchsia.boot.RootResource",
                 "fuchsia.device.composite.DeprecatedCompositeCreator",
+                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.device.fs.Exporter",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.driver.framework.DeviceGroupManager",

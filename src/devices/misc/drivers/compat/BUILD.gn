@@ -167,6 +167,7 @@ executable("unittests") {
     ":fuchsia.test.echo_cpp",
     ":lib",
     ":test-firmware-file",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp_wire_testing",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp_wire_testing",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",

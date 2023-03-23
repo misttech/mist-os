@@ -413,7 +413,10 @@ TEST_F(PowerTestCase, SetPerformanceStateFail_UnsupportedState) {
   ASSERT_EQ(perf_change_response.status, ZX_ERR_INVALID_ARGS);
 }
 
-TEST_F(PowerTestCase, SystemSuspend_SuspendReasonReboot) {
+// TODO(http://fxbug.dev/119962): Re-enable this test after fixing.
+// This test is not easy to replicate without a lot of plumbing changes to allow test to modify the
+// response to fuchsia.device.manager/SystemStateTransition.GetTerminationSystemState.
+TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonReboot) {
   // Add Capabilities
   DevicePowerStateInfo states[3];
   states[0].state_id = DevicePowerState::kDevicePowerStateD0;

@@ -25,6 +25,7 @@ namespace fdf {
 using namespace fuchsia_driver_framework;
 }
 namespace fcd = fuchsia_component_decl;
+namespace fdm = fuchsia_device_manager;
 
 namespace {
 
@@ -88,6 +89,27 @@ std::vector<std::string> MakeServiceOffers(device_add_args_t* zx_args) {
     offers.push_back(std::string(offer));
   }
   return offers;
+}
+
+uint8_t PowerStateToSuspendReason(fdm::SystemPowerState power_state) {
+  switch (power_state) {
+    case fdm::SystemPowerState::kReboot:
+      return DEVICE_SUSPEND_REASON_REBOOT;
+    case fdm::SystemPowerState::kRebootRecovery:
+      return DEVICE_SUSPEND_REASON_REBOOT_RECOVERY;
+    case fdm::SystemPowerState::kRebootBootloader:
+      return DEVICE_SUSPEND_REASON_REBOOT_BOOTLOADER;
+    case fdm::SystemPowerState::kMexec:
+      return DEVICE_SUSPEND_REASON_MEXEC;
+    case fdm::SystemPowerState::kPoweroff:
+      return DEVICE_SUSPEND_REASON_POWEROFF;
+    case fdm::SystemPowerState::kSuspendRam:
+      return DEVICE_SUSPEND_REASON_SUSPEND_RAM;
+    case fdm::SystemPowerState::kRebootKernelInitiated:
+      return DEVICE_SUSPEND_REASON_REBOOT_KERNEL_INITIATED;
+    default:
+      return DEVICE_SUSPEND_REASON_SELECTIVE_SUSPEND;
+  }
 }
 
 }  // namespace
@@ -207,6 +229,17 @@ void Device::Unbind() {
   node_ = {};
 }
 
+fpromise::promise<void> Device::HandleStopSignal(fdm::SystemPowerState state) {
+  if (system_power_state_ == fdm::SystemPowerState::kFullyOn) {
+    // kFullyOn means that power manager hasn't initiated a system power state transition. As a
+    // result, we can assume our stop request came as a result of our parent node
+    // disappearing.
+    return UnbindOp();
+  } else {
+    return SuspendOp(state);
+  }
+}
+
 fpromise::promise<void> Device::UnbindOp() {
   ZX_ASSERT_MSG(!unbind_completer_, "Cannot call UnbindOp twice");
   fpromise::bridge<void> finished_bridge;
@@ -227,6 +260,29 @@ fpromise::promise<void> Device::UnbindOp() {
       });
 }
 
+fpromise::promise<void> Device::SuspendOp(fdm::SystemPowerState state) {
+  ZX_ASSERT_MSG(!suspend_completer_, "Cannot call HandleStopRequest twice");
+  fpromise::bridge<void> finished_bridge;
+  suspend_completer_ = std::move(finished_bridge.completer);
+  system_power_state_ = state;
+
+  // If we are being suspended we have to suspend all of our children first.
+  return SuspendChildren(state)
+      .then([this, bridge = std::move(finished_bridge)](fpromise::result<>& result) mutable {
+        // We don't call unbind on the root parent device because it belongs to another driver.
+        // We find the root parent device because it does not have parent_ set.
+        if (parent_.has_value() && HasOp(ops_, &zx_protocol_device_t::suspend)) {
+          // CompleteSuspend will be called from |device_suspend_reply|.
+          ops_->suspend(compat_symbol_.context, DEV_POWER_STATE_D3COLD, false,
+                        PowerStateToSuspendReason(system_power_state_));
+        } else {
+          CompleteSuspend();
+        }
+        return bridge.consumer.promise();
+      })
+      .wrap_with(scope_);
+}
+
 void Device::CompleteUnbind() {
   // Remove ourself from devfs.
   devfs_connector_.reset();
@@ -237,6 +293,11 @@ void Device::CompleteUnbind() {
     ZX_ASSERT(unbind_completer_);
     unbind_completer_.complete_ok();
   });
+}
+
+void Device::CompleteSuspend() {
+  ZX_ASSERT(suspend_completer_);
+  suspend_completer_.complete_ok();
 }
 
 const char* Device::Name() const { return name_.data(); }
@@ -522,6 +583,25 @@ fpromise::promise<void> Device::RemoveChildren() {
   std::vector<fpromise::promise<void>> promises;
   for (auto& child : children_) {
     promises.push_back(child->Remove());
+  }
+  return fpromise::join_promise_vector(std::move(promises))
+      .then([](fpromise::result<std::vector<fpromise::result<void>>>& results) {
+        if (results.is_error()) {
+          return fpromise::make_error_promise();
+        }
+        for (auto& result : results.value()) {
+          if (result.is_error()) {
+            return fpromise::make_error_promise();
+          }
+        }
+        return fpromise::make_ok_promise();
+      });
+}
+
+fpromise::promise<void> Device::SuspendChildren(fdm::SystemPowerState state) {
+  std::vector<fpromise::promise<void>> promises;
+  for (auto& child : children_) {
+    promises.push_back(child->SuspendOp(state));
   }
   return fpromise::join_promise_vector(std::move(promises))
       .then([](fpromise::result<std::vector<fpromise::result<void>>>& results) {
