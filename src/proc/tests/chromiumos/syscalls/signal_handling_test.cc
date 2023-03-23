@@ -581,4 +581,30 @@ TEST_F(SigaltstackDeathTest, SigaltstackSetupFailureCanUseMainStack) {
   EXPECT_TRUE(helper.WaitForChildren());
 }
 
+TEST(SignalHandling, Sigsuspend) {
+  ForkHelper helper;
+
+  sigset_t old_sigset;
+  sigset_t sigset;
+  ASSERT_EQ(0, sigemptyset(&sigset));
+  ASSERT_EQ(0, sigaddset(&sigset, SIGUSR1));
+  ASSERT_EQ(0, sigprocmask(SIG_BLOCK, &sigset, &old_sigset));
+
+  pid_t child_pid = helper.RunInForkedProcess([] {
+    signal(SIGUSR1, [](int) {});  // empty handler
+
+    sigset_t sigset;
+    ASSERT_EQ(0, sigfillset(&sigset));
+    ASSERT_EQ(0, sigdelset(&sigset, SIGUSR1));
+
+    EXPECT_EQ(-1, sigsuspend(&sigset));
+    EXPECT_EQ(EINTR, errno);
+  });
+
+  ASSERT_EQ(0, kill(child_pid, SIGUSR1));
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  ASSERT_EQ(0, sigprocmask(SIG_SETMASK, &old_sigset, NULL));
+}
+
 }  // namespace
