@@ -35,7 +35,7 @@ const CUBIC_C: f32 = 0.4;
 /// The CUBIC algorithm state variables.
 #[derive(Debug, Clone, Copy, PartialEq, derivative::Derivative)]
 #[derivative(Default(bound = ""))]
-pub(super) struct Cubic<I: Instant, const FAST_CONVERGENCE: bool> {
+pub(super) struct Cubic<I, const FAST_CONVERGENCE: bool> {
     /// The start of the current congestion avoidance epoch.
     epoch_start: Option<I>,
     /// Coefficient for the cubic term of time into the current congestion

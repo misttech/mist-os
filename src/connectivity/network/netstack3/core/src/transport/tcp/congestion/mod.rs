@@ -77,7 +77,7 @@ impl CongestionControlParams {
 /// - Fast retransmit
 /// - Fast recovery: https://datatracker.ietf.org/doc/html/rfc5681#section-3
 #[derive(Debug)]
-pub(super) struct CongestionControl<I: Instant> {
+pub(super) struct CongestionControl<I> {
     params: CongestionControlParams,
     algorithm: LossBasedAlgorithm<I>,
     /// The connection is in fast recovery when this field is a [`Some`].
@@ -86,7 +86,7 @@ pub(super) struct CongestionControl<I: Instant> {
 
 /// Available congestion control algorithms.
 #[derive(Debug)]
-enum LossBasedAlgorithm<I: Instant> {
+enum LossBasedAlgorithm<I> {
     Cubic(cubic::Cubic<I, true /* FAST_CONVERGENCE */>),
 }
 

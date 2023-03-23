@@ -254,7 +254,7 @@ impl Listen {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct SynSent<I: Instant, ActiveOpen> {
+pub(crate) struct SynSent<I, ActiveOpen> {
     iss: SeqNum,
     // The timestamp when the SYN segment was sent. A `None` here means that
     // the SYN segment was retransmitted so that it can't be used to estimate
@@ -477,7 +477,7 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct SynRcvd<I: Instant, ActiveOpen> {
+pub(crate) struct SynRcvd<I, ActiveOpen> {
     iss: SeqNum,
     irs: SeqNum,
     /// The timestamp when the SYN segment was received, and consequently, our
@@ -533,7 +533,7 @@ impl FinQueued {
 #[derive(Derivative)]
 #[derivative(Debug)]
 #[cfg_attr(test, derivative(PartialEq, Eq))]
-struct Send<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> {
+struct Send<I, S, const FIN_QUEUED: bool> {
     nxt: SeqNum,
     max: SeqNum,
     una: SeqNum,
@@ -551,7 +551,7 @@ struct Send<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-struct RetransTimer<I: Instant> {
+struct RetransTimer<I> {
     user_timeout_until: I,
     remaining_retries: Option<NonZeroU8>,
     at: I,
@@ -597,7 +597,7 @@ impl<I: Instant> RetransTimer<I> {
 /// Possible timers for a sender.
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-enum SendTimer<I: Instant> {
+enum SendTimer<I> {
     /// A retransmission timer can only be installed when there is outstanding
     /// data.
     Retrans(RetransTimer<I>),
@@ -616,7 +616,7 @@ enum SendTimer<I: Instant> {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-struct KeepAliveTimer<I: Instant> {
+struct KeepAliveTimer<I> {
     at: I,
     already_sent: u8,
 }
@@ -653,7 +653,7 @@ impl<I: Instant> SendTimer<I> {
 /// TCP control block variables that are responsible for receiving.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-struct Recv<R: ReceiveBuffer> {
+struct Recv<R> {
     buffer: R,
     assembler: Assembler,
 }
@@ -703,7 +703,7 @@ impl<R: ReceiveBuffer> Recv<R> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct Established<I: Instant, R: ReceiveBuffer, S: SendBuffer> {
+pub(crate) struct Established<I, R, S> {
     snd: Send<I, S, { FinQueued::NO }>,
     rcv: Recv<R>,
 }
@@ -1145,7 +1145,7 @@ impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct CloseWait<I: Instant, S: SendBuffer> {
+pub(crate) struct CloseWait<I, S> {
     snd: Send<I, S, { FinQueued::NO }>,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1168,7 +1168,7 @@ pub(crate) struct CloseWait<I: Instant, S: SendBuffer> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct LastAck<I: Instant, S: SendBuffer> {
+pub(crate) struct LastAck<I, S> {
     snd: Send<I, S, { FinQueued::YES }>,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1190,7 +1190,7 @@ pub(crate) struct LastAck<I: Instant, S: SendBuffer> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct FinWait1<I: Instant, R: ReceiveBuffer, S: SendBuffer> {
+pub(crate) struct FinWait1<I, R, S> {
     snd: Send<I, S, { FinQueued::YES }>,
     rcv: Recv<R>,
 }
@@ -1210,7 +1210,7 @@ pub(crate) struct FinWait1<I: Instant, R: ReceiveBuffer, S: SendBuffer> {
 ///   - accept
 ///   - listen
 ///   - connect
-pub(crate) struct FinWait2<R: ReceiveBuffer> {
+pub(crate) struct FinWait2<R> {
     last_seq: SeqNum,
     rcv: Recv<R>,
 }
@@ -1230,7 +1230,7 @@ pub(crate) struct FinWait2<R: ReceiveBuffer> {
 ///   - accept
 ///   - listen
 ///   - connect
-pub(crate) struct Closing<I: Instant, S: SendBuffer> {
+pub(crate) struct Closing<I, S> {
     snd: Send<I, S, { FinQueued::YES }>,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1252,7 +1252,7 @@ pub(crate) struct Closing<I: Instant, S: SendBuffer> {
 ///   - connect
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) struct TimeWait<I: Instant> {
+pub(crate) struct TimeWait<I> {
     last_seq: SeqNum,
     last_ack: SeqNum,
     last_wnd: WindowSize,
@@ -1267,7 +1267,7 @@ fn new_time_wait_expiry<I: Instant>(now: I) -> I {
 
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-pub(crate) enum State<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> {
+pub(crate) enum State<I, R, S, ActiveOpen> {
     Closed(Closed<UserError>),
     Listen(Listen),
     SynRcvd(SynRcvd<I, ActiveOpen>),
