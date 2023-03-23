@@ -102,12 +102,65 @@ class FfxCliTests(unittest.TestCase):
 
         # Start all the mock patches
         self.mock_check_output = mock.patch(
-            "honeydew.utils.host_utils.subprocess.check_output",
+            "honeydew.utils.ffx_cli.subprocess.check_output",
             return_value=_FFX_TARGET_SHOW_OUTPUT,
             autospec=True).start()
 
         # Make sure all mock patches are stopped when the test is completed.
         self.addCleanup(mock.patch.stopall)
+
+    def test_check_ffx_connection_success(self):
+        """Test case for ffx_cli.check_ffx_connection() success case."""
+        self.assertTrue(ffx_cli.check_ffx_connection(target="fuchsia-emulator"))
+
+        self.mock_check_output.assert_called_once_with(
+            "ffx -t fuchsia-emulator target show --json",
+            shell=True,
+            stderr=subprocess.STDOUT,
+            timeout=10)
+
+    def test_check_ffx_connection_failure(self):
+        """Test case for ffx_cli.check_ffx_connection() failure case where
+        target name passed is not same as output returned by
+        ffx_cli.ffx_target_show()."""
+        self.assertFalse(ffx_cli.check_ffx_connection(target="fx-emu"))
+
+        self.mock_check_output.assert_called_once_with(
+            "ffx -t fx-emu target show --json",
+            shell=True,
+            stderr=subprocess.STDOUT,
+            timeout=10)
+
+    @parameterized.expand(
+        [
+            ({
+                "label": "empty_output",
+                "side_effect": b'[]'
+            },),
+            (
+                {
+                    "label":
+                        "CalledProcessError",
+                    "side_effect":
+                        subprocess.CalledProcessError(
+                            returncode=1,
+                            cmd="ffx -t fuchsia-emulator target show")
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    def test_check_ffx_connection_failed_to_confirm(self, parameterized_dict):
+        """Test case for ffx_cli.check_ffx_connection() case where an exception
+        is raised causing it to return False."""
+        self.mock_check_output.side_effect = parameterized_dict["side_effect"]
+
+        self.assertFalse(
+            ffx_cli.check_ffx_connection(target="fuchsia-emulator"))
+
+        self.mock_check_output.assert_called_once_with(
+            "ffx -t fuchsia-emulator target show --json",
+            shell=True,
+            stderr=subprocess.STDOUT,
+            timeout=10)
 
     def test_ffx_target_show_when_connected(self):
         """Verify ffx_target_show succeeds when target is connected to host."""

@@ -5,6 +5,7 @@
 """Contains methods specific to FFX CLI."""
 
 import json
+import logging
 import subprocess
 from typing import Any, Dict, List
 
@@ -18,8 +19,56 @@ _TIMEOUTS = {
     "FFX_CLI": 10,
 }
 
+_LOGGER = logging.getLogger(__name__)
+
 
 # List all the public methods in alphabetical order
+def check_ffx_connection(
+        target: str, timeout: float = _TIMEOUTS["FFX_CLI"]) -> bool:
+    """Check if Host is able to communicate with the (Fuchsia) target via FFX.
+
+    Args:
+        target: Target name.
+        timeout: Timeout to wait for the ffx command to return.
+
+    Returns:
+        True if successful, False otherwise.
+    """
+    # Sample ffx_target_show_info containing ssh_address:
+    # [
+    #     {
+    #         'title': 'Target',
+    #         'label': 'target',
+    #         'description': '',
+    #         'child': [
+    #             {
+    #                 'title': 'Name',
+    #                 'label': 'name',
+    #                 'description': 'Target name.',
+    #                 'value': 'fuchsia-emulator'
+    #             },
+    #             {
+    #                 'title': 'SSH Address',
+    #                 'label': 'ssh_address',
+    #                 'description': 'Interface address',
+    #                 'value': 'fe80::92bf:167b:19c3:58f0%qemu:22'
+    #             }
+    #         ]
+    #     },
+    # ]
+    try:
+        ffx_target_show_info = ffx_target_show(target, timeout)
+        target_entry = _get_label_entry(
+            ffx_target_show_info, label_value="target")
+        target_title_entry = _get_label_entry(
+            target_entry["child"], label_value="name")
+        return target_title_entry['value'] == target
+    except Exception:  # pylint: disable=broad-except
+        _LOGGER.warning(
+            "Failed to confirm if Host is able to communicate with %s.", target)
+        return False
+
+
 def ffx_target_show(
         target: str,
         timeout: float = _TIMEOUTS["FFX_CLI"]) -> List[Dict[str, Any]]:
@@ -42,7 +91,7 @@ def ffx_target_show(
             timeout=timeout).decode()
         ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
         return ffx_target_show_info
-    except Exception as err:
+    except Exception as err:  # pylint: disable=broad-except
         raise errors.FfxCommandError(f"{cmd} command failed") from err
 
 

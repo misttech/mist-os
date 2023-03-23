@@ -26,7 +26,7 @@ class ComponentCapabilityTests(base_test.BaseTestClass):
         fuchsia_devices = self.register_controller(fuchsia_device)
         self.device = fuchsia_devices[0]
 
-    def on_fail(self, record):
+    def on_fail(self, _):
         if not hasattr(self, "device"):
             return
 

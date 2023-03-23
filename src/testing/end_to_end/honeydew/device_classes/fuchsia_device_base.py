@@ -5,23 +5,25 @@
 """Default implementation of FuchsiaDevice abstract base class."""
 
 import base64
+import ipaddress
 import logging
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime
 from http.client import RemoteDisconnected
 from typing import Any, Dict, Iterable, Optional, Type
 
 from honeydew import custom_types, errors
-from honeydew.affordances import component_default, bluetooth_default
-from honeydew.interfaces.affordances import component as component_interface
+from honeydew.affordances import bluetooth_default, component_default
 from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
+from honeydew.interfaces.affordances import component as component_interface
 from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
 from honeydew.interfaces.device_classes import (
-    component_capable_device, fuchsia_device, bluetooth_capable_device)
+    bluetooth_capable_device, component_capable_device, fuchsia_device)
 from honeydew.interfaces.transports import sl4f
-from honeydew.utils import ffx_cli, host_utils, http_utils, properties
+from honeydew.utils import ffx_cli, http_utils, properties
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,6 +48,7 @@ _SL4F_METHODS = {
 _TIMEOUTS = {
     "BOOT_UP_COMPLETE": 60,
     "OFFLINE": 60,
+    "ONLINE": 60,
     "SL4F_RESPONSE": 30,
     "SSH_COMMAND_ARG": 3,
     "SSH_COMMAND_RESPONSE": 60,
@@ -282,7 +285,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             exceptions_to_skip = []
 
         # pylint: disable=protected-access
-        if host_utils._get_ip_version(self._ip_address) == 6:
+        if ipaddress.ip_address(self._normalize_ip_addr(
+                self._ip_address)).version == 6:
             url = f"http://[{self._ip_address}]:{_SL4F_PORT}"
         else:
             url = f"http://{self._ip_address}:{_SL4F_PORT}"
@@ -421,28 +425,25 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         raise errors.FuchsiaDeviceError(
             f"Failed to get the ip address of '{self.name}'.")
 
-    def _ping_device(self, timeout: float):
-        """Pings Fuchsia device from the host.
+    def _normalize_ip_addr(self, ip_address: str) -> str:
+        """Workaround IPv6 scope IDs for Python 3.8 or older.
+
+        IPv6 scope identifiers are not supported in Python 3.8. Added a
+        workaround to remove the scope identifier from IPv6 address if python
+        version is 3.8 or lower.
+
+        Ex: In fe80::1f91:2f5c:5e9b:7ff3%qemu IPv6 address, "%qemu" is the scope
+        identifier.
 
         Args:
-            timeout: How long in sec to wait for ping to succeed.
+            ip_address: IPv4|IPv6 address.
 
-        Raises:
-            errors.FuchsiaDeviceError: If ping is not successful.
+        Returns:
+            ip address with or without scope identifier based on python version.
         """
-        start_time = time.time()
-        end_time = start_time + timeout
-
-        # wait until device is responsive to pings
-        _LOGGER.info("Waiting for %s to become pingable...", self.name)
-        while time.time() < end_time:
-            if host_utils.is_pingable(self._ip_address):
-                break
-            time.sleep(1)
-        else:
-            raise errors.FuchsiaDeviceError(
-                f"'{self.name}' failed to become pingable in {timeout}sec.")
-        _LOGGER.info("%s now pingable.", self.name)
+        if sys.version_info < (3, 9):
+            ip_address = ip_address.split('%')[0]
+        return ip_address
 
     @properties.PersistentProperty
     def _product_info(self) -> Dict[str, Any]:
@@ -513,9 +514,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         # IP address may change on reboot. So get the ip address once again
         self._ip_address = self._get_device_ip_address(timeout)
 
-        # wait until device is responsive to pings
+        # wait until device is responsive to FFX
         remaining_timeout = max(0, end_time - time.time())
-        self._ping_device(remaining_timeout)
+        self._wait_for_online(remaining_timeout)
 
         # wait until device to allow ssh connection
         remaining_timeout = max(0, end_time - time.time())
@@ -533,20 +534,35 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: If device is not offline.
         """
-        # wait until device is not responsive to pings
         _LOGGER.info("Waiting for %s to go offline...", self.name)
         start_time = time.time()
         end_time = start_time + timeout
-        count = 0
         while time.time() < end_time:
-            if not host_utils.is_pingable(self._ip_address):
-                count += 1  # Ensure device is really offline not just a blip
-            else:
-                count = 0
-            if count == 2:
+            if not ffx_cli.check_ffx_connection(self.name):
                 _LOGGER.info("%s is offline.", self.name)
                 break
             time.sleep(.5)
         else:
             raise errors.FuchsiaDeviceError(
                 f"'{self.name}' failed to go offline in {timeout}sec.")
+
+    def _wait_for_online(self, timeout: float = _TIMEOUTS["ONLINE"]) -> None:
+        """Wait for Fuchsia device to go online.
+
+        Args:
+            timeout: How long in sec to wait for device to go offline.
+
+        Raises:
+            errors.FuchsiaDeviceError: If device is not online.
+        """
+        _LOGGER.info("Waiting for %s to go online...", self.name)
+        start_time = time.time()
+        end_time = start_time + timeout
+        while time.time() < end_time:
+            if ffx_cli.check_ffx_connection(self.name):
+                _LOGGER.info("%s is online.", self.name)
+                break
+            time.sleep(.5)
+        else:
+            raise errors.FuchsiaDeviceError(
+                f"'{self.name}' failed to go online in {timeout}sec.")

@@ -507,34 +507,45 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
         mock_get_target_address.assert_called_with(self.fd_obj.name, timeout=2)
 
-    @mock.patch("time.sleep", autospec=True)
-    @mock.patch.object(
-        fuchsia_device_base.host_utils,
-        "is_pingable",
-        side_effect=[False, False, True],
-        autospec=True)
-    def test_ping_device_success(self, mock_is_pingable, mock_sleep):
-        """Testcase for FuchsiaDeviceBase._ping_device() success
-        case"""
-        self.fd_obj._ping_device(timeout=5)
-
-        mock_is_pingable.assert_called_with(self.fd_obj._ip_address)
-        mock_sleep.assert_called_with(1)
-
-    @mock.patch.object(
-        fuchsia_device_base.host_utils,
-        "is_pingable",
-        return_value=False,
-        autospec=True)
-    def test_ping_device_fail(self, mock_is_pingable):
-        """Testcase for FuchsiaDeviceBase._ping_device() failure
-        case"""
-        with self.assertRaisesRegex(
-                fuchsia_device_base.errors.FuchsiaDeviceError,
-                f"'{self.fd_obj.name}' failed to become pingable in 2sec."):
-            self.fd_obj._ping_device(timeout=2)
-
-        mock_is_pingable.assert_called_with(self.fd_obj._ip_address)
+    @parameterized.expand(
+        [
+            (
+                {
+                    "label": "ipv4",
+                    "py_ver": (3, 10),
+                    "ip": "12.34.56.78",
+                    "expected": "12.34.56.78",
+                },),
+            (
+                {
+                    "label": "ipv6_with_scope_id_on_py38",
+                    "py_ver": (3, 8),
+                    "ip": "fe80::1f91:2f5c:5e9b:7ff3%qemu",
+                    "expected": "fe80::1f91:2f5c:5e9b:7ff3",
+                },),
+            (
+                {
+                    "label": "ipv6_with_scope_id_on_py310",
+                    "py_ver": (3, 10),
+                    "ip": "fe80::1f91:2f5c:5e9b:7ff3%qemu",
+                    "expected": "fe80::1f91:2f5c:5e9b:7ff3%qemu",
+                },),
+            (
+                {
+                    "label": "ipv6_without_scope_id",
+                    "py_ver": (3, 10),
+                    "ip": "fe80::1f91:2f5c:5e9b:7ff3",
+                    "expected": "fe80::1f91:2f5c:5e9b:7ff3",
+                },),
+        ],
+        name_func=_custom_test_name_func)
+    def test_normalize_ip_addr(self, parameterized_dict):
+        """Test case for FuchsiaDeviceBase._normalize_ip_addr()"""
+        with mock.patch.object(fuchsia_device_base.sys, "version_info",
+                               parameterized_dict["py_ver"]):
+            self.assertEqual(
+                self.fd_obj._normalize_ip_addr(parameterized_dict["ip"]),
+                parameterized_dict["expected"])
 
     @mock.patch.object(
         fuchsia_device_base.subprocess,
@@ -632,50 +643,79 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "_check_ssh_connection_to_device",
         autospec=True)
     @mock.patch.object(
-        fuchsia_device_base.FuchsiaDeviceBase, "_ping_device", autospec=True)
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "_wait_for_online",
+        autospec=True)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
         "_get_device_ip_address",
         autospec=True)
     def test_wait_for_bootup_complete(
-            self, mock_get_device_ip_address, mock_ping_device,
+            self, mock_get_device_ip_address, mock_wait_for_online,
             mock_check_ssh_connection_to_device, mock_start_sl4f_server):
         """Testcase for FuchsiaDeviceBase._wait_for_bootup_complete()"""
         self.fd_obj._wait_for_bootup_complete(timeout=10)
 
         mock_get_device_ip_address.assert_called_once()
-        mock_ping_device.assert_called_once()
+        mock_wait_for_online.assert_called_once()
         mock_check_ssh_connection_to_device.assert_called_once()
         mock_start_sl4f_server.assert_called_once()
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
-        fuchsia_device_base.host_utils,
-        "is_pingable",
-        side_effect=[
-            True, False, True, False, False, True, False, False, False
-        ],
+        fuchsia_device_base.ffx_cli,
+        "check_ffx_connection",
+        side_effect=[True, False],
         autospec=True)
-    def test_wait_for_offline_success(self, mock_is_pingable, mock_sleep):
+    def test_wait_for_offline_success(
+            self, mock_check_ffx_connection, mock_sleep):
         """Testcase for FuchsiaDeviceBase._wait_for_offline() success case"""
         self.fd_obj._wait_for_offline()
 
-        mock_is_pingable.assert_called_with(self.fd_obj._ip_address)
+        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
         mock_sleep.assert_called()
 
     @mock.patch.object(
-        fuchsia_device_base.host_utils,
-        "is_pingable",
+        fuchsia_device_base.ffx_cli,
+        "check_ffx_connection",
         return_value=True,
         autospec=True)
-    def test_wait_for_offline_fail(self, mock_is_pingable):
+    def test_wait_for_offline_fail(self, mock_check_ffx_connection):
         """Testcase for FuchsiaDeviceBase._wait_for_offline() failure case"""
         with self.assertRaisesRegex(
                 fuchsia_device_base.errors.FuchsiaDeviceError,
                 "failed to go offline"):
             self.fd_obj._wait_for_offline(timeout=2)
 
-        mock_is_pingable.assert_called_with(self.fd_obj._ip_address)
+        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
+
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.ffx_cli,
+        "check_ffx_connection",
+        side_effect=[False, True],
+        autospec=True)
+    def test_wait_for_online_success(
+            self, mock_check_ffx_connection, mock_sleep):
+        """Testcase for FuchsiaDeviceBase._wait_for_online() success case"""
+        self.fd_obj._wait_for_online()
+
+        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
+        mock_sleep.assert_called()
+
+    @mock.patch.object(
+        fuchsia_device_base.ffx_cli,
+        "check_ffx_connection",
+        return_value=False,
+        autospec=True)
+    def test_wait_for_online_fail(self, mock_check_ffx_connection):
+        """Testcase for FuchsiaDeviceBase._wait_for_online() failure case"""
+        with self.assertRaisesRegex(
+                fuchsia_device_base.errors.FuchsiaDeviceError,
+                "failed to go online"):
+            self.fd_obj._wait_for_online(timeout=2)
+
+        mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
 
 
 if __name__ == '__main__':

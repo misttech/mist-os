@@ -6,9 +6,9 @@
 
 import logging
 
-from mobly import asserts, base_test, test_runner
 from honeydew.interfaces.device_classes import bluetooth_capable_device
 from honeydew.mobly_controller import fuchsia_device
+from mobly import asserts, base_test, test_runner
 
 _LOGGER = logging.getLogger(__name__)
 

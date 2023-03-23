@@ -34,7 +34,6 @@ python_library("honeydew") {
     "mobly_controller/fuchsia_device.py",
     "utils/__init__.py",
     "utils/ffx_cli.py",
-    "utils/host_utils.py",
     "utils/http_utils.py",
     "utils/properties.py",
   ]

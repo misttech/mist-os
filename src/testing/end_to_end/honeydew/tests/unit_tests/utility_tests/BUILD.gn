@@ -15,16 +15,6 @@ if (is_host) {
     extra_args = [ "-v" ]
   }
 
-  python_host_test("host_utils_test") {
-    main_source = "host_utils_test.py"
-    libraries = [
-      "//src/testing/end_to_end/honeydew",
-      "//third_party/parameterized",
-    ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
-
   python_host_test("http_utils_test") {
     main_source = "http_utils_test.py"
     libraries = [
@@ -40,7 +30,6 @@ group("tests") {
   testonly = true
   public_deps = [
     ":ffx_cli_test($host_toolchain)",
-    ":host_utils_test($host_toolchain)",
     ":http_utils_test($host_toolchain)",
   ]
 }
