@@ -18,10 +18,7 @@ fuchsia_fidl_library(
         "cpp_driver",
     ],
     library = "{{name}}",
-    target_api_level = select({
-        "//:has_experimental": "HEAD",
-        "//:no_experimental": None,
-    }),
+    target_api_level = "HEAD",
     deps = [
         {{deps}}
     ],

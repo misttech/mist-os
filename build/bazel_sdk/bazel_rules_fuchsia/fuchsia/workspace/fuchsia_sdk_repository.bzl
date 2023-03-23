@@ -21,9 +21,7 @@ _SDK_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/sdk/{t
 
 _LOCAL_FUCHSIA_PLATFORM_BUILD = "LOCAL_FUCHSIA_PLATFORM_BUILD"
 _LOCAL_BUILD_SDK_PATH = "sdk/exported/core"
-_LOCAL_BUILD_EXPERIMENTAL_PATH = "sdk/exported/driver"
 _IDK_INTERNAL_PATH = "_idk"
-_EXPERIMENTAL_INTERNAL_PATH = "_idk_experimental"
 
 def _sdk_url(os, tag, type = "core"):
     # Return the URL of the SDK given an Operating System string and
@@ -63,14 +61,6 @@ def _instantiate_local_env(ctx, manifests):
         fail("Cannot find SDK in local Fuchsia build. Please build it with 'fx build sdk' or unset variable %s: %s" % (_LOCAL_FUCHSIA_PLATFORM_BUILD, local_sdk))
 
     manifests.append({"root": "%s/." % local_sdk, "manifest": "meta/manifest.json"})
-
-    if ctx.attr.use_experimental:
-        ctx.report_progress("Copying experimental SDK from %s" % local_fuchsia_dir)
-        local_exp = ctx.path("%s/%s" % (local_fuchsia_dir, _LOCAL_BUILD_EXPERIMENTAL_PATH))
-        if not local_exp.exists:
-            fail("Cannot find experimental SDK in local Fuchsia build. Please build it with 'fx build sdk:driver' or unset variable %s: %s" % (_LOCAL_FUCHSIA_PLATFORM_BUILD, local_exp))
-
-        manifests.append({"root": "%s/." % local_exp, "manifest": "meta/manifest.json"})
 
 def _merge_rules_fuchsia(ctx):
     rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
@@ -116,32 +106,17 @@ def _fuchsia_sdk_repository_impl(ctx):
             output = _IDK_INTERNAL_PATH,
         )
         manifests.append({"root": _IDK_INTERNAL_PATH, "manifest": "meta/manifest.json"})
-        if ctx.attr.use_experimental:
-            sha256 = ""
-            if ctx.attr.sha256:
-                sha256 = ctx.attr.sha256["%s_experimental" % normalized_os]
-            ctx.download_and_extract(
-                _sdk_url(normalized_os, ctx.attr.cipd_tag, "experimental"),
-                type = "zip",
-                sha256 = sha256,
-                output = _EXPERIMENTAL_INTERNAL_PATH,
-            )
-            manifests.append({"root": _EXPERIMENTAL_INTERNAL_PATH, "manifest": "meta/manifest.json"})
 
     else:
         copy_content_strategy = "symlink"
         fetch_cipd_contents(ctx, ctx.attr._cipd_bin, ctx.attr._cipd_ensure_file, root = _IDK_INTERNAL_PATH)
         manifests.append({"root": _IDK_INTERNAL_PATH, "manifest": "meta/manifest.json"})
-        if ctx.attr.use_experimental:
-            fetch_cipd_contents(ctx, ctx.attr._cipd_bin, ctx.attr._cipd_experimental_ensure_file, root = _EXPERIMENTAL_INTERNAL_PATH)
-            manifests.append({"root": _EXPERIMENTAL_INTERNAL_PATH, "manifest": "meta/manifest.json"})
 
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
         "BUILD.bazel",
         ctx.attr._template,
         substitutions = {
-            "{{has_experimental}}": "has_experimental" if ctx.attr.use_experimental else "no_experimental",
             "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),
         },
     )
@@ -190,12 +165,8 @@ allow Bazel to cache the file.
                 """,
             mandatory = False,
         ),
-        "use_experimental": attr.bool(
-            doc = "Use the experimental SDK libraries and tools. Can only be used if a cipd_tag is present.",
-            default = False,
-        ),
         "sha256": attr.string_dict(
-            doc = "Optional SHA-256 hash of the SDK archive. Valid keys are: mac, linux, mac_experimental and linux_experimental",
+            doc = "Optional SHA-256 hash of the SDK archive. Valid keys are: mac, linux",
         ),
         "local_path": attr.string(
             doc = "DO NOT USE. Soft transition, will be removed soon. Use local_paths instead.",
@@ -213,10 +184,6 @@ allow Bazel to cache the file.
         "_cipd_ensure_file": attr.label(
             doc = "A cipd ensure file to use to download the sdk.",
             default = "//fuchsia/manifests:core_sdk.ensure",
-        ),
-        "_cipd_experimental_ensure_file": attr.label(
-            doc = "A cipd ensure file to use to download the experimental sdk.",
-            default = "//fuchsia/manifests:core_experimental_sdk.ensure",
         ),
         "_cipd_bin": attr.label(
             doc = "The cipd binary that will be used to download the sdk",
@@ -290,7 +257,6 @@ allow Bazel to cache the file.
 def _fuchsia_sdk_repository_ext(ctx):
     cipd_tag = None
     sha256 = None
-    use_experimental = None
     local_paths = None
 
     for mod in ctx.modules:
@@ -303,7 +269,6 @@ def _fuchsia_sdk_repository_ext(ctx):
                 version_info = mod.tags.version[0]
                 cipd_tag = version_info.cipd_tag
                 sha256 = version_info.sha256
-                use_experimental = version_info.use_experimental
             elif len(mod.tags.local) > 0:
                 local_paths = []
                 for p in mod.tags.local:
@@ -313,7 +278,6 @@ def _fuchsia_sdk_repository_ext(ctx):
     fuchsia_sdk_repository(
         name = "fuchsia_sdk",
         cipd_tag = cipd_tag,
-        use_experimental = use_experimental,
         sha256 = sha256,
         local_paths = local_paths,
     )
@@ -324,12 +288,8 @@ _version_tag = tag_class(
         "cipd_tag": attr.string(
             doc = "CIPD tag for the version to load.",
         ),
-        "use_experimental": attr.bool(
-            doc = "Use the experimental SDK libraries and tools. Can only be used if a cipd_tag is present.",
-            default = False,
-        ),
         "sha256": attr.string_dict(
-            doc = "Optional SHA-256 hash of the SDK archive. Valid keys are: mac, linux, mac_experimental and linux_experimental",
+            doc = "Optional SHA-256 hash of the SDK archive. Valid keys are: mac, linux",
         ),
     },
 )

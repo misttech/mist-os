@@ -9,10 +9,7 @@ cc_library(
     deps = [
         {{deps}}
         {{fidl_deps}}
-    ] + select({
-        "//:has_experimental": [{{fidl_llcpp_deps}}],
-        "//:no_experimental": [],
-    }),
+    ] + [{{fidl_llcpp_deps}}],
     strip_include_prefix = "{{relative_include_dir}}",
     target_compatible_with = [ "@platforms//os:fuchsia" ],
 )

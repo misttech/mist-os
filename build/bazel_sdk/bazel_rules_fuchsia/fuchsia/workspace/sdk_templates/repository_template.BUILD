@@ -26,27 +26,6 @@ constraint_value(
     visibility = ["//visibility:public"],
 )
 
-# Toolchain has additional tools if the experimental SDK is included.
-# This is a temporary implementation for the experimental SDK and not
-# published with the core SDK.
-constraint_setting(
-    name = "sdk_setup",
-    default_constraint_value = ":{{has_experimental}}",
-    visibility = ["//visibility:public"],
-)
-
-constraint_value(
-    name = "has_experimental",
-    constraint_setting = "sdk_setup",
-    visibility = ["//visibility:public"],
-)
-
-constraint_value(
-    name = "no_experimental",
-    constraint_setting = "sdk_setup",
-    visibility = ["//visibility:public"],
-)
-
 platform(
     name = "fuchsia_platform_sdk",
     constraint_values = [":fuchsia_toolchain_version_sdk"],
@@ -63,10 +42,7 @@ fuchsia_debug_symbols(
 fuchsia_toolchain_info(
     name = "fuchsia_toolchain_info",
     aemu_runfiles = "//tools:aemu_internal_x64",
-    bindc = select({
-        ":has_experimental": "//tools:x64/bindc",
-        ":no_experimental": None,
-    }),
+    bindc = "//tools:x64/bindc",
     blobfs = "//tools:x64/blobfs_do_not_depend",
     blobfs_manifest = "//tools:x64/blobfs_do_not_depend-meta.json",
     bootserver = "//tools:x64/bootserver",
