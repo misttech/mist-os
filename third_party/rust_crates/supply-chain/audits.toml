@@ -1,0 +1,140 @@
+
+# cargo-vet audits file
+
+[criteria.ub-risk-0]
+description = """
+This crate cannot cause undefined behavior because it contains no unsafe code.
+"""
+implies = "ub-risk-1"
+
+[criteria.ub-risk-1]
+description = """
+A designated unsafe code reviewer has audited the unsafe code in this crate. No
+risk of causing undefined behavior was found.
+
+UB-RISK-1 crates are suitable for applications with the strictest memory safety
+requirements:
+- Safety documentation is comprehensive and precise. Unsafe APIs can be used
+  soundly.
+- Unsafe blocks rely on clear invariants and preconditions, and are
+  well-justified by them.
+- No way to cause undefined behavior was found during review.
+
+UB-RISK-1 crates are exceptionally well-documented and justified, leaving little
+to no room for error.
+"""
+implies = "ub-risk-2"
+
+[criteria.ub-risk-2]
+description = """
+A designated unsafe code reviewer has audited the unsafe code in this crate. It
+has been found to pose a trivial risk of causing undefined behavior.
+
+UB-RISK-2 crates are suitable for most applications:
+- Safety documentation is relatively comprehensive, though it may not be
+  adequately precise. Unsafe APIs can be used soundly with very minor caution.
+- Unsafe blocks may rely on informal invariants and preconditions. The reasoning
+  required to justify them may be especially difficult or under-documented.
+- Undefined behavior may be possible under extraordinary circumstances.
+
+UB-RISK-2 crates are effectively \"the average good crate\". While they may have
+very slight (but real) soundness issues, they are safe to use in general without
+much worry. These crates may exhibit undefined behavior under \"extraordinary
+circumstances\", which is ultimately up to reviewer discretion. Users may expect
+that reasonable use of the crate will not cause undefined behavior.
+"""
+implies = "ub-risk-3"
+
+[criteria.ub-risk-3]
+description = """
+A designated unsafe code reviewer has audited the unsafe code in this crate. It
+has been found to pose a significant risk of causing undefined behavior.
+
+UB-RISK-3 crates are suitable for select applications:
+- Safety documentation may not be adequately comprehensive or precise. Unsafe
+  APIs can be used soundly with a decent amount of caution.
+- Unsafe blocks may rely on under-documented or inferred invariants and
+  preconditions. The reasoning required to justify them may rely on specific
+  interpretations of undefined behavior that are under-specified. Those
+  interpretations must not actively cause UB, and should be unlikely to begin
+  causing UB in the future.
+- Undefined behavior may be possible under uncommon circumstances.
+
+UB-RISK-3 crates may not uphold the typical standards required for unsafe code,
+but are still used because they have been widely adopted and will inevitably be
+leveraged by indirect dependencies. These crates may exhibit undefined behavior
+under \"uncommon circumstances\", which is ultimately up to reviewer discretion.
+A decent amount of experience with unsafe code will be required to avoid
+undefined behavior.
+"""
+implies = "ub-risk-4"
+
+[criteria.ub-risk-4]
+description = """
+A designated unsafe code reviewer has audited the unsafe code in this crate. It
+has been found to pose a high risk of causing undefined behavior.
+
+UB-RISK-4 crates are unsuitable except in specific situations:
+- Safety documentation may be nonexistent. Unsafe APIs may be difficult to use
+  safely even with experience writing unsafe code and specific domain expertise.
+- Unsafe blocks may rely on undocumented invarianats or platform-specific
+  behavior. It may be difficult or impossible to reason about all possible
+  situations that may cause undefined behavior. Even a best-effort review is
+  expected to miss at least some possible unsoundness.
+- Undefined behavior may be possible under common circumstances.
+
+UB-RISK-4 crates may have APIs that are difficult to use without causing
+undefined behavior. They may require a large amount of domain expertise to use
+correctly, have large unsafe APIs with insufficient documentation, or perform
+many operations from safe code that could cause undefined behavior.
+"""
+
+[[audits.ash]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["ub-risk-4", "safe-to-deploy"]
+version = "0.37.0+1.3.209"
+notes = "Reviewed on https://fxrev.dev/694269"
+
+[[audits.async-stream]]
+who = "Tyler Mandry <tmandry@google.com>"
+criteria = ["ub-risk-2", "safe-to-deploy"]
+version = "0.3.4"
+notes = "Reviewed on https://fxrev.dev/761470"
+
+[[audits.async-stream-impl]]
+who = "Tyler Mandry <tmandry@google.com>"
+criteria = ["ub-risk-2", "safe-to-deploy"]
+version = "0.3.4"
+notes = "Reviewed on https://fxrev.dev/761470"
+
+[[audits.http-body]]
+who = "Erick Tryzelaar <etryzelaar@google.com>"
+criteria = ["ub-risk-2", "safe-to-run"]
+version = "0.4.4"
+notes = "Reviewed on https://fxrev.dev/611683"
+
+[[audits.nix]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["ub-risk-3", "safe-to-run"]
+version = "0.26.2"
+notes = """
+Reviewed on https://fxrev.dev/780283
+Issues:
+- https://github.com/nix-rust/nix/issues/1975
+- https://github.com/nix-rust/nix/issues/1977
+- https://github.com/nix-rust/nix/pull/1978
+- https://github.com/nix-rust/nix/pull/1979
+- https://github.com/nix-rust/nix/issues/1980
+- https://github.com/nix-rust/nix/issues/1981
+- https://github.com/nix-rust/nix/pull/1983
+- https://github.com/nix-rust/nix/issues/1990
+- https://github.com/nix-rust/nix/pull/1992
+- https://github.com/nix-rust/nix/pull/1993
+"""
+
+[[audits.tokio-stream]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["ub-risk-1", "safe-to-deploy"]
+version = "0.1.11"
+notes = "Reviewed on https://fxrev.dev/804724"
+
