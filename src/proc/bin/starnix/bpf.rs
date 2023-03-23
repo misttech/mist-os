@@ -20,7 +20,7 @@ use zerocopy::{AsBytes, FromBytes};
 use crate::auth::*;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::lock::RwLock;
+use crate::lock::Mutex;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
 use crate::syscalls::*;
 use crate::task::Kernel;
@@ -83,7 +83,7 @@ struct Map {
     // TODO(tbodt): Linux actually has 30 different implementations of a BPF map, from hashmap to
     // array to bloom filter. BTreeMap is probably the correct semantics for none of them. This
     // will ultimately need to be a trait object.
-    entries: RwLock<BTreeMap<Vec<u8>, Vec<u8>>>,
+    entries: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
 }
 impl BpfObject for Map {}
 
@@ -208,7 +208,7 @@ pub fn sys_bpf(
             let value_addr = unsafe { elem_attr.__bindgen_anon_1.value };
             current_task.mm.read_memory(UserAddress::from(value_addr), &mut value)?;
 
-            map.entries.write().insert(key, value);
+            map.entries.lock().insert(key, value);
             Ok(SUCCESS)
         }
 
@@ -227,7 +227,7 @@ pub fn sys_bpf(
                 None
             };
 
-            let entries = map.entries.read();
+            let entries = map.entries.lock();
             let next_entry = match key {
                 Some(key) if entries.contains_key(&key) => {
                     entries.range((Bound::Excluded(key), Bound::Unbounded)).next()
