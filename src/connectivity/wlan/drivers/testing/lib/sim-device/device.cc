@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <mutex>
 #include <vector>
 
 namespace wlan::simulation {
