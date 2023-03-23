@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 use {
     crate::{diagnostics::BatchIteratorConnectionStats, error::AccessorError},
-    fidl_fuchsia_diagnostics::{DataType, FormattedContent, StreamMode, MAXIMUM_ENTRIES_PER_BATCH},
+    fidl_fuchsia_diagnostics::{
+        DataType, Format, FormattedContent, StreamMode, MAXIMUM_ENTRIES_PER_BATCH,
+    },
     fuchsia_zircon as zx,
     futures::prelude::*,
     serde::Serialize,
@@ -176,14 +178,19 @@ impl Write for VmoWriter {
     }
 }
 
-/// Holds a VMO containing valid JSON as well as the size of that json string.
-pub struct JsonString {
+/// Holds a VMO containing valid serialized data as well as the size of that data.
+pub struct SerializedVmo {
     pub vmo: zx::Vmo,
     pub size: u64,
+    format: Format,
 }
 
-impl JsonString {
-    pub fn serialize(source: &impl Serialize, data_type: DataType) -> Result<Self, AccessorError> {
+impl SerializedVmo {
+    pub fn serialize(
+        source: &impl Serialize,
+        data_type: DataType,
+        format: Format,
+    ) -> Result<Self, AccessorError> {
         let writer = VmoWriter::new(match data_type {
             DataType::Inspect => inspect_format::constants::DEFAULT_VMO_SIZE_BYTES as u64,
             // Logs won't go through this codepath anyway, but in case we ever want to serialize a
@@ -191,16 +198,37 @@ impl JsonString {
             DataType::Logs => 4096, // page size
         });
         let batch_writer = BufWriter::new(writer.clone());
-        serde_json::to_writer(batch_writer, source).map_err(AccessorError::Serialization)?;
+        match format {
+            Format::Json => {
+                serde_json::to_writer(batch_writer, source).map_err(AccessorError::Serialization)?
+            }
+            Format::Cbor => serde_cbor::to_writer(batch_writer, source)
+                .map_err(AccessorError::CborSerialization)?,
+            Format::Text => unreachable!("We'll never get Text"),
+        }
         // Safe to unwrap we should always be able to take the vmo here.
         let (vmo, tail) = writer.finalize().unwrap();
-        Ok(Self { vmo, size: tail })
+        Ok(Self { vmo, size: tail, format })
     }
 }
 
-impl From<JsonString> for FormattedContent {
-    fn from(string: JsonString) -> FormattedContent {
-        FormattedContent::Json(fidl_fuchsia_mem::Buffer { vmo: string.vmo, size: string.size })
+impl From<SerializedVmo> for FormattedContent {
+    fn from(content: SerializedVmo) -> FormattedContent {
+        match content.format {
+            Format::Json => {
+                // set_size() is redundant, but consumers may expect the size there.
+                content.vmo.set_size(content.size).expect("set_size always returns Ok");
+                FormattedContent::Json(fidl_fuchsia_mem::Buffer {
+                    vmo: content.vmo,
+                    size: content.size,
+                })
+            }
+            Format::Cbor => {
+                content.vmo.set_size(content.size).expect("set_size always returns Ok");
+                FormattedContent::Cbor(content.vmo)
+            }
+            Format::Text => unreachable!("We'll never get Text"),
+        }
     }
 }
 
@@ -230,7 +258,7 @@ where
     I: Stream<Item = S> + Unpin,
     S: Serialize,
 {
-    type Item = Result<JsonString, AccessorError>;
+    type Item = Result<SerializedVmo, AccessorError>;
 
     /// Serialize log messages in a JSON array up to the maximum size provided. Returns Ok(None)
     /// when there are no more messages to serialize.
@@ -305,7 +333,7 @@ where
         if writer_tail > 2 {
             // safe to unwrap, the vmo is guaranteed to be present.
             let (vmo, size) = writer.finalize().unwrap();
-            Poll::Ready(Some(Ok(JsonString { vmo, size })))
+            Poll::Ready(Some(Ok(SerializedVmo { vmo, size, format: Format::Json })))
         } else if items_is_pending {
             Poll::Pending
         } else {

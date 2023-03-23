@@ -7,7 +7,7 @@ use {
         constants::{self, FORMATTED_CONTENT_CHUNK_SIZE_TARGET},
         diagnostics::BatchIteratorConnectionStats,
         error::AccessorError,
-        formatter::{new_batcher, FormattedStream, JsonPacketSerializer, JsonString},
+        formatter::{new_batcher, FormattedStream, JsonPacketSerializer, SerializedVmo},
         inspect::{repository::InspectRepository, ReaderServer},
         logs::repository::LogsRepository,
         pipeline::Pipeline,
@@ -147,7 +147,7 @@ impl ArchiveAccessorServer {
         maximum_concurrent_snapshots_per_reader: u64,
     ) -> Result<(), AccessorError> {
         let format = params.format.ok_or(AccessorError::MissingFormat)?;
-        if !matches!(format, Format::Json) {
+        if !matches!(format, Format::Json | Format::Cbor) {
             return Err(AccessorError::UnsupportedFormat);
         }
         let mode = params.stream_mode.ok_or(AccessorError::MissingMode)?;
@@ -203,7 +203,6 @@ impl ArchiveAccessorServer {
                 if let Some(max_snapshot_size) = performance_config.aggregated_content_limit_bytes {
                     stats.global_stats().record_max_snapshot_size_config(max_snapshot_size);
                 }
-
                 BatchIterator::new(
                     ReaderServer::stream(
                         unpopulated_container_vec,
@@ -218,6 +217,7 @@ impl ArchiveAccessorServer {
                     stats,
                     per_component_budget_opt,
                     trace_id,
+                    format,
                 )?
                 .run()
                 .await
@@ -322,7 +322,7 @@ impl SchemaTruncationCounter {
     }
 }
 
-pub struct BatchIterator {
+pub(crate) struct BatchIterator {
     requests: BatchIteratorRequestStream,
     stats: Arc<BatchIteratorConnectionStats>,
     data: FormattedStream,
@@ -362,6 +362,7 @@ impl BatchIterator {
         stats: Arc<BatchIteratorConnectionStats>,
         per_component_byte_limit_opt: Option<usize>,
         parent_trace_id: ftrace::Id,
+        format: Format,
     ) -> Result<Self, AccessorError>
     where
         Items: Stream<Item = Data<D>> + Send + 'static,
@@ -397,7 +398,7 @@ impl BatchIterator {
                     result_stats.add_result_error();
                 }
 
-                match JsonString::serialize(&d, D::DATA_TYPE) {
+                match SerializedVmo::serialize(&d, D::DATA_TYPE, format) {
                     Err(e) => {
                         result_stats.add_result_error();
                         Err(e)
@@ -424,7 +425,7 @@ impl BatchIterator {
                                     // TODO(66085): If a payload is truncated, cache the
                                     // new schema so that we can reuse if other schemas from
                                     // the same component get dropped.
-                                    JsonString::serialize(&new_data, D::DATA_TYPE)
+                                    SerializedVmo::serialize(&new_data, D::DATA_TYPE, format)
                                 }
                             }
                             None => Ok(contents),
@@ -705,6 +706,7 @@ mod tests {
             Arc::new(AccessorStats::new(Node::default()).new_inspect_batch_iterator()),
             None,
             ftrace::Id::random(),
+            Format::Json,
         )
         .expect("create batch iterator");
 

@@ -373,7 +373,7 @@ mod tests {
             pipeline::Pipeline,
         },
         fidl::endpoints::{create_proxy_and_stream, DiscoverableProtocolMarker},
-        fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, StreamMode},
+        fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode},
         fidl_fuchsia_inspect::TreeMarker,
         fuchsia_async::{self as fasync, Task},
         fuchsia_component::server::ServiceFs,
@@ -1095,6 +1095,7 @@ mod tests {
                     stats,
                     None,
                     ftrace::Id::random(),
+                    Format::Json,
                 )
                 .unwrap()
                 .run()

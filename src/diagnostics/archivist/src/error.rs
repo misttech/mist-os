@@ -80,6 +80,9 @@ pub enum AccessorError {
     #[error("JSON serialization failure: {0}")]
     Serialization(#[from] serde_json::Error),
 
+    #[error("CBOR serialization failure: {0}")]
+    CborSerialization(#[from] serde_cbor::Error),
+
     #[error("batch timeout was set on StreamParameter and on PerformanceConfiguration")]
     DuplicateBatchTimeout,
 
@@ -106,6 +109,7 @@ impl AccessorError {
                 ZxStatus::WRONG_TYPE
             }
             AccessorError::Serialization { .. } => ZxStatus::BAD_STATE,
+            AccessorError::CborSerialization { .. } => ZxStatus::BAD_STATE,
             AccessorError::Ipc { .. } | AccessorError::Io(_) => ZxStatus::IO,
         };
         control.shutdown_with_epitaph(epitaph);

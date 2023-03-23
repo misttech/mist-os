@@ -71,6 +71,7 @@ rustc_library("lib") {
     "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:pin-utils",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_cbor",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",

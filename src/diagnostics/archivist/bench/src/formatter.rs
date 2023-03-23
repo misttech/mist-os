@@ -4,7 +4,7 @@
 
 use diagnostics_data::{BuilderArgs, Data, LogsDataBuilder, LogsField, LogsProperty, Severity};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
-use fidl_fuchsia_diagnostics::DataType;
+use fidl_fuchsia_diagnostics::{DataType, Format};
 use fuchsia_async as fasync;
 use fuchsia_criterion::{
     criterion::{self, Criterion},
@@ -14,11 +14,11 @@ use futures::{stream, StreamExt};
 
 use archivist_lib::{
     constants::FORMATTED_CONTENT_CHUNK_SIZE_TARGET,
-    formatter::{JsonPacketSerializer, JsonString},
+    formatter::{JsonPacketSerializer, SerializedVmo},
 };
 use std::time::Duration;
 
-fn bench_json_string(b: &mut criterion::Bencher, n: usize, m: usize) {
+fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: Format) {
     let mut children = vec![];
     for i in 0..n {
         let mut properties = vec![];
@@ -37,7 +37,7 @@ fn bench_json_string(b: &mut criterion::Bencher, n: usize, m: usize) {
     );
 
     b.iter(|| {
-        let _ = criterion::black_box(JsonString::serialize(&data, DataType::Inspect));
+        let _ = criterion::black_box(SerializedVmo::serialize(&data, DataType::Inspect, format));
     });
 }
 
@@ -88,26 +88,10 @@ fn main() {
         .measurement_time(Duration::from_secs(2))
         .sample_size(20);
 
-    // The following benchmarks measure the performance of JsonString and JsonPacketSerializer.
+    // The following benchmarks measure the performance of SerializedVmo and JsonPacketSerializer.
     // This is fundamental when serializing responses in the archivist.
 
-    // Benchmark the time needed to serialize a DiagnosticsData into a JsonString with N children
-    // and M properties each.
-    let mut bench = criterion::Benchmark::new("Formatter/JsonString/Fill/5x5", move |b| {
-        bench_json_string(b, 5, 5);
-    });
-    bench = bench.with_function("Formatter/JsonString/Fill/10x10", move |b| {
-        bench_json_string(b, 10, 10);
-    });
-    bench = bench.with_function("Formatter/JsonString/Fill/100x100", move |b| {
-        bench_json_string(b, 100, 100);
-    });
-    bench = bench.with_function("Formatter/JsonString/Fill/1000x500", move |b| {
-        bench_json_string(b, 1000, 500);
-    });
-
-    // Benchmark the time needed to serialize N logs with JsonPacketSerializer.
-    bench = bench.with_function("Formatter/JsonPacketSerializer/5", move |b| {
+    let mut bench = criterion::Benchmark::new("Formatter/JsonPacketSerializer/5", move |b| {
         bench_json_packet_serializer(b, 5);
     });
     bench = bench.with_function("Formatter/JsonPacketSerializer/5k", move |b| {
@@ -116,6 +100,20 @@ fn main() {
     bench = bench.with_function("Formatter/JsonPacketSerializer/16k", move |b| {
         bench_json_packet_serializer(b, 16000);
     });
+
+    // Benchmark the time needed to serialize a DiagnosticsData into a SerializedVmo with N children
+    // and M properties each, for Json and Cbor.
+    for (format_name, format) in [("JsonString", Format::Json), ("CborData", Format::Cbor)].iter() {
+        for (size_name, n, m) in
+            [("5x5", 5, 5), ("10x10", 10, 10), ("100x100", 100, 100), ("1000x500", 1000, 500)]
+                .iter()
+        {
+            let label = format!("Formatter/{}/Fill/{}", format_name, size_name);
+            bench = bench.with_function(&label, move |b| {
+                bench_serialization(b, *n, *m, *format);
+            });
+        }
+    }
 
     c.bench("fuchsia.archivist", bench);
 }
