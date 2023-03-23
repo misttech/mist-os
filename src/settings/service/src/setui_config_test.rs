@@ -4,7 +4,6 @@
 
 use anyhow::{Context, Error};
 use argh::FromArgs;
-use fuchsia_syslog::fx_log_info;
 use serde::de::DeserializeOwned;
 use settings::{
     AgentConfiguration, DisplayConfiguration, EnabledInterfacesConfiguration, InputConfiguration,
@@ -55,7 +54,7 @@ struct TestConfig {
 }
 
 fn read_config<C: DeserializeOwned>(path: &OsStr) -> Result<C, Error> {
-    fx_log_info!("Validating {:?}", path);
+    tracing::info!("Validating {:?}", path);
     let mut file = File::open(path)
         .with_context(|| format!("Couldn't open path `{}`", path.to_string_lossy()))?;
     let mut contents = String::new();
