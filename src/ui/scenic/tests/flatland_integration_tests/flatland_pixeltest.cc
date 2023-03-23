@@ -103,8 +103,6 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
   }
 
   void TearDown() override {
-    root_flatland_->Clear();
-    BlockingPresent(root_flatland_);
     root_flatland_.Unbind();
     flatland_display_.Unbind();
 
