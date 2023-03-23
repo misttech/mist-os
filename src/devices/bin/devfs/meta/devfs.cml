@@ -47,7 +47,14 @@
         // These services are not actually used but exist to increase the lifetime
         // of components. The capabilities are named after their place in the topology.
         // We cannot use a single service due to the lack of service merging.
-        { service: "bootstrap.boot-drivers" },
+        {
+            service: [
+                "bootstrap.boot-drivers",
+                "bootstrap.full-pkg-drivers",
+                "bootstrap.pkg-drivers",
+            ],
+            availability: "optional",
+        },
         { service: "bootstrap.driver-hosts" },
     ],
     expose: [

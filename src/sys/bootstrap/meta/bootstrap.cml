@@ -22,7 +22,17 @@
             on_terminate: "reboot",
         },
         {
+            // Exists to augment capability graph with information about when #boot-drivers should
+            // be stopped. Most components should prefer depending on capabiliites provided by
+            // #devfs-with-pkg over this component
             name: "devfs",
+            url: "fuchsia-boot:///devfs#meta/devfs.cm",
+        },
+        {
+            // Exists to augment capability graph with information about when #pkg-drivers and
+            // #full-pkg-drivers should be stopped. Most components should prefer depending on
+            // capabiliites provided by this component over #devfs.
+            name: "devfs-with-pkg",
             url: "fuchsia-boot:///devfs#meta/devfs.cm",
         },
         {
@@ -574,9 +584,21 @@
             to: [ "#devfs" ],
         },
         {
+            protocol: "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle",
+            from: "#driver_manager",
+            as: "fuchsia.device.fs.lifecycle.Lifecycle",
+            to: [ "#devfs-with-pkg" ],
+        },
+        {
             directory: "dev",
             from: "#driver_manager",
-            to: "#devfs",
+            to: [ "#devfs" ],
+        },
+        {
+            directory: "dev-topological",
+            from: "#devfs",
+            as: "dev",
+            to: [ "#devfs-with-pkg" ],
         },
 
         // These protocols are not actually used but exist to increase the lifetime
@@ -585,12 +607,25 @@
         {
             service: [ "bootstrap.driver-hosts" ],
             from: "#driver-hosts",
-            to: [ "#devfs" ],
+            to: [
+                "#devfs",
+                "#devfs-with-pkg",
+            ],
         },
         {
             service: [ "bootstrap.boot-drivers" ],
             from: "#boot-drivers",
             to: [ "#devfs" ],
+        },
+        {
+            service: [ "bootstrap.pkg-drivers" ],
+            from: "#pkg-drivers",
+            to: [ "#devfs-with-pkg" ],
+        },
+        {
+            service: [ "bootstrap.full-pkg-drivers" ],
+            from: "#full-pkg-drivers",
+            to: [ "#devfs-with-pkg" ],
         },
         {
             protocol: [ "fuchsia.scheduler.ProfileProvider" ],
@@ -639,10 +674,14 @@
         {
             directory: "dev-topological",
             from: "#devfs",
+            to: [ "#fshost" ],
+        },
+        {
+            directory: "dev-topological",
+            from: "#devfs-with-pkg",
             to: [
                 "#console-launcher",
                 "#flashmap",
-                "#fshost",
                 "#miscsvc",
                 "#sysinfo",
                 "#vboot-fwparam",
@@ -650,13 +689,13 @@
         },
         {
             directory: "dev-topological",
-            from: "#devfs",
+            from: "#devfs-with-pkg",
             to: "#power_manager",
             dependency: "weak",
         },
         {
             directory: "dev-class",
-            from: "#devfs",
+            from: "#devfs-with-pkg",
             as: "dev-class-network",
             to: [
                 "#device_name_provider",
@@ -673,14 +712,14 @@
         },
         {
             directory: "dev-class",
-            from: "#devfs",
+            from: "#devfs-with-pkg",
             as: "dev-class-tpm",
             to: "#cr50_agent",
             subdir: "tpm",
         },
         {
             directory: "dev-class",
-            from: "#devfs",
+            from: "#devfs-with-pkg",
             as: "input-report",
             to: "#virtual_console",
             subdir: "input-report",
@@ -694,7 +733,7 @@
         },
         {
             directory: "dev-class",
-            from: "#devfs",
+            from: "#devfs-with-pkg",
             as: "display-controller",
             to: "#virtual_console",
             subdir: "display-controller",
@@ -888,6 +927,7 @@
                 "#console-launcher",
                 "#cr50_agent",
                 "#devfs",
+                "#devfs-with-pkg",
                 "#device_name_provider",
                 "#driver-hosts",
                 "#driver_index",
@@ -948,7 +988,7 @@
         },
         {
             directory: "dev-class",
-            from: "#devfs",
+            from: "#devfs-with-pkg",
             as: "input",
             to: "#pwrbtn-monitor",
             subdir: "input",
@@ -1103,7 +1143,7 @@
                 "dev-class",
                 "dev-topological",
             ],
-            from: "#devfs",
+            from: "#devfs-with-pkg",
         },
         {
             directory: [

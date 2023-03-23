@@ -164,7 +164,7 @@ ShutdownManager::ShutdownManager(NodeRemover* node_remover, async_dispatcher_t* 
     : node_remover_(node_remover),
       devfs_lifecycle_(
           [this](fit::callback<void(zx_status_t)> cb) { SignalBootShutdown(std::move(cb)); }),
-      fshost_lifecycle_(
+      devfs_with_pkg_lifecycle_(
           [this](fit::callback<void(zx_status_t)> cb) { SignalPackageShutdown(std::move(cb)); }),
       dispatcher_(dispatcher) {
   if (zx::result power_resource = get_power_resource(); power_resource.is_error()) {
@@ -207,9 +207,9 @@ void ShutdownManager::Publish(component::OutgoingDirectory& outgoing) {
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
   result = outgoing.AddUnmanagedProtocol<fuchsia_process_lifecycle::Lifecycle>(
-      lifecycle_bindings_.CreateHandler(&fshost_lifecycle_, dispatcher_,
+      lifecycle_bindings_.CreateHandler(&devfs_with_pkg_lifecycle_, dispatcher_,
                                         fidl::kIgnoreBindingClosure),
-      "fuchsia.fshost.lifecycle.Lifecycle");
+      "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle");
   ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 
   // Bind to lifecycle server

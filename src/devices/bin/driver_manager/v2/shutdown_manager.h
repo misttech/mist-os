@@ -160,9 +160,9 @@ class ShutdownManager : public fidl::WireServer<fuchsia_device_manager::Administ
   // Tracks when the devfs component is stopped by component manager. We shutdown all drivers upon
   // receiving this signal.
   Lifecycle devfs_lifecycle_;
-  // Tracks when the fshost component is stopped by component manager. We shutdown all packaged
-  // drivers upon receiving this signal.
-  Lifecycle fshost_lifecycle_;
+  // Tracks when the devfs-with-pkg component is stopped by component manager. We shutdown all
+  // packaged drivers upon receiving this signal.
+  Lifecycle devfs_with_pkg_lifecycle_;
 
   fidl::ServerBindingGroup<fuchsia_device_manager::Administrator> admin_bindings_;
   fidl::ServerBindingGroup<fuchsia_process_lifecycle::Lifecycle> lifecycle_bindings_;

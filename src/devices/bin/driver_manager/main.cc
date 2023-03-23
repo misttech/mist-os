@@ -318,6 +318,12 @@ int RunDfv1(driver_manager_config::Config dm_config,
     ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
   }
 
+  {
+    zx::result result = outgoing.AddProtocol<fuchsia_process_lifecycle::Lifecycle>(
+        std::make_unique<DevfsLifecycle>(), "fuchsia.device.fs.with.pkg.lifecycle.Lifecycle");
+    ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
+  }
+
   coordinator.set_loader_service_connector(
       [loader_service = std::move(loader_service)](zx::channel* c) {
         auto conn = loader_service->Connect();

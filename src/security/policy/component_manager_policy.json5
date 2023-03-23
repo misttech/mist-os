@@ -43,6 +43,7 @@
             main_process_critical: [
                 "/bootstrap/archivist",
                 "/bootstrap/devfs",
+                "/bootstrap/devfs-with-pkg",
                 "/bootstrap/driver_manager",
                 "/bootstrap/power_manager",
                 "/bootstrap/shutdown_shim",
@@ -710,12 +711,22 @@
                 source_name: "dev-topological",
                 capability: "directory",
                 target_monikers: [
-                    "/bootstrap",
-                    "/bootstrap/console-launcher",
                     "/bootstrap/devfs",
-                    "/bootstrap/flashmap",
+                    "/bootstrap/devfs-with-pkg",
                     "/bootstrap/fshost",
                     "/bootstrap/fshost/blobfs",
+                ],
+            },
+            {
+                source_moniker: "/bootstrap/devfs-with-pkg",
+                source: "component",
+                source_name: "dev-topological",
+                capability: "directory",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/console-launcher",
+                    "/bootstrap/devfs-with-pkg",
+                    "/bootstrap/flashmap",
                     "/bootstrap/miscsvc",
                     "/bootstrap/power_manager",
                     "/bootstrap/sysinfo",
