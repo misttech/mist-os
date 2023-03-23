@@ -935,20 +935,6 @@ impl States {
         bytes: B,
         rx_info: banjo_wlan_softmac::WlanRxInfo,
     ) -> States {
-        // While scanning, it is normal to receive mac frames from other BSSes. Off-channel frames
-        // can be safely ignored since they are handled by the scanner elsewhere.
-        match sta.channel_state.get_main_channel() {
-            Some(main_channel) if main_channel.primary == rx_info.channel.primary => (),
-            Some(_) => return self,
-            None => {
-                error!(
-                    "Received MAC frame on channel {:?} while main channel is not set.",
-                    rx_info.channel
-                );
-                return self;
-            }
-        }
-
         let body_aligned = (rx_info.rx_flags
             & banjo_wlan_softmac::WlanRxInfoFlags::FRAME_BODY_PADDING_4)
             != banjo_wlan_softmac::WlanRxInfoFlags(0);

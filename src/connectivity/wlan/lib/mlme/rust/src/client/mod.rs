@@ -215,8 +215,23 @@ impl ClientMlme {
         }
 
         if let Some(sta) = self.sta.as_mut() {
-            sta.bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                .on_mac_frame(frame, rx_info)
+            // Only pass the frame to a BoundClient under the following conditions:
+            //   - ChannelState currently has a main channel.
+            //   - ClientMlme received the frame on the main channel.
+            match self.channel_state.get_main_channel() {
+                Some(main_channel) if main_channel.primary == rx_info.channel.primary => sta
+                    .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
+                    .on_mac_frame(frame, rx_info),
+                Some(_) => (),
+                // TODO(fxbug.dev/124243): This is only reachable because the Client state machine
+                // returns to the Joined state and clears the main channel upon deauthentication.
+                None => {
+                    error!(
+                        "Received MAC frame on channel {:?} while main channel is not set.",
+                        rx_info.channel
+                    );
+                }
+            }
         }
     }
 
