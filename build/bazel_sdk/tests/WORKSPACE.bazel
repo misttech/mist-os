@@ -42,7 +42,7 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    use_experimental = True,
+    is_test = True,
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")

@@ -117,6 +117,7 @@ def _fuchsia_sdk_repository_impl(ctx):
         "BUILD.bazel",
         ctx.attr._template,
         substitutions = {
+            "{{BINDC}}": "'//tools:x64/bindc'" if not ctx.attr.is_test else "None",
             "{{SDK_ID}}": sdk_id_from_manifests(ctx, manifests),
         },
     )
@@ -177,6 +178,10 @@ allow Bazel to cache the file.
         "local_sdk_version_file": attr.label(
             doc = "An optional file used to mark the version of the SDK pointed to by local_paths.",
             allow_single_file = True,
+        ),
+        "is_test": attr.bool(
+            doc = "When we are in test, we will skip registering tool like bindc.",
+            default = False,
         ),
         "fuchsia_api_level_override": attr.string(
             doc = "API level override to use when building Fuchsia.",
