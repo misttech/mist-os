@@ -341,12 +341,7 @@ bool VkLoopTest::Exec(bool kill_driver, AllowSuccess allow_success) {
   }
 
   if (kill_driver) {
-    magma::TestDeviceBase test_device(get_vendor_id());
-
-    fidl::ClientEnd parent_device = test_device.GetParentDevice();
-    test_device.ShutdownDevice();
-
-    magma::TestDeviceBase::AutobindDriver(parent_device);
+    magma::TestDeviceBase::RebindParentDeviceFromId(get_vendor_id());
   }
 
   constexpr int kReps = 5;

@@ -70,40 +70,22 @@ class TestDeviceBase {
     return std::move(*parent);
   }
 
-  void ShutdownDevice() {
-    auto res = fidl::WireCall(device_controller_)->ScheduleUnbind();
-    EXPECT_EQ(ZX_OK, res.status());
-    EXPECT_TRUE(res->is_ok());
+  static fidl::ClientEnd<fuchsia_device::Controller> GetParentDeviceFromId(uint64_t id) {
+    magma::TestDeviceBase test_base(id);
+    return test_base.GetParentDevice();
   }
 
-  static void AutobindDriver(fidl::UnownedClientEnd<fuchsia_device::Controller> parent_device) {
-    BindDriver(std::move(parent_device), "");
+  static void RebindParentDeviceFromId(uint64_t id, const std::string& url_suffix = "") {
+    fidl::ClientEnd parent = GetParentDeviceFromId(id);
+    RebindDevice(parent);
   }
 
-  static void BindDriver(fidl::UnownedClientEnd<fuchsia_device::Controller> parent_device,
-                         std::string path) {
-    // Rebinding the device immediately after unbinding it sometimes causes the new device to be
-    // created before the old one is released, which can cause problems since the old device can
-    // hold onto interrupts and other resources. Delay recreation to make that less likely.
-    // TODO(fxbug.dev/39852): Remove when the driver framework bug is fixed.
-    constexpr uint32_t kRecreateDelayMs = 1000;
-    zx::nanosleep(zx::deadline_after(zx::msec(kRecreateDelayMs)));
-
-    constexpr uint32_t kMaxRetryCount = 5000;
-    uint32_t retry_count = 0;
-    while (true) {
-      ASSERT_TRUE(retry_count++ < kMaxRetryCount) << "Timed out rebinding driver";
-      // Don't use rebind because we need the recreate delay above. Also, the parent device may have
-      // other children that shouldn't be unbound.
-      auto res = fidl::WireCall(parent_device)->Bind(fidl::StringView::FromExternal(path));
-      ASSERT_EQ(ZX_OK, res.status());
-      if (res->is_error() && res->error_value() == ZX_ERR_ALREADY_BOUND) {
-        zx::nanosleep(zx::deadline_after(zx::msec(10)));
-        continue;
-      }
-      EXPECT_TRUE(res->is_ok());
-      break;
-    }
+  static void RebindDevice(fidl::UnownedClientEnd<fuchsia_device::Controller> device,
+                           const std::string& url_suffix = "") {
+    fidl::WireResult result =
+        fidl::WireCall(device)->Rebind(fidl::StringView::FromExternal(url_suffix));
+    ASSERT_EQ(ZX_OK, result.status());
+    ASSERT_TRUE(result->is_ok()) << zx_status_get_string(result->error_value());
   }
 
   const fidl::UnownedClientEnd<fuchsia_device::Controller>& channel() { return device_controller_; }

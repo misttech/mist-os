@@ -92,14 +92,7 @@ static void test_shutdown(uint32_t iters) {
         // connections while the device is torn down, just so it's easier to test that device
         // creation is working.
         std::unique_lock lock(connection_create_mutex);
-
-        auto test_base = std::make_unique<magma::TestDeviceBase>(MAGMA_VENDOR_ID_MALI);
-        fidl::ClientEnd parent_device = test_base->GetParentDevice();
-
-        test_base->ShutdownDevice();
-        test_base.reset();
-
-        magma::TestDeviceBase::AutobindDriver(parent_device);
+        magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_MALI);
         count += kRestartCount;
       }
       std::this_thread::yield();

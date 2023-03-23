@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fdio/directory.h>
+#include <lib/fit/defer.h>
 #include <lib/magma/magma.h>
 #include <lib/zx/channel.h>
 
@@ -21,29 +22,21 @@
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the
 // test results.
 TEST(UnitTests, UnitTests) {
-  auto test_base = std::make_unique<magma::TestDeviceBase>(MAGMA_VENDOR_ID_VSI);
-  fidl::ClientEnd parent_device = test_base->GetParentDevice();
-
-  test_base->ShutdownDevice();
-  test_base.reset();
+  fidl::ClientEnd parent_device = magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_VSI);
 
   const char* kTestDriverPath = "libmsd_vsi_test.cm";
   // The test driver will run unit tests on startup.
-  magma::TestDeviceBase::BindDriver(parent_device, kTestDriverPath);
+  magma::TestDeviceBase::RebindDevice(parent_device, kTestDriverPath);
+  // Reload the production driver so later tests shouldn't be affected.
+  auto cleanup = fit::defer([&]() { magma::TestDeviceBase::RebindDevice(parent_device); });
 
-  test_base = std::make_unique<magma::TestDeviceBase>(MAGMA_VENDOR_ID_VSI);
+  magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_VSI);
 
   // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{
-      test_base->channel().channel()->borrow()};
+      test_base.channel().channel()->borrow()};
   const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
   ASSERT_TRUE(result.ok()) << result.FormatDescription();
   const fidl::WireResponse response = result.value();
   ASSERT_EQ(response.status, ZX_OK) << zx_status_get_string(response.status);
-
-  test_base->ShutdownDevice();
-  test_base.reset();
-
-  // Reload the production driver so later tests shouldn't be affected.
-  magma::TestDeviceBase::AutobindDriver(parent_device);
 }
