@@ -5,6 +5,8 @@
 #include <lib/async-testing/dispatcher_stub.h>
 #include <lib/async/cpp/sequence_checker.h>
 
+#include <mutex>
+
 #include <zxtest/zxtest.h>
 
 namespace {
