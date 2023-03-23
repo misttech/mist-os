@@ -5,49 +5,56 @@ This document describes how to record a trace with Fuchsia's
 
 ## Prerequisites
 
-Before you attempt to record a trace, make sure you have
-done the following:
+Tracing is only enabled for `core` and `eng` based products. Ensure that your
+build type is not `user` or `userdebug`.
+
+Many existing components already have trace points included and ready to go
+which will give you a reasonable overview of the system. If you are recording a
+general trace, such as for adding additional detail to a bug report, continue on
+to the next step.
+
+However, if you are adding additional trace points, ensure that you have:
 
 * Registered your component as a trace provider. See
   [Registering a trace provider](/docs/development/tracing/tutorial/registering-a-trace-provider.md).
 * Added tracing in your code. See
   [Adding tracing in your code](/docs/development/tracing/tutorial/adding-tracing-in-code.md).
-* Included the `tools` to your Fuchsia build. The `core` product and most other
-  products include `tools` by default. If your build configuration does not
-  include `tools` bundle by default, then you can manually add it with `fx set`:
-
-  <pre class="prettyprint">
-  <code class="devsite-terminal">fx set <var>PRODUCT</var>.<var>BOARD</var> --with-base '//bundles/tools'</code>
-  </pre>
 
 ## Use the utilities
 
-Traces are recorded with the `trace` utility on a Fuchsia target.
-The [`ffx trace start`][ffx-trace] command, which you can run from
-your development host, calls the `trace` utility on your Fuchsia target.
-
-You can record a trace from your Fuchsia target from your development host
-or directly from the Fuchsia target.
+The most convenient and straight forward way to trace is from your development
+host via `ffx trace`.
 
 * [From a development host](#from-a-development-host)
+
+If you run into a situation where you wish to trace, but do not have access to
+ffx, you can also trace directly from the Fuchsia target using the `trace`
+shell package.
+
 * [From a Fuchsia target](#from-a-fuchsia-target)
 
 ### From a development host {#from-a-development-host}
 
-To record a trace for a Fuchsia target from a development host,
-run the following command:
+To record a trace for a Fuchsia target from a development host, run the
+following command:
 
 ```posix-terminal
 ffx trace start [--duration <SECONDS>]
 ```
 
-`ffx trace start` does the following:
+This will start a trace with the default settings, which will capture a general
+overview.
 
- * Starts a trace on the Fuchsia target with the default options.
- * Runs the tracing until the `Enter` key is pressed, or the duration is
-   reached if provided.
- * Prints the trace results from the Fuchsia target device to an output file
-   on your development host.
+The trace will continue for the given duration, or until `<ENTER>` is pressed
+if duration is left unspecified. Once the trace finishes, the trace data will
+automatically be saved to `trace.fxt` in the current directory. This can be
+changed by specifying the flag `ffx trace start --output <file_path>`.
+
+Then, you can upload your trace file to
+[ui.perfetto.dev](https://ui.perfetto.dev) to view it. Alternatively, see
+[Converting and Visualizing a
+Trace](/docs/development/tracing/tutorial/converting-visualizing-a-trace.md)
+for additional options.
 
 #### Categories and category groups
 
@@ -110,8 +117,11 @@ ffx trace start --categories kernel:sched,#chrome_web_content_render
 
 ### From a Fuchsia target {#from-a-fuchsia-target}
 
-To record a trace directly from a Fuchsia target, run the following
-command in a shell on your target:
+To record a trace directly from a Fuchsia target, you will need to include the
+`trace` shell component in your build with `fx set ... --with
+//src/performance/trace`.
+
+Then run the following command in a shell on your target:
 
 <pre class="prettyprint">
 <code class="devsite-terminal">trace record</code>
