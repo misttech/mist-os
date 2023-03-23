@@ -5,6 +5,8 @@ library fuchsia.memory.heapdump.client;
 
 using zx;
 
+const MAX_BUILD_ID_LENGTH uint32 = 32;
+
 /// The reason why a method failed.
 type CollectorError = flexible enum {
     /// The given ProcessSelector value is not supported.
@@ -58,10 +60,31 @@ type StackTrace = table {
     2: program_addresses vector<uint64>:MAX;
 };
 
+/// An ELF build ID.
+type BuildId = struct {
+    value vector<uint8>:MAX_BUILD_ID_LENGTH;
+};
+
+/// A memory region containing code loaded from an ELF file.
+type ExecutableRegion = table {
+    /// The address of the memory region.
+    1: address uint64;
+
+    /// Region size, in bytes.
+    2: size uint64;
+
+    /// The file offset corresponding to the first byte within the region.
+    3: file_offset uint64;
+
+    /// The build ID of the ELF file.
+    4: build_id BuildId;
+};
+
 /// An element that is part of a snapshot.
 type SnapshotElement = flexible union {
     1: allocation Allocation;
     2: stack_trace StackTrace;
+    3: executable_region ExecutableRegion;
 };
 
 /// Protocol to transmit a snapshot as a stream of elements.

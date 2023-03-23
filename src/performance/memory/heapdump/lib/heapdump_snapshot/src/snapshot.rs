@@ -14,6 +14,9 @@ use crate::Error;
 pub struct Snapshot {
     /// All the live allocations in the analyzed process, indexed by memory address.
     pub allocations: HashMap<u64, Allocation>,
+
+    /// All the executable memory regions in the analyzed process, indexed by start address.
+    pub executable_regions: HashMap<u64, ExecutableRegion>,
 }
 
 /// Information about an allocated memory block.
@@ -31,6 +34,19 @@ pub struct Allocation {
 pub struct StackTrace {
     /// Code addresses at each call frame. The first entry corresponds to the leaf call.
     pub program_addresses: Vec<u64>,
+}
+
+/// A memory region containing code loaded from an ELF file.
+#[derive(Debug)]
+pub struct ExecutableRegion {
+    /// Region size, in bytes.
+    pub size: u64,
+
+    /// The corresponding offset in the ELF file.
+    pub file_offset: u64,
+
+    /// The Build ID of the ELF file.
+    pub build_id: Vec<u8>,
 }
 
 /// Gets the value of a field in a FIDL table as a `Result<T, Error>`.
@@ -63,6 +79,7 @@ impl Snapshot {
     ) -> Result<Snapshot, Error> {
         let mut allocations: HashMap<u64, (u64, u64)> = HashMap::new();
         let mut stack_traces: HashMap<u64, Vec<u64>> = HashMap::new();
+        let mut executable_regions: HashMap<u64, ExecutableRegion> = HashMap::new();
 
         while let Some(fheapdump_client::SnapshotReceiverRequest::Batch {
             batch, responder, ..
@@ -96,6 +113,18 @@ impl Snapshot {
                                 .or_default()
                                 .append(&mut program_addresses);
                         }
+                        fheapdump_client::SnapshotElement::ExecutableRegion(region) => {
+                            let address = read_field!(region => ExecutableRegion, address)?;
+                            let size = read_field!(region => ExecutableRegion, size)?;
+                            let file_offset = read_field!(region => ExecutableRegion, file_offset)?;
+                            let build_id = read_field!(region => ExecutableRegion, build_id)?.value;
+                            let region = ExecutableRegion { size, file_offset, build_id };
+                            if executable_regions.insert(address, region).is_some() {
+                                return Err(Error::ConflictingElement {
+                                    element_type: "ExecutableRegion",
+                                });
+                            }
+                        }
                         _ => return Err(Error::UnexpectedElementType),
                     }
                 }
@@ -116,7 +145,8 @@ impl Snapshot {
                         .clone();
                     final_allocations.insert(address, Allocation { size, stack_trace });
                 }
-                return Ok(Snapshot { allocations: final_allocations });
+
+                return Ok(Snapshot { allocations: final_allocations, executable_regions });
             }
         }
 
@@ -141,6 +171,14 @@ mod tests {
     const FAKE_STACK_TRACE_1_KEY: u64 = 9876;
     const FAKE_STACK_TRACE_2_ADDRESSES: [u64; 4] = [11111, 22222, 11111, 66666];
     const FAKE_STACK_TRACE_2_KEY: u64 = 6789;
+    const FAKE_REGION_1_ADDRESS: u64 = 0x10000000;
+    const FAKE_REGION_1_SIZE: u64 = 0x80000;
+    const FAKE_REGION_1_FILE_OFFSET: u64 = 0x1000;
+    const FAKE_REGION_1_BUILD_ID: &[u8] = &[0xaa; 20];
+    const FAKE_REGION_2_ADDRESS: u64 = 0x7654300000;
+    const FAKE_REGION_2_SIZE: u64 = 0x200000;
+    const FAKE_REGION_2_FILE_OFFSET: u64 = 0x2000;
+    const FAKE_REGION_2_BUILD_ID: &[u8] = &[0x55; 32];
 
     #[fasync::run_singlethreaded(test)]
     async fn test_empty() {
@@ -155,6 +193,7 @@ mod tests {
         // Receive the snapshot we just transmitted and verify that it is empty.
         let received_snapshot = receive_worker.await.unwrap();
         assert!(received_snapshot.allocations.is_empty());
+        assert!(received_snapshot.executable_regions.is_empty());
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -163,10 +202,21 @@ mod tests {
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
-        // Send a batch containing two allocations. The stack traces can either be listed before
-        // or after the allocation(s) that reference them.
+        // Send a batch containing two allocations - whose stack traces can either be listed before
+        // or after the allocation(s) that reference them - and two executable regions.
         let fut = receiver_proxy.batch(
             &mut [
+                fheapdump_client::SnapshotElement::ExecutableRegion(
+                    fheapdump_client::ExecutableRegion {
+                        address: Some(FAKE_REGION_1_ADDRESS),
+                        size: Some(FAKE_REGION_1_SIZE),
+                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                        build_id: Some(fheapdump_client::BuildId {
+                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                        }),
+                        ..fheapdump_client::ExecutableRegion::EMPTY
+                    },
+                ),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_1_ADDRESSES.to_vec()),
@@ -178,6 +228,17 @@ mod tests {
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
+                fheapdump_client::SnapshotElement::ExecutableRegion(
+                    fheapdump_client::ExecutableRegion {
+                        address: Some(FAKE_REGION_2_ADDRESS),
+                        size: Some(FAKE_REGION_2_SIZE),
+                        file_offset: Some(FAKE_REGION_2_FILE_OFFSET),
+                        build_id: Some(fheapdump_client::BuildId {
+                            value: FAKE_REGION_2_BUILD_ID.to_vec(),
+                        }),
+                        ..fheapdump_client::ExecutableRegion::EMPTY
+                    },
+                ),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                     address: Some(FAKE_ALLOCATION_2_ADDRESS),
                     size: Some(FAKE_ALLOCATION_2_SIZE),
@@ -207,6 +268,15 @@ mod tests {
         assert_eq!(allocation2.size, FAKE_ALLOCATION_2_SIZE);
         assert_eq!(allocation2.stack_trace.program_addresses, FAKE_STACK_TRACE_1_ADDRESSES);
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
+        let region1 = received_snapshot.executable_regions.remove(&FAKE_REGION_1_ADDRESS).unwrap();
+        assert_eq!(region1.size, FAKE_REGION_1_SIZE);
+        assert_eq!(region1.file_offset, FAKE_REGION_1_FILE_OFFSET);
+        assert_eq!(region1.build_id, FAKE_REGION_1_BUILD_ID);
+        let region2 = received_snapshot.executable_regions.remove(&FAKE_REGION_2_ADDRESS).unwrap();
+        assert_eq!(region2.size, FAKE_REGION_2_SIZE);
+        assert_eq!(region2.file_offset, FAKE_REGION_2_FILE_OFFSET);
+        assert_eq!(region2.build_id, FAKE_REGION_2_BUILD_ID);
+        assert!(received_snapshot.executable_regions.is_empty(), "all entries have been removed");
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -215,9 +285,20 @@ mod tests {
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
-        // Send a first batch containing an allocation.
+        // Send a first batch.
         let fut = receiver_proxy.batch(
             &mut [
+                fheapdump_client::SnapshotElement::ExecutableRegion(
+                    fheapdump_client::ExecutableRegion {
+                        address: Some(FAKE_REGION_2_ADDRESS),
+                        size: Some(FAKE_REGION_2_SIZE),
+                        file_offset: Some(FAKE_REGION_2_FILE_OFFSET),
+                        build_id: Some(fheapdump_client::BuildId {
+                            value: FAKE_REGION_2_BUILD_ID.to_vec(),
+                        }),
+                        ..fheapdump_client::ExecutableRegion::EMPTY
+                    },
+                ),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
@@ -234,7 +315,7 @@ mod tests {
         );
         fut.await.unwrap();
 
-        // Send another batch containing another allocation.
+        // Send another batch.
         let fut = receiver_proxy.batch(
             &mut [
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
@@ -243,6 +324,17 @@ mod tests {
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
+                fheapdump_client::SnapshotElement::ExecutableRegion(
+                    fheapdump_client::ExecutableRegion {
+                        address: Some(FAKE_REGION_1_ADDRESS),
+                        size: Some(FAKE_REGION_1_SIZE),
+                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                        build_id: Some(fheapdump_client::BuildId {
+                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                        }),
+                        ..fheapdump_client::ExecutableRegion::EMPTY
+                    },
+                ),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_2_ADDRESSES.to_vec()),
@@ -266,6 +358,15 @@ mod tests {
         assert_eq!(allocation2.size, FAKE_ALLOCATION_2_SIZE);
         assert_eq!(allocation2.stack_trace.program_addresses, FAKE_STACK_TRACE_1_ADDRESSES);
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
+        let region1 = received_snapshot.executable_regions.remove(&FAKE_REGION_1_ADDRESS).unwrap();
+        assert_eq!(region1.size, FAKE_REGION_1_SIZE);
+        assert_eq!(region1.file_offset, FAKE_REGION_1_FILE_OFFSET);
+        assert_eq!(region1.build_id, FAKE_REGION_1_BUILD_ID);
+        let region2 = received_snapshot.executable_regions.remove(&FAKE_REGION_2_ADDRESS).unwrap();
+        assert_eq!(region2.size, FAKE_REGION_2_SIZE);
+        assert_eq!(region2.file_offset, FAKE_REGION_2_FILE_OFFSET);
+        assert_eq!(region2.build_id, FAKE_REGION_2_BUILD_ID);
+        assert!(received_snapshot.executable_regions.is_empty(), "all entries have been removed");
     }
 
     #[test_case(|allocation| allocation.address = None => matches
@@ -354,6 +455,49 @@ mod tests {
         receive_worker.await
     }
 
+    #[test_case(|region| region.address = None => matches
+        Err(Error::MissingField { container: "ExecutableRegion", field: "address" }) ; "address")]
+    #[test_case(|region| region.size = None => matches
+        Err(Error::MissingField { container: "ExecutableRegion", field: "size" }) ; "size")]
+    #[test_case(|region| region.file_offset = None => matches
+        Err(Error::MissingField { container: "ExecutableRegion", field: "file_offset" }) ; "file_offset")]
+    #[test_case(|region| region.build_id = None => matches
+        Err(Error::MissingField { container: "ExecutableRegion", field: "build_id" }) ; "build_id")]
+    #[test_case(|_| () /* if we do not set any field to None, the result should be Ok */ => matches
+        Ok(_) ; "success")]
+    #[fasync::run_singlethreaded(test)]
+    async fn test_executable_region_required_fields(
+        set_one_field_to_none: fn(&mut fheapdump_client::ExecutableRegion),
+    ) -> Result<Snapshot, Error> {
+        let (receiver_proxy, receiver_stream) =
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+        let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
+
+        // Start with an ExecutableRegion with all the required fields set.
+        let mut region = fheapdump_client::ExecutableRegion {
+            address: Some(FAKE_REGION_1_ADDRESS),
+            size: Some(FAKE_REGION_1_SIZE),
+            file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+            build_id: Some(fheapdump_client::BuildId { value: FAKE_REGION_1_BUILD_ID.to_vec() }),
+            ..fheapdump_client::ExecutableRegion::EMPTY
+        };
+
+        // Set one of the fields to None, according to the case being tested.
+        set_one_field_to_none(&mut region);
+
+        // Send it to the SnapshotReceiver.
+        let fut = receiver_proxy
+            .batch(&mut [fheapdump_client::SnapshotElement::ExecutableRegion(region)].iter_mut());
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Send the end of stream marker.
+        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Return the result.
+        receive_worker.await
+    }
+
     #[fasync::run_singlethreaded(test)]
     async fn test_conflicting_allocations() {
         let (receiver_proxy, receiver_stream) =
@@ -393,6 +537,53 @@ mod tests {
         assert_matches!(
             receive_worker.await,
             Err(Error::ConflictingElement { element_type: "Allocation" })
+        );
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_conflicting_executable_regions() {
+        let (receiver_proxy, receiver_stream) =
+            create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
+        let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
+
+        // Send two executable regions with the same address.
+        let fut = receiver_proxy.batch(
+            &mut [
+                fheapdump_client::SnapshotElement::ExecutableRegion(
+                    fheapdump_client::ExecutableRegion {
+                        address: Some(FAKE_REGION_1_ADDRESS),
+                        size: Some(FAKE_REGION_1_SIZE),
+                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                        build_id: Some(fheapdump_client::BuildId {
+                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                        }),
+                        ..fheapdump_client::ExecutableRegion::EMPTY
+                    },
+                ),
+                fheapdump_client::SnapshotElement::ExecutableRegion(
+                    fheapdump_client::ExecutableRegion {
+                        address: Some(FAKE_REGION_1_ADDRESS),
+                        size: Some(FAKE_REGION_1_SIZE),
+                        file_offset: Some(FAKE_REGION_1_FILE_OFFSET),
+                        build_id: Some(fheapdump_client::BuildId {
+                            value: FAKE_REGION_1_BUILD_ID.to_vec(),
+                        }),
+                        ..fheapdump_client::ExecutableRegion::EMPTY
+                    },
+                ),
+            ]
+            .iter_mut(),
+        );
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Send the end of stream marker.
+        let fut = receiver_proxy.batch(&mut [].iter_mut());
+        let _ = fut.await; // ignore result, as the peer may detect the error and close the channel
+
+        // Verify expected error.
+        assert_matches!(
+            receive_worker.await,
+            Err(Error::ConflictingElement { element_type: "ExecutableRegion" })
         );
     }
 

@@ -15,6 +15,7 @@ use vmo_types::{
 };
 
 use crate::process::{Process, Snapshot};
+use crate::utils::find_executable_regions;
 
 fn get_process_name(process: &zx::Process) -> Result<String, anyhow::Error> {
     Ok(String::from_utf8_lossy(process.get_name()?.as_bytes()).to_string())
@@ -25,9 +26,6 @@ fn get_process_name(process: &zx::Process) -> Result<String, anyhow::Error> {
 /// In particular, version 1 of the protocol implies the usage of:
 /// - `allocations_table_v1` for the `allocations_vmo`
 /// - `resources_table_v1` for the `resources_vmo`
-// TODO(fdurso): Remove this allow(dead_code) once the features that use all these fields are
-// implemented.
-#[allow(dead_code)]
 pub struct ProcessV1 {
     koid: Koid,
     name: String,
@@ -81,7 +79,8 @@ impl Process for ProcessV1 {
     fn take_live_snapshot(&self) -> Result<Box<dyn Snapshot>, anyhow::Error> {
         let size = self.allocations_vmo.get_size()?;
         let snapshot = self.allocations_vmo.create_child(zx::VmoChildOptions::SNAPSHOT, 0, size)?;
-        Ok(Box::new(SnapshotV1::new(snapshot, self.resources_vmo.clone())))
+        let executable_regions = find_executable_regions(&self.process)?;
+        Ok(Box::new(SnapshotV1::new(snapshot, self.resources_vmo.clone(), executable_regions)))
     }
 }
 
@@ -89,11 +88,16 @@ impl Process for ProcessV1 {
 pub struct SnapshotV1 {
     allocations_vmo: zx::Vmo,
     resources_vmo: Arc<zx::Vmo>,
+    executable_regions: Vec<fheapdump_client::ExecutableRegion>,
 }
 
 impl SnapshotV1 {
-    pub fn new(allocations_vmo: zx::Vmo, resources_vmo: Arc<zx::Vmo>) -> SnapshotV1 {
-        SnapshotV1 { allocations_vmo, resources_vmo }
+    pub fn new(
+        allocations_vmo: zx::Vmo,
+        resources_vmo: Arc<zx::Vmo>,
+        executable_regions: Vec<fheapdump_client::ExecutableRegion>,
+    ) -> SnapshotV1 {
+        SnapshotV1 { allocations_vmo, resources_vmo, executable_regions }
     }
 }
 
@@ -145,6 +149,14 @@ impl Snapshot for SnapshotV1 {
             }
         }
 
+        for executable_region in &self.executable_regions {
+            streamer = streamer
+                .push_element(fheapdump_client::SnapshotElement::ExecutableRegion(
+                    executable_region.clone(),
+                ))
+                .await?;
+        }
+
         Ok(streamer.end_of_stream().await?)
     }
 }
@@ -155,6 +167,8 @@ mod tests {
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
     use futures::pin_mut;
+    use itertools::{assert_equal, Itertools};
+    use std::collections::HashMap;
     use vmo_types::{
         allocations_table_v1::AllocationsTableWriter, resources_table_v1::ResourcesTableWriter,
         stack_trace_compression,
@@ -194,6 +208,36 @@ mod tests {
             .unwrap();
 
         (registry_stream, snapshot_proxy, koid, allocations_writer, resources_writer)
+    }
+
+    // Asserts that the given list of executable regions correctly describes the fake process.
+    //
+    // Note: the fake process (created by `setup_fake_process_from_self`) is actually the current
+    // process. Therefore, this function compares the regions described in `actual` to the list of
+    // the executable regions in the current process.
+    fn assert_executable_regions_valid_for_fake_process(
+        actual: &HashMap<u64, heapdump_snapshot::ExecutableRegion>,
+    ) {
+        // Enumerate the expected executable regions.
+        let expected = find_executable_regions(&fuchsia_runtime::process_self())
+            .unwrap()
+            .into_iter()
+            .map(|region| {
+                (
+                    region.address.unwrap(),
+                    region.size.unwrap(),
+                    region.file_offset.unwrap(),
+                    region.build_id.unwrap().value,
+                )
+            });
+
+        // Convert the actual regions to the same format, so that they can be compared.
+        let actual = actual.iter().map(|(address, region)| {
+            (*address, region.size, region.file_offset, region.build_id.clone())
+        });
+
+        // Assert that both iterators return the same elements.
+        assert_equal(actual.sorted(), expected.sorted());
     }
 
     #[test]
@@ -280,5 +324,8 @@ mod tests {
         assert_eq!(foobar_allocation.stack_trace.program_addresses, foobar_stack_trace);
 
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
+
+        // Verify that it contains the expected executable regions.
+        assert_executable_regions_valid_for_fake_process(&received_snapshot.executable_regions);
     }
 }

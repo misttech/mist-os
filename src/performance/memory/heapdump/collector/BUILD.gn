@@ -10,6 +10,11 @@ core_shard("core_shard") {
   shard_file = "meta/collector.core_shard.cml"
 }
 
+shared_library("elf-search-wrapper") {
+  sources = [ "src/elf-search.cc" ]
+  public_deps = [ "//zircon/system/ulib/elf-search" ]
+}
+
 rustc_binary("bin") {
   output_name = "heapdump-collector"
   with_unit_tests = true
@@ -20,9 +25,11 @@ rustc_binary("bin") {
     "src/process.rs",
     "src/process_v1.rs",
     "src/registry.rs",
+    "src/utils.rs",
   ]
 
   deps = [
+    ":elf-search-wrapper",
     "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.client_rust",
     "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.process_rust",
     "//src/lib/fidl/rust/fidl",
@@ -40,6 +47,7 @@ rustc_binary("bin") {
   test_deps = [
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-runtime",
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:test-case",
   ]
 }

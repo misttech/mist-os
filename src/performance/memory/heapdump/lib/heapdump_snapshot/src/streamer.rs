@@ -103,6 +103,10 @@ mod tests {
 
     const FAKE_STACK_TRACE_ADDRESSES: [u64; 3] = [11111, 22222, 33333];
     const FAKE_STACK_TRACE_KEY: u64 = 1234;
+    const FAKE_REGION_ADDRESS: u64 = 8192;
+    const FAKE_REGION_SIZE: u64 = 28672;
+    const FAKE_REGION_FILE_OFFSET: u64 = 4096;
+    const FAKE_REGION_BUILD_ID: &[u8] = &[0xee; 20];
 
     #[test_case(hashmap! {} ; "empty")]
     #[test_case(hashmap! { 1234 => 5678 } ; "only one")]
@@ -113,13 +117,27 @@ mod tests {
             create_proxy_and_stream::<fheapdump_client::SnapshotReceiverMarker>().unwrap();
         let receive_worker = fasync::Task::local(Snapshot::receive_from(receiver_stream));
 
-        // Transmit a snapshot with the given `allocations`, all referencing a common stack trace.
+        // Transmit a snapshot with the given `allocations`, all referencing a common stack trace,
+        // and a single executable region.
         let mut streamer = Streamer::new(receiver_proxy)
             .push_element(fheapdump_client::SnapshotElement::StackTrace(
                 fheapdump_client::StackTrace {
                     stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
                     program_addresses: Some(FAKE_STACK_TRACE_ADDRESSES.to_vec()),
                     ..fheapdump_client::StackTrace::EMPTY
+                },
+            ))
+            .await
+            .unwrap()
+            .push_element(fheapdump_client::SnapshotElement::ExecutableRegion(
+                fheapdump_client::ExecutableRegion {
+                    address: Some(FAKE_REGION_ADDRESS),
+                    size: Some(FAKE_REGION_SIZE),
+                    file_offset: Some(FAKE_REGION_FILE_OFFSET),
+                    build_id: Some(fheapdump_client::BuildId {
+                        value: FAKE_REGION_BUILD_ID.to_vec(),
+                    }),
+                    ..fheapdump_client::ExecutableRegion::EMPTY
                 },
             ))
             .await
@@ -139,8 +157,8 @@ mod tests {
         }
         streamer.end_of_stream().await.unwrap();
 
-        // Receive the snapshot we just transmitted and verify that the allocations we received
-        // match those that were sent.
+        // Receive the snapshot we just transmitted and verify that the allocations and the
+        // executable region we received match those that were sent.
         let mut received_snapshot = receive_worker.await.unwrap();
         for (address, size) in &allocations {
             let allocation = received_snapshot.allocations.remove(address).unwrap();
@@ -148,5 +166,10 @@ mod tests {
             assert_eq!(allocation.stack_trace.program_addresses, FAKE_STACK_TRACE_ADDRESSES);
         }
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
+        let region = received_snapshot.executable_regions.remove(&FAKE_REGION_ADDRESS).unwrap();
+        assert_eq!(region.size, FAKE_REGION_SIZE);
+        assert_eq!(region.file_offset, FAKE_REGION_FILE_OFFSET);
+        assert_eq!(region.build_id, FAKE_REGION_BUILD_ID);
+        assert!(received_snapshot.executable_regions.is_empty(), "all entries have been removed");
     }
 }

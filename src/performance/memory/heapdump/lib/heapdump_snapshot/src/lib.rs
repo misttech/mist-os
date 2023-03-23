@@ -5,7 +5,7 @@
 use thiserror::Error;
 
 mod snapshot;
-pub use snapshot::{Allocation, Snapshot};
+pub use snapshot::{Allocation, ExecutableRegion, Snapshot};
 
 mod streamer;
 pub use streamer::Streamer;
@@ -18,8 +18,7 @@ pub enum Error {
     UnexpectedEndOfStream,
     #[error("SnapshotReceiver stream contains an unknown element type")]
     UnexpectedElementType,
-    #[error("SnapshotReceiver stream contains multiple {} elements with the same unique ID",
-        .element_type)]
+    #[error("SnapshotReceiver stream contains conflicting {} elements", .element_type)]
     ConflictingElement { element_type: &'static str },
     #[error("SnapshotReceiver stream contains a cross-reference to a non-existing {} element",
         .element_type)]

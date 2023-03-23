@@ -11,6 +11,7 @@ use tracing::warn;
 mod process;
 mod process_v1;
 mod registry;
+mod utils;
 
 use registry::Registry;
 
