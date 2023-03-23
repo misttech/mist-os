@@ -28,7 +28,7 @@ class FakeAudioDevice : public fuchsia::hardware::audio::StreamConfigConnector,
   FakeAudioDevice() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fake-audio-device-loop");
   }
-  ~FakeAudioDevice() { loop_.Shutdown(); }
+  ~FakeAudioDevice() override { loop_.Shutdown(); }
 
   fbl::RefPtr<fs::Service> AsService() {
     return fbl::MakeRefCounted<fs::Service>([this](zx::channel c) {
@@ -78,14 +78,14 @@ class DeviceTracker {
                      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig>)>
   GetHandler() {
     return [this](auto name, auto is_input, auto stream_config) {
-      // To make sure the 1-way Connect call is completed in the StreamConfigConnector server,
-      // make a 2-way call. Since StreamConfigConnector does not have a 2-way call, we use
-      // StreamConfig synchronously.
-      fidl::SynchronousInterfacePtr client = stream_config.BindSync();
-      fuchsia::hardware::audio::StreamProperties unused_properties;
-      client->GetProperties(&unused_properties);
-      stream_config = client.Unbind();
-      devices_.emplace_back(DeviceConnection{std::move(name), is_input, std::move(stream_config)});
+      // To make sure the 1-way Connect call is completed in the StreamConfigConnector server, make
+      // a 2-way call.
+      fidl::InterfacePtr client = stream_config.Bind();
+      client.set_error_handler([](zx_status_t status) { FAIL() << zx_status_get_string(status); });
+      client->GetProperties([=, name = std::move(name), client = std::move(client)](
+                                const fuchsia::hardware::audio::StreamProperties&) mutable {
+        devices_.emplace_back(DeviceConnection{std::move(name), is_input, client.Unbind()});
+      });
     };
   }
 
@@ -101,7 +101,6 @@ class PlugDetectorTest : public gtest::RealLoopFixture,
                          public ::testing::WithParamInterface<const char*> {
  protected:
   void SetUp() override {
-    vfs_loop_.StartThread("vfs-loop");
     ASSERT_EQ(fdio_ns_get_installed(&ns_), ZX_OK);
     zx::channel c1, c2;
 
@@ -119,8 +118,6 @@ class PlugDetectorTest : public gtest::RealLoopFixture,
   void TearDown() override {
     ASSERT_TRUE(input_dir_->IsEmpty());
     ASSERT_TRUE(output_dir_->IsEmpty());
-    vfs_loop_.Shutdown();
-    vfs_loop_.JoinThreads();
     ASSERT_NE(ns_, nullptr);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-input"), ZX_OK);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-output"), ZX_OK);
@@ -142,7 +139,7 @@ class PlugDetectorTest : public gtest::RealLoopFixture,
   // the local namespace at /dev/class/audio-input.
   ScopedDirent AddInputDevice(FakeAudioDevice* device) {
     auto name = std::to_string(next_input_device_number_++);
-    FX_CHECK(ZX_OK == input_dir_->AddEntry(name, device->AsService()));
+    EXPECT_EQ(ZX_OK, input_dir_->AddEntry(name, device->AsService()));
     return {name, input_dir_};
   }
 
@@ -150,7 +147,7 @@ class PlugDetectorTest : public gtest::RealLoopFixture,
   // the local namespace at /dev/class/audio-output.
   ScopedDirent AddOutputDevice(FakeAudioDevice* device) {
     auto name = std::to_string(next_output_device_number_++);
-    FX_CHECK(ZX_OK == output_dir_->AddEntry(name, device->AsService()));
+    EXPECT_EQ(ZX_OK, output_dir_->AddEntry(name, device->AsService()));
     return {name, output_dir_};
   }
 
@@ -159,13 +156,7 @@ class PlugDetectorTest : public gtest::RealLoopFixture,
   uint32_t next_input_device_number_ = 0;
   uint32_t next_output_device_number_ = 0;
 
-  // We need to run the vfs on its own loop because the plug detector has some blocking open()
-  // calls that don't yield back to the main loop so that we can populate the device.
-  //
-  // TODO(fxbug.dev/35145): Migrate to an async open so that we can share the same dispatcher in
-  // this test and also remove more blocking logic from audio_core.
-  async::Loop vfs_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  fs::SynchronousVfs vfs_{vfs_loop_.dispatcher()};
+  fs::SynchronousVfs vfs_{dispatcher()};
   // Note these _must_ be RefPtrs since the vfs_ will attempt to AdoptRef on a raw pointer passed
   // to it.
   //

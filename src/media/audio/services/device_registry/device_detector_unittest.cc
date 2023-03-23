@@ -36,9 +36,7 @@ class FakeAudioDevice
     : public fidl::testing::WireTestBase<::fuchsia_hardware_audio::StreamConfigConnector>,
       public fidl::testing::WireTestBase<::fuchsia_hardware_audio::StreamConfig> {
  public:
-  FakeAudioDevice(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-  ~FakeAudioDevice() {}
+  explicit FakeAudioDevice(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
     ADD_FAILURE() << "Method not implemented: '" << name << "";
@@ -100,7 +98,7 @@ class DeviceTracker {
             fidl::ClientEnd<fuchsia_hardware_audio::StreamConfig>(std::move(stream_config)),
             dispatcher());
 
-        devices_.emplace_back(DeviceConnection{std::move(name), device_type, std::move(client)});
+        devices_.emplace_back(DeviceConnection{name, device_type, std::move(client)});
       };
   async_dispatcher_t* dispatcher_;
   const bool detection_is_expected_;
@@ -115,8 +113,6 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   void SetUp() override {
     ASSERT_TRUE(input_dir_ != nullptr);
     ASSERT_TRUE(output_dir_ != nullptr);
-
-    vfs_loop_.StartThread("vfs-loop");
 
     ASSERT_EQ(fdio_ns_get_installed(&ns_), ZX_OK);
     zx::channel channel0, channel1;
@@ -137,26 +133,22 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   void TearDown() override {
     // Scoped directory entries have gone out of scope, but to avoid races we remove all entries.
     bool task_has_run = false;
-    async::PostTask(vfs_loop_.dispatcher(), [this, &task_has_run]() {
+    async::PostTask(dispatcher(), [this, &task_has_run]() {
       input_dir_->RemoveAllEntries();
       output_dir_->RemoveAllEntries();
       task_has_run = true;
     });
     while (!task_has_run) {
-      RunVfsLoopUntilIdle();
+      RunLoopUntilIdle();
     }
     ASSERT_TRUE(input_dir_->IsEmpty() && output_dir_->IsEmpty())
         << "input_dir is " << (input_dir_->IsEmpty() ? "" : "NOT ") << "empty; output_dir is "
         << (output_dir_->IsEmpty() ? "" : "NOT ") << "empty";
 
-    vfs_loop_.Shutdown();
-    vfs_loop_.JoinThreads();
     ASSERT_NE(ns_, nullptr);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-input"), ZX_OK);
     ASSERT_EQ(fdio_ns_unbind(ns_, "/dev/class/audio-output"), ZX_OK);
   }
-
-  void RunVfsLoopUntilIdle() { vfs_loop_.RunUntilIdle(); }
 
   // Holds a ref to a pseudo dir entry that removes the entry when this object goes out of scope.
   struct ScopedDirent {
@@ -173,14 +165,14 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   ScopedDirent AddInputDevice(std::shared_ptr<FakeAudioDevice> device) {
     auto name = std::to_string(next_input_device_number_++);
     bool task_has_run = false;
-    async::PostTask(vfs_loop_.dispatcher(), [this, name, device, &task_has_run]() {
-      FX_CHECK(ZX_OK == input_dir_->AddEntry(name, device->AsService()));
+    async::PostTask(dispatcher(), [this, name, device = std::move(device), &task_has_run]() {
       task_has_run = true;
+      ASSERT_EQ(ZX_OK, input_dir_->AddEntry(name, device->AsService()));
     });
     while (!task_has_run) {
-      RunVfsLoopUntilIdle();  // Switch to the VFS thread so it can add the pseudodir entry.
+      RunLoopUntilIdle();
     }
-    return {name, input_dir_, vfs_loop_.dispatcher()};
+    return {name, input_dir_, dispatcher()};
   }
 
   // Adds a `FakeAudioDevice` to the emulated 'audio-output' directory that has been installed in
@@ -188,14 +180,14 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   ScopedDirent AddOutputDevice(std::shared_ptr<FakeAudioDevice> device) {
     auto name = std::to_string(next_output_device_number_++);
     bool task_has_run = false;
-    async::PostTask(vfs_loop_.dispatcher(), [this, name, device, &task_has_run]() {
-      FX_CHECK(ZX_OK == output_dir_->AddEntry(name, device->AsService()));
+    async::PostTask(dispatcher(), [this, name, device = std::move(device), &task_has_run]() {
       task_has_run = true;
+      ASSERT_EQ(ZX_OK, output_dir_->AddEntry(name, device->AsService()));
     });
     while (!task_has_run) {
-      RunVfsLoopUntilIdle();  // Switch to the VFS thread so it can add the pseudodir entry.
+      RunLoopUntilIdle();
     }
-    return {name, output_dir_, vfs_loop_.dispatcher()};
+    return {name, output_dir_, dispatcher()};
   }
 
  private:
@@ -203,13 +195,7 @@ class DeviceDetectorTest : public gtest::TestLoopFixture {
   uint32_t next_input_device_number_ = 0;
   uint32_t next_output_device_number_ = 0;
 
-  // We must run the vfs on its own loop because the plug detector has a blocking openat()
-  // call that doesn't yield back to the main loop, so that we can detect the device.
-  //
-  // TODO(fxbug.dev/35145): Migrate to an async open so that we can share the same dispatcher in
-  // this test and also remove more blocking logic from the audio service.
-  async::Loop vfs_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
-  fs::SynchronousVfs vfs_{vfs_loop_.dispatcher()};
+  fs::SynchronousVfs vfs_{dispatcher()};
 
   // Note these _must_ be RefPtrs since vfs_ will try to AdoptRef on the raw pointer passed to it.
   //
