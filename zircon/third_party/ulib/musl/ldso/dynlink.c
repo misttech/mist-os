@@ -185,29 +185,27 @@ NO_ASAN LIBC_NO_SAFESTACK static int dl_strcmp(const char* l, const char* r) {
 // in the case of x64 and the caller will need to offset it back in order to get
 // the correct address of the debug trap.
 
+// This is actually defined with internal linkage in the asm.
+// It can't be defined in C since we want the exact address of
+// the breakpoint instruction, not just a function containing it.
 void debug_break(void);
 
+__asm__(
+    ".pushsection .text.debug_break, \"ax\", @progbits\n"
+    "debug_break:\n"
+    ".cfi_startproc\n"
 #if defined(__x86_64__)
-
-__asm__(
-    ".pushsection .text, \"ax\", @progbits\n"
-    ".global debug_break\n"
-    "debug_break:\n"
     "int3\n"
-    "ret\n"
-    ".popsection\n");
-
 #elif defined(__aarch64__)
-
-__asm__(
-    ".pushsection .text, \"ax\", %progbits\n"
-    ".global debug_break\n"
-    "debug_break:\n"
-    "brk 0\n"
-    "ret\n"
-    ".popsection\n");
-
+    "brk #0\n"
+#elif defined(__riscv)
+    "ebreak\n"
+#else
+#error "what machine?"
 #endif
+    "ret\n"
+    ".cfi_endproc\n"
+    ".popsection\n");
 
 LIBC_NO_SAFESTACK static bool should_break_on_load(void) {
   intptr_t dyn_break_on_load = 0;

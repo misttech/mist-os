@@ -345,7 +345,6 @@ Symbols:
   - { Name: ctime, Type: Func }
   - { Name: ctime_r, Type: Func }
   - { Name: daylight, Type: Object, Weak: true }
-  - { Name: debug_break, Type: NoType }
   - { Name: difftime, Type: Func }
   - { Name: dirname, Type: Func }
   - { Name: div, Type: Func }
