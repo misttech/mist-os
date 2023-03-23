@@ -106,6 +106,7 @@ action("generate_main_workspace") {
     # @internal_sdk for
     # @fuchsia_workspace//:fuchsia/workspace/fuchsia_sdk_repository.bzl
     "//sdk:core",
+    "//sdk:driver",
     "//sdk:platform",
   ]
 
@@ -156,6 +157,7 @@ action("generate_fuchsia_sdk_repository") {
   deps = [
     ":generate_main_workspace",
     "//sdk:core",
+    "//sdk:driver",
     "//sdk:platform",
   ]
   inputs = get_target_outputs(deps[0])
