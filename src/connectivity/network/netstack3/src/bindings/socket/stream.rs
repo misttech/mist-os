@@ -1565,11 +1565,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use net_types::ip::Ipv6Addr;
     use test_case::test_case;
-
-    use crate::bindings::integration_tests::{StackSetupBuilder, TestSetupBuilder, TestStack};
-    use crate::bindings::socket::testutil::TestSockAddr;
 
     use super::*;
 
@@ -1718,74 +1714,5 @@ mod tests {
             let _: usize = peer.write(TEST_BYTES).expect("can write");
             sbuf.poll();
         }
-    }
-
-    async fn get_socket<A: TestSockAddr>(
-        test_stack: &mut TestStack,
-    ) -> fposix_socket::StreamSocketProxy {
-        let socket_provider = test_stack.connect_socket_provider().unwrap();
-        socket_provider
-            .stream_socket(A::DOMAIN, fposix_socket::StreamSocketProtocol::Tcp)
-            .await
-            .unwrap()
-            .expect("Socket succeeds")
-            .into_proxy()
-            .expect("conversion succeeds")
-    }
-
-    #[fasync::run_singlethreaded(test)]
-    async fn accept_clears_available_signal() {
-        // create a stack and add a single endpoint to it so we have the interface
-        // id:
-        let mut t = TestSetupBuilder::new()
-            .add_endpoint()
-            .add_stack(StackSetupBuilder::new())
-            .build()
-            .await
-            .unwrap();
-        let mut test_stack = t.get(0);
-
-        let socket = get_socket::<fnet::Ipv6SocketAddress>(&mut test_stack).await;
-
-        const PORT: u16 = 200;
-        socket
-            .bind(&mut fnet::Ipv6SocketAddress::create(Ipv6Addr::default(), PORT))
-            .await
-            .expect("FIDL succeeds")
-            .expect("can bind");
-        socket.listen(1).await.expect("FIDL succeeds").expect("can listen");
-
-        let fposix_socket::StreamSocketDescribeResponse { socket: zx_socket, .. } =
-            socket.describe().await.expect("FIDL succeeds");
-        let zx_socket = zx_socket.expect("has socket");
-
-        assert_eq!(
-            zx_socket.wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE_PAST),
-            Err(zx::Status::TIMED_OUT)
-        );
-
-        let connector = get_socket::<fnet::Ipv6SocketAddress>(&mut test_stack).await;
-
-        while let Err(e) = connector
-            .connect(&mut fnet::Ipv6SocketAddress::create(*Ipv6::LOOPBACK_ADDRESS, PORT))
-            .await
-            .expect("FIDL succeeds")
-        {
-            assert_eq!(e, fposix::Errno::Einprogress);
-        }
-
-        assert_matches!(
-            zx_socket.wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE_PAST),
-            Ok(_)
-        );
-
-        // Once the connection is accepted, the signal should no longer be set.
-        let _: (Option<Box<fnet::SocketAddress>>, ClientEnd<fposix_socket::StreamSocketMarker>) =
-            socket.accept(false).await.expect("FIDL succeeds").expect("has connection");
-
-        assert_eq!(
-            zx_socket.wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE_PAST),
-            Err(zx::Status::TIMED_OUT)
-        );
     }
 }
