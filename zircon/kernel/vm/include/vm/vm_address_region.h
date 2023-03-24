@@ -244,8 +244,8 @@ class VmAddressRegionOrMapping
   const uint32_t flags_;
 
   // address/size within the container address space
-  vaddr_t base_;
-  size_t size_;
+  vaddr_t base_ TA_GUARDED(lock());
+  size_t size_ TA_GUARDED(lock());
 
   // pointer back to our member address space.  The aspace's lock is used
   // to serialize all modifications.
