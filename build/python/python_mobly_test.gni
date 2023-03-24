@@ -127,7 +127,7 @@ template("python_mobly_test") {
     }
   }
 
-  _test_dir = "${target_out_dir}/test_data"
+  _test_dir = "${target_out_dir}/${target_name}/test_data"
   if (defined(invoker.test_dir)) {
     _test_dir = invoker.test_dir
   }
