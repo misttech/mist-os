@@ -48,11 +48,23 @@ function timetrace() {
 # The value is an absolute path.
 readonly default_project_root="$(readlink -f "$script_dir"/../..)"
 
+function _check_realpath_works_for_relative_paths() {
+  if which realpath
+  then
+    # test if it is usable for calculating relative paths
+    realpath -s --relative-to=.. "$script" 2>&1 > /dev/null || return 1
+    return 0  # success
+  else
+    # realpath doesn't even exist
+    return 1
+  fi 2>&1 > /dev/null
+}
+
 [[ -n "${_FUCHSIA_RBE_CACHE_VAR_relpath_uses+x}" ]] || {
   # realpath doesn't ship with Mac OS X (provided by coreutils package).
   # We only want it for calculating relative paths.
   # Work around this using Python as needed.
-  if which realpath 2>&1 > /dev/null
+  if _check_realpath_works_for_relative_paths
   then
     export _FUCHSIA_RBE_CACHE_VAR_relpath_uses=realpath
   else
