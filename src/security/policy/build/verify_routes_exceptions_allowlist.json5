@@ -228,7 +228,26 @@
     {
         capability_type: "protocol",
         results: {
+            // TODO(http://fxbug.dev/8895): For cross-repo migration only.
             errors: [
+                {
+                    using_node: "/core/session-manager/session:session/assistant_aot_product_runner",
+                    capability: "fuchsia.timezone.Timezone",
+                    error: {
+                        error: {
+                            analyzer_model_error: {
+                                routing_error: {
+                                    offer_from_parent_not_found: {
+                                        moniker: "/core/session-manager/session:session",
+                                        capability_id: "fuchsia.timezone.Timezone",
+                                    },
+                                },
+                            },
+                        },
+                        message: "`fuchsia.timezone.Timezone` was not offered to `/core/session-manager/session:session` by parent.",
+                    },
+                },
+
                 // TODO(https://fxbug.dev/107231)
                 {
                     using_node: "/bootstrap/archivist",
