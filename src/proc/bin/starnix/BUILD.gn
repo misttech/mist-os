@@ -7,7 +7,6 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
 import("//src/proc/bin/starnix/starnix.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 declare_args() {
   # Restricted mode is currently only supported by Zircon on x64.
