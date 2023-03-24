@@ -14,9 +14,6 @@ use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams, LinearHisto
 use futures::future::BoxFuture;
 use inspect_format::{BlockIndex, LinkNodeDisposition, PropertyFormat};
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 /// Inspect Node data type.
 ///
 /// NOTE: do not rely on PartialEq implementation for true comparison.
@@ -517,18 +514,6 @@ impl Node {
         child.reparent(self)
     }
 
-    /// Returns the [`Block`][Block] associated with this value.
-    #[cfg(test)]
-    pub(crate) fn get_block(&self) -> Option<Block<Container>> {
-        self.inner.inner_ref().and_then(|inner_ref| {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.heap().get_block(inner_ref.block_index))
-                .ok()
-        })
-    }
-
     /// Creates a new root node.
     pub(crate) fn new_root(state: State) -> Node {
         Node::new(state, BlockIndex::ROOT)
@@ -556,7 +541,11 @@ mod tests {
     use super::*;
     use crate::{
         assert_json_diff, reader,
-        writer::{private::InspectTypeInternal, testing_utils::get_state, ArrayProperty},
+        writer::{
+            private::InspectTypeInternal,
+            testing_utils::{get_state, GetBlockExt},
+            ArrayProperty,
+        },
     };
     use diagnostics_hierarchy::{assert_data_tree, DiagnosticsHierarchy};
     use futures::FutureExt;
@@ -571,17 +560,23 @@ mod tests {
         let state = get_state(4096);
         let root = Node::new_root(state);
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
-        assert_eq!(node_block.block_type(), BlockType::NodeValue);
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.block_type(), BlockType::NodeValue);
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
         {
             let child = node.create_child("child");
-            let child_block = child.get_block().unwrap();
-            assert_eq!(child_block.block_type(), BlockType::NodeValue);
-            assert_eq!(child_block.child_count().unwrap(), 0);
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            child.get_block(|child_block| {
+                assert_eq!(child_block.block_type(), BlockType::NodeValue);
+                assert_eq!(child_block.child_count().unwrap(), 0);
+            });
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 1);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 
     #[fuchsia::test]
@@ -723,25 +718,26 @@ mod tests {
         let node_weak = node.clone_weak();
         let node_weak_2 = node_weak.clone_weak(); // Weak from another weak
 
-        let node_block = node.get_block().unwrap();
-        assert_eq!(node_block.block_type(), BlockType::NodeValue);
-        assert_eq!(node_block.child_count().unwrap(), 0);
-        let node_weak_block = node.get_block().unwrap();
-        assert_eq!(node_weak_block.block_type(), BlockType::NodeValue);
-        assert_eq!(node_weak_block.child_count().unwrap(), 0);
-        let node_weak_2_block = node.get_block().unwrap();
-        assert_eq!(node_weak_2_block.block_type(), BlockType::NodeValue);
-        assert_eq!(node_weak_2_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.block_type(), BlockType::NodeValue);
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
 
         let child_from_strong = node.create_child("child");
         let child = node_weak.create_child("child_1");
         let child_2 = node_weak_2.create_child("child_2");
         std::mem::drop(node_weak_2);
-        assert_eq!(node_weak_block.child_count().unwrap(), 3);
+        node.get_block(|block| {
+            assert_eq!(block.child_count().unwrap(), 3);
+        });
         std::mem::drop(child_from_strong);
-        assert_eq!(node_weak_block.child_count().unwrap(), 2);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 2);
+        });
         std::mem::drop(child);
-        assert_eq!(node_weak_block.child_count().unwrap(), 1);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 1);
+        });
         assert!(node_weak.is_valid());
         assert!(child_2.is_valid());
         std::mem::drop(node);

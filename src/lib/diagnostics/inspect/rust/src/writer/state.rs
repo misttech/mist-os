@@ -311,6 +311,14 @@ impl State {
     fn header(&self) -> Block<Container> {
         self.inner.lock().header.clone()
     }
+
+    pub(crate) fn get_block<F>(&self, index: BlockIndex, callback: F)
+    where
+        F: FnOnce(&Block<Container>) -> (),
+    {
+        let state_lock = self.try_lock().unwrap();
+        callback(&state_lock.get_block(index))
+    }
 }
 
 /// Statistics about the current inspect state.
@@ -425,26 +433,6 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.reparent(being_reparented, new_parent)
     }
 
-    /// Allocate a STRING_REFERENCE block and necessary EXTENTs.
-    #[cfg(test)]
-    pub fn get_or_create_string_reference(
-        &mut self,
-        value: StringReference,
-    ) -> Result<Block<Container>, Error> {
-        self.inner_lock.get_or_create_string_reference(value)
-    }
-
-    /// Free a STRING_REFERENCE block and necessary EXTENTs.
-    #[cfg(test)]
-    pub fn maybe_free_string_reference(&mut self, block: Block<Container>) -> Result<(), Error> {
-        self.inner_lock.maybe_free_string_reference(block)
-    }
-
-    #[cfg(test)]
-    pub fn load_string(&mut self, index: BlockIndex) -> Result<String, Error> {
-        self.inner_lock.load_key_string(index)
-    }
-
     /// Free a PROPERTY block.
     pub fn free_property(&mut self, index: BlockIndex) -> Result<(), Error> {
         self.inner_lock.free_property(index)
@@ -506,8 +494,24 @@ impl<'a> LockedStateGuard<'a> {
     ) -> Result<(), Error> {
         self.inner_lock.set_array_string_slot(block_index, slot_index, value)
     }
+}
 
-    #[cfg(test)]
+#[cfg(test)]
+impl<'a> LockedStateGuard<'a> {
+    pub fn get_or_create_string_reference(
+        &mut self,
+        value: StringReference,
+    ) -> Result<Block<Container>, Error> {
+        self.inner_lock.get_or_create_string_reference(value)
+    }
+
+    pub fn maybe_free_string_reference(&mut self, block: Block<Container>) -> Result<(), Error> {
+        self.inner_lock.maybe_free_string_reference(block)
+    }
+
+    pub fn load_string(&mut self, index: BlockIndex) -> Result<String, Error> {
+        self.inner_lock.load_key_string(index)
+    }
     pub fn allocate_link(
         &mut self,
         name: StringReference,
@@ -518,9 +522,12 @@ impl<'a> LockedStateGuard<'a> {
         self.inner_lock.allocate_link(name, content.into(), disposition, parent_index)
     }
 
-    #[cfg(test)]
     pub fn heap(&self) -> &Heap<Container> {
         &self.inner_lock.heap
+    }
+
+    pub(crate) fn get_block(&self, index: BlockIndex) -> Block<Container> {
+        self.inner_lock.heap.get_block(index).expect("block exists")
     }
 }
 

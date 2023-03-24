@@ -72,10 +72,12 @@ impl Drop for StringArrayProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::assert_json_diff;
-    use crate::hierarchy::DiagnosticsHierarchy;
-    use crate::writer::Length;
-    use crate::Inspector;
+    use crate::{
+        assert_json_diff,
+        hierarchy::DiagnosticsHierarchy,
+        writer::{testing_utils::GetBlockExt, Length},
+        Inspector,
+    };
 
     impl StringArrayProperty {
         pub fn load_string_slot(&self, slot: usize) -> Option<String> {
@@ -86,9 +88,7 @@ mod tests {
                     .and_then(|mut state| {
                         state.load_string(
                             state
-                                .heap()
                                 .get_block(self.block_index().unwrap())
-                                .unwrap()
                                 .array_get_string_index_slot(slot)?,
                         )
                     })
@@ -102,12 +102,13 @@ mod tests {
         let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
 
         {
             let array = node.create_string_array("string_array", 5);
             assert_eq!(array.len().unwrap(), 5);
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 1);
+            });
 
             array.set(0, "0");
             array.set(1, "1");
@@ -141,6 +142,8 @@ mod tests {
             assert!(array.load_string_slot(5).is_none());
         }
 
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 }

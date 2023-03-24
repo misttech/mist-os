@@ -556,8 +556,10 @@ mod tests {
     use {
         super::*,
         crate::{
-            assert_data_tree, assert_json_diff, ArrayProperty, ExponentialHistogramParams,
-            HistogramProperty, Inspector, LinearHistogramParams, StringReference,
+            assert_data_tree, assert_json_diff,
+            private::InspectTypeInternal,
+            writer::{ArrayProperty, HistogramProperty, Inspector, StringReference},
+            ExponentialHistogramParams, LinearHistogramParams,
         },
         anyhow::Error,
         futures::prelude::*,
@@ -847,9 +849,7 @@ mod tests {
         // purpose to produce an invalid UTF8 string in the property.
         let vmo = inspector.vmo().await.unwrap();
         let snapshot = Snapshot::try_from(&vmo).expect("getting snapshot");
-        let block = snapshot
-            .get_block(prop.get_block().map(|b| b.index()).unwrap())
-            .expect("getting block");
+        let block = snapshot.get_block(prop.block_index().unwrap()).expect("getting block");
 
         // The first byte of the actual property string is at this byte offset in the VMO.
         let byte_offset = constants::MIN_ORDER_SIZE
@@ -886,7 +886,7 @@ mod tests {
         ReadBytes::read(&vmo, &mut buf[..]);
 
         // Mess up with the block slots by setting them to a too big number.
-        let offset = array.get_block().map(|b| b.index()).unwrap().offset() + 8;
+        let offset = array.block_index().unwrap().offset() + 8;
         let mut payload =
             Payload(u64::from_le_bytes(*<&[u8; 8]>::try_from(&buf[offset..offset + 8])?));
         payload.set_array_slots_count(255);

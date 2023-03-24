@@ -73,7 +73,10 @@ impl From<Cow<'_, str>> for StringReference {
 
 #[cfg(test)]
 mod tests {
-    use crate::writer::{testing_utils::get_state, Inspector, Node};
+    use crate::writer::{
+        testing_utils::{get_state, GetBlockExt},
+        Inspector, Node,
+    };
     use diagnostics_hierarchy::assert_data_tree;
 
     #[fuchsia::test]
@@ -147,7 +150,6 @@ mod tests {
         let state = get_state(4096);
         let root = Node::new_root(state);
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let _string_property =
                 node.create_string(String::from("string_property"), String::from("test"));
@@ -156,8 +158,12 @@ mod tests {
             let _double_property = node.create_double(String::from("double_property"), 1.0);
             let _int_property = node.create_int(String::from("int_property"), 1);
             let _uint_property = node.create_uint(String::from("uint_property"), 1);
-            assert_eq!(node_block.child_count().unwrap(), 5);
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 5);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 }

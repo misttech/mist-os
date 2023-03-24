@@ -10,9 +10,6 @@ use diagnostics_hierarchy::{ArrayFormat, LinearHistogramParams};
 use inspect_format::constants;
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 #[derive(Debug)]
 /// A linear histogram property for double values.
 pub struct DoubleLinearHistogramProperty {
@@ -44,11 +41,6 @@ impl DoubleLinearHistogramProperty {
             index += 1;
         }
         index as usize
-    }
-
-    #[cfg(test)]
-    fn get_block(&self) -> Option<Block<Container>> {
-        self.array.get_block()
     }
 }
 
@@ -86,14 +78,16 @@ impl HistogramProperty for DoubleLinearHistogramProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{writer::Inspector, LinearHistogramParams};
+    use crate::{
+        writer::{testing_utils::GetBlockExt, Inspector},
+        LinearHistogramParams,
+    };
 
     #[fuchsia::test]
     fn double_linear_histogram() {
         let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let double_histogram = node.create_double_linear_histogram(
                 "double-histogram",
@@ -102,13 +96,19 @@ mod tests {
             double_histogram.insert_multiple(0.0, 2); // underflow
             double_histogram.insert(25.3);
             double_histogram.insert(500.0); // overflow
-            let block = double_histogram.get_block().unwrap();
-            for (i, value) in [10.0, 5.0, 2.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0].iter().enumerate() {
-                assert_eq!(block.array_get_double_slot(i).unwrap(), *value);
-            }
+            double_histogram.array.get_block(|block| {
+                for (i, value) in [10.0, 5.0, 2.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0].iter().enumerate()
+                {
+                    assert_eq!(block.array_get_double_slot(i).unwrap(), *value);
+                }
+            });
 
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 1);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 }

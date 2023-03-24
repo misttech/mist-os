@@ -10,9 +10,6 @@ use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
 use inspect_format::constants;
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 #[derive(Debug)]
 /// An exponential histogram property for int values.
 pub struct IntExponentialHistogramProperty {
@@ -56,11 +53,6 @@ impl IntExponentialHistogramProperty {
         }
         index as usize
     }
-
-    #[cfg(test)]
-    fn get_block(&self) -> Option<Block<Container>> {
-        self.array.get_block()
-    }
 }
 
 impl HistogramProperty for IntExponentialHistogramProperty {
@@ -97,14 +89,16 @@ impl HistogramProperty for IntExponentialHistogramProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{writer::Inspector, ExponentialHistogramParams};
+    use crate::{
+        writer::{testing_utils::GetBlockExt, Inspector},
+        ExponentialHistogramParams,
+    };
 
     #[fuchsia::test]
     fn test_int_exp_histogram() {
         let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let int_histogram = node.create_int_exponential_histogram(
                 "int-histogram",
@@ -118,14 +112,19 @@ mod tests {
             int_histogram.insert_multiple(-1, 2); // underflow
             int_histogram.insert(8);
             int_histogram.insert(500); // overflow
-            let block = int_histogram.get_block().unwrap();
-            for (i, value) in [1, 1, 2, 2, 0, 0, 0, 1, 1].iter().enumerate() {
-                assert_eq!(block.array_get_int_slot(i).unwrap(), *value);
-            }
+            int_histogram.array.get_block(|block| {
+                for (i, value) in [1, 1, 2, 2, 0, 0, 0, 1, 1].iter().enumerate() {
+                    assert_eq!(block.array_get_int_slot(i).unwrap(), *value);
+                }
+            });
 
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 1);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 
     #[fuchsia::test]
@@ -144,18 +143,19 @@ mod tests {
         for i in -200..200 {
             hist.insert(i);
         }
-        let block = hist.get_block().unwrap();
-        assert_eq!(block.array_get_int_slot(0).unwrap(), 0);
-        assert_eq!(block.array_get_int_slot(1).unwrap(), 2);
-        assert_eq!(block.array_get_int_slot(2).unwrap(), 4);
+        hist.array.get_block(|block| {
+            assert_eq!(block.array_get_int_slot(0).unwrap(), 0);
+            assert_eq!(block.array_get_int_slot(1).unwrap(), 2);
+            assert_eq!(block.array_get_int_slot(2).unwrap(), 4);
 
-        // Buckets
-        let i = 3;
-        assert_eq!(block.array_get_int_slot(i).unwrap(), 200);
-        assert_eq!(block.array_get_int_slot(i + 1).unwrap(), 2);
-        assert_eq!(block.array_get_int_slot(i + 2).unwrap(), 6);
-        assert_eq!(block.array_get_int_slot(i + 3).unwrap(), 24);
-        assert_eq!(block.array_get_int_slot(i + 4).unwrap(), 96);
-        assert_eq!(block.array_get_int_slot(i + 5).unwrap(), 72);
+            // Buckets
+            let i = 3;
+            assert_eq!(block.array_get_int_slot(i).unwrap(), 200);
+            assert_eq!(block.array_get_int_slot(i + 1).unwrap(), 2);
+            assert_eq!(block.array_get_int_slot(i + 2).unwrap(), 6);
+            assert_eq!(block.array_get_int_slot(i + 3).unwrap(), 24);
+            assert_eq!(block.array_get_int_slot(i + 4).unwrap(), 96);
+            assert_eq!(block.array_get_int_slot(i + 5).unwrap(), 72);
+        });
     }
 }

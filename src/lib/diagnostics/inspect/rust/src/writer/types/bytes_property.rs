@@ -5,9 +5,6 @@
 use crate::writer::{Inner, InnerPropertyType, InspectType, Property};
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 /// Inspect Bytes Property data type.
 ///
 /// NOTE: do not rely on PartialEq implementation for true comparison.
@@ -38,23 +35,9 @@ impl InspectType for BytesProperty {}
 crate::impl_inspect_type_internal!(BytesProperty);
 
 #[cfg(test)]
-impl BytesProperty {
-    /// Returns the [`Block`][Block] associated with this value.
-    pub fn get_block(&self) -> Option<Block<Container>> {
-        self.inner.inner_ref().and_then(|inner_ref| {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.heap().get_block(inner_ref.block_index))
-                .ok()
-        })
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{testing_utils::get_state, Node};
+    use crate::writer::{testing_utils::get_state, testing_utils::GetBlockExt, Node};
     use inspect_format::{BlockType, PropertyFormat};
 
     #[fuchsia::test]
@@ -66,18 +49,24 @@ mod tests {
         let state = get_state(4096);
         let root = Node::new_root(state);
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let property = node.create_bytes("property", b"test");
-            let property_block = property.get_block().unwrap();
-            assert_eq!(property_block.block_type(), BlockType::BufferValue);
-            assert_eq!(property_block.total_length().unwrap(), 4);
-            assert_eq!(property_block.property_format().unwrap(), PropertyFormat::Bytes);
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            property.get_block(|block| {
+                assert_eq!(block.block_type(), BlockType::BufferValue);
+                assert_eq!(block.total_length().unwrap(), 4);
+                assert_eq!(block.property_format().unwrap(), PropertyFormat::Bytes);
+            });
+            node.get_block(|block| {
+                assert_eq!(block.child_count().unwrap(), 1);
+            });
 
             property.set(b"test-set");
-            assert_eq!(property_block.total_length().unwrap(), 8);
+            property.get_block(|block| {
+                assert_eq!(block.total_length().unwrap(), 8);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|block| {
+            assert_eq!(block.child_count().unwrap(), 0);
+        });
     }
 }

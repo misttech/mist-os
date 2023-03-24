@@ -5,7 +5,7 @@
 mod error;
 pub(crate) mod heap;
 pub(crate) mod state;
-mod testing_utils;
+
 pub mod types;
 mod utils;
 
@@ -14,3 +14,6 @@ pub use {error::Error, types::*, utils::*};
 
 #[doc(hidden)]
 pub use heap::Heap;
+
+#[cfg(test)]
+pub(crate) mod testing_utils;

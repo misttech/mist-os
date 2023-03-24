@@ -5,9 +5,6 @@
 use crate::writer::{Inner, InnerValueType, InspectType, Property};
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 /// Inspect API Bool Property data type.
 ///
 /// NOTE: do not rely on PartialEq implementation for true comparison.
@@ -40,23 +37,9 @@ impl InspectType for BoolProperty {}
 crate::impl_inspect_type_internal!(BoolProperty);
 
 #[cfg(test)]
-impl BoolProperty {
-    /// Returns the [`Block`][Block] associated with this value.
-    pub fn get_block(&self) -> Option<Block<Container>> {
-        self.inner.inner_ref().and_then(|inner_ref| {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.heap().get_block(inner_ref.block_index))
-                .ok()
-        })
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{testing_utils::get_state, Node};
+    use crate::writer::{testing_utils::get_state, testing_utils::GetBlockExt, Node};
     use inspect_format::BlockType;
 
     #[fuchsia::test]
@@ -68,17 +51,23 @@ mod tests {
         let state = get_state(4096);
         let root = Node::new_root(state);
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let property = node.create_bool("property", true);
-            let property_block = property.get_block().unwrap();
-            assert_eq!(property_block.block_type(), BlockType::BoolValue);
-            assert_eq!(property_block.bool_value().unwrap(), true);
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            property.get_block(|block| {
+                assert_eq!(block.block_type(), BlockType::BoolValue);
+                assert_eq!(block.bool_value().unwrap(), true);
+            });
+            node.get_block(|block| {
+                assert_eq!(block.child_count().unwrap(), 1);
+            });
 
             property.set(false);
-            assert_eq!(property_block.bool_value().unwrap(), false);
+            property.get_block(|block| {
+                assert_eq!(block.bool_value().unwrap(), false);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|block| {
+            assert_eq!(block.child_count().unwrap(), 0);
+        });
     }
 }

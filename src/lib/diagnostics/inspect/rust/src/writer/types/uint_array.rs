@@ -5,9 +5,6 @@
 use crate::writer::{ArithmeticArrayProperty, ArrayProperty, Inner, InnerValueType, InspectType};
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 /// Inspect uint array data type.
 ///
 /// NOTE: do not rely on PartialEq implementation for true comparison.
@@ -82,25 +79,11 @@ impl ArithmeticArrayProperty for UintArrayProperty {
         }
     }
 }
-#[cfg(test)]
-impl UintArrayProperty {
-    /// Returns the [`Block`][Block] associated with this value.
-    pub fn get_block(&self) -> Option<Block<Container>> {
-        self.inner.inner_ref().and_then(|inner_ref| {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.heap().get_block(inner_ref.block_index))
-                .ok()
-        })
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::Inspector;
-    use crate::writer::Length;
+    use crate::writer::{testing_utils::GetBlockExt, Inspector, Length};
 
     #[fuchsia::test]
     fn test_uint_array() {
@@ -111,35 +94,47 @@ mod tests {
         let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let array = node.create_uint_array("array_property", 5);
             assert_eq!(array.len().unwrap(), 5);
-            let array_block = array.get_block().unwrap();
 
             array.set(0, 5u64);
-            assert_eq!(array_block.array_get_uint_slot(0).unwrap(), 5);
+            array.get_block(|array_block| {
+                assert_eq!(array_block.array_get_uint_slot(0).unwrap(), 5);
+            });
 
             array.add(0, 5);
-            assert_eq!(array_block.array_get_uint_slot(0).unwrap(), 10);
+            array.get_block(|array_block| {
+                assert_eq!(array_block.array_get_uint_slot(0).unwrap(), 10);
+            });
 
             array.subtract(0, 3);
-            assert_eq!(array_block.array_get_uint_slot(0).unwrap(), 7);
+            array.get_block(|array_block| {
+                assert_eq!(array_block.array_get_uint_slot(0).unwrap(), 7);
+            });
 
             array.set(1, 2u64);
             array.set(3, 3u64);
 
-            for (i, value) in [7, 2, 0, 3, 0].iter().enumerate() {
-                assert_eq!(array_block.array_get_uint_slot(i).unwrap(), *value);
-            }
+            array.get_block(|array_block| {
+                for (i, value) in [7, 2, 0, 3, 0].iter().enumerate() {
+                    assert_eq!(array_block.array_get_uint_slot(i).unwrap(), *value);
+                }
+            });
 
             array.clear();
-            for i in 0..5 {
-                assert_eq!(0, array_block.array_get_uint_slot(i).unwrap());
-            }
+            array.get_block(|array_block| {
+                for i in 0..5 {
+                    assert_eq!(0, array_block.array_get_uint_slot(i).unwrap());
+                }
+            });
 
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 1);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 }

@@ -10,9 +10,6 @@ use diagnostics_hierarchy::{ArrayFormat, ExponentialHistogramParams};
 use inspect_format::constants;
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 #[derive(Debug)]
 /// An exponential histogram property for uint values.
 pub struct UintExponentialHistogramProperty {
@@ -56,11 +53,6 @@ impl UintExponentialHistogramProperty {
         }
         index as usize
     }
-
-    #[cfg(test)]
-    fn get_block(&self) -> Option<Block<Container>> {
-        self.array.get_block()
-    }
 }
 
 impl HistogramProperty for UintExponentialHistogramProperty {
@@ -97,14 +89,16 @@ impl HistogramProperty for UintExponentialHistogramProperty {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{writer::Inspector, ExponentialHistogramParams};
+    use crate::{
+        writer::{testing_utils::GetBlockExt, Inspector},
+        ExponentialHistogramParams,
+    };
 
     #[fuchsia::test]
     fn test_uint_exp_histogram() {
         let inspector = Inspector::default();
         let root = inspector.root();
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let uint_histogram = node.create_uint_exponential_histogram(
                 "uint-histogram",
@@ -118,18 +112,25 @@ mod tests {
             uint_histogram.insert_multiple(0, 2); // underflow
             uint_histogram.insert(8);
             uint_histogram.insert(500); // overflow
-            let block = uint_histogram.get_block().unwrap();
-            for (i, value) in [1, 1, 2, 2, 0, 0, 0, 1, 1].iter().enumerate() {
-                assert_eq!(block.array_get_uint_slot(i).unwrap(), *value);
-            }
+            uint_histogram.array.get_block(|block| {
+                for (i, value) in [1, 1, 2, 2, 0, 0, 0, 1, 1].iter().enumerate() {
+                    assert_eq!(block.array_get_uint_slot(i).unwrap(), *value);
+                }
+            });
 
             uint_histogram.clear();
-            for (i, value) in [1, 1, 2, 0, 0, 0, 0, 0, 0].iter().enumerate() {
-                assert_eq!(*value, block.array_get_uint_slot(i).unwrap());
-            }
+            uint_histogram.array.get_block(|block| {
+                for (i, value) in [1, 1, 2, 0, 0, 0, 0, 0, 0].iter().enumerate() {
+                    assert_eq!(*value, block.array_get_uint_slot(i).unwrap());
+                }
+            });
 
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            node.get_block(|node_block| {
+                assert_eq!(node_block.child_count().unwrap(), 1);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|node_block| {
+            assert_eq!(node_block.child_count().unwrap(), 0);
+        });
     }
 }

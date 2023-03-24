@@ -5,9 +5,6 @@
 use crate::writer::{Error, Inner, InnerValueType, InspectType, NumericProperty, Property};
 use tracing::error;
 
-#[cfg(test)]
-use inspect_format::{Block, Container};
-
 /// Inspect uint property data type.
 ///
 /// NOTE: do not rely on PartialEq implementation for true comparison.
@@ -77,23 +74,9 @@ impl NumericProperty<'_> for UintProperty {
 }
 
 #[cfg(test)]
-impl UintProperty {
-    /// Returns the [`Block`][Block] associated with this value.
-    pub fn get_block(&self) -> Option<Block<Container>> {
-        self.inner.inner_ref().and_then(|inner_ref| {
-            inner_ref
-                .state
-                .try_lock()
-                .and_then(|state| state.heap().get_block(inner_ref.block_index))
-                .ok()
-        })
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
-    use crate::writer::{testing_utils::get_state, Node};
+    use crate::writer::{testing_utils::get_state, testing_utils::GetBlockExt, Node};
     use inspect_format::BlockType;
 
     #[fuchsia::test]
@@ -105,24 +88,34 @@ mod tests {
         let state = get_state(4096);
         let root = Node::new_root(state);
         let node = root.create_child("node");
-        let node_block = node.get_block().unwrap();
         {
             let property = node.create_uint("property", 1);
-            let property_block = property.get_block().unwrap();
-            assert_eq!(property_block.block_type(), BlockType::UintValue);
-            assert_eq!(property_block.uint_value().unwrap(), 1);
-            assert_eq!(node_block.child_count().unwrap(), 1);
+            property.get_block(|block| {
+                assert_eq!(block.block_type(), BlockType::UintValue);
+                assert_eq!(block.uint_value().unwrap(), 1);
+            });
+            node.get_block(|block| {
+                assert_eq!(block.child_count().unwrap(), 1);
+            });
 
             property.set(5);
-            assert_eq!(property_block.uint_value().unwrap(), 5);
+            property.get_block(|block| {
+                assert_eq!(block.uint_value().unwrap(), 5);
+            });
             assert_eq!(property.get().unwrap(), 5);
 
             property.subtract(3);
-            assert_eq!(property_block.uint_value().unwrap(), 2);
+            property.get_block(|block| {
+                assert_eq!(block.uint_value().unwrap(), 2);
+            });
 
             property.add(8);
-            assert_eq!(property_block.uint_value().unwrap(), 10);
+            property.get_block(|block| {
+                assert_eq!(block.uint_value().unwrap(), 10);
+            });
         }
-        assert_eq!(node_block.child_count().unwrap(), 0);
+        node.get_block(|block| {
+            assert_eq!(block.child_count().unwrap(), 0);
+        });
     }
 }
