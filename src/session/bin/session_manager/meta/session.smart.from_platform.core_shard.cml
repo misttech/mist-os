@@ -54,12 +54,16 @@
             // Routed from v1 components.
             protocol: [
                 "fuchsia.timezone.Timezone",
-                "fuchsia.ultrasound.Factory",
                 "google.cast.cryptokey.NamedKeyProvider",
             ],
             from: "self",
             to: "#session-manager",
             dependency: "weak_for_migration",
+        },
+        {
+            protocol: "fuchsia.ultrasound.Factory",
+            from: "#audio_core",
+            to: "#session-manager",
         },
         {
             protocol: "fuchsia.camera3.DeviceWatcher",
