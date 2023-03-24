@@ -61,9 +61,26 @@ struct ReadyObject {
 /// to `epoll_event` used in `epoll_ctl` and `epoll_pwait`.
 #[derive(Default, Debug, Copy, Clone, AsBytes, FromBytes)]
 #[repr(packed)]
+#[non_exhaustive]
 pub struct EpollEvent {
     pub events: u32,
+
+    // On aarch64 the epoll event includes internal padding.
+    #[cfg(target_arch = "aarch64")]
+    _padding: u32,
+
     pub data: u64,
+}
+
+impl EpollEvent {
+    #[cfg(target_arch = "x86_64")]
+    pub fn new(events: u32, data: u64) -> Self {
+        Self { events, data }
+    }
+    #[cfg(target_arch = "aarch64")]
+    pub fn new(events: u32, data: u64) -> Self {
+        Self { events, data, _padding: 0 }
+    }
 }
 
 /// EpollFileObject represents the FileObject used to
@@ -423,7 +440,7 @@ impl EpollFileObject {
             // so ignore the None case.
             if let Some(wait) = state.wait_objects.get_mut(&pending_event.key) {
                 let reported_events = pending_event.observed.bits() & wait.events.bits();
-                result.push(EpollEvent { events: reported_events, data: wait.data });
+                result.push(EpollEvent::new(reported_events, wait.data));
 
                 // Files marked with `EPOLLONESHOT` should only notify
                 // once and need to be rearmed manually with epoll_ctl_mod().
@@ -529,7 +546,7 @@ mod tests {
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
+                EpollEvent::new(FdEvents::POLLIN.bits(), EVENT_DATA),
             )
             .unwrap();
 
@@ -580,7 +597,7 @@ mod tests {
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
+                EpollEvent::new(FdEvents::POLLIN.bits(), EVENT_DATA),
             )
             .unwrap();
 
@@ -612,7 +629,7 @@ mod tests {
                     &current_task,
                     &event,
                     &epoll_file_handle,
-                    EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
+                    EpollEvent::new(FdEvents::POLLIN.bits(), EVENT_DATA),
                 )
                 .unwrap();
 
@@ -674,7 +691,7 @@ mod tests {
                     &current_task,
                     &pipe1,
                     &epoll_object,
-                    EpollEvent { events: FdEvents::POLLIN.bits(), data: 1 },
+                    EpollEvent::new(FdEvents::POLLIN.bits(), 1),
                 )
                 .expect("epoll_file.add");
             epoll_file
@@ -682,7 +699,7 @@ mod tests {
                     &current_task,
                     &pipe2,
                     &epoll_object,
-                    EpollEvent { events: FdEvents::POLLIN.bits(), data: 2 },
+                    EpollEvent::new(FdEvents::POLLIN.bits(), 2),
                 )
                 .expect("epoll_file.add");
             epoll_file.wait(&current_task, 2, zx::Duration::from_millis(0)).expect("wait")
@@ -730,7 +747,7 @@ mod tests {
                 &current_task,
                 &event,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
+                EpollEvent::new(FdEvents::POLLIN.bits(), EVENT_DATA),
             )
             .unwrap();
 
@@ -777,7 +794,7 @@ mod tests {
                 &current_task,
                 &socket1,
                 &epoll_file_handle,
-                EpollEvent { events: FdEvents::POLLIN.bits(), data: EVENT_DATA },
+                EpollEvent::new(FdEvents::POLLIN.bits(), EVENT_DATA),
             )
             .unwrap();
         assert_eq!(
@@ -787,11 +804,7 @@ mod tests {
 
         let read_write_event = FdEvents::POLLIN | FdEvents::POLLOUT;
         epoll_file
-            .modify(
-                &current_task,
-                &socket1,
-                EpollEvent { events: read_write_event.bits(), data: EVENT_DATA },
-            )
+            .modify(&current_task, &socket1, EpollEvent::new(read_write_event.bits(), EVENT_DATA))
             .unwrap();
         let triggered_events =
             epoll_file.wait(&current_task, 10, zx::Duration::from_seconds(0)).unwrap();

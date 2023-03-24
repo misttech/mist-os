@@ -1608,7 +1608,7 @@ pub fn sys_pselect6(
             }
         }
         if aggregated_events != 0 {
-            let event = EpollEvent { events: aggregated_events, data: fd as u64 };
+            let event = EpollEvent::new(aggregated_events, fd as u64);
             let file = current_task.files.get(FdNumber::from_raw(fd as i32))?;
             epoll_file.add(current_task, &file, &file_object, event)?;
             num_fds += 1;
