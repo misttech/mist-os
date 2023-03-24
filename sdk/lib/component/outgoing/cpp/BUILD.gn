@@ -4,25 +4,6 @@
 
 import("//build/cpp/sdk_source_set.gni")
 
-_shared_sources = [
-  "handlers.h",
-  "outgoing_directory.cc",
-  "outgoing_directory.h",
-  "structured_config.h",
-]
-
-_shared_public_deps = [
-  "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
-  "//sdk/lib/fdio",
-  "//sdk/lib/fit",
-  "//sdk/lib/fit-promise",
-  "//sdk/lib/stdcompat",
-  "//sdk/lib/svc",
-  "//zircon/system/ulib/async",
-  "//zircon/system/ulib/async:async-cpp",
-  "//zircon/system/ulib/zx",
-]
-
 _shared_public_configs = [ "//sdk/config" ]
 
 sdk_source_set("cpp") {
@@ -30,17 +11,35 @@ sdk_source_set("cpp") {
   sdk_name = "component_outgoing_cpp"
   include_base = "//sdk"
 
-  sources = _shared_sources
-  public_deps = _shared_public_deps
+  sources = [
+    "globals.cc",
+    "globals.h",
+    "handlers.h",
+    "outgoing_directory.cc",
+    "outgoing_directory.h",
+    "structured_config.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp_wire",
+    "//sdk/lib/fdio",
+    "//sdk/lib/fit",
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/stdcompat",
+    "//sdk/lib/svc",
+    "//zircon/system/ulib/async",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/zx",
+  ]
+
   public_configs = _shared_public_configs
 }
 
 source_set("cpp_disable_synchronization_check") {
-  sources = _shared_sources
-  public_deps = _shared_public_deps
+  public_deps = [ ":cpp" ]
   public_configs = _shared_public_configs
 
-  defines = [ "_LIB_COMPONENT_OUTGOING_CPP_DISABLE_SYNCHRONIZATION_CHECK" ]
+  sources = [ "disable_synchronization_check.cc" ]
 
   # Allowlist of components permitted to skip the synchronization check, which
   # is turned on by default.

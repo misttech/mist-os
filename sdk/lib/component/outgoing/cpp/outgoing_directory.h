@@ -419,11 +419,9 @@ class OutgoingDirectory final {
 
     async::synchronization_checker checker_;
 
-#ifndef _LIB_COMPONENT_OUTGOING_CPP_DISABLE_SYNCHRONIZATION_CHECK
     // This task will be scheduled on the async dispatcher to let |checker|
     // run additional verifications inside a dispatcher task.
-    async::Task synchronization_check_dispatcher_task_;
-#endif
+    std::optional<async::Task> synchronization_check_dispatcher_task_;
 
     // |root_| is the outgoing directory implementation.
     // It is thread-unsafe, hence guarded by our synchronization checker using
