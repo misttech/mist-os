@@ -3,8 +3,12 @@
 # found in the LICENSE file.
 
 import("//build/config.gni")
+import("//build/dist/resource.gni")
 import("//src/fonts/build/font_args.gni")
 import("//src/fonts/build/font_manifest.gni")
+
+# The path relative to component's `/pkg` dir where font assets are stored.
+_assets_relative_path = "data/assets"
 
 ################################################################################
 # Merge the contents of all the .font_pkgs.json files
@@ -98,13 +102,23 @@ template("local_font_bundle") {
     outputs = [ "assets/{{source_file_part}}" ]
   }
 
+  # Same as above, except bundled as regular assets.
+  assets_label = "_${target_name}_assets"
+  resource(assets_label) {
+    sources = local_asset_paths
+    outputs = [ "${_assets_relative_path}/{{source_file_part}}" ]
+  }
+
   group(target_name) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    deps = [ ":${config_data_label}" ]
+    deps = [
+      ":${assets_label}",
+      ":${config_data_label}",
+    ]
     metadata = {
       local_font_file_names = asset_names
       font_barrier = []
@@ -163,16 +177,27 @@ template("local_font_bundle") {
 #     package.
 #     Default: "fonts"
 #     Type: string
+#
+#   generate_hermetic_assets
+#     Optional: If set, generates the hermetic font assets in addition to
+#     the config-data assets.
+#     Default: false
+#     Type: boolean
 template("font_collection") {
   forward_variables_from(invoker,
                          [
                            "font_packages",
-                           "local_font_bundles",
-                           "local_asset_names",
-                           "product_config_path",
-                           "manifest_prefix",
                            "font_service_pkg",
+                           "generate_hermetic_assets",
+                           "local_asset_names",
+                           "local_font_bundles",
+                           "manifest_prefix",
+                           "product_config_path",
                          ])
+
+  if (!defined(generate_hermetic_assets)) {
+    generate_hermetic_assets = false
+  }
 
   if (!defined(font_packages)) {
     font_packages = []
@@ -317,6 +342,42 @@ template("font_collection") {
     outputs = [ "${manifest_prefix}.font_manifest.json" ]
   }
 
+  # Also generate the font manifest for font resources that will get packaged
+  # alongside the font manager.
+  if (generate_hermetic_assets) {
+    asset_font_manifest_label = "${target_name}_asset_manifest_file"
+    asset_font_manifest_path = "${target_out_dir}/${target_name}_all.hermetic_assets.font_manifest.json"
+    font_manifest(asset_font_manifest_label) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      all_fonts_path = _all_fonts_json_path
+      local_fonts_path = _local_fonts_json_path
+      font_files = all_font_file_paths
+      deps = [
+        ":${_all_fonts_json_label}",
+        ":${_local_fonts_json_label}",
+      ]
+      output = asset_font_manifest_path
+      pretty_print = is_debug
+      target_asset_dir = "/pkg/${_assets_relative_path}"
+    }
+
+    font_assets_label = "${target_name}_font_assets"
+    resource(font_assets_label) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      sources = get_target_outputs(":${asset_font_manifest_label}")
+      deps = [ ":${asset_font_manifest_label}" ]
+      outputs = "${_assets_relative_path}/{{source_file_part}}"
+    }
+  }
+
   group(target_name) {
     forward_variables_from(invoker,
                            [
@@ -325,6 +386,9 @@ template("font_collection") {
                            ])
 
     deps = local_font_bundles + [ ":${font_manifest_config_data_label}" ]
+    if (generate_hermetic_assets) {
+      deps += [ ":${font_assets_label}" ]
+    }
     if (generate_pkg_resolver_config_data) {
       deps += [ ":${pkg_resolver_config_data_label}" ]
     } else {

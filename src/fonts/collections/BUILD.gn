@@ -220,6 +220,7 @@ font_collection("downstream-test-fonts-collection") {
   product_config_path = "downstream-test-fonts-collection.fontcfg.json5"
   manifest_prefix = "downstream_test_fonts"
   local_font_bundles = [ ":test-fonts-downstream-local" ]
+  generate_hermetic_assets = true
 }
 
 # Minimal font collection for some tests.

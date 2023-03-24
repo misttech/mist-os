@@ -44,6 +44,11 @@ import("//src/fonts/build/font_args.gni")
 #     Required: Path to the .font_manifest.json file that we'll be writing.
 #     Type: file
 #
+#   target_asset_dir
+#     Optional: Absolute path to the directory that holds the resulting assets.
+#     Type: file
+#     Default: "/config/data/assets"
+#
 #
 # Build variables
 #
@@ -134,6 +139,13 @@ template("font_manifest") {
         args += [
           "--product-config",
           rebase_path(product_config_path, root_build_dir),
+        ]
+      }
+
+      if (defined(invoker.target_asset_dir)) {
+        args += [
+          "--target-asset-dir",
+          invoker.target_asset_dir,
         ]
       }
     } else {
