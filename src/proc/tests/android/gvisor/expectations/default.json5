@@ -138,6 +138,13 @@
                 "AllocateTest.FallocateRlimit",
 
                 // fcntl_test
+                "FcntlLockTest.TestOFDBasicLock",
+                "FcntlLockTest.TestOFDNoUnlockOnClose",
+                "FcntlLockTest.TestOFDUnlocksOnLastClose",
+                "FcntlLockTest.TestOFDInheritsLockAfterDup",
+                "FcntlLockTest.TestOFDLocksHoldAfterExec",
+                "FcntlLockTest.TestOFDGetLkReturnsNegPID",
+                "FcntlLockTest.TestOFDCanUpgradeLock",
                 "FcntlTest.SetFileStatusFlagWithOpath",
                 "FcntlTest.BadFcntlsWithOpath",
                 "FcntlTest.GetAllFlags",
@@ -167,6 +174,7 @@
                 "FcntlTest.SetFlSetOwnSetSigDoNotRace",
                 "FcntlSignalTest.SetSigDefault",
                 "FcntlSignalTest.SignalFD",
+                "FcntlSignalTest.SignalFDSetSigAfterASYNC",
                 "FcntlSignalTest.SetSigCustom",
                 "FcntlSignalTest.SetSigUnregisterStillGetsSigio",
                 "FcntlSignalTest.SetSigWithSigioStillGetsSiginfo",
@@ -460,6 +468,9 @@
 
                 // network_namespace_test
                 "NetworkNamespaceTest.LoopbackExists",
+
+                // open_test
+                "OpenTest.DirectoryDirectFails",
 
                 // packet_socket_dgram_test
                 "BasicCookedPacketTest.WrongType",
@@ -847,6 +858,7 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
                 "AllUnixDomainSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
+                "AllTCPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
 
                 // socket_ip_udp_loopback_test
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
