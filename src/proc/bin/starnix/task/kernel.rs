@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy};
+use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{self as zx, Process};
 use once_cell::sync::OnceCell;
 use std::collections::{BTreeMap, HashSet};
@@ -19,7 +21,6 @@ use crate::lock::RwLock;
 use crate::logging::set_zx_name;
 use crate::mm::FutexTable;
 use crate::task::*;
-#[cfg(target_arch = "x86_64")]
 use crate::types::*;
 use crate::types::{DeviceType, Errno, OpenFlags};
 
@@ -70,6 +71,9 @@ pub struct Kernel {
     // The features enabled for the container this kernel is associated with, as specified in
     // the container's configuration file.
     pub features: HashSet<String>,
+
+    /// The service directory of the container.
+    container_svc: Option<fio::DirectoryProxy>,
 
     /// A `Framebuffer` that can be used to display a view in the workstation UI. If the container
     /// specifies the `framebuffer` feature this framebuffer will be registered as a device.
@@ -158,6 +162,7 @@ impl Kernel {
         name: &[u8],
         cmdline: &[u8],
         features: &[String],
+        container_svc: Option<fio::DirectoryProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
         let vsock_address_maker = Box::new(|x: u32| -> SocketAddress { SocketAddress::Vsock(x) });
@@ -185,6 +190,7 @@ impl Kernel {
             selinux_fs: OnceCell::new(),
             device_registry: RwLock::new(DeviceRegistry::new_with_common_devices()),
             features: HashSet::from_iter(features.iter().cloned()),
+            container_svc,
             framebuffer: Framebuffer::new().expect("Failed to create framebuffer"),
             input_file: InputFile::new(),
             binders: Default::default(),
@@ -208,6 +214,19 @@ impl Kernel {
     ) -> Result<Box<dyn FileOps>, Errno> {
         let registry = self.device_registry.read();
         registry.open_device(current_task, node, flags, dev, mode)
+    }
+
+    /// Returns a Proxy to the service exposed to the container at `filename`.
+    #[allow(unused)]
+    pub fn connect_to_named_protocol_at_container_svc<P: ProtocolMarker>(
+        &self,
+        filename: &str,
+    ) -> Result<ClientEnd<P>, Errno> {
+        let svc = self.container_svc.as_ref().ok_or_else(|| errno!(ENOENT))?;
+        let (client_end, server_end) = create_endpoints::<P>();
+        fdio::service_connect_at(svc.as_channel().as_ref(), filename, server_end.into_channel())
+            .map_err(|status| from_status_like_fdio!(status))?;
+        Ok(client_end)
     }
 
     pub fn selinux_enabled(&self) -> bool {

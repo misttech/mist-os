@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, bail, Error};
+use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_decl as fdecl;
 use fidl_fuchsia_component_runner as frunner;
@@ -23,10 +24,28 @@ pub const PKG_HANDLE_INFO: fruntime::HandleInfo = fruntime::HandleInfo::new(HAND
 pub const CONTAINER_OUTGOING_DIR_HANDLE_INFO: fruntime::HandleInfo =
     fruntime::HandleInfo::new(HANDLE_TYPE, 1);
 
+/// The handle info that is used to pass the svc directory for a container.
+pub const CONTAINER_SVC_HANDLE_INFO: fruntime::HandleInfo =
+    fruntime::HandleInfo::new(HANDLE_TYPE, 2);
+
 #[derive(Debug)]
 pub struct KernelStartInfo {
     pub args: fcomponent::CreateChildArgs,
     pub name: String,
+}
+
+fn take_namespace_entry(
+    ns: &mut Vec<frunner::ComponentNamespaceEntry>,
+    entry_name: &str,
+) -> Result<Option<ClientEnd<fio::DirectoryMarker>>, Error> {
+    if let Some(entry) = ns.iter_mut().find(|entry| entry.path == Some(entry_name.to_string())) {
+        if entry.directory.is_none() {
+            bail!("Missing directory handle in {entry_name} namespace entry");
+        }
+        Ok(entry.directory.take())
+    } else {
+        Ok(None)
+    }
 }
 
 pub fn generate_kernel_config(
@@ -40,13 +59,8 @@ pub fn generate_kernel_config(
     // Grab the /pkg directory of the container component, and pass it to the starnix_kernel as handle
     // `User1`.
     let mut ns = component_start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
-    let pkg = ns
-        .iter_mut()
-        .find(|entry| entry.path == Some("/pkg".to_string()))
-        .ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?
-        .directory
-        .take()
-        .ok_or_else(|| anyhow!("Missing directory handle in pkg namespace entry"))?;
+    let pkg = take_namespace_entry(&mut ns, "/pkg")?
+        .ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?;
     let pkg_handle_info = fprocess::HandleInfo {
         handle: pkg.into_channel().into_handle(),
         id: PKG_HANDLE_INFO.as_raw(),
@@ -60,7 +74,18 @@ pub fn generate_kernel_config(
         handle: outgoing_dir.into_handle(),
         id: CONTAINER_OUTGOING_DIR_HANDLE_INFO.as_raw(),
     };
-    let numbered_handles = vec![pkg_handle_info, outgoing_dir_handle_info];
+
+    let mut numbered_handles = vec![pkg_handle_info, outgoing_dir_handle_info];
+
+    if let Some(svc) = take_namespace_entry(&mut ns, "/svc")? {
+        // Pass the svc directory of the container to the starnix kernel. The kernel used this to
+        // obtain services offered to the container.
+        let svc_handle_info = fprocess::HandleInfo {
+            handle: svc.into_channel().into_handle(),
+            id: CONTAINER_SVC_HANDLE_INFO.as_raw(),
+        };
+        numbered_handles.push(svc_handle_info);
+    }
 
     // Create a new configuration directory for the starnix_kernel instance.
     let kernel_name = generate_kernel_config_directory(kernels_dir, &mut component_start_info)?;

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use fidl::AsyncChannel;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_data as fdata;
 use fidl_fuchsia_io as fio;
@@ -51,6 +52,10 @@ struct ConfigWrapper {
     /// directory.
     #[allow(dead_code)]
     outgoing_dir: Option<zx::Channel>,
+
+    /// The svc directory of the container, used to access protocols from the container.
+    #[allow(dead_code)]
+    svc_dir: Option<zx::Channel>,
 }
 
 impl std::ops::Deref for ConfigWrapper {
@@ -81,6 +86,8 @@ fn get_config() -> ConfigWrapper {
         let outgoing_dir =
             fruntime::take_startup_handle(kernel_config::CONTAINER_OUTGOING_DIR_HANDLE_INFO)
                 .map(zx::Channel::from_handle);
+        let svc_dir = fruntime::take_startup_handle(kernel_config::CONTAINER_SVC_HANDLE_INFO)
+            .map(zx::Channel::from_handle);
 
         ConfigWrapper {
             config: Config {
@@ -95,6 +102,7 @@ fn get_config() -> ConfigWrapper {
             },
             pkg_dir,
             outgoing_dir,
+            svc_dir,
         }
     } else {
         const COMPONENT_PKG_PATH: &str = "/pkg";
@@ -111,7 +119,12 @@ fn get_config() -> ConfigWrapper {
             None
         };
         // Default to the configuration that is provided by structured config.
-        ConfigWrapper { config: Config::take_from_startup_handle(), pkg_dir, outgoing_dir: None }
+        ConfigWrapper {
+            config: Config::take_from_startup_handle(),
+            pkg_dir,
+            outgoing_dir: None,
+            svc_dir: None,
+        }
     }
 }
 
@@ -161,10 +174,21 @@ pub async fn create_container() -> Result<Arc<Container>, Error> {
     const DEFAULT_INIT: &str = "/container/init";
     let mut config = get_config();
 
+    // Install container svc into the kernel namespace
+    let svc_dir = if let Some(svc_dir) = config.svc_dir.take() {
+        Some(fio::DirectoryProxy::new(AsyncChannel::from_channel(svc_dir)?))
+    } else {
+        None
+    };
+
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(config.pkg_dir.take().unwrap());
 
-    let kernel =
-        Kernel::new(config.name.as_bytes(), config.kernel_cmdline.as_bytes(), &config.features)?;
+    let kernel = Kernel::new(
+        config.name.as_bytes(),
+        config.kernel_cmdline.as_bytes(),
+        &config.features,
+        svc_dir,
+    )?;
 
     let node = inspect::component::inspector().root().create_child("container");
     create_container_inspect(kernel.clone(), &node);
