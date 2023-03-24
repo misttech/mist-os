@@ -114,7 +114,6 @@ type TemporaryBoardInfo = struct {
     board_revision uint32;
 };
 
-@transport("Driver")
 protocol SysSuspend {
     Callback(struct {
         requested_state uint8;

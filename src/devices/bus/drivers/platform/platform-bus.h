@@ -110,7 +110,7 @@ class PlatformBus : public PlatformBusType,
 
   inline ddk::GpioImplProtocolClient* gpio() { return &*gpio_; }
 
-  fdf::WireClient<fuchsia_hardware_platform_bus::SysSuspend>& suspend_cb() { return suspend_cb_; }
+  fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend>& suspend_cb() { return suspend_cb_; }
 
   fuchsia_hardware_platform_bus::TemporaryBoardInfo board_info() {
     fbl::AutoLock lock(&board_info_lock_);
@@ -126,7 +126,7 @@ class PlatformBus : public PlatformBusType,
   }
 
  private:
-  fdf::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
+  fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PlatformBus);
 

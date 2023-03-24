@@ -36,12 +36,11 @@ zx_handle_t root_resource_handle;
 
 namespace x86 {
 
-void SysSuspender::Callback(CallbackRequestView request, fdf::Arena& arena,
-                            CallbackCompleter::Sync& completer) {
+void SysSuspender::Callback(CallbackRequestView request, CallbackCompleter::Sync& completer) {
   uint8_t out_state;
   zx_status_t status = acpi_suspend(request->requested_state, request->enable_wake,
                                     request->suspend_reason, &out_state);
-  completer.buffer(arena).Reply(status, out_state);
+  completer.Reply(status, out_state);
 }
 
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -199,13 +198,13 @@ zx_status_t X86::Bind() {
   // (coordinator.cpp:BuildSuspendList()). If move this suspend hook elsewhere,
   // we must make sure that the coordinator code arranges for this suspend op to be
   // called last.
-  auto endpoints = fdf::CreateEndpoints<fpbus::SysSuspend>();
+  auto endpoints = fidl::CreateEndpoints<fpbus::SysSuspend>();
   if (endpoints.is_error()) {
     zxlogf(ERROR, "%s: Could not create suspend callback endpoints: %s", __func__,
            endpoints.status_string());
   } else {
-    fdf::BindServer(fdf::Dispatcher::GetCurrent()->get(), std::move(endpoints->server),
-                    &suspender_);
+    suspender_loop_.StartThread("sys suspender");
+    fidl::BindServer(suspender_loop_.dispatcher(), std::move(endpoints->server), &suspender_);
     auto result = pbus_.buffer(arena)->RegisterSysSuspendCallback(std::move(endpoints->client));
     if (!result.ok()) {
       zxlogf(ERROR, "RegisterSysSuspendCallback request failed: %s",

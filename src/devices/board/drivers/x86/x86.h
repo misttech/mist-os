@@ -8,6 +8,8 @@
 #include <fidl/fuchsia.acpi.tables/cpp/wire.h>
 #include <fidl/fuchsia.hardware.acpi/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/fidl/cpp/channel.h>
@@ -25,9 +27,9 @@
 
 namespace x86 {
 
-class SysSuspender : public fdf::WireServer<fuchsia_hardware_platform_bus::SysSuspend> {
+class SysSuspender : public fidl::WireServer<fuchsia_hardware_platform_bus::SysSuspend> {
  public:
-  void Callback(CallbackRequestView request, fdf::Arena& arena, CallbackCompleter::Sync& completer);
+  void Callback(CallbackRequestView request, CallbackCompleter::Sync& completer);
 };
 
 class X86;
@@ -95,6 +97,7 @@ class X86 : public DeviceType {
   // Whether the global ACPICA initialization has been performed or not
   bool acpica_initialized_ = false;
   SysSuspender suspender_;
+  async::Loop suspender_loop_{&kAsyncLoopConfigNeverAttachToThread};
 };
 
 }  // namespace x86

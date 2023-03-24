@@ -413,7 +413,8 @@ void PlatformBus::SetBootloaderInfo(SetBootloaderInfoRequestView request, fdf::A
 void PlatformBus::RegisterSysSuspendCallback(RegisterSysSuspendCallbackRequestView request,
                                              fdf::Arena& arena,
                                              RegisterSysSuspendCallbackCompleter::Sync& completer) {
-  suspend_cb_.Bind(std::move(request->suspend_cb), fdf::Dispatcher::GetCurrent()->get());
+  suspend_cb_.Bind(std::move(request->suspend_cb),
+                   fdf::Dispatcher::GetCurrent()->async_dispatcher());
   completer.buffer(arena).ReplySuccess();
 }
 
@@ -822,13 +823,10 @@ static void sys_device_suspend(void* ctx, uint8_t requested_state, bool enable_w
   if (pbus != nullptr) {
     auto& suspend_cb = pbus->suspend_cb();
     if (suspend_cb.is_valid()) {
-      fdf::Arena arena('SUSP');
-
-      suspend_cb.buffer(arena)
-          ->Callback(requested_state, enable_wake, suspend_reason)
+      suspend_cb->Callback(requested_state, enable_wake, suspend_reason)
           .ThenExactlyOnce(
               [sys_root = p->sys_root](
-                  fdf::WireUnownedResult<fuchsia_hardware_platform_bus::SysSuspend::Callback>&
+                  fidl::WireUnownedResult<fuchsia_hardware_platform_bus::SysSuspend::Callback>&
                       status) {
                 if (!status.ok()) {
                   device_suspend_reply(sys_root, status.status(), DEV_POWER_STATE_D0);
