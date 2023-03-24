@@ -16,11 +16,17 @@ Assumptions:
 
 ### Device object creation
 ```python
-In [1]: import os
-   ...: import logging
-   ...: logging.basicConfig(level=logging.INFO)
+>>> import os
+>>> import logging
+>>> logging.basicConfig(level=logging.INFO)
 
-In [2]: import honeydew
+# Update `sys.path` to include HoneyDew's path before importing it
+>>> import os
+>>> import sys
+>>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
+>>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end"
+>>> sys.path.append(HONEYDEW_ROOT)
+>>> import honeydew
 
 # honeydew.create_device() will look for a specific Fuchsia device class implementation that matches the device type specified and if it finds, it returns that specific device type object, else returns GenericFuchsiaDevice object.
 # In below examples,
@@ -28,60 +34,60 @@ In [2]: import honeydew
 #   * "fuchsia-d88c-79a3-aa1d" is Google's 1p device whose implementation is not present in HoneyDew. Hence returning a generic_fuchsia_device.GenericFuchsiaDevice object.
 #   * "fuchsia-emulator" is an emulator device whose implementation is not present in HoneyDew. Hence returning a generic_fuchsia_device.GenericFuchsiaDevice object.
 
-In [3]: fd_1p = honeydew.create_device("fuchsia-ac67-847a-2e50", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
+>>> fd_1p = honeydew.create_device("fuchsia-ac67-847a-2e50", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
 INFO:honeydew:Didn't find any matching device class implementation for 'fuchsia-ac67-847a-2e50'. So returning 'GenericFuchsiaDevice'
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-ac67-847a-2e50...
 
-In [4]: type(fd_1p)
-Out[4]: honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
+>>> type(fd_1p)
+honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
 
-In [5]: ws = honeydew.create_device("fuchsia-54b2-038b-6e90", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
+>>> ws = honeydew.create_device("fuchsia-54b2-038b-6e90", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
 INFO:honeydew:Found matching device class implementation for 'fuchsia-54b2-038b-6e90' as 'X64'
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-54b2-038b-6e90...
 
-In [6]: type(ws)
-Out[6]: honeydew.device_classes.x64.X64
+>>> type(ws)
+honeydew.device_classes.x64.X64
 
-In [7]: emu = honeydew.create_device("fuchsia-emulator", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
+>>> emu = honeydew.create_device("fuchsia-emulator", ssh_private_key=os.environ.get("SSH_PRIVATE_KEY_FILE"))
 INFO:honeydew:Registered device classes with HoneyDew '{<class 'honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice'>, <class 'honeydew.device_classes.x64.X64'>, <class 'honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase'>}'
 INFO:honeydew:Didn't find any matching device class implementation for 'fuchsia-emulator'. So returning 'GenericFuchsiaDevice'
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-emulator...
 
-In [8]: type(emu)
-Out[8]: honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
+>>> type(emu)
+honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice
 ```
 
 ### Access the static properties
 ```python
-In [9]: emu.name
-Out[9]: 'fuchsia-emulator'
+>>> emu.name
+'fuchsia-emulator'
 
-In [10]: emu.device_type
-Out[10]: 'qemu-x64'
+>>> emu.device_type
+'qemu-x64'
 
-In [11]: emu.product_name
-Out[11]: 'default-fuchsia'
+>>> emu.product_name
+'default-fuchsia'
 
-In [12]: emu.manufacturer
-Out[12]: 'default-manufacturer'
+>>> emu.manufacturer
+'default-manufacturer'
 
-In [13]: emu.model
-Out[13]: 'default-model'
+>>> emu.model
+'default-model'
 
-In [14]: emu.serial_number
+>>> emu.serial_number
 ```
 
 ### Access the dynamic properties
 ```python
-In [15]: emu.firmware_version
-Out[15]: '2023-02-01T17:26:40+00:00'
+>>> emu.firmware_version
+'2023-02-01T17:26:40+00:00'
 ```
 
 ### Access the public methods
 ```python
-In [16]: emu.reboot()
+>>> emu.reboot()
 INFO:honeydew.device_classes.fuchsia_device_base:Rebooting fuchsia-emulator...
 INFO:honeydew.device_classes.fuchsia_device_base:Waiting for fuchsia-emulator to go offline...
 INFO:honeydew.device_classes.fuchsia_device_base:fuchsia-emulator is offline.
@@ -93,30 +99,30 @@ INFO:honeydew.device_classes.fuchsia_device_base:fuchsia-emulator is available v
 INFO:honeydew.device_classes.fuchsia_device_base:Starting SL4F server on fuchsia-emulator...
 WARNING:honeydew.utils.http_utils:Send HTTP request failed with error: '<urlopen error [Errno 111] Connection refused>' on iteration 1/3
 
-In [17]: emu.log_message_to_device(message="This is a test INFO message logged by HoneyDew", level=honeydew.custom_types.LEVEL.INFO)
+>>> emu.log_message_to_device(message="This is a test INFO message logged by HoneyDew", level=honeydew.custom_types.LEVEL.INFO)
 
-In [18]: emu.snapshot(directory="/tmp/")
+>>> emu.snapshot(directory="/tmp/")
 INFO:honeydew.device_classes.fuchsia_device_base:Snapshot file has been saved @ '/tmp/Snapshot_fuchsia-emulator_2023-03-01-01-09-43-PM.zip'
-Out[18]: '/tmp/Snapshot_fuchsia-emulator_2023-03-01-01-09-43-PM.zip'
+'/tmp/Snapshot_fuchsia-emulator_2023-03-01-01-09-43-PM.zip'
 ```
 
 ### Access the affordances
 
 #### Component affordance
 ```python
-In [19]: emu.component.search("wlanstack.cm")
-Out[19]: True
+>>> emu.component.search("wlanstack.cm")
+True
 ```
 
 #### Bluetooth affordance
 ```
-In [20]: fd_1p.bluetooth.request_discovery(True)
+>>> fd_1p.bluetooth.request_discovery(True)
 ```
 
 ### Device object destruction
 ```
-In [21]: emu.close()
-In [22]: del emu
+>>> emu.close()
+>>> del emu
 
 ```
 
