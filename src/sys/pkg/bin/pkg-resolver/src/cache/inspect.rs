@@ -54,9 +54,9 @@ pub struct NeedsRemoteType {
 
 impl NeedsRemoteType {
     /// Mark that the blob contents will be obtained via http.
-    pub fn http(self) -> NeedsMirror {
+    pub fn http(self) -> TriggerAttempt<Http> {
         self.node.record_string("source", "http");
-        NeedsMirror { node: self.node }
+        TriggerAttempt::<Http>::new(self.node)
     }
 
     /// Mark that the blob contents will be obtained via fuchsia.pkg/LocalMirror.
@@ -66,23 +66,10 @@ impl NeedsRemoteType {
     }
 }
 
-/// A blob fetch being downloaded via http.
-pub struct NeedsMirror {
-    node: Node,
-}
-
-impl NeedsMirror {
-    /// Annotate the fetch with the mirror url.
-    pub fn mirror(self, mirror: &str) -> TriggerAttempt<Http> {
-        self.node.record_string("mirror", mirror);
-        TriggerAttempt::<Http>::new(self.node)
-    }
-}
-
 pub struct TriggerAttempt<S: State> {
     attempt_count: AtomicU32,
     attempts: Node,
-    _node: Node,
+    node: Node,
     _phantom: std::marker::PhantomData<S>,
 }
 
@@ -91,9 +78,13 @@ impl<S: State> TriggerAttempt<S> {
         Self {
             attempt_count: AtomicU32::new(0),
             attempts: node.create_child("attempts"),
-            _node: node,
+            node,
             _phantom: PhantomData,
         }
+    }
+
+    pub fn set_mirror(&self, mirror: &str) {
+        self.node.record_string("mirror", mirror);
     }
 
     pub fn attempt(&self) -> Attempt<S> {
@@ -269,13 +260,14 @@ mod tests {
                         ZEROES_HASH.to_string() => {
                             fetch_ts: AnyProperty,
                             source: "http",
+                            attempts: {},
                         }
                     }
                 }
             }
         );
 
-        let inspect = inspect.mirror("fake-mirror");
+        inspect.set_mirror("fake-mirror");
         assert_data_tree!(
             inspector,
             root: {

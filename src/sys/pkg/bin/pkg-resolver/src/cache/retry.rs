@@ -48,7 +48,7 @@ impl Backoff<FetchError> for HttpErrors {
             }
 
             // Immediately fail on other errors.
-            FetchErrorKind::Network | FetchErrorKind::Other => None,
+            FetchErrorKind::Network | FetchErrorKind::NotFound | FetchErrorKind::Other => None,
         }
     }
 }

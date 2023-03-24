@@ -313,6 +313,7 @@ pub struct TestEnvBuilder<BlobfsAndSystemImageFut, MountsFn> {
     tuf_repo_config_boot_arg: Option<String>,
     local_mirror_repo: Option<(Arc<Repository>, RepositoryUrl)>,
     fetch_delivery_blob: Option<bool>,
+    delivery_blob_fallback: Option<bool>,
     allow_local_mirror: Option<bool>,
     tuf_metadata_timeout_seconds: Option<u32>,
     blob_network_header_timeout_seconds: Option<u32>,
@@ -348,6 +349,7 @@ impl TestEnvBuilder<future::BoxFuture<'static, (BlobfsRamdisk, Option<Hash>)>, f
             tuf_repo_config_boot_arg: None,
             local_mirror_repo: None,
             fetch_delivery_blob: None,
+            delivery_blob_fallback: None,
             allow_local_mirror: None,
             tuf_metadata_timeout_seconds: None,
             blob_network_header_timeout_seconds: None,
@@ -378,6 +380,7 @@ where
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
+            delivery_blob_fallback: self.delivery_blob_fallback,
             allow_local_mirror: self.allow_local_mirror,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
@@ -409,6 +412,7 @@ where
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
+            delivery_blob_fallback: self.delivery_blob_fallback,
             allow_local_mirror: self.allow_local_mirror,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
@@ -427,6 +431,7 @@ where
             tuf_repo_config_boot_arg: self.tuf_repo_config_boot_arg,
             local_mirror_repo: self.local_mirror_repo,
             fetch_delivery_blob: self.fetch_delivery_blob,
+            delivery_blob_fallback: self.delivery_blob_fallback,
             allow_local_mirror: self.allow_local_mirror,
             tuf_metadata_timeout_seconds: self.tuf_metadata_timeout_seconds,
             blob_network_header_timeout_seconds: self.blob_network_header_timeout_seconds,
@@ -478,6 +483,12 @@ where
     pub fn fetch_delivery_blob(mut self, fetch_delivery_blob: bool) -> Self {
         assert_eq!(self.fetch_delivery_blob, None);
         self.fetch_delivery_blob = Some(fetch_delivery_blob);
+        self
+    }
+
+    pub fn delivery_blob_fallback(mut self, delivery_blob_fallback: bool) -> Self {
+        assert_eq!(self.delivery_blob_fallback, None);
+        self.delivery_blob_fallback = Some(delivery_blob_fallback);
         self
     }
 
@@ -608,6 +619,7 @@ where
             .unwrap();
 
         if self.fetch_delivery_blob.is_some()
+            || self.delivery_blob_fallback.is_some()
             || self.allow_local_mirror.is_some()
             || self.tuf_metadata_timeout_seconds.is_some()
             || self.blob_network_header_timeout_seconds.is_some()
@@ -621,6 +633,16 @@ where
                         &pkg_resolver,
                         "fetch_delivery_blob",
                         fetch_delivery_blob,
+                    )
+                    .await
+                    .unwrap();
+            }
+            if let Some(delivery_blob_fallback) = self.delivery_blob_fallback {
+                builder
+                    .set_config_value_bool(
+                        &pkg_resolver,
+                        "delivery_blob_fallback",
+                        delivery_blob_fallback,
                     )
                     .await
                     .unwrap();

@@ -287,7 +287,7 @@ async fn pkg_resolver_fetch_blob_failure() {
     let pkg = PackageBuilder::new("just_meta_far").build().await.expect("created pkg");
     let responder = responder::ForPath::new(
         format!("/blobs/{}", pkg.meta_far_merkle_root()),
-        responder::StaticResponseCode::not_found(),
+        responder::StaticResponseCode::server_error(),
     );
 
     verify_resolve_emits_cobalt_events_with_metric_id(
@@ -297,7 +297,7 @@ async fn pkg_resolver_fetch_blob_failure() {
         metrics::FETCH_BLOB_MIGRATED_METRIC_ID,
         vec![
             (
-                metrics::FetchBlobMigratedMetricDimensionResult::HttpNotFound,
+                metrics::FetchBlobMigratedMetricDimensionResult::HttpInternalServerError,
                 metrics::FetchBlobMigratedMetricDimensionResumed::False
             );
             2
@@ -436,7 +436,7 @@ mod pkg_resolver_blob_fetch {
             (401, 401, 2, HttpUnauthorized),
             (402, 402, 2, Http4xx),
             (403, 403, 2, HttpForbidden),
-            (404, 404, 2, HttpNotFound),
+            (404, 404, 1, HttpNotFound),
             (405, 405, 2, HttpMethodNotAllowed),
             (406, 407, 2, Http4xx),
             (408, 408, 2, HttpRequestTimeout),

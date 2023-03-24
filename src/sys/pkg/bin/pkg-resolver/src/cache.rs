@@ -612,20 +612,41 @@ async fn fetch_blob(
                 "parent_trace_id" => u64::from(context.parent_trace_id),
                 "hash" => merkle.to_string().as_str()
             );
-            let res = fetch_blob_http(
-                inspect.http(),
+            let inspect = inspect.http();
+            let mut res = fetch_blob_http(
+                &inspect,
                 http_client,
                 &context.mirrors,
                 merkle,
                 blob_fetch_params.blob_type(),
-                context.opener,
+                &context.opener,
                 context.expected_len,
                 blob_fetch_params,
-                stats,
-                cobalt_sender,
+                &stats,
+                cobalt_sender.clone(),
                 trace_id,
             )
             .await;
+            if let (Err(FetchErrorKind::NotFound), fpkg::BlobType::Delivery, true) = (
+                res.as_ref().map_err(FetchError::kind),
+                blob_fetch_params.blob_type(),
+                blob_fetch_params.delivery_blob_fallback(),
+            ) {
+                res = fetch_blob_http(
+                    &inspect,
+                    http_client,
+                    &context.mirrors,
+                    merkle,
+                    fpkg::BlobType::Uncompressed,
+                    &context.opener,
+                    context.expected_len,
+                    blob_fetch_params,
+                    &stats,
+                    cobalt_sender,
+                    trace_id,
+                )
+                .await;
+            }
             guard.end(&[ftrace::ArgValue::of("result", format!("{res:?}").as_str())]);
             res
         }
@@ -654,15 +675,15 @@ impl FetchStats {
 }
 
 async fn fetch_blob_http(
-    inspect: inspect::NeedsMirror,
+    inspect: &inspect::TriggerAttempt<inspect::Http>,
     client: &fuchsia_hyper::HttpsClient,
     mirrors: &[MirrorConfig],
     merkle: BlobId,
     blob_type: fpkg::BlobType,
-    opener: pkg::cache::DeferredOpenBlob,
+    opener: &pkg::cache::DeferredOpenBlob,
     expected_len: Option<u64>,
     blob_fetch_params: BlobFetchParams,
-    stats: Arc<Mutex<Stats>>,
+    stats: &Mutex<Stats>,
     cobalt_sender: ProtocolSender<MetricEvent>,
     trace_id: ftrace::Id,
 ) -> Result<(), FetchError> {
@@ -672,19 +693,14 @@ async fn fetch_blob_http(
     } else {
         return Err(FetchError::NoMirrors);
     };
-    let mirror_stats = stats.lock().for_mirror(blob_mirror_url.to_string());
+    let mirror_stats = &stats.lock().for_mirror(blob_mirror_url.to_string());
     let blob_url =
-        make_blob_url(blob_mirror_url, &merkle, blob_type).map_err(FetchError::BlobUrl)?;
-    let inspect = inspect.mirror(&blob_url.to_string());
-    let flaked = Arc::new(AtomicBool::new(false));
+        &make_blob_url(blob_mirror_url, &merkle, blob_type).map_err(FetchError::BlobUrl)?;
+    inspect.set_mirror(&blob_url.to_string());
+    let flaked = &AtomicBool::new(false);
 
     fuchsia_backoff::retry_or_first_error(retry::blob_fetch(), || {
-        let flaked = Arc::clone(&flaked);
-        let mirror_stats = &mirror_stats;
         let mut cobalt_sender = cobalt_sender.clone();
-        let opener = &opener;
-        let inspect = &inspect;
-        let blob_url = &blob_url;
 
         async move {
             let fetch_stats = FetchStats::default();
@@ -735,7 +751,7 @@ async fn fetch_blob_http(
                 Err(FetchErrorKind::Network) => {
                     flaked.store(true, Ordering::SeqCst);
                 }
-                Err(FetchErrorKind::Other) => {}
+                Err(FetchErrorKind::NotFound | FetchErrorKind::Other) => {}
                 Ok(()) => {
                     if flaked.load(Ordering::SeqCst) {
                         mirror_stats.network_blips().increment();
@@ -1116,6 +1132,7 @@ impl FetchError {
             BadHttpStatus { code: StatusCode::TOO_MANY_REQUESTS, uri: _ } => {
                 FetchErrorKind::NetworkRateLimit
             }
+            BadHttpStatus { code: StatusCode::NOT_FOUND, uri: _ } => FetchErrorKind::NotFound,
             Hyper { .. }
             | Http { .. }
             | BadHttpStatus { .. }
@@ -1187,6 +1204,7 @@ impl FetchError {
 pub enum FetchErrorKind {
     NetworkRateLimit,
     Network,
+    NotFound,
     Other,
 }
 
