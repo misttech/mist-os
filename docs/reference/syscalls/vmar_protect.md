@@ -84,7 +84,14 @@ have the rights for the requested change, or the VMAR itself does not allow
 the requested change, or there is a mapping in a sub-region that would have
 its mapping permissions increased.
 
+**ZX_ERR_NO_MEMORY**  Failure due to lack of memory.
+There is no good way for userspace to handle this (unlikely) error.
+In a future build this error will no longer occur.
+
 ## Notes
+
+For failures other than **ZX_ERR_NO_MEMORY**, all access permissions in the range
+will have been left unchanged.
 
 ## See also
 

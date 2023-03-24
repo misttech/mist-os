@@ -991,7 +991,10 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
     AssertHeld(mapping->lock_ref());
 
     // ProtectLocked might delete the mapping, and so we must pause the enumerator to safely perform
-    // mutations.
+    // mutations. Note that even though we are pausing the enumerator here, it is *NOT* okay to drop
+    // the lock between the pause and resume. We need to mutate permissions on all the mappings in
+    // the requested range atomically (except for failure due to ZX_ERR_NO_MEMORY) and so the lock
+    // must be held throughout.
     enumerator.pause();
     zx_status_t status = mapping->ProtectLocked(protect_base, protect_size, new_arch_mmu_flags);
     if (status != ZX_OK) {
