@@ -450,11 +450,6 @@
         moniker: "core/codec_factory",
     },
     {
-        id: 194,
-        label: "Timezone",
-        moniker: "timezone.cmx",
-    },
-    {
         id: 195,
         label: "BlobFS",
         moniker: "bootstrap/fshost/blobfs",
@@ -623,5 +618,25 @@
         id: 228,
         label: "Diagnostics Persistence",
         moniker: "core/diagnostics/persistence",
+    },
+    {
+        id: 229,
+        label: "Reachability",
+        moniker: "core/network/reachability",
+    },
+    {
+        id: 230,
+        label: "Scenic",
+        moniker: "core/ui/scenic",
+    },
+    {
+        id: 231,
+        label: "Overnet",
+        moniker: "core/overnetstack",
+    },
+    {
+        id: 232,
+        label: "Shortcut Manager",
+        moniker: "core/ui/shortcut_manager",
     },
 ]
