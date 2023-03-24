@@ -583,9 +583,9 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
   // we don't end up trying to put an image into two lists.
   for (auto& display_config : configs_) {
     if (display_config.pending_layer_change_) {
-      while (!display_config.current_layers_.is_empty()) {
-        display_config.current_layers_.pop_front();
-      }
+      // This guarantees that all nodes in `current_layers_` will be detached
+      // so that a node can be put into another `current_layers_` list.
+      display_config.current_layers_.clear();
     }
   }
 
