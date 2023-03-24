@@ -72,6 +72,7 @@ async fn run_test(
                 .capability(Capability::protocol_by_name("fuchsia.component.resolution.Resolver"))
                 .capability(Capability::storage("tmp"))
                 .capability(Capability::storage("data"))
+                .capability(Capability::directory("boot"))
                 .capability(Capability::event_stream("started"))
                 .capability(Capability::event_stream("stopped"))
                 .capability(Capability::event_stream("destroyed"))

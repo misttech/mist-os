@@ -31,7 +31,7 @@
 int main(int argc, char** argv) {
   static const std::string static_dir_name(early_boot_instrumentation::kStaticDir);
   static const std::string dynamic_dir_name(early_boot_instrumentation::kDynamicDir);
-  const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
+  const fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   fxl::SetLogSettingsFromCommandLine(command_line, {"early-boot-instrumentation"});
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
@@ -41,14 +41,14 @@ int main(int argc, char** argv) {
   early_boot_instrumentation::SinkDirMap sink_map;
 
   // All but llvm-profile data until its unified.
-  auto debug_data = context->outgoing()->GetOrCreateDirectory("debugdata");
+  vfs::PseudoDir* debug_data = context->outgoing()->GetOrCreateDirectory("debugdata");
 
   // Get the SvcStash server end.
   zx::channel provider_client, provider_server;
-  if (auto res = zx::channel::create(0, &provider_client, &provider_server); res != ZX_OK) {
+  if (zx_status_t res = zx::channel::create(0, &provider_client, &provider_server); res != ZX_OK) {
     FX_LOGS(ERROR) << "Could not create channel for fuchsia.boot.SvcStashProvider. "
                    << zx_status_get_string(res);
-  } else if (auto res = fdio_service_connect(
+  } else if (zx_status_t res = fdio_service_connect(
                  fidl::DiscoverableProtocolDefaultPath<fuchsia_boot::SvcStashProvider>,
                  provider_server.release());
              res != ZX_OK) {
@@ -61,34 +61,32 @@ int main(int argc, char** argv) {
 
     auto get_response = provider_fidl_client->Get();
 
-    if (get_response->is_ok()) {
+    if (get_response.ok() && get_response->is_ok()) {
       auto& stash_svc = get_response->value()->resource;
       sink_map = early_boot_instrumentation::ExtractDebugData(std::move(stash_svc));
     }
   }
 
-  // Even if we fail to populate from the sources, we expose empty directories,
-  // such that the contract remains.
+  // TODO(fxbug.dev/124317): This code does not create any directories when
+  // profraw files are not available. Fix it as per contract.
   fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
   if (!kernel_data_dir) {
     const char* err = strerror(errno);
     FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data'. " << err;
-  }
-
-  if (auto res = early_boot_instrumentation::ExposeKernelProfileData(kernel_data_dir, sink_map);
-      res.is_error()) {
-    FX_LOGS(ERROR) << "Could not expose kernel profile data. " << res.status_value();
+  } else if (zx::result res =
+                 early_boot_instrumentation::ExposeKernelProfileData(kernel_data_dir, sink_map);
+             res.is_error()) {
+    FX_PLOGS(ERROR, res.status_value()) << "Could not expose kernel profile data. ";
   }
 
   fbl::unique_fd phys_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
   if (!phys_data_dir) {
     const char* err = strerror(errno);
     FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data/phys'. " << err;
-  }
-
-  if (auto res = early_boot_instrumentation::ExposePhysbootProfileData(phys_data_dir, sink_map);
-      res.is_error()) {
-    FX_LOGS(ERROR) << "Could not expose physboot profile data. " << res.status_value();
+  } else if (zx::result res =
+                 early_boot_instrumentation::ExposePhysbootProfileData(phys_data_dir, sink_map);
+             res.is_error()) {
+    FX_PLOGS(ERROR, res.status_value()) << "Could not expose physboot profile data. ";
   }
 
   for (auto& [sink, root] : sink_map) {

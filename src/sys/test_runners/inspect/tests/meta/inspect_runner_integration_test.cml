@@ -27,6 +27,12 @@
             from: "parent",
             to: "#realm_builder",
         },
+        {
+            directory: "boot",
+            from: "parent",
+            to: [ "#realm_builder" ],
+            rights: [ "r*" ],
+        },
     ],
     facets: {
         "fuchsia.test": {

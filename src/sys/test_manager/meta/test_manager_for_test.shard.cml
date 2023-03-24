@@ -42,6 +42,12 @@
             from: "parent",
             to: "#test_manager",
         },
+        {
+            directory: "boot",
+            from: "parent",
+            to: [ "#test_manager" ],
+            rights: [ "r*" ],
+        },
     ],
     facets: {
         "fuchsia.test": {

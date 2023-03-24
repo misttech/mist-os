@@ -107,7 +107,8 @@ TEST_F(ExposeKernelProfileDataTest, WithSymbolizerLogExposesBoth) {
 
   SinkDirMap sink_map;
 
-  ASSERT_TRUE(ExposeKernelProfileData(kernel_data_dir, sink_map).is_ok());
+  zx::result result = ExposeKernelProfileData(kernel_data_dir, sink_map);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
   vfs::PseudoDir* lookup = nullptr;
   ASSERT_EQ(
       sink_map["llvm-profile"]->Lookup("dynamic", reinterpret_cast<vfs::internal::Node**>(&lookup)),
@@ -137,7 +138,8 @@ TEST_F(ExposeKernelProfileDataTest, OnlyKernelFileIsOk) {
 
   SinkDirMap sink_map;
 
-  ASSERT_TRUE(ExposeKernelProfileData(kernel_data_dir, sink_map).is_ok());
+  zx::result result = ExposeKernelProfileData(kernel_data_dir, sink_map);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
   vfs::PseudoDir* lookup = nullptr;
   ASSERT_EQ(
       sink_map["llvm-profile"]->Lookup("dynamic", reinterpret_cast<vfs::internal::Node**>(&lookup)),
@@ -155,6 +157,21 @@ TEST_F(ExposeKernelProfileDataTest, OnlyKernelFileIsOk) {
   ASSERT_NE(out_dir.Lookup(symbolizer_file, &node), ZX_OK);
 }
 
+TEST_F(ExposeKernelProfileDataTest, KernelProfrawFileDoesNotExist) {
+  // Don't bind profraw file to the directory
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data"));
+
+  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
+  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
+
+  SinkDirMap sink_map;
+
+  zx::result result = ExposeKernelProfileData(kernel_data_dir, sink_map);
+  // We don't fail when profraw file does not exist.
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_EQ(sink_map.find("llvm-profile"), sink_map.end());
+}
+
 TEST_F(ExposePhysbootProfileDataTest, WithSymbolizerFileIsOk) {
   // Dispatcher
   BindFile("physboot.profraw");
@@ -166,7 +183,8 @@ TEST_F(ExposePhysbootProfileDataTest, WithSymbolizerFileIsOk) {
 
   SinkDirMap sink_map;
 
-  ASSERT_TRUE(ExposePhysbootProfileData(kernel_data_dir, sink_map).is_ok());
+  zx::result result = ExposePhysbootProfileData(kernel_data_dir, sink_map);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
   vfs::PseudoDir* lookup = nullptr;
   ASSERT_EQ(
       sink_map["llvm-profile"]->Lookup("static", reinterpret_cast<vfs::internal::Node**>(&lookup)),
@@ -195,7 +213,8 @@ TEST_F(ExposePhysbootProfileDataTest, OnlyProfrawFileIsOk) {
 
   SinkDirMap sink_map;
 
-  ASSERT_TRUE(ExposePhysbootProfileData(kernel_data_dir, sink_map).is_ok());
+  zx::result result = ExposePhysbootProfileData(kernel_data_dir, sink_map);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
   vfs::PseudoDir* lookup = nullptr;
   ASSERT_EQ(
       sink_map["llvm-profile"]->Lookup("static", reinterpret_cast<vfs::internal::Node**>(&lookup)),
@@ -211,6 +230,22 @@ TEST_F(ExposePhysbootProfileDataTest, OnlyProfrawFileIsOk) {
   node = nullptr;
   std::string symbolizer_file(kPhysSymbolizerFile);
   ASSERT_NE(out_dir.Lookup(symbolizer_file, &node), ZX_OK);
+}
+
+TEST_F(ExposeKernelProfileDataTest, PhysbootProfrawFileDoesNotExist) {
+  // Don't bind profraw file to the directory
+  ASSERT_NO_FATAL_FAILURE(Serve("/boot/kernel/data/phys"));
+
+  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
+  ASSERT_TRUE(kernel_data_dir) << strerror(errno);
+
+  SinkDirMap sink_map;
+
+  zx::result result = ExposePhysbootProfileData(kernel_data_dir, sink_map);
+
+  // We don't fail when profraw file does not exist.
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_EQ(sink_map.find("llvm-profile"), sink_map.end());
 }
 
 struct PublishRequest {
@@ -277,8 +312,8 @@ class ExtractDebugDataTest : public ::testing::Test {
     StashSvcWithPublishedData({&publish_info, 1}, {&out_token, 1});
   }
 
-  // Same as above, but published multiple pairs of |<sink, vmo>| represented by sinks[i], vmos[i].
-  // |out| is the write end of the handle.
+  // Same as above, but published multiple pairs of |<sink, vmo>| represented by sinks[i],
+  // vmos[i]. |out| is the write end of the handle.
   void StashSvcWithPublishedData(cpp20::span<const PublishRequest> publish_info,
                                  cpp20::span<zx::eventpair> out_tokens) {
     zx::channel svc_read, svc_write;

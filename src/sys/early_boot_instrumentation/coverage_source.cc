@@ -4,6 +4,7 @@
 
 #include "src/sys/early_boot_instrumentation/coverage_source.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.debugdata/cpp/wire.h>
@@ -119,6 +120,14 @@ zx::result<> ExposeKernelProfileData(fbl::unique_fd& kernel_data_dir, SinkDirMap
 
   fbl::unique_fd kernel_profile(openat(kernel_data_dir.get(), kKernelProfRaw.data(), O_RDONLY));
   if (!kernel_profile) {
+    if (errno == ENOENT) {
+      // This file is only available in instrumented builds.
+      FX_LOGS(INFO) << kKernelProfRaw << " is not available.";
+      // return success as there is nothing to export.
+      return zx::success();
+    }
+    const char* err = strerror(errno);
+    FX_LOGS(ERROR) << "Could not obtain handle to " << kKernelProfRaw << ": " << err;
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -141,6 +150,14 @@ zx::result<> ExposePhysbootProfileData(fbl::unique_fd& physboot_data_dir, SinkDi
 
   fbl::unique_fd phys_profile(openat(physboot_data_dir.get(), kPhysbootProfRaw.data(), O_RDONLY));
   if (!phys_profile) {
+    if (errno == ENOENT) {
+      // This file is only available in instrumented builds.
+      FX_LOGS(INFO) << kPhysbootProfRaw << " is not available.";
+      // return success as there is nothing to export.
+      return zx::success();
+    }
+    const char* err = strerror(errno);
+    FX_LOGS(ERROR) << "Could not obtain handle to " << kPhysbootProfRaw << ": " << err;
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
