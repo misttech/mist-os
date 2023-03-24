@@ -2,24 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "syslog/offer.shard.cml" ],
-    children: [
-        {
-            name: "diagnostics-kcounter",
-            url: "fuchsia-pkg://fuchsia.com/diagnostics-kcounter#meta/diagnostics-kcounter.cm",
-        },
-    ],
     offer: [
         {
             protocol: [ "fuchsia.kernel.Counter" ],
             from: "parent",
-            to: "#diagnostics-kcounter",
+            to: "#diagnostics",
         },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.component.Binder" ],
-            from: "#diagnostics-kcounter",
+            protocol: "fuchsia.component.KcounterBinder",
+            from: "#diagnostics",
             as: "fuchsia.component.KcounterBinder",
         },
     ],

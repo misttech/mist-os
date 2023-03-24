@@ -450,6 +450,14 @@ assembly_input_bundle("common_minimal") {
                         root_build_dir)
       }
     },
+    {
+      name = "diagnostics"
+      component_shards = {
+        diagnostics = rebase_path(
+                [ "//src/diagnostics/kcounter/meta/diagnostics-kcounter.realm_shard.cml" ],
+                root_build_dir)
+      }
+    },
   ]
 }
 

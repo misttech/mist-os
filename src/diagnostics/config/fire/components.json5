@@ -639,4 +639,9 @@
         label: "Shortcut Manager",
         moniker: "core/ui/shortcut_manager",
     },
+    {
+        id: 233,
+        label: "Diagnostics KCounter",
+        moniker: "core/diagnostics/kcounter",
+    },
 ]

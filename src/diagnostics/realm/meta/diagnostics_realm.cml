@@ -12,7 +12,7 @@
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: "#persistence",
+            to: "all",
         },
         {
             protocol: [ "fuchsia.diagnostics.FeedbackArchiveAccessor" ],
