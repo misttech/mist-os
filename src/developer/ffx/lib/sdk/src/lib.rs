@@ -104,9 +104,16 @@ impl SdkRoot {
                 // Otherwise assume this is a build manifest, but with no module.
                 Sdk::from_build_dir(&manifest, None)
             }
-            Self::Full(manifest) => {
-                Err(ffx_error!("Could not find an sdk manifest in `{}`. Expected a manifest at either `{SDK_MANIFEST_PATH}` or `{SDK_BUILD_MANIFEST_PATH}", manifest.display()).into())
-            }
+            Self::Full(manifest) => Err(ffx_error!(
+                "Failed to load the SDK.\n\
+                    Expected '{0}' to contain a manifest at either:\n\
+                    - '{SDK_MANIFEST_PATH}'\n\
+                    - '{SDK_BUILD_MANIFEST_PATH}'.\n\
+                    Check your SDK configuration (`ffx config get sdk.root`) and verify that \
+                    an SDK has been downloaded or built in that location.",
+                manifest.display()
+            )
+            .into()),
         }
     }
 
