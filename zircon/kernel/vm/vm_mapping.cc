@@ -156,6 +156,15 @@ zx_status_t VmMapping::Protect(vaddr_t base, size_t size, uint new_arch_mmu_flag
     return ZX_ERR_INVALID_ARGS;
   }
 
+  // Do not allow changing caching.
+  if (new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!is_valid_mapping_flags(new_arch_mmu_flags)) {
+    return ZX_ERR_ACCESS_DENIED;
+  }
+
   return ProtectLocked(base, size, new_arch_mmu_flags);
 }
 
@@ -181,16 +190,10 @@ zx_status_t VmMapping::ProtectOrUnmap(const fbl::RefPtr<VmAspace>& aspace, vaddr
 }
 
 zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mmu_flags) {
+  // Assert a few things that should already have been checked by the caller.
   DEBUG_ASSERT(size != 0 && IS_PAGE_ALIGNED(base) && IS_PAGE_ALIGNED(size));
-
-  // Do not allow changing caching
-  if (new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (!is_valid_mapping_flags(new_arch_mmu_flags)) {
-    return ZX_ERR_ACCESS_DENIED;
-  }
+  DEBUG_ASSERT(!(new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK));
+  DEBUG_ASSERT(is_valid_mapping_flags(new_arch_mmu_flags));
 
   DEBUG_ASSERT(object_);
   // grab the lock for the vmo
@@ -235,8 +238,10 @@ zx_status_t VmMapping::ProtectLocked(vaddr_t base, size_t size, uint new_arch_mm
     ASSERT(status == ZX_OK);
   };
 
-  return protection_ranges_.UpdateProtectionRange(base_, size_, base, size, new_arch_mmu_flags,
-                                                  protect_callback);
+  zx_status_t status = protection_ranges_.UpdateProtectionRange(
+      base_, size_, base, size, new_arch_mmu_flags, protect_callback);
+  ASSERT(status == ZX_OK || status == ZX_ERR_NO_MEMORY);
+  return status;
 }
 
 zx_status_t VmMapping::Unmap(vaddr_t base, size_t size) {

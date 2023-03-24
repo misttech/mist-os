@@ -910,6 +910,11 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
     return ZX_ERR_INVALID_ARGS;
   }
 
+  // Do not allow changing caching.
+  if (new_arch_mmu_flags & ARCH_MMU_FLAG_CACHE_MASK) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   // The last byte of the range.
   vaddr_t end_addr_byte = 0;
   bool overflowed = add_overflow(base, size - 1, &end_addr_byte);
@@ -990,6 +995,9 @@ zx_status_t VmAddressRegion::Protect(vaddr_t base, size_t size, uint new_arch_mm
     enumerator.pause();
     zx_status_t status = mapping->ProtectLocked(protect_base, protect_size, new_arch_mmu_flags);
     if (status != ZX_OK) {
+      // We can error out only due to failed allocations. Other error conditions should have already
+      // been checked above.
+      ASSERT(status == ZX_ERR_NO_MEMORY);
       // TODO(teisenbe): Try to work out a way to guarantee success, or
       // provide a full unwind?
       return status;
