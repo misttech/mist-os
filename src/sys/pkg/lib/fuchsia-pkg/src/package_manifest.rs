@@ -413,6 +413,19 @@ impl PackageManifest {
         }
         Err(PackageManifestError::MetaPackage(MetaPackageError::MetaPackageMissing))
     }
+
+    pub fn write_with_relative_paths(self, path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
+        fn inner(this: PackageManifest, path: &Utf8Path) -> anyhow::Result<PackageManifest> {
+            let versioned = match this.0 {
+                VersionedPackageManifest::Version1(manifest) => {
+                    VersionedPackageManifest::Version1(manifest.write_with_relative_paths(path)?)
+                }
+            };
+
+            Ok(PackageManifest(versioned))
+        }
+        inner(self, path.as_ref())
+    }
 }
 
 pub struct PackageManifestBuilder {
@@ -482,6 +495,75 @@ struct PackageManifestV1 {
     subpackages: Vec<SubpackageInfo>,
 }
 
+impl PackageManifestV1 {
+    pub fn write_with_relative_paths(
+        self,
+        manifest_path: impl AsRef<Utf8Path>,
+    ) -> anyhow::Result<PackageManifestV1> {
+        fn inner(
+            this: PackageManifestV1,
+            manifest_path: &Utf8Path,
+        ) -> anyhow::Result<PackageManifestV1> {
+            let manifest = if let RelativeTo::WorkingDir = &this.blob_sources_relative {
+                // manifest contains working-dir relative source paths, make
+                // them relative to the file, instead.
+                let blobs = this
+                    .blobs
+                    .into_iter()
+                    .map(|blob| relativize_blob_source_path(blob, manifest_path))
+                    .collect::<anyhow::Result<_>>()?;
+                let subpackages = this
+                    .subpackages
+                    .into_iter()
+                    .map(|subpackage| {
+                        relativize_subpackage_manifest_path(subpackage, manifest_path)
+                    })
+                    .collect::<anyhow::Result<_>>()?;
+                PackageManifestV1 {
+                    blobs,
+                    subpackages,
+                    blob_sources_relative: RelativeTo::File,
+                    ..this
+                }
+            } else {
+                this
+            };
+
+            let versioned_manifest = VersionedPackageManifest::Version1(manifest.clone());
+
+            let file = File::create(manifest_path)?;
+            serde_json::to_writer(file, &versioned_manifest)?;
+
+            Ok(manifest)
+        }
+        inner(self, manifest_path.as_ref())
+    }
+
+    pub fn resolve_source_paths(self, manifest_path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
+        fn inner(
+            this: PackageManifestV1,
+            manifest_path: &Utf8Path,
+        ) -> anyhow::Result<PackageManifestV1> {
+            if let RelativeTo::File = &this.blob_sources_relative {
+                let blobs = this
+                    .blobs
+                    .into_iter()
+                    .map(|blob| resolve_blob_source_path(blob, manifest_path))
+                    .collect::<anyhow::Result<_>>()?;
+                let subpackages = this
+                    .subpackages
+                    .into_iter()
+                    .map(|subpackage| resolve_subpackage_manifest_path(subpackage, manifest_path))
+                    .collect::<anyhow::Result<_>>()?;
+                Ok(PackageManifestV1 { blobs, subpackages, ..this })
+            } else {
+                Ok(this)
+            }
+        }
+        inner(self, manifest_path.as_ref())
+    }
+}
+
 /// If the path is a relative path, what is it relative from?
 ///
 /// If 'RelativeTo::WorkingDir', then the path is assumed to be relative to the
@@ -531,143 +613,43 @@ pub struct SubpackageInfo {
     pub merkle: fuchsia_merkle::Hash,
 }
 
-pub mod host {
-    use super::*;
+fn relativize_blob_source_path(
+    blob: BlobInfo,
+    manifest_path: &Utf8Path,
+) -> anyhow::Result<BlobInfo> {
+    let source_path = path_relative_from_file(blob.source_path, manifest_path)?;
+    let source_path = source_path.into_string();
 
-    impl PackageManifest {
-        pub fn write_with_relative_paths(self, path: impl AsRef<Utf8Path>) -> anyhow::Result<Self> {
-            fn inner(this: PackageManifest, path: &Utf8Path) -> anyhow::Result<PackageManifest> {
-                let versioned = match this.0 {
-                    VersionedPackageManifest::Version1(manifest) => {
-                        VersionedPackageManifest::Version1(
-                            manifest.write_with_relative_paths(path)?,
-                        )
-                    }
-                };
+    Ok(BlobInfo { source_path, ..blob })
+}
 
-                Ok(PackageManifest(versioned))
-            }
-            inner(self, path.as_ref())
-        }
-    }
+fn resolve_blob_source_path(blob: BlobInfo, manifest_path: &Utf8Path) -> anyhow::Result<BlobInfo> {
+    let source_path = resolve_path_from_file(&blob.source_path, manifest_path)
+        .with_context(|| format!("Resolving blob path: {}", blob.source_path))?
+        .into_string();
+    Ok(BlobInfo { source_path, ..blob })
+}
 
-    impl PackageManifestV1 {
-        pub fn write_with_relative_paths(
-            self,
-            manifest_path: impl AsRef<Utf8Path>,
-        ) -> anyhow::Result<PackageManifestV1> {
-            fn inner(
-                this: PackageManifestV1,
-                manifest_path: &Utf8Path,
-            ) -> anyhow::Result<PackageManifestV1> {
-                let manifest = if let RelativeTo::WorkingDir = &this.blob_sources_relative {
-                    // manifest contains working-dir relative source paths, make
-                    // them relative to the file, instead.
-                    let blobs = this
-                        .blobs
-                        .into_iter()
-                        .map(|blob| relativize_blob_source_path(blob, manifest_path))
-                        .collect::<anyhow::Result<_>>()?;
-                    let subpackages = this
-                        .subpackages
-                        .into_iter()
-                        .map(|subpackage| {
-                            relativize_subpackage_manifest_path(subpackage, manifest_path)
-                        })
-                        .collect::<anyhow::Result<_>>()?;
-                    PackageManifestV1 {
-                        blobs,
-                        subpackages,
-                        blob_sources_relative: RelativeTo::File,
-                        ..this
-                    }
-                } else {
-                    this
-                };
+fn relativize_subpackage_manifest_path(
+    subpackage: SubpackageInfo,
+    manifest_path: &Utf8Path,
+) -> anyhow::Result<SubpackageInfo> {
+    let manifest_path = path_relative_from_file(subpackage.manifest_path, manifest_path)?;
+    let manifest_path = manifest_path.into_string();
 
-                let versioned_manifest = VersionedPackageManifest::Version1(manifest.clone());
+    Ok(SubpackageInfo { manifest_path, ..subpackage })
+}
 
-                let file = File::create(manifest_path)?;
-                serde_json::to_writer(file, &versioned_manifest)?;
-
-                Ok(manifest)
-            }
-            inner(self, manifest_path.as_ref())
-        }
-    }
-
-    impl PackageManifestV1 {
-        pub fn resolve_source_paths(
-            self,
-            manifest_path: impl AsRef<Utf8Path>,
-        ) -> anyhow::Result<Self> {
-            fn inner(
-                this: PackageManifestV1,
-                manifest_path: &Utf8Path,
-            ) -> anyhow::Result<PackageManifestV1> {
-                if let RelativeTo::File = &this.blob_sources_relative {
-                    let blobs = this
-                        .blobs
-                        .into_iter()
-                        .map(|blob| resolve_blob_source_path(blob, manifest_path))
-                        .collect::<anyhow::Result<_>>()?;
-                    let subpackages = this
-                        .subpackages
-                        .into_iter()
-                        .map(|subpackage| {
-                            resolve_subpackage_manifest_path(subpackage, manifest_path)
-                        })
-                        .collect::<anyhow::Result<_>>()?;
-                    Ok(PackageManifestV1 { blobs, subpackages, ..this })
-                } else {
-                    Ok(this)
-                }
-            }
-            inner(self, manifest_path.as_ref())
-        }
-    }
-
-    fn relativize_blob_source_path(
-        blob: BlobInfo,
-        manifest_path: &Utf8Path,
-    ) -> anyhow::Result<BlobInfo> {
-        let source_path = path_relative_from_file(blob.source_path, manifest_path)?;
-        let source_path = source_path.into_string();
-
-        Ok(BlobInfo { source_path, ..blob })
-    }
-
-    fn resolve_blob_source_path(
-        blob: BlobInfo,
-        manifest_path: &Utf8Path,
-    ) -> anyhow::Result<BlobInfo> {
-        let source_path = resolve_path_from_file(&blob.source_path, manifest_path)
-            .with_context(|| format!("Resolving blob path: {}", blob.source_path))?
-            .into_string();
-        Ok(BlobInfo { source_path, ..blob })
-    }
-
-    fn relativize_subpackage_manifest_path(
-        subpackage: SubpackageInfo,
-        manifest_path: &Utf8Path,
-    ) -> anyhow::Result<SubpackageInfo> {
-        let manifest_path = path_relative_from_file(subpackage.manifest_path, manifest_path)?;
-        let manifest_path = manifest_path.into_string();
-
-        Ok(SubpackageInfo { manifest_path, ..subpackage })
-    }
-
-    fn resolve_subpackage_manifest_path(
-        subpackage: SubpackageInfo,
-        manifest_path: &Utf8Path,
-    ) -> anyhow::Result<SubpackageInfo> {
-        let manifest_path = resolve_path_from_file(&subpackage.manifest_path, manifest_path)
-            .with_context(|| {
-                format!("Resolving subpackage manifest path: {}", subpackage.manifest_path)
-            })?
-            .into_string();
-        Ok(SubpackageInfo { manifest_path, ..subpackage })
-    }
+fn resolve_subpackage_manifest_path(
+    subpackage: SubpackageInfo,
+    manifest_path: &Utf8Path,
+) -> anyhow::Result<SubpackageInfo> {
+    let manifest_path = resolve_path_from_file(&subpackage.manifest_path, manifest_path)
+        .with_context(|| {
+            format!("Resolving subpackage manifest path: {}", subpackage.manifest_path)
+        })?
+        .into_string();
+    Ok(SubpackageInfo { manifest_path, ..subpackage })
 }
 
 #[cfg(test)]
@@ -679,7 +661,8 @@ mod tests {
         camino::{Utf8Path, Utf8PathBuf},
         fuchsia_merkle::Hash,
         pretty_assertions::assert_eq,
-        serde_json::json,
+        serde_json::{json, Value},
+        std::fs::File,
         std::path::PathBuf,
         tempfile::{NamedTempFile, TempDir},
     };
@@ -1626,16 +1609,6 @@ mod tests {
 
         assert!(manifest2_blobs.is_empty());
     }
-}
-
-#[cfg(all(test, not(target_os = "fuchsia")))]
-mod host_tests {
-    use super::*;
-    use camino::Utf8Path;
-    use serde_json::Value;
-    use std::fs::File;
-    use tempfile::TempDir;
-    use tests::{ones_hash, ones_hash_str, zeros_hash};
 
     #[test]
     fn test_write_package_manifest_already_relative() {
