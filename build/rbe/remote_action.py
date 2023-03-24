@@ -44,6 +44,7 @@ class RemoteAction(object):
         command: Sequence[str],
         options: Sequence[str] = None,
         exec_root: Optional[str] = None,
+        working_dir: str = None,
         inputs: Sequence[str] = None,
         output_files: Sequence[str] = None,
         output_dirs: Sequence[str] = None,
@@ -70,7 +71,8 @@ class RemoteAction(object):
         self._rewrapper = rewrapper
         self._save_temps = save_temps
         self._auto_reproxy = auto_reproxy
-        self._exec_root = exec_root or PROJECT_ROOT  # absolute path
+        self._working_dir = os.path.abspath(working_dir or os.curdir)
+        self._exec_root = os.path.abspath(exec_root or PROJECT_ROOT)
         # Parse and strip out --remote-* flags from command.
         remote_args, self._remote_command = _REMOTE_FLAG_ARG_PARSER.parse_known_args(
             command)
@@ -112,33 +114,51 @@ class RemoteAction(object):
         return self._save_temps
 
     @property
+    def working_dir(self) -> str:
+        return self._working_dir
+
+    @property
     def remote_disable(self) -> bool:
         return self._remote_disable
 
     def _relativize_to_exec_root(self, paths: Sequence[str]) -> Sequence[str]:
-        current_dir_abs = os.path.abspath(os.curdir)
         return [
             relativize_to_exec_root(
-                os.path.normpath(os.path.join(current_dir_abs, path)),
-                start=self._exec_root) for path in paths
+                os.path.normpath(os.path.join(self.working_dir, path)),
+                start=self.exec_root) for path in paths
         ]
 
     @property
     def build_subdir(self) -> str:
         """This is the relative path from the exec_root to the current working dir."""
-        return os.path.relpath(os.curdir, start=self._exec_root)
+        return os.path.relpath(self.working_dir, start=self.exec_root)
+
+    @property
+    def inputs_relative_to_working_dir(self) -> Sequence[str]:
+        return self._inputs
+
+    @property
+    def output_files_relative_to_working_dir(self) -> Sequence[str]:
+        return self._output_files
+
+    @property
+    def output_dirs_relative_to_working_dir(self) -> Sequence[str]:
+        return self._output_dirs
 
     @property
     def inputs_relative_to_project_root(self) -> Sequence[str]:
-        return self._relativize_to_exec_root(self._inputs)
+        return self._relativize_to_exec_root(
+            self.inputs_relative_to_working_dir)
 
     @property
     def output_files_relative_to_project_root(self) -> Sequence[str]:
-        return self._relativize_to_exec_root(self._output_files)
+        return self._relativize_to_exec_root(
+            self.output_files_relative_to_working_dir)
 
     @property
     def output_dirs_relative_to_project_root(self) -> Sequence[str]:
-        return self._relativize_to_exec_root(self._output_dirs)
+        return self._relativize_to_exec_root(
+            self.output_dirs_relative_to_working_dir)
 
     def _inputs_list_file(self) -> str:
         inputs_list_file = self._output_files[0] + '.inputs'
@@ -149,7 +169,7 @@ class RemoteAction(object):
 
     def _generate_rewrapper_command_prefix(self) -> Iterable[str]:
         yield self._rewrapper
-        yield f"--exec_root={self._exec_root}"
+        yield f"--exec_root={self.exec_root}"
         yield from self._options
 
         if self._inputs:
@@ -205,10 +225,27 @@ class RemoteAction(object):
         try:
             # TODO(http://fxbug.dev/96250): handle some re-client error cases
             #   and in some cases, retry once
-            return subprocess.call(self.command)
+            return subprocess.call(self.command, cwd=self.working_dir)
         finally:
             if not self._save_temps:
                 self._cleanup()
+
+
+def _rewrapper_arg_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        "Understand some rewrapper flags, so they may be used as attributes.",
+        argument_default=[],
+    )
+    parser.add_argument(
+        "--exec_root",
+        type=str,
+        default="",
+        help="Root directory from which all inputs/outputs are contained.",
+    )
+    return parser
+
+
+_REWRAPPER_ARG_PARSER = _rewrapper_arg_parser()
 
 
 def _remote_flag_arg_parser() -> argparse.ArgumentParser:

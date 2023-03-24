@@ -14,6 +14,14 @@ import remote_action
 import cl_utils
 
 
+class RewrapperArgParserTests(unittest.TestCase):
+
+    def test_exec_root(self):
+        args, _ = remote_action._REWRAPPER_ARG_PARSER.parse_known_args(
+            ['--exec_root=/foo/bar'])
+        self.assertEqual(args.exec_root, '/foo/bar')
+
+
 class RemoteActionMainParserTests(unittest.TestCase):
 
     def _make_main_parser(self) -> argparse.ArgumentParser:
@@ -174,13 +182,14 @@ class RemoteActionConstructionTests(unittest.TestCase):
     _PROJECT_ROOT = '/my/project/root'
     _WORKING_DIR = os.path.join(_PROJECT_ROOT, 'build_dir')
 
-    @mock.patch.object(os, 'curdir', _WORKING_DIR)
     def test_minimal(self):
+        rewrapper = '/path/to/rewrapper'
         command = ['cat', 'meow.txt']
         action = remote_action.RemoteAction(
-            rewrapper='/path/to/rewrapper',
+            rewrapper=rewrapper,
             command=command,
             exec_root=self._PROJECT_ROOT,
+            working_dir=self._WORKING_DIR,
         )
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
@@ -188,6 +197,37 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertFalse(action.auto_reproxy)
         self.assertFalse(action.remote_disable)
         self.assertEqual(action.build_subdir, 'build_dir')
+        self.assertEqual(
+            action.command,
+            [rewrapper, f'--exec_root={self._PROJECT_ROOT}', '--'] + command)
+
+    def test_path_setup_implicit(self):
+        command = ['beep', 'boop']
+        fake_root = '/home/project'
+        fake_builddir = 'out/not-default'
+        fake_cwd = os.path.join(fake_root, fake_builddir)
+        with mock.patch.object(os, 'curdir', fake_cwd):
+            with mock.patch.object(remote_action, 'PROJECT_ROOT', fake_root):
+                action = remote_action.RemoteAction(
+                    rewrapper='/path/to/rewrapper',
+                    command=command,
+                )
+                self.assertEqual(action.exec_root, fake_root)
+                self.assertEqual(action.build_subdir, fake_builddir)
+
+    def test_path_setup_explicit(self):
+        command = ['beep', 'boop']
+        fake_root = '/home/project'
+        fake_builddir = 'out/not-default'
+        fake_cwd = os.path.join(fake_root, fake_builddir)
+        with mock.patch.object(os, 'curdir', fake_cwd):
+            action = remote_action.RemoteAction(
+                rewrapper='/path/to/rewrapper',
+                command=command,
+                exec_root=fake_root,
+            )
+            self.assertEqual(action.exec_root, fake_root)
+            self.assertEqual(action.build_subdir, fake_builddir)
 
     @mock.patch.object(os, 'curdir', _WORKING_DIR)
     def test_inputs_outputs(self):
