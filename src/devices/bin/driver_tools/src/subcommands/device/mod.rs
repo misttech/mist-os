@@ -14,24 +14,24 @@ use {
 
 pub async fn device(cmd: DeviceCommand, dev: fio::DirectoryProxy) -> Result<()> {
     match cmd.subcommand {
-        DeviceSubcommand::Bind(BindCommand { ref device_path, ref driver_path }) => {
+        DeviceSubcommand::Bind(BindCommand { ref device_path, ref driver_url_suffix }) => {
             let device = connect_to_device(dev, device_path)?;
-            device.bind(driver_path).await?.map_err(|err| format_err!("{:?}", err))?;
-            println!("Bound {} to {}", driver_path, device_path);
+            device.bind(driver_url_suffix).await?.map_err(|err| format_err!("{:?}", err))?;
+            println!("Bound {} to {}", driver_url_suffix, device_path);
         }
         DeviceSubcommand::Unbind(UnbindCommand { ref device_path }) => {
             let device = connect_to_device(dev, device_path)?;
             device.schedule_unbind().await?.map_err(|err| format_err!("{:?}", err))?;
             println!("Unbound driver from {}", device_path);
         }
-        DeviceSubcommand::Rebind(RebindCommand { ref device_path, ref driver_path }) => {
+        DeviceSubcommand::Rebind(RebindCommand { ref device_path, ref driver_url_suffix }) => {
             let device = connect_to_device(dev, device_path).context("Failed to get device")?;
             device
-                .rebind(driver_path)
+                .rebind(driver_url_suffix)
                 .await?
                 .map_err(|err| format_err!("{:?}", err))
                 .context("Failed to rebind")?;
-            println!("Rebind of {} to {} is complete", driver_path, device_path);
+            println!("Rebind of {} to {} is complete", driver_url_suffix, device_path);
         }
         DeviceSubcommand::LogLevel(LogLevelCommand { ref device_path, log_level }) => {
             let device = connect_to_device(dev, device_path)?;

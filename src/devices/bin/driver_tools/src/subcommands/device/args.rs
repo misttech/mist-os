@@ -37,10 +37,10 @@ pub enum DeviceSubcommand {
 /// Binds the driver specified to the specified device.
 #[argh(subcommand, name = "bind")]
 pub struct BindCommand {
-    // TODO(surajmalhotra): Make this a URL once drivers are components.
-    /// the path of the driver to debug, e.g. "/system/driver/usb_video.so"
+    /// only drivers that match this url suffix will be checked for binding.
+    /// E.g. "usb_video.cm" or "fuchsia-boot:///#meta/my-device.cm".
     #[argh(positional)]
-    pub driver_path: String,
+    pub driver_url_suffix: String,
 
     /// the path of the device to unbind, relative to the /dev directory.
     /// E.g. "sys/platform/pci/00:1f.6" or "class/usb-device/000"
@@ -62,10 +62,10 @@ pub struct UnbindCommand {
 /// Unbinds the driver bound to a device and then attempts to bind a new driver.
 #[argh(subcommand, name = "rebind")]
 pub struct RebindCommand {
-    // TODO(surajmalhotra): Make this a URL once drivers are components.
-    /// the path of the driver to debug, e.g. "/system/driver/usb_video.so"
+    /// only drivers that match this url suffix will be checked for binding.
+    /// E.g. "usb_video.cm" or "fuchsia-boot:///#meta/my-device.cm".
     #[argh(positional)]
-    pub driver_path: String,
+    pub driver_url_suffix: String,
 
     /// the path of the device to unbind, relative to the /dev directory.
     /// E.g. "sys/platform/pci/00:1f.6" or "class/usb-device/000"
