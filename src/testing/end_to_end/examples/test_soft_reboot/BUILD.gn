@@ -20,6 +20,11 @@ if (is_host) {
           device_type = "AEMU"
         }
       },
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+      },
     ]
   }
 }
