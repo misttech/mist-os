@@ -1419,11 +1419,13 @@ const (
 	derivesOrd
 	derivesPartialOrd
 	derivesHash
+	// TODO(fxbug.dev/124207): Remove derivesAsBytes.
 	derivesAsBytes
+	// TODO(fxbug.dev/124207): Remove derivesFromBytes.
 	derivesFromBytes
 	derivesAll derives = (1 << iota) - 1
 
-	// The zeropcopy::{AsBytes, FromBytes} traits.
+	// TODO(fxbug.dev/124207): Remove derivesZerocopy.
 	derivesZerocopy derives = derivesAsBytes | derivesFromBytes
 )
 
@@ -1438,9 +1440,11 @@ var derivesNames = []string{
 	"Ord",
 	"PartialOrd",
 	"Hash",
+	// [END derived_traits]
+
+	// TODO(fxbug.dev/124207): Remove.
 	"zerocopy::AsBytes",
 	"zerocopy::FromBytes",
-	// [END derived_traits]
 }
 
 // Returns the derives that are allowed for a type based on resourceness

@@ -20,6 +20,7 @@ func TestDerivesToString(t *testing.T) {
 		{0, ""},
 		{derivesDebug, "#[derive(Debug)]"},
 		{derivesPartialOrd, "#[derive(PartialOrd)]"},
+		// TODO(fxbug.dev/124207): Remove zerocopy::AsBytes in expected result.
 		{derivesHash | derivesAsBytes, "#[derive(Hash, zerocopy::AsBytes)]"},
 	}
 	for _, ex := range cases {
@@ -48,7 +49,8 @@ func TestDerivesCalculation(t *testing.T) {
 			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]",
 		},
 		{
-			fidl:     `type MyStruct = resource struct { field uint64; };`,
+			fidl: `type MyStruct = resource struct { field uint64; };`,
+			// TODO(fxbug.dev/124207): Remove zerocopy traits in expected result.
 			expected: "#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes)]",
 		},
 		{

@@ -37,7 +37,12 @@ use {
         fidl_table,
         fidl_union,
         wrap_handle_metadata,
-        encoding::{Encodable as _, Decodable as _, zerocopy},
+        encoding::{
+            Encodable as _,
+            Decodable as _,
+            {{- /* TODO(fxbug.dev/124207): Remove zerocopy. */}}
+            zerocopy
+        },
         endpoints::{ControlHandle as _, Responder as _},
         client::{
             QueryResponseFut,

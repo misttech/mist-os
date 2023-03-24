@@ -4,7 +4,11 @@
 
 //! Encoding contains functions and traits for FIDL encoding and decoding.
 
-pub use {static_assertions::const_assert_eq, zerocopy};
+pub use {
+    static_assertions::const_assert_eq,
+    // TODO(fxbug.dev/124207): Remove zerocopy.
+    zerocopy,
+};
 
 use {
     crate::endpoints::ProtocolMarker,
