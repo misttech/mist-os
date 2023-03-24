@@ -235,7 +235,7 @@ bool Layer::ActivateLatestReadyImage() {
   return true;
 }
 
-bool Layer::AddToConfig(fbl::SinglyLinkedList<layer_node_t*>* list, uint32_t z_index) {
+bool Layer::AddToConfig(fbl::SinglyLinkedList<LayerNode*>* list, uint32_t z_index) {
   if (pending_node_.InContainer()) {
     return false;
   } else {

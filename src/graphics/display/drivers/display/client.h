@@ -84,7 +84,7 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
 
   uint32_t vsync_layer_count() const { return vsync_layer_count_; }
   const display_config_t* current_config() const { return &current_; }
-  const fbl::SinglyLinkedList<layer_node_t*>& get_current_layers() const { return current_layers_; }
+  const fbl::SinglyLinkedList<LayerNode*>& get_current_layers() const { return current_layers_; }
 
  private:
   display_config_t current_;
@@ -95,8 +95,8 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>> {
 
   bool pending_layer_change_;
   bool pending_apply_layer_change_;
-  fbl::SinglyLinkedList<layer_node_t*> pending_layers_;
-  fbl::SinglyLinkedList<layer_node_t*> current_layers_;
+  fbl::SinglyLinkedList<LayerNode*> pending_layers_;
+  fbl::SinglyLinkedList<LayerNode*> current_layers_;
 
   fbl::Array<zx_pixel_format_t> pixel_formats_;
   fbl::Array<cursor_info_t> cursor_infos_;

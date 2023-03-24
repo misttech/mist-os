@@ -544,7 +544,7 @@ void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::S
       config.pending_layers_.clear();
     }
     for (auto& config : configs_) {
-      fbl::SinglyLinkedList<layer_node_t*> current_layers;
+      fbl::SinglyLinkedList<LayerNode*> current_layers;
       for (auto& layer_node : config.current_layers_) {
         current_layers.push_front(&layer_node.layer->pending_node_);
       }
@@ -613,7 +613,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
 
     // If there was a layer change, update the current layers list.
     if (display_config.pending_layer_change_) {
-      fbl::SinglyLinkedList<layer_node_t*> new_current;
+      fbl::SinglyLinkedList<LayerNode*> new_current;
       for (auto& layer_node : display_config.pending_layers_) {
         new_current.push_front(&layer_node.layer->current_node_);
       }

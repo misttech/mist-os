@@ -24,9 +24,9 @@ class Layer;
 class LayerTest;
 class Client;
 
-typedef struct layer_node : public fbl::SinglyLinkedListable<layer_node*> {
+struct LayerNode : public fbl::SinglyLinkedListable<LayerNode*> {
   Layer* layer;
-} layer_node_t;
+};
 
 // Almost-POD used by Client to manage layer state. Public state is used by Controller.
 class Layer : public IdMappable<std::unique_ptr<Layer>> {
@@ -92,7 +92,7 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
 
   // Adds the pending_layer_ to a display list, at z_index. Returns false if the pending_layer_ is
   // currently in use.
-  bool AddToConfig(fbl::SinglyLinkedList<layer_node_t*>* list, uint32_t z_index);
+  bool AddToConfig(fbl::SinglyLinkedList<LayerNode*>* list, uint32_t z_index);
 
   void SetPrimaryConfig(fuchsia_hardware_display::wire::ImageConfig image_config);
   void SetPrimaryPosition(fuchsia_hardware_display::wire::Transform transform,
@@ -148,8 +148,8 @@ class Layer : public IdMappable<std::unique_ptr<Layer>> {
   uint8_t pending_color_bytes_[4];
   uint8_t current_color_bytes_[4];
 
-  layer_node_t pending_node_;
-  layer_node_t current_node_;
+  LayerNode pending_node_;
+  LayerNode current_node_;
 
   // The display this layer was most recently displayed on
   uint64_t current_display_id_;
