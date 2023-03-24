@@ -46,10 +46,10 @@
 //!```
 //!
 //! With the blanket `LockAfter` impls, we'd get this:
-//! ```no_run
-//! impl<X> LockAfter<X> for DevicesState where IpState<Ipv4>>: LockAfter<X> {}
+//! ```no_compile
+//! impl<X> LockAfter<X> for DevicesState where IpState<Ipv4>: LockAfter<X> {}
 //! // and
-//! impl<X> LockAfter<X> for DevicesState where IpState<Ipv6>>: LockAfter<X> {}
+//! impl<X> LockAfter<X> for DevicesState where IpState<Ipv6>: LockAfter<X> {}
 //! ```
 //!
 //! Since `X` could be `LoopbackRx`, we'd have duplicate impls of
