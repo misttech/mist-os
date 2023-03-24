@@ -4,8 +4,7 @@
 
 """Defines a WORKSPACE rule for loading a version of clang."""
 
-load("//fuchsia/workspace:utils.bzl", "normalize_os", "workspace_path")
-load("//cipd:defs.bzl", "fetch_cipd_contents")
+load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents", "normalize_os", "workspace_path")
 
 # Base URL for Fuchsia clang archives.
 _CLANG_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/third_party/clang/{os}-amd64/+/{tag}"
@@ -96,8 +95,10 @@ def _fuchsia_clang_repository_impl(ctx):
             type = "zip",
             sha256 = sha256,
         )
+    elif ctx.attr.cipd_bin and ctx.attr.cipd_ensure_file:
+        fetch_cipd_contents(ctx, ctx.attr.cipd_bin, ctx.attr.cipd_ensure_file)
     else:
-        fetch_cipd_contents(ctx, ctx.attr._cipd_bin, ctx.attr._cipd_ensure_file)
+        fail("Please provide a local path or way to fetch the contents")
 
     # find the clang version as the largest number
     clang_version = "0"
@@ -215,13 +216,11 @@ archive file.
             doc = "The fuchsia workspace rules root label. eg: @fuchsia_sdk",
             default = "@fuchsia_sdk",
         ),
-        "_cipd_ensure_file": attr.label(
+        "cipd_ensure_file": attr.string(
             doc = "A cipd ensure file to use to download clang.",
-            default = "//fuchsia/manifests:clang.ensure",
         ),
-        "_cipd_bin": attr.label(
+        "cipd_bin": attr.string(
             doc = "The cipd binary that will be used to download the sdk",
-            default = "@cipd_tool//:cipd",
         ),
     },
 )

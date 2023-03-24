@@ -91,3 +91,33 @@ def workspace_path(repo_ctx, local_path):
         workspace_root = repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname
 
     return "%s/%s" % (workspace_root, local_path)
+
+def fetch_cipd_contents(ctx, cipd_bin, cipd_ensure_file, root = "."):
+    """Fetches the contents of a cipd bucket and places them in the root.
+
+    Args:
+      ctx: A repository_ctx instance.
+
+      cipd_bin: Either a Path object, or a relative or absolute path string which
+          points to a cipd binary. If absolute, the path is  returned as is. If
+          relative, it is resolved relative to the main workspace's directory.
+
+      cipd_ensure_file: Either a Path object, or a relative or absolute path string which
+          points to a cipd binary. If absolute, the path is  returned as is. If
+          relative, it is resolved relative to the main workspace's directory.
+
+      root: A path to where the contents will be installed.
+    """
+    result = ctx.execute(
+        [
+            workspace_path(ctx, cipd_bin),
+            "ensure",
+            "-ensure-file",
+            workspace_path(ctx, cipd_ensure_file),
+            "-root",
+            root,
+            "-max-threads=0",
+        ],
+    )
+    if result.return_code != 0:
+        fail("Unable to download cipd content for {}\n{}".format(cipd_ensure_file, result.stderr))

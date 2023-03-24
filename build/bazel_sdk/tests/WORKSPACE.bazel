@@ -25,12 +25,6 @@ local_repository(
     path = "../bazel_rules_fuchsia",
 )
 
-load("@fuchsia_workspace//cipd:defs.bzl", "cipd_tool_repository")
-
-cipd_tool_repository(
-    name = "cipd_tool",
-)
-
 load(
     "@fuchsia_workspace//fuchsia:deps.bzl",
     "fuchsia_clang_repository",

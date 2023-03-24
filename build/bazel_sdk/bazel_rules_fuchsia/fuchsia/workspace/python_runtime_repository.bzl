@@ -4,7 +4,7 @@
 
 """Defines a WORKSPACE rule for fetching python3 from CIPD server based on ensure file."""
 
-load("//cipd:defs.bzl", "fetch_cipd_contents")
+load("//fuchsia/workspace:utils.bzl", "fetch_cipd_contents")
 
 _BUILD_CONTENT = """
 load("@rules_python//python:defs.bzl", "py_runtime", "py_runtime_pair")

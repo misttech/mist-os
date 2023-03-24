@@ -6,7 +6,6 @@
 
 load("//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl", "generate_sdk_build_rules", "generate_sdk_constants", "sdk_id_from_manifests")
 load("//fuchsia/workspace:utils.bzl", "normalize_os", "workspace_path")
-load("//cipd:defs.bzl", "fetch_cipd_contents")
 
 # Base URL for Fuchsia IDK archives.
 _SDK_URL_TEMPLATE = "https://chrome-infra-packages.appspot.com/dl/fuchsia/sdk/{type}/{os}-amd64/+/{tag}"
@@ -64,7 +63,7 @@ def _instantiate_local_env(ctx, manifests):
 
 def _merge_rules_fuchsia(ctx):
     rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
-    for child in ["cipd", "fuchsia"]:
+    for child in ["fuchsia"]:
         ctx.symlink(rules_fuchsia_root.get_child(child), child)
 
     rules_fuchsia_build = ctx.read(rules_fuchsia_root.get_child("BUILD.bazel")).split("\n")
@@ -108,9 +107,7 @@ def _fuchsia_sdk_repository_impl(ctx):
         manifests.append({"root": _IDK_INTERNAL_PATH, "manifest": "meta/manifest.json"})
 
     else:
-        copy_content_strategy = "symlink"
-        fetch_cipd_contents(ctx, ctx.attr._cipd_bin, ctx.attr._cipd_ensure_file, root = _IDK_INTERNAL_PATH)
-        manifests.append({"root": _IDK_INTERNAL_PATH, "manifest": "meta/manifest.json"})
+        fail("The fuchsia sdk no longer supports downloading content via the cipd tool.")
 
     ctx.report_progress("Generating Bazel rules for the SDK")
     ctx.template(
@@ -185,14 +182,6 @@ allow Bazel to cache the file.
         ),
         "fuchsia_api_level_override": attr.string(
             doc = "API level override to use when building Fuchsia.",
-        ),
-        "_cipd_ensure_file": attr.label(
-            doc = "A cipd ensure file to use to download the sdk.",
-            default = "//fuchsia/manifests:core_sdk.ensure",
-        ),
-        "_cipd_bin": attr.label(
-            doc = "The cipd binary that will be used to download the sdk",
-            default = "@cipd_tool//:cipd",
         ),
         "_template": attr.label(
             default = "//fuchsia/workspace/sdk_templates:repository_template.BUILD",

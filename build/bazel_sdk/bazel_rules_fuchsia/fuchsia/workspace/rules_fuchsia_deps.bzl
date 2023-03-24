@@ -11,9 +11,6 @@ load(
     "assert_bazel_version",
 )
 
-# buildifier: disable=bzl-visibility
-load("//cipd/private:cipd_tool.bzl", "cipd_tool_repository")
-
 # buildifier: disable=function-docstring
 def rules_fuchsia_deps():
     assert_bazel_version(min = "5.1.0")
@@ -23,11 +20,6 @@ def rules_fuchsia_deps():
         sha256 = "a3a6e99f497be089f81ec082882e40246bfd435f52f4e82f37e89449b04573f6",
         strip_prefix = "rules_python-0.10.2",
         url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.10.2.tar.gz",
-    )
-
-    maybe(
-        name = "cipd_tool",
-        repo_rule = cipd_tool_repository,
     )
 
     maybe(
