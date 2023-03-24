@@ -120,24 +120,6 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
         timeout);
   }
 
-  bool TakeScreenshotUntil(
-      ui_testing::Pixel color,
-      fit::function<void(std::map<ui_testing::Pixel, uint32_t>)> histogram_predicate = nullptr,
-      zx::duration timeout = kScreenshotTimeout) {
-    return RunLoopWithTimeoutOrUntil(
-        [this, &histogram_predicate, &color] {
-          auto screenshot = TakeScreenshot();
-          auto histogram = screenshot.Histogram();
-
-          bool color_found = histogram[color] > 0;
-          if (color_found && histogram_predicate != nullptr) {
-            histogram_predicate(std::move(histogram));
-          }
-          return color_found;
-        },
-        timeout);
-  }
-
   ui_testing::Screenshot TakeScreenshot() {
     FX_LOGS(INFO) << "Taking screenshot... ";
 
@@ -344,10 +326,9 @@ TEST_P(StaticHtmlPixelTests, ValidPixelTest) {
 
   // TODO(fxb/116631): Find a better replacement for screenshot loops to verify that content has
   // been rendered on the display. Take screenshot until we see the web page's background color.
-  ASSERT_TRUE(TakeScreenshotUntil(ui_testing::Screenshot::kRed,
-                                  [num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
-                                    EXPECT_EQ(histogram[ui_testing::Screenshot::kRed], num_pixels);
-                                  }));
+  ASSERT_TRUE(TakeScreenshotUntil([num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
+    return histogram[ui_testing::Screenshot::kRed] == num_pixels;
+  }));
 }
 
 // Displays a HTML web page with a solid magenta color. The color of the web page changes to blue
@@ -388,22 +369,18 @@ TEST_P(DynamicHtmlPixelTests, ValidPixelTest) {
 
   // The web page should have a magenta background color.
   {
-    ASSERT_TRUE(TakeScreenshotUntil(ui_testing::Screenshot::kMagenta,
-                                    [num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
-                                      EXPECT_EQ(histogram[ui_testing::Screenshot::kMagenta],
-                                                num_pixels);
-                                    }));
+    ASSERT_TRUE(TakeScreenshotUntil([num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
+      return histogram[ui_testing::Screenshot::kMagenta] == num_pixels;
+    }));
   }
 
   InjectInput(TapLocation::kTopLeft);
 
   // The background color of the web page should change to blue after receiving a tap event.
   {
-    ASSERT_TRUE(TakeScreenshotUntil(ui_testing::Screenshot::kBlue,
-                                    [num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
-                                      EXPECT_EQ(histogram[ui_testing::Screenshot::kBlue],
-                                                num_pixels);
-                                    }));
+    ASSERT_TRUE(TakeScreenshotUntil([num_pixels](std::map<ui_testing::Pixel, uint32_t> histogram) {
+      return histogram[ui_testing::Screenshot::kBlue] == num_pixels;
+    }));
   }
 }
 
