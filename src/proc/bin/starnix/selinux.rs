@@ -4,7 +4,7 @@
 
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
-use crate::lock::{Mutex, RwLock};
+use crate::lock::Mutex;
 use crate::logging::not_implemented;
 use crate::task::*;
 use crate::types::*;
@@ -209,12 +209,12 @@ impl FsNodeOps for AccessFileNode {
 }
 
 struct SeLinuxClassDirectory {
-    entries: RwLock<BTreeMap<FsString, FsNodeHandle>>,
+    entries: Mutex<BTreeMap<FsString, FsNodeHandle>>,
 }
 
 impl SeLinuxClassDirectory {
     fn new() -> Arc<Self> {
-        Arc::new(Self { entries: RwLock::new(BTreeMap::new()) })
+        Arc::new(Self { entries: Mutex::new(BTreeMap::new()) })
     }
 }
 
@@ -226,7 +226,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(VecDirectory::new_file(
             self.entries
-                .read()
+                .lock()
                 .iter()
                 .map(|(name, node)| VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
@@ -243,7 +243,7 @@ impl FsNodeOps for Arc<SeLinuxClassDirectory> {
         _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        let mut entries = self.entries.write();
+        let mut entries = self.entries.lock();
         let next_index = entries.len() + 1;
         Ok(entries
             .entry(name.to_vec())
