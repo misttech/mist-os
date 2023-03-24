@@ -306,13 +306,16 @@ pub fn parse_numbered_handles(
                 ));
             }
         }
-    } else {
-        // If no numbered handles are provided default 0, 1, and 2 to a syslog file.
-        let stdio = SyslogFile::new_file(current_task);
-        files.insert(FdNumber::from_raw(0), stdio.clone());
-        files.insert(FdNumber::from_raw(1), stdio.clone());
-        files.insert(FdNumber::from_raw(2), stdio);
     }
+
+    let stdio = SyslogFile::new_file(current_task);
+    // If no numbered handle is provided for each stdio handle, default to syslog.
+    for i in [0, 1, 2] {
+        if files.get(FdNumber::from_raw(i)).is_err() {
+            files.insert(FdNumber::from_raw(i), stdio.clone());
+        }
+    }
+
     Ok(StartupHandles { shell_controller })
 }
 
