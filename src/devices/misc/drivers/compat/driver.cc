@@ -141,7 +141,7 @@ Driver::Driver(fdf::DriverStartArgs start_args,
 }
 
 Driver::~Driver() {
-  if (record_ != nullptr && record_->ops->release != nullptr && skip_release_ == false) {
+  if (ShouldCallRelease()) {
     record_->ops->release(context_);
   }
   dlclose(library_);
@@ -269,15 +269,6 @@ void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
           .then([completer = std::move(completer)](fpromise::result<void>& init) mutable {
             completer(zx::ok());
           }));
-}
-
-void Driver::Stop() {
-  if (system_state_ != fdm::SystemPowerState::kFullyOn) {
-    // We purposefully leak here to emulate DFv1 shutdown. The fdf::Node client should have been
-    // torn down by the driver runtime canceling all outstanding waits by the time stop has been
-    // called, allowing shutdown to proceed.
-    skip_release_ = true;
-  }
 }
 
 promise<zx::resource, zx_status_t> Driver::GetRootResource(

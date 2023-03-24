@@ -196,10 +196,7 @@ Device::Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
       executor_(dispatcher) {}
 
 Device::~Device() {
-  // We only shut down the devices that have a parent, since that means that *this* compat driver
-  // owns the device. If the device does not have a parent, then ops_ belongs to another driver, and
-  // it's that driver's responsibility to be shut down.
-  if (parent_) {
+  if (ShouldCallRelease()) {
     // Call the parent's pre-release.
     if (HasOp((*parent_)->ops_, &zx_protocol_device_t::child_pre_release)) {
       (*parent_)->ops_->child_pre_release((*parent_)->compat_symbol_.context,
@@ -230,7 +227,7 @@ void Device::Unbind() {
 }
 
 fpromise::promise<void> Device::HandleStopSignal(fdm::SystemPowerState state) {
-  if (system_power_state_ == fdm::SystemPowerState::kFullyOn) {
+  if (state == fdm::SystemPowerState::kFullyOn) {
     // kFullyOn means that power manager hasn't initiated a system power state transition. As a
     // result, we can assume our stop request came as a result of our parent node
     // disappearing.

@@ -173,6 +173,16 @@ class Device : public std::enable_shared_from_this<Device>,
 
   std::string OutgoingName();
 
+  bool ShouldCallRelease() {
+    // We only shut down the devices that have a parent, since that means that *this* compat driver
+    // owns the device. If the device does not have a parent, then ops_ belongs to another driver,
+    // and it's that driver's responsibility to be shut down. We purposefully leak in
+    // shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client should have been torn
+    // down by the driver runtime canceling all outstanding waits by the time stop has been called,
+    // allowing shutdown to proceed.
+    return parent_ && system_power_state_ == fuchsia_device_manager::SystemPowerState::kFullyOn;
+  }
+
   // This arena backs `properties_`.
   // This should be declared before any objects it backs so it is destructed last.
   fidl::Arena<512> arena_;

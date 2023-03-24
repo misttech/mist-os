@@ -196,7 +196,7 @@ class TestSystemStateTransition
     : public fidl::testing::WireTestBase<fuchsia_device_manager::SystemStateTransition> {
  public:
   void GetTerminationSystemState(GetTerminationSystemStateCompleter::Sync& completer) override {
-    completer.Reply(fuchsia_device_manager::wire::SystemPowerState::kReboot);
+    completer.Reply(fuchsia_device_manager::wire::SystemPowerState::kFullyOn);
   }
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {

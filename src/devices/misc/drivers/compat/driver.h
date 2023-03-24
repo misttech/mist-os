@@ -32,7 +32,6 @@ class Driver : public fdf::DriverBase {
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
-  void Stop() override;
 
   // Returns the context that DFv1 driver provided.
   void* Context() const;
@@ -107,6 +106,14 @@ class Driver : public fdf::DriverBase {
   // Serves the diagnostics directory that is used to host inspect files.
   zx_status_t ServeDiagnosticsDir();
 
+  bool ShouldCallRelease() {
+    // We purposefully leak in shutdown/reboot flows to emulate DFv1 shutdown. The fdf::Node client
+    // should have been torn down by the driver runtime canceling all outstanding waits by the time
+    // stop has been called, allowing shutdown to proceed.
+    return record_ != nullptr && record_->ops->release != nullptr &&
+           system_state_ == fuchsia_device_manager::SystemPowerState::kFullyOn;
+  }
+
   async::Executor executor_;
   std::string driver_path_;
 
@@ -134,9 +141,6 @@ class Driver : public fdf::DriverBase {
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;
-
-  // Set to true during shutdown and reboot flows.
-  bool skip_release_ = false;
 
   // NOTE: Must be the last member.
   fpromise::scope scope_;
