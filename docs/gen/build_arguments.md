@@ -1359,7 +1359,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:93
+From //build/toolchain/rbe.gni:124
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1367,7 +1367,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:93
+From //build/toolchain/rbe.gni:124
 
 ### cxx_rbe_exec_strategy
 
@@ -1390,7 +1390,18 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:111
+From //build/toolchain/rbe.gni:142
+
+### cxx_rbe_use_python_impl
+
+EXPERIMENTAL.
+Set to true to use the Python implementation for remote wrappers,
+as opposed to the older (slower) bash scripts.  This option will
+eventually disappear upon completing the transition to the Python scripts.
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/rbe.gni:22
 
 ### dart_aot_debug_build_cfg
 
@@ -7272,7 +7283,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:85
+From //build/toolchain/rbe.gni:116
 
 ### rust_rbe_enable
 
@@ -7284,7 +7295,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:41
+From //build/toolchain/rbe.gni:72
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7292,7 +7303,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:41
+From //build/toolchain/rbe.gni:72
 
 ### rust_rbe_exec_strategy
 
@@ -7315,7 +7326,13 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:59
+From //build/toolchain/rbe.gni:90
+
+### rust_rbe_use_python_impl
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/rbe.gni:23
 
 ### rust_toolchain_triple_suffix
 
