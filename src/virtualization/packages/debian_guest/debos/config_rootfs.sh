@@ -18,8 +18,10 @@ set -e
 username="root"
 default_password="password"
 home=/root
+default_shell=/usr/bin/dash
 echo "${username}:${default_password}" | chpasswd
 echo "Default login/password is ${username}:${default_password}" > /etc/issue
+chsh -s ${default_shell} ${username}
 
 # Squelch MOTD.
 touch ${home}/.hushlogin
