@@ -30,8 +30,8 @@ std::string EscapedFilename(std::string_view filename) {
 
 bool LinuxTestFile::IsValid() {
   std::string result;
-  linux_operator_->ExecuteWithAssert({"set +H;[ -e", EscapedFilename(filename_), "]; echo $?"},
-                                     &result);
+  linux_operator_->ExecuteWithAssert(
+      {"bash -c 'set +H;[ -e", EscapedFilename(filename_), "]; echo $?'"}, &result);
   return result == "0" || result == "0\n";
 }
 
@@ -311,8 +311,8 @@ std::unique_ptr<TestFile> LinuxOperator::Open(std::string_view path, int flags, 
     if (flags & O_DIRECTORY) {
       Mkdir(path, mode);
     } else {
-      ExecuteWithAssert({"set +H;touch", EscapedFilename(ConvertPath(path)), ";chmod ",
-                         ConvertModeString(mode), EscapedFilename(ConvertPath(path))});
+      ExecuteWithAssert({"bash -c 'set +H;touch", EscapedFilename(ConvertPath(path)), ";chmod ",
+                         ConvertModeString(mode), EscapedFilename(ConvertPath(path)), "'"});
     }
   }
 
