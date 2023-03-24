@@ -27,6 +27,7 @@
             // #devfs-with-pkg over this component
             name: "devfs",
             url: "fuchsia-boot:///devfs#meta/devfs.cm",
+            environment: "#devfs-env",
         },
         {
             // Exists to augment capability graph with information about when #pkg-drivers and
@@ -34,6 +35,7 @@
             // capabiliites provided by this component over #devfs.
             name: "devfs-with-pkg",
             url: "fuchsia-boot:///devfs#meta/devfs.cm",
+            environment: "#devfs-env",
         },
         {
             name: "flashmap",
@@ -1296,6 +1298,13 @@
         },
         {
             name: "driver_manager-env",
+            extends: "realm",
+
+            // 1 minute
+            __stop_timeout_ms: 60000,
+        },
+        {
+            name: "devfs-env",
             extends: "realm",
 
             // 1 minute
