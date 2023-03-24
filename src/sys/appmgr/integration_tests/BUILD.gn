@@ -10,12 +10,10 @@ group("integration_tests") {
   testonly = true
   deps = [
     ":appmgr_integration_tests",
-    "component_events",
     "components",
     "fidl",
     "lifecycle",
     "mock_runner",
-    "policy",
     "sandbox",
     "util",
   ]

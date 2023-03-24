@@ -6,14 +6,15 @@ use {
     crate::fake_appmgr::{CreateComponentFn, FakeAppmgr},
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::{
-        create_endpoints, create_proxy, ControlHandle, Proxy, RequestStream, ServerEnd,
+        create_endpoints, create_proxy, ControlHandle, DiscoverableProtocolMarker, Proxy,
+        RequestStream, ServerEnd,
     },
     fidl_fuchsia_element as felement, fidl_fuchsia_examples as fexamples, fidl_fuchsia_io as fio,
     fidl_fuchsia_modular as fmodular, fidl_fuchsia_modular_internal as fmodular_internal,
     fidl_fuchsia_sys as fsys, fidl_fuchsia_ui_app as fapp, fuchsia_async as fasync,
     fuchsia_component::{
         client::connect_to_protocol_at_dir_root,
-        server::{ServiceFs, ServiceObj},
+        server::{ServiceFs, ServiceObj, ServiceObjTrait},
     },
     fuchsia_component_test::{
         Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -191,6 +192,19 @@ fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
     client_end.into_proxy().unwrap()
 }
 
+/// Start serving directory protocol service requests via a `ServiceList`.
+/// The resulting `ServiceList` can be attached to a new environment in
+/// order to provide child components with access to these services.
+pub fn host_services_list<ServiceObjTy: ServiceObjTrait>(
+    names: Vec<String>,
+    service_fs: &mut ServiceFs<ServiceObjTy>,
+) -> Result<fsys::ServiceList, Error> {
+    let (client_end, server_end) = fidl::endpoints::create_endpoints();
+    service_fs.serve_connection(server_end)?;
+
+    Ok(fsys::ServiceList { names, provider: None, host_directory: Some(client_end) })
+}
+
 // Tests that sessionmgr starts and attempts to launch the session shell.
 #[fuchsia::test]
 async fn test_launch_sessionmgr() -> Result<(), Error> {
@@ -246,7 +260,7 @@ async fn test_launch_sessionmgr() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut services_for_agents_fs.host_services_list()?,
+        &mut host_services_list(vec![], &mut services_for_agents_fs)?,
         services_from_sessionmgr_server_end,
         Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
             link_token_pair.view_creation_token,
@@ -363,7 +377,10 @@ async fn test_v2_modular_agents() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut services_for_agents_fs.host_services_list()?,
+        &mut host_services_list(
+            vec!["fuchsia.modular.Agent.test_agent".to_string()],
+            &mut services_for_agents_fs,
+        )?,
         services_from_sessionmgr_server_end,
         Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
             link_token_pair.view_creation_token,
@@ -548,7 +565,10 @@ async fn test_v2_modular_agent_reconnect() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut services_for_agents_fs.host_services_list()?,
+        &mut host_services_list(
+            vec!["fuchsia.modular.Agent.test_agent".to_string()],
+            &mut services_for_agents_fs,
+        )?,
         services_from_sessionmgr_server_end,
         Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
             link_token_pair.view_creation_token,
@@ -673,7 +693,10 @@ async fn test_v2_session_shell() -> Result<(), Error> {
     sessionmgr_proxy.initialize(
         "test_session_id",
         session_context_client_end,
-        &mut services_for_agents_fs.host_services_list()?,
+        &mut host_services_list(
+            vec![felement::GraphicalPresenterMarker::PROTOCOL_NAME.to_string()],
+            &mut services_for_agents_fs,
+        )?,
         services_from_sessionmgr_server_end,
         Some(&mut fmodular_internal::ViewParams::ViewCreationToken(
             link_token_pair.view_creation_token,

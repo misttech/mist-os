@@ -6,21 +6,15 @@
 
 use {
     crate::DEFAULT_SERVICE_INSTANCE,
-    anyhow::{format_err, Context as _, Error},
+    anyhow::Error,
     fidl::endpoints::{
         DiscoverableProtocolMarker, Proxy as _, RequestStream, ServerEnd, ServiceMarker,
         ServiceRequest,
     },
-    fidl_fuchsia_io as fio,
-    fidl_fuchsia_sys::{
-        EnvironmentControllerProxy, EnvironmentMarker, EnvironmentOptions, LauncherProxy,
-        LoaderMarker, ServiceList,
-    },
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::BoxFuture, FutureExt, Stream, StreamExt},
     pin_project::pin_project,
     std::{
-        any::TypeId,
         marker::PhantomData,
         pin::Pin,
         sync::Arc,
@@ -145,46 +139,6 @@ impl<P: DiscoverableProtocolMarker, O> Service for ProxyTo<P, O> {
             fdio::service_connect_at(self.directory_request.channel(), P::PROTOCOL_NAME, channel)
         {
             eprintln!("failed to proxy request to {}: {:?}", P::PROTOCOL_NAME, e);
-        }
-        None
-    }
-}
-
-struct LaunchData {
-    component_url: String,
-    arguments: Option<Vec<String>>,
-}
-
-/// A `Service` implementation that proxies requests
-/// to a launched component.
-///
-/// Not intended for direct use. Use the `add_component_proxy_service`
-/// function instead.
-#[doc(hidden)]
-pub struct ComponentProxy<P: DiscoverableProtocolMarker, O> {
-    launch_data: Option<LaunchData>,
-    launched_app: Option<crate::client::App>,
-    _marker: PhantomData<(P, O)>,
-}
-
-impl<P: DiscoverableProtocolMarker, O> Service for ComponentProxy<P, O> {
-    type Output = O;
-    fn connect(&mut self, channel: zx::Channel) -> Option<Self::Output> {
-        let res = (|| {
-            if let Some(LaunchData { component_url, arguments }) = self.launch_data.take() {
-                self.launched_app = Some(crate::client::launch(
-                    &crate::client::launcher()?,
-                    component_url,
-                    arguments,
-                )?);
-            }
-            if let Some(app) = self.launched_app.as_ref() {
-                app.pass_to_named_protocol(P::PROTOCOL_NAME, channel.into())?;
-            }
-            Ok::<(), Error>(())
-        })();
-        if let Err(e) = res {
-            eprintln!("ServiceFs failed to launch component: {:?}", e);
         }
         None
     }
@@ -462,27 +416,6 @@ macro_rules! add_functions {
             )
         }
 
-        /// Add a service to the `ServicesServer` that will launch a component
-        /// upon request, proxying requests to the launched component.
-        pub fn add_component_proxy_service<P: DiscoverableProtocolMarker, O>(
-            &mut self,
-            component_url: String,
-            arguments: Option<Vec<String>>,
-        ) -> &mut Self
-        where
-            ServiceObjTy: From<ComponentProxy<P, O>>,
-            ServiceObjTy: ServiceObjTrait<Output = O>,
-        {
-            self.add_service_at(
-                P::PROTOCOL_NAME,
-                ComponentProxy {
-                    launch_data: Some(LaunchData { component_url, arguments }),
-                    launched_app: None,
-                    _marker: PhantomData,
-                },
-            )
-        }
-
         /// Adds a VMO file to the directory at the given path.
         ///
         /// The path must be a single component containing no `/` characters. The vmo should have
@@ -589,92 +522,6 @@ impl<ServiceObjTy: ServiceObjTrait> ServiceFs<ServiceObjTy> {
 
     add_functions!();
 
-    /// Start serving directory protocol service requests via a `ServiceList`.
-    /// The resulting `ServiceList` can be attached to a new environment in
-    /// order to provide child components with access to these services.
-    pub fn host_services_list(&mut self) -> Result<ServiceList, Error> {
-        let names = self.dir.filter_map(|name, entry| {
-            if entry.as_ref().type_id() == TypeId::of::<vfs::service::Service>() {
-                Some(name.into())
-            } else {
-                None
-            }
-        });
-
-        let (client_end, server_end) = fidl::endpoints::create_endpoints();
-        self.serve_connection(server_end)?;
-
-        Ok(ServiceList { names, provider: None, host_directory: Some(client_end) })
-    }
-
-    /// Returns true if the root contains any sub-directories.
-    fn has_sub_dirs(&self) -> bool {
-        self.dir
-            .any(|_, entry| entry.as_ref().type_id() == TypeId::of::<Simple<ImmutableConnection>>())
-    }
-
-    /// Creates a new environment that only has access to the services provided through this
-    /// `ServiceFs` and the enclosing environment's `Loader` service, appending a few random
-    /// bytes to the given `environment_label_prefix` to ensure this environment has a unique
-    /// name.
-    ///
-    /// Note that the resulting `NestedEnvironment` must be kept alive for the environment to
-    /// continue to exist. Once dropped, the environment and all components launched within it
-    /// will be destroyed.
-    pub fn create_salted_nested_environment<O>(
-        &mut self,
-        environment_label_prefix: &str,
-    ) -> Result<NestedEnvironment, Error>
-    where
-        ServiceObjTy: From<Proxy<LoaderMarker, O>>,
-        ServiceObjTy: ServiceObjTrait<Output = O>,
-    {
-        let mut salt = [0; 4];
-        zx::cprng_draw(&mut salt[..]);
-        let environment_label = format!("{}_{}", environment_label_prefix, hex::encode(&salt));
-        let env = crate::client::connect_to_protocol::<EnvironmentMarker>()
-            .context("connecting to current environment")?;
-        let services_with_loader = self.add_proxy_service::<LoaderMarker, _>();
-
-        // Services added in any subdirectories won't be provided to the nested environment, which
-        // is an important detail that developers are likely to overlook. If there are any
-        // subdirectories in this ServiceFs, return an error, because what we're about to do
-        // probably doesn't line up with what the developer expects.
-        if services_with_loader.has_sub_dirs() {
-            return Err(format_err!(
-                "services in sub-directories will not be added to nested environment"
-            ));
-        }
-
-        let mut options = EnvironmentOptions {
-            inherit_parent_services: false,
-            use_parent_runners: false,
-            kill_on_oom: false,
-            delete_storage_on_death: false,
-        };
-
-        let mut service_list = services_with_loader.host_services_list()?;
-
-        let (new_env, new_env_server_end) = fidl::endpoints::create_proxy()?;
-        let (controller, controller_server_end) = fidl::endpoints::create_proxy()?;
-        let (launcher, launcher_server_end) = fidl::endpoints::create_proxy()?;
-        let (directory_request, directory_server_end) = fidl::endpoints::create_endpoints();
-
-        env.create_nested_environment(
-            new_env_server_end,
-            controller_server_end,
-            &environment_label,
-            Some(&mut service_list),
-            &mut options,
-        )
-        .context("creating isolated environment")?;
-
-        new_env.get_launcher(launcher_server_end).context("getting nested environment launcher")?;
-        self.serve_connection(directory_server_end)?;
-
-        Ok(NestedEnvironment { controller, launcher, directory_request })
-    }
-
     fn serve_connection_impl(&self, chan: fidl::endpoints::ServerEnd<fio::DirectoryMarker>) {
         self.dir.clone().open(
             self.scope.clone(),
@@ -704,65 +551,6 @@ pub struct ProtocolConnector {
 }
 
 impl ProtocolConnector {
-    /// Connect to a protocol provided by this environment.
-    #[inline]
-    pub fn connect_to_service<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
-        self.connect_to_protocol::<P>()
-    }
-
-    /// Connect to a protocol provided by this environment.
-    #[inline]
-    pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
-        let (client_channel, server_channel) = zx::Channel::create();
-        self.pass_to_protocol::<P>(server_channel)?;
-        Ok(P::Proxy::from_channel(fasync::Channel::from_channel(client_channel)?))
-    }
-
-    /// Connect to a protocol by passing a channel for the server.
-    #[inline]
-    pub fn pass_to_protocol<P: DiscoverableProtocolMarker>(
-        &self,
-        server_channel: zx::Channel,
-    ) -> Result<(), Error> {
-        self.pass_to_named_protocol(P::PROTOCOL_NAME, server_channel)
-    }
-
-    /// Connect to a protocol by name.
-    #[inline]
-    pub fn pass_to_named_protocol(
-        &self,
-        protocol_name: &str,
-        server_channel: zx::Channel,
-    ) -> Result<(), Error> {
-        fdio::service_connect_at(self.directory_request.channel(), protocol_name, server_channel)?;
-        Ok(())
-    }
-}
-
-/// `NestedEnvironment` represents an environment nested within another.
-///
-/// When `NestedEnvironment` is dropped, the environment and all components started within it
-/// will be terminated.
-#[must_use = "Dropping `NestedEnvironment` will cause the environment to be terminated."]
-pub struct NestedEnvironment {
-    controller: EnvironmentControllerProxy,
-    launcher: LauncherProxy,
-    directory_request: fidl::endpoints::ClientEnd<fio::DirectoryMarker>,
-}
-
-impl NestedEnvironment {
-    /// Returns a reference to the environment's controller.
-    #[inline]
-    pub fn controller(&self) -> &EnvironmentControllerProxy {
-        &self.controller
-    }
-
-    /// Returns a reference to the environment's launcher.
-    #[inline]
-    pub fn launcher(&self) -> &LauncherProxy {
-        &self.launcher
-    }
-
     /// Connect to a protocol provided by this environment.
     #[inline]
     pub fn connect_to_service<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
@@ -852,38 +640,5 @@ impl<ServiceObjTy: ServiceObjTrait> Stream for ServiceFs<ServiceObjTy> {
             }
         }
         self.shutdown.poll_unpin(cx).map(|_| None)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use {
-        super::{ServiceFs, ServiceObj},
-        fidl::endpoints::DiscoverableProtocolMarker,
-        fidl_fuchsia_component::{RealmMarker, RealmRequestStream},
-        fidl_fuchsia_sys::ServiceList,
-    };
-
-    enum Services {
-        _Realm(RealmRequestStream),
-    }
-
-    #[test]
-    fn has_sub_dirs() {
-        let mut fs = ServiceFs::<ServiceObj<'_, Services>>::new();
-        assert!(!fs.has_sub_dirs());
-        fs.add_proxy_service::<RealmMarker, Services>();
-        assert!(!fs.has_sub_dirs());
-        fs.dir("test");
-        assert!(fs.has_sub_dirs());
-    }
-
-    #[test]
-    fn host_services_list() {
-        let mut fs = ServiceFs::<ServiceObj<'_, Services>>::new();
-        fs.add_proxy_service::<RealmMarker, Services>();
-        fs.dir("test");
-        assert!(matches!(fs.host_services_list(),
-                     Ok(ServiceList { names, .. }) if names == vec![ RealmMarker::PROTOCOL_NAME ]));
     }
 }
