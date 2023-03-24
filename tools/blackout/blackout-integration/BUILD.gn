@@ -65,7 +65,14 @@ if (is_host) {
 
     deps = [ "//src/developer/ffx:ffx_bin" ]
 
-    environments = [ nuc_env ]
+    environments = [
+      {
+        dimensions = {
+          device_type = "Intel NUC Kit NUC7i5DNHE"
+        }
+        tags = [ "flaky" ]  # fxbug.dev/123763
+      },
+    ]
   }
 
   # This target runs a basic connectivity integration test for the blackout library, with a reboot
