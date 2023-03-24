@@ -95,6 +95,8 @@ static_library("symbols") {
     "dwarf_abstract_child_iterator.h",
     "dwarf_binary_impl.cc",
     "dwarf_binary_impl.h",
+    "dwarf_context.cc",
+    "dwarf_context.h",
     "dwarf_die_decoder.cc",
     "dwarf_die_decoder.h",
     "dwarf_die_scanner.cc",

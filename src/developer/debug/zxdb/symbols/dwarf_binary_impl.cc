@@ -24,6 +24,7 @@
 
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_context.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_unit_impl.h"
 #include "src/lib/elflib/elflib.h"
 
@@ -197,7 +198,7 @@ Err DwarfBinaryImpl::Load() {
   binary_buffer_ = std::move(binary_pair.second);
   binary_ = std::move(binary_pair.first);
 
-  context_ = llvm::DWARFContext::create(*object_file());
+  context_ = GetDwarfContext(object_file());
 
   return Err();
 }

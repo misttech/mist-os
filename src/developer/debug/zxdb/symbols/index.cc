@@ -10,6 +10,7 @@
 #include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/adapters.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_context.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_decoder.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_scanner.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
@@ -625,7 +626,7 @@ void RecursiveFindExact(const IndexNode* node, const Identifier& input, size_t i
 }  // namespace
 
 void Index::CreateIndex(llvm::object::ObjectFile* object_file, bool force_slow_path) {
-  std::unique_ptr<llvm::DWARFContext> context = llvm::DWARFContext::create(*object_file);
+  std::unique_ptr<llvm::DWARFContext> context = GetDwarfContext(object_file);
 
   // Extracts the units to a place where we can destroy them after indexing is complete. This
   // construction order matches that of LLVM's DWARFContext so the indexes into this vector will
