@@ -4,7 +4,10 @@
 
 #include "registers.h"
 
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
@@ -23,20 +26,11 @@ constexpr size_t kRegSize = 0x00000100;
 template <typename T>
 class FakeRegistersDevice : public RegistersDevice<T> {
  public:
-  static std::unique_ptr<FakeRegistersDevice> Create(
-      std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios) {
-    fbl::AllocChecker ac;
-    auto device = fbl::make_unique_checked<FakeRegistersDevice>(&ac);
-    if (!ac.check()) {
-      zxlogf(ERROR, "%s: device object alloc failed", __func__);
-      return nullptr;
-    }
-    device->Init(std::move(mmios));
-
-    return device;
-  }
+  explicit FakeRegistersDevice()
+      : RegistersDevice<T>(nullptr), checker_(fdf::Dispatcher::GetCurrent()->async_dispatcher()) {}
 
   void AddRegister(RegistersMetadataEntry config) {
+    std::lock_guard guard(checker_);
     registers_.push_back(
         std::make_unique<Register<T>>(nullptr, RegistersDevice<T>::mmios_[config.mmio_id()]));
     registers_.back()->Init(config);
@@ -45,29 +39,71 @@ class FakeRegistersDevice : public RegistersDevice<T> {
     if (endpoints.is_error()) {
       return;
     }
-    auto& [client_end, server_end] = endpoints.value();
-    registers_.back()->RegistersConnect(server_end.TakeChannel());
+
+    zx::result outgoing_client = registers_.back()->CreateAndServeOutgoingDirectory();
+    if (outgoing_client.is_error()) {
+      return;
+    }
+
+    zx::result connect_result = component::ConnectAt<fuchsia_hardware_registers::Device>(
+        outgoing_client.value(), std::move(endpoints->server),
+        component::kServiceDirectoryTrailingSlash +
+            component::MakeServiceMemberPath<fuchsia_hardware_registers::Service::Device>(
+                component::kDefaultInstance));
+    if (connect_result.is_error()) {
+      return;
+    }
+
     clients_.emplace(config.bind_id(),
                      std::make_shared<fidl::WireSyncClient<fuchsia_hardware_registers::Device>>(
-                         std::move(client_end)));
+                         std::move(endpoints->client)));
   }
 
   std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>> GetClient(uint64_t id) {
+    std::lock_guard guard(checker_);
     return clients_[id];
   }
 
-  explicit FakeRegistersDevice() : RegistersDevice<T>(nullptr) {}
+  zx_status_t Init(std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios) {
+    std::lock_guard guard(checker_);
+    return RegistersDevice<T>::Init(std::move(mmios));
+  }
 
  private:
-  std::vector<std::unique_ptr<Register<T>>> registers_;
+  async::synchronization_checker checker_;
+  std::vector<std::unique_ptr<Register<T>>> registers_ __TA_GUARDED(checker_);
   std::map<uint64_t, std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>>>
-      clients_;
+      clients_ __TA_GUARDED(checker_);
+};
+
+// Wraps a FakeRegistersDevice inside a |TestDispatcherBound| and provides pass-through helpers
+// for calling |SyncCall| on the wrapped |FakeRegistersDevice|.
+template <typename T>
+class FakeRegistersDeviceWrapper {
+ public:
+  explicit FakeRegistersDeviceWrapper(async_dispatcher_t* dispatcher)
+      : registers_(dispatcher, std::in_place) {}
+
+  void AddRegister(RegistersMetadataEntry config) {
+    registers_.SyncCall(&FakeRegistersDevice<T>::AddRegister, config);
+  }
+
+  std::shared_ptr<fidl::WireSyncClient<fuchsia_hardware_registers::Device>> GetClient(uint64_t id) {
+    return registers_.SyncCall(&FakeRegistersDevice<T>::GetClient, id);
+  }
+
+  zx_status_t Init(std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios) {
+    return registers_.SyncCall(&FakeRegistersDevice<T>::Init, std::move(mmios));
+  }
+
+ private:
+  async_patterns::TestDispatcherBound<FakeRegistersDevice<T>> registers_;
 };
 
 class RegistersDeviceTest : public zxtest::Test {
  public:
   template <typename T>
-  std::unique_ptr<FakeRegistersDevice<T>> Init(uint32_t mmio_count) {
+  std::unique_ptr<FakeRegistersDeviceWrapper<T>> Init(uint32_t mmio_count) {
     fbl::AllocChecker ac;
 
     std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios;
@@ -88,7 +124,10 @@ class RegistersDeviceTest : public zxtest::Test {
                        }));
     }
 
-    return FakeRegistersDevice<T>::Create(std::move(mmios));
+    auto device =
+        std::make_unique<FakeRegistersDeviceWrapper<T>>(registers_dispatcher_.dispatcher());
+    device->Init(std::move(mmios));
+    return device;
   }
 
   void TearDown() override {
@@ -98,12 +137,16 @@ class RegistersDeviceTest : public zxtest::Test {
   }
 
  protected:
-  fdf::TestSynchronizedDispatcher dispatcher_{fdf::kDispatcherDefault};
+  // The |Register| device lives on a driver runtime managed dispatcher since it uses the
+  // |fdf::Dispatcher::GetCurrent()| API. It serves the FIDL protocol on this dispatcher.
+  // This dispatcher must be separate from the test as the test calls synchronously into
+  // this FIDL protocol.
+  fdf_testing::DriverRuntimeEnv managed_runtime_env_;
+  fdf::TestSynchronizedDispatcher registers_dispatcher_{fdf::kDispatcherNoDefault};
+
   // Mmio Regs and Regions
   std::vector<fbl::Array<ddk_mock::MockMmioReg>> regs_;
   std::vector<std::unique_ptr<ddk_mock::MockMmioRegRegion>> mock_mmio_;
-
-  std::map<uint64_t, fidl::WireSyncClient<fuchsia_hardware_registers::Device>> clients_;
 
   fidl::Arena<2048> allocator_;
 };

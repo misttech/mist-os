@@ -68,9 +68,6 @@ zx_status_t FragmentProxy::DdkGetProtocol(uint32_t proto_id, void* out) {
     case ZX_PROTOCOL_PWM:
       proto->ops = &pwm_protocol_ops_;
       return ZX_OK;
-    case ZX_PROTOCOL_REGISTERS:
-      proto->ops = &registers_protocol_ops_;
-      return ZX_OK;
     case ZX_PROTOCOL_SPI:
       proto->ops = &spi_protocol_ops_;
       return ZX_OK;
@@ -671,16 +668,6 @@ zx_status_t FragmentProxy::PwmDisable() {
   req.op = PwmOp::DISABLE;
 
   return Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp));
-}
-
-void FragmentProxy::RegistersConnect(zx::channel chan) {
-  RegistersProxyRequest req = {};
-  RegistersProxyResponse resp = {};
-  req.header.proto_id = ZX_PROTOCOL_REGISTERS;
-  req.op = RegistersOp::CONNECT;
-
-  zx_handle_t handle = chan.release();
-  Rpc(&req.header, sizeof(req), &resp.header, sizeof(resp), &handle, 1, nullptr, 0, nullptr);
 }
 
 zx_status_t FragmentProxy::SpiTransmit(const uint8_t* txdata_list, size_t txdata_count) {

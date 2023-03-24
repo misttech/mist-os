@@ -17,6 +17,6 @@ primary node "pdev" {
 }
 
 node "reset" {
-  fuchsia.BIND_PROTOCOL == fuchsia.hardware.registers.BIND_PROTOCOL.DEVICE;
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.hardware.registers.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_REGISTER_ID == fuchsia.synaptics.platform.BIND_REGISTER_ID.EMMC_RESET;
 }

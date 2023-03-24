@@ -61,26 +61,6 @@ zx_status_t Register<T>::Init(const RegistersMetadataEntry& config) {
 }
 
 template <typename T>
-void Register<T>::RegistersConnect(zx::channel channel) {
-  fidl::ServerEnd<fuchsia_hardware_registers::Device> server_end{std::move(channel)};
-  zx_status_t status;
-  char name[20];
-  snprintf(name, sizeof(name), "register-%lu-thread", id_);
-  if (!loop_started_ && (status = loop_.StartThread(name)) != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to start registers thread: %d", __func__, status);
-    server_end.Close(status);
-    return;
-  }
-
-  loop_started_ = true;
-
-  status = fidl::BindSingleInFlightOnly(loop_.dispatcher(), std::move(server_end), this);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: failed to bind channel: %d", __func__, status);
-  }
-}
-
-template <typename T>
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> Register<T>::CreateAndServeOutgoingDirectory() {
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   if (endpoints.is_error()) {

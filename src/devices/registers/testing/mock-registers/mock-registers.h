@@ -6,7 +6,6 @@
 #define SRC_DEVICES_REGISTERS_TESTING_MOCK_REGISTERS_MOCK_REGISTERS_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 
 #include <map>
 #include <queue>
@@ -152,24 +151,6 @@ class MockRegisters : public fidl::WireServer<fuchsia_hardware_registers::Device
   std::map<uint64_t, std::queue<std::pair<uint16_t, uint16_t>>> expect_write16;
   std::map<uint64_t, std::queue<std::pair<uint32_t, uint32_t>>> expect_write32;
   std::map<uint64_t, std::queue<std::pair<uint64_t, uint64_t>>> expect_write64;
-};
-
-// Mock Registers Device implementing Banjo protocol to connect to FIDL implementation.
-class MockRegistersDevice : public ddk::RegistersProtocol<MockRegistersDevice> {
- public:
-  explicit MockRegistersDevice(async_dispatcher_t* dispatcher)
-      : proto_({&registers_protocol_ops_, this}), fidl_service_(dispatcher) {}
-
-  void RegistersConnect(zx::channel channel) {
-    fidl_service_.Init(fidl::ServerEnd<fuchsia_hardware_registers::Device>{std::move(channel)});
-  }
-
-  const registers_protocol_t* proto() const { return &proto_; }
-  MockRegisters* fidl_service() { return &fidl_service_; }
-
- private:
-  registers_protocol_t proto_;
-  MockRegisters fidl_service_;
 };
 
 zx_status_t MockRegisters::VerifyAll() {

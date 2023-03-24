@@ -99,13 +99,13 @@ static const fpbus::Node usb_phy_dev = []() {
 }();
 
 const std::vector<fuchsia_driver_framework::BindRule> kResetRegisterRules = {
-    fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                            bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
+    fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                            bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
     fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperties = {
-    fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                      bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
+    fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                      bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
     fdf::MakeProperty(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
 const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {

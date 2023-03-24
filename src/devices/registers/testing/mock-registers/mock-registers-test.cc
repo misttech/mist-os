@@ -15,24 +15,22 @@ class MockRegistersTest : public zxtest::Test {
   void SetUp() override {
     loop_.StartThread();
 
-    device_ = std::make_unique<MockRegistersDevice>(loop_.dispatcher());
+    registers_ = std::make_unique<MockRegisters>(loop_.dispatcher());
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_registers::Device>();
     ASSERT_OK(endpoints);
     auto& [client_end, server_end] = endpoints.value();
-    device_->RegistersConnect(server_end.TakeChannel());
+    registers_->Init(std::move(server_end));
     client_.Bind(std::move(client_end));
   }
 
   void TearDown() override {
-    EXPECT_OK(registers()->VerifyAll());
+    EXPECT_OK(registers_->VerifyAll());
     loop_.Shutdown();
   }
 
-  MockRegisters* registers() { return device_->fidl_service(); }
-
  protected:
-  std::unique_ptr<MockRegistersDevice> device_;
+  std::unique_ptr<MockRegisters> registers_;
 
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> client_;
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
@@ -40,39 +38,39 @@ class MockRegistersTest : public zxtest::Test {
 
 TEST_F(MockRegistersTest, ReadTest) {
   // 8-bit
-  registers()->ExpectRead<uint8_t>(0, 1, 2);
+  registers_->ExpectRead<uint8_t>(0, 1, 2);
   auto read8_res = client_->ReadRegister8(0, 1);
   EXPECT_TRUE(read8_res.ok());
   EXPECT_TRUE(read8_res->is_ok());
   EXPECT_EQ(read8_res->value()->value, 2);
 
   // 16-bit
-  registers()->ExpectRead<uint16_t>(5, 15, 3);
+  registers_->ExpectRead<uint16_t>(5, 15, 3);
   auto read16_res = client_->ReadRegister16(5, 15);
   EXPECT_TRUE(read16_res.ok());
   EXPECT_TRUE(read16_res->is_ok());
   EXPECT_EQ(read16_res->value()->value, 3);
 
   // 32-bit
-  registers()->ExpectRead<uint32_t>(145, 127, 25);
+  registers_->ExpectRead<uint32_t>(145, 127, 25);
   auto read32_res = client_->ReadRegister32(145, 127);
   EXPECT_TRUE(read32_res.ok());
   EXPECT_TRUE(read32_res->is_ok());
   EXPECT_EQ(read32_res->value()->value, 25);
 
   // 64-bit
-  registers()->ExpectRead<uint64_t>(325, 54, 136);
+  registers_->ExpectRead<uint64_t>(325, 54, 136);
   auto read64_res = client_->ReadRegister64(325, 54);
   EXPECT_TRUE(read64_res.ok());
   EXPECT_TRUE(read64_res->is_ok());
   EXPECT_EQ(read64_res->value()->value, 136);
 
   // Multiple Reads
-  registers()->ExpectRead<uint32_t>(25, 63, 46);
-  registers()->ExpectRead<uint32_t>(25, 84, 53);
-  registers()->ExpectRead<uint32_t>(102, 57, 7);
-  registers()->ExpectRead<uint32_t>(3, 24, 299);
-  registers()->ExpectRead<uint32_t>(102, 67, 38);
+  registers_->ExpectRead<uint32_t>(25, 63, 46);
+  registers_->ExpectRead<uint32_t>(25, 84, 53);
+  registers_->ExpectRead<uint32_t>(102, 57, 7);
+  registers_->ExpectRead<uint32_t>(3, 24, 299);
+  registers_->ExpectRead<uint32_t>(102, 67, 38);
   auto res1 = client_->ReadRegister32(25, 63);
   EXPECT_TRUE(res1.ok());
   EXPECT_TRUE(res1->is_ok());
@@ -97,35 +95,35 @@ TEST_F(MockRegistersTest, ReadTest) {
 
 TEST_F(MockRegistersTest, WriteTest) {
   // 8-bit
-  registers()->ExpectWrite<uint8_t>(0, 1, 2);
+  registers_->ExpectWrite<uint8_t>(0, 1, 2);
   auto write8_res = client_->WriteRegister8(0, 1, 2);
   EXPECT_TRUE(write8_res.ok());
   EXPECT_TRUE(write8_res->is_ok());
 
   // 16-bit
-  registers()->ExpectWrite<uint16_t>(5, 15, 3);
+  registers_->ExpectWrite<uint16_t>(5, 15, 3);
   auto write16_res = client_->WriteRegister16(5, 15, 3);
   EXPECT_TRUE(write16_res.ok());
   EXPECT_TRUE(write16_res->is_ok());
 
   // 32-bit
-  registers()->ExpectWrite<uint32_t>(145, 127, 25);
+  registers_->ExpectWrite<uint32_t>(145, 127, 25);
   auto write32_res = client_->WriteRegister32(145, 127, 25);
   EXPECT_TRUE(write32_res.ok());
   EXPECT_TRUE(write32_res->is_ok());
 
   // 64-bit
-  registers()->ExpectWrite<uint64_t>(325, 54, 136);
+  registers_->ExpectWrite<uint64_t>(325, 54, 136);
   auto write64_res = client_->WriteRegister64(325, 54, 136);
   EXPECT_TRUE(write64_res.ok());
   EXPECT_TRUE(write64_res->is_ok());
 
   // Multiple Writes
-  registers()->ExpectWrite<uint32_t>(25, 63, 46);
-  registers()->ExpectWrite<uint32_t>(25, 84, 53);
-  registers()->ExpectWrite<uint32_t>(102, 57, 7);
-  registers()->ExpectWrite<uint32_t>(3, 24, 299);
-  registers()->ExpectWrite<uint32_t>(102, 67, 38);
+  registers_->ExpectWrite<uint32_t>(25, 63, 46);
+  registers_->ExpectWrite<uint32_t>(25, 84, 53);
+  registers_->ExpectWrite<uint32_t>(102, 57, 7);
+  registers_->ExpectWrite<uint32_t>(3, 24, 299);
+  registers_->ExpectWrite<uint32_t>(102, 67, 38);
   auto res1 = client_->WriteRegister32(25, 63, 46);
   EXPECT_TRUE(res1.ok());
   EXPECT_TRUE(res1->is_ok());

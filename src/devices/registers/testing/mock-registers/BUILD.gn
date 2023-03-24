@@ -10,7 +10,6 @@ source_set("mock-registers") {
   sources = [ "mock-registers.h" ]
 
   public_deps = [
-    "//sdk/banjo/fuchsia.hardware.registers:fuchsia.hardware.registers_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp_wire",
   ]
 }

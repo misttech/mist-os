@@ -6,7 +6,6 @@
 #define SRC_DEVICES_REGISTERS_DRIVERS_REGISTERS_REGISTERS_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -30,9 +29,7 @@ namespace registers {
 template <typename T>
 class Register;
 template <typename T>
-using RegisterType =
-    ddk::Device<Register<T>, ddk::Messageable<fuchsia_hardware_registers::Device>::Mixin,
-                ddk::Unbindable>;
+using RegisterType = ddk::Device<Register<T>, ddk::Unbindable>;
 
 template <typename T>
 class RegistersDevice;
@@ -49,7 +46,7 @@ using fuchsia_hardware_registers::wire::RegistersMetadataEntry;
 
 template <typename T>
 class Register : public RegisterType<T>,
-                 public ddk::RegistersProtocol<Register<T>, ddk::base_protocol>,
+                 public fidl::WireServer<fuchsia_hardware_registers::Device>,
                  public fbl::RefCounted<Register<T>> {
   using Device = fidl::WireServer<fuchsia_hardware_registers::Device>;
 
@@ -57,19 +54,13 @@ class Register : public RegisterType<T>,
   explicit Register(zx_device_t* device, std::shared_ptr<MmioInfo> mmio)
       : RegisterType<T>(device),
         mmio_(std::move(mmio)),
-        loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
         dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         outgoing_(dispatcher_) {}
 
   zx_status_t Init(const RegistersMetadataEntry& config);
 
-  void DdkUnbind(ddk::UnbindTxn txn) {
-    loop_.Shutdown();
-    txn.Reply();
-  }
+  void DdkUnbind(ddk::UnbindTxn txn) { txn.Reply(); }
   void DdkRelease() { delete this; }
-
-  void RegistersConnect(zx::channel channel);
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> CreateAndServeOutgoingDirectory();
 
@@ -147,9 +138,6 @@ class Register : public RegisterType<T>,
   std::shared_ptr<MmioInfo> mmio_;
   uint64_t id_;
   std::map<uint64_t, std::pair<T, uint32_t>> masks_;  // base_address to (mask, reg_count)
-
-  async::Loop loop_;
-  bool loop_started_ = false;
 
   async_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;

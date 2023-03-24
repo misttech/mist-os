@@ -89,16 +89,16 @@ zx_status_t Sherlock::NnaInit() {
   auto aml_nna_register_reset_node = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
-              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
-                                      bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
               fdf::MakeAcceptBindRule(
                   bind_fuchsia::REGISTER_ID,
                   bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
           },
       .properties =
           {
-              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
-                                bind_fuchsia_hardware_registers::BIND_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_hardware_registers::BIND_FIDL_PROTOCOL_DEVICE),
               fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
                                 bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_NNA_RESET_LEVEL2),
           },

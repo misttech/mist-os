@@ -13,7 +13,6 @@
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
-#include <fuchsia/hardware/registers/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
@@ -41,7 +40,6 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::PDevProtocol<FragmentProxy>,
                       public ddk::PowerProtocol<FragmentProxy>,
                       public ddk::PwmProtocol<FragmentProxy>,
-                      public ddk::RegistersProtocol<FragmentProxy>,
                       public ddk::SpiProtocol<FragmentProxy>,
                       public ddk::SysmemProtocol<FragmentProxy>,
                       public ddk::UsbModeSwitchProtocol<FragmentProxy> {
@@ -110,7 +108,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t PwmSetConfig(const pwm_config_t* config);
   zx_status_t PwmEnable();
   zx_status_t PwmDisable();
-  void RegistersConnect(zx::channel chan);
   zx_status_t SpiTransmit(const uint8_t* txdata_list, size_t txdata_count);
   zx_status_t SpiReceive(uint32_t size, uint8_t* out_rxdata_list, size_t rxdata_count,
                          size_t* out_rxdata_actual);

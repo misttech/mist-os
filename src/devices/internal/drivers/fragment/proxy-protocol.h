@@ -292,20 +292,6 @@ struct UsbModeSwitchProxyRequest {
   usb_mode_t mode;
 };
 
-// ZX_PROTOCOL_REGISTERS proxy supprot.
-enum class RegistersOp {
-  CONNECT,
-};
-
-struct RegistersProxyRequest {
-  ProxyRequest header;
-  RegistersOp op;
-};
-
-struct RegistersProxyResponse {
-  ProxyResponse header;
-};
-
 // ZX_PROTOCOL_GOLDFISH_SYNC proxy support.
 enum class GoldfishSyncOp {
   CREATE_TIMELINE,
