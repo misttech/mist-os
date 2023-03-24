@@ -262,6 +262,10 @@ struct list_head {
 
 // Returns the size of the given struct 'str' and its tailing variant-length array 'member' (which
 // the element count is 'count').
+//
+// Note that the 'str' is NOT neccesary pointing to an existing instance. A random pointer (which
+// its type is the the structure) is good enough.
+//
 #define struct_size(str, member, count) (sizeof(*str) + sizeof(*((str)->member)) * count)
 
 
