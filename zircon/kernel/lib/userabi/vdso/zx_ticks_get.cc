@@ -26,10 +26,22 @@ inline zx_ticks_t get_raw_ticks_arm_a73() {
   __asm__ volatile("mrs %0, cntvct_el0" : "=r"(ticks2));
   return (((ticks1 ^ ticks2) >> 32) & 1) ? ticks1 : ticks2;
 }
-#elif __x86_64__
+
+#elif defined(__x86_64__)
 inline zx_ticks_t get_raw_ticks() { return __rdtsc(); }
+
+#elif defined(__riscv)
+
+inline zx_ticks_t get_raw_ticks() {
+  zx_ticks_t ticks;
+  __asm__ volatile("rdtime %0" : "=r"(ticks));
+  return ticks;
+}
+
 #else
+
 #error Unsupported architecture
+
 #endif
 
 }  // namespace

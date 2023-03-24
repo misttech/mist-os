@@ -106,7 +106,7 @@ __EXPORT zx_status_t _zx_cache_flush(const void* addr, size_t len, uint32_t opti
 
 #else
 
-#error what architecture?
+  return ZX_ERR_NOT_SUPPORTED;
 
 #endif
 
