@@ -9557,6 +9557,8 @@ pub const EVIOCGBIT_EV_LED: __u32 = 2147632433;
 pub const EVIOCGBIT_EV_FF: __u32 = 2148549941;
 pub const EVIOCGBIT_EV_MSC: __u32 = 2147566884;
 pub const EVIOCGPROP: __u32 = 2147763465;
+pub const EVIOCGABS_X: __u32 = 2149074240;
+pub const EVIOCGABS_Y: __u32 = 2149074241;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
 pub struct remote_binder_command {

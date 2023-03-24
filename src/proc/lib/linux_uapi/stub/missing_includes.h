@@ -90,15 +90,15 @@ const __u32 _EVIOCGID = EVIOCGID;
 #undef EVIOCGID
 const __u32 EVIOCGID = _EVIOCGID;
 
-// `EVIOCGBIT` and `EVIOCGPROP` are invoked with various paraemters to query metadata about
-// an input device. Create Rust symbols for the commonly used invocations.
+// `EVIOCGBIT`, `EVIOCGPROP`, and `EVIOCGABS` are invoked with various paraemters to query
+// metadata about an input device. Create Rust symbols for the commonly used invocations.
 //
-// These invocations specify a `size` _just_ large enough to report all off the feature bits
-// for that attribute.
+// The `EVIOCGBIT` invocations specify a `size` _just_ large enough to report all off the
+// feature bits for that attribute.
 //
 // TODO(quiche): Eventually, it will probably be better to provide a way to parse the fields
 // within an `ioctl()`'s `request` parameter. That would allow, e.g., the input code to
-// response to any request for `EV_KEY` feature bits, even if the caller provided a buffer
+// respond to any request for `EV_KEY` feature bits, even if the caller provided a buffer
 // larger than that needed for the available bits.
 #define N_BYTES(BITS) (((BITS) + CHAR_BIT - 1) / CHAR_BIT)
 const __u32 EVIOCGBIT_EV_KEY = EVIOCGBIT(EV_KEY, N_BYTES(KEY_MAX));
@@ -109,6 +109,8 @@ const __u32 EVIOCGBIT_EV_LED = EVIOCGBIT(EV_LED, N_BYTES(LED_MAX));
 const __u32 EVIOCGBIT_EV_FF = EVIOCGBIT(EV_FF, N_BYTES(FF_MAX));
 const __u32 EVIOCGBIT_EV_MSC = EVIOCGBIT(EV_MSC, N_BYTES(MSC_MAX));
 const __u32 EVIOCGPROP = EVIOCGPROP(N_BYTES(INPUT_PROP_MAX));
+const __u32 EVIOCGABS_X = EVIOCGABS(ABS_X);
+const __u32 EVIOCGABS_Y = EVIOCGABS(ABS_Y);
 #undef N_BYTES
 
 // Symbols for remote binder device driver
