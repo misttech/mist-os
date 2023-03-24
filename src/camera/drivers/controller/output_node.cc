@@ -45,7 +45,8 @@ void OutputNode::ProcessFrame(FrameToken token, frame_metadata_t metadata) {
   // of these warnings - one per stream.
   if (!binding_.is_bound()) {
     binding_warnings_++;
-    if (binding_warnings_ <= kBindingWarningsInitial || kBindingWarningsInterval % 100 == 0) {
+    if (binding_warnings_ <= kBindingWarningsInitial ||
+        binding_warnings_ % kBindingWarningsInterval == 0) {
       FX_LOGS(WARNING) << this << ": client disconnected? returning frame... (seen "
                        << binding_warnings_ << " times)";
     }
