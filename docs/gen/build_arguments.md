@@ -6683,7 +6683,7 @@ From //third_party/pigweed/src/pw_tokenizer/backend.gni:20
 
 **Current value (from the default):** `"../../prebuilt/third_party/bin/"`
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:24
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:26
 
 ### pw_toolchain_COVERAGE_ENABLED
 
@@ -6726,7 +6726,7 @@ From //third_party/pigweed/src/pw_toolchain/rbe.gni:26
 
 **Current value (from the default):** `"../../prebuilt/third_party/rust/bin/"`
 
-From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:28
+From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:33
 
 ### pw_toolchain_SANITIZERS
 
