@@ -11,7 +11,6 @@ use fuchsia_async::{Task, Time, Timer};
 use fuchsia_fs::file::ReadError;
 use fuchsia_fs::node::OpenError;
 use fuchsia_fs::OpenFlags;
-use fuchsia_syslog::fx_log_err;
 use fuchsia_zircon as zx;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::future::OptionFuture;
@@ -244,7 +243,7 @@ impl FidlStorage {
                                     .min(MAX_FLUSH_INTERVAL_MS)
                             );
                             let next_flush_time = Time::now() + flush_duration;
-                            fx_log_err!(
+                            tracing::error!(
                                 "Failed to sync write to disk for {:?}, delaying by {:?}, \
                                     caused by: {:?}",
                                 cached_storage.file_path,

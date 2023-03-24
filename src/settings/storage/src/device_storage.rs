@@ -7,7 +7,6 @@ use crate::UpdateState;
 use anyhow::{format_err, Context, Error};
 use fidl_fuchsia_stash::{StoreAccessorProxy, Value};
 use fuchsia_async::{Task, Timer, WakeupTime};
-use fuchsia_syslog::fx_log_err;
 use futures::channel::mpsc::UnboundedSender;
 use futures::future::OptionFuture;
 use futures::lock::{Mutex, MutexGuard};
@@ -87,7 +86,7 @@ pub trait DeviceStorageCompatible:
 
     fn deserialize_from(value: &str) -> Self {
         Self::extract(value).unwrap_or_else(|error| {
-            fx_log_err!("error occurred:{:?}", error);
+            tracing::error!("error occurred:{:?}", error);
             Self::default_value()
         })
     }
