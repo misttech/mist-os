@@ -3,6 +3,9 @@
 # found in the LICENSE file.
 
 [package]
-name = "wepoll-sys"
-version = "3.0.1"
+name = "wepoll-ffi"
+version = "0.1.2"
 authors = ["The Fuchsia Authors <rust-fuchsia@fuchsia.com>"]
+
+[features]
+null-overlapped-wakeups-patch = []

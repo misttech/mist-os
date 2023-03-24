@@ -328,7 +328,7 @@ output_vt100 = { path = "empty/output_vt100" }
 wasi = { path = "empty/wasi" }
 wasi-0_10_1 = { path = "empty/wasi-0.10.1", package = "wasi" }
 web-sys = { path = "empty/web-sys" }
-wepoll-sys = { path = "empty/wepoll-sys" }
+wepoll-ffi = { path = "empty/wepoll-ffi" }
 winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows-sys = { path = "empty/windows-sys" }
@@ -538,6 +538,9 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 rustflags = ["--cfg=has_i128"]
 
 [gn.package.parking_lot_core."0.9.6"]
+rustflags = []
+
+[gn.package.polling."2.4.0"]
 rustflags = []
 
 [gn.package.proc-macro2."0.4.27"]

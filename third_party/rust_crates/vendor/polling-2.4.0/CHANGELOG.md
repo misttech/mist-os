@@ -1,3 +1,27 @@
+# Version 2.4.0
+
+- Fix the build error on illumos and Solaris (#43)
+- Bump MSRV to 1.47 (#40)
+- Optimize `Poller` internal representation (#40)
+
+# Version 2.3.0
+
+- Implement `AsRawFd` for `Poller` on most Unix systems (#39)
+- Implement `AsRawHandle` for `Poller` on Windows (#39)
+- Implement I/O safety traits on Rust 1.63+ (#39)
+
+# Version 2.2.0
+
+- Support VxWorks, Fuchsia and other Unix systems by using poll. (#26)
+
+# Version 2.1.0
+
+- Switch from `wepoll-sys` to `wepoll-ffi`.
+
+# Version 2.0.3
+
+- Update `cfg-if` dependency to 1.
+
 # Version 2.0.2
 
 - Replace manual pointer conversion with `as_ptr()` and `as_mut_ptr()`.
@@ -30,7 +54,7 @@
 # Version 1.0.1
 
 - Fix a typo in the readme.
--
+
 # Version 1.0.0
 
 - Stabilize.

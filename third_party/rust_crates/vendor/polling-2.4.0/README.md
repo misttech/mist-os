@@ -1,9 +1,9 @@
 # polling
 
-[![Build](https://github.com/stjepang/polling/workflows/Build%20and%20test/badge.svg)](
-https://github.com/stjepang/polling/actions)
-[![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](
-https://github.com/stjepang/polling)
+[![Build](https://github.com/smol-rs/polling/workflows/Build%20and%20test/badge.svg)](
+https://github.com/smol-rs/polling/actions)
+[![License](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](
+https://github.com/smol-rs/polling)
 [![Cargo](https://img.shields.io/crates/v/polling.svg)](
 https://crates.io/crates/polling)
 [![Documentation](https://docs.rs/polling/badge.svg)](
@@ -16,6 +16,7 @@ Supported platforms:
 - [kqueue](https://en.wikipedia.org/wiki/Kqueue): macOS, iOS, FreeBSD, NetBSD, OpenBSD,
   DragonFly BSD
 - [event ports](https://illumos.org/man/port_create): illumos, Solaris
+- [poll](https://en.wikipedia.org/wiki/Poll_(Unix)): VxWorks, Fuchsia, other Unix systems
 - [wepoll](https://github.com/piscisaureus/wepoll): Windows
 
 Polling is done in oneshot mode, which means interest in I/O events needs to be reset after

@@ -6,6 +6,9 @@ use std::os::unix::net::UnixStream;
 use std::ptr;
 use std::time::Duration;
 
+#[cfg(not(polling_no_io_safety))]
+use std::os::unix::io::{AsFd, BorrowedFd};
+
 use crate::Event;
 
 /// Interface to kqueue.
@@ -177,6 +180,20 @@ impl Poller {
     }
 }
 
+impl AsRawFd for Poller {
+    fn as_raw_fd(&self) -> RawFd {
+        self.kqueue_fd
+    }
+}
+
+#[cfg(not(polling_no_io_safety))]
+impl AsFd for Poller {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        // SAFETY: lifetime is bound by "self"
+        unsafe { BorrowedFd::borrow_raw(self.kqueue_fd) }
+    }
+}
+
 impl Drop for Poller {
     fn drop(&mut self) {
         log::trace!("drop: kqueue_fd={}", self.kqueue_fd);
@@ -187,7 +204,7 @@ impl Drop for Poller {
 
 /// A list of reported I/O events.
 pub struct Events {
-    list: Box<[libc::kevent]>,
+    list: Box<[libc::kevent; 1024]>,
     len: usize,
 }
 
@@ -204,7 +221,7 @@ impl Events {
             data: 0,
             udata: 0 as _,
         };
-        let list = vec![ev; 1000].into_boxed_slice();
+        let list = Box::new([ev; 1024]);
         let len = 0;
         Events { list, len }
     }

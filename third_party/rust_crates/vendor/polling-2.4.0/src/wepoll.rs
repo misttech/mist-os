@@ -2,12 +2,15 @@
 
 use std::convert::TryInto;
 use std::io;
-use std::os::windows::io::RawSocket;
+use std::os::windows::io::{AsRawHandle, RawHandle, RawSocket};
 use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
-use wepoll_sys as we;
+#[cfg(not(polling_no_io_safety))]
+use std::os::windows::io::{AsHandle, BorrowedHandle};
+
+use wepoll_ffi as we;
 use winapi::ctypes;
 
 use crate::Event;
@@ -87,7 +90,7 @@ impl Poller {
                     // Round up to a whole millisecond.
                     let mut ms = t.as_millis().try_into().unwrap_or(std::u64::MAX);
                     if Duration::from_millis(ms) < t {
-                        ms += 1;
+                        ms = ms.saturating_add(1);
                     }
                     ms.try_into().unwrap_or(std::i32::MAX)
                 }
@@ -115,9 +118,10 @@ impl Poller {
     pub fn notify(&self) -> io::Result<()> {
         log::trace!("notify: handle={:?}", self.handle);
 
-        if !self
+        if self
             .notified
-            .compare_and_swap(false, true, Ordering::SeqCst)
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
         {
             unsafe {
                 // This call errors if a notification has already been posted, but that's okay - we
@@ -148,7 +152,9 @@ impl Poller {
             }
             we::epoll_event {
                 events: flags as u32,
-                data: we::epoll_data { u64: ev.key as u64 },
+                data: we::epoll_data {
+                    u64_: ev.key as u64,
+                },
             }
         });
         wepoll!(epoll_ctl(
@@ -160,6 +166,20 @@ impl Poller {
                 .unwrap_or(ptr::null_mut()),
         ))?;
         Ok(())
+    }
+}
+
+impl AsRawHandle for Poller {
+    fn as_raw_handle(&self) -> RawHandle {
+        self.handle as RawHandle
+    }
+}
+
+#[cfg(not(polling_no_io_safety))]
+impl AsHandle for Poller {
+    fn as_handle(&self) -> BorrowedHandle<'_> {
+        // SAFETY: lifetime is bound by "self"
+        unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
     }
 }
 
@@ -180,7 +200,7 @@ const WRITE_FLAGS: u32 = we::EPOLLOUT | we::EPOLLHUP | we::EPOLLERR;
 
 /// A list of reported I/O events.
 pub struct Events {
-    list: Box<[we::epoll_event]>,
+    list: Box<[we::epoll_event; 1024]>,
     len: usize,
 }
 
@@ -191,18 +211,16 @@ impl Events {
     pub fn new() -> Events {
         let ev = we::epoll_event {
             events: 0,
-            data: we::epoll_data { u64: 0 },
+            data: we::epoll_data { u64_: 0 },
         };
-        Events {
-            list: vec![ev; 1000].into_boxed_slice(),
-            len: 0,
-        }
+        let list = Box::new([ev; 1024]);
+        Events { list, len: 0 }
     }
 
     /// Iterates over I/O events.
     pub fn iter(&self) -> impl Iterator<Item = Event> + '_ {
         self.list[..self.len].iter().map(|ev| Event {
-            key: unsafe { ev.data.u64 } as usize,
+            key: unsafe { ev.data.u64_ } as usize,
             readable: (ev.events & READ_FLAGS) != 0,
             writable: (ev.events & WRITE_FLAGS) != 0,
         })

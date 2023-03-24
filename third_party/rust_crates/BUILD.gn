@@ -1513,7 +1513,7 @@ rust_library("async-io-v1_12_0") {
   deps += [ ":futures-lite-v1_11_3" ]
   deps += [ ":log-v0_4_11" ]
   deps += [ ":parking-v2_0_0" ]
-  deps += [ ":polling-v2_0_2" ]
+  deps += [ ":polling-v2_4_0" ]
   deps += [ ":slab-v0_4_7" ]
   deps += [ ":socket2-v0_4_4" ]
   deps += [ ":waker-fn-v1_1_0" ]
@@ -7418,20 +7418,20 @@ rust_library("podio-v0_1_6") {
   visibility = [ ":*" ]
 }
 
-rust_library("polling-v2_0_2") {
+rust_library("polling-v2_4_0") {
   crate_name = "polling"
-  crate_root = "//third_party/rust_crates/vendor/polling-2.0.2/src/lib.rs"
-  output_name = "polling-2a1f69f38bc0860c"
+  crate_root = "//third_party/rust_crates/vendor/polling-2.4.0/src/lib.rs"
+  output_name = "polling-8f57c54a6963efb"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":cfg-if-v0_1_10" ]
+  deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":log-v0_4_11" ]
-  if (true) {
+  if (true || current_os == "fuchsia" || false) {
     deps += [ ":libc-v0_2_138" ]
   }
   if (false) {
-    deps += [ ":wepoll-sys-v3_0_1" ]
+    deps += [ ":wepoll-ffi-v0_1_2" ]
     deps += [ ":winapi-v0_3_9" ]
   }
 
@@ -7440,8 +7440,8 @@ rust_library("polling-v2_0_2") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=2a1f69f38bc0860c",
-    "-Cextra-filename=-2a1f69f38bc0860c",
+    "-Cmetadata=8f57c54a6963efb",
+    "-Cextra-filename=-8f57c54a6963efb",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
@@ -12487,10 +12487,10 @@ rust_library("webpki-v0_21_0") {
   visibility = [ ":*" ]
 }
 
-rust_library("wepoll-sys-v3_0_1") {
-  crate_name = "wepoll_sys"
-  crate_root = "//third_party/rust_crates/empty/wepoll-sys/src/lib.rs"
-  output_name = "wepoll_sys-ab562e75c3795c15"
+rust_library("wepoll-ffi-v0_1_2") {
+  crate_name = "wepoll_ffi"
+  crate_root = "//third_party/rust_crates/empty/wepoll-ffi/src/lib.rs"
+  output_name = "wepoll_ffi-3e7f08283fc3bd91"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -12500,8 +12500,9 @@ rust_library("wepoll-sys-v3_0_1") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2015",
-    "-Cmetadata=ab562e75c3795c15",
-    "-Cextra-filename=-ab562e75c3795c15",
+    "-Cmetadata=3e7f08283fc3bd91",
+    "-Cextra-filename=-3e7f08283fc3bd91",
+    "--cfg=feature=\"null-overlapped-wakeups-patch\"",
   ]
 
   visibility = [ ":*" ]
