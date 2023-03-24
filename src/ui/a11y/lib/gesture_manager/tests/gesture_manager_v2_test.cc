@@ -39,10 +39,12 @@ using fuchsia::ui::pointer::augment::TouchEventWithLocalHit;
 using fuchsia::ui::pointer::augment::TouchSourceWithLocalHit;
 using fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr;
 
-TouchEventWithLocalHit fake_touch_event(EventPhase phase, uint32_t interaction_id = 0,
+TouchEventWithLocalHit fake_touch_event(EventPhase phase, uint32_t pointer_id = 0,
                                         std::array<float, 2> position_in_viewport = {0, 0}) {
+  static uint32_t interaction_id = 0;
   TouchPointerSample sample;
-  sample.set_interaction({0, 0, interaction_id});
+  sample.set_interaction({pointer_id, 0, interaction_id});
+  ++interaction_id;
   sample.set_phase(phase);
   sample.set_position_in_viewport(position_in_viewport);
 
@@ -281,7 +283,7 @@ TEST_F(GestureManagerV2Test, SimulateOneFingerDoubleTap) {
   events.emplace_back(fake_touch_event(EventPhase::REMOVE, 0));
   events.emplace_back(fake_touch_event(EventPhase::ADD, 1));
   events.emplace_back(fake_touch_event(EventPhase::REMOVE, 1));
-  auto first_interaction = events[1].touch_event.pointer_sample().interaction();
+  auto first_interaction = events[2].touch_event.pointer_sample().interaction();
 
   fake_touch_source_->SimulateEvents(std::move(events));
   RunLoopUntilIdle();
@@ -326,9 +328,13 @@ TEST_F(GestureManagerV2Test, SimulateTwoFingerDoubleTap) {
   events.emplace_back(fake_touch_event(EventPhase::ADD, 1));
   events.emplace_back(fake_touch_event(EventPhase::REMOVE, 1));
   events.emplace_back(fake_touch_event(EventPhase::REMOVE, 0));
-  auto first_interaction = events[1].touch_event.pointer_sample().interaction();
-  auto second_interaction = events[2].touch_event.pointer_sample().interaction();
-  auto fourth_interaction = events[6].touch_event.pointer_sample().interaction();
+
+  // Saves the interaction IDs of the remove events (the ones that are put on hold)
+  auto first_interaction = events[3].touch_event.pointer_sample().interaction();
+  auto second_interaction = events[4].touch_event.pointer_sample().interaction();
+  auto third_interaction = events[7].touch_event.pointer_sample().interaction();
+  // The fourth interaction gets ignored, because it is the one to resolve the held interactions so
+  // it will not trigger an update response.
 
   fake_touch_source_->SimulateEvents(std::move(events));
   RunLoopUntilIdle();
@@ -347,7 +353,7 @@ TEST_F(GestureManagerV2Test, SimulateTwoFingerDoubleTap) {
 
   fake_arena_ptr_->InvokeCallback(first_interaction, 0, ConsumptionStatus::kAccept);
   fake_arena_ptr_->InvokeCallback(second_interaction, 0, ConsumptionStatus::kAccept);
-  fake_arena_ptr_->InvokeCallback(fourth_interaction, 0, ConsumptionStatus::kAccept);
+  fake_arena_ptr_->InvokeCallback(third_interaction, 0, ConsumptionStatus::kAccept);
   RunLoopUntilIdle();
 
   auto updated_responses = fake_touch_source_->TakeUpdatedResponses();
@@ -356,7 +362,7 @@ TEST_F(GestureManagerV2Test, SimulateTwoFingerDoubleTap) {
   EXPECT_EQ(updated_responses[0].second.response_type(), TouchResponseType::YES_PRIORITIZE);
   EXPECT_TRUE(interaction_equals(updated_responses[1].first, second_interaction));
   EXPECT_EQ(updated_responses[1].second.response_type(), TouchResponseType::YES_PRIORITIZE);
-  EXPECT_TRUE(interaction_equals(updated_responses[2].first, fourth_interaction));
+  EXPECT_TRUE(interaction_equals(updated_responses[2].first, third_interaction));
   EXPECT_EQ(updated_responses[2].second.response_type(), TouchResponseType::YES_PRIORITIZE);
 }
 

@@ -24,6 +24,13 @@ using fuchsia::ui::pointer::TouchResponseType;
 using fuchsia::ui::pointer::augment::TouchEventWithLocalHit;
 using fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr;
 
+// Convert a `TouchInteractionId` into a triple of `uint32_t`, so that we can
+// use it as the key in a `std::set`.
+std::tuple<uint32_t, uint32_t, uint32_t> interactionToTriple(
+    fuchsia::ui::pointer::TouchInteractionId interaction) {
+  return {interaction.device_id, interaction.pointer_id, interaction.interaction_id};
+}
+
 // Helper for `normalizeToNdc`.
 //
 // Normalize `p` to be in the square [0, 1] * [0, 1].
@@ -129,10 +136,24 @@ GestureManagerV2::GestureManagerV2(TouchSourceWithLocalHitPtr touch_source,
                          uint64_t trace_flow_id, InteractionTracker::ConsumptionStatus status) {
     FX_DCHECK(status != InteractionTracker::ConsumptionStatus::kUndecided);
 
-    TouchResponse response;
-    response.set_response_type(updatedResponse(status));
-    response.set_trace_flow_id(trace_flow_id);
-    touch_source_->UpdateResponse(interaction, std::move(response), [](auto...) {});
+    // Held interactions mean different things between Scenic and A11y:
+    // A11y: a stream of pointer events started and ended, but no recognizer claimed them yet.
+    // 2. Scenic: a11y submitted a "HOLD" response to an open interaction.
+    //
+    // It can be the case that A11y had a held interaction that gets resolved before we tell Scenic
+    // to hold that interaction for us. This can happen because everything here is async: a11y,
+    // Scenic, recognizers, input.
+    //
+    // In summary: only update a held interaction with Scenic if we previously told Scenic to hold
+    // that one for us.
+    auto it = held_interactions_.find(interactionToTriple(interaction));
+    if (it != held_interactions_.end()) {
+      TouchResponse response;
+      response.set_response_type(updatedResponse(status));
+      response.set_trace_flow_id(trace_flow_id);
+      touch_source_->UpdateResponse(interaction, std::move(response), [](auto...) {});
+      held_interactions_.erase(it);
+    }
   };
 
   arena_ = arena_factory(std::move(callback));
@@ -186,6 +207,10 @@ fuchsia::ui::pointer::TouchResponse GestureManagerV2::HandleEvent(
   const auto contest_status = arena_->OnEvent(event);
   const auto phase = event.touch_event.pointer_sample().phase();
   const auto response_type = initialResponse(contest_status, phase);
+  if (response_type == TouchResponseType::HOLD_SUPPRESS) {
+    auto interaction_id = interactionToTriple(event.touch_event.pointer_sample().interaction());
+    held_interactions_.insert(interaction_id);
+  }
   response.set_response_type(response_type);
 
   return response;

@@ -77,6 +77,8 @@ class GestureManagerV2 {
   //
   // All touch events are expected to lie inside this rectangle.
   std::optional<fuchsia::ui::pointer::Rectangle> viewport_bounds_;
+
+  std::set<std::tuple<uint32_t, uint32_t, uint32_t>> held_interactions_;
 };
 
 }  // namespace a11y
