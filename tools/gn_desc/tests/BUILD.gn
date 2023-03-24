@@ -28,6 +28,7 @@ if (is_host) {
       "//third_party/rust_crates:itertools",
       "//third_party/rust_crates:pretty_assertions",
       "//third_party/rust_crates:serde_json",
+      "//third_party/rust_crates:tempfile",
     ]
 
     source_root = "src/main.rs"

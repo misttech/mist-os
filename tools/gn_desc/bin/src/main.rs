@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use args::Args;
 use gn_graph::Graph;
-use gn_json::target::AllTargets;
 use humansize::{file_size_opts, FileSize};
 use std::time::Instant;
 
@@ -27,13 +26,9 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     let start_time = Instant::now();
-    // Reading to a string before parsing is considerably faster than letting
-    // serde parse from a BufferedReader (saves about 30% based on testing with
-    // with large gn_desc.json files (>500MB).
-    let gn_desc_json = std::fs::read_to_string(&args.file)
-        .with_context(|| format!("Unable to open file: {}", args.file))?;
-    let all_targets: AllTargets = serde_json::from_str(&gn_desc_json)
-        .with_context(|| format!("Unable to parse file as json: {}", &args.file))?;
+
+    // Use the library's optimized parsing implementation for reading the file
+    let all_targets = gn_json::parse_file(&args.file)?;
 
     if args.verbose {
         println!(

@@ -22,6 +22,7 @@ use gn_json::target::{AllTargets, ConfigValues, Public, TargetDescription};
 use pretty_assertions::assert_eq;
 use serde_json;
 use std::{ffi::OsStr, process::Command};
+use tempfile::tempdir;
 
 /// Test arguments for the integration test
 #[derive(Debug, FromArgs)]
@@ -48,7 +49,16 @@ fn main() -> Result<()> {
     gn.gen().context("Running GN 'gen' on the test project")?;
     let raw_desc_json = gn.desc().context("Running GN 'desc' on the test project")?;
 
-    let all_targets: AllTargets = serde_json::from_slice(raw_desc_json.as_bytes())
+    // Write the GN desc output to a temporary file.
+    let temp_out_dir = tempdir()?;
+    let temp_file_path = temp_out_dir.path().join("gn_desc.json");
+    let temp_file = temp_file_path
+        .to_str()
+        .ok_or(anyhow::anyhow!("Is not a valid UTF-8 path: {}", temp_file_path.display()))?;
+    std::fs::write(&temp_file, raw_desc_json)?;
+
+    // Now parse that file using the function provided by the library
+    let all_targets: AllTargets = gn_json::parse_file(&String::try_from(temp_file)?)
         .context("Parsing the GN desc json output")?;
 
     assert_eq!(

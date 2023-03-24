@@ -17,8 +17,10 @@ rustc_binary("gn_desc") {
   testonly = true
   with_unit_tests = true
 
-  # This needs to be compiled with optimizations enabled to be at all
-  # performant when deserializing the 100s of MBs of `gn desc` json output.
+  # This is compiled with optimizations enabled so that operations are as
+  # performant as possible.  The JSON parsing itself is optimized in the
+  # `gn_json` rlib, but this ensures that follow-on operations like graph
+  # traversals are also optimized.
   configs += [ "//build/config:optimize_speed" ]
 
   deps = [

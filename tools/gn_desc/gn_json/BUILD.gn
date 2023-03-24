@@ -15,6 +15,7 @@ rustc_library("gn_json") {
   configs += [ "//build/config:optimize_speed" ]
 
   deps = [
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:thiserror",
@@ -32,6 +33,7 @@ rustc_library("gn_json") {
 rustc_test("gn_json_tests") {
   edition = "2021"
   deps = [
+    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
