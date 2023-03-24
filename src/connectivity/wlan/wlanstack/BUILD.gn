@@ -116,10 +116,6 @@ core_shard("wlanstack-core-shard") {
   shard_file = "meta/wlanstack.core_shard.cml"
 }
 
-core_shard("wlanstack-legacy-privacy-core-shard") {
-  shard_file = "meta/wlanstack_legacy_privacy.core_shard.cml"
-}
-
 fuchsia_unittest_package("wlanstack-tests") {
   deps = [ ":bin_test" ]
 }
