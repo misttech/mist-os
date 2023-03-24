@@ -859,6 +859,8 @@
                 "AllUnixDomainSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
                 "AllUnixDomainSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
                 "AllTCPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
+                "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
+                "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
 
                 // socket_ip_udp_loopback_test
                 "AllUDPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
