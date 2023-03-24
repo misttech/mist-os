@@ -66,22 +66,18 @@ void ReadMetrics::IncrementDiskRead(CompressionAlgorithm algorithm, uint64_t rea
 }
 
 void ReadMetrics::IncrementDecompression(CompressionAlgorithm algorithm, uint64_t decompressed_size,
-                                         fs::Duration decompress_duration, bool remote) {
+                                         fs::Duration decompress_duration) {
   PerCompressionInspect& inspect = MutableInspect(algorithm);
   inspect.decompress_ticks_node.Add(decompress_duration.get());
   inspect.decompress_bytes_node.Add(decompressed_size);
-  if (remote) {
-    remote_decompressions_node_.Add(1);
-  }
+  remote_decompressions_node_.Add(1);
 
   // Hold the lock until snapshot goes out of scope.
   std::lock_guard lock(lock_);
   PerCompressionSnapshot& snapshot = MutableSnapshotLocked(algorithm);
   snapshot.decompress_ticks += decompress_duration.get();
   snapshot.decompress_bytes += decompressed_size;
-  if (remote) {
-    remote_decompressions_++;
-  }
+  remote_decompressions_++;
 }
 
 uint64_t ReadMetrics::GetRemoteDecompressions() const {

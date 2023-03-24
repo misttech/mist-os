@@ -34,7 +34,7 @@ class ReadMetrics {
 
   // Increments aggregate information about decompressing blobs from storage since mounting.
   void IncrementDecompression(CompressionAlgorithm algorithm, uint64_t decompressed_size,
-                              fs::Duration decompress_duration, bool remote) __TA_EXCLUDES(lock_);
+                              fs::Duration decompress_duration) __TA_EXCLUDES(lock_);
 
   struct PerCompressionSnapshot {
     // Metrics for reads from disk

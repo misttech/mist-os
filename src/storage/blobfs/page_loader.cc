@@ -158,21 +158,20 @@ zx::result<std::unique_ptr<PageLoader::Worker>> PageLoader::Worker::Create(
     return zx::error(status);
   }
 
-  if (decompression_connector) {
-    status = zx::vmo::create(kDecompressionBufferSize, 0, &worker->sandbox_buffer_);
-    if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to create sandbox buffer: %s\n" << zx_status_get_string(status);
-      return zx::error(status);
-    }
-
-    auto client_or =
-        ExternalDecompressorClient::Create(decompression_connector, worker->sandbox_buffer_,
-                                           worker->compressed_transfer_buffer_->GetVmo());
-    if (!client_or.is_ok()) {
-      return zx::error(client_or.status_value());
-    }
-    worker->decompressor_client_ = std::move(client_or.value());
+  ZX_ASSERT(decompression_connector);
+  status = zx::vmo::create(kDecompressionBufferSize, 0, &worker->sandbox_buffer_);
+  if (status != ZX_OK) {
+    FX_LOGS(ERROR) << "Failed to create sandbox buffer: %s\n" << zx_status_get_string(status);
+    return zx::error(status);
   }
+
+  auto client_or =
+      ExternalDecompressorClient::Create(decompression_connector, worker->sandbox_buffer_,
+                                         worker->compressed_transfer_buffer_->GetVmo());
+  if (!client_or.is_ok()) {
+    return zx::error(client_or.status_value());
+  }
+  worker->decompressor_client_ = std::move(client_or.value());
 
   return zx::ok(std::move(worker));
 }
@@ -392,43 +391,35 @@ PagerErrorStatus PageLoader::Worker::TransferChunkedPages(
     fs::Ticker ticker;
     size_t decompressed_size = mapping.decompressed_length;
     zx_status_t decompress_status;
-    if (decompressor_client_) {
-      ZX_DEBUG_ASSERT(sandbox_buffer_.is_valid());
-      // Try to commit all of the pages ahead of time to avoid page faulting on each one while
-      // decompressing.
-      if (zx_status_t status = sandbox_buffer_.op_range(
-              ZX_VMO_OP_COMMIT, 0, fbl::round_up(mapping.decompressed_length, kBlobfsBlockSize),
-              nullptr, 0);
-          status != ZX_OK) {
-        FX_LOGS(INFO) << "Failed to pre-commit sanboxed buffer pages: "
-                      << zx_status_get_string(status);
-        ZX_DEBUG_ASSERT(false);
+    ZX_DEBUG_ASSERT(sandbox_buffer_.is_valid());
+    // Try to commit all of the pages ahead of time to avoid page faulting on each one while
+    // decompressing.
+    if (zx_status_t status = sandbox_buffer_.op_range(
+            ZX_VMO_OP_COMMIT, 0, fbl::round_up(mapping.decompressed_length, kBlobfsBlockSize),
+            nullptr, 0);
+        status != ZX_OK) {
+      FX_LOGS(INFO) << "Failed to pre-commit sanboxed buffer pages: "
+                    << zx_status_get_string(status);
+      ZX_DEBUG_ASSERT(false);
+    }
+    auto decommit_sandbox = fit::defer([this, length = mapping.decompressed_length]() {
+      // Decommit pages in the sandbox buffer that might have been populated. All blobs share
+      // the same sandbox buffer - this prevents data leaks between different blobs.
+      sandbox_buffer_.op_range(ZX_VMO_OP_DECOMMIT, 0, fbl::round_up(length, kBlobfsBlockSize),
+                               nullptr, 0);
+    });
+    ExternalSeekableDecompressor decompressor(decompressor_client_.get(),
+                                              info.decompressor->algorithm());
+    decompress_status = decompressor.DecompressRange(
+        offset_of_compressed_data, mapping.compressed_length, mapping.decompressed_length);
+    if (decompress_status == ZX_OK) {
+      zx_status_t read_status =
+          sandbox_buffer_.read(decompressed_mapper.start(), 0, mapping.decompressed_length);
+      if (read_status != ZX_OK) {
+        FX_LOGS(ERROR) << "TransferChunked: Failed to copy from sandbox buffer: "
+                       << zx_status_get_string(read_status);
+        return ToPagerErrorStatus(read_status);
       }
-      auto decommit_sandbox = fit::defer([this, length = mapping.decompressed_length]() {
-        // Decommit pages in the sandbox buffer that might have been populated. All blobs share
-        // the same sandbox buffer - this prevents data leaks between different blobs.
-        sandbox_buffer_.op_range(ZX_VMO_OP_DECOMMIT, 0, fbl::round_up(length, kBlobfsBlockSize),
-                                 nullptr, 0);
-      });
-      ExternalSeekableDecompressor decompressor(decompressor_client_.get(),
-                                                info.decompressor->algorithm());
-      decompress_status = decompressor.DecompressRange(
-          offset_of_compressed_data, mapping.compressed_length, mapping.decompressed_length);
-      if (decompress_status == ZX_OK) {
-        zx_status_t read_status =
-            sandbox_buffer_.read(decompressed_mapper.start(), 0, mapping.decompressed_length);
-        if (read_status != ZX_OK) {
-          FX_LOGS(ERROR) << "TransferChunked: Failed to copy from sandbox buffer: "
-                         << zx_status_get_string(read_status);
-          return ToPagerErrorStatus(read_status);
-        }
-      }
-    } else {
-      // Decompress the data
-      uint8_t* src = static_cast<uint8_t*>(compressed_mapper_.start()) + offset_of_compressed_data;
-      decompress_status = info.decompressor->DecompressRange(
-          decompressed_mapper.start(), &decompressed_size, src, mapping.compressed_length,
-          mapping.decompressed_offset);
     }
     if (decompress_status != ZX_OK) {
       FX_LOGS(ERROR) << "TransferChunked: Failed to decompress for blob " << info.verifier->digest()
@@ -436,8 +427,7 @@ PagerErrorStatus PageLoader::Worker::TransferChunkedPages(
       return ToPagerErrorStatus(decompress_status);
     }
     metrics_->paged_read_metrics().IncrementDecompression(CompressionAlgorithm::kChunked,
-                                                          decompressed_size, ticker.End(),
-                                                          decompressor_client_ != nullptr);
+                                                          decompressed_size, ticker.End());
 
     // Verify the decompressed pages.
     const uint64_t rounded_length =
