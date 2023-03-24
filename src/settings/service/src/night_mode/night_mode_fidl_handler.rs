@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     NightModeRequest, NightModeSetResponder, NightModeSetResult, NightModeSettings,
     NightModeWatchResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use std::convert::TryFrom;
 
 impl ErrorResponder for NightModeSetResponder {
@@ -79,7 +78,7 @@ impl TryFrom<NightModeRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::NightMode, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

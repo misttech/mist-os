@@ -14,7 +14,6 @@ use fidl::prelude::*;
 use fidl_fuchsia_settings::{
     SetupRequest, SetupSetResponder, SetupSetResult, SetupSettings, SetupWatchResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use std::convert::TryFrom;
 
 impl ErrorResponder for SetupSetResponder {
@@ -118,7 +117,7 @@ impl TryFrom<SetupRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Setup, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

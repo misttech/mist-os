@@ -12,7 +12,7 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::{self as inspect, component};
-use fuchsia_syslog::{self as syslog, fx_log_info, fx_log_warn};
+use fuchsia_syslog::{self as syslog};
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
 use settings::base::get_default_interfaces;
@@ -45,7 +45,7 @@ fn main() -> Result<(), Error> {
     let executor = fasync::LocalExecutor::new();
 
     syslog::init_with_tags(&["setui-service"]).expect("Can't init logger");
-    fx_log_info!("Starting setui-service...");
+    tracing::info!("Starting setui-service...");
 
     // Serve stats about inspect in a lazy node.
     let inspector = component::inspector();
@@ -103,7 +103,7 @@ fn main() -> Result<(), Error> {
     // Initialize inspect.
     let mut fs = ServiceFs::new();
     if let Err(e) = inspect_runtime::serve(component::inspector(), &mut fs) {
-        fx_log_warn!("Unable to serve inspect runtime: {:?}", e);
+        tracing::warn!("Unable to serve inspect runtime: {:?}", e);
     }
 
     EnvironmentBuilder::new(Arc::new(storage_factory))

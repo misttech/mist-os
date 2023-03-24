@@ -10,7 +10,6 @@ use crate::handler::setting_handler::{
 };
 use crate::intl::types::{HourCycle, IntlInfo, LocaleId, TemperatureUnit};
 use async_trait::async_trait;
-use fuchsia_syslog::fx_log_err;
 use fuchsia_trace as ftrace;
 use rust_icu_uenum as uenum;
 use rust_icu_uloc as uloc;
@@ -83,7 +82,7 @@ impl IntlController {
         let time_zone_list = match uenum::open_time_zones() {
             Ok(time_zones) => time_zones,
             Err(err) => {
-                fx_log_err!("Unable to load time zones: {:?}", err);
+                tracing::error!("Unable to load time zones: {:?}", err);
                 return HashSet::new();
             }
         };
@@ -121,7 +120,7 @@ impl IntlController {
                 match loc {
                     Ok(parsed) => {
                         if parsed.label().is_empty() {
-                            fx_log_err!("Locale is invalid: {:?}", locale.id);
+                            tracing::error!("Locale is invalid: {:?}", locale.id);
                             return Err(ControllerError::InvalidArgument(
                                 SettingType::Intl,
                                 "locale id".into(),
@@ -130,7 +129,7 @@ impl IntlController {
                         }
                     }
                     Err(err) => {
-                        fx_log_err!("Error loading locale: {:?}", err);
+                        tracing::error!("Error loading locale: {:?}", err);
                         return Err(ControllerError::InvalidArgument(
                             SettingType::Intl,
                             "locale id".into(),

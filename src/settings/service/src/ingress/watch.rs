@@ -28,7 +28,6 @@ use crate::message::receptor::Receptor;
 use crate::service::{message, Address};
 use crate::trace;
 use async_trait::async_trait;
-use fuchsia_syslog::fx_log_warn;
 use fuchsia_trace as ftrace;
 use futures::channel::oneshot;
 use futures::FutureExt;
@@ -193,7 +192,7 @@ impl<
             }
             Ok(Payload::Response(Err(error))) => Some(Err(error)),
             Err(error) => {
-                fx_log_warn!(
+                tracing::warn!(
                     "An error occurred while watching {:?}:{:?}",
                     self.setting_type,
                     error

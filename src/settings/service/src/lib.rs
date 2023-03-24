@@ -30,7 +30,6 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObj};
 #[cfg(test)]
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::component;
-use fuchsia_syslog::{fx_log_err, fx_log_info, fx_log_warn};
 use fuchsia_zircon::{Duration, DurationNum};
 use futures::lock::Mutex;
 use futures::StreamExt;
@@ -465,7 +464,7 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
                         get_metric_event_logger_proxy(factory_proxy)
                             .await
                             .map_err(|e| {
-                                fx_log_warn!("Unable to connect to metric event logger: {e:?}")
+                                tracing::warn!("Unable to connect to metric event logger: {e:?}")
                             })
                             .ok()
                     } else {
@@ -491,11 +490,11 @@ impl<T: StorageFactory<Storage = DeviceStorage> + Send + Sync + 'static> Environ
                     match migration_manager.run_tracked_migrations(metric_event_logger_proxy).await
                     {
                         Ok(id) => {
-                            fx_log_info!("migrated storage to {id:?}");
+                            tracing::info!("migrated storage to {id:?}");
                             id
                         }
                         Err((id, e)) => {
-                            fx_log_err!("Settings migration failed: {e:?}");
+                            tracing::error!("Settings migration failed: {e:?}");
                             id
                         }
                     };
@@ -832,7 +831,7 @@ where
         if registrant.get_dependencies().iter().all(|dependency| {
             let dep_met = dependency.is_fulfilled(&entities);
             if !dep_met {
-                fx_log_err!(
+                tracing::error!(
                     "Skipping {} registration due to missing dependency {:?}",
                     registrant.get_interface(),
                     dependency

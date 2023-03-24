@@ -4,7 +4,6 @@
 
 use anyhow::{format_err, Error};
 use fuchsia_async as fasync;
-use fuchsia_syslog::fx_log_err;
 use futures::lock::Mutex;
 use serde::de::DeserializeOwned;
 use std::fmt::{Debug, Display};
@@ -108,7 +107,7 @@ where
         if let Some(config_load_info) = config_load_info {
             self.write_config_load_to_inspect(path, config_load_info);
         } else {
-            fx_log_err!("Could not load config for {:?}", path);
+            tracing::error!("Could not load config for {:?}", path);
         }
 
         load_result

@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     DoNotDisturbRequest, DoNotDisturbSetResponder, DoNotDisturbSetResult, DoNotDisturbSettings,
     DoNotDisturbWatchResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use std::convert::TryFrom;
 
 impl From<SettingInfo> for DoNotDisturbSettings {
@@ -80,7 +79,7 @@ impl TryFrom<DoNotDisturbRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::DoNotDisturb, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", req);
+                tracing::warn!("Received a call to an unsupported API: {:?}", req);
                 Err(JobError::Unsupported)
             }
         }

@@ -10,7 +10,6 @@ use crate::message::base::{
 use crate::message::beacon::{Beacon, BeaconBuilder};
 use crate::message::receptor::Receptor;
 
-use fuchsia_syslog::fx_log_warn;
 use fuchsia_zircon::Duration;
 
 /// MessengerClient is a wrapper around a messenger with a fuse.
@@ -91,7 +90,7 @@ impl Messenger {
         // Log info. transmit is called by forward. However, forward might fail if there is no next
         // Messenger exists.
         self.action_tx.unbounded_send((self.fingerprint, action, beacon)).unwrap_or_else(|_| {
-            fx_log_warn!("Messenger::transmit, action_tx failed to send message")
+            tracing::warn!("Messenger::transmit, action_tx failed to send message")
         });
     }
 

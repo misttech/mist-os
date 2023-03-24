@@ -14,7 +14,6 @@ use crate::message::messenger::{Messenger, MessengerClient};
 use crate::{trace, trace_guard};
 use anyhow::format_err;
 use fuchsia_async as fasync;
-use fuchsia_syslog::fx_log_warn;
 use fuchsia_trace as ftrace;
 use futures::StreamExt;
 use std::borrow::Cow;
@@ -450,7 +449,7 @@ impl MessageHub {
                     messenger_tx
                         .unbounded_send(MessengerAction::DeleteBySignature(signature))
                         .unwrap_or_else(|_| {
-                            fx_log_warn!(
+                            tracing::warn!(
                                 "messenger_tx failed to send delete action for signature: {:?}",
                                 signature
                             )
@@ -484,7 +483,7 @@ impl MessageHub {
                 if let Err(_) = response_result {
                     // TODO(fxbug.dev/85529) Track whether this is common, if so, bubble the error
                     // up.
-                    fx_log_warn!(
+                    tracing::warn!(
                         "Receiving end of oneshot closed while trying to create messenger client \
                             for client with id: {}",
                         id,

@@ -13,7 +13,6 @@ use fidl::endpoints::{ControlHandle, Responder};
 use fidl_fuchsia_settings::{
     IntlRequest, IntlSetResponder, IntlSetResult, IntlSettings, IntlWatchResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use std::convert::TryFrom;
 
 impl From<SettingInfo> for IntlSettings {
@@ -47,7 +46,7 @@ impl TryFrom<IntlRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Intl, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

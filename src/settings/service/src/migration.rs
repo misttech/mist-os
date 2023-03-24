@@ -24,7 +24,6 @@ use fuchsia_fs::directory::{readdir, DirEntry, DirentKind};
 use fuchsia_fs::file::WriteError;
 use fuchsia_fs::node::{OpenError, RenameError};
 use fuchsia_fs::OpenFlags;
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use fuchsia_zircon as zx;
 use setui_metrics_registry::{
     SetuiMetricDimensionError as ErrorMetric, SetuiMetricDimensionMigrationId as MigrationIdMetric,
@@ -136,7 +135,7 @@ impl MigrationManager {
             )
             .await
             {
-                fx_log_err!("Failed to log migration metrics: {:?}", e);
+                tracing::error!("Failed to log migration metrics: {:?}", e);
             }
         }
 
@@ -234,7 +233,9 @@ impl MigrationManager {
                     {
                         LastMigration { migration_id, cobalt_id }
                     } else {
-                        fx_log_warn!("Unknown migration {migration_id}, reverting to default data");
+                        tracing::warn!(
+                            "Unknown migration {migration_id}, reverting to default data"
+                        );
 
                         // We don't know which migrations to run. Some future build may have
                         // run migrations, then something caused a boot loop, and the system

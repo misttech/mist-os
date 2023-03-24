@@ -5,7 +5,6 @@
 use crate::base::SettingType;
 use fuchsia_inspect::{self as inspect, component, NumericProperty};
 use fuchsia_inspect_derive::Inspect;
-use fuchsia_syslog::fx_log_err;
 use settings_inspect_utils::managed_inspect_map::ManagedInspectMap;
 
 const LISTENER_INSPECT_NODE_NAME: &str = "active_listeners";
@@ -63,7 +62,7 @@ impl ListenerInspectLogger {
         let setting_type_str = format!("{setting_type:?}");
         match self.listener_counts.map_mut().get_mut(&setting_type_str) {
             Some(listener_inspect_info) => listener_inspect_info.count.subtract(1u64),
-            None => fx_log_err!("Tried to subtract from nonexistent listener count"),
+            None => tracing::error!("Tried to subtract from nonexistent listener count"),
         }
     }
 }

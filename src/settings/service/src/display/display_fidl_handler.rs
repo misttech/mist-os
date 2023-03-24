@@ -14,8 +14,6 @@ use fidl_fuchsia_settings::{
     ThemeType as FidlThemeType,
 };
 
-use fuchsia_syslog::fx_log_warn;
-
 use std::convert::TryFrom;
 
 impl From<FidlThemeMode> for ThemeMode {
@@ -170,7 +168,7 @@ impl TryFrom<DisplayRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Display, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", req);
+                tracing::warn!("Received a call to an unsupported API: {:?}", req);
                 Err(JobError::Unsupported)
             }
         }

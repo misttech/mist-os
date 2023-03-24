@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     LightSetLightGroupValuesResult, LightState, LightWatchLightGroupResponder,
     LightWatchLightGroupsResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use fuchsia_zircon::Status;
 
 use crate::base::{SettingInfo, SettingType};
@@ -134,7 +133,7 @@ impl TryFrom<LightRequest> for Job {
             )
             .into()),
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

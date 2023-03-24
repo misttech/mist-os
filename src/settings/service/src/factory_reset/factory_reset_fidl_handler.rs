@@ -13,7 +13,6 @@ use fidl_fuchsia_settings::{
     Error, FactoryResetRequest, FactoryResetSetResponder, FactoryResetSetResult,
     FactoryResetSettings, FactoryResetWatchResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use std::convert::TryFrom;
 
 use crate::job::source::Error as JobError;
@@ -68,7 +67,7 @@ impl TryFrom<FactoryResetRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::FactoryReset, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }

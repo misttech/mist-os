@@ -21,7 +21,6 @@ use crate::message::base::MessengerType;
 use crate::service::{self, message};
 use crate::trace;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use fuchsia_trace as ftrace;
 use futures::stream::{FuturesUnordered, StreamFuture};
 use futures::{FutureExt, StreamExt};
@@ -207,7 +206,7 @@ impl Manager {
                     .expect("source should be present")
                     .add_pending_job(job)
                 {
-                    fx_log_err!("Failed to add job: {:?}", e);
+                    tracing::error!("Failed to add job: {:?}", e);
                     return;
                 }
             }
@@ -216,7 +215,7 @@ impl Manager {
                 // through the APIs error responder.
                 let id = error_responder.id();
                 if let Err(e) = error_responder.respond(fidl_fuchsia_settings::Error::Failed) {
-                    fx_log_warn!(
+                    tracing::warn!(
                         "Failed to report invalid input error to caller on API {} with id {:?}: \
                             {:?}",
                         id,
@@ -231,7 +230,7 @@ impl Manager {
                 let id = error_responder.id();
                 if let Err(e) = error_responder.respond(fidl_fuchsia_settings_policy::Error::Failed)
                 {
-                    fx_log_warn!(
+                    tracing::warn!(
                         "Failed to report invalid policy input error to caller on policy API {} \
                             with id {:?}: {:?}",
                         id,
@@ -243,12 +242,12 @@ impl Manager {
             Some(Err(Error::Unexpected(err))) if !err.is_closed() => {
                 // No-op. If the error did not close the stream then just warn and allow the rest
                 // of the stream to continue processing.
-                fx_log_warn!("Received an unexpected error on source {:?}: {:?}", source, err);
+                tracing::warn!("Received an unexpected error on source {:?}: {:?}", source, err);
             }
             Some(Err(err @ (Error::Unexpected(_) | Error::Unsupported))) => {
                 // All other errors cause the source stream to close. Clean up the source and cancel
                 // any pending jobs. We still need to wait for any remaining jobs to finish.
-                fx_log_warn!(
+                tracing::warn!(
                     "Unable to process anymore job requests for {:?} due to fatal error: {:?}",
                     source,
                     err

@@ -11,7 +11,6 @@ use fidl::prelude::*;
 use fidl_fuchsia_settings::{
     PrivacyRequest, PrivacySetResponder, PrivacySetResult, PrivacySettings, PrivacyWatchResponder,
 };
-use fuchsia_syslog::fx_log_warn;
 use fuchsia_zircon as zx;
 use std::convert::TryFrom;
 
@@ -57,7 +56,7 @@ impl TryFrom<PrivacyRequest> for Job {
                 Ok(watch::Work::new_job(SettingType::Privacy, responder))
             }
             _ => {
-                fx_log_warn!("Received a call to an unsupported API: {:?}", item);
+                tracing::warn!("Received a call to an unsupported API: {:?}", item);
                 Err(JobError::Unsupported)
             }
         }
