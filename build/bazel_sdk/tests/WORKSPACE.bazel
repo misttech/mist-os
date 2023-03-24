@@ -36,13 +36,14 @@ rules_fuchsia_deps()
 
 fuchsia_sdk_repository(
     name = "fuchsia_sdk",
-    is_test = True,
 )
 
 register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
 
 fuchsia_clang_repository(
     name = "fuchsia_clang",
+    # TODO(fxbug.dev/124321) Remove the need to hardcode the host here.
+    local_path = "../../../prebuilt/third_party/clang/linux-x64",
 )
 
 load("@fuchsia_clang//:defs.bzl", "register_clang_toolchains")

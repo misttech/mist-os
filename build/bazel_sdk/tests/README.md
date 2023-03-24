@@ -4,5 +4,4 @@
 
 Until fxb/117700 is resolved, the tests can only run manually, e.g.:
 
-cd ~/fuchsia/build/bazel_sdk/tests
-bazel test :tests
+<FUCHSIA_DIR>/build/bazel_sdk/tests/scripts/bazel_test.sh

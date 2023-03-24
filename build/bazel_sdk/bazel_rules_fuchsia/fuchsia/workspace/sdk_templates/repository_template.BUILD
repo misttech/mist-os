@@ -42,8 +42,7 @@ fuchsia_debug_symbols(
 fuchsia_toolchain_info(
     name = "fuchsia_toolchain_info",
     aemu_runfiles = "//tools:aemu_internal_x64",
-    # No quotes here so we can put None for tests
-    bindc = {{BINDC}},
+    bindc = "//tools:x64/bindc",
     blobfs = "//tools:x64/blobfs_do_not_depend",
     blobfs_manifest = "//tools:x64/blobfs_do_not_depend-meta.json",
     bootserver = "//tools:x64/bootserver",
