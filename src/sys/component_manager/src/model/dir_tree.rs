@@ -320,7 +320,6 @@ mod tests {
                     source_name: CapabilityName::from("elf"),
                     target: ExposeTarget::Parent,
                     target_name: CapabilityName::from("elf"),
-                    availability: cm_rust::Availability::Required,
                 }),
             ],
             ..default_component_decl()

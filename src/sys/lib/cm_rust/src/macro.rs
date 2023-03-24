@@ -444,15 +444,63 @@ fn expose_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {
             fn target(&self) -> &ExposeTarget {
                 &self.target
             }
+
+            fn availability(&self) -> &Availability {
+                &self.availability
+            }
         }
     }
 }
 
-/// A derive-macro that generates an implementation of `ExposeDeclCommon`. Use this for
-/// the inner structs of each variant of `ExposeDecl`.
+/// A derive-macro that generates an implementation of `ExposeDeclCommon`. Use this
+/// for the inner structs of each variant of `ExposeDecl` that supports specifying availability.
 #[proc_macro_derive(ExposeDeclCommon)]
 pub fn expose_decl_common_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     expose_decl_common_derive_impl(parse_macro_input!(input)).into()
+}
+
+fn expose_decl_common_availability_always_required_derive_impl(
+    input: syn::DeriveInput,
+) -> TokenStream {
+    let struct_ident = match DeclCommonOpts::from_derive_input(&input) {
+        Ok(opts) => opts.ident,
+        Err(e) => return e.write_errors(),
+    };
+
+    quote! {
+        impl SourceName for #struct_ident {
+            fn source_name(&self) -> &CapabilityName {
+                &self.source_name
+            }
+        }
+
+        impl ExposeDeclCommon for #struct_ident {
+            fn target_name(&self) -> &CapabilityName {
+                &self.target_name
+            }
+
+            fn source(&self) -> &ExposeSource {
+                &self.source
+            }
+
+            fn target(&self) -> &ExposeTarget {
+                &self.target
+            }
+
+            fn availability(&self) -> &Availability {
+                &Availability::Required
+            }
+        }
+    }
+}
+
+/// A derive-macro that generates an implementation of `ExposeDeclCommon`. Use this
+/// for inner structs of each variant of `ExposeDecl` whose availability is always required.
+#[proc_macro_derive(ExposeDeclCommonAlwaysRequired)]
+pub fn expose_decl_common_with_availability_derive(
+    input: proc_macro::TokenStream,
+) -> proc_macro::TokenStream {
+    expose_decl_common_availability_always_required_derive_impl(parse_macro_input!(input)).into()
 }
 
 fn capability_decl_common_derive_impl(input: syn::DeriveInput) -> TokenStream {

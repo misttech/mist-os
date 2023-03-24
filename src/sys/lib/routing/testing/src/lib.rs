@@ -5037,7 +5037,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         source_name: "elf".into(),
                         target: ExposeTarget::Parent,
                         target_name: "dwarf".into(),
-                        availability: cm_rust::Availability::Required,
                     }))
                     .runner(RunnerDecl {
                         name: "elf".into(),

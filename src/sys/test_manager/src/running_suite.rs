@@ -685,7 +685,6 @@ async fn get_realm(
             source_name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
             target: cm_rust::ExposeTarget::Parent,
             target_name: HERMETIC_RESOLVER_CAPABILITY_NAME.into(),
-            availability: cm_rust::Availability::Required,
         },
     ));
     hermetic_resolver_decl.capabilities.push(cm_rust::CapabilityDecl::Resolver(

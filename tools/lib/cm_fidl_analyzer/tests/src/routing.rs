@@ -1994,7 +1994,6 @@ mod tests {
             source_name: "base".into(),
             target: ExposeTarget::Parent,
             target_name: "base".into(),
-            availability: cm_rust::Availability::Required,
         });
         let resolver_decl = ResolverDecl {
             name: "base".into(),

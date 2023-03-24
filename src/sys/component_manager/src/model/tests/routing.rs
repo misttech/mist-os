@@ -1634,7 +1634,6 @@ async fn use_runner_from_sibling_environment() {
                     source_name: "elf".into(),
                     target: ExposeTarget::Parent,
                     target_name: "dwarf".into(),
-                    availability: cm_rust::Availability::Required,
                 }))
                 .runner(RunnerDecl {
                     name: "elf".into(),
@@ -2156,7 +2155,6 @@ async fn use_resolver_from_parent_environment() {
                     source_name: "base".into(),
                     target: ExposeTarget::Parent,
                     target_name: "base".into(),
-                    availability: cm_rust::Availability::Required,
                 }))
                 .resolver(ResolverDecl {
                     name: "base".into(),

@@ -5,8 +5,8 @@
 use {
     cm_fidl_validator,
     cm_rust_derive::{
-        CapabilityDeclCommon, ExposeDeclCommon, FidlDecl, OfferDeclCommon,
-        OfferDeclCommonNoAvailability, UseDeclCommon,
+        CapabilityDeclCommon, ExposeDeclCommon, ExposeDeclCommonAlwaysRequired, FidlDecl,
+        OfferDeclCommon, OfferDeclCommonNoAvailability, UseDeclCommon,
     },
     cm_types, fidl_fuchsia_component_config as fconfig, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
@@ -698,6 +698,17 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::EventStream(e) => e.target_name(),
         }
     }
+
+    fn availability(&self) -> &Availability {
+        match self {
+            Self::Service(e) => e.availability(),
+            Self::Protocol(e) => e.availability(),
+            Self::Directory(e) => e.availability(),
+            Self::Runner(e) => e.availability(),
+            Self::Resolver(e) => e.availability(),
+            Self::EventStream(e) => e.availability(),
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -749,27 +760,23 @@ pub struct ExposeDirectoryDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, ExposeDeclCommonAlwaysRequired, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::ExposeRunner")]
 pub struct ExposeRunnerDecl {
     pub source: ExposeSource,
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
-    #[fidl_decl(default)]
-    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[derive(FidlDecl, ExposeDeclCommonAlwaysRequired, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::ExposeResolver")]
 pub struct ExposeResolverDecl {
     pub source: ExposeSource,
     pub source_name: CapabilityName,
     pub target: ExposeTarget,
     pub target_name: CapabilityName,
-    #[fidl_decl(default)]
-    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -1697,6 +1704,7 @@ pub trait ExposeDeclCommon: SourceName + Send + Sync {
     fn target_name(&self) -> &CapabilityName;
     fn target(&self) -> &ExposeTarget;
     fn source(&self) -> &ExposeSource;
+    fn availability(&self) -> &Availability;
 }
 
 /// The common properties of a [Capability](fdecl::Capability) declaration.
@@ -2549,7 +2557,6 @@ mod tests {
                         source_name: Some("elf".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                         target_name: Some("elf".to_string()),
-                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeRunner::EMPTY
                     }),
                     fdecl::Expose::Resolver(fdecl::ExposeResolver{
@@ -2560,7 +2567,6 @@ mod tests {
                         source_name: Some("pkg".to_string()),
                         target: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         target_name: Some("pkg".to_string()),
-                        availability: Some(fdecl::Availability::Required),
                         ..fdecl::ExposeResolver::EMPTY
                     }),
                     fdecl::Expose::Service(fdecl::ExposeService {
@@ -2990,14 +2996,12 @@ mod tests {
                             source_name: "elf".try_into().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "elf".try_into().unwrap(),
-                            availability: Availability::Required,
                         }),
                         ExposeDecl::Resolver(ExposeResolverDecl {
                             source: ExposeSource::Child("netstack".to_string()),
                             source_name: "pkg".try_into().unwrap(),
                             target: ExposeTarget::Parent,
                             target_name: "pkg".try_into().unwrap(),
-                            availability: Availability::Required,
                         }),
                         ExposeDecl::Service(ExposeServiceDecl {
                             source: ExposeSource::Child("netstack".to_string()),
@@ -3540,7 +3544,7 @@ mod tests {
         let target = fdecl::Ref::Parent(fdecl::ParentRef {});
         let target_name = "";
         assert_eq!(
-            fdecl::ExposeService {
+            *fdecl::ExposeService {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),
@@ -3549,11 +3553,11 @@ mod tests {
                 ..fdecl::ExposeService::EMPTY
             }
             .fidl_into_native()
-            .availability,
+            .availability(),
             Availability::Required
         );
         assert_eq!(
-            fdecl::ExposeProtocol {
+            *fdecl::ExposeProtocol {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),
@@ -3561,11 +3565,11 @@ mod tests {
                 ..fdecl::ExposeProtocol::EMPTY
             }
             .fidl_into_native()
-            .availability,
+            .availability(),
             Availability::Required
         );
         assert_eq!(
-            fdecl::ExposeDirectory {
+            *fdecl::ExposeDirectory {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),
@@ -3573,11 +3577,11 @@ mod tests {
                 ..fdecl::ExposeDirectory::EMPTY
             }
             .fidl_into_native()
-            .availability,
+            .availability(),
             Availability::Required
         );
         assert_eq!(
-            fdecl::ExposeRunner {
+            *fdecl::ExposeRunner {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),
@@ -3585,11 +3589,11 @@ mod tests {
                 ..fdecl::ExposeRunner::EMPTY
             }
             .fidl_into_native()
-            .availability,
+            .availability(),
             Availability::Required
         );
         assert_eq!(
-            fdecl::ExposeResolver {
+            *fdecl::ExposeResolver {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),
@@ -3597,11 +3601,11 @@ mod tests {
                 ..fdecl::ExposeResolver::EMPTY
             }
             .fidl_into_native()
-            .availability,
+            .availability(),
             Availability::Required
         );
         assert_eq!(
-            fdecl::ExposeEventStream {
+            *fdecl::ExposeEventStream {
                 source: Some(source.clone()),
                 source_name: Some(source_name.into()),
                 target: Some(target.clone()),
@@ -3609,7 +3613,7 @@ mod tests {
                 ..fdecl::ExposeEventStream::EMPTY
             }
             .fidl_into_native()
-            .availability,
+            .availability(),
             Availability::Required
         );
     }
