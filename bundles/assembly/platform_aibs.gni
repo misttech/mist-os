@@ -19,6 +19,7 @@ platform_aib_names = [
 
   # `/core` itself
   "core_realm",
+  "core_realm_user_and_userdebug",
 
   # The additional children of core we add when we have networking enabled
   "core_realm_networking",

@@ -255,6 +255,8 @@ assembly_input_bundle("core_realm_networking") {
 
 # This is common across all eng-mode products that include the core realm.
 #
+# This is mutually-exclusive with the `core_realm_user_and_userdebug` AIB.
+#
 assembly_input_bundle("core_realm_eng") {
   testonly = true
   base_packages = [
@@ -291,6 +293,24 @@ assembly_input_bundle("core_realm_eng") {
                   "//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
                 ],
                 root_build_dir)
+      }
+    },
+  ]
+}
+
+# This is common across all user and userdebug products that include the core
+# realm.
+#
+# This is mutually-exclusive with the `core_realm_eng` AIB.
+#
+assembly_input_bundle("core_realm_user_and_userdebug") {
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
+        core = rebase_path([], root_build_dir)
       }
     },
   ]
