@@ -105,6 +105,9 @@ if (is_host) {
   host_test("ffx-e2e-without-target") {
     binary_path = "$root_out_dir/ffx"
     args = [
+      # TODO(slgrady): remove when we no longer have flake fxb/84938
+      "--config",
+      "log.level=DEBUG",
       "self-test",
       "--include-target",
       "false",
@@ -121,7 +124,9 @@ if (is_host) {
     binary_path = "$root_out_dir/ffx"
     args = [
       "--config",
-      "sdk.root=.,sdk.type=in-tree",
+
+      # TODO(slgrady): remove log.level=DEBUG when we no longer have flake fxb/84938
+      "sdk.root=.,sdk.type=in-tree,log.level=DEBUG",
       "self-test",
     ]
 
