@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <fuchsia/hardware/usb/function/cpp/banjo.h>
-#include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <lib/zx/channel.h>
 
 #include <vector>
@@ -58,9 +57,6 @@
 
     if the usb mode is set to USB_MODE_PERIPHERAL and functions_registered_ is true,
     we are now finally ready to operate in the peripheral role.
-    At this point we can inform the DCI driver to start running in peripheral role
-    by calling usb_mode_switch_set_mode(USB_MODE_PERIPHERAL) on its ZX_PROTOCOL_USB_MODE_SWITCH
-    interface. Now the USB controller hardware is up and running as a USB peripheral.
 
     Teardown of the peripheral role:
     The FIDL ClearFunctions() message will reset this device's list of USB functions.
@@ -99,7 +95,7 @@ class UsbPeripheral : public UsbPeripheralType,
                       public ddk::EmptyProtocol<ZX_PROTOCOL_USB_PERIPHERAL>,
                       public ddk::UsbDciInterfaceProtocol<UsbPeripheral> {
  public:
-  UsbPeripheral(zx_device_t* parent) : UsbPeripheralType(parent), dci_(parent), ums_(parent) {}
+  explicit UsbPeripheral(zx_device_t* parent) : UsbPeripheralType(parent), dci_(parent) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
@@ -180,8 +176,6 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // Our parent's DCI protocol.
   const ddk::UsbDciProtocolClient dci_;
-  // Our parent's optional USB switch protocol.
-  const ddk::UsbModeSwitchProtocolClient ums_;
   // USB device descriptor set via ioctl_usb_peripheral_set_device_desc()
   usb_device_descriptor_t device_desc_ = {};
   // Map from endpoint index to function.

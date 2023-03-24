@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/pwm/c/banjo.h>
-#include <fuchsia/hardware/usb/modeswitch/c/banjo.h>
 
 namespace fragment {
 
@@ -279,17 +278,6 @@ struct SpiProxyRequest {
 
 struct SpiProxyResponse {
   ProxyResponse header;
-};
-
-// ZX_PROTOCOL_USB_MODE_SWITCH proxy support.
-enum class UsbModeSwitchOp {
-  SET_MODE,
-};
-
-struct UsbModeSwitchProxyRequest {
-  ProxyRequest header;
-  UsbModeSwitchOp op;
-  usb_mode_t mode;
 };
 
 // ZX_PROTOCOL_GOLDFISH_SYNC proxy support.

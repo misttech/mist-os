@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <fuchsia/hardware/usb/dci/c/banjo.h>
 #include <fuchsia/hardware/usb/function/c/banjo.h>
-#include <fuchsia/hardware/usb/modeswitch/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -104,10 +103,7 @@ zx_status_t UsbPeripheral::Init() {
     zxlogf(ERROR, "%s: DEVICE_METADATA_USB_MODE failed", __func__);
     return status;
   }
-  // Set DCI mode to USB_MODE_NONE until we are ready
-  if (ums_.is_valid()) {
-    ums_.SetMode(USB_MODE_NONE);
-  }
+
   parent_request_size_ = usb::BorrowedRequest<void>::RequestSize(dci_.GetRequestSize());
 
   status = DdkAdd("usb-peripheral", DEVICE_ADD_NON_BINDABLE);
@@ -696,13 +692,6 @@ zx_status_t UsbPeripheral::DeviceStateChanged() {
 
   if (dci_usb_mode_ != new_dci_usb_mode) {
     zxlogf(DEBUG, "%s: set DCI mode %d", __func__, new_dci_usb_mode);
-    if (ums_.is_valid()) {
-      status = ums_.SetMode(new_dci_usb_mode);
-      if (status != ZX_OK) {
-        ums_.SetMode(USB_MODE_NONE);
-        new_dci_usb_mode = USB_MODE_NONE;
-      }
-    }
     dci_usb_mode_ = new_dci_usb_mode;
   }
 

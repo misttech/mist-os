@@ -61,7 +61,7 @@ DDK_PROTOCOL_DEF(USB_PERIPHERAL,          39,   "usb-peripheral", 0)
 DDK_PROTOCOL_DEF(USB_FUNCTION,            40,   "usb-function", 0)
 DDK_PROTOCOL_DEF(CACHE_TEST,              41,   "usb-cache-test", 0)
 DDK_PROTOCOL_DEF(USB_HCI,                 42,   "usb-hci", 0)  // Host Controller Interface
-DDK_PROTOCOL_DEF(USB_MODE_SWITCH,         43,   "usb-mode-switch", 0)
+// 43 was usb-mode-switch
 DDK_PROTOCOL_DEF(USB_DBC,                 44,   "usb-dbc", 0) // Debug Capability
 DDK_PROTOCOL_DEF(USB_TESTER,              45,   "usb-tester", 0)
 // 46 was usb-fwloader

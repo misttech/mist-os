@@ -15,7 +15,6 @@
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <fuchsia/hardware/spi/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
-#include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
@@ -41,8 +40,7 @@ class FragmentProxy : public FragmentProxyBase,
                       public ddk::PowerProtocol<FragmentProxy>,
                       public ddk::PwmProtocol<FragmentProxy>,
                       public ddk::SpiProtocol<FragmentProxy>,
-                      public ddk::SysmemProtocol<FragmentProxy>,
-                      public ddk::UsbModeSwitchProtocol<FragmentProxy> {
+                      public ddk::SysmemProtocol<FragmentProxy> {
  public:
   FragmentProxy(zx_device_t* parent, zx::channel rpc)
       : FragmentProxyBase(parent), rpc_(std::move(rpc)) {}
@@ -117,9 +115,6 @@ class FragmentProxy : public FragmentProxyBase,
   zx_status_t SysmemRegisterHeap(uint64_t heap, zx::channel heap_connection);
   zx_status_t SysmemRegisterSecureMem(zx::channel tee_connection);
   zx_status_t SysmemUnregisterSecureMem();
-
-  // USB Mode Switch
-  zx_status_t UsbModeSwitchSetMode(usb_mode_t mode);
 
   zx_status_t CodecConnect(zx::channel chan);
   zx_status_t DaiConnect(zx::channel chan);

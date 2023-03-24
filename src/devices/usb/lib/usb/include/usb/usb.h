@@ -148,6 +148,12 @@ __BEGIN_CDECLS
 
 #define USB_ENDPOINT_HALT 0x00
 
+typedef uint32_t usb_mode_t;
+#define USB_MODE_NONE UINT32_C(0)
+#define USB_MODE_HOST UINT32_C(1)
+#define USB_MODE_PERIPHERAL UINT32_C(2)
+#define USB_MODE_OTG UINT32_C(3)
+
 // TODO(fxbug.dev/111397) : Some of these structs are duplicates of usb banjo. Remove and
 // consolidate them.
 /* general USB defines */

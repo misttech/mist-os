@@ -6,7 +6,6 @@
 #define SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_VIM3_USB_PHY_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -17,6 +16,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
+#include <usb/usb.h>
 
 namespace vim3_usb_phy {
 

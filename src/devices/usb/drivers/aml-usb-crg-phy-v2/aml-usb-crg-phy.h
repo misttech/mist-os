@@ -6,7 +6,6 @@
 #define SRC_DEVICES_USB_DRIVERS_AML_USB_CRG_PHY_V2_AML_USB_CRG_PHY_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -18,6 +17,7 @@
 #include <fbl/condition_variable.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
+#include <usb/usb.h>
 
 namespace aml_usb_crg_phy {
 

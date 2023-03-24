@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_A1_USB_PHY_H_
 #define SRC_DEVICES_USB_DRIVERS_A1_USB_PHY_A1_USB_PHY_H_
 
-#include <fuchsia/hardware/usb/modeswitch/cpp/banjo.h>
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
@@ -16,6 +15,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
+#include <usb/usb.h>
 
 namespace a1_usb_phy {
 
