@@ -11,7 +11,9 @@ config("config") {
 executable("bin") {
   output_name = "hello_starnix"
   if (current_cpu == "x64") {
-    sources = [ "hello.S" ]
+    sources = [ "hello_x64.S" ]
+  } else if (current_cpu == "arm64") {
+    sources = [ "hello_aarch64.S" ]
   }
 
   disable_syslog_backend = true

@@ -3,11 +3,11 @@
 # found in the LICENSE file.
 
 group("examples") {
+  deps = [ "hello_starnix:hello-starnix" ]
   if (target_cpu == "x64") {
-    deps = [
+    deps += [
       "android",
       "chromiumos",
-      "hello_starnix:hello-starnix",
     ]
   }
 }
