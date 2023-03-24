@@ -510,7 +510,7 @@ fn test_media_and_avrcp_listener() -> Result<(), Error> {
 
     // The current track position is returned.
     // We expect the future to finish, now that the time has advanced by 10 seconds.
-    let expected = Notification { pos: Some(55), ..Notification::EMPTY };
+    let expected = Notification { pos: Some(10055), ..Notification::EMPTY };
     assert_eq!(Poll::Ready(Ok(Ok(expected))), r1);
 
     Ok(())

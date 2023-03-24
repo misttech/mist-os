@@ -112,13 +112,6 @@ impl ValidPlayStatus {
         Self { song_length, song_position, playback_status }
     }
 
-    /// Return the current playback position of currently playing media.
-    /// If there is no currently playing media (i.e `song_position` is None),
-    /// return u32 MAX, as defined in AVRCP 1.6.2 Section 6.7.2, Table 6.35.
-    pub fn get_playback_position(&self) -> u32 {
-        self.song_position.map_or(std::u32::MAX, |p| p)
-    }
-
     /// Return the current playback status of currently playing media.
     /// If there is no currently playing media (i.e `playback_status` is None),
     /// return PlaybackStatus::Stopped, as this is mandatory.
@@ -758,7 +751,6 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(900000000));
 
         let mut play_status: ValidPlayStatus = Default::default();
-        assert_eq!(play_status.get_playback_position(), std::u32::MAX);
         assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Stopped);
 
         let player_state = Some(fidl_media::PlayerState::Buffering);
@@ -768,7 +760,6 @@ mod tests {
         assert_eq!(play_status.song_length, None);
         assert_eq!(play_status.song_position, None);
         assert_eq!(play_status.playback_status, Some(fidl_avrcp::PlaybackStatus::Paused));
-        assert_eq!(play_status.get_playback_position(), std::u32::MAX);
         assert_eq!(play_status.get_playback_status(), fidl_avrcp::PlaybackStatus::Paused);
 
         let duration = Some(9876543210); // nanos
@@ -787,7 +778,6 @@ mod tests {
         assert_eq!(play_status.song_length, expected_song_length);
         assert_eq!(play_status.song_position, Some(expected_song_position));
         assert_eq!(play_status.playback_status, Some(expected_player_state));
-        assert_eq!(play_status.get_playback_position(), expected_song_position);
         assert_eq!(play_status.get_playback_status(), expected_player_state);
 
         // Verifies the conversion into the AVRCP FIDL type.
@@ -804,7 +794,6 @@ mod tests {
         // are assumed to be unchanged.
         play_status.update_play_status(None, None, None);
         assert_eq!(play_status.song_length, None);
-        assert_eq!(play_status.get_playback_position(), expected_song_position);
         assert_eq!(play_status.get_playback_status(), expected_player_state);
     }
 

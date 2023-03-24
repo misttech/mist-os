@@ -186,6 +186,11 @@ impl SessionInfo {
         &self.playback_rate
     }
 
+    /// Gets the track position, as defined by the AVRCP spec for notification of POS_CHANGED.
+    fn get_track_position(&self) -> u32 {
+        self.playback_rate.map_or(std::u32::MAX, |r| r.current_position().unwrap_or(0))
+    }
+
     /// Return a static value indicating the ID of the player.
     /// For the purposes of Fuchsia Media, there will only be one player, so the
     /// chosen identifier is 1.
@@ -255,7 +260,7 @@ impl SessionInfo {
                 notification.media_info = Some(self.media_info.clone());
             }
             fidl_avrcp::NotificationEvent::TrackPosChanged => {
-                notification.pos = Some(self.play_status.get_playback_position());
+                notification.pos = Some(self.get_track_position());
             }
             fidl_avrcp::NotificationEvent::AddressedPlayerChanged => {
                 notification.player_id = Some(self.get_player_id());
@@ -264,10 +269,7 @@ impl SessionInfo {
                 notification.battery_status = Some(self.battery_status);
             }
             _ => {
-                warn!(
-                    "Received notification request for unsupported notification event_id {:?}",
-                    event_id
-                );
+                warn!(?event_id, "Unsupported notification request");
                 return Err(fidl_avrcp::TargetAvcError::RejectedInvalidParameter);
             }
         }
@@ -328,7 +330,7 @@ impl From<SessionInfo> for Notification {
             src.get_player_application_settings(vec![]).expect("Should get application settings."),
         );
         notification.media_info = Some(src.get_media_info().clone());
-        notification.pos = Some(src.play_status.get_playback_position());
+        notification.pos = Some(src.get_track_position());
         notification.player_id = Some(src.get_player_id());
         notification.battery_status = Some(src.battery_status);
         notification
@@ -338,10 +340,10 @@ impl From<SessionInfo> for Notification {
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
+
     use anyhow::{format_err, Error};
     use fidl::encoding::Decodable as FidlDecodable;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
-    use fidl_fuchsia_media::{self as fidl_media_types};
     use fidl_fuchsia_media_sessions2::{self as fidl_media, *};
     use fuchsia_async as fasync;
     use futures::stream::TryStreamExt;
@@ -669,6 +671,7 @@ pub(crate) mod tests {
             fidl_avrcp::NotificationEvent::PlayerApplicationSettingChanged,
             fidl_avrcp::NotificationEvent::PlaybackStatusChanged,
             fidl_avrcp::NotificationEvent::TrackChanged,
+            fidl_avrcp::NotificationEvent::TrackPosChanged,
             fidl_avrcp::NotificationEvent::BattStatusChanged,
         ];
         let expected_values = vec![
@@ -681,6 +684,8 @@ pub(crate) mod tests {
                 ..fidl_avrcp::Notification::EMPTY
             },
             fidl_avrcp::Notification { track_id: Some(0), ..fidl_avrcp::Notification::EMPTY },
+            // 55.555 milliseconds have passed
+            fidl_avrcp::Notification { pos: Some(55), ..fidl_avrcp::Notification::EMPTY },
             fidl_avrcp::Notification {
                 battery_status: Some(fidl_avrcp::BatteryStatus::Critical),
                 ..fidl_avrcp::Notification::EMPTY
@@ -695,6 +700,19 @@ pub(crate) mod tests {
                 .into();
             assert_eq!(received, expected_v.clone());
         }
+
+        // As time passes, the position notification will change too.
+        exec.set_fake_time(fasync::Time::after(fasync::Duration::from_seconds(7)));
+
+        let updated_pos: fidl_avrcp::Notification = media_state
+            .session_info()
+            .get_notification_value(&fidl_avrcp::NotificationEvent::TrackPosChanged)
+            .expect("value in notification")
+            .into();
+        // Expect 7 more seconds have passed
+        let expected =
+            fidl_avrcp::Notification { pos: Some(7055), ..fidl_avrcp::Notification::EMPTY };
+        assert_eq!(updated_pos, expected);
     }
 
     #[fuchsia::test]
