@@ -36,7 +36,6 @@ rustc_binary("scene_manager_bin") {
     "//sdk/fidl/fuchsia.ui.pointerinjector.configuration:fuchsia.ui.pointerinjector.configuration_rust",
     "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_rust",
     "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
-    "//sdk/fidl/fuchsia.ui.shortcut:fuchsia.ui.shortcut_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/intl:icudtl",
     "//src/lib/diagnostics/inspect/runtime/rust",

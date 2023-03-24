@@ -165,10 +165,10 @@ impl InputPipelineAssembly {
     }
 
     /// Adds a focus listener task into the input pipeline assembly.  The focus
-    /// listener forwards focus chain changes to `fuchsia.ui.shortcut.Manager`,
-    /// `fuchsia.ui.keyboard.focus.Controller`, and watchers of
-    /// `fuchsia.ui.focus.FocusChainProvider`.  It is required for the correct operation of the
-    /// implementors of those protocols (typically, `text_manager`, `shortcut`, and `clipboard`.)
+    /// listener forwards focus chain changes to
+    /// `fuchsia.ui.keyboard.focus.Controller` and watchers of
+    /// `fuchsia.ui.focus.FocusChainProvider`.  It is required for the correct
+    /// operation of the implementors of those protocols, e.g. `text_manager`.
     ///
     /// # Arguments:
     /// * `focus_chain_publisher`: to forward to other downstream watchers.
@@ -176,7 +176,6 @@ impl InputPipelineAssembly {
     /// # Requires:
     /// * `fuchsia.ui.views.FocusChainListenerRegistry`: to register for updates.
     /// * `fuchsia.ui.keyboard.focus.Controller`: to forward to text_manager.
-    /// * `fuchsia.ui.shortcut.Manager`: to forward to shortcut manager.
     pub fn add_focus_listener(self, focus_chain_publisher: FocusChainProviderPublisher) -> Self {
         let (sender, receiver, mut tasks) = self.into_components();
         tasks.push(fasync::Task::local(async move {

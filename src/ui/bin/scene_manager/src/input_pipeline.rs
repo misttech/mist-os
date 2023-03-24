@@ -25,7 +25,6 @@ use {
     fidl_fuchsia_ui_input_config::FeaturesRequestStream as InputConfigFeaturesRequestStream,
     fidl_fuchsia_ui_pointerinjector_configuration::SetupProxy,
     fidl_fuchsia_ui_policy::DeviceListenerRegistryRequestStream,
-    fidl_fuchsia_ui_shortcut as ui_shortcut,
     focus_chain_provider::FocusChainProviderPublisher,
     fsettings::LightMarker,
     fuchsia_async as fasync,
@@ -44,7 +43,6 @@ use {
         light_sensor_handler::CalibratedLightSensorHandler,
         media_buttons_handler::MediaButtonsHandler,
         mouse_injector_handler::MouseInjectorHandler,
-        shortcut_handler::ShortcutHandler,
         touch_injector_handler::TouchInjectorHandler,
     },
     scene_management::{self, SceneManager},
@@ -312,12 +310,9 @@ async fn register_keyboard_related_input_handlers(
     assembly = assembly.add_autorepeater();
     assembly = add_dead_keys_handler(assembly, icu_data_loader);
     assembly = add_immersive_mode_shortcut_handler(assembly);
-
-    // Shortcut needs to go before IME.
-    assembly = add_shortcut_handler(assembly).await;
     assembly = add_ime(assembly).await;
 
-    // Forward focus to Shortcut Manager.
+    // Forward focus to Text Manager.
     // This requires `fuchsia.ui.focus.FocusChainListenerRegistry`
     assembly = assembly.add_focus_listener(focus_chain_publisher);
     assembly
@@ -514,15 +509,6 @@ fn add_dead_keys_handler(
     loader: icu_data::Loader,
 ) -> InputPipelineAssembly {
     assembly.add_handler(dead_keys_handler::DeadKeysHandler::new(loader))
-}
-
-async fn add_shortcut_handler(mut assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    if let Ok(manager) = connect_to_protocol::<ui_shortcut::ManagerMarker>() {
-        if let Ok(shortcut_handler) = ShortcutHandler::new(manager) {
-            assembly = assembly.add_handler(shortcut_handler);
-        }
-    }
-    assembly
 }
 
 async fn add_ime(mut assembly: InputPipelineAssembly) -> InputPipelineAssembly {

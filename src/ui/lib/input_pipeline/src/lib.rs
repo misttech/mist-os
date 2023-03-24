@@ -34,7 +34,6 @@ pub mod modifier_handler;
 pub mod mouse_injector_handler;
 pub mod pointer_display_scale_handler;
 pub mod pointer_sensor_scale_handler;
-pub mod shortcut_handler;
 pub mod text_settings_handler;
 pub mod touch_injector_handler;
 

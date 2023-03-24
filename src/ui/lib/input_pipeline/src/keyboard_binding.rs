@@ -84,19 +84,6 @@ impl KeyboardEvent {
         }
     }
 
-    /// Centralizes the conversion from [KeyboardEvent] to `KeyEvent`.
-    pub(crate) fn from_key_event_at_time(&self, event_time: zx::Time) -> fidl_ui_input3::KeyEvent {
-        fidl_ui_input3::KeyEvent {
-            timestamp: Some(event_time.into_nanos()),
-            type_: Some(self.event_type),
-            key: Some(self.key),
-            modifiers: self.modifiers,
-            lock_state: self.lock_state,
-            repeat_sequence: Some(self.repeat_sequence),
-            key_meaning: self.key_meaning,
-            ..fidl_ui_input3::KeyEvent::EMPTY
-        }
-    }
     /// Converts [KeyboardEvent] into the same one, but with the specified settings.
     pub fn into_with_autorepeat_settings(
         self,
@@ -215,6 +202,21 @@ impl KeyboardEvent {
     /// changed.
     pub fn into_with_repeat_sequence(self, repeat_sequence: u32) -> Self {
         Self { repeat_sequence, ..self }
+    }
+
+    /// Centralizes the conversion from [KeyboardEvent] to `KeyEvent`.
+    #[cfg(test)]
+    pub(crate) fn from_key_event_at_time(&self, event_time: zx::Time) -> fidl_ui_input3::KeyEvent {
+        fidl_ui_input3::KeyEvent {
+            timestamp: Some(event_time.into_nanos()),
+            type_: Some(self.event_type),
+            key: Some(self.key),
+            modifiers: self.modifiers,
+            lock_state: self.lock_state,
+            repeat_sequence: Some(self.repeat_sequence),
+            key_meaning: self.key_meaning,
+            ..fidl_ui_input3::KeyEvent::EMPTY
+        }
     }
 }
 
