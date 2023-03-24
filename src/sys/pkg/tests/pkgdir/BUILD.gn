@@ -4,8 +4,9 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
+import("//sdk/ctf/build/ctf.gni")
 
-rustc_test("driver") {
+ctf_rustc_test("driver") {
   name = "pkgdir_integration_test"
   edition = "2021"
 
@@ -33,16 +34,16 @@ rustc_test("driver") {
   ]
 }
 
-fuchsia_component("test_suite_component") {
+ctf_test_component("default") {
   testonly = true
-  component_name = "default"
   manifest = "meta/pkgdir-integration-test.cml"
   deps = [ ":driver" ]
 }
 
-fuchsia_package("test_suite") {
+ctf_fuchsia_package("pkgdir-tests") {
+  package_name = "pkgdir-tests"
   testonly = true
-  deps = [ ":test_suite_component" ]
+  deps = [ ":default" ]
 }
 
 fuchsia_component("test-root") {
@@ -63,11 +64,16 @@ fuchsia_test_package("pkgdir-integration-tests") {
   test_components = [ ":test-root" ]
   subpackages = [
     "test_realm_proxy",
-    ":test_suite",
+    ":pkgdir-tests",
   ]
 }
 
 group("tests") {
   testonly = true
-  public_deps = [ ":pkgdir-integration-tests" ]
+  deps = [ ":pkgdir-integration-tests" ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":pkgdir-tests_archive" ]
 }

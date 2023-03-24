@@ -6,7 +6,6 @@
 ALLOWED_CTS_DEPS = [
   # TODO(81399): Include this in the SDK.
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2",
-
   "//sdk/lib/device-watcher/cpp:cpp",
   "//sdk/lib/syslog/cpp:cpp",
   "//sdk/ctf/tests/pkg/fidl/cpp:conformance_test_sources",
@@ -24,26 +23,24 @@ ALLOWED_CTS_DEPS = [
   "//src/session/bin/element_manager:element_manager_comp",
   "//src/session/bin/element_manager:sc_values",
 
-  # Individual Rust dependencies that correspond to an SDK element.
+  # Rust dependencies.
   "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+  "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness",
   "//src/lib/fidl/rust/fidl:fidl",
   "//src/lib/fuchsia-async:fuchsia-async",
   "//src/lib/fuchsia-component-test:fuchsia-component-test",
   "//src/lib/fuchsia-component:fuchsia-component",
+  "//src/lib/fuchsia-fs:fuchsia-fs",
+  "//src/lib/fuchsia-runtime:fuchsia-runtime",
   "//src/lib/fuchsia:fuchsia",
   "//src/lib/zircon/rust:fuchsia-zircon",
   "//third_party/rust_crates:anyhow",
   "//third_party/rust_crates:assert_matches",
   "//third_party/rust_crates:futures",
+  "//third_party/rust_crates:itertools",
   "//third_party/rust_crates:log",
+  "//third_party/rust_crates:pretty_assertions",
   "//third_party/rust_crates:tracing",
-
-  # Needed by collections_integration_test.
-  "//examples/components/routing/fidl:echo",
-  "//src/lib/fuchsia-fs:fuchsia-fs",
-  "//src/lib/fuchsia-runtime:fuchsia-runtime",
-  "//src/sys/component_manager/testing/echo_server:echo_server",
-  "//src/sys/component_manager/tests/fidl:components",
 
   # Needed by //sdk/ctf/tests/examples/host_tool:tests.
   "//src/developer/ffx:ffx_bin",
@@ -56,6 +53,16 @@ ALLOWED_CTS_DEPS = [
   "//examples/fidl/fuchsia.examples:fuchsia.examples_cpp",
   "//sdk/lib/component/incoming/cpp:cpp",
   "//sdk/lib/syslog/cpp:cpp-macros",
+
+  # TODO(123604): All of the deps below should be managed by test realm proxies.
+  # They can be removed from this allowlist after making this change, because
+  # the test will depend on the fuchsia.testing.harness.RealmProxy protocol
+  # instead of depending directly on these deps.
+
+  # Needed by the collections_integration_test.
+  "//examples/components/routing/fidl:echo",
+  "//src/sys/component_manager/testing/echo_server:echo_server",
+  "//src/sys/component_manager/tests/fidl:components",
 
   # Needed by //sdk/ctf/tests/fidl/fuchsia.ui.composition.flatland
   "//sdk/ctf/test_realm:fuchsia.ui.composition.flatland_test_realm",

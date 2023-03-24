@@ -7,42 +7,6 @@ import("//sdk/ctf/build/internal/ctf_element.gni")
 import("//sdk/ctf/build/internal/ctf_version.gni")
 import("//sdk/ctf/build/internal/write_ctf_file.gni")
 
-# A Fuchsia package that can be used in CTF.
-#
-# An equivalent to fuchsia_package, but ensures dependencies are allowed in CTF.
-template("ctf_fuchsia_package") {
-  assert(defined(invoker.package_name), "package_name must be defined.")
-
-  if (!defined(invoker.deps)) {
-    invoker.deps = []
-  }
-
-  if (invoker.deps != [] && cts_version == "") {
-    verify_target = target_name + "_verify_deps"
-  }
-  write_file_target = target_name + "_ctf_file"
-
-  if (defined(verify_target)) {
-    ctf_element(verify_target) {
-      deps_to_verify = invoker.deps
-      invoker_label =
-          get_label_info(":${invoker.target_name}", "label_no_toolchain")
-    }
-  }
-
-  write_ctf_file(write_file_target) {
-  }
-
-  fuchsia_package(target_name) {
-    forward_variables_from(invoker, "*")
-
-    if (defined(verify_target)) {
-      deps += [ ":$verify_target" ]
-    }
-    deps += [ ":$write_file_target" ]
-  }
-}
-
 # Creates a FAR archive from a ctf_fuchsia_package_archive target.
 #
 # Parameters
@@ -90,5 +54,50 @@ template("ctf_fuchsia_package_archive") {
         },
       ]
     }
+  }
+}
+
+# A Fuchsia package that can be used in CTF.
+#
+# An equivalent to fuchsia_package, but ensures dependencies are allowed in CTF.
+# To build a FAR archive of this package, depend on ${target_name}_archive.
+template("ctf_fuchsia_package") {
+  assert(defined(invoker.package_name), "package_name must be defined.")
+
+  main_target_name = target_name
+
+  if (!defined(invoker.deps)) {
+    invoker.deps = []
+  }
+
+  if (invoker.deps != [] && cts_version == "") {
+    verify_target = target_name + "_verify_deps"
+  }
+  write_file_target = target_name + "_ctf_file"
+
+  if (defined(verify_target)) {
+    ctf_element(verify_target) {
+      deps_to_verify = invoker.deps
+      invoker_label =
+          get_label_info(":${invoker.target_name}", "label_no_toolchain")
+    }
+  }
+
+  write_ctf_file(write_file_target) {
+  }
+
+  fuchsia_package(target_name) {
+    forward_variables_from(invoker, "*")
+
+    if (defined(verify_target)) {
+      deps += [ ":$verify_target" ]
+    }
+    deps += [ ":$write_file_target" ]
+  }
+
+  # Optional FAR archive that can be released in CTF.
+  ctf_fuchsia_package_archive("${target_name}_archive") {
+    package = ":$main_target_name"
+    package_name = invoker.package_name
   }
 }

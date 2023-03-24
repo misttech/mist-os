@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "//src/storage/testing/driver_test_realm/meta/client.shard.cml" ],
+    include: [
+        "//src/storage/testing/driver_test_realm/meta/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
     children: [
         {
             name: "test_realm_proxy",
@@ -10,7 +13,7 @@
         },
         {
             name: "test_suite",
-            url: "test_suite#meta/default.cm",
+            url: "pkgdir-tests#meta/default.cm",
         },
         {
             name: "decompressor-sandbox",
@@ -22,15 +25,6 @@
             directory: "dev-topological",
             from: "#storage_driver_test_realm",
             to: [ "#test_realm_proxy" ],
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#decompressor-sandbox",
-                "#test_realm_proxy",
-                "#test_suite",
-            ],
         },
         {
             protocol: [ "fuchsia.process.Launcher" ],
