@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Context, Result};
+use anyhow::{anyhow, Context, Result};
+use errors::{ffx_bail, ffx_error};
 use sdk_metadata::{ElementType, FfxTool, HostTool, Manifest, Part};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs,
-    io::{self, BufReader},
+    io::BufReader,
     path::{Path, PathBuf},
 };
 use tracing::warn;
@@ -99,9 +100,12 @@ impl SdkRoot {
                 // If the packaged sdk manifest exists, use that.
                 Sdk::from_sdk_dir(&manifest)
             }
-            Self::Full(manifest) => {
+            Self::Full(manifest) if manifest.join(SDK_BUILD_MANIFEST_PATH).exists() => {
                 // Otherwise assume this is a build manifest, but with no module.
                 Sdk::from_build_dir(&manifest, None)
+            }
+            Self::Full(manifest) => {
+                Err(ffx_error!("Could not find an sdk manifest in `{}`. Expected a manifest at either `{SDK_MANIFEST_PATH}` or `{SDK_BUILD_MANIFEST_PATH}", manifest.display()).into())
             }
         }
     }
@@ -118,8 +122,9 @@ impl SdkRoot {
 
 impl Sdk {
     fn from_build_dir(path: &Path, module_manifest: Option<&str>) -> Result<Self> {
-        let path = std::fs::canonicalize(path)
-            .with_context(|| format!("canonicalizing sdk path prefix {}", path.display()))?;
+        let path = std::fs::canonicalize(path).with_context(|| {
+            ffx_error!("SDK path `{}` was invalid and couldn't be canonicalized", path.display())
+        })?;
         let manifest_path = match module_manifest {
             None => path.join(SDK_BUILD_MANIFEST_PATH),
             Some(module) => if cfg!(target_arch = "x86_64") {
@@ -127,45 +132,33 @@ impl Sdk {
             } else if cfg!(target_arch = "aarch64") {
                 path.join("host_arm64")
             } else {
-                bail!("Host architecture not supported")
+                ffx_bail!("Host architecture {} not supported by the SDK", std::env::consts::ARCH)
             }
             .join("sdk/manifest")
             .join(module),
         };
 
-        let file = fs::File::open(&manifest_path)
-            .with_context(|| format!("opening manifest path: {:?}", manifest_path))?;
+        let file = Self::open_manifest(&manifest_path)?;
+        let atoms = Self::parse_manifest(&manifest_path, file)?;
 
         // If we are able to parse the json file into atoms, creates a Sdk object from the atoms.
-        Self::from_sdk_atoms(
-            path,
-            Self::atoms_from_core_manifest(&manifest_path, BufReader::new(file))?,
-            SdkVersion::InTree,
-        )
-    }
-
-    fn atoms_from_core_manifest<B>(manifest_path: &Path, reader: BufReader<B>) -> Result<SdkAtoms>
-    where
-        B: io::Read,
-    {
-        let atoms: serde_json::Result<SdkAtoms> = serde_json::from_reader(reader);
-
-        match atoms {
-            Ok(result) => Ok(result),
-            Err(e) => Err(anyhow!("Can't read json file {:?}: {:?}", manifest_path, e)),
-        }
+        Self::from_sdk_atoms(&path, atoms, SdkVersion::InTree)
+            .with_context(|| ffx_error!("Failed to parse atoms from SDK in `{}`", path.display()))
     }
 
     pub fn from_sdk_dir(path_prefix: &Path) -> Result<Self> {
         tracing::debug!("from_sdk_dir {:?}", path_prefix);
-        let path_prefix = std::fs::canonicalize(path_prefix)
-            .with_context(|| format!("canonicalizing sdk path prefix {}", path_prefix.display()))?;
+        let path_prefix = std::fs::canonicalize(path_prefix).with_context(|| {
+            ffx_error!(
+                "SDK path `{}` was invalid and couldn't be canonicalized",
+                path_prefix.display()
+            )
+        })?;
         let manifest_path = path_prefix.join(SDK_MANIFEST_PATH);
 
-        let manifest = Self::parse_sdk_manifest(BufReader::new(
-            fs::File::open(&manifest_path)
-                .with_context(|| format!("opening sdk manifest path: {:?}", manifest_path))?,
-        ))?;
+        let manifest_file = Self::open_manifest(&manifest_path)?;
+        let manifest: Manifest = Self::parse_manifest(&manifest_path, manifest_file)?;
+
         Ok(Sdk {
             path_prefix,
             parts: manifest.parts,
@@ -174,19 +167,21 @@ impl Sdk {
         })
     }
 
-    fn parse_sdk_manifest<B>(manifest: BufReader<B>) -> Result<Manifest>
-    where
-        B: io::Read,
-    {
-        tracing::debug!("from_sdk_manifest");
-        let manifest: Manifest =
-            serde_json::from_reader(manifest).context("Reading manifest file")?;
-        // TODO: Check the schema version and log a warning if it's not what we expect.
-
-        Ok(manifest)
+    fn open_manifest(path: &Path) -> Result<fs::File> {
+        fs::File::open(path)
+            .with_context(|| ffx_error!("Failed to open SDK manifest path at `{}`", path.display()))
     }
 
-    pub fn metadata_for<'a, M: DeserializeOwned>(
+    fn parse_manifest<T: DeserializeOwned>(
+        manifest_path: &Path,
+        manifest_file: fs::File,
+    ) -> Result<T> {
+        serde_json::from_reader(BufReader::new(manifest_file)).with_context(|| {
+            ffx_error!("Failed to parse SDK manifest file at `{}`", manifest_path.display())
+        })
+    }
+
+    fn metadata_for<'a, M: DeserializeOwned>(
         &'a self,
         kinds: &'a [ElementType],
     ) -> impl Iterator<Item = M> + 'a {
@@ -231,13 +226,7 @@ impl Sdk {
     }
 
     pub fn get_host_tool(&self, name: &str) -> Result<PathBuf> {
-        match self.get_host_tool_relative_path(name) {
-            Ok(path) => {
-                let result = self.path_prefix.join(path);
-                Ok(result)
-            }
-            Err(error) => Err(error),
-        }
+        self.get_host_tool_relative_path(name).map(|path| self.path_prefix.join(path))
     }
 
     fn get_host_tools(&self) -> impl Iterator<Item = HostTool> + '_ {
@@ -261,16 +250,15 @@ impl Sdk {
             .collect::<Result<Vec<_>>>()?
             .into_iter()
             .min_by_key(|x| x.len()) // Shortest path is the one with no arch specifier, i.e. the default arch, i.e. the current arch (we hope.)
-            .ok_or(anyhow!("Tool '{}' not found in SDK dir", name))?;
+            .ok_or_else(|| ffx_error!("Tool '{}' not found in SDK dir", name))?;
         self.get_real_path(found_tool)
     }
 
     fn get_real_path(&self, path: impl AsRef<str>) -> Result<PathBuf> {
         match &self.real_paths {
-            Some(map) => map.get(path.as_ref()).map(PathBuf::from).ok_or(anyhow!(
-                "SDK File '{}' has no source in the build directory",
-                path.as_ref()
-            )),
+            Some(map) => map.get(path.as_ref()).map(PathBuf::from).ok_or_else(|| {
+                anyhow!("SDK File '{}' has no source in the build directory", path.as_ref())
+            }),
             _ => Ok(PathBuf::from(path.as_ref())),
         }
     }
@@ -293,7 +281,7 @@ impl Sdk {
     ///
     /// All the meta files specified in the atoms are loaded.
     /// The creation succeed only if all the meta files have been loaded successfully.
-    fn from_sdk_atoms(path_prefix: PathBuf, atoms: SdkAtoms, version: SdkVersion) -> Result<Self> {
+    fn from_sdk_atoms(path_prefix: &Path, atoms: SdkAtoms, version: SdkVersion) -> Result<Self> {
         let mut metas = Vec::new();
         let mut real_paths = HashMap::new();
 
@@ -302,14 +290,19 @@ impl Sdk {
                 real_paths.insert(file.destination.clone(), file.source.clone());
             }
 
-            let meta = real_paths
-                .get(&atom.meta)
-                .ok_or(anyhow!("Atom did not specify source for its metadata: {:?}", &atom,))?;
+            let meta = real_paths.get(&atom.meta).ok_or_else(|| {
+                anyhow!("Atom did not specify source for its metadata: {:?}", &atom,)
+            })?;
 
             metas.push(Part { meta: meta.clone(), kind: atom.kind.clone() });
         }
 
-        Ok(Sdk { path_prefix, parts: metas, real_paths: Some(real_paths), version })
+        Ok(Sdk {
+            path_prefix: path_prefix.to_owned(),
+            parts: metas,
+            real_paths: Some(real_paths),
+            version,
+        })
     }
 }
 
@@ -389,10 +382,9 @@ mod test {
     async fn test_core_manifest() {
         let root = core_test_data_root();
         let manifest_path = root.path();
-        let atoms = Sdk::atoms_from_core_manifest(
-            &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
-        )
+        let atoms: SdkAtoms = serde_json::from_reader(BufReader::new(
+            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
+        ))
         .unwrap();
 
         assert!(atoms.ids.is_empty());
@@ -428,14 +420,12 @@ mod test {
     async fn test_core_manifest_to_sdk() {
         let root = core_test_data_root();
         let manifest_path = root.path();
-        let atoms = Sdk::atoms_from_core_manifest(
-            &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
-        )
+        let atoms = serde_json::from_reader(BufReader::new(
+            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
+        ))
         .unwrap();
 
-        let sdk =
-            Sdk::from_sdk_atoms(manifest_path.to_owned(), atoms, SdkVersion::Unknown).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::Unknown).unwrap();
 
         let mut parts = sdk.parts.iter();
         assert!(matches!(parts.next().unwrap(), Part { kind: ElementType::HostTool, .. }));
@@ -449,14 +439,12 @@ mod test {
     async fn test_core_manifest_host_tool() {
         let root = core_test_data_root();
         let manifest_path = root.path();
-        let atoms = Sdk::atoms_from_core_manifest(
-            &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
-        )
+        let atoms = serde_json::from_reader(BufReader::new(
+            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
+        ))
         .unwrap();
 
-        let sdk =
-            Sdk::from_sdk_atoms(manifest_path.to_owned(), atoms, SdkVersion::Unknown).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::Unknown).unwrap();
         let zxdb = sdk.get_host_tool("zxdb").unwrap();
 
         assert_eq!(manifest_path.join("host_x64/zxdb"), zxdb);
@@ -466,13 +454,12 @@ mod test {
     async fn test_core_manifest_host_tool_multi_arch() {
         let root = core_test_data_root();
         let manifest_path = root.path();
-        let atoms = Sdk::atoms_from_core_manifest(
-            &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
-        )
+        let atoms = serde_json::from_reader(BufReader::new(
+            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
+        ))
         .unwrap();
 
-        let sdk = Sdk::from_sdk_atoms(manifest_path.to_owned(), atoms, SdkVersion::InTree).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::InTree).unwrap();
         let symbol_index = sdk.get_host_tool("symbol-index").unwrap();
 
         assert_eq!(manifest_path.join("host_x64/symbol-index"), symbol_index);
@@ -482,14 +469,12 @@ mod test {
     async fn test_core_manifest_ffx_tool() {
         let root = core_test_data_root();
         let manifest_path = root.path();
-        let atoms = Sdk::atoms_from_core_manifest(
-            &manifest_path,
-            BufReader::new(fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap()),
-        )
+        let atoms = serde_json::from_reader(BufReader::new(
+            fs::File::open(manifest_path.join(SDK_BUILD_MANIFEST_PATH)).unwrap(),
+        ))
         .unwrap();
 
-        let sdk =
-            Sdk::from_sdk_atoms(manifest_path.to_owned(), atoms, SdkVersion::Unknown).unwrap();
+        let sdk = Sdk::from_sdk_atoms(manifest_path, atoms, SdkVersion::Unknown).unwrap();
         let ffx_assembly = sdk.get_ffx_tool("ffx-assembly").unwrap();
 
         assert_eq!(manifest_path.join("host_x64/ffx-assembly"), ffx_assembly.executable);
@@ -500,7 +485,7 @@ mod test {
     async fn test_sdk_manifest() {
         let root = sdk_test_data_root();
         let sdk_root = root.path();
-        let manifest = Sdk::parse_sdk_manifest(BufReader::new(
+        let manifest: Manifest = serde_json::from_reader(BufReader::new(
             fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
@@ -518,7 +503,7 @@ mod test {
     async fn test_sdk_manifest_host_tool() {
         let root = sdk_test_data_root();
         let sdk_root = root.path();
-        let manifest = Sdk::parse_sdk_manifest(BufReader::new(
+        let manifest: Manifest = serde_json::from_reader(BufReader::new(
             fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
@@ -538,7 +523,7 @@ mod test {
     async fn test_sdk_manifest_ffx_tool() {
         let root = sdk_test_data_root();
         let sdk_root = root.path();
-        let manifest = Sdk::parse_sdk_manifest(BufReader::new(
+        let manifest: Manifest = serde_json::from_reader(BufReader::new(
             fs::File::open(sdk_root.join(SDK_MANIFEST_PATH)).unwrap(),
         ))
         .unwrap();
