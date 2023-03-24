@@ -120,7 +120,7 @@ class DeliveryBlobTest : public BlobfsTestSetup,
 TEST_P(DeliveryBlobTest, WriteAll) {
   const std::unique_ptr<BlobInfo> info =
       GenerateRandomBlob(/*mount_path*/ "", GetParam().blob_size);
-  const std::vector<uint8_t> delivery_blob =
+  const fbl::Array<uint8_t> delivery_blob =
       GenerateDeliveryBlobType1({info->data.get(), info->size_data}, GetParam().compress).value();
 
   fbl::RefPtr<fs::Vnode> file;
@@ -151,7 +151,7 @@ TEST_P(DeliveryBlobTest, WriteAll) {
 TEST_P(DeliveryBlobTest, WriteChunked) {
   const std::unique_ptr<BlobInfo> info =
       GenerateRandomBlob(/*mount_path*/ "", GetParam().blob_size);
-  const std::vector<uint8_t> delivery_blob =
+  const fbl::Array<uint8_t> delivery_blob =
       GenerateDeliveryBlobType1({info->data.get(), info->size_data}, GetParam().compress).value();
 
   fbl::RefPtr<fs::Vnode> file;

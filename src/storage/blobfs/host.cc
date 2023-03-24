@@ -268,7 +268,7 @@ zx::result<BlobInfo> BlobInfo::CreateCompressed(
     return blob_info;
   }
 
-  zx::result<std::vector<uint8_t>> compressed_data =
+  zx::result<fbl::Array<uint8_t>> compressed_data =
       compressor.Compress(GetDefaultChunkedCompressionParams(data.size()), data);
   if (compressed_data.is_error()) {
     return compressed_data.take_error();

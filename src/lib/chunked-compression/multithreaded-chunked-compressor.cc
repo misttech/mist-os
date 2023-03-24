@@ -47,7 +47,7 @@ class TaskQueue {
 
   void AddTask(T value) {
     std::scoped_lock lock(mutex_);
-    queue_.push_back(value);
+    queue_.push_back(std::move(value));
     condition_.notify_one();
   }
 
@@ -78,7 +78,7 @@ class TaskQueue {
 };
 
 struct CompressFrameResponse {
-  zx::result<std::vector<uint8_t>> compressed_data;
+  zx::result<fbl::Array<uint8_t>> compressed_data;
   size_t frame_id;
 };
 
@@ -89,8 +89,8 @@ struct CompressFrameRequest {
   TaskQueue<CompressFrameResponse>* response_queue;
 };
 
-zx::result<std::vector<uint8_t>> CompressFrame(const CompressionParams& params,
-                                               cpp20::span<const uint8_t> data, ZSTD_CCtx* ctx) {
+zx::result<fbl::Array<uint8_t>> CompressFrame(const CompressionParams& params,
+                                              cpp20::span<const uint8_t> data, ZSTD_CCtx* ctx) {
   if (ZSTD_isError(
           ZSTD_CCtx_setParameter(ctx, ZSTD_c_compressionLevel, params.compression_level))) {
     return zx::error(ZX_ERR_INTERNAL);
@@ -100,14 +100,13 @@ zx::result<std::vector<uint8_t>> CompressFrame(const CompressionParams& params,
       return zx::error(ZX_ERR_INTERNAL);
     }
   }
-  std::vector<uint8_t> output(ZSTD_compressBound(data.size()));
+  fbl::Array<uint8_t> output = fbl::MakeArray<uint8_t>(ZSTD_compressBound(data.size()));
   size_t compressed_size =
       ZSTD_compress2(ctx, output.data(), output.size(), data.data(), data.size());
   if (ZSTD_isError(compressed_size)) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  output.resize(compressed_size);
-  return zx::ok(std::move(output));
+  return zx::ok(fbl::Array<uint8_t>(output.release(), compressed_size));
 }
 
 void StartWorker(TaskQueue<CompressFrameRequest>* queue) {
@@ -143,13 +142,13 @@ class MultithreadedChunkedCompressor::MultithreadedChunkedCompressorImpl {
     }
   }
 
-  zx::result<std::vector<uint8_t>> Compress(const CompressionParams& params,
-                                            cpp20::span<const uint8_t> input) {
+  zx::result<fbl::Array<uint8_t>> Compress(const CompressionParams& params,
+                                           cpp20::span<const uint8_t> input) {
     if (!params.IsValid()) {
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
     if (input.empty()) {
-      return zx::ok(std::vector<uint8_t>());
+      return zx::ok(fbl::Array<uint8_t>());
     }
     TaskQueue<CompressFrameResponse> compression_responses;
     size_t frame_count = HeaderWriter::NumFramesForDataSize(input.size(), params.chunk_size);
@@ -166,7 +165,7 @@ class MultithreadedChunkedCompressor::MultithreadedChunkedCompressorImpl {
       });
     }
 
-    std::vector<std::vector<uint8_t>> frames(frame_count);
+    std::vector<fbl::Array<uint8_t>> frames(frame_count);
     size_t compressed_data_size = 0;
     for (size_t frame = 0; frame < frame_count; ++frame) {
       auto response = compression_responses.TakeTask();
@@ -182,7 +181,7 @@ class MultithreadedChunkedCompressor::MultithreadedChunkedCompressorImpl {
     }
 
     size_t metadata_size = HeaderWriter::MetadataSizeForNumFrames(frame_count);
-    std::vector<uint8_t> output(metadata_size + compressed_data_size);
+    fbl::Array<uint8_t> output = fbl::MakeArray<uint8_t>(metadata_size + compressed_data_size);
     HeaderWriter header_writer;
     if (Status status =
             HeaderWriter::Create(output.data(), metadata_size, frame_count, &header_writer);
@@ -192,7 +191,7 @@ class MultithreadedChunkedCompressor::MultithreadedChunkedCompressorImpl {
 
     size_t compressed_offset = metadata_size;
     for (size_t frame = 0; frame < frame_count; ++frame) {
-      std::vector<uint8_t>& compressed_frame = frames[frame];
+      fbl::Array<uint8_t>& compressed_frame = frames[frame];
       SeekTableEntry entry{
           .decompressed_offset = frame * params.chunk_size,
           .decompressed_size = frame + 1 == frame_count ? last_frame_size : params.chunk_size,
@@ -200,7 +199,8 @@ class MultithreadedChunkedCompressor::MultithreadedChunkedCompressorImpl {
           .compressed_size = compressed_frame.size(),
       };
       header_writer.AddEntry(entry);
-      memcpy(output.data() + compressed_offset, compressed_frame.data(), compressed_frame.size());
+      std::memcpy(output.data() + compressed_offset, compressed_frame.data(),
+                  compressed_frame.size());
       compressed_offset += compressed_frame.size();
     }
 
@@ -221,7 +221,7 @@ MultithreadedChunkedCompressor::MultithreadedChunkedCompressor(size_t thread_cou
 
 MultithreadedChunkedCompressor::~MultithreadedChunkedCompressor() = default;
 
-zx::result<std::vector<uint8_t>> MultithreadedChunkedCompressor::Compress(
+zx::result<fbl::Array<uint8_t>> MultithreadedChunkedCompressor::Compress(
     const CompressionParams& params, cpp20::span<const uint8_t> input) {
   return impl_->Compress(params, input);
 }

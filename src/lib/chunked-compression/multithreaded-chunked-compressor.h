@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <memory>
 
+#include <fbl/array.h>
+
 #include "compression-params.h"
 
 namespace chunked_compression {
@@ -24,8 +26,8 @@ class MultithreadedChunkedCompressor {
   ~MultithreadedChunkedCompressor();
 
   // Compresses |input| and returns the compressed result.
-  zx::result<std::vector<uint8_t>> Compress(const CompressionParams& params,
-                                            cpp20::span<const uint8_t> input);
+  zx::result<fbl::Array<uint8_t>> Compress(const CompressionParams& params,
+                                           cpp20::span<const uint8_t> input);
 
  private:
   class MultithreadedChunkedCompressorImpl;

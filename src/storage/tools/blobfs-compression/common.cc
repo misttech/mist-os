@@ -108,8 +108,8 @@ zx_status_t BlobfsCompress(const uint8_t* src, const size_t src_sz, uint8_t* des
   return ZX_OK;
 }
 
-zx::result<std::vector<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
-                                                      blobfs::DeliveryBlobType type) {
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
+                                                     blobfs::DeliveryBlobType type) {
   switch (type) {
     case blobfs::DeliveryBlobType::kType1:
       return blobfs::GenerateDeliveryBlobType1(data, /*compress=*/std::nullopt);

@@ -38,7 +38,7 @@ std::vector<uint8_t> CreateRandomData(size_t size) {
   return data;
 }
 
-void CheckCompressedData(const std::vector<uint8_t>& compressed_data,
+void CheckCompressedData(cpp20::span<const uint8_t> compressed_data,
                          const std::vector<uint8_t>& data) {
   fbl::Array<uint8_t> decompressed_data;
   size_t decompressed_size;
@@ -91,10 +91,10 @@ TEST(MultithreadedChunkedCompressorTest, InputTooLargeForChunkSize) {
 TEST(MultithreadedChunkedCompressorTest, CompressMultipleBuffersWithDifferentParamsAtOnce) {
   struct CompressionTask {
     std::vector<uint8_t> data;
-    zx::result<std::vector<uint8_t>> result;
+    zx::result<fbl::Array<uint8_t>> result;
     CompressionParams params;
   };
-  std::vector<CompressionTask> compression_tasks = {
+  CompressionTask compression_tasks[] = {
       CompressionTask{
           .data = CreateRandomData(kChunkSize * 2 + 5),
           .params = CompressionParams{.chunk_size = kChunkSize},

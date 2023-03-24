@@ -11,6 +11,7 @@
 #include <string>
 #include <vector>
 
+#include <fbl/array.h>
 #include <fbl/unique_fd.h>
 
 #include "src/lib/chunked-compression/chunked-compressor.h"
@@ -35,8 +36,8 @@ zx_status_t BlobfsCompress(const uint8_t* src, size_t src_sz, uint8_t* dest_writ
                            chunked_compression::CompressionParams params,
                            const CompressionCliOptionStruct& cli_options);
 
-zx::result<std::vector<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
-                                                      blobfs::DeliveryBlobType type);
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlob(cpp20::span<const uint8_t> data,
+                                                     blobfs::DeliveryBlobType type);
 
 }  // namespace blobfs_compress
 

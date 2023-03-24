@@ -7,7 +7,7 @@
 #include <lib/cksum.h>
 #include <zircon/assert.h>
 
-#include "src/lib/chunked-compression/chunked-compressor.h"
+#include "src/lib/chunked-compression/multithreaded-chunked-compressor.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/delivery_blob_private.h"
 
@@ -17,6 +17,7 @@
 #include <machine/endian.h>
 #endif
 #include <filesystem>
+#include <thread>
 #include <type_traits>
 
 #include <safemath/safe_conversions.h>
@@ -30,6 +31,31 @@ constexpr bool IsValidDeliveryType(blobfs::DeliveryBlobType delivery_type) {
     default:
       return false;
   }
+}
+
+zx::result<fbl::Array<uint8_t>> CompressData(cpp20::span<const uint8_t> data,
+                                             const chunked_compression::CompressionParams& params) {
+  if (data.empty()) {
+    return zx::ok(fbl::Array<uint8_t>());
+  }
+  const size_t num_chunks = fbl::round_up(data.size_bytes(), params.chunk_size) / params.chunk_size;
+  // If `data` spans multiple chunks, we compress each chunk in parallel.
+  if (num_chunks > 1) {
+    const size_t num_threads = std::min<size_t>(num_chunks, std::thread::hardware_concurrency());
+    chunked_compression::MultithreadedChunkedCompressor compressor(num_threads);
+    return compressor.Compress(params, data);
+  }
+
+  chunked_compression::ChunkedCompressor compressor(params);
+  const size_t output_limit = params.ComputeOutputSizeLimit(data.size_bytes());
+  fbl::Array<uint8_t> compressed_result = fbl::MakeArray<uint8_t>(output_limit);
+  size_t compressed_size;
+  const chunked_compression::Status status = compressor.Compress(
+      data.data(), data.size_bytes(), compressed_result.data(), output_limit, &compressed_size);
+  if (status != chunked_compression::kStatusOk) {
+    return zx::error(chunked_compression::ToZxStatus(status));
+  }
+  return zx::ok(fbl::Array<uint8_t>(compressed_result.release(), compressed_size));
 }
 
 }  // namespace
@@ -133,46 +159,43 @@ std::string GetDeliveryBlobPath(const std::string_view& path) {
   return fs_path.replace_filename(new_filename);
 }
 
-zx::result<std::vector<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
-                                                           std::optional<bool> compress) {
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
+                                                          std::optional<bool> compress) {
   constexpr size_t kPayloadOffset = sizeof(DeliveryBlobHeader) + sizeof(MetadataType1);
 
-  std::vector<uint8_t> delivery_blob;
-  size_t compressed_size = 0;
+  fbl::Array<uint8_t> delivery_blob;
 
   if (compress.value_or(true) && !data.empty()) {
     // WARNING: If we use different compression parameters here, the `compressed_file_size` in the
     // blob info JSON file will be incorrect.
     const chunked_compression::CompressionParams params =
         blobfs::GetDefaultChunkedCompressionParams(data.size_bytes());
-    chunked_compression::ChunkedCompressor compressor(params);
-
-    const size_t output_limit = params.ComputeOutputSizeLimit(data.size_bytes());
-    delivery_blob.resize(kPayloadOffset + output_limit);
-
-    const chunked_compression::Status status =
-        compressor.Compress(data.data(), data.size_bytes(), delivery_blob.data() + kPayloadOffset,
-                            output_limit, &compressed_size);
-    if (status != chunked_compression::kStatusOk) {
-      return zx::error(chunked_compression::ToZxStatus(status));
+    zx::result compressed_data = CompressData(data, params);
+    if (compressed_data.is_error()) {
+      return compressed_data.take_error();
+    }
+    // Only use the compressed result if it saves space or we require the payload to be compressed.
+    if (compressed_data->size() < data.size_bytes() || compress.value_or(false)) {
+      delivery_blob = fbl::MakeArray<uint8_t>(kPayloadOffset + compressed_data->size());
+      std::memcpy(delivery_blob.data() + kPayloadOffset, compressed_data->data(),
+                  compressed_data->size());
     }
   }
-
-  const bool use_compressed_result =
-      compress.value_or(compressed_size > 0 && (compressed_size < data.size_bytes()));
-  const size_t payload_length = use_compressed_result ? compressed_size : data.size_bytes();
-  // Ensure the returned buffer's size reflects the actual payload length.
-  delivery_blob.resize(kPayloadOffset + payload_length);
+  const bool use_compressed_result = !delivery_blob.empty();
+  if (!use_compressed_result) {
+    delivery_blob = fbl::MakeArray<uint8_t>(kPayloadOffset + data.size_bytes());
+  }
   // Write delivery blob header and metadata.
   std::memcpy(delivery_blob.data(), &MetadataType1::kHeader, sizeof MetadataType1::kHeader);
-  const MetadataType1 metadata = MetadataType1::Create(MetadataType1::kHeader, payload_length,
-                                                       compress.value_or(use_compressed_result));
+  const MetadataType1 metadata =
+      MetadataType1::Create(MetadataType1::kHeader, delivery_blob.size() - kPayloadOffset,
+                            /*is_compressed=*/compress.value_or(use_compressed_result));
   std::memcpy(delivery_blob.data() + sizeof MetadataType1::kHeader, &metadata, sizeof metadata);
-  // Overwrite payload with original data if we aren't compressing the blob or aborted compression.
+  // Copy uncompressed data into payload if we aren't using compression or we aborted compression.
   if (!use_compressed_result && !data.empty()) {
     std::memcpy(delivery_blob.data() + kPayloadOffset, data.data(), data.size_bytes());
   }
-  return zx::ok(delivery_blob);
+  return zx::ok(std::move(delivery_blob));
 }
 
 }  // namespace blobfs

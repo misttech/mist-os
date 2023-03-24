@@ -18,6 +18,8 @@
 #include <string_view>
 #include <vector>
 
+#include <fbl/array.h>
+
 namespace blobfs {
 
 constexpr std::string_view kDeliveryBlobPrefix = "v1-";
@@ -72,8 +74,8 @@ std::string GetDeliveryBlobPath(const std::string_view& path);
 // *WARNING*: Modifying the compression parameters used by this function can cause a mismatch
 // between the calculated on-disk size used for size checking. This function is used to calculate
 // `compressed_file_size` in the blob info JSON file.
-zx::result<std::vector<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
-                                                           std::optional<bool> compress);
+zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint8_t> data,
+                                                          std::optional<bool> compress);
 
 }  // namespace blobfs
 

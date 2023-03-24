@@ -115,7 +115,7 @@ class BlobInfo {
   // The path to the file which this blob came from.
   std::filesystem::path src_file_path_;
 
-  using CompressedBlobData = std::vector<uint8_t>;
+  using CompressedBlobData = fbl::Array<uint8_t>;
   using UncompressedBlobData = FileMapping;
   struct BlobDataVisitor {
     cpp20::span<const uint8_t> operator()(const std::monostate& /*unused*/) {

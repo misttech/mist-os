@@ -16,14 +16,14 @@ namespace blobfs_compress {
 using namespace blobfs;
 
 TEST(OfflineCompressionTest, Type1EmptyBlob) {
-  const zx::result<std::vector<uint8_t>> delivery_blob =
+  const zx::result<fbl::Array<uint8_t>> delivery_blob =
       GenerateDeliveryBlob({}, DeliveryBlobType::kType1);
   ASSERT_TRUE(delivery_blob.is_ok());
   // Data should only contain headers and no payload.
   ASSERT_EQ(delivery_blob->size(), sizeof(DeliveryBlobHeader) + sizeof(MetadataType1));
 
   // Decode headers/metadata and validate.
-  const cpp20::span<const uint8_t> buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const cpp20::span<const uint8_t> buffer(delivery_blob->data(), delivery_blob->size());
   const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
   ASSERT_TRUE(header.is_ok());
   ASSERT_TRUE(header->IsValid());
@@ -46,14 +46,14 @@ TEST(OfflineCompressionTest, Type1ShouldNotCompress) {
   constexpr size_t kSmallPayloadSize = 4u;
   const std::vector<uint8_t> blob_data(kSmallPayloadSize);
 
-  const zx::result<std::vector<uint8_t>> delivery_blob =
+  const zx::result<fbl::Array<uint8_t>> delivery_blob =
       GenerateDeliveryBlob({blob_data.data(), blob_data.size()}, DeliveryBlobType::kType1);
   ASSERT_TRUE(delivery_blob.is_ok());
   ASSERT_EQ(delivery_blob->size(),
             sizeof(DeliveryBlobHeader) + sizeof(MetadataType1) + blob_data.size());
 
   // Decode headers/metadata and validate.
-  const cpp20::span buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const cpp20::span buffer(delivery_blob->data(), delivery_blob->size());
   const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
   ASSERT_TRUE(header.is_ok());
   ASSERT_TRUE(header->IsValid());
@@ -76,14 +76,14 @@ TEST(OfflineCompressionTest, Type1ShouldCompress) {
   constexpr size_t kLargePayloadSize = 1ul << 16;
   const std::vector<uint8_t> blob_data(kLargePayloadSize);
 
-  const zx::result<std::vector<uint8_t>> delivery_blob =
+  const zx::result<fbl::Array<uint8_t>> delivery_blob =
       GenerateDeliveryBlob({blob_data.data(), blob_data.size()}, DeliveryBlobType::kType1);
   ASSERT_TRUE(delivery_blob.is_ok());
   ASSERT_LE(delivery_blob->size(),
             sizeof(DeliveryBlobHeader) + sizeof(MetadataType1) + blob_data.size());
 
   // Decode headers/metadata and validate.
-  const cpp20::span buffer(delivery_blob->cbegin(), delivery_blob->cend());
+  const cpp20::span buffer(delivery_blob->data(), delivery_blob->size());
   const zx::result<DeliveryBlobHeader> header = DeliveryBlobHeader::FromBuffer(buffer);
   ASSERT_TRUE(header.is_ok());
   ASSERT_TRUE(header->IsValid());
