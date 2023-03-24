@@ -43,14 +43,6 @@
             to: "#system_recovery",
         },
         {
-            protocol: [
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-            ],
-            from: "self",
-            to: "#system_recovery",
-        },
-        {
             protocol: "fuchsia.hwinfo.Board",
             from: "#hwinfo",
             to: "#system_recovery",
