@@ -40,7 +40,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("mbr", false)?
                 .field("netboot", false)?
                 .field("no_zxcrypt", false)?
-                .field("sandbox_decompression", true)?
                 .field("format_data_on_corruption", true)?
                 .field("blobfs_initial_inodes", 0)?
                 .field("blobfs_use_deprecated_padded_format", false)?
@@ -48,10 +47,10 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
                 .field("use_disk_based_minfs_migration", false)?
                 .field("nand", false)?
                 .field("fxfs_blob", false)?
-                // LINT.ThenChange(//src/storage/fshost/generated_fshost_config.gni)
+                // LINT.ThenChange(/src/storage/fshost/generated_fshost_config.gni)
                 // LINT.IfChange
                 .field("fvm_slice_size", 8388608)?;
-            // LINT.ThenChange(//build/images/fvm.gni)
+            // LINT.ThenChange(/build/images/fvm.gni)
 
             fshost_config_builder.field("data_filesystem_format", "fxfs")?;
         }

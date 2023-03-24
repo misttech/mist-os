@@ -189,8 +189,13 @@ test("blobfs_component_runner_test") {
   ]
 }
 
-fuchsia_unittest_component("blobfs-component-runner-test") {
+fuchsia_unittest_component("blobfs-component-runner-test-component") {
+  manifest = "meta/blobfs_component_runner_test.cml"
   deps = [ ":blobfs_component_runner_test" ]
+}
+
+wrap_with_decompressor("blobfs-component-runner-test") {
+  test_url = "fuchsia-pkg://fuchsia.com/blobfs-integration#meta/blobfs-component-runner-test-component.cm"
 }
 
 test("blobfs_sync") {
@@ -458,6 +463,7 @@ fuchsia_test_package("blobfs-integration-package") {
     ":external-decompressor",
   ]
   deps = [
+    ":blobfs-component-runner-test-component",
     ":blobfs-integration-component",
     ":blobfs-mount-component",
     ":blobfs-superblock-component",

@@ -44,14 +44,8 @@ struct MountOptions {
 
   CompressionSettings compression_settings{};
 
-  // TODO(fxbug.dev/62177): Default this to true, then remove it altogether after updating tests.
-  // This enables performing decompression in an external component using the
-  // fuchsia.blobfs.internal.DecompressorCreator service.
-  bool sandbox_decompression = false;
-
-  // If |sandbox_decompression| is true and this is populated, then it is used to establish fidl
-  // connections to the DecompressorCreator instead of the default implementation that will perform
-  // an |fdio_service_connect| with the given channel.
+  // Used to establish fidl connections to the DecompressorCreator instead of the default
+  // implementation that will perform an |fdio_service_connect| with the given channel.
   DecompressorCreatorConnector* decompression_connector = nullptr;
 
   int32_t paging_threads = 2;

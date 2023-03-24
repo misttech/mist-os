@@ -173,7 +173,6 @@ class ExternalDecompressorE2ePagedTest : public FdioTest {
     // Chunked files will be paged in.
     options.pager_backed_cache_policy = CachePolicy::EvictImmediately;
     options.compression_settings = {CompressionAlgorithm::kChunked, 14};
-    options.sandbox_decompression = true;
     set_mount_options(options);
   }
 };

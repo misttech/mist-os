@@ -97,7 +97,6 @@ impl BlobfsRamdiskBuilder {
                 &CString::new("blobfs").unwrap(),
                 &CString::new("mount").unwrap(),
                 &CString::new("--allow_delivery_blobs").unwrap(),
-                &CString::new("--sandbox_decompression").unwrap(),
             ],
             None,
             &mut [

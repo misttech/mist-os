@@ -34,14 +34,11 @@ zx_status_t BlobfsTestSetupBase::Mount(std::unique_ptr<BlockDevice> device,
   MountOptions options_copy = options;
   // Override default decompression sandbox connector to be a local threaded version.
   if (options.decompression_connector == nullptr) {
-    if (!decompressor_connector_) {
-      auto connector_or = LocalDecompressorCreator::Create();
-      if (!connector_or.is_ok()) {
-        return connector_or.error_value();
-      }
-      decompressor_connector_ = std::move(connector_or.value());
+    auto connector_or = GetDecompressorCreatorConnector();
+    if (connector_or.is_error()) {
+      return connector_or.error_value();
     }
-    options_copy.decompression_connector = &decompressor_connector_->GetDecompressorConnector();
+    options_copy.decompression_connector = connector_or.value();
   }
 
   auto blobfs_or = Blobfs::Create(dispatcher(), std::move(device), vfs_.get(), options_copy);
@@ -50,6 +47,17 @@ zx_status_t BlobfsTestSetupBase::Mount(std::unique_ptr<BlockDevice> device,
   blobfs_ = std::move(blobfs_or.value());
 
   return ZX_OK;
+}
+
+zx::result<DecompressorCreatorConnector*> BlobfsTestSetupBase::GetDecompressorCreatorConnector() {
+  if (!decompressor_connector_) {
+    auto connector_or = LocalDecompressorCreator::Create();
+    if (!connector_or.is_ok()) {
+      return connector_or.take_error();
+    }
+    decompressor_connector_ = std::move(connector_or.value());
+  }
+  return zx::ok(&decompressor_connector_->GetDecompressorConnector());
 }
 
 std::unique_ptr<BlockDevice> BlobfsTestSetupBase::Unmount() {

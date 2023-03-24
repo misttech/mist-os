@@ -95,7 +95,6 @@ class DeliveryBlobTest : public BlobfsTestSetup,
     ASSERT_EQ(FormatFilesystem(device.get(), filesystem_options), ZX_OK);
 
     const MountOptions mount_options{
-        .sandbox_decompression = true,
         .streaming_writes = GetParam().streaming_writes,
         .allow_delivery_blobs = true,
     };

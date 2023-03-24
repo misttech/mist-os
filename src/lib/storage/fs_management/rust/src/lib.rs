@@ -209,7 +209,6 @@ pub struct Blobfs {
     pub num_inodes: u64,
     // Start Options
     pub readonly: bool,
-    pub sandbox_decompression: bool,
     pub write_compression_algorithm: Option<BlobCompression>,
     pub write_compression_level: Option<i32>,
     pub cache_eviction_policy_override: Option<BlobEvictionPolicy>,
@@ -248,7 +247,6 @@ impl FSConfig for Blobfs {
                 let mut start_options = StartOptions {
                     read_only: self.readonly,
                     verbose: self.verbose,
-                    sandbox_decompression: self.sandbox_decompression,
                     fsck_after_every_transaction: false,
                     write_compression_level: self.write_compression_level.unwrap_or(-1),
                     write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
@@ -324,7 +322,6 @@ impl FSConfig for Minfs {
             start_options: StartOptions {
                 read_only: self.readonly,
                 verbose: self.verbose,
-                sandbox_decompression: false,
                 fsck_after_every_transaction: self.fsck_after_every_transaction,
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
@@ -437,7 +434,6 @@ impl FSConfig for Fxfs {
             start_options: StartOptions {
                 read_only: self.readonly,
                 verbose: false,
-                sandbox_decompression: false,
                 fsck_after_every_transaction: self.fsck_after_every_transaction,
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
@@ -498,7 +494,6 @@ impl FSConfig for F2fs {
             start_options: StartOptions {
                 read_only: false,
                 verbose: false,
-                sandbox_decompression: false,
                 fsck_after_every_transaction: false,
                 write_compression_level: -1,
                 write_compression_algorithm: CompressionAlgorithm::ZstdChunked,

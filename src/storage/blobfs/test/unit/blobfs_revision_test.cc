@@ -13,6 +13,7 @@
 #include "src/storage/blobfs/mkfs.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/blobfs_test_setup.h"
+#include "src/storage/blobfs/test/unit/local_decompressor_creator.h"
 
 namespace blobfs {
 namespace {
@@ -33,7 +34,12 @@ template <uint64_t oldest_minor_version,
           uint64_t num_blocks = kNumBlocks>
 class BlobfsTestAtMinorVersion : public BlobfsTestSetup, public testing::Test {
  public:
-  void SetUp() final { srand(testing::UnitTest::GetInstance()->random_seed()); }
+  void SetUp() final {
+    srand(testing::UnitTest::GetInstance()->random_seed());
+    auto connector_or = GetDecompressorCreatorConnector();
+    ASSERT_TRUE(connector_or.is_ok());
+    connector_ = connector_or.value();
+  }
 
   std::unique_ptr<BlockDevice> CreateAndFormat() {
     FilesystemOptions options{.blob_layout_format = BlobLayoutFormat::kCompactMerkleTreeAtEnd,
@@ -44,12 +50,21 @@ class BlobfsTestAtMinorVersion : public BlobfsTestSetup, public testing::Test {
   }
 
   MountOptions ReadOnlyOptions() const {
-    return MountOptions{.writability = Writability::ReadOnlyDisk};
+    return MountOptions{
+        .writability = Writability::ReadOnlyDisk,
+        .decompression_connector = connector_,
+    };
   }
 
   MountOptions ReadWriteOptions() const {
-    return MountOptions{.writability = Writability::Writable};
+    return MountOptions{
+        .writability = Writability::Writable,
+        .decompression_connector = connector_,
+    };
   }
+
+ private:
+  DecompressorCreatorConnector* connector_;
 };
 
 using BlobfsTestAtRev2 = BlobfsTestAtMinorVersion<kBlobfsMinorVersionBackupSuperblock>;

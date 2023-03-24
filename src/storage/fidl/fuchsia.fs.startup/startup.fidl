@@ -31,9 +31,6 @@ type StartOptions = resource struct {
     /// Enable verbose logging.
     @allow_deprecated_struct_defaults
     verbose bool = false;
-    /// If true, decompression is run in a sandbox component (if the filesystem supports it).
-    @allow_deprecated_struct_defaults
-    sandbox_decompression bool = false;
     /// If true, run fsck after every transaction. This is for testing purposes only - it's very
     /// slow to run a filesystem like this.
     fsck_after_every_transaction bool;

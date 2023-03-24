@@ -140,12 +140,9 @@ zx::result<std::unique_ptr<Blobfs>> Blobfs::Create(async_dispatcher_t* dispatche
   }
   const Superblock* superblock = reinterpret_cast<Superblock*>(block);
 
-  DecompressorCreatorConnector* decompression_connector = nullptr;
-  if (options.sandbox_decompression) {
-    decompression_connector = options.decompression_connector
-                                  ? options.decompression_connector
-                                  : &DecompressorCreatorConnector::DefaultServiceConnector();
-  }
+  DecompressorCreatorConnector* decompression_connector =
+      options.decompression_connector ? options.decompression_connector
+                                      : &DecompressorCreatorConnector::DefaultServiceConnector();
 
   // Construct the Blobfs object, without intensive validation, since it
   // may require upgrades / journal replays to become valid.
@@ -1097,8 +1094,10 @@ zx_status_t Blobfs::OpenRootNode(fbl::RefPtr<fs::Vnode>* out) {
 void Blobfs::FsckAtEndOfTransaction() {
   std::scoped_lock lock(fsck_at_end_of_transaction_mutex_);
   auto device = std::make_unique<block_client::PassThroughReadOnlyBlockDevice>(block_device_.get());
-  MountOptions options;
-  options.writability = Writability::ReadOnlyDisk;
+  MountOptions options = {
+      .writability = Writability::ReadOnlyDisk,
+      .decompression_connector = decompression_connector_,
+  };
   ZX_ASSERT(Fsck(std::move(device), options) == ZX_OK);
 }
 

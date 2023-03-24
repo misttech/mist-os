@@ -298,7 +298,6 @@ impl FilesystemLauncher {
         Blobfs {
             write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
             cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
-            sandbox_decompression: self.config.sandbox_decompression,
             ..Default::default()
         }
     }

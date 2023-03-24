@@ -37,9 +37,6 @@ std::vector<std::string> MountOptions::as_argv(const char *binary) const {
   if (fsck_after_every_transaction) {
     argv.push_back("--fsck_after_every_transaction");
   }
-  if (sandbox_decompression) {
-    argv.push_back("--sandbox_decompression");
-  }
   return argv;
 }
 
@@ -48,7 +45,6 @@ zx::result<fuchsia_fs_startup::wire::StartOptions> MountOptions::as_start_option
 
   options.read_only = readonly;
   options.verbose = verbose_mount;
-  options.sandbox_decompression = sandbox_decompression;
   options.write_compression_level = write_compression_level;
 
   if (write_compression_algorithm) {

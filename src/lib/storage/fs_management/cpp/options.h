@@ -37,9 +37,6 @@ struct MountOptions {
   // If set, run fsck after every transaction.
   bool fsck_after_every_transaction = false;
 
-  // If true, puts decompression in a sandboxed process.
-  bool sandbox_decompression = false;
-
   // If set, a callable that returns a handle to the crypt client.
   std::function<zx::channel()> crypt_client;
 

@@ -18,8 +18,10 @@
 #include "src/lib/storage/block_client/cpp/fake_block_device.h"
 #include "src/lib/storage/block_client/cpp/reader.h"
 #include "src/storage/blobfs/blob.h"
+#include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/mkfs.h"
+#include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/test/blob_utils.h"
 #include "src/storage/blobfs/test/blobfs_test_setup.h"
 #include "src/storage/blobfs/test/test_scoped_vnode_open.h"
@@ -85,6 +87,10 @@ class BlobfsTestAtRevision : public BlobfsTestSetup, public testing::Test {
     ASSERT_TRUE(device);
     device_ = device.get();
 
+    auto connector_or = GetDecompressorCreatorConnector();
+    ASSERT_TRUE(connector_or.is_ok());
+    connector_ = connector_or.value();
+
     ASSERT_EQ(ZX_OK, Mount(std::move(device), GetMountOptions()));
 
     srand(testing::UnitTest::GetInstance()->random_seed());
@@ -96,8 +102,13 @@ class BlobfsTestAtRevision : public BlobfsTestSetup, public testing::Test {
   }
 
  protected:
-  virtual MountOptions GetMountOptions() const { return MountOptions(); }
+  virtual MountOptions GetMountOptions() const {
+    return MountOptions{
+        .decompression_connector = connector_,
+    };
+  }
 
+  DecompressorCreatorConnector* connector_;
   Device* device_ = nullptr;
 };
 

@@ -44,6 +44,9 @@ class BlobfsTestSetupBase {
                     const MountOptions& options = MountOptions());
   std::unique_ptr<BlockDevice> Unmount();
 
+  // Initializes the decompressor creator if needed and returns a connector.
+  zx::result<DecompressorCreatorConnector*> GetDecompressorCreatorConnector();
+
   // Unmounts and remounts using the given options.
   //
   // Any Blob references that the test holds will need to be released before this function is

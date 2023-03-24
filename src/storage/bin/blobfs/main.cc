@@ -227,7 +227,6 @@ int usage() {
       "                                    space. Only valid for mkfs on Astro devices.\n"
       "         -i|--num_inodes n          The initial number of inodes to allocate space for.\n"
       "                                    Only valid for mkfs.\n"
-      "         -s|--sandbox_decompression Run blob decompression in a sandboxed component.\n"
       "         -t|--paging_threads n      The number of threads to use in the pager\n"
       "         -d|--allow_delivery_blobs  Allow writing delivery blobs.\n"
       "         -h|--help                  Display this message\n"
@@ -260,7 +259,6 @@ zx::result<Options> ProcessArgs(int argc, char** argv, CommandFunction* func) {
         {"eviction_policy", required_argument, nullptr, 'e'},
         {"deprecated_padded_format", no_argument, nullptr, kDeprecatedPaddedFormat},
         {"num_inodes", required_argument, nullptr, 'i'},
-        {"sandbox_decompression", no_argument, nullptr, 's'},
         {"paging_threads", no_argument, nullptr, 't'},
         {"allow_delivery_blobs", no_argument, nullptr, 'd'},
         {"help", no_argument, nullptr, 'h'},
@@ -318,10 +316,6 @@ zx::result<Options> ProcessArgs(int argc, char** argv, CommandFunction* func) {
       case kDeprecatedPaddedFormat: {
         options.mkfs_options.blob_layout_format =
             blobfs::BlobLayoutFormat::kDeprecatedPaddedMerkleTreeAtStart;
-        break;
-      }
-      case 's': {
-        options.mount_options.sandbox_decompression = true;
         break;
       }
       case 't': {

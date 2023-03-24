@@ -65,7 +65,6 @@ class BlobLoaderTest : public TestWithParam<TestParamType> {
     decompressor_creator_ = std::move(connector_or.value());
     options_ = {
         .compression_settings = {.compression_algorithm = compression_algorithm},
-        .sandbox_decompression = true,
         .decompression_connector = &decompressor_creator_->GetDecompressorConnector(),
     };
     ASSERT_EQ(ZX_OK, setup_.CreateFormatMount(kNumBlocks, kTestBlockSize, fs_options, options_));

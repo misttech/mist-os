@@ -16,7 +16,6 @@ void AssertStartOptionsEqual(const fuchsia_fs_startup::wire::StartOptions& a,
                              const fuchsia_fs_startup::wire::StartOptions& b) {
   ASSERT_EQ(a.read_only, b.read_only);
   ASSERT_EQ(a.verbose, b.verbose);
-  ASSERT_EQ(a.sandbox_decompression, b.sandbox_decompression);
   ASSERT_EQ(a.write_compression_algorithm, b.write_compression_algorithm);
   ASSERT_EQ(a.write_compression_level, b.write_compression_level);
   ASSERT_EQ(a.cache_eviction_policy_override, b.cache_eviction_policy_override);
@@ -54,7 +53,6 @@ TEST(MountOptionsTest, AllOptionsSet) {
       .write_compression_level = 10,
       .cache_eviction_policy = "NEVER_EVICT",
       .fsck_after_every_transaction = true,
-      .sandbox_decompression = true,
   };
   std::vector<std::string> expected_argv = {kTestBinary,
                                             "--verbose",
@@ -66,12 +64,10 @@ TEST(MountOptionsTest, AllOptionsSet) {
                                             "10",
                                             "--eviction_policy",
                                             "NEVER_EVICT",
-                                            "--fsck_after_every_transaction",
-                                            "--sandbox_decompression"};
+                                            "--fsck_after_every_transaction"};
   fuchsia_fs_startup::wire::StartOptions expected_start_options{
       .read_only = true,
       .verbose = true,
-      .sandbox_decompression = true,
       .write_compression_algorithm = fuchsia_fs_startup::wire::CompressionAlgorithm::kUncompressed,
       .write_compression_level = 10,
       .cache_eviction_policy_override =

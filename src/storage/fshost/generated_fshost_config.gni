@@ -95,9 +95,8 @@ template("generated_fshost_config") {
       mbr = false
       netboot = false
       no_zxcrypt = false
-      sandbox_decompression = true
 
-      # LINT.ThenChange(//src/lib/assembly/platform_configuration/src/subsystems/storage.rs)
+      # LINT.ThenChange(/src/lib/assembly/platform_configuration/src/subsystems/storage.rs)
 
       # Parameters from //build/images/fvm.gni
       fvm_slice_size = fvm_slice_size
