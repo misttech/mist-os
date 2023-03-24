@@ -214,8 +214,10 @@ static_library("blobfs") {
     deps += [ "//zircon/system/ulib/fs-host" ]
   }
 
+  defines = []
+
   if (blobfs_page_in_metrics_recording) {
-    defines = [
+    defines += [
       # Enable blobfs page-in metrics.
       "BLOBFS_ENABLE_PAGE_IN_METRICS",
 
@@ -225,11 +227,11 @@ static_library("blobfs") {
   }
 
   if (blobfs_enable_streaming_writes) {
-    defines = [ "BLOBFS_STREAMING_WRITES_ENABLED_DEFAULT" ]
+    defines += [ "BLOBFS_STREAMING_WRITES_ENABLED_DEFAULT" ]
   }
 
   if (blobfs_enable_delivery_blobs) {
-    defines = [ "BLOBFS_DELIVERY_BLOBS_ENABLED_DEFAULT" ]
+    defines += [ "BLOBFS_DELIVERY_BLOBS_ENABLED_DEFAULT" ]
   }
 }
 
