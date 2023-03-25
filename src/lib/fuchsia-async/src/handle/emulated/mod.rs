@@ -46,8 +46,13 @@ impl ObjectType {
     pub const NONE: ObjectType = ObjectType(0);
     invoke_for_handle_types!(define_object_type_constant);
 
-    /// Converts ObjectType into the underlying zircon type.
-    pub fn into_raw(self) -> u32 {
+    /// Creates an `ObjectType` from the underlying zircon type.
+    pub const fn from_raw(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    /// Converts `ObjectType` into the underlying zircon type.
+    pub const fn into_raw(self) -> u32 {
         self.0
     }
 }

@@ -6,9 +6,7 @@ pub use {
     crate::util,
     crate::FONTS_ALIASED_CM,
     anyhow::{Context as _, Error},
-    fidl_fuchsia_fonts as fonts,
-    fidl_fuchsia_fonts_ext::DecodableExt,
-    fidl_fuchsia_intl as intl, fuchsia_async as fasync,
+    fidl_fuchsia_fonts as fonts, fidl_fuchsia_intl as intl, fuchsia_async as fasync,
     fuchsia_component_test::ScopedInstance,
     fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
@@ -44,7 +42,11 @@ pub async fn get_typeface_info_detailed(
 ) -> Result<TypefaceInfo, Error> {
     let typeface = font_provider.get_typeface(request.clone()).await?;
 
-    assert!(!typeface.is_empty(), "Received empty response for {:?}", request);
+    assert!(
+        typeface != fonts::TypefaceResponse::EMPTY,
+        "Received empty response for {:?}",
+        request
+    );
     let buffer = typeface.buffer.unwrap();
     assert!(buffer.size > 0);
     assert!(buffer.size <= buffer.vmo.get_size()?);

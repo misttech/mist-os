@@ -244,7 +244,6 @@ impl OutputValidator for VideoFrameHasher {
 #[cfg(test)]
 mod test {
     use super::{Error, *};
-    use fidl::encoding::Decodable;
     use fidl_fuchsia_sysmem::{ColorSpace, PixelFormat, *};
     use fuchsia_stream_processors::{ValidPacket, ValidPacketHeader};
     use rand::prelude::*;
@@ -269,28 +268,26 @@ mod test {
 
     impl Into<OutputPacket> for TestSpec {
         fn into(self) -> OutputPacket {
-            let mut format_details = <FormatDetails as Decodable>::new_empty();
-            format_details.domain =
-                Some(DomainFormat::Video(VideoFormat::Uncompressed(VideoUncompressedFormat {
-                    image_format: ImageFormat2 {
-                        pixel_format: PixelFormat {
-                            type_: self.pixel_format,
-                            has_format_modifier: false,
-                            format_modifier: FormatModifier { value: 0 },
-                        },
-                        coded_width: self.coded_width as u32,
-                        coded_height: self.coded_height() as u32,
-                        bytes_per_row: self.bytes_per_row as u32,
-                        display_width: self.display_width as u32,
-                        display_height: self.display_height as u32,
-                        layers: 0,
-                        color_space: ColorSpace { type_: ColorSpaceType::Rec709 },
-                        has_pixel_aspect_ratio: false,
-                        pixel_aspect_ratio_width: 0,
-                        pixel_aspect_ratio_height: 0,
+            let mut format_details = FormatDetails::EMPTY;
+            format_details.domain = Some(DomainFormat::Video(VideoFormat::Uncompressed(
+                new_video_uncompressed_format(ImageFormat2 {
+                    pixel_format: PixelFormat {
+                        type_: self.pixel_format,
+                        has_format_modifier: false,
+                        format_modifier: FormatModifier { value: 0 },
                     },
-                    ..blank_uncompressed_format()
-                })));
+                    coded_width: self.coded_width as u32,
+                    coded_height: self.coded_height() as u32,
+                    bytes_per_row: self.bytes_per_row as u32,
+                    display_width: self.display_width as u32,
+                    display_height: self.display_height as u32,
+                    layers: 0,
+                    color_space: ColorSpace { type_: ColorSpaceType::Rec709 },
+                    has_pixel_aspect_ratio: false,
+                    pixel_aspect_ratio_width: 0,
+                    pixel_aspect_ratio_height: 0,
+                }),
+            )));
             OutputPacket {
                 data: vec![0; self.bytes_per_row * self.coded_height() * 3 / 2],
                 format: Rc::new(ValidStreamOutputFormat {
@@ -311,8 +308,31 @@ mod test {
         }
     }
 
-    fn blank_uncompressed_format() -> VideoUncompressedFormat {
-        <VideoUncompressedFormat as Decodable>::new_empty()
+    fn new_video_uncompressed_format(
+        image_format: fidl_fuchsia_sysmem::ImageFormat2,
+    ) -> VideoUncompressedFormat {
+        VideoUncompressedFormat {
+            image_format,
+            fourcc: 0,
+            primary_width_pixels: 0,
+            primary_height_pixels: 0,
+            secondary_width_pixels: 0,
+            secondary_height_pixels: 0,
+            planar: false,
+            swizzled: false,
+            primary_line_stride_bytes: 0,
+            secondary_line_stride_bytes: 0,
+            primary_start_offset: 0,
+            secondary_start_offset: 0,
+            tertiary_start_offset: 0,
+            primary_pixel_stride: 0,
+            secondary_pixel_stride: 0,
+            primary_display_width_pixels: 0,
+            primary_display_height_pixels: 0,
+            has_pixel_aspect_ratio: false,
+            pixel_aspect_ratio_width: 0,
+            pixel_aspect_ratio_height: 0,
+        }
     }
 
     fn specs(pixel_format: PixelFormatType) -> impl Iterator<Item = TestSpec> {

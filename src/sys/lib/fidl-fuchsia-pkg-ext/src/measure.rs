@@ -30,7 +30,7 @@ impl Measurable for fidl::PackageIndexEntry {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, proptest::prelude::*, zerocopy::AsBytes};
+    use {super::*, proptest::prelude::*};
 
     prop_compose! {
         fn arb_package_index_entry()(
@@ -56,7 +56,7 @@ mod tests {
         fn blob_id_size_is_as_bytes_size(item: crate::BlobId) {
             let item: fidl::BlobId = item.into();
 
-            let expected = item.as_bytes().len();
+            let expected = std::mem::size_of_val(&item);
             let actual = item.measure();
             prop_assert_eq!(expected, actual);
         }
@@ -65,20 +65,19 @@ mod tests {
         fn blob_info_size_is_as_bytes_size(item: crate::BlobInfo) {
             let item: fidl::BlobInfo = item.into();
 
-            let expected = item.as_bytes().len();
+            let expected = std::mem::size_of_val(&item);
             let actual = item.measure();
             prop_assert_eq!(expected, actual);
         }
 
         #[test]
         fn package_index_entry_size_is_fidl_encoded_size(
-            mut item in arb_package_index_entry()
+            item in arb_package_index_entry()
         ) {
             let actual = item.measure();
-            let expected = ::fidl::encoding::with_tls_encoded::<_, _, false>(
-                &mut item,
-                |bytes, _handles| Result::<_, ::fidl::Error>::Ok(bytes.len())
-            ).unwrap();
+            let (bytes, _, _) =
+                ::fidl::encoding::standalone_encode::<fidl::PackageIndexEntry>(&item).unwrap();
+            let expected = bytes.len();
             prop_assert_eq!(expected, actual);
         }
     }

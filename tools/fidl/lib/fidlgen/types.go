@@ -469,7 +469,8 @@ const (
 
 	HandleRightsSameRights HandleRights = 1 << 31
 
-	HandleRightsBasic HandleRights = HandleRightsTransfer | HandleRightsDuplicate | HandleRightsWait | HandleRightsInspect
+	HandleRightsBasic          HandleRights = HandleRightsTransfer | HandleRightsDuplicate | HandleRightsWait | HandleRightsInspect
+	HandleRightsChannelDefault HandleRights = HandleRightsTransfer | HandleRightsWait | HandleRightsInspect | HandleRightsRead | HandleRightsWrite | HandleRightsSignal | HandleRightsSignalPeer
 )
 
 type LiteralKind string
@@ -1793,6 +1794,38 @@ func (dt DeclType) IsPrimitive() bool {
 	return false
 }
 
+// LookupResourceness looks up whether a type is a value or resource.
+// TODO(fxbug.dev/7660): Store this on types directly.
+func (m DeclInfoMap) LookupResourceness(t Type) Resourceness {
+	switch t.Kind {
+	case PrimitiveType, StringType, InternalType:
+		return IsValueType
+	case HandleType, RequestType:
+		return IsResourceType
+	case ArrayType, VectorType:
+		return m.LookupResourceness(*t.ElementType)
+	case ZxExperimentalPointerType:
+		return m.LookupResourceness(*t.PointeeType)
+	case IdentifierType:
+		info, ok := m[t.Identifier]
+		if !ok {
+			panic(fmt.Sprintf("identifier not found: %s", t.Identifier))
+		}
+		switch info.Type {
+		case BitsDeclType, EnumDeclType:
+			return IsValueType
+		case ProtocolDeclType:
+			return IsResourceType
+		case StructDeclType, TableDeclType, UnionDeclType:
+			return *info.Resourceness
+		default:
+			panic(fmt.Sprintf("unexpected decl type: %s", info.Type))
+		}
+	default:
+		panic(fmt.Sprintf("unknown type kind: %s", t.Kind))
+	}
+}
+
 // Library represents a FIDL dependency on a separate library.
 type Library struct {
 	Name  EncodedLibraryIdentifier `json:"name"`
@@ -1950,6 +1983,10 @@ func (r *Root) payloadTypeNames() EncodedCompoundIdentifierSet {
 // `A` is `BothMethodTypeUsage` (it is both exposed to the user, via the
 // signature of the request-sending function, and describes the shape of the
 // message sent over the wire).
+//
+// TODO(fxbug.dev/123307): Make this easier to understand. Categorize by special
+// cases (top response, result union, empty success struct) rather than
+// generalizing to "payload" and "message body" concepts.
 type MethodTypeUsage string
 
 const (

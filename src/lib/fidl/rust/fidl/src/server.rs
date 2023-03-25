@@ -7,7 +7,10 @@
 use {
     crate::{
         create_trace_provider,
-        encoding::{DynamicFlags, Encodable, TransactionHeader, TransactionMessage},
+        encoding::{
+            DynamicFlags, Encode, TransactionHeader, TransactionMessage, TransactionMessageType,
+            TypeMarker,
+        },
         epitaph,
         handle::HandleDisposition,
         AsyncChannel, Error,
@@ -75,20 +78,21 @@ impl ServeInner {
     }
 
     /// Send an encodable message to the client.
-    pub fn send<T: Encodable, const OVERFLOWABLE: bool>(
+    pub fn send<T: TypeMarker, const OVERFLOWABLE: bool>(
         &self,
-        body: &mut T,
+        body: impl Encode<T>,
         tx_id: u32,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
     ) -> Result<(), Error> {
-        let msg = &mut TransactionMessage {
+        let msg = TransactionMessage {
             header: TransactionHeader::new(tx_id, ordinal, dynamic_flags),
             body,
         };
-        crate::encoding::with_tls_encoded::<_, _, OVERFLOWABLE>(msg, |bytes, handles| {
-            self.send_raw_msg(&**bytes, handles)
-        })
+        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, (), OVERFLOWABLE>(
+            msg,
+            |bytes, handles| self.send_raw_msg(bytes, handles),
+        )
     }
 
     /// Send a raw message to the client.

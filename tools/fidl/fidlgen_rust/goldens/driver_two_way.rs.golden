@@ -20,14 +20,85 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
 
 const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct TwoWayAddRequest {
+    pub addend1: u16,
+    pub addend2: u16,
+}
+
+impl fidl::encoding::TopLevel for TwoWayAddRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: TwoWayAddRequest,
+    members: [
+        addend1 {
+            ty: u16,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        addend2 {
+            ty: u16,
+            index: 1,
+            typevar: T1,
+            offset_v1: 2,
+            offset_v2: 2,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 2,
+    align_v2: 2,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct TwoWayAddResponse {
+    pub sum: u16,
+}
+
+impl fidl::encoding::TopLevel for TwoWayAddResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: TwoWayAddResponse,
+    members: [
+        sum {
+            ty: u16,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 2,
+    size_v2: 2,
+    align_v1: 2,
+    align_v2: 2,
+}

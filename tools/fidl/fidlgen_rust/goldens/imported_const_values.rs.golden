@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -43,6 +42,7 @@ pub struct MyStruct;
 
 impl fidl::encoding::TopLevel for MyStruct {}
 
-impl fidl::encoding::Persistable for MyStruct {}
-
-fidl_empty_struct!(MyStruct);
+fidl_struct! {
+    empty: true,
+    name: MyStruct,
+}

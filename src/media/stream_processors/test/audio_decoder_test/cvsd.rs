@@ -1,7 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use fidl::encoding::Decodable;
+
 use fidl_fuchsia_media::*;
 use std::{fs, io, path::Path};
 use stream_processor_test::*;
@@ -28,7 +28,7 @@ impl ElementaryStream for CvsdStream {
         FormatDetails {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("audio/cvsd")),
-            ..<FormatDetails as Decodable>::new_empty()
+            ..FormatDetails::EMPTY
         }
     }
 

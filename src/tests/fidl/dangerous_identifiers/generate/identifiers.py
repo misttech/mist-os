@@ -30,6 +30,7 @@ RUST_KEYWORD = [
             'method.response.arguments',
             'service.member.names',
             'table.fields',
+            'struct.names',
         ])
 ]
 

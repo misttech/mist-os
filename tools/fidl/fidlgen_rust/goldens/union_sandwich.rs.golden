@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -51,13 +50,11 @@ impl UnionSize12Alignment4 {
 
 impl fidl::encoding::TopLevel for UnionSize12Alignment4 {}
 
-impl fidl::encoding::Persistable for UnionSize12Alignment4 {}
-
 fidl_union! {
     name: UnionSize12Alignment4,
     members: [
         Variant {
-            ty: [u8; 6],
+            ty: fidl::encoding::Array<u8, 6>,
             ordinal: 1,
         },
     ],
@@ -83,8 +80,6 @@ impl UnionSize24Alignment8 {
 }
 
 impl fidl::encoding::TopLevel for UnionSize24Alignment8 {}
-
-impl fidl::encoding::Persistable for UnionSize24Alignment8 {}
 
 fidl_union! {
     name: UnionSize24Alignment8,
@@ -117,13 +112,11 @@ impl UnionSize36Alignment4 {
 
 impl fidl::encoding::TopLevel for UnionSize36Alignment4 {}
 
-impl fidl::encoding::Persistable for UnionSize36Alignment4 {}
-
 fidl_union! {
     name: UnionSize36Alignment4,
     members: [
         Variant {
-            ty: [u8; 32],
+            ty: fidl::encoding::Array<u8, 32>,
             ordinal: 1,
         },
     ],
@@ -150,8 +143,6 @@ impl UnionSize8Alignment4 {
 
 impl fidl::encoding::TopLevel for UnionSize8Alignment4 {}
 
-impl fidl::encoding::Persistable for UnionSize8Alignment4 {}
-
 fidl_union! {
     name: UnionSize8Alignment4,
     members: [
@@ -171,23 +162,27 @@ pub struct SandwichUnionSize12Alignment4 {
 
 impl fidl::encoding::TopLevel for SandwichUnionSize12Alignment4 {}
 
-impl fidl::encoding::Persistable for SandwichUnionSize12Alignment4 {}
-
 fidl_struct! {
     name: SandwichUnionSize12Alignment4,
     members: [
         before {
             ty: u32,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
         union {
             ty: UnionSize12Alignment4,
+            index: 1,
+            typevar: T1,
             offset_v1: 8,
             offset_v2: 8,
         },
         after {
             ty: i32,
+            index: 2,
+            typevar: T2,
             offset_v1: 32,
             offset_v2: 24,
         },
@@ -202,7 +197,8 @@ fidl_struct! {
             ty: u64,
             offset: 32,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     padding_v2: [
         {
             ty: u64,
@@ -213,7 +209,8 @@ fidl_struct! {
             ty: u64,
             offset: 24,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     size_v1: 40,
     size_v2: 32,
     align_v1: 8,
@@ -229,23 +226,27 @@ pub struct SandwichUnionSize24Alignment8 {
 
 impl fidl::encoding::TopLevel for SandwichUnionSize24Alignment8 {}
 
-impl fidl::encoding::Persistable for SandwichUnionSize24Alignment8 {}
-
 fidl_struct! {
     name: SandwichUnionSize24Alignment8,
     members: [
         before {
             ty: u32,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
         union {
             ty: UnionSize24Alignment8,
+            index: 1,
+            typevar: T1,
             offset_v1: 8,
             offset_v2: 8,
         },
         after {
             ty: u32,
+            index: 2,
+            typevar: T2,
             offset_v1: 32,
             offset_v2: 24,
         },
@@ -260,7 +261,8 @@ fidl_struct! {
             ty: u64,
             offset: 32,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     padding_v2: [
         {
             ty: u64,
@@ -271,7 +273,8 @@ fidl_struct! {
             ty: u64,
             offset: 24,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     size_v1: 40,
     size_v2: 32,
     align_v1: 8,
@@ -287,23 +290,27 @@ pub struct SandwichUnionSize36Alignment4 {
 
 impl fidl::encoding::TopLevel for SandwichUnionSize36Alignment4 {}
 
-impl fidl::encoding::Persistable for SandwichUnionSize36Alignment4 {}
-
 fidl_struct! {
     name: SandwichUnionSize36Alignment4,
     members: [
         before {
             ty: u32,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
         union {
             ty: UnionSize36Alignment4,
+            index: 1,
+            typevar: T1,
             offset_v1: 8,
             offset_v2: 8,
         },
         after {
             ty: u32,
+            index: 2,
+            typevar: T2,
             offset_v1: 32,
             offset_v2: 24,
         },
@@ -318,7 +325,8 @@ fidl_struct! {
             ty: u64,
             offset: 32,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     padding_v2: [
         {
             ty: u64,
@@ -329,7 +337,8 @@ fidl_struct! {
             ty: u64,
             offset: 24,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     size_v1: 40,
     size_v2: 32,
     align_v1: 8,
@@ -345,23 +354,27 @@ pub struct SandwichUnionSize8Alignment4 {
 
 impl fidl::encoding::TopLevel for SandwichUnionSize8Alignment4 {}
 
-impl fidl::encoding::Persistable for SandwichUnionSize8Alignment4 {}
-
 fidl_struct! {
     name: SandwichUnionSize8Alignment4,
     members: [
         before {
             ty: u32,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
         union {
             ty: UnionSize8Alignment4,
+            index: 1,
+            typevar: T1,
             offset_v1: 8,
             offset_v2: 8,
         },
         after {
             ty: u32,
+            index: 2,
+            typevar: T2,
             offset_v1: 32,
             offset_v2: 24,
         },
@@ -376,7 +389,8 @@ fidl_struct! {
             ty: u64,
             offset: 32,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     padding_v2: [
         {
             ty: u64,
@@ -387,7 +401,8 @@ fidl_struct! {
             ty: u64,
             offset: 24,
             mask: 0xffffffff00000000u64,
-        },],
+        },
+    ],
     size_v1: 40,
     size_v2: 32,
     align_v1: 8,
@@ -405,24 +420,29 @@ pub struct StructSize16Alignment8 {
 
 impl fidl::encoding::TopLevel for StructSize16Alignment8 {}
 
-impl fidl::encoding::Persistable for StructSize16Alignment8 {}
-
-fidl_struct_copy! {
+fidl_struct! {
+    copy: true,
     name: StructSize16Alignment8,
     members: [
         f1 {
             ty: u64,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
         f2 {
             ty: u64,
+            index: 1,
+            typevar: T1,
             offset_v1: 8,
             offset_v2: 8,
         },
     ],
-    padding_v1: [],
-    padding_v2: [],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
     size_v1: 16,
     size_v2: 16,
     align_v1: 8,

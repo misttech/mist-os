@@ -5,9 +5,9 @@
 */}}
 
 {{- define "UnionDeclaration" }}
-{{- range .DocComments}}
+{{- range .DocComments }}
 ///{{ . }}
-{{- end}}
+{{- end }}
 {{- if .IsFlexible }}
 {{ .Derives.RemoveCustom "PartialEq" }}
 {{- else }}
@@ -18,7 +18,7 @@ pub enum {{ .Name }} {
     {{- range .DocComments }}
     ///{{ . }}
     {{- end }}
-    {{ .Name }}({{ .Type }}),
+    {{ .Name }}({{ .Type.Owned }}),
     {{- end }}
     {{- if .IsFlexible }}
     #[deprecated = "Use `{{ .Name }}::unknown()` to construct and `{{ .Name }}Unknown!()` to exhaustively match."]
@@ -93,23 +93,20 @@ impl {{ .Name }} {
 }
 
 impl fidl::encoding::TopLevel for {{ .Name }} {}
-{{ if .IsValueType }}
-impl fidl::encoding::Persistable for {{ .Name }} {}
-{{- end }}
 
 fidl_union! {
     name: {{ .Name }},
+    {{- if .IsResourceType }}
+    resource: true,
+    {{- end }}
     members: [
     {{- range .Members }}
         {{ .Name }} {
-            ty: {{ .Type }},
-            ordinal: {{ .Ordinal }},
-            {{- if .HasHandleMetadata }}
-            handle_metadata: {
-                handle_subtype: {{ .HandleSubtype }},
-                handle_rights: {{ .HandleRights }},
-            },
+            ty: {{ .Type.Fidl }},
+            {{- if .Type.IsResourceType }}
+            resource: true,
             {{- end }}
+            ordinal: {{ .Ordinal }},
         },
     {{- end }}
     ],
@@ -117,4 +114,4 @@ fidl_union! {
     unknown_member: __Unknown,
     {{- end }}
 }
-{{ end }}
+{{- end }}

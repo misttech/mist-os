@@ -5,8 +5,8 @@
 */}}
 
 {{- define "ConstDeclaration" }}
-{{- range .DocComments}}
+{{- range .DocComments }}
 ///{{ . }}
-{{- end}}
+{{- end }}
 pub const {{ .Name }}: {{ .Type }} = {{ .Value }};
 {{- end }}

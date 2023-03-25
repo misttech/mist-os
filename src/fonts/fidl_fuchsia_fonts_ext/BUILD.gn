@@ -10,7 +10,6 @@ rustc_library("fidl_fuchsia_fonts_ext") {
   deps = [
     "//sdk/fidl/fuchsia.fonts:fuchsia.fonts_rust",
     "//sdk/fidl/fuchsia.intl:fuchsia.intl_rust",
-    "//src/lib/fidl/rust/fidl",
   ]
 
   sources = [ "src/lib.rs" ]

@@ -32,7 +32,8 @@ type conformanceTmplInput struct {
 }
 
 type encodeSuccessCase struct {
-	Name, Context, HandleDefs, Value, Bytes, Handles, HandleDispositions string
+	Name, Context, HandleDefs, ValueType, Value, Bytes, Handles, HandleDispositions string
+	IsResource                                                                      bool
 }
 
 type decodeSuccessCase struct {
@@ -40,7 +41,8 @@ type decodeSuccessCase struct {
 }
 
 type encodeFailureCase struct {
-	Name, Context, HandleDefs, Value, ErrorCode string
+	Name, Context, HandleDefs, ValueType, Value, ErrorCode string
+	IsResource                                             bool
 }
 
 type decodeFailureCase struct {
@@ -84,6 +86,7 @@ func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Sch
 		if err != nil {
 			return nil, fmt.Errorf("encode success %s: %s", encodeSuccess.Name, err)
 		}
+		valueType := declName(decl)
 		value := visit(encodeSuccess.Value, decl)
 		for _, encoding := range encodeSuccess.Encodings {
 			if !wireFormatSupported(encoding.WireFormat) {
@@ -93,8 +96,10 @@ func encodeSuccessCases(gidlEncodeSuccesses []ir.EncodeSuccess, schema mixer.Sch
 				Name:       testCaseName(encodeSuccess.Name, encoding.WireFormat),
 				Context:    encodingContext(encoding.WireFormat),
 				HandleDefs: buildHandleDefs(encodeSuccess.HandleDefs),
+				ValueType:  valueType,
 				Value:      value,
 				Bytes:      rust.BuildBytes(encoding.Bytes),
+				IsResource: decl.IsResourceType(),
 			}
 			if len(newCase.HandleDefs) != 0 {
 				if encodeSuccess.CheckHandleRights {
@@ -154,6 +159,7 @@ func encodeFailureCases(gidlEncodeFailures []ir.EncodeFailure, schema mixer.Sche
 		if err != nil {
 			return nil, fmt.Errorf("encode failure %s: %s", encodeFailure.Name, err)
 		}
+		valueType := declName(decl)
 		value := visit(encodeFailure.Value, decl)
 
 		for _, wireFormat := range supportedWireFormats {
@@ -161,8 +167,10 @@ func encodeFailureCases(gidlEncodeFailures []ir.EncodeFailure, schema mixer.Sche
 				Name:       testCaseName(encodeFailure.Name, wireFormat),
 				Context:    encodingContext(wireFormat),
 				HandleDefs: buildHandleDefs(encodeFailure.HandleDefs),
+				ValueType:  valueType,
 				Value:      value,
 				ErrorCode:  errorCode,
+				IsResource: decl.IsResourceType(),
 			})
 		}
 	}

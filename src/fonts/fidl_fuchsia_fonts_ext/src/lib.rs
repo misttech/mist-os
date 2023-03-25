@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use {
-    fidl::encoding::Decodable,
     fidl_fuchsia_fonts::{
         self as fonts, CacheMissPolicy, FallbackGroup, FamilyName, FontFamilyInfo,
         GenericFontFamily, Style2, TypefaceQuery, TypefaceRequest, TypefaceRequestFlags,
@@ -113,7 +112,7 @@ pub trait TypefaceResponseExt {
 
 impl TypefaceResponseExt for TypefaceResponse {
     fn into_font_response(self) -> Option<fonts::Response> {
-        if self.is_empty() {
+        if self == Self::EMPTY {
             None
         } else {
             Some(fonts::Response {
@@ -132,7 +131,7 @@ pub trait FontFamilyInfoExt {
 
 impl FontFamilyInfoExt for FontFamilyInfo {
     fn into_family_info(self) -> Option<fonts::FamilyInfo> {
-        if self.is_empty() {
+        if self == Self::EMPTY {
             None
         } else {
             Some(fonts::FamilyInfo {
@@ -155,7 +154,7 @@ pub trait Style2Ext {
 
 impl Style2Ext for Style2 {
     fn into_style(self) -> Option<fonts::Style> {
-        if self.is_empty() {
+        if self == Self::EMPTY {
             None
         } else {
             Some(fonts::Style {
@@ -164,21 +163,5 @@ impl Style2Ext for Style2 {
                 slant: self.slant.unwrap(),
             })
         }
-    }
-}
-
-/// Extensions for [`Decodable`](fidl::encoding::Decodable).
-pub trait DecodableExt {
-    fn is_empty(&self) -> bool;
-}
-
-impl<T> DecodableExt for T
-where
-    T: Decodable + PartialEq + Sized,
-{
-    /// Test whether a table or other FIDL message is empty.
-    fn is_empty(&self) -> bool {
-        let empty: T = Decodable::new_empty();
-        return *self == empty;
     }
 }

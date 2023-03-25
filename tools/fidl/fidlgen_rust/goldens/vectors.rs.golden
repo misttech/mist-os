@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -38,24 +37,28 @@ pub struct ExampleUseOfVectors {
 
 impl fidl::encoding::TopLevel for ExampleUseOfVectors {}
 
-impl fidl::encoding::Persistable for ExampleUseOfVectors {}
-
 fidl_struct! {
     name: ExampleUseOfVectors,
     members: [
         vector_of_uint8 {
-            ty: Vec<u8>,
+            ty: fidl::encoding::UnboundedVector<u8>,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
         vector_of_vector_of_bool {
-            ty: Vec<Vec<bool>>,
+            ty: fidl::encoding::UnboundedVector<fidl::encoding::UnboundedVector<bool>>,
+            index: 1,
+            typevar: T1,
             offset_v1: 16,
             offset_v2: 16,
         },
     ],
-    padding_v1: [],
-    padding_v2: [],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
     size_v1: 32,
     size_v2: 32,
     align_v1: 8,

@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -44,8 +43,6 @@ impl EmptyTable {
 }
 
 impl fidl::encoding::TopLevel for EmptyTable {}
-
-impl fidl::encoding::Persistable for EmptyTable {}
 
 fidl_table! {
     name: EmptyTable,
@@ -67,8 +64,6 @@ impl ExtensionTable {
 }
 
 impl fidl::encoding::TopLevel for ExtensionTable {}
-
-impl fidl::encoding::Persistable for ExtensionTable {}
 
 fidl_table! {
     name: ExtensionTable,
@@ -93,8 +88,6 @@ impl NewerSimpleTable {
 }
 
 impl fidl::encoding::TopLevel for NewerSimpleTable {}
-
-impl fidl::encoding::Persistable for NewerSimpleTable {}
 
 fidl_table! {
     name: NewerSimpleTable,
@@ -130,8 +123,6 @@ impl OlderSimpleTable {
 
 impl fidl::encoding::TopLevel for OlderSimpleTable {}
 
-impl fidl::encoding::Persistable for OlderSimpleTable {}
-
 fidl_table! {
     name: OlderSimpleTable,
     members: [
@@ -159,8 +150,6 @@ impl ReverseOrdinalTable {
 }
 
 impl fidl::encoding::TopLevel for ReverseOrdinalTable {}
-
-impl fidl::encoding::Persistable for ReverseOrdinalTable {}
 
 fidl_table! {
     name: ReverseOrdinalTable,
@@ -196,8 +185,6 @@ impl SimpleTable {
 }
 
 impl fidl::encoding::TopLevel for SimpleTable {}
-
-impl fidl::encoding::Persistable for SimpleTable {}
 
 fidl_table! {
     name: SimpleTable,
@@ -357,8 +344,6 @@ impl SixtyFourOrdinalTable {
 }
 
 impl fidl::encoding::TopLevel for SixtyFourOrdinalTable {}
-
-impl fidl::encoding::Persistable for SixtyFourOrdinalTable {}
 
 fidl_table! {
     name: SixtyFourOrdinalTable,
@@ -637,8 +622,6 @@ impl TableWithAttributes {
 }
 
 impl fidl::encoding::TopLevel for TableWithAttributes {}
-
-impl fidl::encoding::Persistable for TableWithAttributes {}
 
 fidl_table! {
     name: TableWithAttributes,

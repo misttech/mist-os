@@ -4,7 +4,6 @@
 
 use anyhow::{self, ensure};
 use byteorder::{BigEndian, WriteBytesExt};
-use fidl::encoding::Decodable;
 use fidl_fuchsia_media::FormatDetails;
 use std::{convert::TryFrom, fs, mem, path::Path};
 use stream_processor_test::*;
@@ -55,7 +54,7 @@ impl ElementaryStream for H264Stream {
         FormatDetails {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("video/h264")),
-            ..<FormatDetails as Decodable>::new_empty()
+            ..FormatDetails::EMPTY
         }
     }
 
@@ -176,7 +175,7 @@ impl ElementaryStream for H264AVCCStream {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("video/h264")),
             oob_bytes: Some(self.oob_data.clone()),
-            ..<FormatDetails as Decodable>::new_empty()
+            ..FormatDetails::EMPTY
         }
     }
 

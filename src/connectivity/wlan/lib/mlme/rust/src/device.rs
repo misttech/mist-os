@@ -967,8 +967,8 @@ pub mod test_utils {
         }
 
         #[track_caller]
-        pub fn next_mlme_msg<T: fidl::encoding::Decodable>(&mut self) -> Result<T, Error> {
-            use fidl::encoding::{decode_transaction_header, Decodable, Decoder};
+        pub fn next_mlme_msg<T: fidl::encoding::TypeMarker>(&mut self) -> Result<T::Owned, Error> {
+            use fidl::encoding::{decode_transaction_header, Decode, Decoder};
 
             let mut buf = zx::MessageBuf::new();
             let () = self
@@ -977,8 +977,8 @@ pub mod test_utils {
                 .map_err(|status| Error::Status(format!("error reading MLME message"), status))?;
 
             let (header, tail): (_, &[u8]) = decode_transaction_header(buf.bytes())?;
-            let mut msg = Decodable::new_empty();
-            Decoder::decode_into(&header, tail, &mut [], &mut msg)
+            let mut msg = T::Owned::new_empty();
+            Decoder::decode_into::<T>(&header, tail, &mut [], &mut msg)
                 .expect("error decoding MLME message");
             Ok(msg)
         }

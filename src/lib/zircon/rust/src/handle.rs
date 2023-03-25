@@ -414,8 +414,13 @@ assoc_values!(ObjectType, [
 ]);
 
 impl ObjectType {
-    /// Converts ObjectType into the underlying zircon type.
-    pub fn into_raw(self) -> sys::zx_obj_type_t {
+    /// Creates an `ObjectType` from the underlying zircon type.
+    pub const fn from_raw(raw: sys::zx_obj_type_t) -> Self {
+        Self(raw)
+    }
+
+    /// Converts `ObjectType` into the underlying zircon type.
+    pub const fn into_raw(self) -> sys::zx_obj_type_t {
         self.0
     }
 }

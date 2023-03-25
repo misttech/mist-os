@@ -30,24 +30,14 @@ use {
     futures::future::{self, MaybeDone, TryFutureExt},
     fidl::{
         fidl_bits,
-        fidl_empty_struct,
         fidl_enum,
-        fidl_struct_copy,
         fidl_struct,
         fidl_table,
         fidl_union,
-        wrap_handle_metadata,
-        encoding::{
-            Encodable as _,
-            Decodable as _,
-            {{- /* TODO(fxbug.dev/124207): Remove zerocopy. */}}
-            zerocopy
-        },
+        {{- /* TODO(fxbug.dev/124207): Remove zerocopy. */}}
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        client::{
-            QueryResponseFut,
-            decode_transaction_body_fut,
-        },
+        client::QueryResponseFut,
     },
 };
 
@@ -76,9 +66,6 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 {{ range $enum := .Enums -}}
 {{ template "EnumDeclaration" $enum }}
 {{ end -}}
-{{ range $result := .Results -}}
-{{ template "ResultDeclaration" $result}}
-{{ end -}}
 {{ range $union := .Unions -}}
 {{ template "UnionDeclaration" $union }}
 {{ end -}}
@@ -87,9 +74,6 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 {{ end -}}
 {{ range $table := .Tables -}}
 {{ template "TableDeclaration" $table }}
-{{ end -}}
-{{ range $hmw := .HandleMetadataWrappers -}}
-{{ template "HandleMetadataWrapperDeclaration" $hmw }}
 {{ end -}}
 {{ range $protocol := .Protocols -}}
 {{ range $transport, $_ := .Transports -}}

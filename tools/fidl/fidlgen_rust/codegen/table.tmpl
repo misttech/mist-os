@@ -5,16 +5,16 @@
 */}}
 
 {{- define "TableDeclaration" }}
-{{- range .DocComments}}
+{{- range .DocComments }}
 ///{{ . }}
-{{- end}}
+{{- end }}
 {{ .Derives }}
 pub struct {{ .Name }} {
     {{- range .Members }}
-    {{- range .DocComments}}
+    {{- range .DocComments }}
     ///{{ . }}
-    {{- end}}
-    pub {{ .Name }}: Option<{{ .Type }}>,
+    {{- end }}
+    pub {{ .Name }}: Option<{{ .Type.Owned }}>,
     {{- end }}
     #[deprecated = "Use `..{{ .Name }}::EMPTY` to construct and `..` to match."]
     #[doc(hidden)]
@@ -46,25 +46,22 @@ impl {{ .Name }} {
 }
 
 impl fidl::encoding::TopLevel for {{ .Name }} {}
-{{ if .IsValueType }}
-impl fidl::encoding::Persistable for {{ .Name }} {}
-{{- end }}
 
 fidl_table! {
     name: {{ .Name }},
+    {{- if .IsResourceType }}
+    resource: true,
+    {{- end }}
     members: [
         {{- range .Members }}
         {{ .Name }} {
-            ty: {{ .Type }},
-            ordinal: {{ .Ordinal }},
-            {{- if .HasHandleMetadata }}
-            handle_metadata: {
-                handle_subtype: {{ .HandleSubtype }},
-                handle_rights: {{ .HandleRights }},
-            },
+            ty: {{ .Type.Fidl }},
+            {{- if .Type.IsResourceType }}
+            resource: true,
             {{- end }}
+            ordinal: {{ .Ordinal }},
         },
         {{- end }}
     ],
 }
-{{ end }}
+{{- end }}

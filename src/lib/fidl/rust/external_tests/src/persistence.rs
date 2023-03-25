@@ -52,8 +52,9 @@ fn persist_unpersist_with_old_header() {
 
 #[test]
 fn standalone_encode_decode_value() {
-    let mut value = FlexibleValueThing::Name("foo".to_string());
-    let (bytes, handles, metadata) = standalone_encode(&mut value).expect("encoding failed");
+    let value = FlexibleValueThing::Name("foo".to_string());
+    let (bytes, handles, metadata) =
+        standalone_encode::<FlexibleValueThing>(&value).expect("encoding failed");
     assert_eq!(handles, &[]);
     let value_out = standalone_decode::<FlexibleValueThing>(&bytes, &mut [], &metadata)
         .expect("decoding failed");
@@ -76,7 +77,7 @@ mod zx {
         let mut value = StructWithHandles { v: vec![c1, c2] };
 
         let (bytes, handle_dispositions, metadata) =
-            standalone_encode(&mut value).expect("encoding failed");
+            standalone_encode::<StructWithHandles>(&mut value).expect("encoding failed");
         assert_eq!(handle_dispositions.len(), 2);
 
         let mut handle_infos = convert_handle_dispositions_to_infos(handle_dispositions)

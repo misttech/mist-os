@@ -18,11 +18,33 @@ import (
 
 type EncodedCompoundIdentifier = fidlgen.EncodedCompoundIdentifier
 
+type Type struct {
+	// TODO(fxbug.dev/7660): Remove Resourceness once stored on fidlgen.Type.
+	fidlgen.Resourceness
+
+	// Information extracted from fidlgen.Type.
+	Kind             fidlgen.TypeKind
+	Nullable         bool
+	PrimitiveSubtype fidlgen.PrimitiveSubtype
+	ElementType      *Type
+	Identifier       EncodedCompoundIdentifier
+	DeclType         fidlgen.DeclType
+
+	// The marker type that implements fidl::encoding::Type.
+	Fidl string
+	// The associated type fidl::encoding::Type::Owned.
+	Owned string
+	// The type to use when this occurs as a method parameter.
+	// TODO(fxbug.dev/122199): Once the transition to the new types if complete,
+	// document this as being {Value,Resource}Type::Borrowed.
+	Param string
+}
+
 type Bits struct {
 	fidlgen.Bits
-	Name    string
-	Type    string
-	Members []BitsMember
+	Name           string
+	UnderlyingType string
+	Members        []BitsMember
 }
 
 type BitsMember struct {
@@ -40,11 +62,11 @@ type Const struct {
 
 type Enum struct {
 	fidlgen.Enum
-	Name    string
-	Type    string
-	Members []EnumMember
+	Name           string
+	UnderlyingType string
+	Members        []EnumMember
 	// Member name with the minimum value, used as an arbitrary default value
-	// in Decodable::new_empty for strict enums.
+	// in Decode::new_empty for strict enums.
 	MinMember string
 }
 
@@ -64,43 +86,9 @@ type Union struct {
 
 type UnionMember struct {
 	fidlgen.UnionMember
-	Type              string
-	OGType            fidlgen.Type
-	Name              string
-	Ordinal           int
-	HasHandleMetadata bool
-	HandleRights      string
-	HandleSubtype     string
-}
-
-type ResultOkEntry struct {
-	OGType            fidlgen.Type
-	Type              string
-	HasHandleMetadata bool
-	HandleWrapperName string
-}
-
-// A Result is the result type used for a method that is flexible or uses error syntax.
-type Result struct {
-	// Compound identifier for the result type, used for lookups.
-	ECI EncodedCompoundIdentifier
-	// Rust UpperCamelCase name for the result type used when generating or
-	// referencing it.
-	Name              string
-	Ok                []ResultOkEntry
-	ErrOGType         *fidlgen.Type
-	ErrType           *string
-	HasTransportError bool
-}
-
-// HasAnyHandleWrappers returns true if any value in Ok uses a handle wrapper.
-func (r *Result) HasAnyHandleWrappers() bool {
-	for _, okEntry := range r.Ok {
-		if okEntry.HasHandleMetadata {
-			return true
-		}
-	}
-	return false
+	Type    Type
+	Name    string
+	Ordinal int
 }
 
 type Struct struct {
@@ -114,21 +102,15 @@ type Struct struct {
 	SizeV1, SizeV2                                       int
 	AlignmentV1, AlignmentV2                             int
 	HasPadding                                           bool
-	// True iff the fidl_struct_copy! macro should be used instead of fidl_struct!.
+	// True if the struct should be encoded and decoded by memcpy.
 	UseFidlStructCopy bool
 }
 
 type StructMember struct {
 	fidlgen.StructMember
-	OGType             fidlgen.Type
-	Type               string
+	Type               Type
 	Name               string
 	OffsetV1, OffsetV2 int
-	HasDefault         bool
-	DefaultValue       string
-	HasHandleMetadata  bool
-	HandleRights       string
-	HandleSubtype      string
 }
 
 type Table struct {
@@ -141,13 +123,9 @@ type Table struct {
 
 type TableMember struct {
 	fidlgen.TableMember
-	OGType            fidlgen.Type
-	Type              string
-	Name              string
-	Ordinal           int
-	HasHandleMetadata bool
-	HandleRights      string
-	HandleSubtype     string
+	Type    Type
+	Name    string
+	Ordinal int
 }
 
 // Protocol is the definition of a protocol in the library being compiled.
@@ -182,26 +160,11 @@ type Method struct {
 	// Name of the method converted to CamelCase. Used when generating
 	// rust-types associated with this method, such as responders.
 	CamelName string
-	// Parameters to this method extracted from the request type struct.
-	Request []Parameter
-	// Arguments used for method responses. If error syntax is used, this will
-	// contain a single element for the Result enum used in rust generated code.
-	// For methods which do not use error syntax, this will contain fields
-	// extracted from the response struct.
-	//
-	// Note that since methods being strict vs flexible is not exposed in the
-	// client API, this field does not reflect whether the method is strict or
-	// flexible. For flexible, the value is still either fields extracted from
-	// the response struct or the Rust Result enum, depending only on whether
-	// error syntax was used.  In the case of flexible methods without error
-	// syntax, the parameters are extracted from the success variant of the
-	// underlying result union.
-	Response []Parameter
-	// If error syntax was used, this will contain information about the result
-	// union.
-	Result *Result
 	// Stores overflowing information for this method's payloads.
 	Overflowable fidlgen.Overflowable
+
+	Request  Payload
+	Response Payload
 }
 
 // DynamicFlags gets rust code for the DynamicFlags value that should be set for
@@ -213,37 +176,53 @@ func (m *Method) DynamicFlags() string {
 	return "fidl::encoding::DynamicFlags::FLEXIBLE"
 }
 
-// HasErrorResult returns true if the method uses error syntax.
-func (m *Method) HasErrorResult() bool {
-	return m.Result != nil && m.Result.ErrOGType != nil
+// A method request or response.
+type Payload struct {
+	// The fidl::encoding::Type type. It can be fidl::encoding::EmptyPayload,
+	// a struct, table, or union, or (only for two-way responses) one of
+	// fidl::encoding::{Result,Flexible,FlexibleResult}Type.
+	FidlType string
+	// Equivalent to <FidlType as fidl::encoding::Type>::Owned.
+	OwnedType string
+	// The user-facing owned type. This is derived from OwnedType by removing
+	// flexible wrappers (if any) and flattening structs to tuples.
+	TupleType string
+	// For methods that use error syntax, TupleType is an alias that refers
+	// to TupleTypeAliasRhs. Otherwise, TupleTypeAliasRhs is empty.
+	// TODO(fxbug.dev/122199): Remove.
+	TupleTypeAliasRhs string
+	// Parameters for sending this payload. For an empty payload, this is nil.
+	// For a struct without error syntax, it contains one element per struct
+	// field. Otherwise, it contains a single element (table, union, or Result).
+	Parameters []Parameter
+	// Assuming that names from Parameters are in scope, EncodeExpr is an
+	// expression of a type implementing fidl::encoding::Encode<FidlType>.
+	EncodeExpr string
+	// ConvertToTuple converts an expression to TupleType. If OwnedType is
+	// fidl::encoding::Flexible or fidl::encoding::FlexibleResult, expects the
+	// input variable to be the Ok return value of .into_result(). Otherwise,
+	// expects the input variable to be of type OwnedType.
+	// TODO(fxbug.dev/122199): Remove.
+	ConvertToTuple func(string) string
+	// Like ConvertToTuple, but uses names from Parameters for inclusion in a
+	// struct. Examples for ConvertToFields("v"):
+	//     ""
+	//     "param1: v.param1, param2: v.param2,"
+	//     "result: v.map(|x| x.param1),"
+	// TODO(fxbug.dev/122199): Remove.
+	ConvertToFields func(string) string
 }
 
-// A Parameter to either the requset or response of a method. Contains
-// information to assist in generating code using borrowed types and handle
-// wrappers.
+// A parameter in a method request or response.
 type Parameter struct {
-	// The raw fidlgen type of the parameter.
-	OGType fidlgen.Type
-	// String representing the type to use for this parameter when handling it
-	// by-value.
-	Type string
-	// String representing the type to use for this parameter when receiving it
-	// as a possibly-borrowed method argument.
-	BorrowedType string
-	// Snake-case name to use for the parameter.
+	// Snake-case parameter name.
 	Name string
-	// Name of the wrapper type that should be used for handle validation, if
-	// HasHandleMetadata is true.
-	HandleWrapperName string
-	// True if the type of the parameter has handle metadata and so requires
-	// validation.
-	HasHandleMetadata bool
-}
-
-type HandleMetadataWrapper struct {
-	Name    string
-	Subtype string
-	Rights  string
+	// Parameter type.
+	Type string
+	// Type to use when storing the parameter in an owning data structure.
+	OwnedType string
+	// Set only if this parameter corresponds to a struct member.
+	StructMemberType *Type
 }
 
 type Service struct {
@@ -270,12 +249,9 @@ type Root struct {
 	Enums        []Enum
 	Structs      []Struct
 	Unions       []Union
-	// Result types for methods with error syntax.
-	Results                []Result
-	Tables                 []Table
-	Protocols              []Protocol
-	Services               []Service
-	HandleMetadataWrappers []HandleMetadataWrapper
+	Tables       []Table
+	Protocols    []Protocol
+	Services     []Service
 }
 
 func (r *Root) findProtocol(eci EncodedCompoundIdentifier) *Protocol {
@@ -300,15 +276,6 @@ func (r *Root) findTable(eci EncodedCompoundIdentifier) *Table {
 	for i := range r.Tables {
 		if r.Tables[i].ECI == eci {
 			return &r.Tables[i]
-		}
-	}
-	return nil
-}
-
-func (r *Root) findResult(eci EncodedCompoundIdentifier) *Result {
-	for i := range r.Results {
-		if r.Results[i].ECI == eci {
-			return &r.Results[i]
 		}
 	}
 	return nil
@@ -487,67 +454,67 @@ var primitiveTypes = map[fidlgen.PrimitiveSubtype]string{
 }
 
 var handleSubtypes = map[fidlgen.HandleSubtype]string{
-	fidlgen.HandleSubtypeBti:          "Bti",
-	fidlgen.HandleSubtypeChannel:      "Channel",
-	fidlgen.HandleSubtypeClock:        "Clock",
-	fidlgen.HandleSubtypeDebugLog:     "DebugLog",
-	fidlgen.HandleSubtypeEvent:        "Event",
-	fidlgen.HandleSubtypeEventpair:    "EventPair",
-	fidlgen.HandleSubtypeException:    "Exception",
-	fidlgen.HandleSubtypeFifo:         "Fifo",
-	fidlgen.HandleSubtypeGuest:        "Guest",
-	fidlgen.HandleSubtypeInterrupt:    "Interrupt",
-	fidlgen.HandleSubtypeIommu:        "Iommu",
-	fidlgen.HandleSubtypeJob:          "Job",
-	fidlgen.HandleSubtypeMsi:          "Msi",
-	fidlgen.HandleSubtypeNone:         "Handle",
-	fidlgen.HandleSubtypePager:        "Pager",
-	fidlgen.HandleSubtypePciDevice:    "PciDevice",
-	fidlgen.HandleSubtypePmt:          "Pmt",
-	fidlgen.HandleSubtypePort:         "Port",
-	fidlgen.HandleSubtypeProcess:      "Process",
-	fidlgen.HandleSubtypeProfile:      "Profile",
-	fidlgen.HandleSubtypeResource:     "Resource",
-	fidlgen.HandleSubtypeSocket:       "Socket",
-	fidlgen.HandleSubtypeStream:       "Stream",
-	fidlgen.HandleSubtypeSuspendToken: "SuspendToken",
-	fidlgen.HandleSubtypeThread:       "Thread",
-	fidlgen.HandleSubtypeTimer:        "Timer",
-	fidlgen.HandleSubtypeVcpu:         "Vcpu",
-	fidlgen.HandleSubtypeVmar:         "Vmar",
-	fidlgen.HandleSubtypeVmo:          "Vmo",
+	fidlgen.HandleSubtypeBti:          "fidl::Bti",
+	fidlgen.HandleSubtypeChannel:      "fidl::Channel",
+	fidlgen.HandleSubtypeClock:        "fidl::Clock",
+	fidlgen.HandleSubtypeDebugLog:     "fidl::DebugLog",
+	fidlgen.HandleSubtypeEvent:        "fidl::Event",
+	fidlgen.HandleSubtypeEventpair:    "fidl::EventPair",
+	fidlgen.HandleSubtypeException:    "fidl::Exception",
+	fidlgen.HandleSubtypeFifo:         "fidl::Fifo",
+	fidlgen.HandleSubtypeGuest:        "fidl::Guest",
+	fidlgen.HandleSubtypeInterrupt:    "fidl::Interrupt",
+	fidlgen.HandleSubtypeIommu:        "fidl::Iommu",
+	fidlgen.HandleSubtypeJob:          "fidl::Job",
+	fidlgen.HandleSubtypeMsi:          "fidl::Msi",
+	fidlgen.HandleSubtypeNone:         "fidl::Handle",
+	fidlgen.HandleSubtypePager:        "fidl::Pager",
+	fidlgen.HandleSubtypePciDevice:    "fidl::PciDevice",
+	fidlgen.HandleSubtypePmt:          "fidl::Pmt",
+	fidlgen.HandleSubtypePort:         "fidl::Port",
+	fidlgen.HandleSubtypeProcess:      "fidl::Process",
+	fidlgen.HandleSubtypeProfile:      "fidl::Profile",
+	fidlgen.HandleSubtypeResource:     "fidl::Resource",
+	fidlgen.HandleSubtypeSocket:       "fidl::Socket",
+	fidlgen.HandleSubtypeStream:       "fidl::Stream",
+	fidlgen.HandleSubtypeSuspendToken: "fidl::SuspendToken",
+	fidlgen.HandleSubtypeThread:       "fidl::Thread",
+	fidlgen.HandleSubtypeTimer:        "fidl::Timer",
+	fidlgen.HandleSubtypeVcpu:         "fidl::Vcpu",
+	fidlgen.HandleSubtypeVmar:         "fidl::Vmar",
+	fidlgen.HandleSubtypeVmo:          "fidl::Vmo",
 }
 
-var handleSubtypeConsts = map[fidlgen.HandleSubtype]string{
-	fidlgen.HandleSubtypeBti:          "BTI",
-	fidlgen.HandleSubtypeChannel:      "CHANNEL",
-	fidlgen.HandleSubtypeClock:        "CLOCK",
-	fidlgen.HandleSubtypeDebugLog:     "DEBUGLOG",
-	fidlgen.HandleSubtypeEvent:        "EVENT",
-	fidlgen.HandleSubtypeEventpair:    "EVENTPAIR",
-	fidlgen.HandleSubtypeException:    "EXCEPTION",
-	fidlgen.HandleSubtypeFifo:         "FIFO",
-	fidlgen.HandleSubtypeGuest:        "GUEST",
-	fidlgen.HandleSubtypeInterrupt:    "INTERRUPT",
-	fidlgen.HandleSubtypeIommu:        "IOMMU",
-	fidlgen.HandleSubtypeJob:          "JOB",
-	fidlgen.HandleSubtypeMsi:          "MSI",
-	fidlgen.HandleSubtypeNone:         "NONE",
-	fidlgen.HandleSubtypePager:        "PAGER",
-	fidlgen.HandleSubtypePciDevice:    "PCI_DEVICE",
-	fidlgen.HandleSubtypePmt:          "PMT",
-	fidlgen.HandleSubtypePort:         "PORT",
-	fidlgen.HandleSubtypeProcess:      "PROCESS",
-	fidlgen.HandleSubtypeProfile:      "PROFILE",
-	fidlgen.HandleSubtypeResource:     "RESOURCE",
-	fidlgen.HandleSubtypeSocket:       "SOCKET",
-	fidlgen.HandleSubtypeStream:       "STREAM",
-	fidlgen.HandleSubtypeSuspendToken: "SUSPEND_TOKEN",
-	fidlgen.HandleSubtypeThread:       "THREAD",
-	fidlgen.HandleSubtypeTimer:        "TIMER",
-	fidlgen.HandleSubtypeVcpu:         "VCPU",
-	fidlgen.HandleSubtypeVmar:         "VMAR",
-	fidlgen.HandleSubtypeVmo:          "VMO",
+var objectTypeConsts = map[fidlgen.HandleSubtype]string{
+	fidlgen.HandleSubtypeBti:          "fidl::ObjectType::BTI",
+	fidlgen.HandleSubtypeChannel:      "fidl::ObjectType::CHANNEL",
+	fidlgen.HandleSubtypeClock:        "fidl::ObjectType::CLOCK",
+	fidlgen.HandleSubtypeDebugLog:     "fidl::ObjectType::DEBUGLOG",
+	fidlgen.HandleSubtypeEvent:        "fidl::ObjectType::EVENT",
+	fidlgen.HandleSubtypeEventpair:    "fidl::ObjectType::EVENTPAIR",
+	fidlgen.HandleSubtypeException:    "fidl::ObjectType::EXCEPTION",
+	fidlgen.HandleSubtypeFifo:         "fidl::ObjectType::FIFO",
+	fidlgen.HandleSubtypeGuest:        "fidl::ObjectType::GUEST",
+	fidlgen.HandleSubtypeInterrupt:    "fidl::ObjectType::INTERRUPT",
+	fidlgen.HandleSubtypeIommu:        "fidl::ObjectType::IOMMU",
+	fidlgen.HandleSubtypeJob:          "fidl::ObjectType::JOB",
+	fidlgen.HandleSubtypeMsi:          "fidl::ObjectType::MSI",
+	fidlgen.HandleSubtypeNone:         "fidl::ObjectType::NONE",
+	fidlgen.HandleSubtypePager:        "fidl::ObjectType::PAGER",
+	fidlgen.HandleSubtypePciDevice:    "fidl::ObjectType::PCI_DEVICE",
+	fidlgen.HandleSubtypePmt:          "fidl::ObjectType::PMT",
+	fidlgen.HandleSubtypePort:         "fidl::ObjectType::PORT",
+	fidlgen.HandleSubtypeProcess:      "fidl::ObjectType::PROCESS",
+	fidlgen.HandleSubtypeProfile:      "fidl::ObjectType::PROFILE",
+	fidlgen.HandleSubtypeResource:     "fidl::ObjectType::RESOURCE",
+	fidlgen.HandleSubtypeSocket:       "fidl::ObjectType::SOCKET",
+	fidlgen.HandleSubtypeStream:       "fidl::ObjectType::STREAM",
+	fidlgen.HandleSubtypeSuspendToken: "fidl::ObjectType::SUSPEND_TOKEN",
+	fidlgen.HandleSubtypeThread:       "fidl::ObjectType::THREAD",
+	fidlgen.HandleSubtypeTimer:        "fidl::ObjectType::TIMER",
+	fidlgen.HandleSubtypeVcpu:         "fidl::ObjectType::VCPU",
+	fidlgen.HandleSubtypeVmar:         "fidl::ObjectType::VMAR",
+	fidlgen.HandleSubtypeVmo:          "fidl::ObjectType::VMO",
 }
 
 type compiler struct {
@@ -555,12 +522,9 @@ type compiler struct {
 	experiments  fidlgen.Experiments
 	library      fidlgen.LibraryIdentifier
 	externCrates map[string]struct{}
-	// Raw structs (including ExternalStructs), needed for computeUseFidlStructCopy.
+	// Raw structs (including ExternalStructs), needed for
+	// flattening parameters and in computeUseFidlStructCopy.
 	structs map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct
-	// Compiled structs (including ExternalStructs), needed for flattening parameters.
-	compiledStructs        map[fidlgen.EncodedCompoundIdentifier]Struct
-	results                map[fidlgen.EncodedCompoundIdentifier]Result
-	handleMetadataWrappers map[string]HandleMetadataWrapper
 }
 
 // inExternalLibrary returns true if the library that the given
@@ -757,7 +721,7 @@ func (c *compiler) compileConstant(val fidlgen.Constant, typ fidlgen.Type) strin
 		if typ.Kind == fidlgen.PrimitiveType {
 			return val.Value
 		}
-		decl := c.compileType(typ)
+		decl := c.compileCamelCompoundIdentifier(typ.Identifier)
 		// from_bits isn't a const function, so from_bits_truncate must be used.
 		return fmt.Sprintf("%s::from_bits_truncate(%s)", decl, val.Value)
 	default:
@@ -778,7 +742,7 @@ func (c *compiler) compileConst(val fidlgen.Const) Const {
 	} else {
 		r = Const{
 			Const: val,
-			Type:  c.compileType(val.Type),
+			Type:  c.compileType(val.Type).Owned,
 			Name:  name,
 			Value: c.compileConstant(val.Value, val.Type),
 		}
@@ -800,155 +764,349 @@ func compileHandleSubtype(val fidlgen.HandleSubtype) string {
 	panic(fmt.Sprintf("unknown handle type: %v", val))
 }
 
-type FieldHandleInformation struct {
-	fullObjectType    string
-	fullRights        string
-	shortObjectType   string
-	shortRights       string
-	hasHandleMetadata bool
+func compileObjectTypeConst(val fidlgen.HandleSubtype) string {
+	if t, ok := objectTypeConsts[val]; ok {
+		return t
+	}
+	panic(fmt.Sprintf("unknown handle type: %v", val))
 }
 
-func (c *compiler) fieldHandleInformation(val *fidlgen.Type) FieldHandleInformation {
-	if val.ElementType != nil {
-		return c.fieldHandleInformation(val.ElementType)
+func (c *compiler) compileType(val fidlgen.Type) Type {
+	t := Type{
+		Resourceness:     c.decls.LookupResourceness(val),
+		Kind:             val.Kind,
+		Nullable:         val.Nullable,
+		PrimitiveSubtype: val.PrimitiveSubtype,
+		Identifier:       val.Identifier,
 	}
-	if val.Kind == fidlgen.RequestType {
-		return FieldHandleInformation{
-			fullObjectType:    "fidl::ObjectType::CHANNEL",
-			fullRights:        "fidl::Rights::CHANNEL_DEFAULT",
-			shortObjectType:   "CHANNEL",
-			shortRights:       "CHANNEL_DEFAULT",
-			hasHandleMetadata: true,
-		}
-	}
-	if val.Kind == fidlgen.IdentifierType {
-		declInfo, ok := c.decls[val.Identifier]
-		if !ok {
-			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
-		}
-		if declInfo.Type == fidlgen.ProtocolDeclType {
-			return FieldHandleInformation{
-				fullObjectType:    "fidl::ObjectType::CHANNEL",
-				fullRights:        "fidl::Rights::CHANNEL_DEFAULT",
-				shortObjectType:   "CHANNEL",
-				shortRights:       "CHANNEL_DEFAULT",
-				hasHandleMetadata: true,
-			}
-		}
-	}
-	if val.Kind != fidlgen.HandleType {
-		return FieldHandleInformation{
-			fullObjectType:    "fidl::ObjectType::NONE",
-			fullRights:        "fidl::Rights::NONE",
-			shortObjectType:   "NONE",
-			shortRights:       "NONE",
-			hasHandleMetadata: false,
-		}
-	}
-	subtype, ok := handleSubtypeConsts[val.HandleSubtype]
-	if !ok {
-		panic(fmt.Sprintf("unknown handle type for const: %v", val))
-	}
-	return FieldHandleInformation{
-		fullObjectType:    fmt.Sprintf("fidl::ObjectType::%s", subtype),
-		fullRights:        fmt.Sprintf("fidl::Rights::from_bits_const(%d).unwrap()", val.HandleRights),
-		shortObjectType:   subtype,
-		shortRights:       fmt.Sprintf("%d", val.HandleRights),
-		hasHandleMetadata: true,
-	}
-}
 
-// compileType gets a string to use in generated code for the rust type used for
-// the given FIDL type.
-func (c *compiler) compileType(val fidlgen.Type) string {
-	var t string
+	fidlOptionalFmt := "fidl::encoding::Optional<%s>"
+	ownedOptionalFmt := "Option<%s>"
+
 	switch val.Kind {
-	case fidlgen.ArrayType:
-		t = fmt.Sprintf("[%s; %v]", c.compileType(*val.ElementType), *val.ElementCount)
-	case fidlgen.VectorType:
-		t = fmt.Sprintf("Vec<%s>", c.compileType(*val.ElementType))
-	case fidlgen.StringType:
-		t = "String"
-	case fidlgen.HandleType:
-		t = fmt.Sprintf("fidl::%s", compileHandleSubtype(val.HandleSubtype))
-	case fidlgen.RequestType:
-		t = fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileCamelCompoundIdentifier(val.RequestSubtype))
 	case fidlgen.PrimitiveType:
-		t = compilePrimitiveSubtype(val.PrimitiveSubtype)
+		s := compilePrimitiveSubtype(val.PrimitiveSubtype)
+		t.Fidl = s
+		t.Owned = s
+		t.Param = s
+	case fidlgen.ArrayType:
+		el := c.compileType(*val.ElementType)
+		t.ElementType = &el
+		t.Fidl = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.Fidl, *val.ElementCount)
+		t.Owned = fmt.Sprintf("[%s; %d]", el.Owned, *val.ElementCount)
+		t.Param = fmt.Sprintf("&mut [%s; %d]", el.Param, *val.ElementCount)
+	case fidlgen.VectorType:
+		// TODO(fxbug.dev/37304): Use val.ElementCount for vector bound.
+		el := c.compileType(*val.ElementType)
+		t.ElementType = &el
+		t.Fidl = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.Fidl)
+		t.Owned = fmt.Sprintf("Vec<%s>", el.Owned)
+		if val.ElementType.Kind == fidlgen.PrimitiveType {
+			t.Param = fmt.Sprintf("&[%s]", el.Owned)
+		} else {
+			t.Param = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", el.Param)
+		}
+	case fidlgen.StringType:
+		// TODO(fxbug.dev/37304): Use val.ElementCount for string bound.
+		t.Fidl = "fidl::encoding::UnboundedString"
+		t.Owned = "String"
+		t.Param = "&str"
+	case fidlgen.HandleType:
+		s := compileHandleSubtype(val.HandleSubtype)
+		objType := compileObjectTypeConst(val.HandleSubtype)
+		t.Fidl = fmt.Sprintf("fidl::encoding::HandleType<%s, { %s.into_raw() }, %d>", s, objType, val.HandleRights)
+		t.Owned = s
+		t.Param = s
+	case fidlgen.RequestType:
+		s := fmt.Sprintf("fidl::endpoints::ServerEnd<%sMarker>", c.compileCamelCompoundIdentifier(val.RequestSubtype))
+		t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+		t.Owned = s
+		t.Param = s
 	case fidlgen.IdentifierType:
-		t = c.compileCamelCompoundIdentifier(val.Identifier)
+		name := c.compileCamelCompoundIdentifier(val.Identifier)
 		declInfo, ok := c.decls[val.Identifier]
 		if !ok {
 			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
 		}
+		t.DeclType = declInfo.Type
 		switch declInfo.Type {
-		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
-			if val.Nullable {
-				t = fmt.Sprintf("Box<%s>", t)
-			}
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
+			t.Fidl = name
+			t.Owned = name
+			t.Param = name
+		case fidlgen.StructDeclType:
+			t.Fidl = name
+			t.Owned = name
+			t.Param = "&mut " + name
+			fidlOptionalFmt = "fidl::encoding::Boxed<%s>"
+			ownedOptionalFmt = "Option<Box<%s>>"
+		case fidlgen.TableDeclType:
+			t.Fidl = name
+			t.Owned = name
+			t.Param = name
+		case fidlgen.UnionDeclType:
+			t.Fidl = name
+			t.Owned = name
+			t.Param = "&mut " + name
+			fidlOptionalFmt = "fidl::encoding::OptionalUnion<%s>"
+			ownedOptionalFmt = "Option<Box<%s>>"
 		case fidlgen.ProtocolDeclType:
-			t = fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", t)
+			s := fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", name)
+			t.Fidl = fmt.Sprintf("fidl::encoding::Endpoint<%s>", s)
+			t.Owned = s
+			t.Param = s
+		default:
+			panic(fmt.Sprintf("unexpected type: %v", declInfo.Type))
+		}
+	case fidlgen.InternalType:
+		switch val.InternalSubtype {
+		case fidlgen.TransportErr:
+			s := "fidl::encoding::FrameworkErr"
+			t.Fidl = s
+			t.Owned = s
+			t.Param = s
+		default:
+			panic(fmt.Sprintf("unknown internal subtype: %v", val.InternalSubtype))
 		}
 	default:
 		panic(fmt.Sprintf("unknown type kind: %v", val.Kind))
 	}
 
 	if val.Nullable {
-		return fmt.Sprintf("Option<%s>", t)
+		t.Fidl = fmt.Sprintf(fidlOptionalFmt, t.Fidl)
+		t.Owned = fmt.Sprintf(ownedOptionalFmt, t.Owned)
+		t.Param = fmt.Sprintf("Option<%s>", t.Param)
 	}
 	return t
 }
 
-// compileBorrowedType gets a string to use in generated code for the rust type
-// used when the given FIDL type is used in a method parameter where encoding is
-// needed. Note that borrowing is only actually used for structs and collections
-// where we want to avoid copying, primitive types are passed by value.
-// Generated references are mutable in order to allow fuchsia handles to be
-// moved out when encoding.
-func (c *compiler) compileBorrowedType(val fidlgen.Type) string {
-	var t string
-	switch val.Kind {
-	case fidlgen.PrimitiveType, fidlgen.HandleType, fidlgen.RequestType:
-		return c.compileType(val)
+// convertParamToEncodeExpr returns an expression that converts a variable v
+// from t.Param to a type implementing fidl::encoding::Encode<t.Fidl>.
+//
+// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
+// complete, since parameter types will be encodable as is.
+func convertParamToEncodeExpr(v string, t Type) string {
+	switch t.Kind {
+	case fidlgen.PrimitiveType, fidlgen.StringType, fidlgen.HandleType, fidlgen.RequestType:
+		return v
 	case fidlgen.ArrayType:
-		t = fmt.Sprintf("&mut [%s; %v]", c.compileBorrowedType(*val.ElementType), *val.ElementCount)
+		owned := convertMutRefParamToOwned(v, t)
+		if t.IsResourceType() {
+			return "&mut " + owned
+		}
+		return "&" + owned
 	case fidlgen.VectorType:
-		t = c.compileBorrowedType(*val.ElementType)
-		if val.ElementType.Kind == fidlgen.PrimitiveType {
-			t = fmt.Sprintf("&[%s]", t)
+		if t.ElementType.Kind == fidlgen.PrimitiveType {
+			return v
+		}
+		var inner string
+		// Arrays and tables should be encoded by &/&mut, but encoding.rs also
+		// allows encoding by value specifically for when they occur in vectors.
+		// (Converting from Item=T to Item=&T requires a lending iterator.)
+		if t.ElementType.Kind == fidlgen.IdentifierType && t.ElementType.DeclType == fidlgen.TableDeclType {
+			inner = "x"
+		} else if t.ElementType.Kind == fidlgen.ArrayType {
+			inner = convertMutRefParamToOwned("x", *t.ElementType)
 		} else {
-			t = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", t)
+			inner = convertParamToEncodeExpr("x", *t.ElementType)
 		}
-	case fidlgen.StringType:
-		t = "&str"
+		if inner == "x" {
+			if t.Nullable {
+				return fmt.Sprintf("%s.map(fidl::encoding::Iterator)", v)
+			}
+			return fmt.Sprintf("fidl::encoding::Iterator(%s)", v)
+		}
+		if t.Nullable {
+			return fmt.Sprintf("%s.map(|x| x.map(|x| %s)).map(fidl::encoding::Iterator)", v, inner)
+		}
+		return fmt.Sprintf("fidl::encoding::Iterator(%s.map(|x| %s))", v, inner)
 	case fidlgen.IdentifierType:
-		t = c.compileCamelCompoundIdentifier(val.Identifier)
-		declInfo, ok := c.decls[val.Identifier]
-		if !ok {
-			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
-		}
-		switch declInfo.Type {
+		switch t.DeclType {
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType:
+			return v
 		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
-			t = fmt.Sprintf("&mut %s", t)
-		case fidlgen.ProtocolDeclType:
-			t = fmt.Sprintf("fidl::endpoints::ClientEnd<%sMarker>", t)
+			if t.IsResourceType() {
+				return v
+			}
+			if t.Nullable {
+				return v + ".map(|x| &*x)"
+			}
+			return "&*" + v
+		case fidlgen.TableDeclType:
+			if t.IsResourceType() {
+				if t.Nullable {
+					return v + ".as_mut()"
+				}
+				return "&mut " + v
+			}
+			if t.Nullable {
+				return v + ".as_ref()"
+			}
+			return "&" + v
+		default:
+			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
 		}
 	default:
-		panic(fmt.Sprintf("unknown type kind: %v", val.Kind))
+		panic(fmt.Sprintf("unknown type kind: %v", t.Kind))
 	}
+}
 
-	if val.Nullable {
-		return fmt.Sprintf("Option<%s>", t)
+// convertMutRefParamToOwned returns an expression that converts a variable v
+// from &mut t.Param to t.Owned. It assumes that the t.Param value can be moved
+// from, i.e. it returns *v if t.Param and t.Owned are the same.
+//
+// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
+// complete. This is only needed for arrays in convertParamToEncodeExpr.
+func convertMutRefParamToOwned(v string, t Type) string {
+	switch t.Kind {
+	case fidlgen.PrimitiveType, fidlgen.HandleType, fidlgen.RequestType:
+		return "*" + v
+	case fidlgen.StringType:
+		if t.Nullable {
+			return v + ".map(str::to_string)"
+		}
+		return v + ".to_string()"
+	case fidlgen.ArrayType:
+		inner := convertMutRefParamToOwned("x", *t.ElementType)
+		if inner == "*x" {
+			return "*" + v
+		}
+		return fmt.Sprintf(`{
+	let mut temp: %s = fidl::new_empty!(%s);
+	for (i, x) in %s.iter_mut().enumerate() {
+		temp[i] = %s;
 	}
-	return t
+	temp
+}`,
+			t.Owned, t.Fidl, v, inner)
+	case fidlgen.VectorType:
+		inner := convertMutRefParamToOwned("x", *t.ElementType)
+		if t.Nullable {
+			return fmt.Sprintf("%s.map(|x| x.map(|ref mut x| %s).collect::<Vec<_>>())", v, inner)
+		}
+		return fmt.Sprintf("%s.map(|ref mut x| %s).collect::<Vec<_>>()", v, inner)
+	case fidlgen.IdentifierType:
+		switch t.DeclType {
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType, fidlgen.ProtocolDeclType, fidlgen.TableDeclType:
+			return "*" + v
+		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
+			if t.Nullable {
+				if t.IsResourceType() {
+					return fmt.Sprintf("%s.map(|x| Box::new(std::mem::replace(x, fidl::new_empty!(%s))))", v, t.Fidl)
+				}
+				return fmt.Sprintf("%s.map(|x| Box::new(x.clone()))", v)
+			}
+			if t.IsResourceType() {
+				return fmt.Sprintf("std::mem::replace(%s, fidl::new_empty!(%s))", v, t.Fidl)
+			}
+			return v + ".clone()"
+		default:
+			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
+		}
+	default:
+		panic(fmt.Sprintf("unknown type kind: %v", t.Kind))
+	}
+}
+
+// convertMutRefResultToEncodeExpr returns an expression that converts a
+// variable v from &mut Result<p.TupleType, _> to to Result<T, _>, where p is
+// payloadForType(t) and T implements fidl::encoding::Encode<p.FidlType>.
+//
+// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
+// complete. This is only needed for Result types, which always contained owned
+// types for the Ok value in the old types.
+func convertMutRefResultToEncodeExpr(v string, t Type, p Payload) string {
+	switch t.DeclType {
+	case fidlgen.StructDeclType:
+		if len(p.Parameters) == 0 {
+			return "*" + v
+		}
+		var names []string
+		var exprs []string
+		for _, param := range p.Parameters {
+			names = append(names, param.Name)
+			exprs = append(exprs, convertMutRefOwnedToEncodeExpr(param.Name, *param.StructMemberType))
+		}
+		return fmt.Sprintf("%s.as_mut().map_err(|e| *e).map(|%s| %s)", v, fmtOneOrTuple(names), fmtTuple(exprs))
+	case fidlgen.TableDeclType, fidlgen.UnionDeclType:
+		if t.IsResourceType() {
+			return v + ".as_mut().map_err(|e| *e)"
+		}
+		return v + ".as_ref().map_err(|e| *e)"
+	default:
+		panic(fmt.Sprintf("unexpected decl type %s", t.DeclType))
+	}
+}
+
+// convertMutRefOwnedToEncodeExpr returns an expression that converts a variable
+// v from &mut t.Owned to a type implementing fidl::encoding::Encode<t.Fidl>.
+//
+// TODO(fxbug.dev/122199): Remove this once the transition to the new types is
+// complete. This is only needed for convertMutRefResultToEncodeExpr.
+func convertMutRefOwnedToEncodeExpr(v string, t Type) string {
+	switch t.Kind {
+	case fidlgen.PrimitiveType:
+		return "*" + v
+	case fidlgen.HandleType, fidlgen.RequestType:
+		if t.Nullable {
+			return fmt.Sprintf("%s.as_mut().map(|x| std::mem::replace(x, fidl::Handle::invalid().into()))", v)
+		}
+		return fmt.Sprintf("std::mem::replace(%s, fidl::Handle::invalid().into())", v)
+	case fidlgen.StringType:
+		if t.Nullable {
+			return v + ".as_deref()"
+		}
+		return v + ".as_str()"
+	case fidlgen.ArrayType:
+		if t.IsResourceType() {
+			return v
+		}
+		return "&*" + v
+	case fidlgen.VectorType:
+		if t.Nullable {
+			if t.IsResourceType() {
+				return v + ".as_deref_mut()"
+			}
+			return v + ".as_deref()"
+		}
+		if t.IsResourceType() {
+			return v + ".as_mut_slice()"
+		}
+		return v + ".as_slice()"
+	case fidlgen.IdentifierType:
+		switch t.DeclType {
+		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
+			return "*" + v
+		case fidlgen.StructDeclType, fidlgen.TableDeclType, fidlgen.UnionDeclType:
+			if t.Nullable {
+				if t.IsResourceType() {
+					return v + ".as_deref_mut()"
+				}
+				return v + ".as_deref()"
+			}
+			if t.IsResourceType() {
+				return v
+			}
+			return "&*" + v
+		case fidlgen.ProtocolDeclType:
+			if t.Nullable {
+				return fmt.Sprintf("%s.as_mut().map(|x| std::mem::replace(x, fidl::Handle::invalid().into()))", v)
+			}
+			return fmt.Sprintf("std::mem::replace(%s, fidl::Handle::invalid().into())", v)
+		default:
+			panic(fmt.Sprintf("unexpected type: %v", t.DeclType))
+		}
+	default:
+		panic(fmt.Sprintf("unknown type kind: %v", t.Kind))
+	}
 }
 
 func (c *compiler) compileBits(val fidlgen.Bits) Bits {
 	e := Bits{
-		Bits:    val,
-		Name:    c.compileCamelCompoundIdentifier(val.Name),
-		Type:    c.compileType(val.Type),
-		Members: []BitsMember{},
+		Bits:           val,
+		Name:           c.compileCamelCompoundIdentifier(val.Name),
+		UnderlyingType: c.compileType(val.Type).Owned,
+		Members:        []BitsMember{},
 	}
 	for _, v := range val.Members {
 		e.Members = append(e.Members, BitsMember{
@@ -962,10 +1120,10 @@ func (c *compiler) compileBits(val fidlgen.Bits) Bits {
 
 func (c *compiler) compileEnum(val fidlgen.Enum) Enum {
 	e := Enum{
-		Enum:    val,
-		Name:    c.compileCamelCompoundIdentifier(val.Name),
-		Type:    compilePrimitiveSubtype(val.Type),
-		Members: []EnumMember{},
+		Enum:           val,
+		Name:           c.compileCamelCompoundIdentifier(val.Name),
+		UnderlyingType: compilePrimitiveSubtype(val.Type),
+		Members:        []EnumMember{},
 	}
 	for _, v := range val.Members {
 		e.Members = append(e.Members, EnumMember{
@@ -1008,59 +1166,185 @@ func findMinEnumMember(typ fidlgen.PrimitiveSubtype, members []EnumMember) EnumM
 	return res
 }
 
-func (c *compiler) compileHandleMetadataWrapper(val *fidlgen.Type) (string, bool) {
-	hi := c.fieldHandleInformation(val)
-	name := fmt.Sprintf("HandleWrapperObjectType%sRights%s", hi.shortObjectType, hi.shortRights)
-	wrapper := HandleMetadataWrapper{
-		Name:    name,
-		Subtype: hi.fullObjectType,
-		Rights:  hi.fullRights,
+// fmtTuple formats items (types or expressions) as a Rust tuple.
+func fmtTuple(items []string) string {
+	if len(items) == 0 {
+		panic("expected at least one item")
 	}
-	if hi.hasHandleMetadata {
-		if _, ok := c.handleMetadataWrappers[name]; !ok {
-			c.handleMetadataWrappers[name] = wrapper
+	return fmt.Sprintf("(%s,)", strings.Join(items, ", "))
+}
+
+// fmtOneOrTuple is like fmtTuple but does not create 1-tuples.
+func fmtOneOrTuple(items []string) string {
+	switch len(items) {
+	case 0:
+		panic("expected at least one item")
+	case 1:
+		return items[0]
+	default:
+		return fmt.Sprintf("(%s)", strings.Join(items, ", "))
+	}
+}
+
+func emptyPayload(fidlType string) Payload {
+	return Payload{
+		FidlType:        fidlType,
+		OwnedType:       "()",
+		TupleType:       "()",
+		EncodeExpr:      "()",
+		ConvertToTuple:  func(owned string) string { return owned },
+		ConvertToFields: func(owned string) string { return "" },
+	}
+}
+
+func (c *compiler) payloadForType(payloadType Type) Payload {
+	typeName := c.compileCamelCompoundIdentifier(payloadType.Identifier)
+	st, ok := c.structs[payloadType.Identifier]
+
+	// Not a struct: table or union payload.
+	if !ok {
+		paramName := "payload"
+		return Payload{
+			FidlType:  typeName,
+			OwnedType: typeName,
+			TupleType: typeName,
+			Parameters: []Parameter{{
+				Name:      paramName,
+				Type:      payloadType.Param,
+				OwnedType: payloadType.Owned,
+			}},
+			EncodeExpr:      convertParamToEncodeExpr(paramName, payloadType),
+			ConvertToTuple:  func(owned string) string { return owned },
+			ConvertToFields: func(owned string) string { return fmt.Sprintf("%s: %s,", paramName, owned) },
 		}
 	}
-	return name, hi.hasHandleMetadata
-}
 
-// compileParameterArray extracts the fields of the given method-request or
-// method-response payload struct as method parameters, and prepares them for
-// code generation by providing rust types and names to use.
-func (c *compiler) compileParameterArray(payload fidlgen.Struct) []Parameter {
+	// Empty struct with error syntax.
+	if len(st.Members) == 0 {
+		return emptyPayload("fidl::encoding::EmptyStruct")
+	}
+
+	// Struct payload. Flatten it to parameters.
 	var parameters []Parameter
-	for _, v := range payload.Members {
-		wrapperName, hasHandleMetadata := c.compileHandleMetadataWrapper(&v.Type)
+	var ownedTypes, encodeExprs []string
+	for _, v := range st.Members {
+		paramName := compileSnakeIdentifier(v.Name)
+		typ := c.compileType(v.Type)
 		parameters = append(parameters, Parameter{
-			OGType:            v.Type,
-			Type:              c.compileType(v.Type),
-			BorrowedType:      c.compileBorrowedType(v.Type),
-			Name:              compileSnakeIdentifier(v.Name),
-			HandleWrapperName: wrapperName,
-			HasHandleMetadata: hasHandleMetadata,
+			Name:             paramName,
+			Type:             typ.Param,
+			OwnedType:        typ.Owned,
+			StructMemberType: &typ,
 		})
+		ownedTypes = append(ownedTypes, typ.Owned)
+		encodeExprs = append(encodeExprs, convertParamToEncodeExpr(paramName, typ))
 	}
-	return parameters
+	return Payload{
+		FidlType:   typeName,
+		OwnedType:  typeName,
+		TupleType:  fmtOneOrTuple(ownedTypes),
+		Parameters: parameters,
+		EncodeExpr: fmtTuple(encodeExprs),
+		ConvertToTuple: func(owned string) string {
+			var exprs []string
+			for _, param := range parameters {
+				exprs = append(exprs, fmt.Sprintf("%s.%s", owned, param.Name))
+			}
+			return fmtOneOrTuple(exprs)
+		},
+		ConvertToFields: func(owned string) string {
+			var b strings.Builder
+			for _, param := range parameters {
+				b.WriteString(fmt.Sprintf("%s: %s.%s,\n", param.Name, owned, param.Name))
+			}
+			return b.String()
+		},
+	}
 }
 
-// compileParameterSingleton converts a union or table payload into a form that
-// is ready for code generation, providing a Rust-friendly type and name (always
-// "payload"). Unlike compileParameterArray, this does not result in the payload
-// layout being "flattened" into its constituent members.
-func (c *compiler) compileParameterSingleton(val *fidlgen.Type) []Parameter {
-	if _, ok := c.compileHandleMetadataWrapper(val); ok {
-		panic("table/union should not require handle metadata wrapper")
+func (c *compiler) compileRequest(m fidlgen.Method) Payload {
+	if !m.HasRequest {
+		// Not applicable (because the method is an event).
+		return Payload{}
 	}
-	return []Parameter{{
-		OGType:       *val,
-		Type:         c.compileType(*val),
-		BorrowedType: c.compileBorrowedType(*val),
-		Name:         "payload",
-	}}
+	if m.RequestPayload == nil {
+		// Empty payload, e.g. the request of `Foo();`.
+		return emptyPayload("fidl::encoding::EmptyPayload")
+	}
+	// Struct, table, or union request payload.
+	return c.payloadForType(c.compileType(*m.RequestPayload))
 }
 
-// TODO(fxbug.dev/76655): Remove this.
-const maximumAllowedParameters = 12
+func (c *compiler) compileResponse(m fidlgen.Method) Payload {
+	if !m.HasResponse {
+		// Not applicable (because the method is one-way).
+		return Payload{}
+	}
+	if m.ResponsePayload == nil {
+		// Empty payload, e.g. the response of `Foo() -> ();` or `-> Foo();`.
+		return emptyPayload("fidl::encoding::EmptyPayload")
+	}
+	if m.ResultType == nil {
+		// Plain payload with no flexible/error result union.
+		return c.payloadForType(c.compileType(*m.ResponsePayload))
+	}
+
+	innerType := c.compileType(*m.ValueType)
+	inner := c.payloadForType(innerType)
+	var errType Type
+	if m.HasError {
+		errType = c.compileType(*m.ErrorType)
+	}
+
+	var p Payload
+
+	// Set FidlType and OwnedType, which are different for each of the 3 cases.
+	if m.HasTransportError() && m.HasError {
+		p.FidlType = fmt.Sprintf("fidl::encoding::FlexibleResultType<%s, %s>", inner.FidlType, errType.Fidl)
+		p.OwnedType = fmt.Sprintf("fidl::encoding::FlexibleResult<%s, %s>", inner.OwnedType, errType.Owned)
+	} else if m.HasTransportError() {
+		p.FidlType = fmt.Sprintf("fidl::encoding::FlexibleType<%s>", inner.FidlType)
+		p.OwnedType = fmt.Sprintf("fidl::encoding::Flexible<%s>", inner.OwnedType)
+	} else if m.HasError {
+		p.FidlType = fmt.Sprintf("fidl::encoding::ResultType<%s, %s>", inner.FidlType, errType.Fidl)
+		p.OwnedType = fmt.Sprintf("Result<%s, %s>", inner.OwnedType, errType.Owned)
+	} else {
+		panic("should have returned earlier")
+	}
+
+	// Set all the other fields, where all that matters is m.HasError.
+	if !m.HasError {
+		p.TupleType = inner.TupleType
+		p.Parameters = inner.Parameters
+		p.EncodeExpr = inner.EncodeExpr
+		p.ConvertToTuple = inner.ConvertToTuple
+		p.ConvertToFields = inner.ConvertToFields
+	} else {
+		paramName := "result"
+		p.TupleType = c.compileCamelCompoundIdentifier(m.ResultType.Identifier)
+		p.TupleTypeAliasRhs = fmt.Sprintf("Result<%s, %s>", inner.TupleType, errType.Owned)
+		p.Parameters = []Parameter{{
+			Name:      paramName,
+			Type:      "&mut " + p.TupleType,
+			OwnedType: p.TupleType,
+		}}
+		p.EncodeExpr = convertMutRefResultToEncodeExpr(paramName, innerType, inner)
+		p.ConvertToTuple = func(owned string) string {
+			return fmt.Sprintf("%s.map(|x| %s)", owned, inner.ConvertToTuple("x"))
+		}
+		p.ConvertToFields = func(owned string) string {
+			return fmt.Sprintf("%s: %s.map(|x| %s),", paramName, owned, inner.ConvertToTuple("x"))
+		}
+	}
+
+	// For FlexibleType and FlexibleResultType, we need to wrap the value before encoding.
+	if m.HasTransportError() {
+		name, _, _ := strings.Cut(p.OwnedType, "<")
+		p.EncodeExpr = fmt.Sprintf("%s::new(%s)", name, p.EncodeExpr)
+	}
+
+	return p
+}
 
 func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 	r := Protocol{
@@ -1071,55 +1355,13 @@ func (c *compiler) compileProtocol(val fidlgen.Protocol) Protocol {
 		ProtocolName: strings.Trim(val.GetProtocolName(), "\""),
 	}
 
-	getParametersFromType := func(t *fidlgen.Type) []Parameter {
-		if val, ok := c.compiledStructs[t.Identifier]; ok {
-			return c.compileParameterArray(val.Struct)
-		}
-		return c.compileParameterSingleton(t)
-	}
-
 	for _, v := range val.Methods {
-		var compiledRequestParameterList []Parameter
-		if v.RequestPayload != nil {
-			compiledRequestParameterList = getParametersFromType(v.RequestPayload)
-			if len(compiledRequestParameterList) > maximumAllowedParameters {
-				panic(fmt.Sprintf(
-					`Method %s.%s has %d parameters, but the FIDL Rust bindings `+
-						`only support up to %d. See https://fxbug.dev/76655 for details.`,
-					val.Name, v.Name, len(compiledRequestParameterList), maximumAllowedParameters))
-			}
-		}
-
-		name := compileSnakeIdentifier(v.Name)
-		camelName := compileCamelIdentifier(v.Name)
-		var compiledResponseParameterList []Parameter
-		var foundResult *Result
-
-		findResultType := func() *Result {
-			if result, ok := c.results[v.ResultType.Identifier]; ok {
-				return &result
-			}
-			panic(fmt.Sprintf("unknown result type: %v", v.ResultType.Identifier))
-		}
-
-		if v.ResponsePayload != nil {
-			if v.HasError || v.HasTransportError() {
-				foundResult = findResultType()
-			}
-			innerResponse := v.ResponsePayload
-			if !v.HasError && v.HasTransportError() {
-				innerResponse = v.ValueType
-			}
-			compiledResponseParameterList = getParametersFromType(innerResponse)
-		}
-
 		r.Methods = append(r.Methods, Method{
 			Method:       v,
-			Name:         name,
-			CamelName:    camelName,
-			Request:      compiledRequestParameterList,
-			Response:     compiledResponseParameterList,
-			Result:       foundResult,
+			Name:         compileSnakeIdentifier(v.Name),
+			CamelName:    compileCamelIdentifier(v.Name),
+			Request:      c.compileRequest(v),
+			Response:     c.compileResponse(v),
 			Overflowable: v.GetOverflowable(val, c.experiments),
 		})
 	}
@@ -1151,19 +1393,12 @@ func (c *compiler) compileService(val fidlgen.Service) Service {
 }
 
 func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
-	hi := c.fieldHandleInformation(&val.Type)
 	return StructMember{
-		StructMember:      val,
-		Type:              c.compileType(val.Type),
-		OGType:            val.Type,
-		Name:              compileSnakeIdentifier(val.Name),
-		OffsetV1:          val.FieldShapeV1.Offset,
-		OffsetV2:          val.FieldShapeV2.Offset,
-		HasDefault:        false,
-		DefaultValue:      "", // TODO(fxbug.dev/118283) support defaults
-		HasHandleMetadata: hi.hasHandleMetadata,
-		HandleSubtype:     hi.fullObjectType,
-		HandleRights:      hi.fullRights,
+		StructMember: val,
+		Type:         c.compileType(val.Type),
+		Name:         compileSnakeIdentifier(val.Name),
+		OffsetV1:     val.FieldShapeV1.Offset,
+		OffsetV2:     val.FieldShapeV2.Offset,
 	}
 }
 
@@ -1174,20 +1409,20 @@ func (c *compiler) computeUseFidlStructCopyForStruct(st fidlgen.Struct) bool {
 		return false
 	}
 	for _, member := range st.Members {
-		if !c.computeUseFidlStructCopy(&member.Type) {
+		if !c.computeUseFidlStructCopy(member.Type) {
 			return false
 		}
 	}
 	return true
 }
 
-func (c *compiler) computeUseFidlStructCopy(typ *fidlgen.Type) bool {
+func (c *compiler) computeUseFidlStructCopy(typ fidlgen.Type) bool {
 	if typ.Nullable {
 		return false
 	}
 	switch typ.Kind {
 	case fidlgen.ArrayType:
-		return c.computeUseFidlStructCopy(typ.ElementType)
+		return c.computeUseFidlStructCopy(*typ.ElementType)
 	case fidlgen.VectorType, fidlgen.StringType, fidlgen.HandleType, fidlgen.RequestType:
 		return false
 	case fidlgen.PrimitiveType:
@@ -1302,110 +1537,41 @@ func (c *compiler) compileStruct(val fidlgen.Struct) Struct {
 	return r
 }
 
-func (c *compiler) compileUnionMember(val fidlgen.UnionMember) UnionMember {
-	hi := c.fieldHandleInformation(val.Type)
-	return UnionMember{
-		UnionMember:       val,
-		Type:              c.compileType(*val.Type),
-		OGType:            *val.Type,
-		Name:              compileCamelIdentifier(val.Name),
-		Ordinal:           val.Ordinal,
-		HasHandleMetadata: hi.hasHandleMetadata,
-		HandleSubtype:     hi.fullObjectType,
-		HandleRights:      hi.fullRights,
-	}
-}
-
 func (c *compiler) compileUnion(val fidlgen.Union) Union {
 	r := Union{
-		Union:   val,
-		ECI:     val.Name,
-		Name:    c.compileCamelCompoundIdentifier(val.Name),
-		Members: []UnionMember{},
+		Union: val,
+		ECI:   val.Name,
+		Name:  c.compileCamelCompoundIdentifier(val.Name),
 	}
-
 	for _, v := range val.Members {
 		if v.Reserved {
 			continue
 		}
-		r.Members = append(r.Members, c.compileUnionMember(v))
-	}
-
-	return r
-}
-
-func (c *compiler) compileResultFromUnion(m fidlgen.Method, root Root) Result {
-	// Results may be compiled more than once if they are composed. In that
-	// case, just re use the existing value.
-	if r, ok := c.results[m.ResultType.Identifier]; ok {
-		return r
-	}
-
-	r := Result{
-		ECI:               m.ResultType.Identifier,
-		Name:              c.compileCamelCompoundIdentifier(m.ResultType.Identifier),
-		HasTransportError: m.HasTransportError(),
-	}
-
-	if m.HasError {
-		r.ErrOGType = m.ErrorType
-		errType := c.compileType(*m.ErrorType)
-		r.ErrType = &errType
-	}
-	declInfo, ok := c.decls[m.ValueType.Identifier]
-	if !ok {
-		panic(fmt.Sprintf("declaration not found: %v", m.ValueType.Identifier))
-	}
-
-	switch declInfo.Type {
-	case fidlgen.StructDeclType:
-		for _, m := range c.compiledStructs[m.ValueType.Identifier].Members {
-			wrapperName, hasHandleMetadata := c.compileHandleMetadataWrapper(&m.OGType)
-			r.Ok = append(r.Ok, ResultOkEntry{
-				OGType:            m.OGType,
-				Type:              m.Type,
-				HasHandleMetadata: hasHandleMetadata,
-				HandleWrapperName: wrapperName,
-			})
-		}
-	case fidlgen.TableDeclType, fidlgen.UnionDeclType:
-		wrapperName, hasHandleMetadata := c.compileHandleMetadataWrapper(m.ValueType)
-		r.Ok = append(r.Ok, ResultOkEntry{
-			OGType:            *m.ValueType,
-			Type:              c.compileType(*m.ValueType),
-			HasHandleMetadata: hasHandleMetadata,
-			HandleWrapperName: wrapperName,
+		r.Members = append(r.Members, UnionMember{
+			UnionMember: v,
+			Type:        c.compileType(*v.Type),
+			Name:        compileCamelIdentifier(v.Name),
+			Ordinal:     v.Ordinal,
 		})
-	default:
-		panic("payload must be struct, table, or union")
 	}
-
-	c.results[r.ECI] = r
-
 	return r
 }
 
 func (c *compiler) compileTable(table fidlgen.Table) Table {
-	var members []TableMember
+	r := Table{
+		Table: table,
+		ECI:   table.Name,
+		Name:  c.compileCamelCompoundIdentifier(table.Name),
+	}
 	for _, member := range table.SortedMembersNoReserved() {
-		hi := c.fieldHandleInformation(member.Type)
-		members = append(members, TableMember{
-			TableMember:       member,
-			OGType:            *member.Type,
-			Type:              c.compileType(*member.Type),
-			Name:              compileSnakeIdentifier(member.Name),
-			Ordinal:           member.Ordinal,
-			HasHandleMetadata: hi.hasHandleMetadata,
-			HandleSubtype:     hi.fullObjectType,
-			HandleRights:      hi.fullRights,
+		r.Members = append(r.Members, TableMember{
+			TableMember: member,
+			Type:        c.compileType(*member.Type),
+			Name:        compileSnakeIdentifier(member.Name),
+			Ordinal:     member.Ordinal,
 		})
 	}
-	return Table{
-		Table:   table,
-		ECI:     table.Name,
-		Name:    c.compileCamelCompoundIdentifier(table.Name),
-		Members: members,
-	}
+	return r
 }
 
 type derives uint16
@@ -1592,7 +1758,7 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 			derivesOut &^= derivesZerocopy
 		}
 		for _, member := range st.Members {
-			derivesOut &= dc.derivesForType(member.OGType)
+			derivesOut &= dc.derivesForType(member.Type)
 		}
 		st.Derives = derivesOut
 	case fidlgen.TableDeclType:
@@ -1620,7 +1786,7 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 		} else {
 			derivesOut = allowedDerives(union.Resourceness) &^ derivesZerocopy
 			for _, member := range union.Members {
-				derivesOut &= dc.derivesForType(member.OGType)
+				derivesOut &= dc.derivesForType(member.Type)
 			}
 		}
 		union.Derives = derivesOut
@@ -1658,18 +1824,18 @@ func (dc *derivesCompiler) fillDerivesForECI(eci EncodedCompoundIdentifier) deri
 	return derivesOut
 }
 
-func (dc *derivesCompiler) derivesForType(ogType fidlgen.Type) derives {
-	switch ogType.Kind {
+func (dc *derivesCompiler) derivesForType(t Type) derives {
+	switch t.Kind {
 	case fidlgen.ArrayType:
-		return dc.derivesForType(*ogType.ElementType)
+		return dc.derivesForType(*t.ElementType)
 	case fidlgen.VectorType:
-		return derivesAll &^ (derivesCopy | derivesZerocopy) & dc.derivesForType(*ogType.ElementType)
+		return derivesAll &^ (derivesCopy | derivesZerocopy) & dc.derivesForType(*t.ElementType)
 	case fidlgen.StringType:
 		return derivesAll &^ (derivesCopy | derivesZerocopy)
 	case fidlgen.HandleType, fidlgen.RequestType:
 		return derivesAll &^ (derivesCopy | derivesClone | derivesZerocopy)
 	case fidlgen.PrimitiveType:
-		switch ogType.PrimitiveSubtype {
+		switch t.PrimitiveSubtype {
 		case fidlgen.Bool:
 			return derivesAll &^ derivesZerocopy
 		case fidlgen.Int8, fidlgen.Int16, fidlgen.Int32, fidlgen.Int64,
@@ -1679,35 +1845,29 @@ func (dc *derivesCompiler) derivesForType(ogType fidlgen.Type) derives {
 			// Floats don't have a total ordering due to NAN and its multiple representations.
 			return derivesAll &^ (derivesEq | derivesOrd | derivesHash | derivesZerocopy)
 		default:
-			panic(fmt.Sprintf("unknown primitive type: %v", ogType.PrimitiveSubtype))
+			panic(fmt.Sprintf("unknown primitive type: %v", t.PrimitiveSubtype))
 		}
 	case fidlgen.IdentifierType:
-		declInfo, ok := dc.decls[ogType.Identifier]
-		if !ok {
-			panic(fmt.Sprintf("unknown identifier: %v", ogType.Identifier))
-		}
-		switch declInfo.Type {
+		switch t.DeclType {
 		case fidlgen.BitsDeclType, fidlgen.EnumDeclType:
-			// Enums and bits are always simple, non-float primitives which
-			// implement all derivable traits except zerocopy.
 			return derivesAll &^ derivesZerocopy
 		case fidlgen.StructDeclType, fidlgen.UnionDeclType:
-			result := dc.fillDerivesForECI(ogType.Identifier)
-			if ogType.Nullable {
+			result := dc.fillDerivesForECI(t.Identifier)
+			if t.Nullable {
 				// Nullable structs and unions gets put in Option<Box<...>>.
 				result &^= derivesCopy | derivesZerocopy
 			}
 			return result
 		case fidlgen.TableDeclType:
-			return dc.fillDerivesForECI(ogType.Identifier)
+			return dc.fillDerivesForECI(t.Identifier)
 		case fidlgen.ProtocolDeclType:
 			// An IdentifierType referring to a Protocol is a client_end.
 			return derivesAll &^ (derivesCopy | derivesClone | derivesZerocopy)
 		default:
-			panic(fmt.Sprintf("unexpected identifier type: %v", declInfo.Type))
+			panic(fmt.Sprintf("unexpected identifier type: %v", t.DeclType))
 		}
 	default:
-		panic(fmt.Sprintf("unknown type kind: %v", ogType.Kind))
+		panic(fmt.Sprintf("unknown type kind: %v", t.Kind))
 	}
 }
 
@@ -1718,16 +1878,14 @@ func Compile(r fidlgen.Root) Root {
 	}
 	thisLibParsed := r.Name.Parse()
 	c := compiler{
-		decls:                  r.DeclInfo(),
-		experiments:            r.Experiments,
-		library:                thisLibParsed,
-		externCrates:           map[string]struct{}{},
-		structs:                map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
-		compiledStructs:        map[fidlgen.EncodedCompoundIdentifier]Struct{},
-		results:                map[fidlgen.EncodedCompoundIdentifier]Result{},
-		handleMetadataWrappers: map[string]HandleMetadataWrapper{},
+		decls:        r.DeclInfo(),
+		experiments:  r.Experiments,
+		library:      thisLibParsed,
+		externCrates: map[string]struct{}{},
+		structs:      map[fidlgen.EncodedCompoundIdentifier]fidlgen.Struct{},
 	}
-	methodTypeUses := r.MethodTypeUsageMap()
+
+	methodUsage := r.MethodTypeUsageMap()
 
 	for _, s := range r.Structs {
 		c.structs[s.Name] = s
@@ -1753,66 +1911,32 @@ func Compile(r fidlgen.Root) Root {
 		root.Services = append(root.Services, c.compileService(v))
 	}
 
-	for _, v := range r.Structs {
-		compiled := c.compileStruct(v)
-		c.compiledStructs[v.Name] = compiled
-		if _, ok := methodTypeUses[v.Name]; ok {
-			if v.IsAnonymous() {
-				continue
-			}
-		}
-		root.Structs = append(root.Structs, compiled)
-	}
-
-	for _, v := range r.ExternalStructs {
-		c.compiledStructs[v.Name] = c.compileStruct(v)
-	}
-
 	for _, v := range r.Tables {
 		root.Tables = append(root.Tables, c.compileTable(v))
 	}
 
-	for _, v := range r.Protocols {
-		for _, m := range v.Methods {
-			// A result is referenced multiple times when a method is composed.
-			// We always need to compile the result from the union, because it
-			// will be referenced when compiling the method and affects how the
-			// method handles its arguments and return value, so we always run
-			// compileResultFromUnion to ensure that c.results contains the
-			// result union.
-			//
-			// However, we only want to actually generate the type aliases for
-			// the result union once, and we especially don't want to generate
-			// aliases when those already exist in another generated library, so
-			// we don't add the result type to root.Results unless this is the
-			// original non-composed method.
-			if m.ResultType != nil {
-				result := c.compileResultFromUnion(m, root)
-				if !m.IsComposed {
-					root.Results = append(root.Results, result)
-				}
-			}
+	for _, v := range r.Structs {
+		// Don't emit compiler-generated "TopResponse" structs.
+		if methodUsage[v.Name] == fidlgen.UsedOnlyAsMessageBody {
+			continue
 		}
+		// Don't emit compiler-generated empty structs for error syntax.
+		if methodUsage[v.Name] == fidlgen.UsedOnlyAsPayload && len(v.Members) == 0 {
+			continue
+		}
+		root.Structs = append(root.Structs, c.compileStruct(v))
 	}
 
 	for _, v := range r.Unions {
-		if result := root.findResult(v.Name); result == nil {
-			root.Unions = append(root.Unions, c.compileUnion(v))
+		// Don't emit compiler-generated "Result" unions.
+		if v.HasAttribute("result") {
+			continue
 		}
+		root.Unions = append(root.Unions, c.compileUnion(v))
 	}
 
 	for _, v := range r.Protocols {
 		root.Protocols = append(root.Protocols, c.compileProtocol(v))
-	}
-
-	// Sort by wrapper name for deterministic output order.
-	handleMetadataWrapperNames := make([]string, 0, len(c.handleMetadataWrappers))
-	for name := range c.handleMetadataWrappers {
-		handleMetadataWrapperNames = append(handleMetadataWrapperNames, name)
-	}
-	sort.Strings(handleMetadataWrapperNames)
-	for _, name := range handleMetadataWrapperNames {
-		root.HandleMetadataWrappers = append(root.HandleMetadataWrappers, c.handleMetadataWrappers[name])
 	}
 
 	c.fillDerives(&root)

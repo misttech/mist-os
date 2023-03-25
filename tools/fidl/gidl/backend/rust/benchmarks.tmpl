@@ -7,7 +7,7 @@
 #![allow(unused_imports)]
 use {
     fidl::{
-        encoding::{Context, Decodable, Decoder, Encoder, with_tls_encode_buf, WireFormatVersion},
+        encoding::{Context, Decode, Decoder, Encoder, with_tls_encode_buf, WireFormatVersion},
         handle::Handle, handle::HandleDisposition, handle::HandleInfo, handle::HandleOp,
         ObjectType, Rights,
     },
@@ -36,7 +36,7 @@ pub const BENCHMARKS: [(&'static str, fn(&mut Bencher)); {{ .NumBenchmarks }}] =
 {{- end }}
 ];
 
-const _V2_CONTEXT: &Context = &Context { wire_format_version: WireFormatVersion::V2 };
+const _V2_CONTEXT: Context = Context { wire_format_version: WireFormatVersion::V2 };
 
 {{ range .Benchmarks }}
 fn benchmark_{{ .Name }}_builder(b: &mut Bencher) {
@@ -71,7 +71,7 @@ fn benchmark_{{ .Name }}_encode(b: &mut Bencher) {
         |value| {
             {{- /* Encode to TLS buffers since that's what the bindings do in practice. */}}
             with_tls_encode_buf(|bytes, handles| {
-                Encoder::encode_with_context(_V2_CONTEXT, bytes, handles, value).unwrap();
+                Encoder::encode_with_context::<{{ .ValueType }}>(_V2_CONTEXT, bytes, handles, {{ if not .IsResource }}&*{{ end }}value).unwrap();
                 {{- /* Return the underlying heap storage of handles, since with_tls_encode_buf
                     clears it after calling this closure, which otherwise would close all the
                     handles. By returning the actual handles, we avoid including handle close
@@ -95,16 +95,16 @@ fn benchmark_{{ .Name }}_decode(b: &mut Bencher) {
             {{- end }}
             let mut bytes = Vec::<u8>::new();
             let mut handles = Vec::<HandleDisposition<'static>>::new();
-            let original_value = &mut {{ .Value }};
-            Encoder::encode_with_context(_V2_CONTEXT, &mut bytes, &mut handles, original_value).unwrap();
+            let original_value = &{{ if .IsResource}}mut {{ end }}{{ .Value }};
+            Encoder::encode_with_context::<{{ .ValueType }}>(_V2_CONTEXT, &mut bytes, &mut handles, original_value).unwrap();
             let handle_infos = fidl::encoding::convert_handle_dispositions_to_infos(handles).unwrap();
             {{- /* Wrap handle in an Option to allow low-overhead measurement of drop time */}}
-            (bytes, handle_infos, ManuallyDrop::new({{ .ValueType }}::new_empty()))
+            (bytes, handle_infos, ManuallyDrop::new(fidl::new_empty!({{ .ValueType }})))
         },
         |(bytes, handle_infos, manually_drop_value)| {
             // Cast &mut ManuallyDrop<T> to &mut T.
             let value : &mut {{ .ValueType }} = unsafe { std::mem::transmute(manually_drop_value as *mut _) };
-            Decoder::decode_with_context(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
+            Decoder::decode_with_context::<{{ .ValueType }}>(_V2_CONTEXT, bytes, handle_infos, value).unwrap();
             // Count the drop time in the benchmark.
             unsafe { ManuallyDrop::drop(manually_drop_value) };
         },

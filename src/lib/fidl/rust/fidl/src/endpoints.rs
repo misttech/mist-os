@@ -389,8 +389,6 @@ impl<T: ProtocolMarker> ::std::fmt::Debug for ServerEnd<T> {
 
 impl<T> HandleBased for ServerEnd<T> {}
 
-handle_based_codable![ClientEnd :- <T,>, ServerEnd :- <T,>,];
-
 /// Creates client and server endpoints connected to by a channel.
 pub fn create_endpoints<T: ProtocolMarker>() -> (ClientEnd<T>, ServerEnd<T>) {
     let (client, server) = Channel::create();

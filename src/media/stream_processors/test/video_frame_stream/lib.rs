@@ -4,7 +4,6 @@
 
 use anyhow::format_err;
 use async_trait::async_trait;
-use fidl::encoding::Decodable;
 use fidl_fuchsia_media::*;
 use fidl_fuchsia_sysmem as sysmem;
 use std::rc::Rc;
@@ -101,6 +100,33 @@ impl OutputValidator for TimestampValidator {
     }
 }
 
+fn new_video_uncompressed_format(
+    image_format: fidl_fuchsia_sysmem::ImageFormat2,
+) -> VideoUncompressedFormat {
+    VideoUncompressedFormat {
+        image_format,
+        fourcc: 0,
+        primary_width_pixels: 0,
+        primary_height_pixels: 0,
+        secondary_width_pixels: 0,
+        secondary_height_pixels: 0,
+        planar: false,
+        swizzled: false,
+        primary_line_stride_bytes: 0,
+        secondary_line_stride_bytes: 0,
+        primary_start_offset: 0,
+        secondary_start_offset: 0,
+        tertiary_start_offset: 0,
+        primary_pixel_stride: 0,
+        secondary_pixel_stride: 0,
+        primary_display_width_pixels: 0,
+        primary_display_height_pixels: 0,
+        has_pixel_aspect_ratio: false,
+        pixel_aspect_ratio_width: 0,
+        pixel_aspect_ratio_height: 0,
+    }
+}
+
 /// Implements an `ElementaryStream` of raw video frames with the specified `format`, intended to be
 /// fed to an encoder StreamProcessor.
 pub struct VideoFrameStream {
@@ -142,10 +168,9 @@ impl VideoFrameStream {
 impl ElementaryStream for VideoFrameStream {
     fn format_details(&self, format_details_version_ordinal: u64) -> FormatDetails {
         FormatDetails {
-            domain: Some(DomainFormat::Video(VideoFormat::Uncompressed(VideoUncompressedFormat {
-                image_format: self.format.clone(),
-                ..<VideoUncompressedFormat as Decodable>::new_empty()
-            }))),
+            domain: Some(DomainFormat::Video(VideoFormat::Uncompressed(
+                new_video_uncompressed_format(self.format.clone()),
+            ))),
             encoder_settings: Some((self.encoder_settings)()),
             format_details_version_ordinal: Some(format_details_version_ordinal),
             mime_type: Some(self.mime_type.to_string()),
@@ -194,26 +219,23 @@ mod test {
 
     impl Into<VideoUncompressedFormat> for TestSpec {
         fn into(self) -> VideoUncompressedFormat {
-            VideoUncompressedFormat {
-                image_format: sysmem::ImageFormat2 {
-                    pixel_format: sysmem::PixelFormat {
-                        type_: self.pixel_format,
-                        has_format_modifier: false,
-                        format_modifier: sysmem::FormatModifier { value: 0 },
-                    },
-                    coded_width: self.coded_width as u32,
-                    coded_height: self.coded_height as u32,
-                    bytes_per_row: self.bytes_per_row as u32,
-                    display_width: self.display_width as u32,
-                    display_height: self.display_height as u32,
-                    layers: 0,
-                    color_space: sysmem::ColorSpace { type_: sysmem::ColorSpaceType::Rec709 },
-                    has_pixel_aspect_ratio: false,
-                    pixel_aspect_ratio_width: 0,
-                    pixel_aspect_ratio_height: 0,
+            new_video_uncompressed_format(sysmem::ImageFormat2 {
+                pixel_format: sysmem::PixelFormat {
+                    type_: self.pixel_format,
+                    has_format_modifier: false,
+                    format_modifier: sysmem::FormatModifier { value: 0 },
                 },
-                ..<VideoUncompressedFormat as Decodable>::new_empty()
-            }
+                coded_width: self.coded_width as u32,
+                coded_height: self.coded_height as u32,
+                bytes_per_row: self.bytes_per_row as u32,
+                display_width: self.display_width as u32,
+                display_height: self.display_height as u32,
+                layers: 0,
+                color_space: sysmem::ColorSpace { type_: sysmem::ColorSpaceType::Rec709 },
+                has_pixel_aspect_ratio: false,
+                pixel_aspect_ratio_width: 0,
+                pixel_aspect_ratio_height: 0,
+            })
         }
     }
 

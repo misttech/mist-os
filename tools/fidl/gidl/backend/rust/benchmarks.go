@@ -30,8 +30,8 @@ type benchmarkTmplInput struct {
 	Benchmarks    []benchmark
 }
 type benchmark struct {
-	Name, ChromeperfPath, HandleDefs, Value, ValueType string
-	EnableSendEventBenchmark, EnableEchoCallBenchmark  bool
+	Name, ChromeperfPath, HandleDefs, Value, ValueType            string
+	IsResource, EnableSendEventBenchmark, EnableEchoCallBenchmark bool
 }
 
 // GenerateBenchmarks generates Rust benchmarks.
@@ -51,6 +51,7 @@ func GenerateBenchmarks(gidl ir.All, fidl fidlgen.Root, config config.GeneratorC
 			HandleDefs:               buildHandleDefs(gidlBenchmark.HandleDefs),
 			Value:                    value,
 			ValueType:                declName(decl),
+			IsResource:               decl.IsResourceType(),
 			EnableSendEventBenchmark: gidlBenchmark.EnableSendEventBenchmark,
 			EnableEchoCallBenchmark:  gidlBenchmark.EnableEchoCallBenchmark,
 		})

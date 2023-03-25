@@ -24,7 +24,7 @@ async fn test_get_font_family_info_basic(factory: &ProviderFactory) -> Result<()
         .get_font_family_info(&mut fonts::FamilyName { name: "materialicons".to_string() })
         .await?;
 
-    assert!(!font_family_info.is_empty());
+    assert!(font_family_info != fonts::FontFamilyInfo::EMPTY);
 
     assert_eq!(font_family_info.name.unwrap().name, "Material Design Icons");
     assert!(font_family_info.styles.unwrap().len() > 0);
@@ -52,7 +52,7 @@ async fn test_get_font_family_info_aliases(factory: &ProviderFactory) -> Result<
     .collect();
 
     for font_family_info in font_family_infos? {
-        assert!(!font_family_info.is_empty());
+        assert!(font_family_info != fonts::FontFamilyInfo::EMPTY);
         assert_eq!(font_family_info.name.unwrap().name, "Alpha Sans");
         assert!(font_family_info.styles.unwrap().len() > 0);
     }

@@ -5,12 +5,12 @@
 */}}
 
 {{- define "EnumDeclaration" -}}
-{{- range .DocComments}}
+{{- range .DocComments }}
 ///{{ . }}
 {{- end }}
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 {{- if .IsStrict }}
-#[repr({{ .Type }})]
+#[repr({{ .UnderlyingType }})]
 {{- else }}
 #[non_exhaustive]
 {{- end }}
@@ -24,7 +24,7 @@ pub enum {{ .Name }} {
     {{- if .IsFlexible }}
     #[deprecated = "Use `{{ .Name }}::unknown()` to construct and `{{ .Name }}Unknown!()` to exhaustively match."]
     #[doc(hidden)]
-    __Unknown({{ .Type }}),
+    __Unknown({{ .UnderlyingType }}),
     {{- end }}
 }
 
@@ -38,7 +38,7 @@ macro_rules! {{ .Name }}Unknown {
 
 impl {{ .Name }} {
     #[inline]
-    pub fn from_primitive(prim: {{ .Type }}) -> Option<Self> {
+    pub fn from_primitive(prim: {{ .UnderlyingType }}) -> Option<Self> {
         match prim {
             {{- range .Members }}
             {{ .Value }} => Some(Self::{{ .Name }}),
@@ -49,8 +49,8 @@ impl {{ .Name }} {
 
 {{ if .IsStrict }}
     #[inline]
-    pub const fn into_primitive(self) -> {{ .Type }} {
-        self as {{ .Type }}
+    pub const fn into_primitive(self) -> {{ .UnderlyingType }} {
+        self as {{ .UnderlyingType }}
     }
 
     #[deprecated = "Strict enums should not use `is_unknown`"]
@@ -60,7 +60,7 @@ impl {{ .Name }} {
     }
 {{- else }}
     #[inline]
-    pub fn from_primitive_allow_unknown(prim: {{ .Type }}) -> Self {
+    pub fn from_primitive_allow_unknown(prim: {{ .UnderlyingType }}) -> Self {
         match prim {
             {{- range .Members }}
             {{ .Value }} => Self::{{ .Name }},
@@ -77,7 +77,7 @@ impl {{ .Name }} {
     }
 
     #[inline]
-    pub const fn into_primitive(self) -> {{ .Type }} {
+    pub const fn into_primitive(self) -> {{ .UnderlyingType }} {
         match self {
             {{- range .Members }}
             Self::{{ .Name }} => {{ .Value }},
@@ -102,7 +102,7 @@ impl {{ .Name }} {
 
 fidl_enum! {
     name: {{ .Name }},
-    prim_ty: {{ .Type }},
+    prim_ty: {{ .UnderlyingType }},
     {{- if .IsStrict }}
     strict: true,
     min_member: {{ .MinMember }},

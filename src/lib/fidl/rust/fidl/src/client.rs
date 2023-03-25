@@ -9,15 +9,15 @@ use {
         create_trace_provider,
         encoding::{
             decode_transaction_header, maybe_overflowing_after_encode, maybe_overflowing_decode,
-            Decodable, Decoder, DynamicFlags, Encodable, Encoder, EpitaphBody, TransactionHeader,
-            TransactionMessage,
+            Decode, Decoder, DynamicFlags, Encode, Encoder, EpitaphBody, TransactionHeader,
+            TransactionMessage, TransactionMessageType, TypeMarker,
         },
         handle::{AsyncChannel, HandleDisposition, MessageBufEtc},
         Error,
     },
     fuchsia_zircon_status as zx_status,
     futures::{
-        future::{self, AndThen, FusedFuture, Future, FutureExt, MaybeDone, Ready, TryFutureExt},
+        future::{self, FusedFuture, Future, FutureExt, Map, MaybeDone},
         ready,
         stream::{FusedStream, Stream},
         task::{noop_waker, ArcWake, Context, Poll, Waker},
@@ -27,29 +27,20 @@ use {
     std::{collections::VecDeque, marker::Unpin, mem, pin::Pin, sync::Arc},
 };
 
-fn decode_transaction_body<D: Decodable, const OVERFLOWABLE: bool>(
+/// Decodes the body of `buf` as the FIDL type `T`.
+#[doc(hidden)] // only exported for use in macros or generated code
+pub fn decode_transaction_body<T: TypeMarker, const OVERFLOWABLE: bool>(
     mut buf: MessageBufEtc,
-) -> Result<D, Error> {
+) -> Result<T::Owned, Error> {
     let (bytes, handles) = buf.split_mut();
     let (header, body_bytes) = decode_transaction_header(bytes)?;
-    let mut output = D::new_empty();
-
+    let mut output = Decode::<T>::new_empty();
     if OVERFLOWABLE {
-        maybe_overflowing_decode(&header, body_bytes, handles, &mut output)?;
+        maybe_overflowing_decode::<T>(&header, body_bytes, handles, &mut output)?;
     } else {
-        Decoder::decode_into(&header, body_bytes, handles, &mut output)?;
+        Decoder::decode_into::<T>(&header, body_bytes, handles, &mut output)?;
     }
-
     Ok(output)
-}
-
-/// Decodes the body of a transaction.
-/// Exposed for generated code.
-pub fn decode_transaction_body_fut<D: Decodable, T, const OVERFLOWABLE: bool>(
-    buf: MessageBufEtc,
-    transform: fn(Result<D, Error>) -> Result<T, Error>,
-) -> Ready<Result<T, Error>> {
-    future::ready(transform(decode_transaction_body::<_, OVERFLOWABLE>(buf)))
 }
 
 /// A FIDL client which can be used to send buffers and receive responses via a channel.
@@ -60,7 +51,7 @@ pub struct Client {
 
 /// A future representing the decoded and transformed response to a FIDL query.
 pub type DecodedQueryResponseFut<T> =
-    AndThen<MessageResponse, Ready<Result<T, Error>>, fn(MessageBufEtc) -> Ready<Result<T, Error>>>;
+    Map<MessageResponse, fn(Result<MessageBufEtc, Error>) -> Result<T, Error>>;
 
 /// A future representing the result of a FIDL query, with early error detection available if the
 /// message couldn't be sent.
@@ -211,84 +202,74 @@ impl Client {
         EventReceiver { inner: self.inner.clone(), state: EventReceiverState::Active }
     }
 
-    /// Send an encodable message without expecting a response.
-    pub fn send<T: Encodable, const OVERFLOWABLE: bool>(
+    /// Encodes and sends a request without expecting a response.
+    pub fn send<T: TypeMarker, const OVERFLOWABLE: bool>(
         &self,
-        body: &mut T,
+        body: impl Encode<T>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
     ) -> Result<(), Error> {
-        let msg = &mut TransactionMessage {
-            header: TransactionHeader::new(0, ordinal, dynamic_flags),
-            body,
-        };
-        crate::encoding::with_tls_encoded::<_, _, OVERFLOWABLE>(msg, |bytes, handles| {
-            self.send_raw_msg(&**bytes, handles)
-        })
+        let msg =
+            TransactionMessage { header: TransactionHeader::new(0, ordinal, dynamic_flags), body };
+        crate::encoding::with_tls_encoded::<TransactionMessageType<T>, (), OVERFLOWABLE>(
+            msg,
+            |bytes, handles| self.send_raw(bytes, handles),
+        )
     }
 
-    /// Send an encodable query and receive a decodable response.
+    /// Encodes and sends a request. Returns a future that decodes the response.
     pub fn send_query<
-        E: Encodable,
-        D: Decodable,
+        Request: TypeMarker,
+        Response: TypeMarker,
         const REQUEST_ENCODE_OVERFLOWABLE: bool,
         const RESPONSE_DECODE_OVERFLOWABLE: bool,
     >(
         &self,
-        msg: &mut E,
+        body: impl Encode<Request>,
         ordinal: u64,
         dynamic_flags: DynamicFlags,
-    ) -> QueryResponseFut<D> {
-        let send_result = self.send_raw_query(|tx_id, bytes, handles| {
-            let msg = &mut TransactionMessage {
-                header: TransactionHeader::new(tx_id.as_raw_id(), ordinal, dynamic_flags),
-                body: msg,
-            };
-            Encoder::encode(bytes, handles, msg)?;
+    ) -> QueryResponseFut<Response::Owned> {
+        self.send_query_and_decode::<Request, Response::Owned, REQUEST_ENCODE_OVERFLOWABLE>(
+            body,
+            ordinal,
+            dynamic_flags,
+            |buf| buf.and_then(decode_transaction_body::<Response, RESPONSE_DECODE_OVERFLOWABLE>),
+        )
+    }
 
+    /// Encodes and sends a request. Returns a future that decodes the response
+    /// using the given `decode` function.
+    pub fn send_query_and_decode<
+        Request: TypeMarker,
+        Output,
+        const REQUEST_ENCODE_OVERFLOWABLE: bool,
+    >(
+        &self,
+        body: impl Encode<Request>,
+        ordinal: u64,
+        dynamic_flags: DynamicFlags,
+        decode: fn(Result<MessageBufEtc, Error>) -> Result<Output, Error>,
+    ) -> QueryResponseFut<Output> {
+        let send_result = self.send_raw_query(|tx_id, bytes, handles| {
+            let msg = TransactionMessage {
+                header: TransactionHeader::new(tx_id.as_raw_id(), ordinal, dynamic_flags),
+                body,
+            };
+            Encoder::encode::<TransactionMessageType<Request>>(bytes, handles, msg)?;
             if REQUEST_ENCODE_OVERFLOWABLE {
                 maybe_overflowing_after_encode(bytes, handles)?;
             }
-
             Ok(())
         });
 
         QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(res_fut.and_then(|buf| {
-                decode_transaction_body_fut::<D, D, RESPONSE_DECODE_OVERFLOWABLE>(
-                    buf,
-                    std::convert::identity,
-                )
-            })),
+            Ok(res_fut) => future::maybe_done(res_fut.map(decode)),
             Err(e) => MaybeDone::Done(Err(e)),
         })
     }
 
-    /// Send an encodable query and receive a decodable response, transforming
-    /// the response with the specified function after decoding.
-    pub fn call_send_raw_query<E: Encodable, const OVERFLOWABLE: bool>(
-        &self,
-        msg: &mut E,
-        ordinal: u64,
-        dynamic_flags: DynamicFlags,
-    ) -> Result<MessageResponse, Error> {
-        self.send_raw_query(|tx_id, bytes, handles| {
-            let msg = &mut TransactionMessage {
-                header: TransactionHeader::new(tx_id.as_raw_id(), ordinal, dynamic_flags),
-                body: msg,
-            };
-            Encoder::encode(bytes, handles, msg)?;
-
-            if OVERFLOWABLE {
-                maybe_overflowing_after_encode(bytes, handles)?;
-            }
-
-            Ok(())
-        })
-    }
-
-    /// Send a raw message without expecting a response.
-    pub fn send_raw_msg(
+    /// Sends a raw message without expecting a response.
+    pub fn send_raw(
         &self,
         bytes: &[u8],
         handles: &mut Vec<HandleDisposition<'_>>,
@@ -299,19 +280,19 @@ impl Client {
         }
     }
 
-    /// Send a raw query and receive a response future.
-    pub fn send_raw_query<F>(&self, msg_from_id: F) -> Result<MessageResponse, Error>
+    /// Sends a raw query and receives a response future.
+    pub fn send_raw_query<F>(&self, encode_msg: F) -> Result<MessageResponse, Error>
     where
         F: for<'a, 'b> FnOnce(
             Txid,
             &'a mut Vec<u8>,
-            &'b mut Vec<HandleDisposition<'_>>,
+            &'b mut Vec<HandleDisposition<'static>>,
         ) -> Result<(), Error>,
     {
         let id = self.inner.register_msg_interest();
         crate::encoding::with_tls_encode_buf(|bytes, handles| {
-            msg_from_id(Txid::from_interest_id(id), bytes, handles)?;
-            self.send_raw_msg(bytes, handles)
+            encode_msg(Txid::from_interest_id(id), bytes, handles)?;
+            self.send_raw(bytes, handles)
         })?;
 
         Ok(MessageResponse { id: Txid::from_interest_id(id), client: Some(self.inner.clone()) })
@@ -704,8 +685,13 @@ impl ClientInner {
             if header.is_epitaph() {
                 // Received an epitaph. Record this so that everyone receives the same epitaph.
                 let handles = &mut [];
-                let mut epitaph_body = EpitaphBody::new_empty();
-                Decoder::decode_into(&header, &body_bytes, handles, &mut epitaph_body)?;
+                let mut epitaph_body = Decode::<EpitaphBody>::new_empty();
+                Decoder::decode_into::<EpitaphBody>(
+                    &header,
+                    &body_bytes,
+                    handles,
+                    &mut epitaph_body,
+                )?;
                 *epitaph_lock = Some(epitaph_body.error);
                 // Wake up everyone waiting, since an epitaph is broadcast to all receivers.
                 self.wake_all();
@@ -827,25 +813,26 @@ pub mod sync {
         }
 
         /// Send a new message.
-        pub fn send<E: Encodable, const OVERFLOWABLE: bool>(
+        pub fn send<T: TypeMarker, const OVERFLOWABLE: bool>(
             &self,
-            msg: &mut E,
+            body: impl Encode<T>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
         ) -> Result<(), Error> {
             let mut write_bytes = Vec::new();
             let mut write_handles = Vec::new();
-
-            let msg = &mut TransactionMessage {
+            let msg = TransactionMessage {
                 header: TransactionHeader::new(0, ordinal, dynamic_flags),
-                body: msg,
+                body,
             };
-            Encoder::encode(&mut write_bytes, &mut write_handles, msg)?;
-
+            Encoder::encode::<TransactionMessageType<T>>(
+                &mut write_bytes,
+                &mut write_handles,
+                msg,
+            )?;
             if OVERFLOWABLE {
                 maybe_overflowing_after_encode(&mut write_bytes, &mut write_handles)?;
             }
-
             match self.channel.write_etc(&mut write_bytes, &mut write_handles) {
                 Ok(()) | Err(zx_status::Status::PEER_CLOSED) => Ok(()),
                 Err(e) => Err(Error::ClientWrite(e)),
@@ -854,25 +841,29 @@ pub mod sync {
 
         /// Send a new message expecting a response.
         pub fn send_query<
-            E: Encodable,
-            D: Decodable,
+            Request: TypeMarker,
+            Response: TypeMarker,
             const REQUEST_ENCODE_OVERFLOWABLE: bool,
             const RESPONSE_DECODE_OVERFLOWABLE: bool,
         >(
             &self,
-            msg: &mut E,
+            body: impl Encode<Request>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
             deadline: zx::Time,
-        ) -> Result<D, Error> {
+        ) -> Result<Response::Owned, Error> {
             let mut write_bytes = Vec::new();
             let mut write_handles = Vec::new();
 
-            let msg = &mut TransactionMessage {
+            let msg = TransactionMessage {
                 header: TransactionHeader::new(0, ordinal, dynamic_flags),
-                body: msg,
+                body,
             };
-            Encoder::encode(&mut write_bytes, &mut write_handles, msg)?;
+            Encoder::encode::<TransactionMessageType<Request>>(
+                &mut write_bytes,
+                &mut write_handles,
+                msg,
+            )?;
 
             if REQUEST_ENCODE_OVERFLOWABLE {
                 maybe_overflowing_after_encode(&mut write_bytes, &mut write_handles)?;
@@ -890,12 +881,22 @@ pub mod sync {
 
             let (bytes, mut handle_infos) = buf.split();
             let (header, body_bytes) = decode_transaction_header(&bytes)?;
-            let mut output = D::new_empty();
+            let mut output = Decode::<Response>::new_empty();
 
             if RESPONSE_DECODE_OVERFLOWABLE {
-                maybe_overflowing_decode(&header, body_bytes, &mut handle_infos, &mut output)?;
+                maybe_overflowing_decode::<Response>(
+                    &header,
+                    body_bytes,
+                    &mut handle_infos,
+                    &mut output,
+                )?;
             } else {
-                Decoder::decode_into(&header, body_bytes, &mut handle_infos, &mut output)?;
+                Decoder::decode_into::<Response>(
+                    &header,
+                    body_bytes,
+                    &mut handle_infos,
+                    &mut output,
+                )?;
             }
 
             Ok(output)
@@ -968,7 +969,7 @@ mod tests {
         fuchsia_async::{DurationExt, TimeoutExt},
         fuchsia_zircon as zx,
         fuchsia_zircon::{AsHandleRef, DurationNum},
-        futures::{join, FutureExt, StreamExt},
+        futures::{join, FutureExt, StreamExt, TryFutureExt},
         futures_test::task::new_count_waker,
         std::thread,
     };
@@ -1001,10 +1002,11 @@ mod tests {
     fn encode_transaction<'a>(
         header: TransactionHeader,
         bytes: &mut Vec<u8>,
-        handles: &mut Vec<zx::HandleDisposition<'a>>,
+        handles: &mut Vec<zx::HandleDisposition<'static>>,
     ) {
-        let event = &mut TransactionMessage { header: header, body: &mut SEND_DATA.clone() };
-        Encoder::encode(bytes, handles, event).expect("Encoding failure");
+        let event = TransactionMessage { header, body: SEND_DATA };
+        Encoder::encode::<TransactionMessageType<u8>>(bytes, handles, event)
+            .expect("Encoding failure");
     }
 
     #[test]
@@ -1012,7 +1014,7 @@ mod tests {
         let (client_end, server_end) = zx::Channel::create();
         let client = sync::Client::new(client_end, "test_protocol");
         client
-            .send::<u8, false>(&mut SEND_DATA.clone(), SEND_ORDINAL, DynamicFlags::empty())
+            .send::<u8, false>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
             .context("sending")?;
         let mut received = MessageBufEtc::new();
         server_end.read_etc(&mut received).context("reading")?;
@@ -1042,7 +1044,7 @@ mod tests {
         });
         let response_data = client
             .send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
+                SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
                 zx::Time::after(5.seconds()),
@@ -1081,7 +1083,7 @@ mod tests {
         });
         let response_data = client
             .send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
+                SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
                 zx::Time::after(5.seconds()),
@@ -1150,7 +1152,7 @@ mod tests {
         let client = sync::Client::new(client_end, "test_protocol");
         drop(server_end);
         assert_matches!(
-            client.send::<u8, false>(&mut SEND_DATA.clone(), SEND_ORDINAL, DynamicFlags::empty()),
+            client.send::<u8, false>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty()),
             Ok(())
         );
         Ok(())
@@ -1163,7 +1165,7 @@ mod tests {
         drop(server_end);
         assert_matches!(
             client.send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
+                SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
                 zx::Time::after(5.seconds())
@@ -1188,7 +1190,7 @@ mod tests {
             .expect("failed to write epitaph");
         assert_matches!(
             client.send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
+                SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
                 zx::Time::after(5.seconds())
@@ -1229,7 +1231,7 @@ mod tests {
             .on_timeout(300.millis().after_now(), || panic!("did not receive message in time!"));
 
         client
-            .send::<u8, false>(&mut SEND_DATA.clone(), SEND_ORDINAL, DynamicFlags::empty())
+            .send::<u8, false>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
             .expect("failed to send msg");
 
         receiver.await;
@@ -1259,11 +1261,7 @@ mod tests {
             .on_timeout(300.millis().after_now(), || panic!("did not receiver message in time!"));
 
         let sender = client
-            .send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
-                SEND_ORDINAL,
-                DynamicFlags::empty(),
-            )
+            .send_query::<u8, u8, false, false>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
             .map_ok(|x| assert_eq!(x, SEND_DATA))
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 
@@ -1294,7 +1292,7 @@ mod tests {
 
         let sender = async move {
             let result = client
-                .send_query::<u8, u8, false, false>(&mut 55, 42 << 32, DynamicFlags::empty())
+                .send_query::<u8, u8, false, false>(55, 42 << 32, DynamicFlags::empty())
                 .await;
             assert_matches!(
                 result,
@@ -1412,7 +1410,7 @@ mod tests {
                 let x = x.expect("should contain one element");
                 let x = x.expect("fidl error");
                 let x: i32 =
-                    decode_transaction_body::<_, false>(x).expect("failed to decode event");
+                    decode_transaction_body::<i32, false>(x).expect("failed to decode event");
                 assert_eq!(x, 55);
                 stream.into_future()
             })
@@ -1453,7 +1451,7 @@ mod tests {
                     let x = x.expect("should contain one element");
                     let x = x.expect("fidl error");
                     let x: i32 =
-                        decode_transaction_body::<_, false>(x).expect("failed to decode event");
+                        decode_transaction_body::<i32, false>(x).expect("failed to decode event");
                     assert_eq!(x, 55);
                     stream.into_future()
                 })
@@ -1487,7 +1485,7 @@ mod tests {
         let header = TransactionHeader::new_full(
             0,
             5,
-            &crate::encoding::Context {
+            crate::encoding::Context {
                 wire_format_version: crate::encoding::WireFormatVersion::V2,
             },
             DynamicFlags::empty(),
@@ -1675,7 +1673,7 @@ mod tests {
         let (response_waker, _response_waker_count) = new_count_waker();
         let response_cx = &mut Context::from_waker(&response_waker);
         let mut response_future =
-            client.send_query::<u8, u8, false, false>(&mut 55, 42, DynamicFlags::empty());
+            client.send_query::<u8, u8, false, false>(55, 42, DynamicFlags::empty());
         assert!(response_future.poll_unpin(response_cx).is_pending());
 
         // then, make sure we can still take the event receiver without panicking
@@ -1737,15 +1735,11 @@ mod tests {
             for (index, action) in two_actions.iter().enumerate() {
                 let err = match action {
                     SendMsg => client
-                        .send::<u8, false>(
-                            &mut SEND_DATA.clone(),
-                            SEND_ORDINAL,
-                            DynamicFlags::empty(),
-                        )
+                        .send::<u8, false>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
                         .err(),
                     WaitQuery => client
                         .send_query::<u8, u8, false, false>(
-                            &mut SEND_DATA.clone(),
+                            SEND_DATA,
                             SEND_ORDINAL,
                             DynamicFlags::empty(),
                         )
@@ -1753,7 +1747,7 @@ mod tests {
                         .err(),
                     SendQuery => client
                         .send_query::<u8, u8, false, false>(
-                            &mut SEND_DATA.clone(),
+                            SEND_DATA,
                             SEND_ORDINAL,
                             DynamicFlags::empty(),
                         )
@@ -1796,7 +1790,7 @@ mod tests {
 
         // Sending works, and checking when a message successfully sends returns itself.
         let active_fut = client.send_query::<u8, u8, false, false>(
-            &mut SEND_DATA.clone(),
+            SEND_DATA,
             SEND_ORDINAL,
             DynamicFlags::empty(),
         );
@@ -1823,7 +1817,7 @@ mod tests {
         drop(server);
 
         let query_fut = client.send_query::<u8, u8, false, false>(
-            &mut SEND_DATA.clone(),
+            SEND_DATA,
             SEND_ORDINAL,
             DynamicFlags::empty(),
         );
@@ -1863,7 +1857,7 @@ mod tests {
             // Create a send future to insert a message interest but drop it
             // before a response can be received.
             let _sender = client.send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
+                SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
             );
@@ -1909,11 +1903,7 @@ mod tests {
             .on_timeout(300.millis().after_now(), || panic!("did not receiver message in time!"));
 
         let sender = client
-            .send_query::<u8, u8, false, false>(
-                &mut SEND_DATA.clone(),
-                SEND_ORDINAL,
-                DynamicFlags::empty(),
-            )
+            .send_query::<u8, u8, false, false>(SEND_DATA, SEND_ORDINAL, DynamicFlags::empty())
             .map_ok(|x| assert_eq!(x, SEND_DATA))
             .unwrap_or_else(|e| panic!("fidl error: {:?}", e));
 

@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -184,8 +183,6 @@ impl Union {
 
 impl fidl::encoding::TopLevel for Union {}
 
-impl fidl::encoding::Persistable for Union {}
-
 fidl_union! {
     name: Union,
     members: [
@@ -207,19 +204,22 @@ pub struct Struct {
 
 impl fidl::encoding::TopLevel for Struct {}
 
-impl fidl::encoding::Persistable for Struct {}
-
-fidl_struct_copy! {
+fidl_struct! {
+    copy: true,
     name: Struct,
     members: [
         x {
             ty: u32,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
     ],
-    padding_v1: [],
-    padding_v2: [],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
     size_v1: 4,
     size_v2: 4,
     align_v1: 4,
@@ -241,8 +241,6 @@ impl Table {
 }
 
 impl fidl::encoding::TopLevel for Table {}
-
-impl fidl::encoding::Persistable for Table {}
 
 fidl_table! {
     name: Table,
@@ -531,8 +529,8 @@ impl ProtocolSynchronousProxy {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#foo(&self) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (),
+        self.client.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0x567a8096af6e6139,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -582,8 +580,8 @@ impl ProtocolProxy {
 
 impl ProtocolProxyInterface for ProtocolProxy {
     fn r#foo(&self) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (),
+        self.client.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0x567a8096af6e6139,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -713,14 +711,19 @@ impl futures::Stream for ProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x567a8096af6e6139 => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.versions/ProtocolFooRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ProtocolControlHandle { inner: this.inner.clone() };
 

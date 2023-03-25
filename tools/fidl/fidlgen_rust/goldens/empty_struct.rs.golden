@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -37,9 +36,122 @@ pub struct Empty;
 
 impl fidl::encoding::TopLevel for Empty {}
 
-impl fidl::encoding::Persistable for Empty {}
+fidl_struct! {
+    empty: true,
+    name: Empty,
+}
 
-fidl_empty_struct!(Empty);
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EmptyProtocolReceiveRequest {
+    pub e: Empty,
+}
+
+impl fidl::encoding::TopLevel for EmptyProtocolReceiveRequest {}
+
+fidl_struct! {
+    name: EmptyProtocolReceiveRequest,
+    members: [
+        e {
+            ty: Empty,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 1,
+    size_v2: 1,
+    align_v1: 1,
+    align_v2: 1,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EmptyProtocolSendAndReceiveRequest {
+    pub e: Empty,
+}
+
+impl fidl::encoding::TopLevel for EmptyProtocolSendAndReceiveRequest {}
+
+fidl_struct! {
+    name: EmptyProtocolSendAndReceiveRequest,
+    members: [
+        e {
+            ty: Empty,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 1,
+    size_v2: 1,
+    align_v1: 1,
+    align_v2: 1,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EmptyProtocolSendAndReceiveResponse {
+    pub e: Empty,
+}
+
+impl fidl::encoding::TopLevel for EmptyProtocolSendAndReceiveResponse {}
+
+fidl_struct! {
+    name: EmptyProtocolSendAndReceiveResponse,
+    members: [
+        e {
+            ty: Empty,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 1,
+    size_v2: 1,
+    align_v1: 1,
+    align_v2: 1,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct EmptyProtocolSendRequest {
+    pub e: Empty,
+}
+
+impl fidl::encoding::TopLevel for EmptyProtocolSendRequest {}
+
+fidl_struct! {
+    name: EmptyProtocolSendRequest,
+    members: [
+        e {
+            ty: Empty,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 1,
+    size_v2: 1,
+    align_v1: 1,
+    align_v2: 1,
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct EmptyProtocolMarker;
@@ -52,8 +164,7 @@ impl fidl::endpoints::ProtocolMarker for EmptyProtocolMarker {
 
 pub trait EmptyProtocolProxyInterface: Send + Sync {
     fn r#send_(&self, e: &mut Empty) -> Result<(), fidl::Error>;
-    type SendAndReceiveResponseFut: std::future::Future<Output = Result<(Empty), fidl::Error>>
-        + Send;
+    type SendAndReceiveResponseFut: std::future::Future<Output = Result<Empty, fidl::Error>> + Send;
     fn r#send_and_receive(&self, e: &mut Empty) -> Self::SendAndReceiveResponseFut;
 }
 
@@ -80,8 +191,8 @@ impl EmptyProtocolSynchronousProxy {
         EmptyProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#send_(&self, mut e: &mut Empty) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (e,),
+        self.client.send::<EmptyProtocolSendRequest, false>(
+            (&*e,),
             0x132262fd8b200708,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -90,14 +201,17 @@ impl EmptyProtocolSynchronousProxy {
         &self,
         mut e: &mut Empty,
         ___deadline: zx::Time,
-    ) -> Result<(Empty), fidl::Error> {
-        let _value: (Empty,) = self.client.send_query::<_, _, false, false>(
-            &mut (e),
-            0x76a931254962cea,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    ) -> Result<Empty, fidl::Error> {
+        let _response = self.client.send_query::<
+                EmptyProtocolSendAndReceiveRequest,
+                EmptyProtocolSendAndReceiveResponse,false,false>(
+                (&*e,),
+                0x76a931254962cea,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.e)
     }
 }
 
@@ -140,35 +254,36 @@ impl EmptyProtocolProxy {
     pub fn r#send_(&self, mut e: &mut Empty) -> Result<(), fidl::Error> {
         EmptyProtocolProxyInterface::r#send_(self, e)
     }
-    pub fn r#send_and_receive(&self, mut e: &mut Empty) -> fidl::client::QueryResponseFut<(Empty)> {
+    pub fn r#send_and_receive(&self, mut e: &mut Empty) -> fidl::client::QueryResponseFut<Empty> {
         EmptyProtocolProxyInterface::r#send_and_receive(self, e)
     }
 }
 
 impl EmptyProtocolProxyInterface for EmptyProtocolProxy {
     fn r#send_(&self, mut e: &mut Empty) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (e),
+        self.client.send::<EmptyProtocolSendRequest, false>(
+            (&*e,),
             0x132262fd8b200708,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type SendAndReceiveResponseFut = fidl::client::QueryResponseFut<(Empty)>;
+    type SendAndReceiveResponseFut = fidl::client::QueryResponseFut<Empty>;
     fn r#send_and_receive(&self, mut e: &mut Empty) -> Self::SendAndReceiveResponseFut {
-        fn transform(result: Result<(Empty,), fidl::Error>) -> Result<(Empty), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<Empty, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                EmptyProtocolSendAndReceiveResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.e)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (e),
+        self.client.send_query_and_decode::<EmptyProtocolSendAndReceiveRequest, Empty, false>(
+            (&*e,),
             0x76a931254962cea,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
 }
 
@@ -210,7 +325,7 @@ pub enum EmptyProtocolEvent {
 
 impl EmptyProtocolEvent {
     #[allow(irrefutable_let_patterns)]
-    pub fn into_receive(self) -> Option<(Empty)> {
+    pub fn into_receive(self) -> Option<Empty> {
         if let EmptyProtocolEvent::Receive { e } = self {
             Some((e))
         } else {
@@ -226,20 +341,20 @@ impl EmptyProtocolEvent {
 
         match tx_header.ordinal() {
             0x1ff0ccf9b710e23f => {
-                let mut out_tuple: (Empty,) = fidl::encoding::Decodable::new_empty();
+                let mut out = fidl::new_empty!(EmptyProtocolReceiveRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolReceiveEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
                 if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                     return Err(fidl::Error::LargeMessageImpossible);
                 }
-                fidl::encoding::Decoder::decode_into(
+                fidl::encoding::Decoder::decode_into::<EmptyProtocolReceiveRequest>(
                     &tx_header,
                     _body_bytes,
                     _handles,
-                    &mut out_tuple,
+                    &mut out,
                 )?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
-                Ok((EmptyProtocolEvent::Receive { e: out_tuple.0 }))
+                Ok((EmptyProtocolEvent::Receive { e: out.e }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -322,33 +437,44 @@ impl futures::Stream for EmptyProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x132262fd8b200708 => {
-                    let mut req: (Empty,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(EmptyProtocolSendRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolSend_Request");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<EmptyProtocolSendRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
 
-                    Ok(EmptyProtocolRequest::Send_ { e: req.0, control_handle })
+                    Ok(EmptyProtocolRequest::Send_ { e: req.e, control_handle })
                 }
                 0x76a931254962cea => {
-                    let mut req: (Empty,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(EmptyProtocolSendAndReceiveRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolSendAndReceiveRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<EmptyProtocolSendAndReceiveRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = EmptyProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(EmptyProtocolRequest::SendAndReceive {
-                        e: req.0,
+                        e: req.e,
+
                         responder: EmptyProtocolSendAndReceiveResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -380,7 +506,6 @@ impl EmptyProtocolRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_send_and_receive(self) -> Option<(Empty, EmptyProtocolSendAndReceiveResponder)> {
         if let EmptyProtocolRequest::SendAndReceive { e, responder } = self {
@@ -424,9 +549,8 @@ impl fidl::endpoints::ControlHandle for EmptyProtocolControlHandle {
 
 impl EmptyProtocolControlHandle {
     pub fn send_receive(&self, mut e: &mut Empty) -> Result<(), fidl::Error> {
-        let mut response = (e);
-        self.inner.send::<_, false>(
-            &mut response,
+        self.inner.send::<EmptyProtocolReceiveRequest, false>(
+            (&*e,),
             0,
             0x1ff0ccf9b710e23f,
             fidl::encoding::DynamicFlags::empty(),
@@ -489,20 +613,20 @@ impl EmptyProtocolSendAndReceiveResponder {
     }
 
     fn send_raw(&self, mut e: &mut Empty) -> Result<(), fidl::Error> {
-        let mut response = (e);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (&*e,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.emptystruct/EmptyProtocolSendAndReceiveResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<EmptyProtocolSendAndReceiveResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 

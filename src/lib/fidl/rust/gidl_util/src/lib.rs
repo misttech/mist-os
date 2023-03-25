@@ -6,7 +6,7 @@
 
 use {
     fidl::{
-        encoding::{Context, Decodable, Decoder},
+        encoding::{Context, Decoder, TopLevel},
         AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, Rights,
     },
     fuchsia_zircon_status::Status,
@@ -200,13 +200,9 @@ pub fn repeat<T: Clone>(value: T, len: usize) -> Vec<T> {
 }
 
 /// Decodes `T` from the given bytes and handles. Panics on failure.
-pub fn decode_value<T: Decodable>(
-    context: &Context,
-    bytes: &[u8],
-    handles: &mut [HandleInfo],
-) -> T {
+pub fn decode_value<T: TopLevel>(context: Context, bytes: &[u8], handles: &mut [HandleInfo]) -> T {
     let mut value = T::new_empty();
-    Decoder::decode_with_context(context, bytes, handles, &mut value).expect(
+    Decoder::decode_with_context::<T>(context, bytes, handles, &mut value).expect(
         "failed decoding for the GIDL decode() function (not a regular decode test failure!)",
     );
     value

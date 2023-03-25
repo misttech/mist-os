@@ -5,53 +5,52 @@
 */}}
 
 {{- define "StructDeclaration" }}
-
-{{- if .Members }}
-
-{{- range .DocComments}}
+{{- range .DocComments }}
 ///{{ . }}
-{{- end}}
+{{- end }}
 {{ .Derives }}
 {{- if .UseFidlStructCopy }}
 #[repr(C)]
 {{- end }}
-pub struct {{ .Name }} {
+pub struct {{ .Name }}{{ if not .Members }};{{ else }}{
     {{- range .Members }}
-    {{- range .DocComments}}
+    {{- range .DocComments }}
     ///{{ . }}
-    {{- end}}
-    pub {{ .Name }}: {{ .Type }},
+    {{- end }}
+    pub {{ .Name }}: {{ .Type.Owned }},
     {{- end }}
 }
+{{- end }}
 
 impl fidl::encoding::TopLevel for {{ .Name }} {}
-{{ if .IsValueType }}
-impl fidl::encoding::Persistable for {{ .Name }} {}
-{{- end }}
 
-{{ if .UseFidlStructCopy -}}
-fidl_struct_copy! {
-{{- else -}}
 fidl_struct! {
-{{- end }}
+    {{- if not .Members }}
+    empty: true,
+    {{- else if .UseFidlStructCopy }}
+    copy: true,
+    {{- end }}
     name: {{ .Name }},
+    {{- if .IsResourceType }}
+    resource: true,
+    {{- end }}
+    {{- if .Members }}
     members: [
-        {{- range .Members }}
+        {{- range $index, $member := .Members }}
         {{ .Name }} {
-            ty: {{ .Type }},
+            ty: {{ .Type.Fidl }},
+            {{- if .Type.IsResourceType }}
+            resource: true,
+            {{- end }}
+            index: {{ $index }},
+            typevar: T{{ $index }},
             offset_v1: {{ .OffsetV1 }},
             offset_v2: {{ .OffsetV2 }},
-            {{- if and .HasHandleMetadata (not $.UseFidlStructCopy) }}
-            handle_metadata: {
-                handle_subtype: {{ .HandleSubtype }},
-                handle_rights: {{ .HandleRights }},
-            },
-            {{- end }}
         },
         {{- end }}
     ],
     padding_v1: [
-        {{- if .UseFidlStructCopy -}}
+        {{- if .UseFidlStructCopy }}
         {{- range .FlattenedPaddingMarkersV1 }}
         {
             ty: {{ .Type }},
@@ -59,7 +58,7 @@ fidl_struct! {
             mask: {{ .Mask }},
         },
         {{- end }}
-        {{- else -}}
+        {{- else }}
         {{- range .PaddingMarkersV1 }}
         {
             ty: {{ .Type }},
@@ -67,10 +66,10 @@ fidl_struct! {
             mask: {{ .Mask }},
         },
         {{- end }}
-        {{- end -}}
-        ],
+        {{- end }}
+    ],
     padding_v2: [
-        {{- if .UseFidlStructCopy -}}
+        {{- if .UseFidlStructCopy }}
         {{- range .FlattenedPaddingMarkersV2 }}
         {
             ty: {{ .Type }},
@@ -78,7 +77,7 @@ fidl_struct! {
             mask: {{ .Mask }},
         },
         {{- end }}
-        {{- else -}}
+        {{- else }}
         {{- range .PaddingMarkersV2 }}
         {
             ty: {{ .Type }},
@@ -86,27 +85,12 @@ fidl_struct! {
             mask: {{ .Mask }},
         },
         {{- end }}
-        {{- end -}}
+        {{- end }}
     ],
     size_v1: {{ .SizeV1 }},
     size_v2: {{ .SizeV2 }},
     align_v1: {{ .AlignmentV1 }},
     align_v2: {{ .AlignmentV2 }},
+    {{- end }}
 }
-{{- else }}
-
-{{- range .DocComments}}
-///{{ . }}
-{{- end}}
-{{ .Derives }}
-pub struct {{ .Name }};
-
-impl fidl::encoding::TopLevel for {{ .Name }} {}
-{{ if .IsValueType }}
-impl fidl::encoding::Persistable for {{ .Name }} {}
-{{- end }}
-
-fidl_empty_struct!({{ .Name }});
-
-{{- end }}
 {{- end }}

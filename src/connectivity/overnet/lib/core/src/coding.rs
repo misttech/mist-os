@@ -29,25 +29,28 @@ pub fn decode_fidl_with_context<T: fidl::encoding::Persistable>(
         // format migrations, which are driven by header flags.
         let context =
             fidl::encoding::Context { wire_format_version: fidl::encoding::WireFormatVersion::V1 };
-        fidl::encoding::Decoder::decode_with_context(&context, bytes, &mut [], &mut value)?;
+        fidl::encoding::Decoder::decode_with_context::<T>(context, bytes, &mut [], &mut value)?;
         Ok(value)
     }
 }
 
 /// Encode a FIDL type into some bytes
-pub fn encode_fidl_with_context(
+pub fn encode_fidl_with_context<'a, T: fidl::encoding::Persistable>(
     ctx: Context,
-    value: &mut impl fidl::encoding::Persistable,
-) -> Result<Vec<u8>, Error> {
+    value: &'a mut T,
+) -> Result<Vec<u8>, Error>
+where
+    &'a T: fidl::encoding::Encode<T>,
+{
     if ctx.use_persistent_header {
         fidl::encoding::persist(value).map_err(Into::into)
     } else {
         let (mut bytes, mut handles) = (Vec::new(), Vec::new());
-        fidl::encoding::Encoder::encode_with_context(
-            &fidl::encoding::Context { wire_format_version: fidl::encoding::WireFormatVersion::V1 },
+        fidl::encoding::Encoder::encode_with_context::<T>(
+            fidl::encoding::Context { wire_format_version: fidl::encoding::WireFormatVersion::V1 },
             &mut bytes,
             &mut handles,
-            value,
+            &*value,
         )?;
         assert_eq!(handles.len(), 0);
         Ok(bytes)

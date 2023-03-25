@@ -6,7 +6,6 @@
 
 use audio_decoder_test_lib::{cvsd::*, sbc::*, test_suite::*};
 
-use fidl::encoding::Decodable;
 use fidl_fuchsia_media::*;
 use fuchsia_async as fasync;
 use std::rc::Rc;
@@ -47,7 +46,7 @@ fn sbc_decode() -> Result<()> {
                 channel_map: vec![AudioChannelId::Lf],
             },
         )))),
-        ..<FormatDetails as Decodable>::new_empty()
+        ..FormatDetails::EMPTY
     };
 
     let stream = Rc::new(TimestampedStream {
@@ -88,7 +87,7 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
                 channel_map: vec![AudioChannelId::Lf],
             },
         )))),
-        ..<FormatDetails as Decodable>::new_empty()
+        ..FormatDetails::EMPTY
     };
 
     let large_input_chunk_stream = Rc::new(TimestampedStream {
@@ -129,7 +128,7 @@ fn cvsd_simple_decode() -> Result<()> {
                 channel_map: vec![AudioChannelId::Lf],
             },
         )))),
-        ..<FormatDetails as Decodable>::new_empty()
+        ..FormatDetails::EMPTY
     };
 
     let cvsd_tests = AudioDecoderTestCase {

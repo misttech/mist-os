@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -51,13 +50,11 @@ impl UnionLargeArray {
 
 impl fidl::encoding::TopLevel for UnionLargeArray {}
 
-impl fidl::encoding::Persistable for UnionLargeArray {}
-
 fidl_union! {
     name: UnionLargeArray,
     members: [
         A {
-            ty: [u32; 100],
+            ty: fidl::encoding::Array<u32, 100>,
             ordinal: 1,
         },
     ],
@@ -84,13 +81,11 @@ impl UnionSmallArray {
 
 impl fidl::encoding::TopLevel for UnionSmallArray {}
 
-impl fidl::encoding::Persistable for UnionSmallArray {}
-
 fidl_union! {
     name: UnionSmallArray,
     members: [
         A {
-            ty: [u32; 2],
+            ty: fidl::encoding::Array<u32, 2>,
             ordinal: 1,
         },
     ],
@@ -106,19 +101,22 @@ pub struct StructLargeArray {
 
 impl fidl::encoding::TopLevel for StructLargeArray {}
 
-impl fidl::encoding::Persistable for StructLargeArray {}
-
-fidl_struct_copy! {
+fidl_struct! {
+    copy: true,
     name: StructLargeArray,
     members: [
         a {
-            ty: [u32; 100],
+            ty: fidl::encoding::Array<u32, 100>,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
     ],
-    padding_v1: [],
-    padding_v2: [],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
     size_v1: 400,
     size_v2: 400,
     align_v1: 4,
@@ -135,19 +133,22 @@ pub struct StructSmallArray {
 
 impl fidl::encoding::TopLevel for StructSmallArray {}
 
-impl fidl::encoding::Persistable for StructSmallArray {}
-
-fidl_struct_copy! {
+fidl_struct! {
+    copy: true,
     name: StructSmallArray,
     members: [
         a {
-            ty: [u32; 2],
+            ty: fidl::encoding::Array<u32, 2>,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
         },
     ],
-    padding_v1: [],
-    padding_v2: [],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
     size_v1: 8,
     size_v2: 8,
     align_v1: 4,
@@ -170,13 +171,11 @@ impl TableLargeArray {
 
 impl fidl::encoding::TopLevel for TableLargeArray {}
 
-impl fidl::encoding::Persistable for TableLargeArray {}
-
 fidl_table! {
     name: TableLargeArray,
     members: [
         a {
-            ty: [u32; 100],
+            ty: fidl::encoding::Array<u32, 100>,
             ordinal: 1,
         },
     ],
@@ -198,13 +197,11 @@ impl TableSmallArray {
 
 impl fidl::encoding::TopLevel for TableSmallArray {}
 
-impl fidl::encoding::Persistable for TableSmallArray {}
-
 fidl_table! {
     name: TableSmallArray,
     members: [
         a {
-            ty: [u32; 2],
+            ty: fidl::encoding::Array<u32, 2>,
             ordinal: 1,
         },
     ],

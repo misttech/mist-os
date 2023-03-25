@@ -148,7 +148,7 @@ pub trait FidlIteratorRequestStream:
 
 /// A responder to a Next() request for a FIDL iterator.
 pub trait FidlIteratorNextResponder {
-    type Item: Measurable + fidl::encoding::Encodable;
+    type Item: Measurable;
 
     fn send_chunk(self, chunk: &mut [Self::Item]) -> Result<(), fidl::Error>;
 }
@@ -445,17 +445,20 @@ mod tests {
     #[test]
     fn verify_fidl_vec_response_overhead() {
         let vec_response_overhead = {
-            use fidl::encoding::{DynamicFlags, TransactionHeader, TransactionMessage};
-
-            let mut nop: Vec<()> = vec![];
-            let mut msg = TransactionMessage {
-                header: TransactionHeader::new(0, 0, DynamicFlags::empty()),
-                body: &mut nop,
+            use fidl::encoding::{
+                DynamicFlags, TransactionHeader, TransactionMessage, TransactionMessageType,
+                UnboundedVector,
             };
 
-            fidl::encoding::with_tls_encoded::<_, _, false>(&mut msg, |bytes, _handles| {
-                Result::<_, fidl::Error>::Ok(bytes.len())
-            })
+            type Msg = TransactionMessageType<UnboundedVector<u8>>;
+            let msg = TransactionMessage {
+                header: TransactionHeader::new(0, 0, DynamicFlags::empty()),
+                body: &[] as &[u8],
+            };
+            fidl::encoding::with_tls_encoded::<Msg, _, false>(
+                msg,
+                |bytes, _handles| Ok(bytes.len()),
+            )
             .unwrap()
         };
         assert_eq!(vec_response_overhead, FIDL_VEC_RESPONSE_OVERHEAD_BYTES);

@@ -24,16 +24,19 @@ fn persist_unpersist() -> Result<(), fidl::Error> {
 #[test]
 fn standalone_encode_decode() -> Result<(), fidl::Error> {
     // [START standalone_encode]
-    let mut original_value = fex::JsonValue::StringValue("hello".to_string());
+    let original_value = fex::JsonValue::StringValue("hello".to_string());
     let (bytes, handle_dispositions, wire_metadata) =
-        fidl::encoding::standalone_encode(&mut original_value)?;
+        fidl::encoding::standalone_encode::<fex::JsonValue>(&original_value)?;
     // [END standalone_encode]
 
     // [START standalone_decode]
     let mut handle_infos =
         fidl::encoding::convert_handle_dispositions_to_infos(handle_dispositions)?;
-    let decoded_value =
-        fidl::encoding::standalone_decode(&bytes, &mut handle_infos, &wire_metadata)?;
+    let decoded_value = fidl::encoding::standalone_decode::<fex::JsonValue>(
+        &bytes,
+        &mut handle_infos,
+        &wire_metadata,
+    )?;
     assert_eq!(original_value, decoded_value);
     // [END standalone_decode]
 

@@ -28,7 +28,7 @@ pub enum {{ $service.Name }}Request {
     ///{{ . }}
     {{- end }}
     {{ $member.CamelName }}({{ $member.ProtocolType }}RequestStream),
-    {{- end}}
+    {{- end }}
 }
 
 #[cfg(target_os = "fuchsia")]

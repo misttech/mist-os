@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::encoding::Decodable;
 use fidl_fuchsia_media::FormatDetails;
 use stream_processor_test::*;
 
@@ -34,7 +33,7 @@ impl ElementaryStream for H265Stream {
         FormatDetails {
             format_details_version_ordinal: Some(version_ordinal),
             mime_type: Some(String::from("video/h265")),
-            ..<FormatDetails as Decodable>::new_empty()
+            ..FormatDetails::EMPTY
         }
     }
 

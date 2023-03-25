@@ -20,11 +20,10 @@ use fuchsia_zircon as zx;
 use {
     bitflags::bitflags,
     fidl::{
-        client::{decode_transaction_body_fut, QueryResponseFut},
-        encoding::{zerocopy, Decodable as _, Encodable as _},
+        client::QueryResponseFut,
+        encoding::zerocopy,
         endpoints::{ControlHandle as _, Responder as _},
-        fidl_bits, fidl_empty_struct, fidl_enum, fidl_struct, fidl_struct_copy, fidl_table,
-        fidl_union, wrap_handle_metadata,
+        fidl_bits, fidl_enum, fidl_struct, fidl_table, fidl_union,
     },
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
@@ -67,43 +66,6 @@ fidl_enum! {
     strict: true,
     min_member: ErrFoo,
 }
-
-pub type WithErrorSyntaxResponseAsStructResult = Result<(i64, i64, i64), u32>;
-
-/// Handle-type validating wrapper for WithErrorSyntaxResponseAsStructResult responses, used internally by
-/// FIDL bindings to decode method results. This should only be used by
-/// generated APIs, API users should never need to use this type. It is public
-/// because it is shared with composed protocols.
-#[doc(hidden)]
-pub type WithErrorSyntaxResponseAsStructResultHandleWrapper = Result<(i64, i64, i64), u32>;
-
-pub type WithErrorSyntaxErrorAsPrimitiveResult = Result<(), u32>;
-
-/// Handle-type validating wrapper for WithErrorSyntaxErrorAsPrimitiveResult responses, used internally by
-/// FIDL bindings to decode method results. This should only be used by
-/// generated APIs, API users should never need to use this type. It is public
-/// because it is shared with composed protocols.
-#[doc(hidden)]
-pub type WithErrorSyntaxErrorAsPrimitiveResultHandleWrapper = Result<(), u32>;
-
-pub type WithErrorSyntaxErrorAsEnumResult = Result<(), ErrorEnum>;
-
-/// Handle-type validating wrapper for WithErrorSyntaxErrorAsEnumResult responses, used internally by
-/// FIDL bindings to decode method results. This should only be used by
-/// generated APIs, API users should never need to use this type. It is public
-/// because it is shared with composed protocols.
-#[doc(hidden)]
-pub type WithErrorSyntaxErrorAsEnumResultHandleWrapper = Result<(), ErrorEnum>;
-
-pub type WithErrorSyntaxHandleInResultResult = Result<(fidl::Handle), u32>;
-
-/// Handle-type validating wrapper for WithErrorSyntaxHandleInResultResult responses, used internally by
-/// FIDL bindings to decode method results. This should only be used by
-/// generated APIs, API users should never need to use this type. It is public
-/// because it is shared with composed protocols.
-#[doc(hidden)]
-pub type WithErrorSyntaxHandleInResultResultHandleWrapper =
-    Result<(HandleWrapperObjectTypeNONERights2147483648<fidl::Handle>,), u32>;
 
 #[derive(Debug, Clone)]
 pub enum TheUnion {
@@ -160,8 +122,6 @@ impl TheUnion {
 
 impl fidl::encoding::TopLevel for TheUnion {}
 
-impl fidl::encoding::Persistable for TheUnion {}
-
 fidl_union! {
     name: TheUnion,
     members: [
@@ -171,6 +131,424 @@ fidl_union! {
         },
     ],
     unknown_member: __Unknown,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct ChannelProtocolEventARequest {
+    pub a: i64,
+    pub b: i64,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolEventARequest {}
+
+fidl_struct! {
+    copy: true,
+    name: ChannelProtocolEventARequest,
+    members: [
+        a {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        b {
+            ty: i64,
+            index: 1,
+            typevar: T1,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct ChannelProtocolMethodARequest {
+    pub a: i64,
+    pub b: i64,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolMethodARequest {}
+
+fidl_struct! {
+    copy: true,
+    name: ChannelProtocolMethodARequest,
+    members: [
+        a {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        b {
+            ty: i64,
+            index: 1,
+            typevar: T1,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct ChannelProtocolMethodBRequest {
+    pub a: i64,
+    pub b: i64,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolMethodBRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: ChannelProtocolMethodBRequest,
+    members: [
+        a {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        b {
+            ty: i64,
+            index: 1,
+            typevar: T1,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct ChannelProtocolMethodBResponse {
+    pub result: i64,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolMethodBResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: ChannelProtocolMethodBResponse,
+    members: [
+        result {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 8,
+    size_v2: 8,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct ChannelProtocolMutateSocketRequest {
+    pub a: fidl::Socket,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolMutateSocketRequest {}
+
+fidl_struct! {
+    name: ChannelProtocolMutateSocketRequest,
+    resource: true,
+    members: [
+        a {
+            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct ChannelProtocolMutateSocketResponse {
+    pub b: fidl::Socket,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolMutateSocketResponse {}
+
+fidl_struct! {
+    name: ChannelProtocolMutateSocketResponse,
+    resource: true,
+    members: [
+        b {
+            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2147483648>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct ChannelProtocolTakeHandleRequest {
+    pub h: fidl::Handle,
+}
+
+impl fidl::encoding::TopLevel for ChannelProtocolTakeHandleRequest {}
+
+fidl_struct! {
+    name: ChannelProtocolTakeHandleRequest,
+    resource: true,
+    members: [
+        h {
+            ty: fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct HandleRightsProtocolAnEventRequest {
+    pub h: fidl::Socket,
+}
+
+impl fidl::encoding::TopLevel for HandleRightsProtocolAnEventRequest {}
+
+fidl_struct! {
+    name: HandleRightsProtocolAnEventRequest,
+    resource: true,
+    members: [
+        h {
+            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 3>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct HandleRightsProtocolNoResponseMethodRequest {
+    pub h: fidl::Socket,
+}
+
+impl fidl::encoding::TopLevel for HandleRightsProtocolNoResponseMethodRequest {}
+
+fidl_struct! {
+    name: HandleRightsProtocolNoResponseMethodRequest,
+    resource: true,
+    members: [
+        h {
+            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 3>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct HandleRightsProtocolResponseMethodRequest {
+    pub h: fidl::Socket,
+}
+
+impl fidl::encoding::TopLevel for HandleRightsProtocolResponseMethodRequest {}
+
+fidl_struct! {
+    name: HandleRightsProtocolResponseMethodRequest,
+    resource: true,
+    members: [
+        h {
+            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 3>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct HandleRightsProtocolResponseMethodResponse {
+    pub h: fidl::Socket,
+}
+
+impl fidl::encoding::TopLevel for HandleRightsProtocolResponseMethodResponse {}
+
+fidl_struct! {
+    name: HandleRightsProtocolResponseMethodResponse,
+    resource: true,
+    members: [
+        h {
+            ty: fidl::encoding::HandleType<fidl::Socket, { fidl::ObjectType::SOCKET.into_raw() }, 2>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MethodWithUnionUnionMethodRequest {
+    pub u: TheUnion,
+}
+
+impl fidl::encoding::TopLevel for MethodWithUnionUnionMethodRequest {}
+
+fidl_struct! {
+    name: MethodWithUnionUnionMethodRequest,
+    members: [
+        u {
+            ty: TheUnion,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MethodWithUnionUnionMethodResponse {
+    pub u: Option<Box<TheUnion>>,
+}
+
+impl fidl::encoding::TopLevel for MethodWithUnionUnionMethodResponse {}
+
+fidl_struct! {
+    name: MethodWithUnionUnionMethodResponse,
+    members: [
+        u {
+            ty: fidl::encoding::OptionalUnion<TheUnion>,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
 }
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -185,80 +563,644 @@ impl fidl::encoding::TopLevel for ProtocolEnds {}
 
 fidl_struct! {
     name: ProtocolEnds,
+    resource: true,
     members: [
         client {
-            ty: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
+            ty: fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+            resource: true,
+            index: 0,
+            typevar: T0,
             offset_v1: 0,
             offset_v2: 0,
-            handle_metadata: {
-                handle_subtype: fidl::ObjectType::CHANNEL,
-                handle_rights: fidl::Rights::CHANNEL_DEFAULT,
-            },
         },
         server {
-            ty: fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
+            ty: fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
+            resource: true,
+            index: 1,
+            typevar: T1,
             offset_v1: 4,
             offset_v2: 4,
-            handle_metadata: {
-                handle_subtype: fidl::ObjectType::CHANNEL,
-                handle_rights: fidl::Rights::CHANNEL_DEFAULT,
-            },
         },
         client_opt {
-            ty: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+            ty: fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>>,
+            resource: true,
+            index: 2,
+            typevar: T2,
             offset_v1: 8,
             offset_v2: 8,
-            handle_metadata: {
-                handle_subtype: fidl::ObjectType::CHANNEL,
-                handle_rights: fidl::Rights::CHANNEL_DEFAULT,
-            },
         },
         server_opt {
-            ty: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
+            ty: fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>>,
+            resource: true,
+            index: 3,
+            typevar: T3,
             offset_v1: 12,
             offset_v2: 12,
-            handle_metadata: {
-                handle_subtype: fidl::ObjectType::CHANNEL,
-                handle_rights: fidl::Rights::CHANNEL_DEFAULT,
-            },
         },
     ],
-    padding_v1: [],
-    padding_v2: [],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
     size_v1: 16,
     size_v2: 16,
     align_v1: 4,
     align_v2: 4,
 }
-wrap_handle_metadata!(
-    HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT,
-    fidl::ObjectType::CHANNEL,
-    fidl::Rights::CHANNEL_DEFAULT
-);
 
-wrap_handle_metadata!(
-    HandleWrapperObjectTypeNONERights2147483648,
-    fidl::ObjectType::NONE,
-    fidl::Rights::from_bits_const(2147483648).unwrap()
-);
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct SyscallProtocolMethodCRequest {
+    pub a: i64,
+    pub b: i64,
+}
 
-wrap_handle_metadata!(
-    HandleWrapperObjectTypeSOCKETRights2,
-    fidl::ObjectType::SOCKET,
-    fidl::Rights::from_bits_const(2).unwrap()
-);
+impl fidl::encoding::TopLevel for SyscallProtocolMethodCRequest {}
 
-wrap_handle_metadata!(
-    HandleWrapperObjectTypeSOCKETRights2147483648,
-    fidl::ObjectType::SOCKET,
-    fidl::Rights::from_bits_const(2147483648).unwrap()
-);
+fidl_struct! {
+    copy: true,
+    name: SyscallProtocolMethodCRequest,
+    members: [
+        a {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        b {
+            ty: i64,
+            index: 1,
+            typevar: T1,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
 
-wrap_handle_metadata!(
-    HandleWrapperObjectTypeSOCKETRights3,
-    fidl::ObjectType::SOCKET,
-    fidl::Rights::from_bits_const(3).unwrap()
-);
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct TransitionalEventRequest {
+    pub x: i64,
+}
+
+impl fidl::encoding::TopLevel for TransitionalEventRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: TransitionalEventRequest,
+    members: [
+        x {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 8,
+    size_v2: 8,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct TransitionalOneWayRequest {
+    pub x: i64,
+}
+
+impl fidl::encoding::TopLevel for TransitionalOneWayRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: TransitionalOneWayRequest,
+    members: [
+        x {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 8,
+    size_v2: 8,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct TransitionalRequestRequest {
+    pub x: i64,
+}
+
+impl fidl::encoding::TopLevel for TransitionalRequestRequest {}
+
+fidl_struct! {
+    copy: true,
+    name: TransitionalRequestRequest,
+    members: [
+        x {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 8,
+    size_v2: 8,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct TransitionalRequestResponse {
+    pub y: i64,
+}
+
+impl fidl::encoding::TopLevel for TransitionalRequestResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: TransitionalRequestResponse,
+    members: [
+        y {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 8,
+    size_v2: 8,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithAndWithoutRequestResponseNoRequestWithResponseResponse {
+    pub ret: String,
+}
+
+impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseNoRequestWithResponseResponse {}
+
+fidl_struct! {
+    name: WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+    members: [
+        ret {
+            ty: fidl::encoding::UnboundedString,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithAndWithoutRequestResponseOnWithResponseRequest {
+    pub ret: String,
+}
+
+impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseOnWithResponseRequest {}
+
+fidl_struct! {
+    name: WithAndWithoutRequestResponseOnWithResponseRequest,
+    members: [
+        ret {
+            ty: fidl::encoding::UnboundedString,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
+    pub arg: String,
+}
+
+impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {}
+
+fidl_struct! {
+    name: WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+    members: [
+        arg {
+            ty: fidl::encoding::UnboundedString,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithAndWithoutRequestResponseWithRequestNoResponseRequest {
+    pub arg: String,
+}
+
+impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestNoResponseRequest {}
+
+fidl_struct! {
+    name: WithAndWithoutRequestResponseWithRequestNoResponseRequest,
+    members: [
+        arg {
+            ty: fidl::encoding::UnboundedString,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithAndWithoutRequestResponseWithRequestWithResponseRequest {
+    pub arg: String,
+}
+
+impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestWithResponseRequest {}
+
+fidl_struct! {
+    name: WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+    members: [
+        arg {
+            ty: fidl::encoding::UnboundedString,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithAndWithoutRequestResponseWithRequestWithResponseResponse {
+    pub ret: String,
+}
+
+impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestWithResponseResponse {}
+
+fidl_struct! {
+    name: WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+    members: [
+        ret {
+            ty: fidl::encoding::UnboundedString,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithErrorSyntaxHandleInResultResponse {
+    pub h: fidl::Handle,
+}
+
+impl fidl::encoding::TopLevel for WithErrorSyntaxHandleInResultResponse {}
+
+fidl_struct! {
+    name: WithErrorSyntaxHandleInResultResponse,
+    resource: true,
+    members: [
+        h {
+            ty: fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(
+    Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, zerocopy::AsBytes, zerocopy::FromBytes,
+)]
+#[repr(C)]
+pub struct WithErrorSyntaxResponseAsStructResponse {
+    pub a: i64,
+    pub b: i64,
+    pub c: i64,
+}
+
+impl fidl::encoding::TopLevel for WithErrorSyntaxResponseAsStructResponse {}
+
+fidl_struct! {
+    copy: true,
+    name: WithErrorSyntaxResponseAsStructResponse,
+    members: [
+        a {
+            ty: i64,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        b {
+            ty: i64,
+            index: 1,
+            typevar: T1,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+        c {
+            ty: i64,
+            index: 2,
+            typevar: T2,
+            offset_v1: 16,
+            offset_v2: 16,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 24,
+    size_v2: 24,
+    align_v1: 8,
+    align_v2: 8,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithProtocolEndsClientEndsRequest {
+    pub in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
+}
+
+impl fidl::encoding::TopLevel for WithProtocolEndsClientEndsRequest {}
+
+fidl_struct! {
+    name: WithProtocolEndsClientEndsRequest,
+    resource: true,
+    members: [
+        in_ {
+            ty: fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithProtocolEndsClientEndsResponse {
+    pub out: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+}
+
+impl fidl::encoding::TopLevel for WithProtocolEndsClientEndsResponse {}
+
+fidl_struct! {
+    name: WithProtocolEndsClientEndsResponse,
+    resource: true,
+    members: [
+        out {
+            ty: fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithProtocolEndsServerEndsRequest {
+    pub in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
+}
+
+impl fidl::encoding::TopLevel for WithProtocolEndsServerEndsRequest {}
+
+fidl_struct! {
+    name: WithProtocolEndsServerEndsRequest,
+    resource: true,
+    members: [
+        in_ {
+            ty: fidl::encoding::Optional<fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithProtocolEndsServerEndsResponse {
+    pub out: fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
+}
+
+impl fidl::encoding::TopLevel for WithProtocolEndsServerEndsResponse {}
+
+fidl_struct! {
+    name: WithProtocolEndsServerEndsResponse,
+    resource: true,
+    members: [
+        out {
+            ty: fidl::encoding::Endpoint<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 4,
+    size_v2: 4,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithProtocolEndsStructContainingEndsRequest {
+    pub in_: ProtocolEnds,
+}
+
+impl fidl::encoding::TopLevel for WithProtocolEndsStructContainingEndsRequest {}
+
+fidl_struct! {
+    name: WithProtocolEndsStructContainingEndsRequest,
+    resource: true,
+    members: [
+        in_ {
+            ty: ProtocolEnds,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 4,
+    align_v2: 4,
+}
+
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct WithProtocolEndsStructContainingEndsResponse {
+    pub out: ProtocolEnds,
+}
+
+impl fidl::encoding::TopLevel for WithProtocolEndsStructContainingEndsResponse {}
+
+fidl_struct! {
+    name: WithProtocolEndsStructContainingEndsResponse,
+    resource: true,
+    members: [
+        out {
+            ty: ProtocolEnds,
+            resource: true,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 16,
+    size_v2: 16,
+    align_v1: 4,
+    align_v2: 4,
+}
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct AnotherDiscoverableProtocolMarker;
@@ -519,11 +1461,11 @@ impl fidl::endpoints::ProtocolMarker for ChannelProtocolMarker {
 
 pub trait ChannelProtocolProxyInterface: Send + Sync {
     fn r#method_a(&self, a: i64, b: i64) -> Result<(), fidl::Error>;
-    type MethodBResponseFut: std::future::Future<Output = Result<(i64), fidl::Error>> + Send;
+    type MethodBResponseFut: std::future::Future<Output = Result<i64, fidl::Error>> + Send;
     fn r#method_b(&self, a: i64, b: i64) -> Self::MethodBResponseFut;
     type TakeHandleResponseFut: std::future::Future<Output = Result<(), fidl::Error>> + Send;
     fn r#take_handle(&self, h: fidl::Handle) -> Self::TakeHandleResponseFut;
-    type MutateSocketResponseFut: std::future::Future<Output = Result<(fidl::Socket), fidl::Error>>
+    type MutateSocketResponseFut: std::future::Future<Output = Result<fidl::Socket, fidl::Error>>
         + Send;
     fn r#mutate_socket(&self, a: fidl::Socket) -> Self::MutateSocketResponseFut;
 }
@@ -551,8 +1493,8 @@ impl ChannelProtocolSynchronousProxy {
         ChannelProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#method_a(&self, mut a: i64, mut b: i64) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (a, b),
+        self.client.send::<ChannelProtocolMethodARequest, false>(
+            (a, b),
             0x2bc8d7d32bc66ba2,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -562,41 +1504,49 @@ impl ChannelProtocolSynchronousProxy {
         mut a: i64,
         mut b: i64,
         ___deadline: zx::Time,
-    ) -> Result<(i64), fidl::Error> {
-        let _value: (i64,) = self.client.send_query::<_, _, false, false>(
-            &mut (a, b),
-            0x7b8dd3d6c741c9c6,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    ) -> Result<i64, fidl::Error> {
+        let _response = self.client.send_query::<
+                ChannelProtocolMethodBRequest,
+                ChannelProtocolMethodBResponse,false,false>(
+                (a, b,),
+                0x7b8dd3d6c741c9c6,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.result)
     }
     pub fn r#take_handle(
         &self,
         mut h: fidl::Handle,
         ___deadline: zx::Time,
     ) -> Result<(), fidl::Error> {
-        let _value: () = self.client.send_query::<_, _, false, false>(
-            &mut (HandleWrapperObjectTypeNONERights2147483648::<fidl::Handle>(h)),
-            0x836fa31201a0a65,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(())
+        let _response = self.client.send_query::<
+                ChannelProtocolTakeHandleRequest,
+                fidl::encoding::EmptyPayload,false,false>(
+                (h,),
+                0x836fa31201a0a65,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response)
     }
     pub fn r#mutate_socket(
         &self,
         mut a: fidl::Socket,
         ___deadline: zx::Time,
-    ) -> Result<(fidl::Socket), fidl::Error> {
-        let _value: (HandleWrapperObjectTypeSOCKETRights2147483648<fidl::Socket>,) =
-            self.client.send_query::<_, _, false, false>(
-                &mut (HandleWrapperObjectTypeSOCKETRights2147483648::<fidl::Socket>(a)),
+    ) -> Result<fidl::Socket, fidl::Error> {
+        let _response = self.client.send_query::<
+                ChannelProtocolMutateSocketRequest,
+                ChannelProtocolMutateSocketResponse,false,false>(
+                (a,),
                 0x66dbcccc06f7f14f,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?;
-        Ok(_value.0.into_inner())
+            )?
+            ;
+        Ok(_response.b)
     }
 }
 
@@ -639,7 +1589,7 @@ impl ChannelProtocolProxy {
     pub fn r#method_a(&self, mut a: i64, mut b: i64) -> Result<(), fidl::Error> {
         ChannelProtocolProxyInterface::r#method_a(self, a, b)
     }
-    pub fn r#method_b(&self, mut a: i64, mut b: i64) -> fidl::client::QueryResponseFut<(i64)> {
+    pub fn r#method_b(&self, mut a: i64, mut b: i64) -> fidl::client::QueryResponseFut<i64> {
         ChannelProtocolProxyInterface::r#method_b(self, a, b)
     }
     pub fn r#take_handle(&self, mut h: fidl::Handle) -> fidl::client::QueryResponseFut<()> {
@@ -648,74 +1598,69 @@ impl ChannelProtocolProxy {
     pub fn r#mutate_socket(
         &self,
         mut a: fidl::Socket,
-    ) -> fidl::client::QueryResponseFut<(fidl::Socket)> {
+    ) -> fidl::client::QueryResponseFut<fidl::Socket> {
         ChannelProtocolProxyInterface::r#mutate_socket(self, a)
     }
 }
 
 impl ChannelProtocolProxyInterface for ChannelProtocolProxy {
     fn r#method_a(&self, mut a: i64, mut b: i64) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (a, b),
+        self.client.send::<ChannelProtocolMethodARequest, false>(
+            (a, b),
             0x2bc8d7d32bc66ba2,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type MethodBResponseFut = fidl::client::QueryResponseFut<(i64)>;
+    type MethodBResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#method_b(&self, mut a: i64, mut b: i64) -> Self::MethodBResponseFut {
-        fn transform(result: Result<(i64,), fidl::Error>) -> Result<(i64), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                ChannelProtocolMethodBResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.result)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (a, b),
+        self.client.send_query_and_decode::<ChannelProtocolMethodBRequest, i64, false>(
+            (a, b),
             0x7b8dd3d6c741c9c6,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
     type TakeHandleResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#take_handle(&self, mut h: fidl::Handle) -> Self::TakeHandleResponseFut {
-        fn transform(result: Result<(), fidl::Error>) -> Result<(), fidl::Error> {
-            result.map(|_value| ())
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                false,
+            >(_buf?)?;
+            Ok(_response)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (HandleWrapperObjectTypeNONERights2147483648::<fidl::Handle>(h)),
+        self.client.send_query_and_decode::<ChannelProtocolTakeHandleRequest, (), false>(
+            (h,),
             0x836fa31201a0a65,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
-    type MutateSocketResponseFut = fidl::client::QueryResponseFut<(fidl::Socket)>;
+    type MutateSocketResponseFut = fidl::client::QueryResponseFut<fidl::Socket>;
     fn r#mutate_socket(&self, mut a: fidl::Socket) -> Self::MutateSocketResponseFut {
-        fn transform(
-            result: Result<
-                (HandleWrapperObjectTypeSOCKETRights2147483648<fidl::Socket>,),
-                fidl::Error,
-            >,
-        ) -> Result<(fidl::Socket), fidl::Error> {
-            result.map(|_value| _value.0.into_inner())
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<fidl::Socket, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                ChannelProtocolMutateSocketResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.b)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (HandleWrapperObjectTypeSOCKETRights2147483648::<fidl::Socket>(a)),
-            0x66dbcccc06f7f14f,
-            fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+        self.client
+            .send_query_and_decode::<ChannelProtocolMutateSocketRequest, fidl::Socket, false>(
+                (a,),
+                0x66dbcccc06f7f14f,
+                fidl::encoding::DynamicFlags::empty(),
+                _decode,
+            )
     }
 }
 
@@ -773,20 +1718,20 @@ impl ChannelProtocolEvent {
 
         match tx_header.ordinal() {
             0x1ed0a220297145ce => {
-                let mut out_tuple: (i64, i64) = fidl::encoding::Decodable::new_empty();
+                let mut out = fidl::new_empty!(ChannelProtocolEventARequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolEventAEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
                 if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                     return Err(fidl::Error::LargeMessageImpossible);
                 }
-                fidl::encoding::Decoder::decode_into(
+                fidl::encoding::Decoder::decode_into::<ChannelProtocolEventARequest>(
                     &tx_header,
                     _body_bytes,
                     _handles,
-                    &mut out_tuple,
+                    &mut out,
                 )?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
-                Ok((ChannelProtocolEvent::EventA { a: out_tuple.0, b: out_tuple.1 }))
+                Ok((ChannelProtocolEvent::EventA { a: out.a, b: out.b }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -870,34 +1815,45 @@ impl futures::Stream for ChannelProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x2bc8d7d32bc66ba2 => {
-                    let mut req: (i64, i64) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(ChannelProtocolMethodARequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolMethodARequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<ChannelProtocolMethodARequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ChannelProtocolControlHandle { inner: this.inner.clone() };
 
-                    Ok(ChannelProtocolRequest::MethodA { a: req.0, b: req.1, control_handle })
+                    Ok(ChannelProtocolRequest::MethodA { a: req.a, b: req.b, control_handle })
                 }
                 0x7b8dd3d6c741c9c6 => {
-                    let mut req: (i64, i64) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(ChannelProtocolMethodBRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolMethodBRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<ChannelProtocolMethodBRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ChannelProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(ChannelProtocolRequest::MethodB {
-                        a: req.0,
-                        b: req.1,
+                        a: req.a,
+                        b: req.b,
+
                         responder: ChannelProtocolMethodBResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -906,20 +1862,25 @@ impl futures::Stream for ChannelProtocolRequestStream {
                     })
                 }
                 0x836fa31201a0a65 => {
-                    let mut req: (HandleWrapperObjectTypeNONERights2147483648<fidl::Handle>,) =
-                        fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(ChannelProtocolTakeHandleRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolTakeHandleRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<ChannelProtocolTakeHandleRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ChannelProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(ChannelProtocolRequest::TakeHandle {
-                        h: req.0.into_inner(),
+                        h: req.h,
+
                         responder: ChannelProtocolTakeHandleResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -928,20 +1889,25 @@ impl futures::Stream for ChannelProtocolRequestStream {
                     })
                 }
                 0x66dbcccc06f7f14f => {
-                    let mut req: (HandleWrapperObjectTypeSOCKETRights2147483648<fidl::Socket>,) =
-                        fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(ChannelProtocolMutateSocketRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolMutateSocketRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<ChannelProtocolMutateSocketRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = ChannelProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(ChannelProtocolRequest::MutateSocket {
-                        a: req.0.into_inner(),
+                        a: req.a,
+
                         responder: ChannelProtocolMutateSocketResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -975,7 +1941,6 @@ impl ChannelProtocolRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_method_b(self) -> Option<(i64, i64, ChannelProtocolMethodBResponder)> {
         if let ChannelProtocolRequest::MethodB { a, b, responder } = self {
@@ -984,7 +1949,6 @@ impl ChannelProtocolRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_take_handle(self) -> Option<(fidl::Handle, ChannelProtocolTakeHandleResponder)> {
         if let ChannelProtocolRequest::TakeHandle { h, responder } = self {
@@ -993,7 +1957,6 @@ impl ChannelProtocolRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_mutate_socket(
         self,
@@ -1041,9 +2004,8 @@ impl fidl::endpoints::ControlHandle for ChannelProtocolControlHandle {
 
 impl ChannelProtocolControlHandle {
     pub fn send_event_a(&self, mut a: i64, mut b: i64) -> Result<(), fidl::Error> {
-        let mut response = (a, b);
-        self.inner.send::<_, false>(
-            &mut response,
+        self.inner.send::<ChannelProtocolEventARequest, false>(
+            (a, b),
             0,
             0x1ed0a220297145ce,
             fidl::encoding::DynamicFlags::empty(),
@@ -1106,20 +2068,20 @@ impl ChannelProtocolMethodBResponder {
     }
 
     fn send_raw(&self, mut result: i64) -> Result<(), fidl::Error> {
-        let mut response = (result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (result,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolMethodBResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<ChannelProtocolMethodBResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -1183,20 +2145,20 @@ impl ChannelProtocolTakeHandleResponder {
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let mut response = (());
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolTakeHandleResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<fidl::encoding::EmptyPayload>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -1260,20 +2222,20 @@ impl ChannelProtocolMutateSocketResponder {
     }
 
     fn send_raw(&self, mut b: fidl::Socket) -> Result<(), fidl::Error> {
-        let mut response = (HandleWrapperObjectTypeSOCKETRights2147483648::<fidl::Socket>(b));
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (b,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ChannelProtocolMutateSocketResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<ChannelProtocolMutateSocketResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -1323,8 +2285,8 @@ impl DiscoverableProtocolSynchronousProxy {
         DiscoverableProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#method(&self) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (),
+        self.client.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0x2ff5ba3a2bd170eb,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -1375,8 +2337,8 @@ impl DiscoverableProtocolProxy {
 
 impl DiscoverableProtocolProxyInterface for DiscoverableProtocolProxy {
     fn r#method(&self) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (),
+        self.client.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0x2ff5ba3a2bd170eb,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -1507,14 +2469,19 @@ impl futures::Stream for DiscoverableProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x2ff5ba3a2bd170eb => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/DiscoverableProtocolMethodRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle =
                         DiscoverableProtocolControlHandle { inner: this.inner.clone() };
@@ -1589,7 +2556,7 @@ impl fidl::endpoints::ProtocolMarker for HandleRightsProtocolMarker {
 
 pub trait HandleRightsProtocolProxyInterface: Send + Sync {
     fn r#no_response_method(&self, h: fidl::Socket) -> Result<(), fidl::Error>;
-    type ResponseMethodResponseFut: std::future::Future<Output = Result<(fidl::Socket), fidl::Error>>
+    type ResponseMethodResponseFut: std::future::Future<Output = Result<fidl::Socket, fidl::Error>>
         + Send;
     fn r#response_method(&self, h: fidl::Socket) -> Self::ResponseMethodResponseFut;
 }
@@ -1621,8 +2588,8 @@ impl HandleRightsProtocolSynchronousProxy {
         HandleRightsProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#no_response_method(&self, mut h: fidl::Socket) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (HandleWrapperObjectTypeSOCKETRights3::<fidl::Socket>(h),),
+        self.client.send::<HandleRightsProtocolNoResponseMethodRequest, false>(
+            (h,),
             0x10078afd320d2bfd,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -1631,15 +2598,17 @@ impl HandleRightsProtocolSynchronousProxy {
         &self,
         mut h: fidl::Socket,
         ___deadline: zx::Time,
-    ) -> Result<(fidl::Socket), fidl::Error> {
-        let _value: (HandleWrapperObjectTypeSOCKETRights2<fidl::Socket>,) =
-            self.client.send_query::<_, _, false, false>(
-                &mut (HandleWrapperObjectTypeSOCKETRights3::<fidl::Socket>(h)),
+    ) -> Result<fidl::Socket, fidl::Error> {
+        let _response = self.client.send_query::<
+                HandleRightsProtocolResponseMethodRequest,
+                HandleRightsProtocolResponseMethodResponse,false,false>(
+                (h,),
                 0x52a8f194ac143547,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?;
-        Ok(_value.0.into_inner())
+            )?
+            ;
+        Ok(_response.h)
     }
 }
 
@@ -1686,37 +2655,40 @@ impl HandleRightsProtocolProxy {
     pub fn r#response_method(
         &self,
         mut h: fidl::Socket,
-    ) -> fidl::client::QueryResponseFut<(fidl::Socket)> {
+    ) -> fidl::client::QueryResponseFut<fidl::Socket> {
         HandleRightsProtocolProxyInterface::r#response_method(self, h)
     }
 }
 
 impl HandleRightsProtocolProxyInterface for HandleRightsProtocolProxy {
     fn r#no_response_method(&self, mut h: fidl::Socket) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (HandleWrapperObjectTypeSOCKETRights3::<fidl::Socket>(h)),
+        self.client.send::<HandleRightsProtocolNoResponseMethodRequest, false>(
+            (h,),
             0x10078afd320d2bfd,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-    type ResponseMethodResponseFut = fidl::client::QueryResponseFut<(fidl::Socket)>;
+    type ResponseMethodResponseFut = fidl::client::QueryResponseFut<fidl::Socket>;
     fn r#response_method(&self, mut h: fidl::Socket) -> Self::ResponseMethodResponseFut {
-        fn transform(
-            result: Result<(HandleWrapperObjectTypeSOCKETRights2<fidl::Socket>,), fidl::Error>,
-        ) -> Result<(fidl::Socket), fidl::Error> {
-            result.map(|_value| _value.0.into_inner())
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<fidl::Socket, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                HandleRightsProtocolResponseMethodResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.h)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (HandleWrapperObjectTypeSOCKETRights3::<fidl::Socket>(h)),
+        self.client.send_query_and_decode::<
+            HandleRightsProtocolResponseMethodRequest,
+            fidl::Socket,
+            false,
+        >(
+            (h,),
             0x52a8f194ac143547,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
 }
 
@@ -1758,7 +2730,7 @@ pub enum HandleRightsProtocolEvent {
 
 impl HandleRightsProtocolEvent {
     #[allow(irrefutable_let_patterns)]
-    pub fn into_an_event(self) -> Option<(fidl::Socket)> {
+    pub fn into_an_event(self) -> Option<fidl::Socket> {
         if let HandleRightsProtocolEvent::AnEvent { h } = self {
             Some((h))
         } else {
@@ -1774,21 +2746,20 @@ impl HandleRightsProtocolEvent {
 
         match tx_header.ordinal() {
             0x69dad41418eb133 => {
-                let mut out_tuple: (HandleWrapperObjectTypeSOCKETRights3<fidl::Socket>,) =
-                    fidl::encoding::Decodable::new_empty();
+                let mut out = fidl::new_empty!(HandleRightsProtocolAnEventRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/HandleRightsProtocolAnEventEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
                 if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                     return Err(fidl::Error::LargeMessageImpossible);
                 }
-                fidl::encoding::Decoder::decode_into(
+                fidl::encoding::Decoder::decode_into::<HandleRightsProtocolAnEventRequest>(
                     &tx_header,
                     _body_bytes,
                     _handles,
-                    &mut out_tuple,
+                    &mut out,
                 )?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
-                Ok((HandleRightsProtocolEvent::AnEvent { h: out_tuple.0.into_inner() }))
+                Ok((HandleRightsProtocolEvent::AnEvent { h: out.h }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -1872,40 +2843,40 @@ impl futures::Stream for HandleRightsProtocolRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x10078afd320d2bfd => {
-                    let mut req: (HandleWrapperObjectTypeSOCKETRights3<fidl::Socket>,) =
-                        fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(HandleRightsProtocolNoResponseMethodRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/HandleRightsProtocolNoResponseMethodRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<
+                        HandleRightsProtocolNoResponseMethodRequest,
+                    >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle =
                         HandleRightsProtocolControlHandle { inner: this.inner.clone() };
 
-                    Ok(HandleRightsProtocolRequest::NoResponseMethod {
-                        h: req.0.into_inner(),
-                        control_handle,
-                    })
+                    Ok(HandleRightsProtocolRequest::NoResponseMethod { h: req.h, control_handle })
                 }
                 0x52a8f194ac143547 => {
-                    let mut req: (HandleWrapperObjectTypeSOCKETRights3<fidl::Socket>,) =
-                        fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(HandleRightsProtocolResponseMethodRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/HandleRightsProtocolResponseMethodRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<
+                        HandleRightsProtocolResponseMethodRequest,
+                    >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle =
                         HandleRightsProtocolControlHandle { inner: this.inner.clone() };
 
                     Ok(HandleRightsProtocolRequest::ResponseMethod {
-                        h: req.0.into_inner(),
+                        h: req.h,
+
                         responder: HandleRightsProtocolResponseMethodResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -1939,7 +2910,6 @@ impl HandleRightsProtocolRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_response_method(
         self,
@@ -1985,9 +2955,8 @@ impl fidl::endpoints::ControlHandle for HandleRightsProtocolControlHandle {
 
 impl HandleRightsProtocolControlHandle {
     pub fn send_an_event(&self, mut h: fidl::Socket) -> Result<(), fidl::Error> {
-        let mut response = (HandleWrapperObjectTypeSOCKETRights3::<fidl::Socket>(h));
-        self.inner.send::<_, false>(
-            &mut response,
+        self.inner.send::<HandleRightsProtocolAnEventRequest, false>(
+            (h,),
             0,
             0x69dad41418eb133,
             fidl::encoding::DynamicFlags::empty(),
@@ -2050,20 +3019,20 @@ impl HandleRightsProtocolResponseMethodResponder {
     }
 
     fn send_raw(&self, mut h: fidl::Socket) -> Result<(), fidl::Error> {
-        let mut response = (HandleWrapperObjectTypeSOCKETRights2::<fidl::Socket>(h));
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (h,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/HandleRightsProtocolResponseMethodResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<HandleRightsProtocolResponseMethodResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -2324,7 +3293,7 @@ impl fidl::endpoints::ProtocolMarker for MethodWithUnionMarker {
 }
 
 pub trait MethodWithUnionProxyInterface: Send + Sync {
-    type UnionMethodResponseFut: std::future::Future<Output = Result<(Option<Box<TheUnion>>), fidl::Error>>
+    type UnionMethodResponseFut: std::future::Future<Output = Result<Option<Box<TheUnion>>, fidl::Error>>
         + Send;
     fn r#union_method(&self, u: &mut TheUnion) -> Self::UnionMethodResponseFut;
 }
@@ -2355,14 +3324,17 @@ impl MethodWithUnionSynchronousProxy {
         &self,
         mut u: &mut TheUnion,
         ___deadline: zx::Time,
-    ) -> Result<(Option<Box<TheUnion>>), fidl::Error> {
-        let _value: (Option<Box<TheUnion>>,) = self.client.send_query::<_, _, false, true>(
-            &mut (u),
-            0x393e7f5b2b821218,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
+        let _response = self.client.send_query::<
+                MethodWithUnionUnionMethodRequest,
+                MethodWithUnionUnionMethodResponse,false,true>(
+                (&*u,),
+                0x393e7f5b2b821218,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.u)
     }
 }
 
@@ -2405,30 +3377,33 @@ impl MethodWithUnionProxy {
     pub fn r#union_method(
         &self,
         mut u: &mut TheUnion,
-    ) -> fidl::client::QueryResponseFut<(Option<Box<TheUnion>>)> {
+    ) -> fidl::client::QueryResponseFut<Option<Box<TheUnion>>> {
         MethodWithUnionProxyInterface::r#union_method(self, u)
     }
 }
 
 impl MethodWithUnionProxyInterface for MethodWithUnionProxy {
-    type UnionMethodResponseFut = fidl::client::QueryResponseFut<(Option<Box<TheUnion>>)>;
+    type UnionMethodResponseFut = fidl::client::QueryResponseFut<Option<Box<TheUnion>>>;
     fn r#union_method(&self, mut u: &mut TheUnion) -> Self::UnionMethodResponseFut {
-        fn transform(
-            result: Result<(Option<Box<TheUnion>>,), fidl::Error>,
-        ) -> Result<(Option<Box<TheUnion>>), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<Option<Box<TheUnion>>, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                MethodWithUnionUnionMethodResponse,
+                true,
+            >(_buf?)?;
+            Ok(_response.u)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (u),
+        self.client.send_query_and_decode::<
+            MethodWithUnionUnionMethodRequest,
+            Option<Box<TheUnion>>,
+            false,
+        >(
+            (&*u,),
             0x393e7f5b2b821218,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, true>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
 }
 
@@ -2556,10 +3531,10 @@ impl futures::Stream for MethodWithUnionRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x393e7f5b2b821218 => {
-                    let mut req: (TheUnion,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(MethodWithUnionUnionMethodRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/MethodWithUnionUnionMethodRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
-                    fidl::encoding::maybe_overflowing_decode(
+                    fidl::encoding::maybe_overflowing_decode::<MethodWithUnionUnionMethodRequest>(
                         &header,
                         _body_bytes,
                         handles,
@@ -2569,7 +3544,8 @@ impl futures::Stream for MethodWithUnionRequestStream {
                     let control_handle = MethodWithUnionControlHandle { inner: this.inner.clone() };
 
                     Ok(MethodWithUnionRequest::UnionMethod {
-                        u: req.0,
+                        u: req.u,
+
                         responder: MethodWithUnionUnionMethodResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -2689,20 +3665,20 @@ impl MethodWithUnionUnionMethodResponder {
     }
 
     fn send_raw(&self, mut u: Option<&mut TheUnion>) -> Result<(), fidl::Error> {
-        let mut response = (u);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (u.map(|x| &*x),),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/MethodWithUnionUnionMethodResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<MethodWithUnionUnionMethodResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -2721,7 +3697,7 @@ impl fidl::endpoints::ProtocolMarker for TransitionalMarker {
 }
 
 pub trait TransitionalProxyInterface: Send + Sync {
-    type RequestResponseFut: std::future::Future<Output = Result<(i64), fidl::Error>> + Send;
+    type RequestResponseFut: std::future::Future<Output = Result<i64, fidl::Error>> + Send;
     #[allow(unused_variables)]
     fn r#request(&self, x: i64) -> Self::RequestResponseFut {
         unimplemented!("transitional method request is unimplemented");
@@ -2754,18 +3730,20 @@ impl TransitionalSynchronousProxy {
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<TransitionalEvent, fidl::Error> {
         TransitionalEvent::decode(self.client.wait_for_event(deadline)?)
     }
-    pub fn r#request(&self, mut x: i64, ___deadline: zx::Time) -> Result<(i64), fidl::Error> {
-        let _value: (i64,) = self.client.send_query::<_, _, false, false>(
-            &mut (x),
-            0x512cc1ba467fef08,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    pub fn r#request(&self, mut x: i64, ___deadline: zx::Time) -> Result<i64, fidl::Error> {
+        let _response = self
+            .client
+            .send_query::<TransitionalRequestRequest, TransitionalRequestResponse, false, false>(
+                (x,),
+                0x512cc1ba467fef08,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?;
+        Ok(_response.y)
     }
     pub fn r#one_way(&self, mut x: i64) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (x,),
+        self.client.send::<TransitionalOneWayRequest, false>(
+            (x,),
             0x3c2ee8512dc7f7e7,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -2808,7 +3786,7 @@ impl TransitionalProxy {
     pub fn take_event_stream(&self) -> TransitionalEventStream {
         TransitionalEventStream { event_receiver: self.client.take_event_receiver() }
     }
-    pub fn r#request(&self, mut x: i64) -> fidl::client::QueryResponseFut<(i64)> {
+    pub fn r#request(&self, mut x: i64) -> fidl::client::QueryResponseFut<i64> {
         TransitionalProxyInterface::r#request(self, x)
     }
     pub fn r#one_way(&self, mut x: i64) -> Result<(), fidl::Error> {
@@ -2817,26 +3795,23 @@ impl TransitionalProxy {
 }
 
 impl TransitionalProxyInterface for TransitionalProxy {
-    type RequestResponseFut = fidl::client::QueryResponseFut<(i64)>;
+    type RequestResponseFut = fidl::client::QueryResponseFut<i64>;
     fn r#request(&self, mut x: i64) -> Self::RequestResponseFut {
-        fn transform(result: Result<(i64,), fidl::Error>) -> Result<(i64), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<i64, fidl::Error> {
+            let _response =
+                fidl::client::decode_transaction_body::<TransitionalRequestResponse, false>(_buf?)?;
+            Ok(_response.y)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (x),
+        self.client.send_query_and_decode::<TransitionalRequestRequest, i64, false>(
+            (x,),
             0x512cc1ba467fef08,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
     fn r#one_way(&self, mut x: i64) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (x),
+        self.client.send::<TransitionalOneWayRequest, false>(
+            (x,),
             0x3c2ee8512dc7f7e7,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -2881,7 +3856,7 @@ pub enum TransitionalEvent {
 
 impl TransitionalEvent {
     #[allow(irrefutable_let_patterns)]
-    pub fn into_event(self) -> Option<(i64)> {
+    pub fn into_event(self) -> Option<i64> {
         if let TransitionalEvent::Event { x } = self {
             Some((x))
         } else {
@@ -2897,20 +3872,20 @@ impl TransitionalEvent {
 
         match tx_header.ordinal() {
             0x76113c4b4d484841 => {
-                let mut out_tuple: (i64,) = fidl::encoding::Decodable::new_empty();
+                let mut out = fidl::new_empty!(TransitionalEventRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/TransitionalEventEvent");
                 fidl::trace_blob!("fidl:blob", "decode", bytes);
                 if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                     return Err(fidl::Error::LargeMessageImpossible);
                 }
-                fidl::encoding::Decoder::decode_into(
+                fidl::encoding::Decoder::decode_into::<TransitionalEventRequest>(
                     &tx_header,
                     _body_bytes,
                     _handles,
-                    &mut out_tuple,
+                    &mut out,
                 )?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
-                Ok((TransitionalEvent::Event { x: out_tuple.0 }))
+                Ok((TransitionalEvent::Event { x: out.x }))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
                 ordinal: tx_header.ordinal(),
@@ -2993,19 +3968,25 @@ impl futures::Stream for TransitionalRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x512cc1ba467fef08 => {
-                    let mut req: (i64,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(TransitionalRequestRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/TransitionalRequestRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<TransitionalRequestRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = TransitionalControlHandle { inner: this.inner.clone() };
 
                     Ok(TransitionalRequest::Request {
-                        x: req.0,
+                        x: req.x,
+
                         responder: TransitionalRequestResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -3014,18 +3995,23 @@ impl futures::Stream for TransitionalRequestStream {
                     })
                 }
                 0x3c2ee8512dc7f7e7 => {
-                    let mut req: (i64,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(TransitionalOneWayRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/TransitionalOneWayRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<TransitionalOneWayRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = TransitionalControlHandle { inner: this.inner.clone() };
 
-                    Ok(TransitionalRequest::OneWay { x: req.0, control_handle })
+                    Ok(TransitionalRequest::OneWay { x: req.x, control_handle })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal(),
@@ -3051,7 +4037,6 @@ impl TransitionalRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_one_way(self) -> Option<(i64, TransitionalControlHandle)> {
         if let TransitionalRequest::OneWay { x, control_handle } = self {
@@ -3095,9 +4080,8 @@ impl fidl::endpoints::ControlHandle for TransitionalControlHandle {
 
 impl TransitionalControlHandle {
     pub fn send_event(&self, mut x: i64) -> Result<(), fidl::Error> {
-        let mut response = (x);
-        self.inner.send::<_, false>(
-            &mut response,
+        self.inner.send::<TransitionalEventRequest, false>(
+            (x,),
             0,
             0x76113c4b4d484841,
             fidl::encoding::DynamicFlags::empty(),
@@ -3160,20 +4144,20 @@ impl TransitionalRequestResponder {
     }
 
     fn send_raw(&self, mut y: i64) -> Result<(), fidl::Error> {
-        let mut response = (y);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (y,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/TransitionalRequestResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<TransitionalRequestResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -3196,7 +4180,7 @@ pub trait WithAndWithoutRequestResponseProxyInterface: Send + Sync {
     type NoRequestEmptyResponseResponseFut: std::future::Future<Output = Result<(), fidl::Error>>
         + Send;
     fn r#no_request_empty_response(&self) -> Self::NoRequestEmptyResponseResponseFut;
-    type NoRequestWithResponseResponseFut: std::future::Future<Output = Result<(String), fidl::Error>>
+    type NoRequestWithResponseResponseFut: std::future::Future<Output = Result<String, fidl::Error>>
         + Send;
     fn r#no_request_with_response(&self) -> Self::NoRequestWithResponseResponseFut;
     fn r#with_request_no_response(&self, arg: &str) -> Result<(), fidl::Error>;
@@ -3204,7 +4188,7 @@ pub trait WithAndWithoutRequestResponseProxyInterface: Send + Sync {
         + Send;
     fn r#with_request_empty_response(&self, arg: &str)
         -> Self::WithRequestEmptyResponseResponseFut;
-    type WithRequestWithResponseResponseFut: std::future::Future<Output = Result<(String), fidl::Error>>
+    type WithRequestWithResponseResponseFut: std::future::Future<Output = Result<String, fidl::Error>>
         + Send;
     fn r#with_request_with_response(&self, arg: &str) -> Self::WithRequestWithResponseResponseFut;
 }
@@ -3236,36 +4220,38 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
         WithAndWithoutRequestResponseEvent::decode(self.client.wait_for_event(deadline)?)
     }
     pub fn r#no_request_no_response(&self) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (),
+        self.client.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0x4b212a6c8c5f7bab,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     pub fn r#no_request_empty_response(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
-        let _value: () = self.client.send_query::<_, _, false, false>(
-            &mut (),
-            0x16a329d17f458668,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(())
+        let _response = self
+            .client
+            .send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload, false, false>(
+                (),
+                0x16a329d17f458668,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?;
+        Ok(_response)
     }
-    pub fn r#no_request_with_response(
-        &self,
-        ___deadline: zx::Time,
-    ) -> Result<(String), fidl::Error> {
-        let _value: (String,) = self.client.send_query::<_, _, false, true>(
-            &mut (),
-            0x7d6b2fcf0e2a65bd,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    pub fn r#no_request_with_response(&self, ___deadline: zx::Time) -> Result<String, fidl::Error> {
+        let _response = self.client.send_query::<
+                fidl::encoding::EmptyPayload,
+                WithAndWithoutRequestResponseNoRequestWithResponseResponse,false,true>(
+                (),
+                0x7d6b2fcf0e2a65bd,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.ret)
     }
     pub fn r#with_request_no_response(&self, mut arg: &str) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (arg,),
+        self.client.send::<WithAndWithoutRequestResponseWithRequestNoResponseRequest, false>(
+            (arg,),
             0x65ab625138c50a77,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -3275,26 +4261,32 @@ impl WithAndWithoutRequestResponseSynchronousProxy {
         mut arg: &str,
         ___deadline: zx::Time,
     ) -> Result<(), fidl::Error> {
-        let _value: () = self.client.send_query::<_, _, false, false>(
-            &mut (arg),
-            0x27ee4d2bd405df5f,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(())
+        let _response = self.client.send_query::<
+                WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+                fidl::encoding::EmptyPayload,false,false>(
+                (arg,),
+                0x27ee4d2bd405df5f,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response)
     }
     pub fn r#with_request_with_response(
         &self,
         mut arg: &str,
         ___deadline: zx::Time,
-    ) -> Result<(String), fidl::Error> {
-        let _value: (String,) = self.client.send_query::<_, _, false, true>(
-            &mut (arg),
-            0x590e91945d58f5b1,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    ) -> Result<String, fidl::Error> {
+        let _response = self.client.send_query::<
+                WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+                WithAndWithoutRequestResponseWithRequestWithResponseResponse,false,true>(
+                (arg,),
+                0x590e91945d58f5b1,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.ret)
     }
 }
 
@@ -3343,7 +4335,7 @@ impl WithAndWithoutRequestResponseProxy {
     pub fn r#no_request_empty_response(&self) -> fidl::client::QueryResponseFut<()> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_empty_response(self)
     }
-    pub fn r#no_request_with_response(&self) -> fidl::client::QueryResponseFut<(String)> {
+    pub fn r#no_request_with_response(&self) -> fidl::client::QueryResponseFut<String> {
         WithAndWithoutRequestResponseProxyInterface::r#no_request_with_response(self)
     }
     pub fn r#with_request_no_response(&self, mut arg: &str) -> Result<(), fidl::Error> {
@@ -3358,56 +4350,56 @@ impl WithAndWithoutRequestResponseProxy {
     pub fn r#with_request_with_response(
         &self,
         mut arg: &str,
-    ) -> fidl::client::QueryResponseFut<(String)> {
+    ) -> fidl::client::QueryResponseFut<String> {
         WithAndWithoutRequestResponseProxyInterface::r#with_request_with_response(self, arg)
     }
 }
 
 impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestResponseProxy {
     fn r#no_request_no_response(&self) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (),
+        self.client.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0x4b212a6c8c5f7bab,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
     type NoRequestEmptyResponseResponseFut = fidl::client::QueryResponseFut<()>;
     fn r#no_request_empty_response(&self) -> Self::NoRequestEmptyResponseResponseFut {
-        fn transform(result: Result<(), fidl::Error>) -> Result<(), fidl::Error> {
-            result.map(|_value| ())
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                false,
+            >(_buf?)?;
+            Ok(_response)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (),
+        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, (), false>(
+            (),
             0x16a329d17f458668,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
-    type NoRequestWithResponseResponseFut = fidl::client::QueryResponseFut<(String)>;
+    type NoRequestWithResponseResponseFut = fidl::client::QueryResponseFut<String>;
     fn r#no_request_with_response(&self) -> Self::NoRequestWithResponseResponseFut {
-        fn transform(result: Result<(String,), fidl::Error>) -> Result<(String), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<String, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+                true,
+            >(_buf?)?;
+            Ok(_response.ret)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (),
+        self.client.send_query_and_decode::<fidl::encoding::EmptyPayload, String, false>(
+            (),
             0x7d6b2fcf0e2a65bd,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, true>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
     fn r#with_request_no_response(&self, mut arg: &str) -> Result<(), fidl::Error> {
-        self.client.send::<_, false>(
-            &mut (arg),
+        self.client.send::<WithAndWithoutRequestResponseWithRequestNoResponseRequest, false>(
+            (arg,),
             0x65ab625138c50a77,
             fidl::encoding::DynamicFlags::empty(),
         )
@@ -3417,40 +4409,48 @@ impl WithAndWithoutRequestResponseProxyInterface for WithAndWithoutRequestRespon
         &self,
         mut arg: &str,
     ) -> Self::WithRequestEmptyResponseResponseFut {
-        fn transform(result: Result<(), fidl::Error>) -> Result<(), fidl::Error> {
-            result.map(|_value| ())
+        fn _decode(mut _buf: Result<fidl::MessageBufEtc, fidl::Error>) -> Result<(), fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::EmptyPayload,
+                false,
+            >(_buf?)?;
+            Ok(_response)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (arg),
+        self.client.send_query_and_decode::<
+            WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
+            (),
+            false,
+        >(
+            (arg,),
             0x27ee4d2bd405df5f,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
-    type WithRequestWithResponseResponseFut = fidl::client::QueryResponseFut<(String)>;
+    type WithRequestWithResponseResponseFut = fidl::client::QueryResponseFut<String>;
     fn r#with_request_with_response(
         &self,
         mut arg: &str,
     ) -> Self::WithRequestWithResponseResponseFut {
-        fn transform(result: Result<(String,), fidl::Error>) -> Result<(String), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<String, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+                true,
+            >(_buf?)?;
+            Ok(_response.ret)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (arg),
+        self.client.send_query_and_decode::<
+            WithAndWithoutRequestResponseWithRequestWithResponseRequest,
+            String,
+            false,
+        >(
+            (arg,),
             0x590e91945d58f5b1,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, true>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
 }
 
@@ -3488,7 +4488,6 @@ impl futures::Stream for WithAndWithoutRequestResponseEventStream {
 #[derive(Debug)]
 pub enum WithAndWithoutRequestResponseEvent {
     OnEmptyResponse {},
-
     OnWithResponse { ret: String },
 }
 
@@ -3501,9 +4500,8 @@ impl WithAndWithoutRequestResponseEvent {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
-    pub fn into_on_with_response(self) -> Option<(String)> {
+    pub fn into_on_with_response(self) -> Option<String> {
         if let WithAndWithoutRequestResponseEvent::OnWithResponse { ret } = self {
             Some((ret))
         } else {
@@ -3521,24 +4519,29 @@ impl WithAndWithoutRequestResponseEvent {
 
         match tx_header.ordinal() {
             0x4ae85a2b8d7c2e56 => {
-                let mut out_tuple: () = fidl::encoding::Decodable::new_empty();
+                let mut out = fidl::new_empty!(fidl::encoding::EmptyPayload);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseOnEmptyResponseEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                if tx_header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                     return Err(fidl::Error::LargeMessageImpossible)
                 }
-                fidl::encoding::Decoder::decode_into(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&tx_header, _body_bytes, _handles, &mut out)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
-                    WithAndWithoutRequestResponseEvent::OnEmptyResponse {}
+                    WithAndWithoutRequestResponseEvent::OnEmptyResponse {
+                    }
                 ))
             }
             0x50a6f21a322f31a8 => {
-                let mut out_tuple: (String,) = fidl::encoding::Decodable::new_empty();
+                let mut out = fidl::new_empty!(WithAndWithoutRequestResponseOnWithResponseRequest);
                 fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseOnWithResponseEvent");
-                fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&tx_header, _body_bytes, _handles, &mut out_tuple)?;
+                fidl::trace_blob!("fidl:blob", "decode", bytes);
+                fidl::encoding::maybe_overflowing_decode::<WithAndWithoutRequestResponseOnWithResponseRequest>(&tx_header, _body_bytes, _handles, &mut out)?;
                 fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => _handles.len() as u32);
                 Ok((
-                    WithAndWithoutRequestResponseEvent::OnWithResponse {ret: out_tuple.0,}
+                    WithAndWithoutRequestResponseEvent::OnWithResponse {ret: out.ret,
+
+                    }
                 ))
             }
             _ => Err(fidl::Error::UnknownOrdinal {
@@ -3622,95 +4625,116 @@ impl futures::Stream for WithAndWithoutRequestResponseRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x4b212a6c8c5f7bab => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseNoRequestNoResponseRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
                         inner: this.inner.clone(),
                     };
 
-                    Ok(WithAndWithoutRequestResponseRequest::NoRequestNoResponse {control_handle,})
+                    Ok(WithAndWithoutRequestResponseRequest::NoRequestNoResponse {
+                            control_handle,
+                    })
                 }
                 0x16a329d17f458668 => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseNoRequestEmptyResponseRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
                         inner: this.inner.clone(),
                     };
 
-                    Ok(WithAndWithoutRequestResponseRequest::NoRequestEmptyResponse {responder:WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
+                    Ok(WithAndWithoutRequestResponseRequest::NoRequestEmptyResponse {
+                            responder:WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
                                 tx_id: header.tx_id(),
                                 ordinal: header.ordinal(),
-                            },})
+                            },
+                    })
                 }
                 0x7d6b2fcf0e2a65bd => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW) {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
                         inner: this.inner.clone(),
                     };
 
-                    Ok(WithAndWithoutRequestResponseRequest::NoRequestWithResponse {responder:WithAndWithoutRequestResponseNoRequestWithResponseResponder {
+                    Ok(WithAndWithoutRequestResponseRequest::NoRequestWithResponse {
+                            responder:WithAndWithoutRequestResponseNoRequestWithResponseResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
                                 tx_id: header.tx_id(),
                                 ordinal: header.ordinal(),
-                            },})
+                            },
+                    })
                 }
                 0x65ab625138c50a77 => {
-                    let mut req: (String,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(WithAndWithoutRequestResponseWithRequestNoResponseRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseWithRequestNoResponseRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&header, _body_bytes, handles, &mut req)?;
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::encoding::maybe_overflowing_decode::<WithAndWithoutRequestResponseWithRequestNoResponseRequest>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
                         inner: this.inner.clone(),
                     };
 
-                    Ok(WithAndWithoutRequestResponseRequest::WithRequestNoResponse {arg: req.0,control_handle,})
+                    Ok(WithAndWithoutRequestResponseRequest::WithRequestNoResponse {arg: req.arg,
+
+                            control_handle,
+                    })
                 }
                 0x27ee4d2bd405df5f => {
-                    let mut req: (String,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(WithAndWithoutRequestResponseWithRequestEmptyResponseRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseWithRequestEmptyResponseRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&header, _body_bytes, handles, &mut req)?;
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::encoding::maybe_overflowing_decode::<WithAndWithoutRequestResponseWithRequestEmptyResponseRequest>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
                         inner: this.inner.clone(),
                     };
 
-                    Ok(WithAndWithoutRequestResponseRequest::WithRequestEmptyResponse {arg: req.0,responder:WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
+                    Ok(WithAndWithoutRequestResponseRequest::WithRequestEmptyResponse {arg: req.arg,
+
+                            responder:WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
                                 tx_id: header.tx_id(),
                                 ordinal: header.ordinal(),
-                            },})
+                            },
+                    })
                 }
                 0x590e91945d58f5b1 => {
-                    let mut req: (String,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(WithAndWithoutRequestResponseWithRequestWithResponseRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseRequest");
-                    fidl::trace_blob!("fidl:blob", "decode", bytes);fidl::encoding::maybe_overflowing_decode(&header, _body_bytes, handles, &mut req)?;
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    fidl::encoding::maybe_overflowing_decode::<WithAndWithoutRequestResponseWithRequestWithResponseRequest>(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithAndWithoutRequestResponseControlHandle {
                         inner: this.inner.clone(),
                     };
 
-                    Ok(WithAndWithoutRequestResponseRequest::WithRequestWithResponse {arg: req.0,responder:WithAndWithoutRequestResponseWithRequestWithResponseResponder {
+                    Ok(WithAndWithoutRequestResponseRequest::WithRequestWithResponse {arg: req.arg,
+
+                            responder:WithAndWithoutRequestResponseWithRequestWithResponseResponder {
                                 control_handle: std::mem::ManuallyDrop::new(control_handle),
                                 tx_id: header.tx_id(),
                                 ordinal: header.ordinal(),
-                            },})
+                            },
+                    })
                 }
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal(),
@@ -3756,7 +4780,6 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_no_request_empty_response(
         self,
@@ -3767,7 +4790,6 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_no_request_with_response(
         self,
@@ -3778,7 +4800,6 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_with_request_no_response(
         self,
@@ -3791,7 +4812,6 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_with_request_empty_response(
         self,
@@ -3804,7 +4824,6 @@ impl WithAndWithoutRequestResponseRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_with_request_with_response(
         self,
@@ -3868,19 +4887,16 @@ impl fidl::endpoints::ControlHandle for WithAndWithoutRequestResponseControlHand
 
 impl WithAndWithoutRequestResponseControlHandle {
     pub fn send_on_empty_response(&self) -> Result<(), fidl::Error> {
-        let mut response = ();
-        self.inner.send::<_, false>(
-            &mut response,
+        self.inner.send::<fidl::encoding::EmptyPayload, false>(
+            (),
             0,
             0x4ae85a2b8d7c2e56,
             fidl::encoding::DynamicFlags::empty(),
         )
     }
-
     pub fn send_on_with_response(&self, mut ret: &str) -> Result<(), fidl::Error> {
-        let mut response = (ret);
-        self.inner.send::<_, false>(
-            &mut response,
+        self.inner.send::<WithAndWithoutRequestResponseOnWithResponseRequest, false>(
+            (ret,),
             0,
             0x50a6f21a322f31a8,
             fidl::encoding::DynamicFlags::empty(),
@@ -3943,20 +4959,20 @@ impl WithAndWithoutRequestResponseNoRequestEmptyResponseResponder {
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let mut response = (());
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseNoRequestEmptyResponseResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<fidl::encoding::EmptyPayload>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -4020,20 +5036,22 @@ impl WithAndWithoutRequestResponseNoRequestWithResponseResponder {
     }
 
     fn send_raw(&self, mut ret: &str) -> Result<(), fidl::Error> {
-        let mut response = (ret);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (ret,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseNoRequestWithResponseResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    WithAndWithoutRequestResponseNoRequestWithResponseResponse,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -4097,20 +5115,20 @@ impl WithAndWithoutRequestResponseWithRequestEmptyResponseResponder {
     }
 
     fn send_raw(&self) -> Result<(), fidl::Error> {
-        let mut response = (());
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseWithRequestEmptyResponseResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<fidl::encoding::EmptyPayload>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -4174,20 +5192,22 @@ impl WithAndWithoutRequestResponseWithRequestWithResponseResponder {
     }
 
     fn send_raw(&self, mut ret: &str) -> Result<(), fidl::Error> {
-        let mut response = (ret);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (ret,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithAndWithoutRequestResponseWithRequestWithResponseResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    WithAndWithoutRequestResponseWithRequestWithResponseResponse,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -4204,18 +5224,22 @@ impl fidl::endpoints::ProtocolMarker for WithErrorSyntaxMarker {
     type RequestStream = WithErrorSyntaxRequestStream;
     const DEBUG_NAME: &'static str = "(anonymous) WithErrorSyntax";
 }
+pub type WithErrorSyntaxResponseAsStructResult = Result<(i64, i64, i64), u32>;
+pub type WithErrorSyntaxErrorAsPrimitiveResult = Result<(), u32>;
+pub type WithErrorSyntaxErrorAsEnumResult = Result<(), ErrorEnum>;
+pub type WithErrorSyntaxHandleInResultResult = Result<fidl::Handle, u32>;
 
 pub trait WithErrorSyntaxProxyInterface: Send + Sync {
-    type ResponseAsStructResponseFut: std::future::Future<Output = Result<(WithErrorSyntaxResponseAsStructResult), fidl::Error>>
+    type ResponseAsStructResponseFut: std::future::Future<Output = Result<WithErrorSyntaxResponseAsStructResult, fidl::Error>>
         + Send;
     fn r#response_as_struct(&self) -> Self::ResponseAsStructResponseFut;
-    type ErrorAsPrimitiveResponseFut: std::future::Future<Output = Result<(WithErrorSyntaxErrorAsPrimitiveResult), fidl::Error>>
+    type ErrorAsPrimitiveResponseFut: std::future::Future<Output = Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error>>
         + Send;
     fn r#error_as_primitive(&self) -> Self::ErrorAsPrimitiveResponseFut;
-    type ErrorAsEnumResponseFut: std::future::Future<Output = Result<(WithErrorSyntaxErrorAsEnumResult), fidl::Error>>
+    type ErrorAsEnumResponseFut: std::future::Future<Output = Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error>>
         + Send;
     fn r#error_as_enum(&self) -> Self::ErrorAsEnumResponseFut;
-    type HandleInResultResponseFut: std::future::Future<Output = Result<(WithErrorSyntaxHandleInResultResult), fidl::Error>>
+    type HandleInResultResponseFut: std::future::Future<Output = Result<WithErrorSyntaxHandleInResultResult, fidl::Error>>
         + Send;
     fn r#handle_in_result(&self) -> Self::HandleInResultResponseFut;
 }
@@ -4245,54 +5269,62 @@ impl WithErrorSyntaxSynchronousProxy {
     pub fn r#response_as_struct(
         &self,
         ___deadline: zx::Time,
-    ) -> Result<(WithErrorSyntaxResponseAsStructResult), fidl::Error> {
-        let _value: WithErrorSyntaxResponseAsStructResultHandleWrapper =
-            self.client.send_query::<_, _, false, false>(
-                &mut (),
+    ) -> Result<WithErrorSyntaxResponseAsStructResult, fidl::Error> {
+        let _response = self.client.send_query::<
+                fidl::encoding::EmptyPayload,
+                fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,false,false>(
+                (),
                 0x3b902a6d8d24693,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?;
-        Ok(_value.map(|_value| (_value.0, _value.1, _value.2)))
+            )?
+            ;
+        Ok(_response.map(|x| (x.a, x.b, x.c)))
     }
     pub fn r#error_as_primitive(
         &self,
         ___deadline: zx::Time,
-    ) -> Result<(WithErrorSyntaxErrorAsPrimitiveResult), fidl::Error> {
-        let _value: WithErrorSyntaxErrorAsPrimitiveResultHandleWrapper =
-            self.client.send_query::<_, _, false, false>(
-                &mut (),
+    ) -> Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error> {
+        let _response = self.client.send_query::<
+                fidl::encoding::EmptyPayload,
+                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,false,false>(
+                (),
                 0x602fd6bd920135e7,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?;
-        Ok(_value.map(|_value| ()))
+            )?
+            ;
+        Ok(_response.map(|x| x))
     }
     pub fn r#error_as_enum(
         &self,
         ___deadline: zx::Time,
-    ) -> Result<(WithErrorSyntaxErrorAsEnumResult), fidl::Error> {
-        let _value: WithErrorSyntaxErrorAsEnumResultHandleWrapper =
-            self.client.send_query::<_, _, false, false>(
-                &mut (),
+    ) -> Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error> {
+        let _response = self.client.send_query::<
+                fidl::encoding::EmptyPayload,
+                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,false,false>(
+                (),
                 0x4c371e1673212f43,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?;
-        Ok(_value.map(|_value| ()))
+            )?
+            ;
+        Ok(_response.map(|x| x))
     }
     pub fn r#handle_in_result(
         &self,
         ___deadline: zx::Time,
-    ) -> Result<(WithErrorSyntaxHandleInResultResult), fidl::Error> {
-        let _value: WithErrorSyntaxHandleInResultResultHandleWrapper =
-            self.client.send_query::<_, _, false, false>(
-                &mut (),
+    ) -> Result<WithErrorSyntaxHandleInResultResult, fidl::Error> {
+        let _response = self.client.send_query::<
+                fidl::encoding::EmptyPayload,
+                fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,false,false>(
+                (),
                 0x13092c5b835b0cbf,
                 fidl::encoding::DynamicFlags::empty(),
                 ___deadline,
-            )?;
-        Ok(_value.map(|_value| _value.0.into_inner()))
+            )?
+            ;
+        Ok(_response.map(|x| x.h))
     }
 }
 
@@ -4334,106 +5366,117 @@ impl WithErrorSyntaxProxy {
     }
     pub fn r#response_as_struct(
         &self,
-    ) -> fidl::client::QueryResponseFut<(WithErrorSyntaxResponseAsStructResult)> {
+    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxResponseAsStructResult> {
         WithErrorSyntaxProxyInterface::r#response_as_struct(self)
     }
     pub fn r#error_as_primitive(
         &self,
-    ) -> fidl::client::QueryResponseFut<(WithErrorSyntaxErrorAsPrimitiveResult)> {
+    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsPrimitiveResult> {
         WithErrorSyntaxProxyInterface::r#error_as_primitive(self)
     }
     pub fn r#error_as_enum(
         &self,
-    ) -> fidl::client::QueryResponseFut<(WithErrorSyntaxErrorAsEnumResult)> {
+    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsEnumResult> {
         WithErrorSyntaxProxyInterface::r#error_as_enum(self)
     }
     pub fn r#handle_in_result(
         &self,
-    ) -> fidl::client::QueryResponseFut<(WithErrorSyntaxHandleInResultResult)> {
+    ) -> fidl::client::QueryResponseFut<WithErrorSyntaxHandleInResultResult> {
         WithErrorSyntaxProxyInterface::r#handle_in_result(self)
     }
 }
 
 impl WithErrorSyntaxProxyInterface for WithErrorSyntaxProxy {
     type ResponseAsStructResponseFut =
-        fidl::client::QueryResponseFut<(WithErrorSyntaxResponseAsStructResult)>;
+        fidl::client::QueryResponseFut<WithErrorSyntaxResponseAsStructResult>;
     fn r#response_as_struct(&self) -> Self::ResponseAsStructResponseFut {
-        fn transform(
-            result: Result<WithErrorSyntaxResponseAsStructResultHandleWrapper, fidl::Error>,
-        ) -> Result<(WithErrorSyntaxResponseAsStructResult), fidl::Error> {
-            result.map(|_value| _value.map(|_value| (_value.0, _value.1, _value.2)))
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<WithErrorSyntaxResponseAsStructResult, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,
+                false,
+            >(_buf?)?;
+            Ok(_response.map(|x| (x.a, x.b, x.c)))
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (),
+        self.client.send_query_and_decode::<
+            fidl::encoding::EmptyPayload,
+            WithErrorSyntaxResponseAsStructResult,
+            false,
+        >(
+            (),
             0x3b902a6d8d24693,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
     type ErrorAsPrimitiveResponseFut =
-        fidl::client::QueryResponseFut<(WithErrorSyntaxErrorAsPrimitiveResult)>;
+        fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsPrimitiveResult>;
     fn r#error_as_primitive(&self) -> Self::ErrorAsPrimitiveResponseFut {
-        fn transform(
-            result: Result<WithErrorSyntaxErrorAsPrimitiveResultHandleWrapper, fidl::Error>,
-        ) -> Result<(WithErrorSyntaxErrorAsPrimitiveResult), fidl::Error> {
-            result.map(|_value| _value.map(|_value| ()))
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<WithErrorSyntaxErrorAsPrimitiveResult, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,
+                false,
+            >(_buf?)?;
+            Ok(_response.map(|x| x))
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (),
+        self.client.send_query_and_decode::<
+            fidl::encoding::EmptyPayload,
+            WithErrorSyntaxErrorAsPrimitiveResult,
+            false,
+        >(
+            (),
             0x602fd6bd920135e7,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
-    type ErrorAsEnumResponseFut =
-        fidl::client::QueryResponseFut<(WithErrorSyntaxErrorAsEnumResult)>;
+    type ErrorAsEnumResponseFut = fidl::client::QueryResponseFut<WithErrorSyntaxErrorAsEnumResult>;
     fn r#error_as_enum(&self) -> Self::ErrorAsEnumResponseFut {
-        fn transform(
-            result: Result<WithErrorSyntaxErrorAsEnumResultHandleWrapper, fidl::Error>,
-        ) -> Result<(WithErrorSyntaxErrorAsEnumResult), fidl::Error> {
-            result.map(|_value| _value.map(|_value| ()))
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<WithErrorSyntaxErrorAsEnumResult, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,
+                false,
+            >(_buf?)?;
+            Ok(_response.map(|x| x))
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (),
+        self.client.send_query_and_decode::<
+            fidl::encoding::EmptyPayload,
+            WithErrorSyntaxErrorAsEnumResult,
+            false,
+        >(
+            (),
             0x4c371e1673212f43,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
     type HandleInResultResponseFut =
-        fidl::client::QueryResponseFut<(WithErrorSyntaxHandleInResultResult)>;
+        fidl::client::QueryResponseFut<WithErrorSyntaxHandleInResultResult>;
     fn r#handle_in_result(&self) -> Self::HandleInResultResponseFut {
-        fn transform(
-            result: Result<WithErrorSyntaxHandleInResultResultHandleWrapper, fidl::Error>,
-        ) -> Result<(WithErrorSyntaxHandleInResultResult), fidl::Error> {
-            result.map(|_value| _value.map(|_value| _value.0.into_inner()))
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<WithErrorSyntaxHandleInResultResult, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,
+                false,
+            >(_buf?)?;
+            Ok(_response.map(|x| x.h))
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (),
+        self.client.send_query_and_decode::<
+            fidl::encoding::EmptyPayload,
+            WithErrorSyntaxHandleInResultResult,
+            false,
+        >(
+            (),
             0x13092c5b835b0cbf,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
 }
 
@@ -4561,14 +5604,19 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x3b902a6d8d24693 => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxResponseAsStructRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithErrorSyntaxControlHandle { inner: this.inner.clone() };
 
@@ -4581,14 +5629,19 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     })
                 }
                 0x602fd6bd920135e7 => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxErrorAsPrimitiveRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithErrorSyntaxControlHandle { inner: this.inner.clone() };
 
@@ -4601,14 +5654,19 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     })
                 }
                 0x4c371e1673212f43 => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxErrorAsEnumRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithErrorSyntaxControlHandle { inner: this.inner.clone() };
 
@@ -4621,14 +5679,19 @@ impl futures::Stream for WithErrorSyntaxRequestStream {
                     })
                 }
                 0x13092c5b835b0cbf => {
-                    let mut req: () = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(fidl::encoding::EmptyPayload);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxHandleInResultRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<fidl::encoding::EmptyPayload>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle = WithErrorSyntaxControlHandle { inner: this.inner.clone() };
 
@@ -4666,7 +5729,6 @@ impl WithErrorSyntaxRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_error_as_primitive(self) -> Option<(WithErrorSyntaxErrorAsPrimitiveResponder)> {
         if let WithErrorSyntaxRequest::ErrorAsPrimitive { responder } = self {
@@ -4675,7 +5737,6 @@ impl WithErrorSyntaxRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_error_as_enum(self) -> Option<(WithErrorSyntaxErrorAsEnumResponder)> {
         if let WithErrorSyntaxRequest::ErrorAsEnum { responder } = self {
@@ -4684,7 +5745,6 @@ impl WithErrorSyntaxRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_handle_in_result(self) -> Option<(WithErrorSyntaxHandleInResultResponder)> {
         if let WithErrorSyntaxRequest::HandleInResult { responder } = self {
@@ -4792,22 +5852,24 @@ impl WithErrorSyntaxResponseAsStructResponder {
 
     fn send_raw(
         &self,
-        mut _result: &mut WithErrorSyntaxResponseAsStructResult,
+        mut result: &mut WithErrorSyntaxResponseAsStructResult,
     ) -> Result<(), fidl::Error> {
-        let mut response = (_result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: result.as_mut().map_err(|e| *e).map(|(a, b, c)| (*a, *b, *c)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxResponseAsStructResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    fidl::encoding::ResultType<WithErrorSyntaxResponseAsStructResponse, u32>,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -4878,22 +5940,24 @@ impl WithErrorSyntaxErrorAsPrimitiveResponder {
 
     fn send_raw(
         &self,
-        mut _result: &mut WithErrorSyntaxErrorAsPrimitiveResult,
+        mut result: &mut WithErrorSyntaxErrorAsPrimitiveResult,
     ) -> Result<(), fidl::Error> {
-        let mut response = (_result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: *result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxErrorAsPrimitiveResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    fidl::encoding::ResultType<fidl::encoding::EmptyStruct, u32>,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -4964,22 +6028,24 @@ impl WithErrorSyntaxErrorAsEnumResponder {
 
     fn send_raw(
         &self,
-        mut _result: &mut WithErrorSyntaxErrorAsEnumResult,
+        mut result: &mut WithErrorSyntaxErrorAsEnumResult,
     ) -> Result<(), fidl::Error> {
-        let mut response = (_result);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: *result,
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxErrorAsEnumResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    fidl::encoding::ResultType<fidl::encoding::EmptyStruct, ErrorEnum>,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -5050,25 +6116,27 @@ impl WithErrorSyntaxHandleInResultResponder {
 
     fn send_raw(
         &self,
-        mut _result: &mut WithErrorSyntaxHandleInResultResult,
+        mut result: &mut WithErrorSyntaxHandleInResultResult,
     ) -> Result<(), fidl::Error> {
-        let mut response = (match _result {
-            Ok((_0)) => Ok((HandleWrapperObjectTypeNONERights2147483648(_0))),
-            Err(e) => Err(e),
-        });
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: result
+                .as_mut()
+                .map_err(|e| *e)
+                .map(|h| (std::mem::replace(h, fidl::Handle::invalid().into()),)),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithErrorSyntaxHandleInResultResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    fidl::encoding::ResultType<WithErrorSyntaxHandleInResultResponse, u32>,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -5089,7 +6157,7 @@ impl fidl::endpoints::ProtocolMarker for WithProtocolEndsMarker {
 pub trait WithProtocolEndsProxyInterface: Send + Sync {
     type ClientEndsResponseFut: std::future::Future<
             Output = Result<
-                (Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>),
+                Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
                 fidl::Error,
             >,
         > + Send;
@@ -5098,13 +6166,13 @@ pub trait WithProtocolEndsProxyInterface: Send + Sync {
         in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
     ) -> Self::ClientEndsResponseFut;
     type ServerEndsResponseFut: std::future::Future<
-            Output = Result<(fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>), fidl::Error>,
+            Output = Result<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>, fidl::Error>,
         > + Send;
     fn r#server_ends(
         &self,
         in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
     ) -> Self::ServerEndsResponseFut;
-    type StructContainingEndsResponseFut: std::future::Future<Output = Result<(ProtocolEnds), fidl::Error>>
+    type StructContainingEndsResponseFut: std::future::Future<Output = Result<ProtocolEnds, fidl::Error>>
         + Send;
     fn r#struct_containing_ends(
         &self,
@@ -5138,52 +6206,49 @@ impl WithProtocolEndsSynchronousProxy {
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
         ___deadline: zx::Time,
-    ) -> Result<(Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>), fidl::Error> {
-        let _value: (
-            HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT<
-                Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
-            >,
-        ) = self.client.send_query::<_, _, false, false>(
-            &mut (HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT::<
-                fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
-            >(in_)),
-            0x51780563edb15042,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0.into_inner())
+    ) -> Result<Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>, fidl::Error> {
+        let _response = self.client.send_query::<
+                WithProtocolEndsClientEndsRequest,
+                WithProtocolEndsClientEndsResponse,false,false>(
+                (in_,),
+                0x51780563edb15042,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.out)
     }
     pub fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
         ___deadline: zx::Time,
-    ) -> Result<(fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>), fidl::Error> {
-        let _value: (
-            HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT<
-                fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
-            >,
-        ) = self.client.send_query::<_, _, false, false>(
-            &mut (HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT::<
-                Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
-            >(in_)),
-            0x70a02c2ba2228a33,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0.into_inner())
+    ) -> Result<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>, fidl::Error> {
+        let _response = self.client.send_query::<
+                WithProtocolEndsServerEndsRequest,
+                WithProtocolEndsServerEndsResponse,false,false>(
+                (in_,),
+                0x70a02c2ba2228a33,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.out)
     }
     pub fn r#struct_containing_ends(
         &self,
         mut in_: &mut ProtocolEnds,
         ___deadline: zx::Time,
-    ) -> Result<(ProtocolEnds), fidl::Error> {
-        let _value: (ProtocolEnds,) = self.client.send_query::<_, _, false, false>(
-            &mut (in_),
-            0x3893f0baad26f5d5,
-            fidl::encoding::DynamicFlags::empty(),
-            ___deadline,
-        )?;
-        Ok(_value.0)
+    ) -> Result<ProtocolEnds, fidl::Error> {
+        let _response = self.client.send_query::<
+                WithProtocolEndsStructContainingEndsRequest,
+                WithProtocolEndsStructContainingEndsResponse,false,false>(
+                (in_,),
+                0x3893f0baad26f5d5,
+                fidl::encoding::DynamicFlags::empty(),
+                ___deadline,
+            )?
+            ;
+        Ok(_response.out)
     }
 }
 
@@ -5227,113 +6292,104 @@ impl WithProtocolEndsProxy {
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
     ) -> fidl::client::QueryResponseFut<
-        (Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>),
+        Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
     > {
         WithProtocolEndsProxyInterface::r#client_ends(self, in_)
     }
     pub fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
-    ) -> fidl::client::QueryResponseFut<(fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>)>
+    ) -> fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>
     {
         WithProtocolEndsProxyInterface::r#server_ends(self, in_)
     }
     pub fn r#struct_containing_ends(
         &self,
         mut in_: &mut ProtocolEnds,
-    ) -> fidl::client::QueryResponseFut<(ProtocolEnds)> {
+    ) -> fidl::client::QueryResponseFut<ProtocolEnds> {
         WithProtocolEndsProxyInterface::r#struct_containing_ends(self, in_)
     }
 }
 
 impl WithProtocolEndsProxyInterface for WithProtocolEndsProxy {
     type ClientEndsResponseFut = fidl::client::QueryResponseFut<
-        (Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>),
+        Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
     >;
     fn r#client_ends(
         &self,
         mut in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
     ) -> Self::ClientEndsResponseFut {
-        fn transform(
-            result: Result<
-                (
-                    HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT<
-                        Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
-                    >,
-                ),
-                fidl::Error,
-            >,
-        ) -> Result<(Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>), fidl::Error>
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>, fidl::Error>
         {
-            result.map(|_value| _value.0.into_inner())
+            let _response = fidl::client::decode_transaction_body::<
+                WithProtocolEndsClientEndsResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.out)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT::<
-                fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
-            >(in_)),
+        self.client.send_query_and_decode::<
+            WithProtocolEndsClientEndsRequest,
+            Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
+            false,
+        >(
+            (in_,),
             0x51780563edb15042,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
     type ServerEndsResponseFut =
-        fidl::client::QueryResponseFut<(fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>)>;
+        fidl::client::QueryResponseFut<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>;
     fn r#server_ends(
         &self,
         mut in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
     ) -> Self::ServerEndsResponseFut {
-        fn transform(
-            result: Result<
-                (
-                    HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT<
-                        fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
-                    >,
-                ),
-                fidl::Error,
-            >,
-        ) -> Result<(fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>), fidl::Error> {
-            result.map(|_value| _value.0.into_inner())
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                WithProtocolEndsServerEndsResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.out)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT::<
-                Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
-            >(in_)),
+        self.client.send_query_and_decode::<
+            WithProtocolEndsServerEndsRequest,
+            fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
+            false,
+        >(
+            (in_,),
             0x70a02c2ba2228a33,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
-    type StructContainingEndsResponseFut = fidl::client::QueryResponseFut<(ProtocolEnds)>;
+    type StructContainingEndsResponseFut = fidl::client::QueryResponseFut<ProtocolEnds>;
     fn r#struct_containing_ends(
         &self,
         mut in_: &mut ProtocolEnds,
     ) -> Self::StructContainingEndsResponseFut {
-        fn transform(
-            result: Result<(ProtocolEnds,), fidl::Error>,
-        ) -> Result<(ProtocolEnds), fidl::Error> {
-            result.map(|_value| _value.0)
+        fn _decode(
+            mut _buf: Result<fidl::MessageBufEtc, fidl::Error>,
+        ) -> Result<ProtocolEnds, fidl::Error> {
+            let _response = fidl::client::decode_transaction_body::<
+                WithProtocolEndsStructContainingEndsResponse,
+                false,
+            >(_buf?)?;
+            Ok(_response.out)
         }
-        let send_result = self.client.call_send_raw_query::<_, false>(
-            &mut (in_),
+        self.client.send_query_and_decode::<
+            WithProtocolEndsStructContainingEndsRequest,
+            ProtocolEnds,
+            false,
+        >(
+            (in_,),
             0x3893f0baad26f5d5,
             fidl::encoding::DynamicFlags::empty(),
-        );
-        QueryResponseFut(match send_result {
-            Ok(res_fut) => future::maybe_done(
-                res_fut.and_then(|buf| decode_transaction_body_fut::<_, _, false>(buf, transform)),
-            ),
-            Err(e) => MaybeDone::Done(Err(e)),
-        })
+            _decode,
+        )
     }
 }
 
@@ -5461,24 +6517,26 @@ impl futures::Stream for WithProtocolEndsRequestStream {
 
             std::task::Poll::Ready(Some(match header.ordinal() {
                 0x51780563edb15042 => {
-                    let mut req: (
-                        HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT<
-                            fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
-                        >,
-                    ) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(WithProtocolEndsClientEndsRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithProtocolEndsClientEndsRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<WithProtocolEndsClientEndsRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle =
                         WithProtocolEndsControlHandle { inner: this.inner.clone() };
 
                     Ok(WithProtocolEndsRequest::ClientEnds {
-                        in_: req.0.into_inner(),
+                        in_: req.in_,
+
                         responder: WithProtocolEndsClientEndsResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -5487,24 +6545,26 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                     })
                 }
                 0x70a02c2ba2228a33 => {
-                    let mut req: (
-                        HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT<
-                            Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
-                        >,
-                    ) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(WithProtocolEndsServerEndsRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithProtocolEndsServerEndsRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<WithProtocolEndsServerEndsRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle =
                         WithProtocolEndsControlHandle { inner: this.inner.clone() };
 
                     Ok(WithProtocolEndsRequest::ServerEnds {
-                        in_: req.0.into_inner(),
+                        in_: req.in_,
+
                         responder: WithProtocolEndsServerEndsResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -5513,20 +6573,23 @@ impl futures::Stream for WithProtocolEndsRequestStream {
                     })
                 }
                 0x3893f0baad26f5d5 => {
-                    let mut req: (ProtocolEnds,) = fidl::encoding::Decodable::new_empty();
+                    let mut req = fidl::new_empty!(WithProtocolEndsStructContainingEndsRequest);
                     fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithProtocolEndsStructContainingEndsRequest");
                     fidl::trace_blob!("fidl:blob", "decode", bytes);
                     if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
                     {
                         Err(fidl::Error::LargeMessageImpossible)?;
                     }
-                    fidl::encoding::Decoder::decode_into(&header, _body_bytes, handles, &mut req)?;
+                    fidl::encoding::Decoder::decode_into::<
+                        WithProtocolEndsStructContainingEndsRequest,
+                    >(&header, _body_bytes, handles, &mut req)?;
                     fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
                     let control_handle =
                         WithProtocolEndsControlHandle { inner: this.inner.clone() };
 
                     Ok(WithProtocolEndsRequest::StructContainingEnds {
-                        in_: req.0,
+                        in_: req.in_,
+
                         responder: WithProtocolEndsStructContainingEndsResponder {
                             control_handle: std::mem::ManuallyDrop::new(control_handle),
                             tx_id: header.tx_id(),
@@ -5573,7 +6636,6 @@ impl WithProtocolEndsRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_server_ends(
         self,
@@ -5587,7 +6649,6 @@ impl WithProtocolEndsRequest {
             None
         }
     }
-
     #[allow(irrefutable_let_patterns)]
     pub fn into_struct_containing_ends(
         self,
@@ -5698,22 +6759,20 @@ impl WithProtocolEndsClientEndsResponder {
         &self,
         mut out: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
     ) -> Result<(), fidl::Error> {
-        let mut response = (HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT::<
-            Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
-        >(out));
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (out,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithProtocolEndsClientEndsResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<WithProtocolEndsClientEndsResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -5786,22 +6845,20 @@ impl WithProtocolEndsServerEndsResponder {
         &self,
         mut out: fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
     ) -> Result<(), fidl::Error> {
-        let mut response = (HandleWrapperObjectTypeCHANNELRightsCHANNEL_DEFAULT::<
-            fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
-        >(out));
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (out,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithProtocolEndsServerEndsResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<WithProtocolEndsServerEndsResponse>,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 
@@ -5865,20 +6922,22 @@ impl WithProtocolEndsStructContainingEndsResponder {
     }
 
     fn send_raw(&self, mut out: &mut ProtocolEnds) -> Result<(), fidl::Error> {
-        let mut response = (out);
-
-        let mut msg = fidl::encoding::TransactionMessage {
+        let msg = fidl::encoding::TransactionMessage {
             header: fidl::encoding::TransactionHeader::new(
                 self.tx_id,
                 self.ordinal,
                 fidl::encoding::DynamicFlags::empty(),
             ),
-            body: &mut response,
+            body: (out,),
         };
 
         fidl::encoding::with_tls_encode_buf(|bytes, handles| {
             fidl::duration_begin!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/WithProtocolEndsStructContainingEndsResponse");
-            fidl::encoding::Encoder::encode(bytes, handles, &mut msg)?;
+            fidl::encoding::Encoder::encode::<
+                fidl::encoding::TransactionMessageType<
+                    WithProtocolEndsStructContainingEndsResponse,
+                >,
+            >(bytes, handles, msg)?;
             fidl::trace_blob!("fidl:blob", "encode", bytes.as_slice());
             fidl::duration_end!("fidl", "encode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
 

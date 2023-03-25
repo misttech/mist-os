@@ -6,14 +6,14 @@
 
 {{- define "BitsDeclaration" -}}
 bitflags! {
-    {{- range .DocComments}}
+    {{- range .DocComments }}
     ///{{ . }}
-    {{- end}}
-    pub struct {{ .Name }}: {{ .Type }} {
+    {{- end }}
+    pub struct {{ .Name }}: {{ .UnderlyingType }} {
         {{- range .Members }}
-        {{- range .DocComments}}
+        {{- range .DocComments }}
         ///{{ . }}
-        {{- end}}
+        {{- end }}
         const {{ .Name }} = {{ .Value }};
         {{- end }}
     }
@@ -29,12 +29,13 @@ impl {{ .Name }} {
 
     #[deprecated = "Strict bits should not use `get_unknown_bits`"]
     #[inline(always)]
-    pub fn get_unknown_bits(&self) -> {{ .Type }} {
+    pub fn get_unknown_bits(&self) -> {{ .UnderlyingType }} {
         0
     }
 {{- else }}
     #[inline(always)]
-    pub fn from_bits_allow_unknown(bits: {{ .Type }}) -> Self {
+    pub fn from_bits_allow_unknown(bits: {{ .UnderlyingType }}) -> Self {
+        {{- /* TODO(fxbug.dev/124335): Use `from_bits_retain` instead. */}}
         unsafe { Self::from_bits_unchecked(bits) }
     }
 
@@ -44,7 +45,7 @@ impl {{ .Name }} {
     }
 
     #[inline(always)]
-    pub fn get_unknown_bits(&self) -> {{ .Type }} {
+    pub fn get_unknown_bits(&self) -> {{ .UnderlyingType }} {
         self.bits & !Self::all().bits
     }
 {{- end }}
@@ -52,7 +53,7 @@ impl {{ .Name }} {
 
 fidl_bits! {
     name: {{ .Name }},
-    prim_ty: {{ .Type }},
+    prim_ty: {{ .UnderlyingType }},
     {{- if .IsStrict }}
     strict: true,
     {{- else }}
