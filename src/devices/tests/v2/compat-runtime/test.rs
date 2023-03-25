@@ -35,8 +35,7 @@ async fn test_compat_runtime() -> Result<()> {
 
     // Connect to our driver.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    let driver =
-        device_watcher::recursive_wait_and_open::<ft::LeafMarker>(&dev, "root/v1/leaf").await?;
+    let driver = device_watcher::recursive_wait_and_open::<ft::LeafMarker>(&dev, "v1/leaf").await?;
     let response = driver.get_string().await.unwrap();
     assert_eq!(response, "hello world!");
     Ok(())

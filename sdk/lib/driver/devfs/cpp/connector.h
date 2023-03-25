@@ -35,6 +35,8 @@ class Connector : public fidl::WireServer<fuchsia_device_fs::Connector> {
     return zx::ok(std::move(endpoints->client));
   }
 
+  std::optional<fidl::ServerBinding<fuchsia_device_fs::Connector>>& binding() { return binding_; }
+
  private:
   void Connect(ConnectRequestView request, ConnectCompleter::Sync& completer) override {
     callback_(fidl::ServerEnd<Protocol>(std::move(request->server)));

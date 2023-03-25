@@ -37,9 +37,13 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
        .driver_info = fuchsia_driver_index::MatchedDriverInfo(
            {.url = "fuchsia-boot:///#meta/composite-driver.cm", .colocate = true})});
 
+  std::optional<Devnode> root_devnode;
+  Devfs devfs = Devfs(root_devnode);
+
   // Bind the first node.
   auto parent_1 =
       std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_1", {}, &node_manager, dispatcher()));
+  parent_1->AddToDevfsForTesting(root_devnode.value());
   auto matched_parent_1 = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
       .name = "spec",
       .node_index = 0,
@@ -55,6 +59,7 @@ TEST_F(CompositeNodeSpecV2Test, SpecBind) {
   // Bind the second node.
   auto parent_2 =
       std::shared_ptr<dfv2::Node>(new dfv2::Node("spec_parent_2", {}, &node_manager, dispatcher()));
+  parent_2->AddToDevfsForTesting(root_devnode.value());
   auto matched_parent_2 = fuchsia_driver_index::MatchedCompositeNodeSpecInfo({
       .name = "spec",
       .node_index = 1,

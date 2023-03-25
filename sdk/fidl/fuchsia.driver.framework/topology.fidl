@@ -3,8 +3,10 @@
 // found in the LICENSE file.
 library fuchsia.driver.framework;
 
+using fuchsia.device.fs;
 using fuchsia.component;
 using fuchsia.component.decl;
+using fuchsia.io;
 
 using zx;
 
@@ -57,6 +59,20 @@ type NodeProperty = struct {
     value NodePropertyValue;
 };
 
+// Arguments for adding a node to the devfs filesystem.
+type DevfsAddArgs = resource table {
+    /// This is the connector to be installed in devfs.
+    /// `Connect()` will be called when a client connects to this node in the filesystem.
+    /// Optional: If this is not provided then an empty node will appear in devfs.
+    1: connector client_end:fuchsia.device.fs.Connector;
+
+    /// This is the class name for installing this node in devfs.
+    /// The node will be placed within /dev/class/{class_name}.
+    /// If `class_name` does not exist under /dev/class/ it will be created.
+    /// Optional: If this is not provided then the node will only be added via topological path.
+    2: class_name string:fuchsia.io.MAX_NAME_LENGTH;
+};
+
 /// Arguments for adding a node.
 type NodeAddArgs = resource table {
     /// Name of the node.
@@ -72,6 +88,9 @@ type NodeAddArgs = resource table {
 
     /// Properties of the node.
     4: properties NodePropertyVector;
+
+    /// The arguments for how this node should be added to devfs.
+    5: devfs_args DevfsAddArgs;
 };
 
 /// Protocol through which a parent node controls one of its children.

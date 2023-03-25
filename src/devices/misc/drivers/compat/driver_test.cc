@@ -204,35 +204,6 @@ class TestSystemStateTransition
   }
 };
 
-class TestExporter : public fidl::testing::WireTestBase<fuchsia_device_fs::Exporter> {
- public:
-  void Export(ExportRequestView request, ExportCompleter::Sync& completer) override {
-    auto [i, inserted] = devfs_paths_.emplace(request->topological_path.get());
-    if (!inserted) {
-      std::cerr << "Cannot export \"" << request->topological_path.get()
-                << "\": Path already exists";
-      completer.ReplyError(ZX_ERR_ALREADY_EXISTS);
-    }
-
-    connectors_.push_back(std::move(request->open_client));
-
-    completer.ReplySuccess();
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    printf("Not implemented: TestExporter::%s", name.data());
-  }
-
-  void AssertDevfsPaths(std::unordered_set<std::string> expected) const {
-    ASSERT_EQ(devfs_paths_, expected);
-  }
-
- private:
-  // We don't do anything with these clients but we hold on to them to keep them alive.
-  std::vector<fidl::ClientEnd<fuchsia_device_fs::Connector>> connectors_;
-  std::unordered_set<std::string> devfs_paths_;
-};
-
 class TestLogSink : public fidl::testing::WireTestBase<flogger::LogSink> {
  public:
   TestLogSink() = default;
@@ -363,13 +334,6 @@ class DriverTest : public testing::Test {
                       return ZX_OK;
                     }));
 
-      svc->AddEntry(fidl::DiscoverableProtocolName<fuchsia_device_fs::Exporter>,
-                    fbl::MakeRefCounted<fs::Service>([this](zx::channel server) {
-                      fidl::ServerEnd<fuchsia_device_fs::Exporter> server_end(std::move(server));
-                      fidl::BindServer(fidl_loop_.dispatcher(), std::move(server_end), &exporter_);
-                      return ZX_OK;
-                    }));
-
       svc->AddEntry(
           fidl::DiscoverableProtocolName<fuchsia_scheduler::ProfileProvider>,
           fbl::MakeRefCounted<fs::Service>([this](zx::channel server) {
@@ -458,10 +422,6 @@ class DriverTest : public testing::Test {
     driver.reset();
   }
 
-  void AssertDevfsPaths(std::unordered_set<std::string> expected) const {
-    exporter_.AssertDevfsPaths(expected);
-  }
-
   void WaitForChildDeviceAdded() {
     while (node().children().empty()) {
       fdf_testing_run_until_idle();
@@ -482,7 +442,6 @@ class DriverTest : public testing::Test {
   TestFile v1_test_file_;
   TestFile firmware_file_;
   TestDirectory pkg_directory_;
-  TestExporter exporter_;
   TestSystemStateTransition system_state_transition_;
   std::optional<fs::ManagedVfs> vfs_;
   fdf::TestSynchronizedDispatcher driver_dispatcher_;
@@ -511,7 +470,6 @@ TEST_F(DriverTest, Start) {
   EXPECT_EQ(ZX_OK, v1_test->status);
   EXPECT_FALSE(v1_test->did_create);
   EXPECT_FALSE(v1_test->did_release);
-  AssertDevfsPaths({"/dev/test/my-device/v1"});
 
   // Verify v1_test.so state after release.
   UnbindAndFreeDriver(std::move(driver));

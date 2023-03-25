@@ -16,6 +16,7 @@
 #include <list>
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
+#include "src/devices/bin/driver_manager/devfs/devfs.h"
 #include "src/devices/bin/driver_manager/v2/driver_host.h"
 
 namespace dfv2 {
@@ -171,6 +172,18 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Exposed for testing.
   Node* GetPrimaryParent() const;
 
+  // This should be used on the root node. Install the root node at the top of the devfs filesystem.
+  void SetupDevfsForRootNode(
+      std::optional<Devfs>& devfs,
+      std::optional<fidl::ClientEnd<fuchsia_io::Directory>> diagnostics = {}) {
+    devfs.emplace(devfs_device_.topological_node());
+  }
+
+  // This is exposed for testing. Setup this node's devfs nodes.
+  void AddToDevfsForTesting(Devnode& parent) {
+    parent.add_child(name_, std::nullopt, Devnode::NoRemote(), devfs_device_);
+  }
+
   const std::string& name() const { return name_; }
   const DriverHost* driver_host() const { return *driver_host_; }
   const std::string& driver_url() const;
@@ -181,6 +194,7 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols() const;
   const std::vector<fuchsia_driver_framework::wire::NodeProperty>& properties() const;
   const Collection& collection() const { return collection_; }
+  std::optional<Devnode>& topological_devnode() { return devfs_device_.topological_node(); }
 
   void set_collection(Collection collection);
   void set_offers(std::vector<fuchsia_component_decl::wire::Offer> offers) {
@@ -273,6 +287,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<DriverComponent> driver_component_;
   std::optional<fidl::ServerBindingRef<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBindingRef<fuchsia_driver_framework::NodeController>> controller_ref_;
+
+  // This represents the node's presence in devfs, both it's topological path and it's class path.
+  DevfsDevice devfs_device_;
 };
 
 }  // namespace dfv2

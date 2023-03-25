@@ -348,7 +348,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
     composite->properties_.push_back(new_prop);
   }
 
-  auto primary = composite->GetPrimaryParent();
+  Node* primary = composite->GetPrimaryParent();
   // We know that our device has a parent because we're creating it.
   ZX_ASSERT(primary);
 
@@ -380,6 +380,11 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   composite->offers_ = std::move(node_offers);
 
   composite->AddToParents();
+  ZX_ASSERT_MSG(primary->devfs_device_.topological_node().has_value(), "%s",
+                composite->MakeTopologicalPath().c_str());
+  primary->devfs_device_.topological_node().value().add_child(
+      composite->name_, std::nullopt, Devnode::NoRemote(), composite->devfs_device_);
+  composite->devfs_device_.publish();
   return zx::ok(std::move(composite));
 }
 
@@ -528,6 +533,7 @@ void Node::FinishRemoval() {
   LOGF(DEBUG, "Node: %s unbinding and resetting", name().c_str());
   UnbindAndReset(controller_ref_);
   UnbindAndReset(node_ref_);
+  devfs_device_.unpublish();
   if (removal_tracker_ && removal_id_.has_value()) {
     removal_tracker_->Notify(removal_id_.value(), node_state_);
   }
@@ -729,6 +735,25 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     }
   }
 
+  Devnode::Target devfs_target = Devnode::NoRemote();
+  std::optional<std::string_view> devfs_class_path;
+  if (args.devfs_args().has_value() && args.devfs_args()->connector().has_value()) {
+    if (args.devfs_args()->class_name().has_value()) {
+      devfs_class_path = args.devfs_args()->class_name();
+    }
+    devfs_target = Devnode::Connector{
+        .connector = fidl::WireSharedClient<fuchsia_device_fs::Connector>(
+            std::move(args.devfs_args().value().connector().value()), dispatcher_),
+    };
+  }
+  ZX_ASSERT(devfs_device_.topological_node().has_value());
+  zx_status_t status = devfs_device_.topological_node()->add_child(
+      child->name_, std::move(devfs_class_path), std::move(devfs_target), child->devfs_device_);
+  ZX_ASSERT_MSG(status == ZX_OK, "%s failed to export: %s", child->MakeTopologicalPath().c_str(),
+                zx_status_get_string(status));
+  ZX_ASSERT(child->devfs_device_.topological_node().has_value());
+  child->devfs_device_.publish();
+
   if (controller.is_valid()) {
     child->controller_ref_ = fidl::BindServer(dispatcher_, std::move(controller), child.get());
   }
@@ -742,6 +767,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
     // We don't care about tracking binds here, sending nullptr is fine.
     (*node_manager_)->Bind(*child, nullptr);
   }
+
   child->AddToParents();
   return fit::ok(child);
 }

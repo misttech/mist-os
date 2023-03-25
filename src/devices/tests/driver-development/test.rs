@@ -645,8 +645,7 @@ async fn test_add_test_node_dfv2() -> Result<()> {
         .unwrap();
 
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait(&dev, "sample_driver").await?;
-
+    device_watcher::recursive_wait(&dev, "test_sample/sample_driver").await?;
     driver_dev.remove_test_node("test_sample").await?.unwrap();
     assert_eq!(
         Err(zx_status::Status::NOT_FOUND.into_raw()),

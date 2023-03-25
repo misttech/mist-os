@@ -395,43 +395,6 @@ zx_status_t Device::ExportAfterInit() {
     return status;
   }
 
-  // Export to devfs.
-  // This must happen before creating the node, because otherwise the children that bind to our node
-  // will steal our devfs entry.
-  {
-    if (!devfs_connector_.has_value()) {
-      FDF_LOG(ERROR, "Device %s failed to add to devfs: no devfs_connector",
-              topological_path_.c_str());
-      return ZX_ERR_INTERNAL;
-    }
-
-    zx::result connector = devfs_connector_.value().Bind(dispatcher());
-    if (connector.is_error()) {
-      FDF_LOG(ERROR, "Device %s failed to create devfs connector: %s", topological_path_.c_str(),
-              connector.status_string());
-      return connector.error_value();
-    }
-
-    fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
-    fidl::WireResult result = driver()->devfs_exporter().sync()->Export(
-        std::move(connector.value()), fidl::StringView::FromExternal(topological_path_),
-        class_name);
-    if (!result.ok()) {
-      FDF_LOG(ERROR, "Device %s: devfs failed: calling export2 returned: %s",
-              topological_path_.c_str(), result.status_string());
-      return result.status();
-    }
-    if (result.value().is_error()) {
-      FDF_LOG(ERROR, "Device %s: devfs failed: export2 returned: %s", topological_path_.c_str(),
-              zx_status_get_string(result.value().error_value()));
-      return result.value().error_value();
-    }
-
-    // TODO(fxdebug.dev/90735): When DriverDevelopment works in DFv2, don't print
-    // this.
-    FDF_LOG(DEBUG, "Created /dev/%s", topological_path().data());
-  }
-
   if (zx_status_t status = CreateNode(); status != ZX_OK) {
     FDF_LOG(ERROR, "Device %s: failed to create node: %s", topological_path_.c_str(),
             zx_status_get_string(status));
@@ -457,13 +420,12 @@ zx_status_t Device::CreateNode() {
                            .address(reinterpret_cast<uint64_t>(ops_))
                            .Build());
 
-  auto args =
+  auto args_builder =
       fdf::wire::NodeAddArgs::Builder(arena)
           .name(fidl::StringView::FromExternal(name_))
           .symbols(fidl::VectorView<fdf::wire::NodeSymbol>::FromExternal(symbols))
           .offers(fidl::VectorView<fcd::wire::Offer>::FromExternal(offers.data(), offers.size()))
-          .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_))
-          .Build();
+          .properties(fidl::VectorView<fdf::wire::NodeProperty>::FromExternal(properties_));
 
   // Create NodeController, so we can control the device.
   auto controller_ends = fidl::CreateEndpoints<fdf::NodeController>();
@@ -532,6 +494,33 @@ zx_status_t Device::CreateNode() {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
+  // Set up devfs information.
+  {
+    if (!devfs_connector_.has_value()) {
+      FDF_LOG(ERROR, "Device %s failed to add to devfs: no devfs_connector",
+              topological_path_.c_str());
+      return ZX_ERR_INTERNAL;
+    }
+
+    if (devfs_connector_->binding().has_value()) {
+      devfs_connector_->binding().reset();
+    }
+
+    zx::result connector = devfs_connector_.value().Bind(dispatcher());
+    if (connector.is_error()) {
+      FDF_LOG(ERROR, "Device %s failed to create devfs connector: %s", topological_path_.c_str(),
+              connector.status_string());
+      return connector.error_value();
+    }
+    auto devfs_args =
+        fdf::wire::DevfsAddArgs::Builder(arena).connector(std::move(connector.value()));
+    fidl::StringView class_name = ProtocolIdToClassName(device_server_.proto_id());
+    if (!class_name.empty()) {
+      devfs_args.class_name(class_name);
+    }
+    args_builder.devfs_args(devfs_args.Build());
+  }
+
   // Add the device node.
   fpromise::bridge<void, std::variant<zx_status_t, fdf::NodeError>> bridge;
   auto callback = [completer = std::move(bridge.completer)](
@@ -547,7 +536,8 @@ zx_status_t Device::CreateNode() {
     completer.complete_ok();
   };
   parent_.value()
-      ->node_->AddChild(args, std::move(controller_ends->server), std::move(node_server))
+      ->node_
+      ->AddChild(args_builder.Build(), std::move(controller_ends->server), std::move(node_server))
       .ThenExactlyOnce(std::move(callback));
 
   auto task =

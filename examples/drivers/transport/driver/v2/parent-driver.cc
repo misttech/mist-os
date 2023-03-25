@@ -54,39 +54,21 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
     fuchsia_examples_gizmo::Service::InstanceHandler handler(
         {.device = std::move(protocol_handler)});
 
-    auto result =
+    zx::result result =
         context().outgoing()->AddService<fuchsia_examples_gizmo::Service>(std::move(handler));
     if (result.is_error()) {
       FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
       return result.take_error();
     }
+    if (zx::result result = ExportService(name()); result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to export to services", KV("status", result.status_string()));
+      return result.take_error();
+    }
 
-    // Initialize driver compat context
-    compat::Context::ConnectAndCreate(
-        &context(), dispatcher(),
-        [this](zx::result<std::shared_ptr<compat::Context>> compat_result) {
-          if (!compat_result.is_ok()) {
-            FDF_LOG(ERROR, "Call to Context::ConnectAndCreate failed: %s",
-                    compat_result.status_string());
-            node().reset();
-            return;
-          }
-          compat_context_ = std::move(*compat_result);
-
-          auto result = ExportService(name());
-          if (result.is_error()) {
-            FDF_SLOG(ERROR, "Failed to export to services", KV("status", result.status_string()));
-            node().reset();
-            return;
-          }
-
-          result = AddChild(name());
-          if (result.is_error()) {
-            FDF_SLOG(ERROR, "Failed to add child node", KV("status", result.status_string()));
-            node().reset();
-            return;
-          }
-        });
+    if (zx::result result = AddChild(name()); result.is_error()) {
+      FDF_SLOG(ERROR, "Failed to add child node", KV("status", result.status_string()));
+      return result.take_error();
+    }
 
     return zx::ok();
   }
@@ -94,8 +76,7 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
   // Add a child device node and offer the service capabilities.
   zx::result<> AddChild(std::string_view node_name) {
     fidl::Arena arena;
-    // Offer `fuchsia.driver.compat.Service` to the driver that binds to the node.
-    auto offers = child_->CreateOffers(arena);
+    std::vector<fuchsia_component_decl::wire::Offer> offers;
     // Offer `fuchsia.examples.gizmo.Service` to the driver that binds to the node.
     auto service_offer = fuchsia_component_decl::wire::OfferService::Builder(arena)
                              .source_name(arena, fuchsia_examples_gizmo::Service::Name)
@@ -107,10 +88,19 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
     properties[0] = fdf::MakeProperty(arena, bind_fuchsia_examples_gizmo::DEVICE,
                                       bind_fuchsia_examples_gizmo::DEVICE_DRIVERTRANSPORT);
 
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
+    }
+
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
+        std::move(connector.value()));
+
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, node_name)
                     .offers(offers)
                     .properties(properties)
+                    .devfs_args(devfs.Build())
                     .Build();
 
     // Create endpoints of the `NodeController` for the node.
@@ -129,9 +119,8 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
     return zx::ok();
   }
 
-  // Publish offered services for client components.
+  // Publish `fuchsia.gizmo.protocol.Service` to the outgoing directory.
   zx::result<> ExportService(std::string_view node_name) {
-    // Publish `fuchsia.gizmo.protocol.Service` to the outgoing directory.
     fuchsia_gizmo_protocol::Service::InstanceHandler handler({
         .testing = fit::bind_member<&ParentDriverTransportDriver::Serve>(this),
     });
@@ -142,21 +131,6 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
       FDF_SLOG(ERROR, "Failed to add service", KV("status", result.status_string()));
       return result.take_error();
     }
-
-    // Publish `fuchsia.driver.compat.Service` to the outgoing directory.
-    child_ = compat::DeviceServer(std::string(node_name), 0,
-                                  compat_context_->TopologicalPath(node_name));
-    auto status = child_->Serve(dispatcher(), &context().outgoing()->component());
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to serve compat device server: %s", zx_status_get_string(status));
-      return zx::error(status);
-    }
-
-    // Export to devfs.
-    if (zx::result status = ExportToDevfs(child_->topological_path()); status.is_error()) {
-      FDF_LOG(ERROR, "Failed to export to devfs: %s", status.status_string());
-      return status.take_error();
-    }
     return zx::ok();
   }
 
@@ -166,32 +140,7 @@ class ParentDriverTransportDriver : public fdf::DriverBase {
     fidl::BindServer(dispatcher(), std::move(server), std::move(server_impl));
   }
 
-  zx::result<> ExportToDevfs(std::string_view devfs_path) {
-    zx::result connection = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
-    if (connection.is_error()) {
-      return connection.take_error();
-    }
-    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
-
-    zx::result connector = devfs_connector_.Bind(dispatcher());
-    if (connector.is_error()) {
-      return connector.take_error();
-    }
-    fidl::WireResult result =
-        devfs_exporter->Export(std::move(connector.value()),
-                               fidl::StringView::FromExternal(devfs_path), fidl::StringView());
-    if (!result.ok()) {
-      return zx::error(result.status());
-    }
-    if (result.value().is_error()) {
-      return result.value().take_error();
-    }
-    return zx::ok();
-  }
-
-  std::optional<compat::DeviceServer> child_;
   driver_devfs::Connector<fuchsia_gizmo_protocol::TestingProtocol> devfs_connector_;
-  std::shared_ptr<compat::Context> compat_context_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
 };

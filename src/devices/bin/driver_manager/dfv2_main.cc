@@ -63,13 +63,6 @@ int RunDfv2(driver_manager_config::Config config,
   zx::result diagnostics_client = inspect_manager.Connect();
   ZX_ASSERT_MSG(diagnostics_client.is_ok(), "%s", diagnostics_client.status_string());
 
-  std::optional<Devnode> root_devnode;
-  Devfs devfs(root_devnode, std::move(diagnostics_client.value()));
-
-  // Launch devfs_exporter.
-  driver_manager::DevfsExporter devfs_exporter(devfs, &root_devnode.value(), loop.dispatcher());
-  devfs_exporter.PublishExporter(outgoing);
-
   // Launch DriverRunner for DFv2 drivers.
   auto realm_result = component::Connect<fuchsia_component::Realm>();
   if (realm_result.is_error()) {
@@ -100,6 +93,16 @@ int RunDfv2(driver_manager_config::Config config,
       std::move(realm_result.value()), std::move(driver_index_result.value()),
       inspect_manager.inspector(), [loader_service]() { return loader_service->Connect(); },
       loop.dispatcher());
+
+  // Setup devfs.
+  std::optional<Devfs> devfs;
+  driver_runner.root_node()->SetupDevfsForRootNode(devfs, std::move(diagnostics_client.value()));
+
+  std::optional<Devnode>& root_devnode = driver_runner.root_node()->topological_devnode();
+  driver_manager::DevfsExporter devfs_exporter(devfs.value(), &root_devnode.value(),
+                                               loop.dispatcher());
+  devfs_exporter.PublishExporter(outgoing);
+
   driver_runner.PublishComponentRunner(outgoing);
 
   // Find and load v2 Drivers.
@@ -127,7 +130,7 @@ int RunDfv2(driver_manager_config::Config config,
 
   // Serve the USB device watcher protocol.
   {
-    zx::result devfs_client = devfs.Connect(vfs);
+    zx::result devfs_client = devfs.value().Connect(vfs);
     ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
 
     const zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_device_manager::DeviceWatcher>(
@@ -168,7 +171,7 @@ int RunDfv2(driver_manager_config::Config config,
 
   // Add the devfs folder to the tree:
   {
-    zx::result devfs_client = devfs.Connect(vfs);
+    zx::result devfs_client = devfs.value().Connect(vfs);
     ZX_ASSERT_MSG(devfs_client.is_ok(), "%s", devfs_client.status_string());
     const zx::result result = outgoing.AddDirectory(std::move(devfs_client.value()), "dev");
     ZX_ASSERT(result.is_ok());

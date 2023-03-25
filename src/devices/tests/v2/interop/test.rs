@@ -69,7 +69,7 @@ async fn test_interop() -> Result<()> {
 
     // Make sure dev was exported correctly.
     let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait(&dev, "root/v1/leaf").await?;
+    device_watcher::recursive_wait(&dev, "v1/leaf").await?;
 
     // Wait for the driver to call Waiter.Done.
     receiver.next().await.ok_or(anyhow!("Receiver failed"))
