@@ -28,7 +28,6 @@
             // Capabilities here are test-only and used only by SL4F, they are not guaranteed to exist for every product.
             protocol: [
                 "fuchsia.bluetooth.rfcomm.test.RfcommTest", // test-only
-                "fuchsia.developer.tiles.Controller", // test-only
             ],
         },
     ],
@@ -182,7 +181,6 @@
         {
             protocol: [
                 "fuchsia.bluetooth.rfcomm.test.RfcommTest", // test-only
-                "fuchsia.developer.tiles.Controller", // test-only
             ],
             from: "self",
             to: "#sl4f",

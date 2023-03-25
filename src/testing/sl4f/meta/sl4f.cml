@@ -49,7 +49,6 @@
                 "fuchsia.bluetooth.sys.HostWatcher",
                 "fuchsia.bluetooth.sys.Pairing",
                 "fuchsia.buildinfo.Provider",
-                "fuchsia.developer.tiles.Controller",
                 "fuchsia.device.NameProvider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
