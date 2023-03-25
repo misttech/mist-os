@@ -110,10 +110,10 @@ def fetch_cipd_contents(ctx, cipd_bin, cipd_ensure_file, root = "."):
     """
     result = ctx.execute(
         [
-            workspace_path(ctx, cipd_bin),
+            ctx.path(cipd_bin),
             "ensure",
             "-ensure-file",
-            workspace_path(ctx, cipd_ensure_file),
+            ctx.path(cipd_ensure_file),
             "-root",
             root,
             "-max-threads=0",

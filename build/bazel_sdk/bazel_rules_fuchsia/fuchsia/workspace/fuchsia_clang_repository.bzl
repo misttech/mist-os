@@ -216,10 +216,10 @@ archive file.
             doc = "The fuchsia workspace rules root label. eg: @fuchsia_sdk",
             default = "@fuchsia_sdk",
         ),
-        "cipd_ensure_file": attr.string(
+        "cipd_ensure_file": attr.label(
             doc = "A cipd ensure file to use to download clang.",
         ),
-        "cipd_bin": attr.string(
+        "cipd_bin": attr.label(
             doc = "The cipd binary that will be used to download the sdk",
         ),
     },
