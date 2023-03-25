@@ -579,6 +579,12 @@ func FromJSON(ctx context.Context, config json.RawMessage, opts Options) (Base, 
 			return nil, fmt.Errorf("invalid GCE config found: %w", err)
 		}
 		return NewGCE(ctx, cfg, opts)
+	case "auxiliary":
+		var cfg AuxiliaryConfig
+		if err := json.Unmarshal(config, &cfg); err != nil {
+			return nil, fmt.Errorf("invalid auxiliary device config found: %w", err)
+		}
+		return NewAuxiliary(cfg)
 	default:
 		return nil, fmt.Errorf("unknown type found: %q", x.Type)
 	}
