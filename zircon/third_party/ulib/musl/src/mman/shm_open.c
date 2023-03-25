@@ -5,36 +5,19 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-char* __strchrnul(const char*, int);
-
-char* __shm_mapname(const char* name, char* buf) {
-  char* p;
+static int check_name(const char* name) {
   while (*name == '/')
     name++;
-  if (*(p = __strchrnul(name, '/')) || p == name ||
-      (p - name <= 2 && name[0] == '.' && p[-1] == '.')) {
+  if (name[0] == '\0' || !strcmp(name, ".") || !strcmp(name, "..")) {
     errno = EINVAL;
-    return 0;
-  }
-  if (p - name > NAME_MAX) {
+  } else if (strlen(name) > NAME_MAX) {
     errno = ENAMETOOLONG;
-    return 0;
+  } else {
+    errno = ENOENT;
   }
-  memcpy(buf, "/dev/shm/", 9);
-  memcpy(buf + 9, name, p - name + 1);
-  return buf;
+  return -1;
 }
 
-int shm_open(const char* name, int flag, mode_t mode) {
-  char buf[NAME_MAX + 10];
-  if (!(name = __shm_mapname(name, buf)))
-    return -1;
-  return open(name, flag | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK, mode);
-}
+int shm_open(const char* name, int flag, mode_t mode) { return check_name(name); }
 
-int shm_unlink(const char* name) {
-  char buf[NAME_MAX + 10];
-  if (!(name = __shm_mapname(name, buf)))
-    return -1;
-  return unlink(name);
-}
+int shm_unlink(const char* name) { return check_name(name); }

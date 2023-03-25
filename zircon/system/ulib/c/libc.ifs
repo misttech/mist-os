@@ -120,7 +120,6 @@ Symbols:
   - { Name: __scudo_print_stats, Type: Func }
   - { Name: __shgetc, Type: Func }
   - { Name: __shlim, Type: Func }
-  - { Name: __shm_mapname, Type: Func }
   - { Name: __signbit, Type: Func }
   - { Name: __signbitf, Type: Func }
   - { Name: __signbitl, Type: Func }
