@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdio>
+#include <mutex>
 #include <new>
 #include <thread>
 #include <utility>
