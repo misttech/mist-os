@@ -85,7 +85,6 @@ Symbols:
   - { Name: __optreset, Type: Object }
   - { Name: __overflow, Type: Func }
   - { Name: __p1evll, Type: Func }
-  - { Name: __pleval, Type: Func }
   - { Name: __polevll, Type: Func }
   - { Name: __posix_getopt, Type: Func, Weak: true }
   - { Name: __posix_spawnx, Type: Func }

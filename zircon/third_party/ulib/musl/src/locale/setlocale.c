@@ -21,8 +21,6 @@ static char* setlocale_one_unlocked(int cat, const char* name) {
   return (char*)(lm ? lm->name : "C");
 }
 
-char* __strchrnul(const char*, int);
-
 char* setlocale(int cat, const char* name) {
   static mtx_t lock = MTX_INIT;
 
@@ -39,15 +37,14 @@ char* setlocale(int cat, const char* name) {
   if (cat == LC_ALL) {
     int i;
     if (name) {
-      char part[LOCALE_NAME_MAX + 1] = "C.UTF-8";
       const char* p = name;
       for (i = 0; i < LC_ALL; i++) {
-        const char* z = __strchrnul(p, ';');
-        if (z - p <= LOCALE_NAME_MAX) {
-          memcpy(part, p, z - p);
-          part[z - p] = 0;
-          if (*z)
-            p = z + 1;
+        const char* part = "C";
+        const char* z = strchr(p, ';');
+        if (!z) {
+          part = p;
+        } else if (!strncmp("C.UTF8", p, z - p)) {
+          part = "C.UTF8";
         }
         setlocale_one_unlocked(i, part);
       }

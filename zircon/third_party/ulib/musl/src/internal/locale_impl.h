@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_LOCALE_IMPL_H_
+#define ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_LOCALE_IMPL_H_
 
 #include <locale.h>
 #include <stdlib.h>
@@ -20,13 +21,10 @@ extern const struct __locale_struct __c_locale;
 extern const struct __locale_struct __c_dot_utf8_locale;
 
 const struct __locale_map* __get_locale(int, const char*) ATTR_LIBC_VISIBILITY;
-const char* __mo_lookup(const void*, size_t, const char*) ATTR_LIBC_VISIBILITY;
-const char* __lctrans(const char*, const struct __locale_map*) ATTR_LIBC_VISIBILITY;
-const char* __lctrans_cur(const char*) ATTR_LIBC_VISIBILITY;
 int __loc_is_allocated(locale_t) ATTR_LIBC_VISIBILITY;
 
-#define LCTRANS(msg, lc, loc) __lctrans(msg, (loc)->cat[(lc)])
-#define LCTRANS_CUR(msg) __lctrans_cur(msg)
+#define LCTRANS(msg, lc, loc) (msg)
+#define LCTRANS_CUR(msg) (msg)
 
 #define C_LOCALE ((locale_t)&__c_locale)
 #define UTF8_LOCALE ((locale_t)&__c_dot_utf8_locale)
@@ -37,3 +35,5 @@ int __loc_is_allocated(locale_t) ATTR_LIBC_VISIBILITY;
 
 #undef MB_CUR_MAX
 #define MB_CUR_MAX (CURRENT_UTF8 ? 4 : 1)
+
+#endif  // ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_LOCALE_IMPL_H_

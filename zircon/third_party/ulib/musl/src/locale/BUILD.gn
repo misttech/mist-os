@@ -5,8 +5,6 @@
 source_set("locale") {
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
-    "__lctrans.c",
-    "__mo_lookup.c",
     "c_locale.c",
     "catclose.c",
     "catgets.c",
@@ -18,7 +16,6 @@ source_set("locale") {
     "locale_map.c",
     "localeconv.c",
     "newlocale.c",
-    "pleval.c",
     "setlocale.c",
     "strcoll.c",
     "strfmon.c",
