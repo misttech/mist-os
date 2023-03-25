@@ -7758,13 +7758,13 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:21
+From //src/proc/bin/starnix/BUILD.gn:20
 
 ### starnix_restricted_mode
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:17
+From //src/proc/bin/starnix/BUILD.gn:16
 
 ### target_cpu
 
