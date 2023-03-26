@@ -18,20 +18,29 @@
 
 #include "src/lib/test-suite/test_suite.h"
 
-#define ASSERT_OK(e)                      \
-  if (e != ZX_OK) {                       \
-    return fuchsia::test::Status::FAILED; \
-  }
+#define ASSERT_OK(e)                                                        \
+  do {                                                                      \
+    if (e != ZX_OK) {                                                       \
+      fprintf(stderr, "test assert failed at %s:%d\n", __FILE__, __LINE__); \
+      return fuchsia::test::Status::FAILED;                                 \
+    }                                                                       \
+  } while (0)
 
-#define ASSERT_EQ(e1, e2)                 \
-  if (e1 != e2) {                         \
-    return fuchsia::test::Status::FAILED; \
-  }
+#define ASSERT_EQ(e1, e2)                                                   \
+  do {                                                                      \
+    if (e1 != e2) {                                                         \
+      fprintf(stderr, "test assert failed at %s:%d\n", __FILE__, __LINE__); \
+      return fuchsia::test::Status::FAILED;                                 \
+    }                                                                       \
+  } while (0)
 
-#define ASSERT_NE(e1, e2)                 \
-  if (e1 == e2) {                         \
-    return fuchsia::test::Status::FAILED; \
-  }
+#define ASSERT_NE(e1, e2)                                                   \
+  do {                                                                      \
+    if (e1 == e2) {                                                         \
+      fprintf(stderr, "test assert failed at %s:%d\n", __FILE__, __LINE__); \
+      return fuchsia::test::Status::FAILED;                                 \
+    }                                                                       \
+  } while (0)
 
 fuchsia::test::Status shared_map_in_prototype() {
   zx::process prototype_process;
@@ -212,10 +221,189 @@ fuchsia::test::Status info_process_vmos() {
   return fuchsia::test::Status::PASSED;
 }
 
+// Verify mappings in shared processes are properly accounted for in zx_info_task_stats_t.
+//
+// See also fxbug.dev/123525.
+fuchsia::test::Status info_task_stats() {
+  // We're going to create 3 processes, proc1, proc2, and proc3, with a total of 4 VMARs.  proc1 and
+  // proc2 will share a region (vmar_shared) and each have their own private region (vmar1 and
+  // vmar2).  proc3 will have one (unshared) region (vmar3).
+  //
+  // We'll then map 6 VMOs (m[0] through m[5]) and verify that each process's zx_info_task_stats_t
+  // accurately counts the private/shared pages and that the mem_scaled_shared_bytes "sums to 1".
+
+  // First, we'll need to create a process with a shared region that we can use to create proc1 and
+  // proc2.  We're only creating this process, proc0, so that we can create the region that proc1
+  // and proc2 will share.  We'll destroy proc0 before we create any mappings.
+  zx::process proc0;
+  zx::vmar vmar_shared;
+  static constexpr char kNameProc0[] = "proc0";
+  ASSERT_OK(zx::process::create(*zx::job::default_job(), kNameProc0, sizeof(kNameProc0),
+                                ZX_PROCESS_SHARED, &proc0, &vmar_shared));
+
+  // Create proc1 and proc2.
+  zx::process proc1;
+  zx::vmar vmar1;
+  static constexpr char kNameProc1[] = "proc1";
+  ASSERT_OK(zx_process_create_shared(proc0.get(), 0, kNameProc1, sizeof(kNameProc1),
+                                     proc1.reset_and_get_address(), vmar1.reset_and_get_address()));
+  zx::process proc2;
+  zx::vmar vmar2;
+  static constexpr char kNameProc2[] = "proc2";
+  ASSERT_OK(zx_process_create_shared(proc0.get(), 0, kNameProc2, sizeof(kNameProc2),
+                                     proc2.reset_and_get_address(), vmar2.reset_and_get_address()));
+
+  // We can now destroy proc0 since it has served its purpose (to facilitate creation of proc1 and
+  // proc2).
+  proc0.reset();
+
+  // Create proc3, a regular old process.
+  zx::process proc3;
+  zx::vmar vmar3;
+  static constexpr char kNameProc3[] = "proc3";
+  ASSERT_OK(zx::process::create(*zx::job::default_job(), kNameProc3, sizeof(kNameProc3), 0, &proc3,
+                                &vmar3));
+
+  // Now create the 6 VMOs of 1 page each.
+  const size_t kSize = zx_system_get_page_size();
+  zx::vmo m[6];
+  const char buffer[1] = {'A'};
+  for (zx::vmo& i : m) {
+    ASSERT_OK(zx::vmo::create(kSize, 0u, &i));
+    // Write into the VMO to ensure a page is committed.
+    ASSERT_OK(i.write(buffer, 0, sizeof(buffer)));
+  }
+
+  // Make sure all the task stats start as 0.
+  auto assertProcStatsAreZero = [](zx::process& proc) -> fuchsia::test::Status {
+    zx_info_task_stats_t stats{};
+    size_t actual{};
+    size_t avail{};
+    ASSERT_OK(proc.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+    ASSERT_EQ(0, stats.mem_mapped_bytes);
+    ASSERT_EQ(0, stats.mem_private_bytes);
+    ASSERT_EQ(0, stats.mem_shared_bytes);
+    ASSERT_EQ(0, stats.mem_scaled_shared_bytes);
+    return fuchsia::test::Status::PASSED;
+  };
+  zx::process* procs[] = {&proc1, &proc2, &proc3};
+  for (zx::process* p : procs) {
+    if (assertProcStatsAreZero(*p) != fuchsia::test::Status::PASSED) {
+      return fuchsia::test::Status::FAILED;
+    }
+  }
+
+  // Now we'll start mapping the VMOs and verify the stats as we go.
+
+  // vmar1 will get m[0] and m[1].
+  zx_vaddr_t vaddr{};
+  ASSERT_OK(vmar1.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[0], 0, kSize, &vaddr));
+  ASSERT_OK(vmar1.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[1], 0, kSize, &vaddr));
+  zx_info_task_stats_t stats{};
+  size_t actual{};
+  size_t avail{};
+  ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(1, actual);
+  ASSERT_EQ(2 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(0, stats.mem_shared_bytes);
+  ASSERT_EQ(0, stats.mem_scaled_shared_bytes);
+  if (assertProcStatsAreZero(proc2) != fuchsia::test::Status::PASSED) {
+    return fuchsia::test::Status::FAILED;
+  }
+  if (assertProcStatsAreZero(proc3) != fuchsia::test::Status::PASSED) {
+    return fuchsia::test::Status::FAILED;
+  }
+
+  // vmar_shared will get m[2] and m[3].
+  ASSERT_OK(vmar_shared.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[2], 0, kSize, &vaddr));
+  ASSERT_OK(vmar_shared.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[3], 0, kSize, &vaddr));
+
+  // At this point, we have a total of 4 pages mapped.  2 are private and 2 are shared, with proc1
+  // and proc2 each being fractionally-responsible for 1 of the 2 shared pages.
+
+  ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ(kSize, stats.mem_scaled_shared_bytes);
+
+  ASSERT_OK(proc2.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(2 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(0, stats.mem_private_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ(kSize, stats.mem_scaled_shared_bytes);
+
+  // vmar2 will get m[4] and m[5].
+  ASSERT_OK(vmar2.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[4], 0, kSize, &vaddr));
+  ASSERT_OK(vmar2.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[5], 0, kSize, &vaddr));
+
+  // We've now got 6 pages mapped.  2 are private to proc1, 2 are private to proc2 and 2 are shared
+  // between them.  Each is fractionally responsible for 1 of the shared pages.
+
+  ASSERT_OK(proc2.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ(kSize, stats.mem_scaled_shared_bytes);
+
+  // Now bring proc3 into the mix.
+
+  // vmar3 will get m[1], m[2], and m[4].
+  ASSERT_OK(vmar3.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[1], 0, kSize, &vaddr));
+  ASSERT_OK(vmar3.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[2], 0, kSize, &vaddr));
+  ASSERT_OK(vmar3.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[4], 0, kSize, &vaddr));
+
+  // Still 6 mapped pages.  proc1 and proc2 each have 1 private page and 3 shared pages.  proc3 has
+  // 0 private pages and 3 shared pages.  The important thing here is that the
+  // mem_scaled_shared_bytes of the three processes plus the private pages sum to 6 pages.
+  //
+  // See that there are 2 private pages and that proc1 and proc2 are each fractionally-responsible
+  // for 1.25 pages, while proc3 is fractionally-responsible for 1.5 pages.
+  //
+  // 2 + 2 * 1.25 + 1.5 == 6
+  ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(3 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ((kSize / 2) + (kSize / 2) + (kSize / 4), stats.mem_scaled_shared_bytes);
+
+  ASSERT_OK(proc2.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(3 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ((kSize / 2) + (kSize / 2) + (kSize / 4), stats.mem_scaled_shared_bytes);
+
+  ASSERT_OK(proc3.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(3 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(0, stats.mem_private_bytes);
+  ASSERT_EQ(3 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ((kSize / 2) + (kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
+
+  // Kill off proc2.  We're now down to 5 pages.  See that it sums up properly.
+  //
+  // 2 + 1 + (0.5 + 0.5) + (0.5 + 0.5) == 5
+  proc2.reset();
+  ASSERT_OK(proc1.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(4 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
+
+  ASSERT_OK(proc3.get_info(ZX_INFO_TASK_STATS, &stats, sizeof(stats), &actual, &avail));
+  ASSERT_EQ(3 * kSize, stats.mem_mapped_bytes);
+  ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
+  ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
+  ASSERT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
+
+  return fuchsia::test::Status::PASSED;
+}
+
 int main(int argc, const char** argv) {
   printf("test");
   std::vector<example::TestInput> inputs = {
-      {.name = "ShareableProcess.GetInfo", .status = info_process_vmos()},
+      {.name = "ShareableProcess.GetInfoVmos", .status = info_process_vmos()},
+      {.name = "ShareableProcess.GetInfoTaskStats", .status = info_task_stats()},
       {.name = "ProcessTest.SharedMapInPrototype", .status = shared_map_in_prototype()},
       {.name = "ProcessTest.RestrictedVmarNotShared", .status = restricted_vmar_not_shared()},
       {.name = "ProcessTest.SharedProcessInvalidPrototype",

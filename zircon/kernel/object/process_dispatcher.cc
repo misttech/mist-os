@@ -637,28 +637,68 @@ zx_status_t ProcessDispatcher::GetStats(zx_info_task_stats_t* stats) const {
   if (state_ == State::DEAD) {
     return ZX_ERR_BAD_STATE;
   }
+
+  // The calls to shared_count() GetMemoryUsage() are not synchronized, but that's OK because we're
+  // providing a moment-in-time view of just this one process's memory usage.  If instead, we were
+  // providing a snapshot across multiple processes and required consistency within the snapshot,
+  // we'd need to synchronize.
+  uint64_t count = shareable_state_->share_count();
+  if (count < 1) {
+    return ZX_ERR_BAD_STATE;
+  }
+
   VmAspace::vm_usage_t usage;
-  zx_status_t s = shareable_state_->aspace()->GetMemoryUsage(&usage);
-  if (s != ZX_OK) {
-    return s;
+  zx_status_t status = shareable_state_->aspace()->GetMemoryUsage(&usage);
+  if (status != ZX_OK) {
+    return status;
   }
 
+  // If there's only one process using this aspace, then the accounting is simple.
+  if (count == 1) {
+    stats->mem_mapped_bytes = usage.mapped_pages * PAGE_SIZE;
+    stats->mem_private_bytes = usage.private_pages * PAGE_SIZE;
+    stats->mem_shared_bytes = usage.shared_pages * PAGE_SIZE;
+    stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes;
+  } else {
+    // There are multiple processes using the shareable aspace so things are a little more complex
+    // because the values in VmAspace::vm_usage_t are aspace-centric, while zx_info_task_stats_t is
+    // process-centric.
+    //
+    // Mapped pages are unchanged.  If they're mapped in the aspace, they're mapped in the process
+    // that uses this aspace.
+    stats->mem_mapped_bytes = usage.mapped_pages * PAGE_SIZE;
+    //
+    // This aspace contributes no private-to-process pages because multiple processes are using it.
+    stats->mem_private_bytes = 0;
+    //
+    // However, the private-to-aspace pages are really shared among the processes sharing this
+    // aspace so be sure to count them in the process-shared bucket along with the aspace-shared
+    // pages.
+    stats->mem_shared_bytes = (usage.private_pages + usage.shared_pages) * PAGE_SIZE;
+    //
+    // Finally, we need to computed the mem_scaled_shared_bytes.
+    //
+    // Start by scaling down the aspace's scaled_shared_bytes by the number of processes sharing the
+    // aspace.
+    stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes / count;
+    // Now, add to that the private-to-aspace pages, scaled down by the number of processes that
+    // share the aspace.
+    stats->mem_scaled_shared_bytes += (usage.private_pages * PAGE_SIZE) / count;
+  }
+
+  // Now that we've handled the shareable aspace, handle the restricted aspace (if present).
   if (restricted_aspace_) {
-    VmAspace::vm_usage_t restricted_usage;
-    zx_status_t sr = restricted_aspace_->GetMemoryUsage(&restricted_usage);
-    usage.mapped_pages += restricted_usage.mapped_pages;
-    usage.private_pages += restricted_usage.private_pages;
-    usage.shared_pages += restricted_usage.shared_pages;
-    usage.scaled_shared_bytes += restricted_usage.scaled_shared_bytes;
-    if (sr != ZX_OK) {
-      return sr;
+    VmAspace::vm_usage_t r_usage;
+    status = restricted_aspace_->GetMemoryUsage(&r_usage);
+    if (status != ZX_OK) {
+      return status;
     }
+    stats->mem_mapped_bytes += r_usage.mapped_pages * PAGE_SIZE;
+    stats->mem_private_bytes += r_usage.private_pages * PAGE_SIZE;
+    stats->mem_shared_bytes += r_usage.shared_pages * PAGE_SIZE;
+    stats->mem_scaled_shared_bytes += r_usage.scaled_shared_bytes;
   }
 
-  stats->mem_mapped_bytes = usage.mapped_pages * PAGE_SIZE;
-  stats->mem_private_bytes = usage.private_pages * PAGE_SIZE;
-  stats->mem_shared_bytes = usage.shared_pages * PAGE_SIZE;
-  stats->mem_scaled_shared_bytes = usage.scaled_shared_bytes;
   return ZX_OK;
 }
 
