@@ -86,26 +86,22 @@ function check-if-we-can-start-package-server {
     else
       # Check if the ffx package repository server is running. If so, shut it
       # down if it's configured to use the port we're trying to use.
-      local ffx_enabled=$(ffx-repository-server-running)
+      local ffx_port=$(ffx-repository-server-running-port)
       local err=$?
-      if [[ "${err}" -eq 0 && "${ffx_enabled}" == "true" ]]; then
-        local ffx_port=$(ffx-configured-repository-server-port)
+      if [[ "${err}" -eq 0 && "${ffx_port}" == "${expected_port}" ]]; then
+        fx-warn "The ffx repository server is running on ${expected_port}".
+        fx-warn "Trying to shut it down..."
+
+        fx-command-run ffx repository server stop
         local err=$?
-        if [[ "${err}" -eq 0 && "${ffx_port}" == "${expected_port}" ]]; then
-          fx-warn "The ffx repository server may be running, and is configured"
-          fx-warn "to run on ${expected_port}. Trying to shut it down..."
+        if [[ "${err}" -ne 0 ]]; then
+          fx-warn "Failed to stop ffx repository server. Checking if the port"
+          fx-warn "freed up anyway."
+        fi
 
-          fx-command-run ffx repository server stop
-          local err=$?
-          if [[ "${err}" -ne 0 ]]; then
-            fx-warn "Failed to stop ffx repository server. Checking if the port"
-            fx-warn "freed up anyway."
-          fi
-
-          if ! is-listening-on-port "${expected_port}"; then
-            fx-info "ffx repository server shut down"
-            return 0
-          fi
+        if ! is-listening-on-port "${expected_port}"; then
+          fx-info "ffx repository server shut down"
+          return 0
         fi
       fi
 
