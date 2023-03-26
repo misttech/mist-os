@@ -591,8 +591,6 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
   static zx_status_t ForEveryPageInRange(S self, F func, uint64_t start_offset, uint64_t end_offset,
                                          uint64_t skew) {
     // Assert that the requested range is sensible and falls within our nodes actual offset range.
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
     DEBUG_ASSERT(end_offset >= start_offset);
     DEBUG_ASSERT(start_offset >= self->obj_offset_);
     DEBUG_ASSERT(end_offset <= self->end_offset());
@@ -963,6 +961,8 @@ class VmPageList final {
   template <typename PTR_TYPE, NodeCheck NODE_CHECK = NodeCheck::Skip, typename S, typename F>
   static zx_status_t ForEveryPageInRange(S self, F per_page_func, uint64_t start_offset,
                                          uint64_t end_offset) {
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
+    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
     start_offset += self->list_skew_;
     end_offset += self->list_skew_;
 
