@@ -3056,7 +3056,7 @@ mod tests {
         D,
     >;
 
-    type TcpCtx<I, D> = FakeCtxWithSyncCtx<TcpSyncCtx<I, D>, TimerId, (), ()>;
+    type TcpCtx<I, D> = FakeCtxWithSyncCtx<TcpSyncCtx<I, D>, TimerId, (), NonSyncState>;
 
     impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId>
         AsMut<FakeFrameCtx<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>>>
@@ -3074,7 +3074,43 @@ mod tests {
         type SendMeta = SendIpPacketMeta<I, FakeDeviceId, SpecifiedAddr<<I as Ip>::Addr>>;
     }
 
-    type TcpNonSyncCtx = FakeNonSyncCtx<TimerId, (), ()>;
+    #[derive(Default)]
+    struct NonSyncState(Vec<NonSyncEvent>);
+
+    impl Drop for NonSyncState {
+        fn drop(&mut self) {
+            let Self(events) = self;
+            assert_eq!(events, &[], "some events were not consumed");
+        }
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    enum EitherId<V4, V6> {
+        V4(V4),
+        V6(V6),
+    }
+
+    impl<I: Ip> From<ListenerId<I>> for EitherId<ListenerId<Ipv4>, ListenerId<Ipv6>> {
+        fn from(value: ListenerId<I>) -> Self {
+            let IpInvariant(either) =
+                I::map_ip(value, |v4| IpInvariant(Self::V4(v4)), |v6| IpInvariant(Self::V6(v6)));
+            either
+        }
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    enum NonSyncEvent {
+        ListenerConnectionCount(EitherId<ListenerId<Ipv4>, ListenerId<Ipv6>>, usize),
+    }
+
+    type TcpNonSyncCtx = FakeNonSyncCtx<TimerId, (), NonSyncState>;
+
+    impl TcpNonSyncCtx {
+        fn take_tcp_events(&mut self) -> Vec<NonSyncEvent> {
+            let NonSyncState(events) = self.state_mut();
+            events.take()
+        }
+    }
 
     impl Buffer for Rc<RefCell<RingBuffer>> {
         fn limits(&self) -> BufferLimits {
@@ -3176,11 +3212,9 @@ mod tests {
         type ReturnedBuffers = ClientBuffers;
         type ProvidedBuffers = WriteBackClientBuffers;
 
-        fn on_waiting_connections_change<I: Ip>(
-            &mut self,
-            _listener: ListenerId<I>,
-            _count: usize,
-        ) {
+        fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize) {
+            let NonSyncState(events) = self.state_mut();
+            events.push(NonSyncEvent::ListenerConnectionCount(listener.into(), count))
         }
 
         fn new_passive_open_buffers(
@@ -3516,7 +3550,19 @@ mod tests {
         net.run_until_idle(&mut maybe_drop_frame, handle_timer);
         let (accepted, addr, accepted_ends) =
             net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-                SocketHandler::accept(sync_ctx, non_sync_ctx, server).expect("failed to accept")
+                assert_eq!(
+                    non_sync_ctx.take_tcp_events(),
+                    &[NonSyncEvent::ListenerConnectionCount(server.into(), 1)]
+                );
+
+                let r = SocketHandler::accept(sync_ctx, non_sync_ctx, server)
+                    .expect("failed to accept");
+
+                assert_eq!(
+                    non_sync_ctx.take_tcp_events(),
+                    &[NonSyncEvent::ListenerConnectionCount(server.into(), 0)]
+                );
+                r
             });
         if bind_client {
             assert_eq!(
@@ -4078,6 +4124,13 @@ mod tests {
                 let (server_conn, _addr, _buffers) =
                     SocketHandler::accept(sync_ctx, non_sync_ctx, local_server)
                         .expect("connection is available");
+                assert_eq!(
+                    non_sync_ctx.take_tcp_events(),
+                    &[
+                        NonSyncEvent::ListenerConnectionCount(local_server.into(), 1),
+                        NonSyncEvent::ListenerConnectionCount(local_server.into(), 0),
+                    ]
+                );
                 SocketHandler::get_connection_info(sync_ctx, server_conn)
             });
 
@@ -4289,6 +4342,14 @@ mod tests {
         // shutdown.
         net.run_until_idle(handle_frame, handle_timer);
 
+        // The incoming connection was signaled.
+        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ListenerConnectionCount(local_listener.into(), 1)]
+            );
+        });
+
         // Create a second half-open connection so that we have one entry in the
         // pending queue.
         net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
@@ -4376,6 +4437,13 @@ mod tests {
                 let (conn, _, _addr) = new_remote_connection.get_from_socketmap(&sockets.socketmap);
                 assert_matches!(conn.state, State::Established(_));
             });
+        });
+
+        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ListenerConnectionCount(local_listener.into(), 1)]
+            );
         });
     }
 
@@ -4497,6 +4565,14 @@ mod tests {
         let local_connection = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let (conn, _, _) = SocketHandler::accept(sync_ctx, non_sync_ctx, local_listener)
                 .expect("received connection");
+
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[
+                    NonSyncEvent::ListenerConnectionCount(local_listener.into(), 1),
+                    NonSyncEvent::ListenerConnectionCount(local_listener.into(), 0)
+                ]
+            );
             conn
         });
 
@@ -4707,6 +4783,14 @@ mod tests {
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let (_server_conn, _, _): (_, SocketAddr<_, _>, ClientBuffers) =
                 SocketHandler::accept(sync_ctx, non_sync_ctx, server).expect("pending connection");
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[
+                    NonSyncEvent::ListenerConnectionCount(server.into(), 1),
+                    NonSyncEvent::ListenerConnectionCount(server.into(), 0)
+                ]
+            );
+
             let server = SocketHandler::shutdown_listener(sync_ctx, non_sync_ctx, server);
             SocketHandler::remove_bound(sync_ctx, server);
 
