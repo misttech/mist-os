@@ -22,11 +22,17 @@
 
             // TODO(https://fxbug.dev/117725): change this to r* when that
             // doesn't prevent the use of /dev/null.
+            //
+            // TODO(https://fxbug.dev/77623): Expose this without the READ_BYTES
+            // right when the world speaks io2.
             rights: [ "rw*" ],
             path: "/dev",
         },
         {
             directory: "dev-class",
+
+            // TODO(https://fxbug.dev/77623): Expose this without the READ_BYTES
+            // right when the world speaks io2.
             rights: [ "r*" ],
             path: "/dev/class",
         },

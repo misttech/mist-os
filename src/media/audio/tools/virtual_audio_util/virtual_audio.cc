@@ -26,6 +26,7 @@
 
 #include "src/lib/fsl/tasks/fd_waiter.h"
 #include "src/lib/fxl/command_line.h"
+#include "src/lib/fxl/strings/concatenate.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
 namespace virtual_audio {
@@ -366,11 +367,12 @@ bool VirtualAudioUtil::WaitForKey() {
 }
 
 bool VirtualAudioUtil::ConnectToController() {
-  zx_status_t status = fdio_service_connect(fuchsia::virtualaudio::CONTROL_NODE_NAME,
+  const std::string kControlNodePath =
+      fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
+  zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
                                             controller_.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
-    printf("Failed to connect to '%s', status = %d\n", fuchsia::virtualaudio::CONTROL_NODE_NAME,
-           status);
+    printf("Failed to connect to '%s', status = %d\n", kControlNodePath.c_str(), status);
     return false;
   }
 

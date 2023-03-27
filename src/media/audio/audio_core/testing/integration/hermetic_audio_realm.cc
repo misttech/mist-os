@@ -37,13 +37,10 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
   ASSERT_EQ(status, ZX_OK);
 
   // This file hosts a fuchsia.virtualaudio.Control channel.
-  std::string_view kControlName(fuchsia::virtualaudio::CONTROL_NODE_NAME);
-  ASSERT_EQ(kControlName.substr(0, 5), "/dev/") << "unexpected file name: " << kControlName;
-  std::string control_file_name(kControlName.substr(5));
-
+  //
   // Wait for the driver to load.
   zx::result channel =
-      device_watcher::RecursiveWaitForFile(dev_fd.get(), control_file_name.c_str());
+      device_watcher::RecursiveWaitForFile(dev_fd.get(), fuchsia::virtualaudio::CONTROL_NODE_NAME);
   ASSERT_EQ(channel.status_value(), ZX_OK);
 
   // Turn the connection into FIDL.

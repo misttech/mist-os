@@ -353,16 +353,15 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     // trying to access the capabilities. The lack of synchronization with simple variants of DTR
     // in particular causes issues.
     for (auto& [dir, _, server_end] : directories_) {
-      auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-      if (endpoints.is_error()) {
-        return endpoints.take_error();
+      zx::result client_end = fidl::CreateEndpoints(&server_end);
+      if (client_end.is_error()) {
+        return client_end.take_error();
       }
-      auto result = outgoing_->AddDirectory(std::move(endpoints->client), dir);
+      zx::result result = outgoing_->AddDirectory(std::move(client_end.value()), dir);
       if (result.is_error()) {
         FX_SLOG(ERROR, "Failed to add directory to outgoing directory", KV("directory", dir));
         return result.take_error();
       }
-      server_end = std::move(endpoints->server);
     }
 
     const std::array<std::string, 6> kProtocols = {

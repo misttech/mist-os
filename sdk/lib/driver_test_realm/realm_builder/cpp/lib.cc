@@ -18,39 +18,53 @@ using namespace component_testing;
 
 void Setup(component_testing::RealmBuilder& realm_builder) {
   realm_builder.AddChild("driver_test_realm", "#meta/driver_test_realm.cm");
-  realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.logger.LogSink"}},
-                               .source = {ParentRef()},
-                               .targets = {ChildRef{"driver_test_realm"}}});
-  realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.process.Launcher"}},
-                               .source = {ParentRef()},
-                               .targets = {ChildRef{"driver_test_realm"}}});
-  realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.sys.Launcher"}},
-                               .source = {ParentRef()},
-                               .targets = {ChildRef{"driver_test_realm"}}});
-  realm_builder.AddRoute(
-      Route{.capabilities = {Protocol{"fuchsia.driver.development.DriverDevelopment"}},
-            .source = {ChildRef{"driver_test_realm"}},
-            .targets = {ParentRef()}});
-  realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.driver.test.Realm"}},
-                               .source = {ChildRef{"driver_test_realm"}},
-                               .targets = {ParentRef()}});
-  realm_builder.AddRoute(Route{.capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
-                               .source = {ChildRef{"driver_test_realm"}},
-                               .targets = {ParentRef()}});
-  // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
-  realm_builder.AddRoute(
-      Route{.capabilities = {Directory{
-                .name = "dev-topological", .as = "dev", .rights = fuchsia::io::RW_STAR_DIR}},
-            .source = {ChildRef{"driver_test_realm"}},
-            .targets = {ParentRef()}});
   realm_builder.AddRoute(Route{
-      .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::RW_STAR_DIR}},
+      .capabilities = {Protocol{"fuchsia.logger.LogSink"}},
+      .source = {ParentRef()},
+      .targets = {ChildRef{"driver_test_realm"}},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.process.Launcher"}},
+      .source = {ParentRef()},
+      .targets = {ChildRef{"driver_test_realm"}},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.sys.Launcher"}},
+      .source = {ParentRef()},
+      .targets = {ChildRef{"driver_test_realm"}},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.driver.development.DriverDevelopment"}},
       .source = {ChildRef{"driver_test_realm"}},
-      .targets = {ParentRef()}});
-  realm_builder.AddRoute(
-      Route{.capabilities = {Directory{.name = "dev-class", .rights = fuchsia::io::RW_STAR_DIR}},
-            .source = {ChildRef{"driver_test_realm"}},
-            .targets = {ParentRef()}});
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.driver.test.Realm"}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()},
+  });
+  // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
+  realm_builder.AddRoute(Route{
+      .capabilities = {Directory{
+          .name = "dev-topological", .as = "dev", .rights = fuchsia::io::R_STAR_DIR}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::R_STAR_DIR}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Directory{.name = "dev-class", .rights = fuchsia::io::R_STAR_DIR}},
+      .source = {ChildRef{"driver_test_realm"}},
+      .targets = {ParentRef()},
+  });
 }
 
 }  // namespace driver_test_realm

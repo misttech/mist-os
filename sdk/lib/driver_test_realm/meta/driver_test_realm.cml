@@ -27,12 +27,12 @@
         },
         {
             directory: "dev",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
         {
             directory: "dev-topological",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev-topological",
         },
         {

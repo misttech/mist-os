@@ -834,13 +834,11 @@ impl AudioFacade {
     }
 
     pub fn new() -> Result<AudioFacade, Error> {
+        let path = format!("/dev/{}", fidl_fuchsia_virtualaudio::CONTROL_NODE_NAME);
         // Connect to the virtual audio control service.
         let (control_client, control_server) = zx::Channel::create();
-        fdio::service_connect(fidl_fuchsia_virtualaudio::CONTROL_NODE_NAME, control_server)
-            .context(format!(
-                "failed to connect to '{}'",
-                fidl_fuchsia_virtualaudio::CONTROL_NODE_NAME
-            ))?;
+        let () = fdio::service_connect(&path, control_server)
+            .with_context(|| format!("failed to connect to '{path}'"))?;
         let vad_control = fidl_fuchsia_virtualaudio::ControlSynchronousProxy::new(control_client);
 
         // The input and output devices are initialized lazily.

@@ -16,7 +16,7 @@
         },
         {
             directory: "dev-topological",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev",
         },
     ],

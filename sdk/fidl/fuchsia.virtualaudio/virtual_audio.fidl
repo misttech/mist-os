@@ -8,7 +8,7 @@ using zx;
 const MAX_UI_STRING_SIZE uint32 = 256;
 const MAX_FORMAT_RANGES uint32 = 64;
 
-const CONTROL_NODE_NAME string = "/dev/sys/platform/00:00:2f/virtual_audio";
+const CONTROL_NODE_NAME string = "sys/platform/00:00:2f/virtual_audio";
 
 /// This protocol provides methods for adding and removing virtual audio
 /// devices. This protocol is made available through the device tree via

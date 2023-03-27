@@ -36,7 +36,7 @@
         },
         {
             directory: "dev-class-fastboot",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/dev/class/fastboot",
         },
     ],

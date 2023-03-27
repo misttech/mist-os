@@ -30,17 +30,14 @@ TEST_F(DriverTestRealmTest, DriversExist) {
   ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
   fuchsia::driver::test::Realm_Start_Result realm_result;
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
-  ASSERT_FALSE(realm_result.is_err());
+  ASSERT_FALSE(realm_result.is_err()) << zx_status_get_string(realm_result.err());
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {},
-                                                         "dev", dev.NewRequest());
-  ASSERT_EQ(status, ZX_OK);
+  ASSERT_EQ(ZX_OK, realm.component().exposed()->Open({}, {}, "dev", dev.NewRequest()));
 
   fbl::unique_fd root_fd;
-  status = fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK);
+  ASSERT_EQ(ZX_OK, fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address()));
 
   // Wait for driver.
   zx::result channel =
@@ -52,8 +49,8 @@ TEST_F(DriverTestRealmTest, DriversExist) {
       fidl::ClientEnd<fuchsia_hardware_sample::Echo>(std::move(channel.value())));
 
   // Send a FIDL request.
-  std::string_view sent_string = "hello";
-  auto result = client->EchoString(fidl::StringView::FromExternal(sent_string));
+  constexpr std::string_view sent_string = "hello";
+  fidl::WireResult result = client->EchoString(fidl::StringView::FromExternal(sent_string));
   ASSERT_EQ(ZX_OK, result.status());
   ASSERT_EQ(sent_string, result.value().response.get());
 }
