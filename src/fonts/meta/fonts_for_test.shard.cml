@@ -1,0 +1,37 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Include by a realm that needs a hermetic font component.
+{
+    children: [
+        {
+            name: "fonts",
+            url: "#meta/font_provider_hermetic_for_test.cm",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.logger.LogSink",
+                "fuchsia.tracing.provider.Registry",
+            ],
+            to: "#fonts",
+        },
+        {
+            directory: "diagnostics",
+            to: "#fonts",
+            rights: [ "connect" ],
+            path: "/diagnostics",
+        },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.fonts.experimental.Provider",
+                "fuchsia.fonts.Provider",
+            ],
+            from: "#fonts",
+        },
+    ],
+}

@@ -1,0 +1,39 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// A font server manifest for hermetic testing.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        runner: "elf",
+        binary: "bin/font_provider",
+        args: [
+            "--font-manifest",
+            "/pkg/data/assets/downstream_test_font_collection_all.hermetic_assets.font_manifest.json",
+        ],
+    },
+    capabilities: [
+        {
+            protocol: [
+                "fuchsia.fonts.experimental.Provider",
+                "fuchsia.fonts.Provider",
+            ],
+        },
+    ],
+    use: [
+        { protocol: "fuchsia.tracing.provider.Registry" },
+    ],
+    expose: [
+        {
+            protocol: [
+                "fuchsia.fonts.experimental.Provider",
+                "fuchsia.fonts.Provider",
+            ],
+            from: "self",
+        },
+    ],
+}
