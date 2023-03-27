@@ -10,7 +10,6 @@ from honeydew.interfaces.affordances import bluetooth
 from honeydew.utils import properties
 
 
-# pylint: disable=too-few-public-methods
 class BluetoothCapableDevice(abc.ABC):
     """Abstract base class to be implemented by a device which supports the
     Bluetooth affordance."""

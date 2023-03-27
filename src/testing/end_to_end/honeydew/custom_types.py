@@ -4,11 +4,11 @@
 # found in the LICENSE file.
 """Custom data types."""
 
-from enum import Enum, auto
+import enum
 
 
-class LEVEL(Enum):
+class LEVEL(enum.Enum):
     """Logging level that need to specified to log a message onto device"""
-    INFO = auto()
-    WARNING = auto()
-    ERROR = auto()
+    INFO = enum.auto()
+    WARNING = enum.auto()
+    ERROR = enum.auto()

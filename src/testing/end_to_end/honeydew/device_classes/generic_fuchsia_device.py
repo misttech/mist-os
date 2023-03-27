@@ -7,7 +7,6 @@
 from honeydew.device_classes import fuchsia_device_base
 
 
-# pylint: disable=too-few-public-methods
 class GenericFuchsiaDevice(fuchsia_device_base.FuchsiaDeviceBase):
     """Generic fuchsia device class.
 

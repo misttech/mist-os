@@ -8,8 +8,9 @@ import abc
 from typing import Optional
 
 from honeydew import custom_types
-from honeydew.interfaces.affordances import component, bluetooth
-from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
+from honeydew.interfaces.affordances import bluetooth, component
+from honeydew.interfaces.auxiliary_devices import \
+    power_switch as power_switch_interface
 from honeydew.utils import ffx_cli, properties
 
 DEFAULT_SSH_USER = "fuchsia"
@@ -141,7 +142,7 @@ class FuchsiaDevice(abc.ABC):
     @abc.abstractmethod
     def power_cycle(
             self,
-            power_switch: PowerSwitch,
+            power_switch: power_switch_interface.PowerSwitch,
             outlet: Optional[int] = None) -> None:
         """Power cycle (power off, wait for delay, power on) the device.
 

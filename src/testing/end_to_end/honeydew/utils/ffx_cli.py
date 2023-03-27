@@ -62,7 +62,7 @@ def check_ffx_connection(
             ffx_target_show_info, label_value="target")
         target_title_entry = _get_label_entry(
             target_entry["child"], label_value="name")
-        return target_title_entry['value'] == target
+        return target_title_entry["value"] == target
     except Exception:  # pylint: disable=broad-except
         _LOGGER.warning(
             "Failed to confirm if Host is able to communicate with %s.", target)
@@ -138,7 +138,7 @@ def get_target_address(
         ssh_address_entry = _get_label_entry(
             target_entry["child"], label_value="ssh_address")
         # in 'fe80::92bf:167b:19c3:58f0%qemu:22', ":22" is SSH port.
-        return ssh_address_entry['value'][:-3]
+        return ssh_address_entry["value"][:-3]
     except Exception as err:  # pylint: disable=broad-except
         raise errors.FfxCommandError(
             f"Failed to get the ip address of {target}") from err
@@ -197,7 +197,7 @@ def get_target_type(target: str, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
             ffx_target_show_info, label_value="build")
         board_entry = _get_label_entry(
             build_entry["child"], label_value="board")
-        return board_entry['value']
+        return board_entry["value"]
     except Exception as err:  # pylint: disable=broad-except
         raise errors.FfxCommandError(
             f"Failed to get the target type of {target}") from err

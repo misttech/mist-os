@@ -9,7 +9,6 @@ from mobly import asserts, test_runner
 from test_fuchsia_device_base import test_fuchsia_device_base
 
 
-# pylint: disable=too-few-public-methods
 class X64Tests(test_fuchsia_device_base.FuchsiaDeviceBaseTests):
     """X64 device tests"""
 

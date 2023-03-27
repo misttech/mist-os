@@ -21,7 +21,6 @@ Assumptions:
 >>> logging.basicConfig(level=logging.INFO)
 
 # Update `sys.path` to include HoneyDew's path before importing it
->>> import os
 >>> import sys
 >>> FUCHSIA_ROOT = os.environ.get("FUCHSIA_DIR")
 >>> HONEYDEW_ROOT = f"{FUCHSIA_ROOT}/src/testing/end_to_end"
@@ -156,8 +155,9 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 * Ensure code is [pylint] and [mypy] compatible
   * Install `pylint` and `mypy` inside virtual environment or at system level
   * For `pylint`, you can either enable it in your IDE ([pylint in vscode]) or
-    run `pylint honeydew/`
-  * For `mypy`, you can run `mypy honeydew/`
+    run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/.pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+    * If you are using [pylint in vscode], then make sure to include `"python.linting.pylintArgs": ["--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/.pylintrc"],` in your vscode settings
+  * For `mypy`, you can run `mypy $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
     * Note - If you encounter errors related to importing modules listed in
       [//third_party] such as `parameterized`, `mobly` etc, please ignore them
 * At least one of the [HoneyDew OWNERS] should be added for the CL review

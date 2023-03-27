@@ -19,7 +19,8 @@ from honeydew import custom_types, errors
 from honeydew.affordances import bluetooth_default, component_default
 from honeydew.interfaces.affordances import bluetooth as bluetooth_interface
 from honeydew.interfaces.affordances import component as component_interface
-from honeydew.interfaces.auxiliary_devices.power_switch import PowerSwitch
+from honeydew.interfaces.auxiliary_devices import \
+    power_switch as power_switch_interface
 from honeydew.interfaces.device_classes import (
     bluetooth_capable_device, component_capable_device, fuchsia_device)
 from honeydew.interfaces.transports import sl4f
@@ -62,7 +63,6 @@ _SSH_COMMAND = \
     "ssh {ssh_options} -i {ssh_private_key} {ssh_user}@{ip_address} {command}"
 
 
-# pylint: disable=attribute-defined-outside-init, too-many-instance-attributes
 class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                         component_capable_device.ComponentCapableDevice,
                         bluetooth_capable_device.BluetoothCapableDevice):
@@ -218,7 +218,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
 
     def power_cycle(
             self,
-            power_switch: PowerSwitch,
+            power_switch: power_switch_interface.PowerSwitch,
             outlet: Optional[int] = None) -> None:
         """Power cycle (power off, wait for delay, power on) the device.
 
@@ -250,7 +250,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         self._wait_for_offline()
         self._wait_for_bootup_complete()
 
-    # pylint: disable=too-many-arguments
     def send_sl4f_command(
         self,
         method: str,
@@ -308,11 +307,11 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                     interval=interval,
                     exceptions_to_skip=exceptions_to_skip)
 
-                error = http_response.get('error')
+                error = http_response.get("error")
                 if not error:
                     return http_response
 
-                if attempt < attempts:  # pylint: disable=no-else-continue
+                if attempt < attempts:
                     _LOGGER.warning(
                         "SL4F method '%s' failed with error: '%s' on "
                         "iteration %s/%s", method, error, attempt, attempts)
@@ -396,7 +395,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         _LOGGER.info("Waiting for %s to allow ssh connection...", self.name)
         while time.time() < end_time:
             try:
-                self._run_ssh_command_on_host(command=_CMDS['ECHO'])
+                self._run_ssh_command_on_host(command=_CMDS["ECHO"])
                 break
             except Exception:  # pylint: disable=broad-except
                 time.sleep(1)
@@ -442,7 +441,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             ip address with or without scope identifier based on python version.
         """
         if sys.version_info < (3, 9):
-            ip_address = ip_address.split('%')[0]
+            ip_address = ip_address.split("%")[0]
         return ip_address
 
     @properties.PersistentProperty
@@ -494,7 +493,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             errors.FuchsiaDeviceError: Failed to start the SL4F server.
         """
         _LOGGER.info("Starting SL4F server on %s...", self.name)
-        self._run_ssh_command_on_host(command=_CMDS['START_SL4F'])
+        self._run_ssh_command_on_host(command=_CMDS["START_SL4F"])
 
         # verify the device is responsive to SL4F requests
         self._check_sl4f_connection()

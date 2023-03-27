@@ -18,15 +18,16 @@ UNKNOWN_COMPONENT_NAME = "unknown.cm"
 _LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=attribute-defined-outside-init
 class ComponentCapabilityTests(base_test.BaseTestClass):
     """Component capability tests"""
 
     def setup_class(self):
+        """setup_class is called once before running tests."""
         fuchsia_devices = self.register_controller(fuchsia_device)
         self.device = fuchsia_devices[0]
 
     def on_fail(self, _):
+        """on_fail is called once when a test case fails."""
         if not hasattr(self, "device"):
             return
 
@@ -63,5 +64,5 @@ class ComponentCapabilityTests(base_test.BaseTestClass):
     ### TBD - Write a test case for component.launch()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

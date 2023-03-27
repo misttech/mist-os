@@ -14,7 +14,6 @@ from mobly import base_test, test_runner
 _LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=attribute-defined-outside-init
 class SoftRebootTest(base_test.BaseTestClass):
     """Soft Reboot test."""
 
@@ -33,7 +32,7 @@ class SoftRebootTest(base_test.BaseTestClass):
         fuchsia_devices = self.register_controller(fuchsia_device)
         self.dut = cast(FuchsiaDevice, fuchsia_devices[0])
 
-    def on_fail(self, record):
+    def on_fail(self, _):
         if not hasattr(self, "dut"):
             return
 
@@ -54,5 +53,5 @@ class SoftRebootTest(base_test.BaseTestClass):
         return f"test_soft_reboot_{iteration}"
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

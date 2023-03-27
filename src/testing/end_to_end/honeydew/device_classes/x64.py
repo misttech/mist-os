@@ -7,7 +7,6 @@
 from honeydew.device_classes import fuchsia_device_base
 
 
-# pylint: disable=attribute-defined-outside-init
 class X64(fuchsia_device_base.FuchsiaDeviceBase):
     """X64 device class.
 

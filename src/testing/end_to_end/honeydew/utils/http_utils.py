@@ -24,7 +24,6 @@ _DEFAULTS = {
 }
 
 
-# pylint: disable=too-many-arguments
 def send_http_request(
     url: str,
     data: Optional[Dict[str, Any]] = None,

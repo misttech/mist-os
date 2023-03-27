@@ -98,7 +98,7 @@ class HttpUtilsTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    @mock.patch.object(http_utils.urllib.request, 'urlopen', autospec=True)
+    @mock.patch.object(http_utils.urllib.request, "urlopen", autospec=True)
     def test_send_http_request_success(self, parameterized_dict, mock_urlopen):
         """Test case for http_utils.send_http_request() success case."""
 
@@ -121,7 +121,7 @@ class HttpUtilsTests(unittest.TestCase):
 
     @mock.patch.object(
         http_utils.urllib.request,
-        'urlopen',
+        "urlopen",
         side_effect=RemoteDisconnected,
         autospec=True)
     def test_send_http_request_with_exceptions_to_skip(self, mock_urlopen):
@@ -133,10 +133,10 @@ class HttpUtilsTests(unittest.TestCase):
         self.assertEqual(response, {})
         mock_urlopen.assert_called_once()
 
-    @mock.patch.object(http_utils.time, 'sleep', autospec=True)
+    @mock.patch.object(http_utils.time, "sleep", autospec=True)
     @mock.patch.object(
         http_utils.urllib.request,
-        'urlopen',
+        "urlopen",
         side_effect=RuntimeError("some run time error"),
         autospec=True)
     def test_send_http_request_fail_because_of_exception(
@@ -154,5 +154,5 @@ class HttpUtilsTests(unittest.TestCase):
         self.assertEqual(mock_sleep.call_count, _PARAMS["attempts"] - 1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

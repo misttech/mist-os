@@ -2,9 +2,9 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Utility module for different type of property decorators supported by HoneyDew."""
+"""Utility module for different type of property decorators in HoneyDew."""
 
-from functools import lru_cache
+import functools
 from typing import Any, Callable, Optional
 
 
@@ -30,7 +30,7 @@ class PersistentProperty(property):
     """
 
     def __init__(self, fget: Callable[[Any], Any]):
-        super().__init__(lru_cache()(fget), doc=fget.__doc__)
+        super().__init__(functools.lru_cache()(fget), doc=fget.__doc__)
         self.name = fget.__name__
 
 
@@ -38,5 +38,5 @@ class Affordance(property):
     """A property that represents an affordance."""
 
     def __init__(self, fget: Callable[[Any], Any]):
-        super().__init__(lru_cache()(fget), doc=fget.__doc__)
+        super().__init__(functools.lru_cache()(fget), doc=fget.__doc__)
         self.name = fget.__name__

@@ -29,55 +29,55 @@ _FFX_TARGET_SHOW_OUTPUT = \
 
 _FFX_TARGET_SHOW_JSON = [
     {
-        'title':
-            'Target',
-        'label':
-            'target',
-        'description':
-            '',
-        'child':
+        "title":
+            "Target",
+        "label":
+            "target",
+        "description":
+            "",
+        "child":
             [
                 {
-                    'title': 'Name',
-                    'label': 'name',
-                    'description': 'Target name.',
-                    'value': 'fuchsia-emulator'
+                    "title": "Name",
+                    "label": "name",
+                    "description": "Target name.",
+                    "value": "fuchsia-emulator"
                 }, {
-                    'title': 'SSH Address',
-                    'label': 'ssh_address',
-                    'description': 'Interface address',
-                    'value': 'fe80::3804:df7d:daa8:ce6c%qemu:22'
+                    "title": "SSH Address",
+                    "label": "ssh_address",
+                    "description": "Interface address",
+                    "value": "fe80::3804:df7d:daa8:ce6c%qemu:22"
                 }
             ]
     }, {
-        'title':
-            'Build',
-        'label':
-            'build',
-        'description':
-            '',
-        'child':
+        "title":
+            "Build",
+        "label":
+            "build",
+        "description":
+            "",
+        "child":
             [
                 {
-                    'title': 'Version',
-                    'label': 'version',
-                    'description': 'Build version.',
-                    'value': '2023-02-01T17:26:40+00:00'
+                    "title": "Version",
+                    "label": "version",
+                    "description": "Build version.",
+                    "value": "2023-02-01T17:26:40+00:00"
                 }, {
-                    'title': 'Product',
-                    'label': 'product',
-                    'description': 'Product config.',
-                    'value': 'workstation_eng'
+                    "title": "Product",
+                    "label": "product",
+                    "description": "Product config.",
+                    "value": "workstation_eng"
                 }, {
-                    'title': 'Board',
-                    'label': 'board',
-                    'description': 'Board config.',
-                    'value': 'qemu-x64'
+                    "title": "Board",
+                    "label": "board",
+                    "description": "Board config.",
+                    "value": "qemu-x64"
                 }, {
-                    'title': 'Commit',
-                    'label': 'commit',
-                    'description': 'Integration Commit Date',
-                    'value': '2023-02-01T17:26:40+00:00'
+                    "title": "Commit",
+                    "label": "commit",
+                    "description": "Integration Commit Date",
+                    "value": "2023-02-01T17:26:40+00:00"
                 }
             ]
     }
@@ -135,7 +135,7 @@ class FfxCliTests(unittest.TestCase):
         [
             ({
                 "label": "empty_output",
-                "side_effect": b'[]'
+                "side_effect": b"[]"
             },),
             (
                 {
@@ -191,7 +191,7 @@ class FfxCliTests(unittest.TestCase):
     def test_get_target_address(self):
         """Verify get_target_address returns ip address of fuchsia device."""
         result = ffx_cli.get_target_address(target="fuchsia-emulator")
-        expected = _FFX_TARGET_SHOW_JSON[0]['child'][1]['value'][:-3]
+        expected = _FFX_TARGET_SHOW_JSON[0]["child"][1]["value"][:-3]
 
         self.assertEqual(result, expected)
 
@@ -205,7 +205,7 @@ class FfxCliTests(unittest.TestCase):
         [
             ({
                 "label": "empty_output",
-                "side_effect": b'[]'
+                "side_effect": b"[]"
             },),
             (
                 {
@@ -234,7 +234,7 @@ class FfxCliTests(unittest.TestCase):
     def test_get_target_type(self):
         """Verify get_target_type returns target type of fuchsia device."""
         result = ffx_cli.get_target_type(target="fuchsia-emulator")
-        expected = _FFX_TARGET_SHOW_JSON[1]['child'][2]['value']
+        expected = _FFX_TARGET_SHOW_JSON[1]["child"][2]["value"]
 
         self.assertEqual(result, expected)
 
@@ -248,7 +248,7 @@ class FfxCliTests(unittest.TestCase):
         [
             ({
                 "label": "empty_output",
-                "side_effect": b'[]'
+                "side_effect": b"[]"
             },),
             (
                 {
@@ -275,5 +275,5 @@ class FfxCliTests(unittest.TestCase):
             timeout=10)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

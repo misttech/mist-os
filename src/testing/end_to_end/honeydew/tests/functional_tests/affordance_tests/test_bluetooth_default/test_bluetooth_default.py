@@ -13,17 +13,16 @@ from mobly import asserts, base_test, test_runner
 _LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=attribute-defined-outside-init
 class BluetoothCapabilityTests(base_test.BaseTestClass):
     """Bluetooth capability tests"""
 
     def setup_class(self):
-        """Setup class for Bluetooth test."""
+        """setup_class is called once before running tests."""
         fuchsia_devices = self.register_controller(fuchsia_device)
         self.device = fuchsia_devices[0]
 
     def on_fail(self, _):
-        """Gets device log if test fails."""
+        """on_fail is called once when a test case fails."""
         if not hasattr(self, "device"):
             return
 
@@ -42,5 +41,5 @@ class BluetoothCapabilityTests(base_test.BaseTestClass):
         self.device.bluetooth.request_discovery(True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_runner.main()

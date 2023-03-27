@@ -8,13 +8,11 @@ import abc
 from typing import Any, Dict, Iterable, Optional, Type
 
 
-# pylint: disable=too-few-public-methods
 class SL4F(abc.ABC):
     """Abstract base class for SL4F transport."""
 
     # List all the public methods in alphabetical order
 
-    # pylint: disable=too-many-arguments
     @abc.abstractmethod
     def send_sl4f_command(
         self,

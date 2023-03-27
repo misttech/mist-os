@@ -89,7 +89,7 @@ class InitTests(unittest.TestCase):
     def test_get_all_affordances(self, mock_get_device_class):
         """Test case for honeydew.get_all_affordances()."""
         device_name = "fuchsia-emulator"
-        expected_affordances = ['bluetooth', 'component']
+        expected_affordances = ["bluetooth", "component"]
 
         self.assertEqual(
             honeydew.get_all_affordances(device_name), expected_affordances)
@@ -178,3 +178,7 @@ class InitTests(unittest.TestCase):
 
         mock_get_target_type.assert_called_once_with(device_name)
         mock_get_all_register_device_classes.assert_called_once()
+
+
+if __name__ == "__main__":
+    unittest.main()

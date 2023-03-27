@@ -12,7 +12,6 @@ _SL4F_METHODS = {
 }
 
 
-# pylint: disable=attribute-defined-outside-init
 class BluetoothDefault(bluetooth.Bluetooth):
     """Default implementation for Bluetooth affordance.
 

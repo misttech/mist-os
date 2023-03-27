@@ -16,7 +16,6 @@ _SL4F_METHODS = {
 }
 
 
-# pylint: disable=attribute-defined-outside-init
 class ComponentDefault(component.Component):
     """Default implementation for Component affordance.
 

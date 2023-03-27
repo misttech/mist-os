@@ -28,13 +28,13 @@ _MOCK_ARGS = {
     "device_type": "qemu-x64",
     "sl4f_request": fuchsia_device_base._SL4F_METHODS["GetDeviceName"],
     "sl4f_response": {
-        'id': '',
-        'result': 'fuchsia-emulator',
-        'error': None,
+        "id": "",
+        "result": "fuchsia-emulator",
+        "error": None,
     },
     "sl4f_error_response": {
-        'id': '',
-        'error': 'some error',
+        "id": "",
+        "error": "some error",
     },
 }
 
@@ -51,7 +51,6 @@ def _custom_test_name_func(testcase_func, _, param):
     return f"{test_func_name}_with_{test_label}"
 
 
-# pylint: disable=too-many-public-methods
 class FuchsiaDeviceBaseTests(unittest.TestCase):
     """Unit tests for honeydew.device_classes.fuchsia_device_base.py."""
 
@@ -70,7 +69,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "check_output",
         return_value=b"some output",
         autospec=True)
-    def setUp(  # pylint: disable=arguments-differ
+    def setUp(
             self, mock_check_output, mock_get_target_address,
             mock_send_sl4f_command) -> None:
         super().setUp()
@@ -333,7 +332,8 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     def test_power_cycle(
             self, mock_wait_for_offline, mock_wait_for_bootup_complete):
         """Testcase for FuchsiaDeviceBase.power_cycle()"""
-        power_switch = mock.MagicMock(spec=fuchsia_device_base.PowerSwitch)
+        power_switch = mock.MagicMock(
+            spec=fuchsia_device_base.power_switch_interface.PowerSwitch)
         self.fd_obj.power_cycle(power_switch=power_switch, outlet=5)
 
         power_switch.power_off.assert_called_once()
@@ -414,7 +414,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                 snapshot_file_path,
                 f"{directory}/Snapshot_{self.fd_obj.name}_.*.zip")
 
-        mocked_file.assert_called_once_with(snapshot_file_path, 'wb')
+        mocked_file.assert_called_once_with(snapshot_file_path, "wb")
         mocked_file().write.assert_called_once_with(
             base64.b64decode(_BASE64_ENCODED_STR))
 
@@ -445,7 +445,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
         "_run_ssh_command_on_host",
-        side_effect=[subprocess.CalledProcessError, b'some output'],
+        side_effect=[subprocess.CalledProcessError, b"some output"],
         autospec=True)
     def test_check_ssh_connection_to_device_success(
             self, mock_run_ssh_command_on_host, mock_sleep):
@@ -610,7 +610,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         """Testcase for FuchsiaDeviceBase.send_sl4f_command() failure case when
         there is 'error' in SL4F response received."""
         method = _MOCK_ARGS["sl4f_request"]
-        expected_error = _MOCK_ARGS['sl4f_error_response']['error']
+        expected_error = _MOCK_ARGS["sl4f_error_response"]["error"]
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     f"Error: '{expected_error}'"):
             self.fd_obj.send_sl4f_command(method=method, attempts=5, interval=0)
@@ -718,5 +718,5 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_check_ffx_connection.assert_called_with(self.fd_obj.name)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -8,27 +8,28 @@ import logging
 import os
 import tempfile
 
-from mobly import asserts, base_test, test_runner
 from honeydew import custom_types
 from honeydew.device_classes import fuchsia_device_base
 from honeydew.interfaces.device_classes import (
     component_capable_device, fuchsia_device)
 from honeydew.mobly_controller import \
     fuchsia_device as fuchsia_device_mobly_controller
+from mobly import asserts, base_test, test_runner
 
 _LOGGER = logging.getLogger(__name__)
 
 
-# pylint: disable=attribute-defined-outside-init
 class FuchsiaDeviceBaseTests(base_test.BaseTestClass):
     """FuchsiaDeviceBase tests run using an X64 device"""
 
     def setup_class(self):
+        """setup_class is called once before running tests."""
         fuchsia_devices = self.register_controller(
             fuchsia_device_mobly_controller)
         self.device = fuchsia_devices[0]
 
     def on_fail(self, record):
+        """on_fail is called once when a test case fails."""
         if not hasattr(self, "device"):
             return
 

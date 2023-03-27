@@ -8,16 +8,18 @@ import logging
 from typing import Any, Dict, List
 
 import honeydew
-from honeydew.interfaces.device_classes.fuchsia_device import (
-    DEFAULT_SSH_USER, FuchsiaDevice)
-from honeydew.utils.properties import DynamicProperty, PersistentProperty
+from honeydew.interfaces.device_classes import \
+    fuchsia_device as fuchsia_device_interface
+from honeydew.utils import properties
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
 
 _LOGGER = logging.getLogger(__name__)
 
 
-def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
+def create(
+    configs: List[Dict[str,
+                       Any]]) -> List[fuchsia_device_interface.FuchsiaDevice]:
     """Create Fuchsia device controller(s) and returns them.
 
     Required for Mobly controller registration.
@@ -52,7 +54,8 @@ def create(configs: List[Dict[str, Any]]) -> List[FuchsiaDevice]:
     return fuchsia_devices
 
 
-def destroy(fuchsia_devices: List[FuchsiaDevice]) -> None:
+def destroy(
+        fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice]) -> None:
     """Closes all created fuchsia devices.
 
     Required for Mobly controller registration.
@@ -64,7 +67,9 @@ def destroy(fuchsia_devices: List[FuchsiaDevice]) -> None:
         fuchsia_device.close()
 
 
-def get_info(fuchsia_devices: List[FuchsiaDevice]) -> List[Dict[str, Any]]:
+def get_info(
+    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice]
+) -> List[Dict[str, Any]]:
     """Gets information from a list of FuchsiaDevice objects.
 
     Optional for Mobly controller registration.
@@ -81,7 +86,9 @@ def get_info(fuchsia_devices: List[FuchsiaDevice]) -> List[Dict[str, Any]]:
     ]
 
 
-def _get_fuchsia_device_info(fuchsia_device: FuchsiaDevice) -> Dict[str, Any]:
+def _get_fuchsia_device_info(
+        fuchsia_device: fuchsia_device_interface.FuchsiaDevice
+) -> Dict[str, Any]:
     """Returns information of a specific fuchsia device object.
 
     Args:
@@ -101,9 +108,9 @@ def _get_fuchsia_device_info(fuchsia_device: FuchsiaDevice) -> Dict[str, Any]:
             continue
 
         attr_type = getattr(type(fuchsia_device), attr, None)
-        if isinstance(attr_type, DynamicProperty):
+        if isinstance(attr_type, properties.DynamicProperty):
             device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
-        elif isinstance(attr_type, PersistentProperty):
+        elif isinstance(attr_type, properties.PersistentProperty):
             device_info["persistent"][attr] = getattr(fuchsia_device, attr)
 
     return device_info
@@ -128,10 +135,14 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         config)
 
     device_config = {
-        "name": "",
-        "ssh_private_key": "",
-        "ssh_user": config.get("ssh_user", DEFAULT_SSH_USER),
-        "ip_address": ""
+        "name":
+            "",
+        "ssh_private_key":
+            "",
+        "ssh_user":
+            config.get("ssh_user", fuchsia_device_interface.DEFAULT_SSH_USER),
+        "ip_address":
+            ""
     }
 
     # Sample testbed file format for FuchsiaDevice controller used in infra...

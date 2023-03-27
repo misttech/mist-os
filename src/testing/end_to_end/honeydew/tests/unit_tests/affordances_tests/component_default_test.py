@@ -84,8 +84,8 @@ class ComponentDefaultTests(unittest.TestCase):
                     "label": "when_component_found",
                     "return_value":
                         {
-                            "id": '',
-                            "result": 'Success',
+                            "id": "",
+                            "result": "Success",
                             "error": None
                         },
                     "expected": True,
@@ -115,3 +115,7 @@ class ComponentDefaultTests(unittest.TestCase):
         self.sl4f_obj.send_sl4f_command.assert_called_once_with(
             method=component_default._SL4F_METHODS["Search"],
             params={"name": name})
+
+
+if __name__ == "__main__":
+    unittest.main()
