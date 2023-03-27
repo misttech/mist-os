@@ -7,8 +7,8 @@ use {
         buffer_reader::BufferReader, mac::ReasonCode, organization::Oui,
         unaligned_view::UnalignedView,
     },
-    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
+    banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     ieee80211::MacAddr,
     static_assertions::const_assert_eq,
     std::mem::size_of,
@@ -510,7 +510,7 @@ pub struct HtOperation {
     pub basic_ht_mcs_set: SupportedMcsSet, // u128
 }
 
-impl From<HtOperation> for banjo_wlan_associnfo::WlanHtOp {
+impl From<HtOperation> for banjo_wlan_softmac::WlanHtOp {
     fn from(op: HtOperation) -> Self {
         Self {
             primary_channel: op.primary_channel,
@@ -1218,7 +1218,7 @@ pub struct VhtOperation {
     pub basic_mcs_nss: VhtMcsNssMap, // u16
 }
 
-impl From<VhtOperation> for banjo_wlan_associnfo::WlanVhtOp {
+impl From<VhtOperation> for banjo_wlan_softmac::WlanVhtOp {
     fn from(op: VhtOperation) -> Self {
         Self {
             // vht_cbw is a NewType for u8 instead of a bitfield, thus does not have raw() defined.
@@ -1403,7 +1403,7 @@ mod tests {
     #[test]
     fn ddk_conversion_ht_operation() {
         let ht_op = crate::ie::fake_ies::fake_ht_operation();
-        let ddk: banjo_wlan_associnfo::WlanHtOp = ht_op.into();
+        let ddk: banjo_wlan_softmac::WlanHtOp = ht_op.into();
         // Local reference to avoid referring to an unaligned_reference
         let ht_op_ptr_head_0 = ht_op.ht_op_info_head.0;
 
@@ -1416,7 +1416,7 @@ mod tests {
     #[test]
     fn ddk_conversion_vht_operation() {
         let vht_op = crate::ie::fake_ies::fake_vht_operation();
-        let ddk: banjo_wlan_associnfo::WlanVhtOp = vht_op.into();
+        let ddk: banjo_wlan_softmac::WlanVhtOp = vht_op.into();
         // Local reference to avoid referring to an unaligned_reference
         let vht_op_basic_mcs_nss_0 = vht_op.basic_mcs_nss.0;
 

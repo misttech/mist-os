@@ -9,7 +9,8 @@ use {
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_internal::JoinBssRequest,
     banjo_fuchsia_wlan_softmac::{
-        self as banjo_wlan_softmac, WlanRxPacket, WlanSoftmacQueryResponse, WlanTxPacket,
+        self as banjo_wlan_softmac, WlanAssociationConfig, WlanRxPacket, WlanSoftmacQueryResponse,
+        WlanTxPacket,
     },
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
     ieee80211::MacAddr,
@@ -189,11 +190,11 @@ impl Device {
         self.raw_device.set_eth_link(LinkStatus::DOWN)
     }
 
-    pub fn configure_assoc(&self, assoc_ctx: WlanAssocCtx) -> Result<(), zx::Status> {
+    pub fn configure_assoc(&self, assoc_cfg: WlanAssociationConfig) -> Result<(), zx::Status> {
         if let Some(minstrel) = &self.minstrel {
-            minstrel.lock().add_peer(&assoc_ctx);
+            minstrel.lock().add_peer(&assoc_cfg);
         }
-        self.raw_device.configure_assoc(assoc_ctx)
+        self.raw_device.configure_assoc(assoc_cfg)
     }
 
     pub fn clear_assoc(&self, addr: &MacAddr) -> Result<(), zx::Status> {
@@ -438,8 +439,9 @@ pub struct DeviceInterface {
     /// Sets the link status to be UP or DOWN.
     set_link_status: extern "C" fn(device: *mut c_void, status: u8) -> i32,
     /// Configure the association context.
-    /// |assoc_ctx| is mutable because the underlying API does not take a const wlan_assoc_ctx_t.
-    configure_assoc: extern "C" fn(device: *mut c_void, assoc_ctx: *mut WlanAssocCtx) -> i32,
+    /// |assoc_cfg| is mutable because the underlying API does not take a const wlan_association_config_t.
+    configure_assoc:
+        extern "C" fn(device: *mut c_void, assoc_cfg: *mut WlanAssociationConfig) -> i32,
     /// Clear the association context.
     clear_assoc: extern "C" fn(device: *mut c_void, addr: &[u8; 6]) -> i32,
 }
@@ -586,8 +588,9 @@ impl DeviceInterface {
         zx::ok(status)
     }
 
-    fn configure_assoc(&self, mut assoc_ctx: WlanAssocCtx) -> Result<(), zx::Status> {
-        let status = (self.configure_assoc)(self.device, &mut assoc_ctx as *mut WlanAssocCtx);
+    fn configure_assoc(&self, mut assoc_cfg: WlanAssociationConfig) -> Result<(), zx::Status> {
+        let status =
+            (self.configure_assoc)(self.device, &mut assoc_cfg as *mut WlanAssociationConfig);
         zx::ok(status)
     }
 
@@ -673,7 +676,7 @@ pub mod test_utils {
         pub join_bss_request: Option<JoinBssRequest>,
         pub beacon_config: Option<(Vec<u8>, usize, TimeUnit)>,
         pub link_status: LinkStatus,
-        pub assocs: std::collections::HashMap<MacAddr, WlanAssocCtx>,
+        pub assocs: std::collections::HashMap<MacAddr, WlanAssociationConfig>,
         pub buffer_provider: BufferProvider,
         pub set_key_results: Vec<zx::Status>,
         pub supported_phys: Vec<banjo_common::WlanPhyType>,
@@ -951,7 +954,10 @@ pub mod test_utils {
 
         // Cannot mark fn unsafe because it has to match fn signature in DeviceInterface
         #[allow(clippy::not_unsafe_ptr_arg_deref)]
-        pub extern "C" fn configure_assoc(device: *mut c_void, cfg: *mut WlanAssocCtx) -> i32 {
+        pub extern "C" fn configure_assoc(
+            device: *mut c_void,
+            cfg: *mut WlanAssociationConfig,
+        ) -> i32 {
             unsafe {
                 (*(device as *mut Self)).assocs.insert((*cfg).bssid, (*cfg).clone());
             }
@@ -1495,7 +1501,7 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
-        dev.configure_assoc(WlanAssocCtx {
+        dev.configure_assoc(WlanAssociationConfig {
             bssid: [1, 2, 3, 4, 5, 6],
             aid: 1,
             listen_interval: 2,
@@ -1508,7 +1514,7 @@ mod tests {
             wmm_params: ddk_converter::blank_wmm_params(),
 
             rates_cnt: 4,
-            rates: [0; WLAN_MAC_MAX_RATES as usize],
+            rates: [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize],
             capability_info: 0x0102,
 
             has_ht_cap: false,
@@ -1516,14 +1522,14 @@ mod tests {
             ht_cap: unsafe { std::mem::zeroed::<HtCapabilities>() },
             has_ht_op: false,
             // Safe: This is not read by the driver.
-            ht_op: unsafe { std::mem::zeroed::<WlanHtOp>() },
+            ht_op: unsafe { std::mem::zeroed::<banjo_wlan_softmac::WlanHtOp>() },
 
             has_vht_cap: false,
             // Safe: This is not read by the driver.
             vht_cap: unsafe { std::mem::zeroed::<VhtCapabilities>() },
             has_vht_op: false,
             // Safe: This is not read by the driver.
-            vht_op: unsafe { std::mem::zeroed::<WlanVhtOp>() },
+            vht_op: unsafe { std::mem::zeroed::<banjo_wlan_softmac::WlanVhtOp>() },
         })
         .expect("error configuring assoc");
         assert!(fake_device.assocs.contains_key(&[1, 2, 3, 4, 5, 6]));
@@ -1540,7 +1546,7 @@ mod tests {
             beacon_period: 100,
         })
         .expect("error configuring bss");
-        let assoc_ctx = ddk_converter::build_ddk_assoc_ctx(
+        let assoc_cfg = ddk_converter::build_ddk_assoc_cfg(
             Bssid([1, 2, 3, 4, 5, 6]),
             1,
             banjo_common::WlanChannel {
@@ -1558,7 +1564,7 @@ mod tests {
             None,
         );
         assert!(fake_device.join_bss_request.is_some());
-        dev.configure_assoc(assoc_ctx).expect("error configuring assoc");
+        dev.configure_assoc(assoc_cfg).expect("error configuring assoc");
         assert_eq!(fake_device.assocs.len(), 1);
         dev.clear_assoc(&[1, 2, 3, 4, 5, 6]).expect("error clearing assoc");
         assert_eq!(fake_device.assocs.len(), 0);

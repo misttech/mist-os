@@ -45,7 +45,7 @@ exclude = [
     "SpectrumManagementSupport",
     "WlanSoftmacStartActiveScanRequest",
     "WlanSoftmacStartPassiveScanRequest",
-    "WlanAssocCtx",
+    "WlanAssociationConfig",
     "WlanChannel",
     "WlanIndication",
     "WlanKeyConfig",
@@ -76,7 +76,7 @@ exclude = [
 "SpectrumManagementSupport" = "spectrum_management_support_t"
 "WlanSoftmacStartActiveScanRequest" = "wlan_softmac_start_active_scan_request_t"
 "WlanSoftmacStartPassiveScanRequest" = "wlan_softmac_start_passive_scan_request_t"
-"WlanAssocCtx" = "wlan_assoc_ctx_t"
+"WlanAssociationConfig" = "wlan_association_config_t"
 "WlanChannel" = "wlan_channel_t"
 "WlanSoftmacIfcProtocol" = "rust_wlan_softmac_ifc_protocol_copy_t"
 "WlanSoftmacIfcProtocolOps" = "rust_wlan_softmac_ifc_protocol_ops_copy_t"

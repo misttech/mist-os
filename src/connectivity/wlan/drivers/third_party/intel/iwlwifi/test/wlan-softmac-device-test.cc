@@ -564,8 +564,8 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t ConfigureAssoc(const fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx* ctx) {
-    auto result = client_.buffer(test_arena_)->ConfigureAssoc(*ctx);
+  zx_status_t ConfigureAssoc(const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg) {
+    auto result = client_.buffer(test_arena_)->ConfigureAssoc(*assoc_cfg);
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
@@ -733,12 +733,12 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
   };
 
   // Assoc context without HT related data.
-  static constexpr fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx kAssocCtx = {
+  static constexpr fuchsia_wlan_softmac::wire::WlanAssociationConfig kAssocCtx = {
       .listen_interval = kListenInterval,
   };
 
   // Assoc context with HT related data. (The values below comes from real data in manual test)
-  static constexpr fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx kHtAssocCtx = {
+  static constexpr fuchsia_wlan_softmac::wire::WlanAssociationConfig kHtAssocCtx = {
       .listen_interval = kListenInterval,
       .channel =
           {
@@ -1121,8 +1121,8 @@ TEST_F(MacInterfaceTest, ClearAssocAfterFailedAssoc) {
   ASSERT_NE(ZX_OK, ClearAssoc());
 }
 
-// This test case is to verify ConfigureAssoc() with HT wlan_assoc_ctx_t input can successfully
-// trigger LQ_CMD with correct data.
+// This test case is to verify ConfigureAssoc() with HT wlan_association_config_t input can
+// successfully trigger LQ_CMD with correct data.
 TEST_F(MacInterfaceTest, AssocWithHtConfig) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));

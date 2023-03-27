@@ -152,9 +152,10 @@ typedef struct {
   int32_t (*set_link_status)(void *device, uint8_t status);
   /**
    * Configure the association context.
-   * |assoc_ctx| is mutable because the underlying API does not take a const wlan_assoc_ctx_t.
+   * |assoc_cfg| is mutable because the underlying API does not take a const
+   * wlan_association_config_t.
    */
-  int32_t (*configure_assoc)(void *device, wlan_assoc_ctx_t *assoc_ctx);
+  int32_t (*configure_assoc)(void *device, wlan_association_config_t *assoc_cfg);
   /**
    * Clear the association context.
    */

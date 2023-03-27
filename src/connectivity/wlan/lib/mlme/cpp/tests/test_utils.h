@@ -71,7 +71,7 @@ static inline std::unique_ptr<Packet> MakeEthPacket(const common::MacAddr& dest_
   return packet;
 }
 
-wlan_assoc_ctx_t FakeDdkAssocCtx();
+wlan_association_config_t FakeDdkAssocCtx();
 wlan_softmac_band_capability_t FakeBandCapability(wlan_band_t band);
 
 }  // namespace test_utils

@@ -3,9 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.wlan.associnfo;
 
-using fuchsia.wlan.common;
-using fuchsia.wlan.ieee80211 as ieee80211;
-
 // LINT.IfChange
 type WlanKeyType = strict enum : uint8 {
     PAIRWISE = 1;
@@ -14,44 +11,6 @@ type WlanKeyType = strict enum : uint8 {
     PEER = 4;
 };
 // LINT.ThenChange(//src/connectivity/wlan/lib/mlme/rust/src/key.rs)
-
-// IEEE Std 802.11-2016, 9.4.2.57
-type WlanHtOp = struct {
-    primary_channel uint8;
-
-    /// First 8 bits of HT Operation:
-    /// - Secondary Channel Offset: 2 bits
-    /// - STA Channel Width: 1 bit
-    /// - RIFS Mode: 1 bit
-    /// - Reserved: 4 bits
-    /// - HT Protection: 2 bits
-    /// - Nongreenfield HT STAs Present: 1 bit
-    /// - Reserved: 1 bit
-    /// - OBSS Non-HT STAs Present: 1 bit
-    /// - Channel Center Frequency Segment 2: 8 bits (spec says "11 bits": that can't be correct)
-    /// - Reserved: 3 bits (spec says "2 bits": can't be correct either)
-    /// - Reserved: 6 bits
-    /// - Dual Beacon: 1 bit
-    /// - Dual CTS Protection: 1 bit
-    head uint32;
-
-    /// Next 8 bits of HT Operation:
-    /// - STBC Beacon: 1 bit
-    /// - L-SIG TXOP Protection Full Support: 1 bit
-    /// - PCO Active: 1 bit
-    /// - PCO Phase: 1 bit
-    /// - Reserved: 4 bits
-    tail uint8;
-
-    mcs_set array<uint8, 16>;
-};
-
-type WlanVhtOp = struct {
-    vht_cbw uint8;
-    center_freq_seg0 uint8;
-    center_freq_seg1 uint8;
-    basic_mcs uint16;
-};
 
 type WlanRxInfoValid = strict enum : uint32 {
     /// Bits 6-31 reserved
@@ -120,37 +79,3 @@ type WlanWmmAcParams = struct {
 /// Some parameters are distinctively for Rx only, and some are Tx only.
 const WLAN_MAC_MAX_SUPP_RATES uint32 = 8;
 const WLAN_MAC_MAX_EXT_RATES uint32 = 255;
-const WLAN_MAC_MAX_RATES uint32 = 263; // (8 + 255)
-type WlanAssocCtx = struct {
-    bssid ieee80211.MacAddr;
-    aid uint16;
-    listen_interval uint16;
-    channel fuchsia.wlan.common.WlanChannel;
-
-    /// QoS capable and parameters
-    qos bool;
-    /// WFA WMM v1.2, 2.2.2
-    wmm_params WlanWmmParameters;
-
-    /// Coincatenation of SupportedRates and ExtendedSupportedRates
-    /// IEEE Std 802.11-2016, 9.4.2.3 & 9.4.2.13
-    rates_cnt uint16;
-    rates array<uint8, WLAN_MAC_MAX_RATES>;
-
-    /// IEEE Std 802.11-2016, 9.4.1.4
-    capability_info uint16;
-
-    /// IEEE Std 802.11-2016, 9.4.2.56, 57
-    /// Rx MCS Bitmask in Supported MCS Set field represents the set of MCS
-    /// the peer can receive at from this device, considering this device's Tx capability.
-    has_ht_cap bool;
-    ht_cap ieee80211.HtCapabilities;
-    has_ht_op bool;
-    ht_op WlanHtOp;
-
-    /// IEEE Std 802.11-2016, 9.4.2.158, 159
-    has_vht_cap bool;
-    vht_cap ieee80211.VhtCapabilities;
-    has_vht_op bool;
-    vht_op WlanVhtOp;
-};

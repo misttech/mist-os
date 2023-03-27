@@ -10,7 +10,6 @@ use {
         disconnect::LocallyInitiated,
         error::Error,
     },
-    banjo_fuchsia_hardware_wlan_associnfo::*,
     banjo_fuchsia_wlan_common as banjo_common,
     banjo_fuchsia_wlan_ieee80211::*,
     banjo_fuchsia_wlan_softmac::WlanTxInfoFlags,
@@ -431,7 +430,7 @@ impl RemoteClient {
             },
         )?;
 
-        let mut rates_arr = [0; WLAN_MAC_MAX_RATES as usize];
+        let mut rates_arr = [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize];
         rates_arr[..rates.len()].copy_from_slice(rates);
 
         if let State::Associated { .. } = self.state.as_ref() {
@@ -439,7 +438,7 @@ impl RemoteClient {
             // idle timer.
             self.reset_bss_max_idle_timeout(ctx);
             ctx.device
-                .configure_assoc(WlanAssocCtx {
+                .configure_assoc(banjo_fuchsia_wlan_softmac::WlanAssociationConfig {
                     bssid: self.addr,
                     aid: aid,
                     listen_interval: 0, // This field is not used for AP.
@@ -463,14 +462,14 @@ impl RemoteClient {
                     ht_cap: HtCapabilities { bytes: Default::default() },
                     has_ht_op: false,
                     // Safe: This is not read by the driver.
-                    ht_op: unsafe { std::mem::zeroed::<WlanHtOp>() },
+                    ht_op: unsafe { std::mem::zeroed::<banjo_fuchsia_wlan_softmac::WlanHtOp>() },
 
                     has_vht_cap: false,
                     // This is not read by the driver.
                     vht_cap: VhtCapabilities { bytes: Default::default() },
                     has_vht_op: false,
                     // Safe: This is not read by the driver.
-                    vht_op: unsafe { std::mem::zeroed::<WlanVhtOp>() },
+                    vht_op: unsafe { std::mem::zeroed::<banjo_fuchsia_wlan_softmac::WlanVhtOp>() },
                 })
                 .map_err(|s| Error::Status(format!("failed to configure association"), s))?;
         }

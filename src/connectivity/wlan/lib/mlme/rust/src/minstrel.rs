@@ -5,7 +5,7 @@
 use {
     crate::probe_sequence::{ProbeEntry, ProbeSequence},
     banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
-    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as hw_wlan_softmac,
+    banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     fidl_fuchsia_wlan_minstrel as fidl_minstrel, fuchsia_zircon as zx,
     log::{debug, error},
     static_assertions::const_assert_eq,
@@ -130,20 +130,20 @@ struct Peer {
 }
 
 impl Peer {
-    fn from_assoc_ctx(assoc_ctx: &banjo_wlan_associnfo::WlanAssocCtx) -> Self {
+    fn from_assoc_cfg(assoc_cfg: &banjo_wlan_softmac::WlanAssociationConfig) -> Self {
         let mut peer = Self {
-            addr: assoc_ctx.bssid,
+            addr: assoc_cfg.bssid,
             num_pkt_until_next_probe: PROBE_INTERVAL - 1,
             ..Default::default()
         };
 
-        if assoc_ctx.has_ht_cap {
+        if assoc_cfg.has_ht_cap {
             // Safe unwrap: Fixed size array.
             const_assert_eq!(
                 std::mem::size_of::<HtCapabilities>(),
                 banjo_fuchsia_wlan_ieee80211::HT_CAP_LEN as usize,
             );
-            let mut ht_cap = HtCapabilities::read_from(&assoc_ctx.ht_cap.bytes[..]).unwrap();
+            let mut ht_cap = HtCapabilities::read_from(&assoc_cfg.ht_cap.bytes[..]).unwrap();
 
             // TODO(fxbug.dev/29488): SGI support suppressed. Remove these once they are supported.
             let mut cap_info = ht_cap.ht_cap_info;
@@ -159,9 +159,9 @@ impl Peer {
             }
         }
 
-        if assoc_ctx.rates_cnt > 0 {
+        if assoc_cfg.rates_cnt > 0 {
             peer.erp_rates =
-                peer.add_supported_erp(&assoc_ctx.rates[0..assoc_ctx.rates_cnt as usize]);
+                peer.add_supported_erp(&assoc_cfg.rates[0..assoc_cfg.rates_cnt as usize]);
             peer.highest_erp_rate = peer.erp_rates.iter().cloned().max();
         }
         debug!("tx_stats_map populated. size: {}", peer.tx_stats_map.len());
@@ -495,16 +495,16 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
         }
     }
 
-    pub fn add_peer(&mut self, assoc_ctx: &banjo_wlan_associnfo::WlanAssocCtx) {
-        if self.peer_map.contains_key(&assoc_ctx.bssid) {
-            error!("Attempted to add peer {:?} twice.", &assoc_ctx.bssid);
+    pub fn add_peer(&mut self, assoc_cfg: &banjo_wlan_softmac::WlanAssociationConfig) {
+        if self.peer_map.contains_key(&assoc_cfg.bssid) {
+            error!("Attempted to add peer {:?} twice.", &assoc_cfg.bssid);
         } else {
-            let mut peer = Peer::from_assoc_ctx(assoc_ctx);
+            let mut peer = Peer::from_assoc_cfg(assoc_cfg);
             if self.peer_map.is_empty() {
                 self.timer_manager.schedule(self.update_interval);
             }
             peer.update_stats();
-            self.peer_map.insert(assoc_ctx.bssid.clone(), peer);
+            self.peer_map.insert(assoc_cfg.bssid.clone(), peer);
         }
     }
 
@@ -557,7 +557,7 @@ impl<T: TimerManager> MinstrelRateSelector<T> {
             Some(peer) => {
                 if frame_control.is_data() {
                     let needs_reliability =
-                        (flags & hw_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0) != 0;
+                        (flags & banjo_wlan_softmac::WlanTxInfoFlags::FAVOR_RELIABILITY.0) != 0;
                     peer.get_tx_vector_idx(needs_reliability, &mut self.probe_sequence)
                 } else {
                     peer.best_erp_for_reliability
@@ -686,7 +686,7 @@ fn erp_idx_stats(tx_vector_idx: TxVecIdx, rate: SupportedRate) -> TxStats {
 mod tests {
     use {
         super::*,
-        crate::ddk_converter::build_ddk_assoc_ctx,
+        crate::ddk_converter::build_ddk_assoc_cfg,
         ieee80211::{Bssid, MacAddr},
         std::sync::{Arc, Mutex},
         wlan_common::{
@@ -725,7 +725,7 @@ mod tests {
     const RATES: [u8; 12] =
         [2, 4, 11, 22, 12 | BASIC_RATE_BIT, 18, 24, 36, 48, 72, 96, 108 | BASIC_RATE_BIT];
 
-    fn ht_assoc_ctx() -> banjo_wlan_associnfo::WlanAssocCtx {
+    fn ht_assoc_cfg() -> banjo_wlan_softmac::WlanAssociationConfig {
         let channel = banjo_common::WlanChannel {
             primary: 149,
             cbw: banjo_common::ChannelBandwidth::CBW40,
@@ -744,14 +744,14 @@ mod tests {
             ht_cap: Some(ht_cap),
             vht_cap: None,
         };
-        build_ddk_assoc_ctx(Bssid(TEST_MAC_ADDR), 42, channel, negotiated_capabilities, None, None)
+        build_ddk_assoc_cfg(Bssid(TEST_MAC_ADDR), 42, channel, negotiated_capabilities, None, None)
     }
 
     #[test]
-    fn peer_from_assoc_ctx() {
-        let assoc_ctx = ht_assoc_ctx();
-        let peer = Peer::from_assoc_ctx(&assoc_ctx);
-        assert_eq!(peer.addr, assoc_ctx.bssid);
+    fn peer_from_assoc_cfg() {
+        let assoc_cfg = ht_assoc_cfg();
+        let peer = Peer::from_assoc_cfg(&assoc_cfg);
+        assert_eq!(peer.addr, assoc_cfg.bssid);
         assert_eq!(peer.tx_stats_map.len(), 24);
         let mut peer_rates = peer
             .tx_stats_map
@@ -782,7 +782,7 @@ mod tests {
     fn add_peer() {
         let (mut minstrel, timer) = mock_minstrel();
         assert!(timer.lock().unwrap().is_none()); // No timer is scheduled.
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         assert!(timer.lock().unwrap().is_some()); // A timer is scheduled.
 
         let peers = minstrel.get_fidl_peers();
@@ -802,7 +802,7 @@ mod tests {
     #[test]
     fn remove_peer() {
         let (mut minstrel, timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         assert_eq!(minstrel.get_fidl_peers().addrs.len(), 1);
         assert!(timer.lock().unwrap().is_some()); // A timer is scheduled.
 
@@ -816,8 +816,8 @@ mod tests {
     #[test]
     fn remove_second_peer() {
         let (mut minstrel, timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
-        let mut peer2 = ht_assoc_ctx();
+        minstrel.add_peer(&ht_assoc_cfg());
+        let mut peer2 = ht_assoc_cfg();
         peer2.bssid = [11, 12, 13, 14, 15, 16];
         minstrel.add_peer(&peer2);
         assert_eq!(minstrel.get_fidl_peers().addrs.len(), 2);
@@ -859,7 +859,7 @@ mod tests {
         let tx_status = make_tx_status(vec![(16, 1), (15, 1), (14, 1), (13, 1)], true);
 
         let (mut minstrel, _timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         minstrel.handle_tx_status_report(&tx_status);
 
         // Stats are not updated until after the timer fires.
@@ -924,7 +924,7 @@ mod tests {
             make_tx_status(vec![(ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 1, 1)], true);
 
         let (mut minstrel, _timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         minstrel.handle_tx_status_report(&ht_tx_status_failed);
         minstrel.handle_tx_status_report(&ht_tx_status_success);
         minstrel.handle_tx_status_report(&erp_tx_status_success);
@@ -940,13 +940,13 @@ mod tests {
     #[test]
     fn add_missing_rates() {
         let (mut minstrel, _timer) = mock_minstrel();
-        let mut assoc_ctx = ht_assoc_ctx();
+        let mut assoc_cfg = ht_assoc_cfg();
         // Remove top rates 96 and 108 from the supported list.
         let reduced_supported_rates = vec![2, 4, 11, 22, 12, 18, 24, 36, 48, 72];
-        assoc_ctx.rates[0..reduced_supported_rates.len()]
+        assoc_cfg.rates[0..reduced_supported_rates.len()]
             .copy_from_slice(&reduced_supported_rates[..]);
-        assoc_ctx.rates_cnt = reduced_supported_rates.len() as u16;
-        minstrel.add_peer(&assoc_ctx);
+        assoc_cfg.rates_cnt = reduced_supported_rates.len() as u16;
+        minstrel.add_peer(&assoc_cfg);
 
         let rate_108 = ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 1; // ERP, CBW20, GI 800 ns
         let rate_72 = ERP_START_IDX + ERP_NUM_TX_VECTOR as u16 - 3;
@@ -991,7 +991,7 @@ mod tests {
     #[test]
     fn expected_probe_order() {
         let (mut minstrel, _timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
 
         // We do not expect to probe rate 16 since it's max throughput,
         // or probe rate 136 since it's the highest basic rate.
@@ -1006,7 +1006,7 @@ mod tests {
     #[test]
     fn skip_seen_probes() {
         let (mut minstrel, _timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         let tx_status = make_tx_status(vec![(16, 1), (15, 1), (14, 1)], true);
         minstrel.handle_tx_status_report(&tx_status);
         let tx_status = make_tx_status(vec![(13, 1)], true);
@@ -1036,7 +1036,7 @@ mod tests {
     #[test]
     fn dead_probe_cycle_count() {
         let (mut minstrel, _timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         let tx_status = make_tx_status(vec![(16, 1), (15, 1), (14, 1)], true);
         minstrel.handle_tx_status_report(&tx_status);
         minstrel.handle_timeout();
@@ -1065,7 +1065,7 @@ mod tests {
     #[test]
     fn max_slow_probe() {
         let (mut minstrel, _timer) = mock_minstrel();
-        minstrel.add_peer(&ht_assoc_ctx());
+        minstrel.add_peer(&ht_assoc_cfg());
         // Rate 16 is max_tp, max_probability, and 100% success rate.
         minstrel.handle_tx_status_report(&make_tx_status(vec![(16, 1)], true));
         minstrel.handle_timeout();

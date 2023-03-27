@@ -6,9 +6,9 @@
 #define SRC_CONNECTIVITY_WLAN_LIB_COMMON_CPP_INCLUDE_WLAN_COMMON_ELEMENT_H_
 
 #include <endian.h>
-#include <fuchsia/hardware/wlan/associnfo/c/banjo.h>
 #include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
+#include <fuchsia/wlan/softmac/c/banjo.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>

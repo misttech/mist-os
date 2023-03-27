@@ -331,7 +331,7 @@ void WlanSoftmacDevice::ConfigureAssoc(ConfigureAssocRequestView request, fdf::A
     return;
   }
   CHECK_DELETE_IN_PROGRESS_WITH_ERRSYNTAX(mvmvif_);
-  zx_status_t status = mac_configure_assoc(mvmvif_, &request->assoc_ctx);
+  zx_status_t status = mac_configure_assoc(mvmvif_, &request->assoc_cfg);
   if (status != ZX_OK) {
     IWL_ERR(this, "failed mac configure assoc: %s", zx_status_get_string(status));
     completer.buffer(arena).ReplyError(status);

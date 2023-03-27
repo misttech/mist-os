@@ -185,8 +185,8 @@ zx_status_t WlanSoftmacHandle::Init() {
       },
       .set_link_status = [](void* device,
                             uint8_t status) { return DEVICE(device)->SetStatus(status); },
-      .configure_assoc = [](void* device, wlan_assoc_ctx_t* assoc_ctx) -> zx_status_t {
-        return DEVICE(device)->ConfigureAssoc(assoc_ctx);
+      .configure_assoc = [](void* device, wlan_association_config_t* assoc_cfg) -> zx_status_t {
+        return DEVICE(device)->ConfigureAssoc(assoc_cfg);
       },
       .clear_assoc = [](void* device, const uint8_t(*addr)[6]) -> zx_status_t {
         return DEVICE(device)->ClearAssoc(*addr);
@@ -924,7 +924,7 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
   return result.status();
 }
 
-zx_status_t Device::ConfigureAssoc(wlan_assoc_ctx_t* assoc_ctx) {
+zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     errorf("Arena creation failed: %s", arena.status_string());
@@ -932,13 +932,13 @@ zx_status_t Device::ConfigureAssoc(wlan_assoc_ctx_t* assoc_ctx) {
   }
 
   zx_status_t status = ZX_OK;
-  fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx fidl_assoc_ctx;
-  if ((status = ConvertAssocCtx(*assoc_ctx, &fidl_assoc_ctx)) != ZX_OK) {
-    errorf("WlanAssocCtx conversion failed: %s", zx_status_get_string(status));
+  fuchsia_wlan_softmac::wire::WlanAssociationConfig fidl_assoc_cfg;
+  if ((status = ConvertAssocCtx(*assoc_cfg, &fidl_assoc_cfg)) != ZX_OK) {
+    errorf("WlanAssociationConfig conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
-  auto result = client_.sync().buffer(*std::move(arena))->ConfigureAssoc(fidl_assoc_ctx);
+  auto result = client_.sync().buffer(*std::move(arena))->ConfigureAssoc(fidl_assoc_cfg);
   if (!result.ok()) {
     errorf("ConfigureAssoc failed (FIDL error %s)", result.status_string());
     return result.status();

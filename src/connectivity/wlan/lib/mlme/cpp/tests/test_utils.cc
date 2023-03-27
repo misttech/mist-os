@@ -12,8 +12,8 @@
 namespace wlan {
 namespace test_utils {
 
-wlan_assoc_ctx_t FakeDdkAssocCtx() {
-  return wlan_assoc_ctx_t{
+wlan_association_config_t FakeDdkAssocCtx() {
+  return wlan_association_config_t{
       .has_ht_cap = true,
       .ht_cap =
           ht_capabilities_t{

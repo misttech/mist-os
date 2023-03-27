@@ -25,15 +25,15 @@ pub fn ddk_channel_from_fidl(fc: fidl_common::WlanChannel) -> banjo_common::Wlan
     banjo_common::WlanChannel { primary: fc.primary, cbw, secondary80: fc.secondary80 }
 }
 
-pub fn build_ddk_assoc_ctx(
+pub fn build_ddk_assoc_cfg(
     bssid: Bssid,
     aid: Aid,
     channel: banjo_common::WlanChannel,
     negotiated_capabilities: StaCapabilities,
     ht_op: Option<[u8; fidl_ieee80211::HT_OP_LEN as usize]>,
     vht_op: Option<[u8; fidl_ieee80211::VHT_OP_LEN as usize]>,
-) -> banjo_wlan_associnfo::WlanAssocCtx {
-    let mut rates = [0; banjo_wlan_associnfo::WLAN_MAC_MAX_RATES as usize];
+) -> banjo_wlan_softmac::WlanAssociationConfig {
+    let mut rates = [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize];
     rates[..negotiated_capabilities.rates.len()]
         .clone_from_slice(negotiated_capabilities.rates.as_bytes());
     let has_ht_cap = negotiated_capabilities.ht_cap.is_some();
@@ -50,7 +50,7 @@ pub fn build_ddk_assoc_ctx(
     });
     let ht_op_bytes = ht_op.unwrap_or([0; fidl_ieee80211::HT_OP_LEN as usize]);
     let vht_op_bytes = vht_op.unwrap_or([0; fidl_ieee80211::VHT_OP_LEN as usize]);
-    banjo_wlan_associnfo::WlanAssocCtx {
+    banjo_wlan_softmac::WlanAssociationConfig {
         bssid: bssid.0,
         aid,
         // In the association request we sent out earlier, listen_interval is always set to 0,
@@ -251,8 +251,8 @@ mod tests {
     };
 
     #[test]
-    fn assoc_ctx_construction_successful() {
-        let ddk = build_ddk_assoc_ctx(
+    fn assoc_cfg_construction_successful() {
+        let ddk = build_ddk_assoc_cfg(
             Bssid([1, 2, 3, 4, 5, 6]),
             42,
             banjo_common::WlanChannel {
@@ -295,7 +295,7 @@ mod tests {
         assert_eq!(&ie::fake_ht_capabilities().as_bytes()[..], &ddk.ht_cap.bytes[..]);
 
         assert_eq!(true, ddk.has_ht_op);
-        let expected_ht_op: banjo_wlan_associnfo::WlanHtOp = ie::fake_ht_operation().into();
+        let expected_ht_op: banjo_wlan_softmac::WlanHtOp = ie::fake_ht_operation().into();
         assert_eq!(expected_ht_op, ddk.ht_op);
 
         assert_eq!(true, ddk.has_vht_cap);
@@ -303,7 +303,7 @@ mod tests {
         assert_eq!(expected_vht_cap, ddk.vht_cap);
 
         assert_eq!(true, ddk.has_vht_op);
-        let expected_vht_op: banjo_wlan_associnfo::WlanVhtOp = ie::fake_vht_operation().into();
+        let expected_vht_op: banjo_wlan_softmac::WlanVhtOp = ie::fake_vht_operation().into();
         assert_eq!(expected_vht_op, ddk.vht_op);
     }
 

@@ -475,7 +475,7 @@ zx_status_t mac_configure_beacon(void* ctx,
 //
 zx_status_t mac_configure_assoc(
     struct iwl_mvm_vif* mvmvif,
-    const fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx* assoc_ctx) {
+    const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg) {
   zx_status_t ret = ZX_OK;
   IWL_INFO(ctx, "Associating ...\n");
 
@@ -489,8 +489,8 @@ zx_status_t mac_configure_assoc(
   }
 
   // Save band info into interface struct for future usage.
-  mvmvif->phy_ctxt->band = iwl_mvm_get_channel_band(assoc_ctx->channel.primary);
-  switch (assoc_ctx->channel.cbw) {
+  mvmvif->phy_ctxt->band = iwl_mvm_get_channel_band(assoc_cfg->channel.primary);
+  switch (assoc_cfg->channel.cbw) {
     case fuchsia_wlan_common::ChannelBandwidth::kCbw20:
       mvm_sta->bw = CHANNEL_BANDWIDTH_CBW20;
       break;
@@ -514,13 +514,13 @@ zx_status_t mac_configure_assoc(
       return ZX_ERR_INVALID_ARGS;
   }
   // Record the intersection of AP and station supported rate to mvm_sta.
-  ZX_ASSERT(assoc_ctx->rates_cnt <= sizeof(mvm_sta->supp_rates));
-  memcpy(mvm_sta->supp_rates, assoc_ctx->rates.data(), assoc_ctx->rates_cnt);
+  ZX_ASSERT(assoc_cfg->rates_cnt <= sizeof(mvm_sta->supp_rates));
+  memcpy(mvm_sta->supp_rates, assoc_cfg->rates.data(), assoc_cfg->rates_cnt);
 
-  // Copy HT related fields from fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx.
-  mvm_sta->support_ht = assoc_ctx->has_ht_cap;
-  if (assoc_ctx->has_ht_cap) {
-    memcpy(&mvm_sta->ht_cap, assoc_ctx->ht_cap.bytes.data(), sizeof(ht_capabilities_t));
+  // Copy HT related fields from fuchsia_wlan_softmac::wire::WlanAssociationConfig.
+  mvm_sta->support_ht = assoc_cfg->has_ht_cap;
+  if (assoc_cfg->has_ht_cap) {
+    memcpy(&mvm_sta->ht_cap, assoc_cfg->ht_cap.bytes.data(), sizeof(ht_capabilities_t));
   }
 
   // Change the station states step by step.
@@ -547,7 +547,7 @@ zx_status_t mac_configure_assoc(
 
     // Update the MAC context in the firmware.
     mvmvif->bss_conf.assoc = true;
-    mvmvif->bss_conf.listen_interval = assoc_ctx->listen_interval;
+    mvmvif->bss_conf.listen_interval = assoc_cfg->listen_interval;
     ret = iwl_mvm_mac_ctxt_changed(mvmvif, false, NULL);
     if (ret != ZX_OK) {
       IWL_ERR(mvmvif, "cannot update MAC context in the firmware: %s\n", zx_status_get_string(ret));

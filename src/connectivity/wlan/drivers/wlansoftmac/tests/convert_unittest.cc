@@ -661,8 +661,8 @@ void VerifyWlanWmmAcParams(wlan_associnfo::WlanWmmAcParams& in) {
 }
 
 TEST(ConvertTest, ToFidlAssocCtx) {
-  // Populate wlan_assoc_ctx_t
-  wlan_assoc_ctx_t in = {
+  // Populate wlan_association_config_t
+  wlan_association_config_t in = {
       .aid = kRandomPopulaterUint16,
       .listen_interval = kRandomPopulaterUint16,
       .channel =
@@ -748,7 +748,7 @@ TEST(ConvertTest, ToFidlAssocCtx) {
   }
 
   // Conduct the conversion
-  wlan_associnfo::WlanAssocCtx out;
+  fuchsia_wlan_softmac::wire::WlanAssociationConfig out;
   EXPECT_EQ(ZX_OK, ConvertAssocCtx(in, &out));
 
   // Verify outputs

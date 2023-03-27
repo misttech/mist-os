@@ -52,8 +52,8 @@ void ConvertPassiveScanArgs(const wlan_softmac_start_passive_scan_request_t& in,
 void ConvertActiveScanArgs(const wlan_softmac_start_active_scan_request_t& in,
                            fuchsia_wlan_softmac::wire::WlanSoftmacStartActiveScanRequest* out,
                            fidl::AnyArena& arena);
-zx_status_t ConvertAssocCtx(const wlan_assoc_ctx_t& in,
-                            fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx* out);
+zx_status_t ConvertAssocCtx(const wlan_association_config_t& in,
+                            fuchsia_wlan_softmac::wire::WlanAssociationConfig* out);
 
 }  // namespace wlan
 

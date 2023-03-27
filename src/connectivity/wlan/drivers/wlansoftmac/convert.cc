@@ -631,22 +631,22 @@ void ConvertWmmAcParams(const wlan_wmm_ac_params_t& in,
   out->acm = in.acm;
 }
 
-void ConvertHtOp(const wlan_ht_op_t& in, fuchsia_hardware_wlan_associnfo::wire::WlanHtOp* out) {
+void ConvertHtOp(const wlan_ht_op_t& in, fuchsia_wlan_softmac::wire::WlanHtOp* out) {
   out->primary_channel = in.primary_channel;
   out->head = in.head;
   out->tail = in.tail;
   memcpy(out->mcs_set.begin(), &in.mcs_set[0], 16);
 }
 
-void ConvertVhtOp(const wlan_vht_op_t& in, fuchsia_hardware_wlan_associnfo::wire::WlanVhtOp* out) {
+void ConvertVhtOp(const wlan_vht_op_t& in, fuchsia_wlan_softmac::wire::WlanVhtOp* out) {
   out->vht_cbw = in.vht_cbw;
   out->center_freq_seg0 = in.center_freq_seg0;
   out->center_freq_seg1 = in.center_freq_seg1;
   out->basic_mcs = in.basic_mcs;
 }
 
-zx_status_t ConvertAssocCtx(const wlan_assoc_ctx_t& in,
-                            fuchsia_hardware_wlan_associnfo::wire::WlanAssocCtx* out) {
+zx_status_t ConvertAssocCtx(const wlan_association_config_t& in,
+                            fuchsia_wlan_softmac::wire::WlanAssociationConfig* out) {
   memcpy(out->bssid.begin(), &in.bssid[0], fuchsia::wlan::ieee80211::MAC_ADDR_LEN);
   out->aid = in.aid;
   out->listen_interval = in.listen_interval;

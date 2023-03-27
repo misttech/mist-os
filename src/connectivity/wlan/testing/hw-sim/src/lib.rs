@@ -178,7 +178,7 @@ pub fn send_association_response(
             },
         },
         ies: {
-            // These rates will be captured in assoc_ctx to initialize Minstrel. 11b rates are
+            // These rates will be captured in assoc_cfg to initialize Minstrel. 11b rates are
             // ignored.
             // tx_vec_idx:        _     _     _   129   130     _   131   132
             supported_rates: &[0x82, 0x84, 0x8b, 0x0c, 0x12, 0x96, 0x18, 0x24],

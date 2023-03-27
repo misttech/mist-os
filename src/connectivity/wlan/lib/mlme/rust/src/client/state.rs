@@ -326,7 +326,7 @@ impl Associating {
                 return Err(());
             }
         };
-        let assoc_ctx = ddk::build_ddk_assoc_ctx(
+        let assoc_cfg = ddk::build_ddk_assoc_cfg(
             sta.sta.bssid(),
             assoc_resp_hdr.aid,
             main_channel,
@@ -340,9 +340,9 @@ impl Associating {
         //
         // Aruba / Ubiquiti are confirmed to be compatible with QoS field for the
         // BlockAck session, independently of 40MHz operation.
-        let qos = assoc_ctx.qos.into();
+        let qos = assoc_cfg.qos.into();
 
-        if let Err(status) = sta.ctx.device.configure_assoc(assoc_ctx) {
+        if let Err(status) = sta.ctx.device.configure_assoc(assoc_cfg) {
             // Device cannot handle this association. Something is seriously wrong.
             error!("device failed to configure association: {}", status);
             sta.send_connect_conf_failure(fidl_ieee80211::StatusCode::RefusedReasonUnspecified);
@@ -1486,8 +1486,8 @@ mod tests {
         }
     }
 
-    fn fake_ddk_assoc_ctx() -> banjo_wlan_associnfo::WlanAssocCtx {
-        ddk::build_ddk_assoc_ctx(
+    fn fake_ddk_assoc_cfg() -> banjo_wlan_softmac::WlanAssociationConfig {
+        ddk::build_ddk_assoc_cfg(
             BSSID,
             42,
             banjo_common::WlanChannel {
@@ -1733,19 +1733,19 @@ mod tests {
 
         // Verify association context is set
         assert_eq!(m.fake_device.assocs.len(), 1);
-        let assoc_ctx = m.fake_device.assocs.get(&BSSID.0).expect("expect assoc ctx to be set");
-        assert_eq!(assoc_ctx.aid, 42);
-        assert_eq!(assoc_ctx.qos, true);
-        assert_eq!(assoc_ctx.rates_cnt, 12);
+        let assoc_cfg = m.fake_device.assocs.get(&BSSID.0).expect("expect assoc ctx to be set");
+        assert_eq!(assoc_cfg.aid, 42);
+        assert_eq!(assoc_cfg.qos, true);
+        assert_eq!(assoc_cfg.rates_cnt, 12);
         assert_eq!(
-            assoc_ctx.rates[..12],
+            assoc_cfg.rates[..12],
             [0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c]
         );
-        assert_eq!(assoc_ctx.capability_info, 2);
-        assert!(assoc_ctx.has_ht_cap);
-        assert!(assoc_ctx.has_vht_cap);
-        assert!(assoc_ctx.has_ht_op);
-        assert!(assoc_ctx.has_vht_op);
+        assert_eq!(assoc_cfg.capability_info, 2);
+        assert!(assoc_cfg.has_ht_cap);
+        assert!(assoc_cfg.has_vht_cap);
+        assert!(assoc_cfg.has_ht_op);
+        assert!(assoc_cfg.has_vht_op);
 
         // Verify MLME-CONNECT.confirm message was sent.
         let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");
@@ -1936,11 +1936,11 @@ mod tests {
         let mut state = Associated(empty_association(&mut sta));
 
         assert!(m.fake_device.join_bss_request.is_some());
-        // ddk_assoc_ctx will be cleared when MLME receives deauth frame.
+        // ddk_assoc_cfg will be cleared when MLME receives deauth frame.
         sta.ctx
             .device
-            .configure_assoc(fake_ddk_assoc_ctx())
-            .expect("valid assoc_ctx should succeed");
+            .configure_assoc(fake_ddk_assoc_cfg())
+            .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device.assocs.len());
 
         sta.ctx.device.set_eth_link_up().expect("should succeed");
@@ -1980,11 +1980,11 @@ mod tests {
 
         assert!(m.fake_device.join_bss_request.is_some());
         state.0.controlled_port_open = true;
-        // ddk_assoc_ctx must be cleared when MLME receives disassociation frame later.
+        // ddk_assoc_cfg must be cleared when MLME receives disassociation frame later.
         sta.ctx
             .device
-            .configure_assoc(fake_ddk_assoc_ctx())
-            .expect("valid assoc_ctx should succeed");
+            .configure_assoc(fake_ddk_assoc_cfg())
+            .expect("valid assoc_cfg should succeed");
         assert_eq!(1, m.fake_device.assocs.len());
 
         sta.ctx.device.set_eth_link_up().expect("should succeed");
@@ -3287,7 +3287,7 @@ mod tests {
         })));
         sta.ctx
             .device
-            .configure_assoc(fake_ddk_assoc_ctx())
+            .configure_assoc(fake_ddk_assoc_cfg())
             .expect("valid assoc ctx should not fail");
         assert_eq!(1, m.fake_device.assocs.len());
 
