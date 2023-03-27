@@ -1316,6 +1316,10 @@
 
                 // Causes some other wait tests to fail.
                 "WaitTest.TraceeWALL",
+
+                // Fails in updated image, but passes with current. Will be removed after rolling
+                // new images.
+                "RlimitTest.SetRlimitHigher",
             ],
         },
     ],
