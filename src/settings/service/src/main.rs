@@ -12,7 +12,6 @@ use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_fs::OpenFlags;
 use fuchsia_inspect::{self as inspect, component};
-use fuchsia_syslog::{self as syslog};
 use futures::lock::Mutex;
 use lazy_static::lazy_static;
 use settings::base::get_default_interfaces;
@@ -41,10 +40,10 @@ lazy_static! {
         Arc::new(Mutex::new(ListenerInspectLogger::new()));
 }
 
+#[fuchsia::main(logging_tags = ["setui-service"])]
 fn main() -> Result<(), Error> {
     let executor = fasync::LocalExecutor::new();
 
-    syslog::init_with_tags(&["setui-service"]).expect("Can't init logger");
     tracing::info!("Starting setui-service...");
 
     // Serve stats about inspect in a lazy node.
