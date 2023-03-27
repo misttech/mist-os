@@ -8,12 +8,11 @@ use crate::{
     identity::ComponentIdentity,
     inspect::collector::{self as collector, InspectData},
 };
-use diagnostics_data as schema;
+use diagnostics_data::{self as schema, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_inspect::TreeProxy;
 use fidl_fuchsia_io as fio;
-use flyweights::FlyStr;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_fs;
 use fuchsia_inspect::reader::snapshot::{Snapshot, SnapshotTree};
@@ -30,9 +29,9 @@ use std::{
 };
 use tracing::warn;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum InspectHandle {
-    Tree(TreeProxy),
+    Tree(TreeProxy, Option<InspectHandleName>),
     Directory(fio::DirectoryProxy),
 }
 
@@ -40,13 +39,13 @@ impl InspectHandle {
     pub fn is_closed(&self) -> bool {
         match self {
             Self::Directory(proxy) => proxy.as_channel().is_closed(),
-            Self::Tree(proxy) => proxy.as_channel().is_closed(),
+            Self::Tree(proxy, _) => proxy.as_channel().is_closed(),
         }
     }
 
     pub async fn on_closed(&self) -> Result<zx::Signals, zx::Status> {
         match self {
-            Self::Tree(proxy) => proxy.on_closed().await,
+            Self::Tree(proxy, _) => proxy.on_closed().await,
             Self::Directory(proxy) => proxy.on_closed().await,
         }
     }
@@ -56,10 +55,18 @@ impl InspectHandle {
             Self::Directory(proxy) => {
                 proxy.as_channel().as_handle_ref().get_koid().expect("DirectoryProxy has koid")
             }
-            Self::Tree(proxy) => {
+            Self::Tree(proxy, _) => {
                 proxy.as_channel().as_handle_ref().get_koid().expect("TreeProxy has koid")
             }
         }
+    }
+
+    pub fn from_named_tree_proxy(proxy: TreeProxy, name: Option<String>) -> Self {
+        InspectHandle::Tree(proxy, name.map(InspectHandleName::name))
+    }
+
+    pub fn is_tree(&self) -> bool {
+        matches!(self, Self::Tree(_, _))
     }
 }
 
@@ -71,7 +78,7 @@ impl From<fio::DirectoryProxy> for InspectHandle {
 
 impl From<TreeProxy> for InspectHandle {
     fn from(proxy: TreeProxy) -> Self {
-        InspectHandle::Tree(proxy)
+        InspectHandle::Tree(proxy, None)
     }
 }
 
@@ -134,7 +141,7 @@ impl InspectArtifactsContainer {
         }
 
         // we know there is at least 1
-        let (_koid, handle) = self.inspect_handles.iter().next().unwrap();
+        let handle = self.inspect_handles.values().next().unwrap();
 
         match handle.as_ref() {
             // there can only be one Directory, semantically
@@ -142,15 +149,22 @@ impl InspectArtifactsContainer {
                 fuchsia_fs::directory::clone_no_describe(dir, None).ok().map(|directory| {
                     UnpopulatedInspectDataContainer {
                         identity: Arc::clone(identity),
-                        component_diagnostics_proxy: directory,
+                        inspect_handles: vec![directory.into()],
                         inspect_matcher: matcher,
                     }
                 })
             }
 
-            InspectHandle::Tree(_tree) => {
-                todo!("TODO(fxbug.dev/93344): We can't read from Trees published by InspectSink.")
-            }
+            InspectHandle::Tree(_, _) => Some(UnpopulatedInspectDataContainer {
+                identity: Arc::clone(identity),
+                inspect_matcher: matcher,
+                inspect_handles: self
+                    .inspect_handles
+                    .values()
+                    .filter(|handle| handle.as_ref().is_tree())
+                    .map(|handle| handle.as_ref().clone())
+                    .collect::<Vec<InspectHandle>>(),
+            }),
 
             _ => None,
         }
@@ -185,7 +199,6 @@ impl InspectArtifactsContainer {
 }
 
 lazy_static! {
-    static ref NO_FILE_SUCCEEDED: FlyStr = FlyStr::new("NO_FILE_SUCCEEDED");
     static ref TIMEOUT_MESSAGE: &'static str =
         "Exceeded per-component time limit for fetching diagnostics data";
 }
@@ -201,8 +214,8 @@ pub enum ReadSnapshot {
 /// populate a diagnostics schema for that snapshot.
 #[derive(Debug)]
 pub struct SnapshotData {
-    /// Name of the file that created this snapshot.
-    pub filename: FlyStr,
+    /// Optional name of the file or InspectSink proxy that created this snapshot.
+    pub name: Option<InspectHandleName>,
     /// Timestamp at which this snapshot resolved or failed.
     pub timestamp: zx::Time,
     /// Errors encountered when processing this snapshot.
@@ -214,7 +227,7 @@ pub struct SnapshotData {
 
 impl SnapshotData {
     async fn new(
-        filename: FlyStr,
+        name: Option<InspectHandleName>,
         data: InspectData,
         lazy_child_timeout: zx::Duration,
         identity: &ComponentIdentity,
@@ -230,7 +243,14 @@ impl SnapshotData {
             "parent_trace_id" => u64::from(parent_trace_id),
             "trace_id" => u64::from(trace_id),
             "moniker" => identity.to_string().as_ref(),
-            "filename" => filename.as_ref()
+            "filename" => name
+                    .as_ref()
+                    .and_then(InspectHandleName::as_filename)
+                    .unwrap_or(""),
+            "name" => name
+                    .as_ref()
+                    .and_then(InspectHandleName::as_name)
+                    .unwrap_or("")
         );
         match data {
             InspectData::Tree(tree) => {
@@ -238,46 +258,44 @@ impl SnapshotData {
                     Duration::from_nanos(lazy_child_timeout.into_nanos() as u64);
                 match SnapshotTree::try_from_with_timeout(&tree, lazy_child_timeout).await {
                     Ok(snapshot_tree) => {
-                        SnapshotData::successful(ReadSnapshot::Tree(snapshot_tree), filename)
+                        SnapshotData::successful(ReadSnapshot::Tree(snapshot_tree), name)
                     }
                     Err(e) => SnapshotData::failed(
                         schema::InspectError { message: format!("{e:?}") },
-                        filename,
+                        name,
                     ),
                 }
             }
             InspectData::DeprecatedFidl(inspect_proxy) => {
                 match deprecated_inspect::load_hierarchy(inspect_proxy).await {
                     Ok(hierarchy) => {
-                        SnapshotData::successful(ReadSnapshot::Finished(hierarchy), filename)
+                        SnapshotData::successful(ReadSnapshot::Finished(hierarchy), name)
                     }
                     Err(e) => SnapshotData::failed(
                         schema::InspectError { message: format!("{e:?}") },
-                        filename,
+                        name,
                     ),
                 }
             }
             InspectData::Vmo(vmo) => match Snapshot::try_from(&vmo) {
-                Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), filename),
-                Err(e) => SnapshotData::failed(
-                    schema::InspectError { message: format!("{e:?}") },
-                    filename,
-                ),
+                Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), name),
+                Err(e) => {
+                    SnapshotData::failed(schema::InspectError { message: format!("{e:?}") }, name)
+                }
             },
             InspectData::File(contents) => match Snapshot::try_from(contents) {
-                Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), filename),
-                Err(e) => SnapshotData::failed(
-                    schema::InspectError { message: format!("{e:?}") },
-                    filename,
-                ),
+                Ok(snapshot) => SnapshotData::successful(ReadSnapshot::Single(snapshot), name),
+                Err(e) => {
+                    SnapshotData::failed(schema::InspectError { message: format!("{e:?}") }, name)
+                }
             },
         }
     }
 
     // Constructs packet that timestamps and packages inspect snapshot for exfiltration.
-    fn successful(snapshot: ReadSnapshot, filename: FlyStr) -> SnapshotData {
+    fn successful(snapshot: ReadSnapshot, name: Option<InspectHandleName>) -> SnapshotData {
         SnapshotData {
-            filename,
+            name,
             timestamp: fasync::Time::now().into_zx(),
             errors: Vec::new(),
             snapshot: Some(snapshot),
@@ -285,9 +303,9 @@ impl SnapshotData {
     }
 
     // Constructs packet that timestamps and packages inspect snapshot failure for exfiltration.
-    fn failed(error: schema::InspectError, filename: FlyStr) -> SnapshotData {
+    fn failed(error: schema::InspectError, name: Option<InspectHandleName>) -> SnapshotData {
         SnapshotData {
-            filename,
+            name,
             timestamp: fasync::Time::now().into_zx(),
             errors: vec![error],
             snapshot: None,
@@ -313,7 +331,7 @@ pub struct PopulatedInspectDataContainer {
 
 enum Status {
     Begin,
-    Pending(VecDeque<(FlyStr, InspectData)>),
+    Pending(VecDeque<(Option<InspectHandleName>, InspectData)>),
 }
 
 struct State {
@@ -327,7 +345,11 @@ struct State {
 }
 
 impl State {
-    fn into_pending(self, pending: VecDeque<(FlyStr, InspectData)>, start_time: zx::Time) -> Self {
+    fn into_pending(
+        self,
+        pending: VecDeque<(Option<InspectHandleName>, InspectData)>,
+        start_time: zx::Time,
+    ) -> Self {
         Self {
             unpopulated: self.unpopulated,
             status: Status::Pending(pending),
@@ -351,8 +373,7 @@ impl State {
             match &mut self.status {
                 Status::Begin => {
                     let data_map =
-                        collector::populate_data_map(&self.unpopulated.component_diagnostics_proxy)
-                            .await;
+                        collector::populate_data_map(&self.unpopulated.inspect_handles).await;
                     self = self
                         .into_pending(data_map.into_iter().collect::<VecDeque<_>>(), start_time);
                 }
@@ -366,9 +387,9 @@ impl State {
                             .await;
                         return None;
                     }
-                    Some((filename, data)) => {
+                    Some((name, data)) => {
                         let snapshot = SnapshotData::new(
-                            filename,
+                            name,
                             data,
                             self.batch_timeout.unwrap_or(zx::Duration::from_seconds(
                                 constants::PER_COMPONENT_ASYNC_TIMEOUT_SECONDS,
@@ -397,9 +418,9 @@ impl State {
 #[derive(Debug)]
 pub struct UnpopulatedInspectDataContainer {
     pub identity: Arc<ComponentIdentity>,
-    /// DirectoryProxy for the out directory that this
-    /// data packet is configured for.
-    pub component_diagnostics_proxy: fio::DirectoryProxy,
+    /// Proxies configured for container. It is an invariant that if any value is an
+    /// InspectHandle::Directory, then there is exactly one value.
+    pub inspect_handles: Vec<InspectHandle>,
     /// Optional hierarchy matcher. If unset, the reader is running
     /// in all-access mode, meaning no matching or filtering is required.
     pub inspect_matcher: Option<Arc<HierarchyMatcher>>,
@@ -458,7 +479,7 @@ impl UnpopulatedInspectDataContainer {
                             inspect_matcher: unpopulated_for_timeout.inspect_matcher.clone(),
                             snapshot: SnapshotData::failed(
                                 schema::InspectError { message: TIMEOUT_MESSAGE.to_string() },
-                                NO_FILE_SUCCEEDED.clone(),
+                                None,
                             ),
                         };
                         Some((
@@ -508,7 +529,7 @@ mod test {
 
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            component_diagnostics_proxy: directory,
+            inspect_handles: vec![directory.into()],
             inspect_matcher: None,
         };
         let mut stream = container.populate(
@@ -517,7 +538,7 @@ mod test {
             ftrace::Id::random(),
         );
         let res = stream.next().await.unwrap();
-        assert_eq!(res.snapshot.filename, *NO_FILE_SUCCEEDED);
+        assert_eq!(res.snapshot.name, None);
         assert_eq!(
             res.snapshot.errors,
             vec![schema::InspectError { message: TIMEOUT_MESSAGE.to_string() }]
@@ -531,7 +552,7 @@ mod test {
                 .unwrap();
         let container = UnpopulatedInspectDataContainer {
             identity: EMPTY_IDENTITY.clone(),
-            component_diagnostics_proxy: directory,
+            inspect_handles: vec![directory.into()],
             inspect_matcher: None,
         };
         let mut stream = container.populate(

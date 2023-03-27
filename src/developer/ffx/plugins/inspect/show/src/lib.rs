@@ -25,6 +25,7 @@ pub async fn show(
 #[cfg(test)]
 mod test {
     use super::*;
+    use diagnostics_data::InspectHandleName;
     use errors::ResultExt as _;
     use ffx_inspect_test_utils::{
         inspect_bridge_data, make_inspect, make_inspect_with_length, make_inspects,
@@ -67,7 +68,8 @@ mod test {
         let mut inspects = make_inspects();
         let mut inspect_with_file_name =
             make_inspect_with_length(String::from("test/moniker1"), 1, 20);
-        inspect_with_file_name.metadata.filename = String::from("fuchsia.inspect.Tree");
+        inspect_with_file_name.metadata.name =
+            Some(InspectHandleName::filename("fuchsia.inspect.Tree"));
         inspects.push(inspect_with_file_name.clone());
         let inspect_data =
             inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());
@@ -129,7 +131,8 @@ mod test {
         let mut inspects = make_inspects();
         let mut inspect_with_file_name =
             make_inspect_with_length(String::from("test/moniker1"), 1, 20);
-        inspect_with_file_name.metadata.filename = String::from("fuchsia.inspect.Tree");
+        inspect_with_file_name.metadata.name =
+            Some(InspectHandleName::filename("fuchsia.inspect.Tree"));
         inspects.push(inspect_with_file_name);
         let inspect_data =
             inspect_bridge_data(ClientSelectorConfiguration::SelectAll(true), inspects.clone());

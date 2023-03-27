@@ -9,10 +9,9 @@ use {
         inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer},
         moniker_rewriter::OutputRewriter,
     },
-    diagnostics_data::{self as schema, Data, Inspect},
+    diagnostics_data::{self as schema, Data, Inspect, InspectHandleName},
     diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher},
     fidl_fuchsia_diagnostics::{self, Selector},
-    flyweights::FlyStr,
     fuchsia_inspect::reader::PartialNodeHierarchy,
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::prelude::*,
@@ -34,7 +33,7 @@ use container::PopulatedInspectDataContainer;
 /// populate a diagnostics schema for that node hierarchy.
 pub struct NodeHierarchyData {
     // Name of the file that created this snapshot.
-    filename: FlyStr,
+    name: Option<InspectHandleName>,
     // Timestamp at which this snapshot resolved or failed.
     timestamp: zx::Time,
     // Errors encountered when processing this snapshot.
@@ -49,20 +48,20 @@ impl From<SnapshotData> for NodeHierarchyData {
         match data.snapshot {
             Some(snapshot) => match convert_snapshot_to_node_hierarchy(snapshot) {
                 Ok(node_hierarchy) => NodeHierarchyData {
-                    filename: data.filename,
+                    name: data.name,
                     timestamp: data.timestamp,
                     errors: data.errors,
                     hierarchy: Some(node_hierarchy),
                 },
                 Err(e) => NodeHierarchyData {
-                    filename: data.filename,
+                    name: data.name,
                     timestamp: data.timestamp,
                     errors: vec![schema::InspectError { message: format!("{e:?}") }],
                     hierarchy: None,
                 },
             },
             None => NodeHierarchyData {
-                filename: data.filename,
+                name: data.name,
                 timestamp: data.timestamp,
                 errors: data.errors,
                 hierarchy: None,
@@ -129,7 +128,7 @@ impl ReaderServer {
         moniker: &str,
         parent_trace_id: ftrace::Id,
     ) -> NodeHierarchyData {
-        let filename = snapshot_data.filename.clone();
+        let filename = snapshot_data.name.clone();
         let node_hierarchy_data = match static_matcher {
             // The only way we have a None value for the PopulatedDataContainer is
             // if there were no provided static selectors, which is only valid in
@@ -147,7 +146,14 @@ impl ReaderServer {
                     "parent_trace_id" => u64::from(parent_trace_id),
                     "trace_id" => u64::from(trace_id),
                     "moniker" => moniker,
-                    "filename" => filename.as_ref()
+                    "filename" => filename
+                            .as_ref()
+                            .and_then(InspectHandleName::as_filename)
+                            .unwrap_or(""),
+                    "name" => filename
+                            .as_ref()
+                            .and_then(InspectHandleName::as_name)
+                            .unwrap_or("")
                 );
                 snapshot_data.into()
             }
@@ -163,7 +169,14 @@ impl ReaderServer {
                         "parent_trace_id" => u64::from(parent_trace_id),
                         "trace_id" => u64::from(trace_id),
                         "moniker" => moniker,
-                        "filename" => filename.as_ref()
+                        "filename" => filename
+                                .as_ref()
+                                .and_then(InspectHandleName::as_filename)
+                                .unwrap_or(""),
+                        "name" => filename
+                                .as_ref()
+                                .and_then(InspectHandleName::as_name)
+                                .unwrap_or("")
                     );
                     snapshot_data.into()
                 };
@@ -180,7 +193,16 @@ impl ReaderServer {
                             "parent_trace_id" => u64::from(parent_trace_id),
                             "trace_id" => u64::from(trace_id),
                             "moniker" => moniker,
-                            "filename" => node_hierarchy_data.filename.as_ref(),
+                            "filename"  => node_hierarchy_data
+                                    .name
+                                    .as_ref()
+                                    .and_then(InspectHandleName::as_filename)
+                                    .unwrap_or(""),
+                            "name" => node_hierarchy_data
+                                    .name
+                                    .as_ref()
+                                    .and_then(InspectHandleName::as_name)
+                                    .unwrap_or(""),
                             "selector_type" => "static"
                         );
                         match diagnostics_hierarchy::filter_hierarchy(
@@ -188,13 +210,13 @@ impl ReaderServer {
                             &static_matcher,
                         ) {
                             Some(filtered_hierarchy) => NodeHierarchyData {
-                                filename: node_hierarchy_data.filename,
+                                name: node_hierarchy_data.name,
                                 timestamp: node_hierarchy_data.timestamp,
                                 errors: node_hierarchy_data.errors,
                                 hierarchy: Some(filtered_hierarchy),
                             },
                             None => NodeHierarchyData {
-                                filename: node_hierarchy_data.filename,
+                                name: node_hierarchy_data.name,
                                 timestamp: node_hierarchy_data.timestamp,
                                 errors: vec![schema::InspectError {
                                     message: concat!(
@@ -208,7 +230,7 @@ impl ReaderServer {
                         }
                     }
                     None => NodeHierarchyData {
-                        filename: node_hierarchy_data.filename,
+                        name: node_hierarchy_data.name,
                         timestamp: node_hierarchy_data.timestamp,
                         errors: node_hierarchy_data.errors,
                         hierarchy: None,
@@ -224,7 +246,7 @@ impl ReaderServer {
             // this component with the dynamically provided components.
             Some(dynamic_matcher) => match node_hierarchy_data.hierarchy {
                 None => NodeHierarchyData {
-                    filename: node_hierarchy_data.filename,
+                    name: node_hierarchy_data.name,
                     timestamp: node_hierarchy_data.timestamp,
                     errors: node_hierarchy_data.errors,
                     hierarchy: None,
@@ -240,19 +262,32 @@ impl ReaderServer {
                         "parent_trace_id" => u64::from(parent_trace_id),
                         "trace_id" => u64::from(trace_id),
                         "moniker" => moniker,
-                        "filename" => node_hierarchy_data.filename.as_ref(),
+                        "filename" => {
+                            node_hierarchy_data
+                                .name
+                                .as_ref()
+                                .and_then(InspectHandleName::as_filename)
+                                .unwrap_or("")
+                        },
+                        "name" => {
+                            node_hierarchy_data
+                                .name
+                                .as_ref()
+                                .and_then(InspectHandleName::as_name)
+                                .unwrap_or("")
+                        },
                         "selector_type" => "client"
                     );
                     match diagnostics_hierarchy::filter_hierarchy(node_hierarchy, &dynamic_matcher)
                     {
                         Some(filtered_hierarchy) => NodeHierarchyData {
-                            filename: node_hierarchy_data.filename,
+                            name: node_hierarchy_data.name,
                             timestamp: node_hierarchy_data.timestamp,
                             errors: node_hierarchy_data.errors,
                             hierarchy: Some(filtered_hierarchy),
                         },
                         None => NodeHierarchyData {
-                            filename: node_hierarchy_data.filename,
+                            name: node_hierarchy_data.name,
                             timestamp: node_hierarchy_data.timestamp,
                             errors: vec![schema::InspectError {
                                 message: concat!(
@@ -350,7 +385,7 @@ impl ReaderServer {
             hierarchy_data.hierarchy,
             hierarchy_data.timestamp.into_nanos(),
             identity.url.clone(),
-            hierarchy_data.filename,
+            hierarchy_data.name,
             hierarchy_data.errors,
         ))
     }
@@ -372,6 +407,7 @@ mod tests {
             inspect::repository::InspectRepository,
             pipeline::Pipeline,
         },
+        diagnostics_data::InspectHandleName,
         fidl::endpoints::{create_proxy_and_stream, DiscoverableProtocolMarker},
         fidl_fuchsia_diagnostics::{BatchIteratorMarker, BatchIteratorProxy, Format, StreamMode},
         fidl_fuchsia_inspect::TreeMarker,
@@ -433,7 +469,7 @@ mod tests {
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
-                    let extra = extra_data.get(&FlyStr::new(path));
+                    let extra = extra_data.get(&Some(InspectHandleName::filename(path)));
                     assert!(extra.is_some());
 
                     match extra.unwrap() {
@@ -501,7 +537,8 @@ mod tests {
                     .expect("collector missing data");
                 assert_eq!(1, extra_data.len());
 
-                let extra = extra_data.get(&FlyStr::new(TreeMarker::PROTOCOL_NAME));
+                let extra =
+                    extra_data.get(&Some(InspectHandleName::filename(TreeMarker::PROTOCOL_NAME)));
                 assert!(extra.is_some());
 
                 match extra.unwrap() {

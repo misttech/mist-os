@@ -168,26 +168,18 @@ pub async fn get_inspect_data(
             .await
             .context("snapshot did not return any inspect data")?
             .into_iter()
-            .filter_map(
-                |diagnostics_data::InspectData {
-                     data_source: _,
-                     metadata,
-                     moniker: _,
-                     payload,
-                     version: _,
-                 }| {
-                    if metadata.filename.starts_with(file_prefix) {
-                        Some(payload.ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "empty inspect payload, metadata errors: {:?}",
-                                metadata.errors
-                            )
-                        }))
-                    } else {
-                        None
-                    }
-                },
-            );
+            .filter_map(|inspect_data| {
+                if inspect_data.name().unwrap_or("").starts_with(file_prefix) {
+                    Some(inspect_data.payload.ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "empty inspect payload, metadata errors: {:?}",
+                            inspect_data.metadata.errors
+                        )
+                    }))
+                } else {
+                    None
+                }
+            });
         match data.next() {
             Some(datum) => {
                 let data: Vec<_> = data.collect();

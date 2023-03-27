@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
+    crate::inspect::container::InspectHandle,
+    diagnostics_data::InspectHandleName,
     fidl::endpoints::{DiscoverableProtocolMarker, Proxy},
     fidl_fuchsia_inspect::{TreeMarker, TreeProxy},
     fidl_fuchsia_inspect_deprecated::{InspectMarker, InspectProxy},
-    fidl_fuchsia_io as fio,
-    flyweights::FlyStr,
-    fuchsia_fs, fuchsia_zircon as zx,
+    fidl_fuchsia_io as fio, fuchsia_fs, fuchsia_zircon as zx,
     futures::stream::StreamExt,
     pin_utils::pin_mut,
     std::collections::HashMap,
@@ -20,7 +20,7 @@ use anyhow::Context as _;
 
 /// Mapping from a diagnostics filename to the underlying encoding of that
 /// diagnostics data.
-pub type DataMap = HashMap<FlyStr, InspectData>;
+pub type DataMap = HashMap<Option<InspectHandleName>, InspectData>;
 
 /// Data associated with a component.
 /// This data is stored by data collectors and passed by the collectors to processors.
@@ -58,9 +58,23 @@ fn maybe_load_service<P: DiscoverableProtocolMarker>(
     Ok(None)
 }
 
+pub async fn populate_data_map(inspect_handles: &[InspectHandle]) -> DataMap {
+    let mut data_map = DataMap::new();
+    for inspect_handle in inspect_handles {
+        match inspect_handle {
+            InspectHandle::Directory(ref dir) => return populate_data_map_from_dir(dir).await,
+            InspectHandle::Tree(proxy, ref name) => {
+                data_map.insert(name.clone(), InspectData::Tree(proxy.clone()));
+            }
+        }
+    }
+
+    data_map
+}
+
 /// Searches the directory specified by inspect_directory_proxy for
 /// .inspect files and populates the `inspect_data_map` with the found VMOs.
-pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
+async fn populate_data_map_from_dir(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
     // TODO(fxbug.dev/36762): Use a streaming and bounded readdir API when available to avoid
     // being hung.
     let entries = fuchsia_fs::directory::readdir_recursive(inspect_proxy, /* timeout= */ None)
@@ -77,12 +91,16 @@ pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
         // We are only currently interested in inspect VMO files (root.inspect) and
         // inspect services.
         if let Ok(Some(proxy)) = maybe_load_service::<TreeMarker>(inspect_proxy, &entry) {
-            data_map.insert(FlyStr::new(entry.name), InspectData::Tree(proxy));
+            data_map
+                .insert(Some(InspectHandleName::filename(entry.name)), InspectData::Tree(proxy));
             continue;
         }
 
         if let Ok(Some(proxy)) = maybe_load_service::<InspectMarker>(inspect_proxy, &entry) {
-            data_map.insert(FlyStr::new(entry.name), InspectData::DeprecatedFidl(proxy));
+            data_map.insert(
+                Some(InspectHandleName::filename(entry.name)),
+                InspectData::DeprecatedFidl(proxy),
+            );
             continue;
         }
 
@@ -137,7 +155,7 @@ pub async fn populate_data_map(inspect_proxy: &fio::DirectoryProxy) -> DataMap {
                 }
             }
         };
-        data_map.insert(FlyStr::new(entry.name), data);
+        data_map.insert(Some(InspectHandleName::filename(entry.name)), data);
     }
 
     data_map
@@ -156,15 +174,16 @@ pub async fn collect(path: &str) -> Result<DataMap, anyhow::Error> {
     let inspect_proxy = find_directory_proxy(path)
         .await
         .with_context(|| format!("Failed to open out directory at {path}"))?;
-    Ok(populate_data_map(&inspect_proxy).await)
+    Ok(populate_data_map(&[inspect_proxy.into()]).await)
 }
 
 #[cfg(test)]
 mod tests {
     use {
         super::*,
+        assert_matches::assert_matches,
         fdio,
-        fidl::endpoints::DiscoverableProtocolMarker,
+        fidl::endpoints::{create_request_stream, DiscoverableProtocolMarker},
         fidl_fuchsia_inspect::TreeMarker,
         fuchsia_async as fasync,
         fuchsia_component::server::ServiceFs,
@@ -172,12 +191,63 @@ mod tests {
         fuchsia_zircon as zx,
         fuchsia_zircon::Peered,
         futures::{FutureExt, StreamExt},
+        inspect_runtime::service::{spawn_tree_server, TreeServerSettings},
     };
 
     fn get_vmo(text: &[u8]) -> zx::Vmo {
         let vmo = zx::Vmo::create(4096).unwrap();
         vmo.write(text, 0).unwrap();
         vmo
+    }
+
+    #[fuchsia::test]
+    async fn populate_data_map_with_trees() {
+        let insp1 = Inspector::default();
+        let insp2 = Inspector::default();
+        let insp3 = Inspector::default();
+
+        insp1.root().record_int("one", 1);
+        insp2.root().record_int("two", 2);
+        insp3.root().record_int("three", 3);
+
+        let (tree1, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        spawn_tree_server(insp1, TreeServerSettings::default(), request_stream).detach();
+        let (tree2, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        spawn_tree_server(insp2, TreeServerSettings::default(), request_stream).detach();
+        let (tree3, request_stream) = create_request_stream::<TreeMarker>().unwrap();
+        spawn_tree_server(insp3, TreeServerSettings::default(), request_stream).detach();
+
+        let name1 = Some(InspectHandleName::name("tree1"));
+        let name2 = Some(InspectHandleName::name("tree2"));
+        let name3 = None;
+
+        let data = populate_data_map(&[
+            InspectHandle::Tree(tree1.into_proxy().unwrap(), name1.clone()),
+            InspectHandle::Tree(tree2.into_proxy().unwrap(), name2.clone()),
+            InspectHandle::Tree(tree3.into_proxy().unwrap(), name3.clone()),
+        ])
+        .await;
+
+        assert_eq!(data.len(), 3);
+
+        assert_matches!(data.get(&name1), Some(InspectData::Tree(t)) => {
+            let h = reader::read(t).await.unwrap();
+            assert_data_tree!(h, root: {
+                one: 1i64,
+            });
+        });
+        assert_matches!(data.get(&name2), Some(InspectData::Tree(t)) => {
+            let h = reader::read(t).await.unwrap();
+            assert_data_tree!(h, root: {
+                two: 2i64,
+            });
+        });
+        assert_matches!(data.get(&name3), Some(InspectData::Tree(t)) => {
+            let h = reader::read(t).await.unwrap();
+            assert_data_tree!(h, root: {
+                three: 3i64,
+            });
+        });
     }
 
     #[fuchsia::test]
@@ -217,7 +287,7 @@ mod tests {
                 assert_eq!(3, extra_data.len());
 
                 let assert_extra_data = |path: &str, content: &[u8]| {
-                    let extra = extra_data.get(&FlyStr::new(path));
+                    let extra = extra_data.get(&Some(InspectHandleName::filename(path)));
                     assert!(extra.is_some());
 
                     match extra.unwrap() {
@@ -284,7 +354,8 @@ mod tests {
                     collect(&format!("{path}/diagnostics")).await.expect("collector missing data");
                 assert_eq!(1, extra_data.len());
 
-                let extra = extra_data.get(&FlyStr::new(TreeMarker::PROTOCOL_NAME));
+                let extra =
+                    extra_data.get(&Some(InspectHandleName::filename(TreeMarker::PROTOCOL_NAME)));
                 assert!(extra.is_some());
 
                 match extra.unwrap() {

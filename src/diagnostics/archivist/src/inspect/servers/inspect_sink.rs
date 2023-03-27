@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::events::{
-    router::EventConsumer,
-    types::{Event, EventPayload, InspectSinkRequestedPayload},
+use crate::{
+    events::{
+        router::EventConsumer,
+        types::{Event, EventPayload, InspectSinkRequestedPayload},
+    },
+    identity::ComponentIdentity,
+    inspect::{container::InspectHandle, repository::InspectRepository},
 };
-use crate::identity::ComponentIdentity;
-use crate::inspect::repository::InspectRepository;
 use anyhow::Error;
 use async_lock::{Mutex, RwLock};
 use async_trait::async_trait;
@@ -72,10 +74,14 @@ impl InspectSinkServer {
         while let Some(Ok(request)) = stream.next().await {
             match request {
                 fdiagnostics::InspectSinkRequest::Publish {
-                    payload: fdiagnostics::InspectSinkPublishRequest { tree: Some(tree), .. },
+                    payload: fdiagnostics::InspectSinkPublishRequest { tree: Some(tree), name, .. },
                     ..
                 } => {
-                    repo.add_inspect_handle(Arc::clone(&component), tree.into_proxy()?).await;
+                    repo.add_inspect_handle(
+                        Arc::clone(&component),
+                        InspectHandle::from_named_tree_proxy(tree.into_proxy()?, name),
+                    )
+                    .await;
                 }
                 _ => continue,
             }
@@ -292,7 +298,7 @@ mod tests {
             async move {
                 assert_matches!(
                     &*handle,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            int: 0i64,
@@ -331,7 +337,7 @@ mod tests {
             async move {
                 assert_matches!(
                     &*handle1,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            int: 0i64,
@@ -340,7 +346,7 @@ mod tests {
 
                 assert_matches!(
                     &*handle2,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            double: 1.24,
@@ -370,7 +376,7 @@ mod tests {
             async move {
                 assert_matches!(
                     &*handle,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            int: 0i64,
@@ -389,7 +395,7 @@ mod tests {
             async move {
                 assert_matches!(
                     &*handle,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            int: 0i64,
@@ -429,7 +435,7 @@ mod tests {
             async move {
                 assert_matches!(
                     &*handle,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            int: 0i64,
@@ -445,7 +451,7 @@ mod tests {
             async move {
                 assert_matches!(
                     &*handle,
-                    InspectHandle::Tree(tree) => {
+                    InspectHandle::Tree(tree, _) => {
                        let hierarchy = read(tree).await.unwrap();
                        assert_json_diff!(hierarchy, root: {
                            is_insp2: true,

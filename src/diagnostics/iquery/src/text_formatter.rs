@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    diagnostics_data::InspectData,
+    diagnostics_data::{InspectData, InspectHandleName},
     diagnostics_hierarchy::{ArrayContent, DiagnosticsHierarchy, Property},
     nom::HexDisplay,
     num_traits::Bounded,
@@ -28,7 +28,18 @@ pub fn format_schema(schema: InspectData) -> String {
     if let Some(errors) = &schema.metadata.errors {
         result.push_str(&format!("    errors = {}\n", errors.join(", ")));
     }
-    result.push_str(&format!("    filename = {}\n", schema.metadata.filename));
+
+    if let Some(name) = schema.metadata.name {
+        match name {
+            InspectHandleName::Filename(f) => {
+                result.push_str(&format!("    filename = {}\n", f));
+            }
+            InspectHandleName::Name(n) => {
+                result.push_str(&format!("    name = {}\n", n));
+            }
+        }
+    }
+
     result.push_str(&format!(
         "    component_url = {}\n",
         schema.metadata.component_url.unwrap_or("null".to_string())

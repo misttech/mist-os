@@ -9,6 +9,7 @@
 
 use anyhow::format_err;
 use fidl_fuchsia_diagnostics::{DataType, Severity as FidlSeverity};
+use flyweights::FlyStr;
 use serde::{
     self,
     de::{DeserializeOwned, Deserializer},
@@ -37,6 +38,57 @@ pub use crate::logs_legacy::*;
 
 const SCHEMA_VERSION: u64 = 1;
 const MICROS_IN_SEC: u128 = 1000000;
+
+#[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Hash, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum InspectHandleName {
+    /// The name of an `InspectHandle`. This comes from the `name` argument
+    /// in `InspectSink`.
+    Name(FlyStr),
+
+    /// The name of the file source when reading a file source of Inspect
+    /// (eg an inspect VMO file or fuchsia.inspect.Tree in out/diagnostics)
+    Filename(FlyStr),
+}
+
+impl InspectHandleName {
+    /// Construct an InspectHandleName::Name
+    pub fn name(n: impl Into<FlyStr>) -> Self {
+        Self::Name(n.into())
+    }
+
+    /// Construct an InspectHandleName::Filename
+    pub fn filename(n: impl Into<FlyStr>) -> Self {
+        Self::Filename(n.into())
+    }
+
+    /// If variant is Name, get the underlying value.
+    pub fn as_name(&self) -> Option<&str> {
+        if let Self::Name(n) = self {
+            Some(n.as_str())
+        } else {
+            None
+        }
+    }
+
+    /// If variant is Filename, get the underlying value
+    pub fn as_filename(&self) -> Option<&str> {
+        if let Self::Filename(f) = self {
+            Some(f.as_str())
+        } else {
+            None
+        }
+    }
+}
+
+impl AsRef<str> for InspectHandleName {
+    fn as_ref(&self) -> &str {
+        match self {
+            Self::Filename(f) => f.as_str(),
+            Self::Name(n) => n.as_str(),
+        }
+    }
+}
 
 /// The source of diagnostics data
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -123,7 +175,7 @@ impl DiagnosticsData for Inspect {
 
     fn override_error(metadata: Self::Metadata, error: String) -> Self::Metadata {
         InspectMetadata {
-            filename: metadata.filename,
+            name: metadata.name,
             component_url: metadata.component_url,
             timestamp: metadata.timestamp,
             errors: Some(vec![InspectError { message: error.into() }]),
@@ -244,11 +296,16 @@ pub struct InspectMetadata {
     /// Optional vector of errors encountered by platform.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub errors: Option<Vec<InspectError>>,
-    /// Name of diagnostics file producing data.
-    pub filename: String,
+
+    /// Name of diagnostics source producing data.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(flatten)]
+    pub name: Option<InspectHandleName>,
+
     /// The url with which the component was launched.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub component_url: Option<String>,
+
     /// Monotonic time in nanos.
     pub timestamp: i64,
 }
@@ -486,7 +543,7 @@ impl Data<Inspect> {
         inspect_hierarchy: Option<DiagnosticsHierarchy>,
         timestamp: impl Into<Timestamp>,
         component_url: impl Into<String>,
-        filename: impl Into<String>,
+        name: Option<InspectHandleName>,
         errors: Vec<InspectError>,
     ) -> InspectData {
         let errors_opt = if errors.is_empty() { None } else { Some(errors) };
@@ -499,10 +556,15 @@ impl Data<Inspect> {
             metadata: InspectMetadata {
                 timestamp: *(timestamp.into()),
                 component_url: Some(component_url.into()),
-                filename: filename.into(),
+                name,
                 errors: errors_opt,
             },
         }
+    }
+
+    /// Access the name or filename within `self.metadata`.
+    pub fn name(&self) -> Option<&str> {
+        self.metadata.name.as_ref().map(InspectHandleName::as_ref)
     }
 }
 
@@ -1274,7 +1336,7 @@ mod tests {
             Some(hierarchy),
             123456i64,
             TEST_URL,
-            "test_file_plz_ignore.inspect",
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
             Vec::new(),
         );
 
@@ -1307,7 +1369,7 @@ mod tests {
             None,
             123456i64,
             TEST_URL,
-            "test_file_plz_ignore.inspect",
+            Some(InspectHandleName::filename("test_file_plz_ignore.inspect")),
             vec![InspectError { message: "too much fun being had.".to_string() }],
         );
 

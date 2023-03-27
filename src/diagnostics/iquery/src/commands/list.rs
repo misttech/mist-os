@@ -169,7 +169,7 @@ impl Command for ListCommand {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use diagnostics_data::Timestamp;
+    use diagnostics_data::{InspectHandleName, Timestamp};
 
     #[fuchsia::test]
     fn components_from_inspect_data_uses_diagnostics_ready() {
@@ -179,7 +179,7 @@ mod tests {
                 /*inspect_hierarchy=*/ None,
                 Timestamp::from(123456789800i64),
                 "fake-url",
-                "fake-file",
+                Some(InspectHandleName::filename("fake-file")),
                 vec![],
             ),
             InspectData::for_inspect(
@@ -187,7 +187,7 @@ mod tests {
                 /*inspect_hierarchy=*/ None,
                 Timestamp::from(123456789900i64),
                 "other-fake-url",
-                "fake-file",
+                Some(InspectHandleName::filename("fake-file")),
                 vec![],
             ),
             InspectData::for_inspect(
@@ -195,7 +195,7 @@ mod tests {
                 /*inspect_hierarchy=*/ None,
                 Timestamp::from(123456789910i64),
                 "fake-url",
-                "fake-file",
+                Some(InspectHandleName::filename("fake-file")),
                 vec![],
             ),
             InspectData::for_inspect(
@@ -203,7 +203,7 @@ mod tests {
                 /*inspect_hierarchy=*/ None,
                 Timestamp::from(123456790990i64),
                 "different-fake-url",
-                "fake-file",
+                Some(InspectHandleName::filename("fake-file")),
                 vec![],
             ),
         ];

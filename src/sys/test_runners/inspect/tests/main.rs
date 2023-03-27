@@ -4,7 +4,7 @@
 
 use {
     anyhow::{Context as _, Error},
-    diagnostics_data::{hierarchy, Data, DiagnosticsHierarchy, Property},
+    diagnostics_data::{hierarchy, Data, DiagnosticsHierarchy, InspectHandleName, Property},
     fake_archive_accessor::FakeArchiveAccessor,
     fidl_fuchsia_test_manager as ftest_manager,
     ftest_manager::{CaseStatus, RunOptions, SuiteStatus},
@@ -152,7 +152,7 @@ async fn launch_and_test_sample_test() {
             }),
             0,
             "no-url",
-            "fake-file-name",
+            Some(InspectHandleName::filename("fake-file-name")),
             vec![],
         ),
         Data::for_inspect(
@@ -168,7 +168,7 @@ async fn launch_and_test_sample_test() {
             }),
             0,
             "no-url",
-            "fake-file-name",
+            Some(InspectHandleName::filename("fake-file-name")),
             vec![],
         ),
         // Inject one that is missing data to ensure we retry correctly.
@@ -177,7 +177,7 @@ async fn launch_and_test_sample_test() {
             Some(hierarchy! {root: {}}),
             0,
             "no-url",
-            "fake-file-name",
+            Some(InspectHandleName::filename("fake-file-name")),
             vec![],
         ),
         Data::for_inspect(
@@ -195,7 +195,7 @@ async fn launch_and_test_sample_test() {
             }),
             0,
             "no-url",
-            "fake-file-name",
+            Some(InspectHandleName::filename("fake-file-name")),
             vec![],
         ),
     ]
@@ -272,7 +272,7 @@ fn create_example_data(opts: ExampleDataOpts) -> Data<diagnostics_data::Inspect>
         Some(DiagnosticsHierarchy::new("root", properties, vec![])),
         0,
         "no-url",
-        "fake-file-name",
+        Some(InspectHandleName::filename("fake-file-name")),
         vec![],
     )
 }

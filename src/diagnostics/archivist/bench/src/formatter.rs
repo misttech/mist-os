@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use diagnostics_data::{BuilderArgs, Data, LogsDataBuilder, LogsField, LogsProperty, Severity};
+use diagnostics_data::{
+    BuilderArgs, Data, InspectHandleName, LogsDataBuilder, LogsField, LogsProperty, Severity,
+};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, Property};
 use fidl_fuchsia_diagnostics::{DataType, Format};
 use fuchsia_async as fasync;
@@ -32,7 +34,7 @@ fn bench_serialization(b: &mut criterion::Bencher, n: usize, m: usize, format: F
         Some(DiagnosticsHierarchy::new("root", vec![], children)),
         1, /* timestamp_nanos */
         "fuchsia-pkg://fuchsia.com/testing#meta/bench.cm",
-        "fuchsia.inspect.Tree",
+        Some(InspectHandleName::filename("fuchsia.inspect.Tree")),
         vec![],
     );
 

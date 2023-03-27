@@ -350,7 +350,9 @@ mod test {
         anyhow::Error,
         assert_matches::assert_matches,
         async_trait::async_trait,
-        diagnostics_data::{DiagnosticsHierarchy, InspectData, Property, Severity},
+        diagnostics_data::{
+            DiagnosticsHierarchy, InspectData, InspectHandleName, Property, Severity,
+        },
         fidl::endpoints::create_proxy,
         fidl::AsyncSocket,
         fidl_fuchsia_developer_remotecontrol::{
@@ -514,8 +516,8 @@ mod test {
             String::from("test/moniker"),
             Some(hierarchy),
             timestamp,
-            String::from("fake-url"),
             String::from("fake-filename"),
+            Some(InspectHandleName::filename("fake-filename")),
             vec![],
         )
     }

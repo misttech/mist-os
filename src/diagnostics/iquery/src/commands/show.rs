@@ -11,7 +11,7 @@ use {
     argh::FromArgs,
     async_trait::async_trait,
     derivative::Derivative,
-    diagnostics_data::{Inspect, InspectData},
+    diagnostics_data::{Inspect, InspectData, InspectHandleName},
     glob,
     itertools::Itertools,
     serde::Serialize,
@@ -38,9 +38,11 @@ impl PartialOrd for ShowCommandResultItem {
 
 impl Ord for ShowCommandResultItem {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.moniker
-            .cmp(&other.moniker)
-            .then_with(|| self.metadata.filename.cmp(&other.metadata.filename))
+        self.moniker.cmp(&other.moniker).then_with(|| {
+            let this_name = self.metadata.name.as_ref().map(InspectHandleName::as_ref);
+            let other_name = other.metadata.name.as_ref().map(InspectHandleName::as_ref);
+            this_name.cmp(&other_name)
+        })
     }
 }
 
@@ -135,7 +137,9 @@ impl Command for ShowCommand {
                 )
             }
             Box::new(move |d: &InspectData| {
-                glob_patterns.iter().any(|glob| glob.matches(&d.metadata.filename))
+                glob_patterns.iter().any(|glob| {
+                    glob.matches(&d.metadata.name.as_ref().map(|name| name.as_ref()).unwrap_or(""))
+                })
             })
         } else {
             Box::new(|_d: &InspectData| true)
