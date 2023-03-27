@@ -36,7 +36,3 @@ toc:
       path: /docs/development/idk/documentation/packages.md
     - title: "SSH"
       path: /docs/development/idk/documentation/ssh.md
-- title: GN C++ Frontend SDK
-  section:
-  - title: "Getting started"
-    path: /docs/development/idk/gn

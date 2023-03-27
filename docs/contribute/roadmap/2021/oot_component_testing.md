@@ -50,8 +50,7 @@ impossible to scale for the following reasons:
   tests, such as [sanitizers] and [coverage].
 
 - Some tools and source code is distributed to partners not via the
-  [Fuchsia IDK][idk], the set of [SDK tools][sdk-tools], or specific frontends
-  such as the [Fuchsia GN SDK][gn-sdk]. For instance the
+  [Fuchsia IDK][idk], the set of [SDK tools][sdk-tools]. For instance the
   [`TestWithEnvironment`][testwithenvironment] helper class is
   [manually copied to the Flutter repository on GitHub][fxb-73984] to unblock
   integration testing needs.
@@ -333,7 +332,6 @@ covered in a [separate roadmap document][oot-system-testing].
 [fxb-73984]: https://bugs.fuchsia.dev/p/fuchsia/issues/detail?id=73984
 [glossary.in-tree]: /docs/glossary/README.md#in-tree
 [glossary.out-of-tree]: /docs/glossary/README.md#out-of-tree
-[gn-sdk]: /docs/development/idk/gn/README.md
 [idk]: /docs/development/idk/README.md
 [llvm]: https://llvm.org/
 [oot-system-testing]: /docs/contribute/roadmap/2021/oot_system_testing.md

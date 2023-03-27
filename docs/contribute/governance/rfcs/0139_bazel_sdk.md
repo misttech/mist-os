@@ -262,7 +262,7 @@ recommended way for users to install Bazel (using [bazelisk]).
 
 [1]: /docs/contribute/governance/rfcs/0095_build_and_assemble_workstation_out_of_tree.md
 [2]: /docs/development/idk
-[3]: /docs/development/idk/gn
+[3]: https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/development/idk/gn/README.md;drc=552aeea3b169aacb0dea4dcd4ee88109fd3886ef
 [4]: /docs/development/idk#strategy
 [10]: https://github.com/bazelbuild/stardoc
 [11]: https://fuchsia.googlesource.com/fuchsia/+/d9201b0b2049cd08fbb15b764910edc22dba4837/scripts/sdk/bazel
