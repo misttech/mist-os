@@ -63,7 +63,6 @@
                 "fuchsia.ui.input.ImeService",
                 "fuchsia.ui.input3.Keyboard",
                 "fuchsia.ui.scenic.Scenic",
-                "fuchsia.ui.shortcut2.Registry",
                 "fuchsia.update.channelcontrol.ChannelControl",
                 "fuchsia.update.Manager",
                 "fuchsia.wlan.policy.ClientProvider",

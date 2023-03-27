@@ -35,11 +35,7 @@
     offer: [
         {
             // These protocols are not available in smart products
-            protocol: [
-                "fuchsia.ui.pointer.augment.GlobalMouse",
-                "fuchsia.ui.shortcut.Manager",
-                "fuchsia.ui.shortcut2.Registry",
-            ],
+            protocol: [ "fuchsia.ui.pointer.augment.GlobalMouse" ],
             from: "void",
             to: "#session-manager",
             availability: "optional",
