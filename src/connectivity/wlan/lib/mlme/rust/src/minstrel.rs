@@ -137,7 +137,7 @@ impl Peer {
             ..Default::default()
         };
 
-        if assoc_cfg.has_ht_cap {
+        if assoc_cfg.ht_cap_is_valid {
             // Safe unwrap: Fixed size array.
             const_assert_eq!(
                 std::mem::size_of::<HtCapabilities>(),

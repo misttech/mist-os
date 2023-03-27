@@ -564,8 +564,80 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     return ZX_OK;
   }
 
-  zx_status_t ConfigureAssoc(const fuchsia_wlan_softmac::wire::WlanAssociationConfig* assoc_cfg) {
-    auto result = client_.buffer(test_arena_)->ConfigureAssoc(*assoc_cfg);
+  zx_status_t ConfigureAssoc() {
+    fidl::Arena fidl_arena;
+    auto builder = fuchsia_wlan_softmac::wire::WlanAssociationConfig::Builder(fidl_arena);
+    builder.listen_interval(kListenInterval);
+    builder.channel(fuchsia_wlan_common::wire::WlanChannel{
+        .primary = 157,
+        .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw80,
+    });
+    builder.rates_cnt(1);
+    builder.rates({
+        .data_ =
+            {
+                140,
+            },
+    });
+    builder.ht_cap_is_valid(false);
+    builder.vht_cap_is_valid(false);
+    builder.ht_op_is_valid(false);
+    builder.vht_op_is_valid(false);
+    auto result = client_.buffer(test_arena_)->ConfigureAssoc(builder.Build());
+    EXPECT_TRUE(result.ok());
+    if (result->is_error()) {
+      return result->error_value();
+    }
+    return ZX_OK;
+  }
+
+  zx_status_t ConfigureHtAssoc() {
+    fidl::Arena fidl_arena;
+    auto builder = fuchsia_wlan_softmac::wire::WlanAssociationConfig::Builder(fidl_arena);
+    builder.listen_interval(kListenInterval);
+    builder.channel(fuchsia_wlan_common::wire::WlanChannel{
+        .primary = 157,
+        .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw80,
+    });
+    builder.rates_cnt(8);
+    builder.rates({
+        .data_ =
+            {
+                140,
+                18,
+                152,
+                36,
+                176,
+                72,
+                96,
+                108,
+            },
+    });
+    builder.ht_cap_is_valid(true);
+    builder.ht_cap(fuchsia_wlan_ieee80211::wire::HtCapabilities{
+        .bytes =
+            {
+                .data_ =
+                    {
+                        0,
+                        0,  // HtCapabilityInfo
+                        0,  // AmpduParams
+
+                        255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+                        0,  // Supported mcs set
+
+                        0,
+                        0,  // HtExtCapabilities
+                        0,   0,   0,
+                        0,  // TxBeamformingCapabilities
+                        0,  // AselCapability
+                    },
+            },
+    });
+    builder.vht_cap_is_valid(false);
+    builder.ht_op_is_valid(false);
+    builder.vht_op_is_valid(false);
+    auto result = client_.buffer(test_arena_)->ConfigureAssoc(builder.Build());
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
       return result->error_value();
@@ -730,58 +802,6 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
       .bss_type = fuchsia_wlan_internal::wire::BssType::kInfrastructure,
       .remote = true,
       .beacon_period = kDefaultBeaconPeriod,
-  };
-
-  // Assoc context without HT related data.
-  static constexpr fuchsia_wlan_softmac::wire::WlanAssociationConfig kAssocCtx = {
-      .listen_interval = kListenInterval,
-  };
-
-  // Assoc context with HT related data. (The values below comes from real data in manual test)
-  static constexpr fuchsia_wlan_softmac::wire::WlanAssociationConfig kHtAssocCtx = {
-      .listen_interval = kListenInterval,
-      .channel =
-          {
-              .primary = 157,
-              .cbw = fuchsia_wlan_common::ChannelBandwidth::kCbw80,
-          },
-      .rates_cnt = 8,
-      .rates =
-          {
-              .data_ =
-                  {
-                      140,
-                      18,
-                      152,
-                      36,
-                      176,
-                      72,
-                      96,
-                      108,
-                  },
-          },
-      .has_ht_cap = true,
-      .ht_cap =
-          {
-              .bytes =
-                  {
-                      .data_ =
-                          {
-                              0,
-                              0,  // HtCapabilityInfo
-                              0,  // AmpduParams
-
-                              255, 255, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
-                              0,  // Supported mcs set
-
-                              0,
-                              0,  // HtExtCapabilities
-                              0,   0,   0,
-                              0,  // TxBeamformingCapabilities
-                              0,  // AselCapability
-                          },
-                  },
-          },
   };
 
   static constexpr uint16_t kChannelSize = 4;
@@ -1042,7 +1062,7 @@ TEST_F(MacInterfaceTest, AssociateToOpenNetwork) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc(&kAssocCtx));
+  ASSERT_OK(ConfigureAssoc());
   ASSERT_EQ(IWL_STA_AUTHORIZED, mvm_sta->sta_state);
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
   ASSERT_EQ(kListenInterval, mvmvif_->bss_conf.listen_interval);
@@ -1063,7 +1083,7 @@ TEST_F(MacInterfaceTest, CheckStaState) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc(&kAssocCtx));
+  ASSERT_OK(ConfigureAssoc());
   ASSERT_EQ(IWL_STA_AUTHORIZED, mvm_sta->sta_state);
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
   ASSERT_EQ(kListenInterval, mvmvif_->bss_conf.listen_interval);
@@ -1108,7 +1128,7 @@ TEST_F(MacInterfaceTest, ClearAssocAfterFailedAssoc) {
   // Fail the association by forcing some relevant internal state.
   auto orig = mvmvif_->uploaded;
   mvmvif_->uploaded = false;
-  ASSERT_EQ(ZX_ERR_IO, ConfigureAssoc(&kAssocCtx));
+  ASSERT_EQ(ZX_ERR_IO, ConfigureAssoc());
   mvmvif_->uploaded = orig;
 
   // ClearAssoc will clean up the failed association.
@@ -1143,7 +1163,7 @@ TEST_F(MacInterfaceTest, AssocWithHtConfig) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc(&kHtAssocCtx));
+  ASSERT_OK(ConfigureHtAssoc());
 
   // Verify the values in LQ_CMD API structure.
   EXPECT_EQ(lq_cmd->sta_id, 0);
@@ -1279,7 +1299,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
   struct iwl_mvm* mvm = mvmvif_->mvm;
   ASSERT_GT(list_length(&mvm->time_event_list), 0);
 
-  ASSERT_OK(ConfigureAssoc(&kAssocCtx));
+  ASSERT_OK(ConfigureAssoc());
   ASSERT_EQ(IWL_STA_AUTHORIZED, mvm_sta->sta_state);
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
   ASSERT_EQ(kListenInterval, mvmvif_->bss_conf.listen_interval);
@@ -1333,7 +1353,7 @@ TEST_F(MacInterfaceTest, InstallKeysTest) {
 TEST_F(MacInterfaceTest, InstallKeysSupportConfigs) {
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
-  ASSERT_OK(ConfigureAssoc(&kAssocCtx));
+  ASSERT_OK(ConfigureAssoc());
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
 
   fidl::Arena fidl_arena;
@@ -1379,7 +1399,7 @@ TEST_F(MacInterfaceTest, InstallKeysTKIP) {
   constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
   ASSERT_OK(SetChannel(&kChannel));
   ASSERT_OK(JoinBss(&kJoinBssRequest));
-  ASSERT_OK(ConfigureAssoc(&kAssocCtx));
+  ASSERT_OK(ConfigureAssoc());
   ASSERT_TRUE(mvmvif_->bss_conf.assoc);
 
   fidl::Arena fidl_arena;

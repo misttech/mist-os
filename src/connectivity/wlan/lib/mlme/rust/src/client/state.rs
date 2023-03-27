@@ -1742,10 +1742,10 @@ mod tests {
             [0x82, 0x84, 0x8b, 0x96, 0x0c, 0x12, 0x18, 0x24, 0x30, 0x48, 0x60, 0x6c]
         );
         assert_eq!(assoc_cfg.capability_info, 2);
-        assert!(assoc_cfg.has_ht_cap);
-        assert!(assoc_cfg.has_vht_cap);
-        assert!(assoc_cfg.has_ht_op);
-        assert!(assoc_cfg.has_vht_op);
+        assert!(assoc_cfg.ht_cap_is_valid);
+        assert!(assoc_cfg.vht_cap_is_valid);
+        assert!(assoc_cfg.ht_op_is_valid);
+        assert!(assoc_cfg.vht_op_is_valid);
 
         // Verify MLME-CONNECT.confirm message was sent.
         let msg = m.fake_device.next_mlme_msg::<fidl_mlme::ConnectConfirm>().expect("no message");

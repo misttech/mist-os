@@ -36,8 +36,8 @@ pub fn build_ddk_assoc_cfg(
     let mut rates = [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize];
     rates[..negotiated_capabilities.rates.len()]
         .clone_from_slice(negotiated_capabilities.rates.as_bytes());
-    let has_ht_cap = negotiated_capabilities.ht_cap.is_some();
-    let has_vht_cap = negotiated_capabilities.vht_cap.is_some();
+    let ht_cap_is_valid = negotiated_capabilities.ht_cap.is_some();
+    let vht_cap_is_valid = negotiated_capabilities.vht_cap.is_some();
     let mut ht_cap =
         banjo_ieee80211::HtCapabilities { bytes: [0u8; fidl_ieee80211::HT_CAP_LEN as usize] };
     let mut vht_cap =
@@ -62,20 +62,20 @@ pub fn build_ddk_assoc_cfg(
         // TODO(fxbug.dev/29325): QoS works with Aruba/Ubiquiti for BlockAck session but it may need to be
         // dynamically determined for each outgoing data frame.
         // TODO(fxbug.dev/43938): Derive QoS flag and WMM parameters from device info
-        qos: has_ht_cap,
+        qos: ht_cap_is_valid,
         wmm_params: blank_wmm_params(),
 
         rates_cnt: negotiated_capabilities.rates.len() as u16, // will not overflow as MAX_RATES_LEN is u8
         rates,
         capability_info: negotiated_capabilities.capability_info.raw(),
         // All the unwrap are safe because the size of the byte array follow wire format.
-        has_ht_cap,
+        ht_cap_is_valid,
         ht_cap,
-        has_ht_op: ht_op.is_some(),
+        ht_op_is_valid: ht_op.is_some(),
         ht_op: { *ie::parse_ht_operation(&ht_op_bytes[..]).unwrap() }.into(),
-        has_vht_cap,
+        vht_cap_is_valid,
         vht_cap,
-        has_vht_op: vht_op.is_some(),
+        vht_op_is_valid: vht_op.is_some(),
         vht_op: { *ie::parse_vht_operation(&vht_op_bytes[..]).unwrap() }.into(),
     }
 }
@@ -291,18 +291,18 @@ mod tests {
 
         assert_eq!(0x1234, ddk.capability_info);
 
-        assert_eq!(true, ddk.has_ht_cap);
+        assert_eq!(true, ddk.ht_cap_is_valid);
         assert_eq!(&ie::fake_ht_capabilities().as_bytes()[..], &ddk.ht_cap.bytes[..]);
 
-        assert_eq!(true, ddk.has_ht_op);
+        assert_eq!(true, ddk.ht_op_is_valid);
         let expected_ht_op: banjo_wlan_softmac::WlanHtOp = ie::fake_ht_operation().into();
         assert_eq!(expected_ht_op, ddk.ht_op);
 
-        assert_eq!(true, ddk.has_vht_cap);
+        assert_eq!(true, ddk.vht_cap_is_valid);
         let expected_vht_cap: banjo_80211::VhtCapabilities = ie::fake_vht_capabilities().into();
         assert_eq!(expected_vht_cap, ddk.vht_cap);
 
-        assert_eq!(true, ddk.has_vht_op);
+        assert_eq!(true, ddk.vht_op_is_valid);
         let expected_vht_op: banjo_wlan_softmac::WlanVhtOp = ie::fake_vht_operation().into();
         assert_eq!(expected_vht_op, ddk.vht_op);
     }

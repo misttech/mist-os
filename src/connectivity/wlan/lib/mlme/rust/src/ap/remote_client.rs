@@ -457,17 +457,17 @@ impl RemoteClient {
                     capability_info: capabilities.raw(),
 
                     // TODO(fxbug.dev/40917): Correctly support all of this.
-                    has_ht_cap: false,
+                    ht_cap_is_valid: false,
                     // This is not read by the driver.
                     ht_cap: HtCapabilities { bytes: Default::default() },
-                    has_ht_op: false,
+                    ht_op_is_valid: false,
                     // Safe: This is not read by the driver.
                     ht_op: unsafe { std::mem::zeroed::<banjo_fuchsia_wlan_softmac::WlanHtOp>() },
 
-                    has_vht_cap: false,
+                    vht_cap_is_valid: false,
                     // This is not read by the driver.
                     vht_cap: VhtCapabilities { bytes: Default::default() },
-                    has_vht_op: false,
+                    vht_op_is_valid: false,
                     // Safe: This is not read by the driver.
                     vht_op: unsafe { std::mem::zeroed::<banjo_fuchsia_wlan_softmac::WlanVhtOp>() },
                 })

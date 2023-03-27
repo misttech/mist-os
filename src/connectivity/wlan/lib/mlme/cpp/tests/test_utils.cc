@@ -14,7 +14,7 @@ namespace test_utils {
 
 wlan_association_config_t FakeDdkAssocCtx() {
   return wlan_association_config_t{
-      .has_ht_cap = true,
+      .ht_cap_is_valid = true,
       .ht_cap =
           ht_capabilities_t{
               .bytes =
@@ -28,7 +28,7 @@ wlan_association_config_t FakeDdkAssocCtx() {
                       0xff,                    // ASEL capabilities
                   },
           },
-      .has_ht_op = true,
+      .ht_op_is_valid = true,
       .ht_op =
           wlan_ht_op_t{
               .primary_channel = 123,
@@ -37,7 +37,7 @@ wlan_association_config_t FakeDdkAssocCtx() {
               .mcs_set = {0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
                           0x00, 0x00, 0x00, 0xff},
           },
-      .has_vht_cap = true,
+      .vht_cap_is_valid = true,
       .vht_cap =
           vht_capabilities_t{
               .bytes =
@@ -46,7 +46,7 @@ wlan_association_config_t FakeDdkAssocCtx() {
                       0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00, 0x00,  // VHT MCS and NSS set
                   },
           },
-      .has_vht_op = true,
+      .vht_op_is_valid = true,
       .vht_op =
           wlan_vht_op_t{
               .vht_cbw = 0x01,

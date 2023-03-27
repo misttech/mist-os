@@ -339,42 +339,47 @@ const WLAN_MAC_MAX_RATES uint32 = 263; // (8 + 255)
 /// WlanSoftmac.ConfigureAssoc.
 /// All information here is relevant only in the context of the association with
 /// the given peer_addr.
-type WlanAssociationConfig = struct {
+/// All fields in this table are required unless stated otherwise.
+type WlanAssociationConfig = table {
     /// The MAC address of the peer with which we are now associated.
-    bssid ieee80211.MacAddr;
+    1: bssid ieee80211.MacAddr;
     /// A unique identifier for this specific association. This is unique among
     /// active associations, not necessarily historical ones.
-    aid uint16;
-    listen_interval uint16;
+    2: aid uint16;
+    3: listen_interval uint16;
     /// The channel on which we have associated with this peer.
-    channel fuchsia.wlan.common.WlanChannel;
+    4: channel fuchsia.wlan.common.WlanChannel;
 
     /// QoS capable and parameters
-    qos bool;
+    5: qos bool;
     /// WFA WMM v1.2, 2.2.2
-    wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
+    6: wmm_params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
 
     /// Coincatenation of SupportedRates and ExtendedSupportedRates
     /// IEEE Std 802.11-2016, 9.4.2.3 & 9.4.2.13
-    rates_cnt uint16;
-    rates array<uint8, WLAN_MAC_MAX_RATES>;
+    7: rates_cnt uint16;
+    8: rates array<uint8, WLAN_MAC_MAX_RATES>;
 
     /// IEEE Std 802.11-2016, 9.4.1.4
-    capability_info uint16;
+    9: capability_info uint16;
 
     /// IEEE Std 802.11-2016, 9.4.2.56, 57
     /// Rx MCS Bitmask in Supported MCS Set field represents the set of MCS
     /// the peer can receive at from this device, considering this device's Tx capability.
-    has_ht_cap bool;
-    ht_cap ieee80211.HtCapabilities;
-    has_ht_op bool;
-    ht_op WlanHtOp;
+   10: ht_cap_is_valid bool;
+    /// This field is optional.
+   11: ht_cap ieee80211.HtCapabilities;
+   12: ht_op_is_valid bool;
+    /// This field is optional.
+   13: ht_op WlanHtOp;
 
     /// IEEE Std 802.11-2016, 9.4.2.158, 159
-    has_vht_cap bool;
-    vht_cap ieee80211.VhtCapabilities;
-    has_vht_op bool;
-    vht_op WlanVhtOp;
+   14: vht_cap_is_valid bool;
+    /// This field is optional.
+   15: vht_cap ieee80211.VhtCapabilities;
+   16: vht_op_is_valid bool;
+    /// This field is optional.
+   17: vht_op WlanVhtOp;
 };
 
 @discoverable

@@ -645,39 +645,61 @@ void ConvertVhtOp(const wlan_vht_op_t& in, fuchsia_wlan_softmac::wire::WlanVhtOp
   out->basic_mcs = in.basic_mcs;
 }
 
-zx_status_t ConvertAssocCtx(const wlan_association_config_t& in,
+zx_status_t ConvertAssocCtx(const wlan_association_config_t& in, fidl::AnyArena& arena,
                             fuchsia_wlan_softmac::wire::WlanAssociationConfig* out) {
-  memcpy(out->bssid.begin(), &in.bssid[0], fuchsia::wlan::ieee80211::MAC_ADDR_LEN);
-  out->aid = in.aid;
-  out->listen_interval = in.listen_interval;
+  auto builder = fuchsia_wlan_softmac::wire::WlanAssociationConfig::Builder(arena);
 
-  ConvertChannel(in.channel, &out->channel);
-  out->qos = in.qos;
+  fidl::Array<uint8_t, fuchsia::wlan::ieee80211::MAC_ADDR_LEN> bssid;
+  memcpy(bssid.begin(), &in.bssid[0], fuchsia::wlan::ieee80211::MAC_ADDR_LEN);
+  builder.bssid(bssid);
 
-  // wmm_params
-  out->wmm_params.apsd = in.wmm_params.apsd;
-  ConvertWmmAcParams(in.wmm_params.ac_be_params, &out->wmm_params.ac_be_params);
-  ConvertWmmAcParams(in.wmm_params.ac_bk_params, &out->wmm_params.ac_bk_params);
-  ConvertWmmAcParams(in.wmm_params.ac_vi_params, &out->wmm_params.ac_vi_params);
-  ConvertWmmAcParams(in.wmm_params.ac_vo_params, &out->wmm_params.ac_vo_params);
+  builder.aid(in.aid);
+  builder.listen_interval(in.listen_interval);
 
-  out->rates_cnt = in.rates_cnt;
-  memcpy(out->rates.begin(), in.rates, in.rates_cnt * sizeof(uint8_t));
+  fuchsia_wlan_common::wire::WlanChannel channel;
+  ConvertChannel(in.channel, &channel);
+  builder.channel(channel);
+  builder.qos(in.qos);
 
-  out->capability_info = in.capability_info;
+  fuchsia_hardware_wlan_associnfo::wire::WlanWmmParameters wmm_params;
+  wmm_params.apsd = in.wmm_params.apsd;
+  ConvertWmmAcParams(in.wmm_params.ac_be_params, &wmm_params.ac_be_params);
+  ConvertWmmAcParams(in.wmm_params.ac_bk_params, &wmm_params.ac_bk_params);
+  ConvertWmmAcParams(in.wmm_params.ac_vi_params, &wmm_params.ac_vi_params);
+  ConvertWmmAcParams(in.wmm_params.ac_vo_params, &wmm_params.ac_vo_params);
+  builder.wmm_params(wmm_params);
 
-  out->has_ht_cap = in.has_ht_cap;
-  memcpy(out->ht_cap.bytes.data(), &in.ht_cap.bytes[0], fuchsia_wlan_ieee80211::wire::kHtCapLen);
-  out->has_ht_op = in.has_ht_op;
+  builder.rates_cnt(in.rates_cnt);
+  fidl::Array<uint8_t, fuchsia_wlan_softmac::wire::kWlanMacMaxRates> rates;
+  memcpy(rates.begin(), in.rates, fuchsia_wlan_softmac::wire::kWlanMacMaxRates);
+  builder.rates(rates);
+  builder.capability_info(in.capability_info);
+
+  // ht_cap
+  builder.ht_cap_is_valid(in.ht_cap_is_valid);
+  fuchsia_wlan_ieee80211::wire::HtCapabilities ht_cap;
+  memcpy(ht_cap.bytes.data(), in.ht_cap.bytes, fuchsia_wlan_ieee80211::wire::kHtCapLen);
+  builder.ht_cap(ht_cap);
+
   // ht_op
-  ConvertHtOp(in.ht_op, &out->ht_op);
+  builder.ht_op_is_valid(in.ht_op_is_valid);
+  fuchsia_wlan_softmac::wire::WlanHtOp ht_op;
+  ConvertHtOp(in.ht_op, &ht_op);
+  builder.ht_op(ht_op);
 
-  out->has_vht_cap = in.has_vht_cap;
-  memcpy(out->vht_cap.bytes.data(), &in.vht_cap.bytes[0], fuchsia_wlan_ieee80211::wire::kVhtCapLen);
-  out->has_vht_op = in.has_vht_op;
+  // vht cap
+  builder.vht_cap_is_valid(in.vht_cap_is_valid);
+  fuchsia_wlan_ieee80211::wire::VhtCapabilities vht_cap;
+  memcpy(vht_cap.bytes.begin(), in.vht_cap.bytes, fuchsia_wlan_ieee80211::wire::kVhtCapLen);
+  builder.vht_cap(vht_cap);
+
   // vht_op
-  ConvertVhtOp(in.vht_op, &out->vht_op);
+  builder.vht_op_is_valid(in.vht_op_is_valid);
+  fuchsia_wlan_softmac::wire::WlanVhtOp vht_op;
+  ConvertVhtOp(in.vht_op, &vht_op);
+  builder.vht_op(vht_op);
 
+  *out = builder.Build();
   return ZX_OK;
 }
 

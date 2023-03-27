@@ -933,7 +933,8 @@ zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
 
   zx_status_t status = ZX_OK;
   fuchsia_wlan_softmac::wire::WlanAssociationConfig fidl_assoc_cfg;
-  if ((status = ConvertAssocCtx(*assoc_cfg, &fidl_assoc_cfg)) != ZX_OK) {
+  fidl::Arena fidl_arena;
+  if ((status = ConvertAssocCtx(*assoc_cfg, fidl_arena, &fidl_assoc_cfg)) != ZX_OK) {
     errorf("WlanAssociationConfig conversion failed: %s", zx_status_get_string(status));
     return status;
   }

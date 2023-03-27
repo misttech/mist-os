@@ -710,8 +710,8 @@ TEST(ConvertTest, ToFidlAssocCtx) {
           },
       .rates_cnt = kFakeAssocCtxRateCount,
       .capability_info = kRandomPopulaterUint16,
-      .has_ht_cap = kPopulaterBool,
-      .has_ht_op = kPopulaterBool,
+      .ht_cap_is_valid = kPopulaterBool,
+      .ht_op_is_valid = kPopulaterBool,
       .ht_op =
           {
               .primary_channel = kFakeChannel,
@@ -719,8 +719,8 @@ TEST(ConvertTest, ToFidlAssocCtx) {
               .tail = kRandomPopulaterUint8,
               //  mcs_set initialized below
           },
-      .has_vht_cap = kPopulaterBool,
-      .has_vht_op = kPopulaterBool,
+      .vht_cap_is_valid = kPopulaterBool,
+      .vht_op_is_valid = kPopulaterBool,
       .vht_op =
           {
               .vht_cbw = kRandomPopulaterUint8,
@@ -749,49 +749,50 @@ TEST(ConvertTest, ToFidlAssocCtx) {
 
   // Conduct the conversion
   fuchsia_wlan_softmac::wire::WlanAssociationConfig out;
-  EXPECT_EQ(ZX_OK, ConvertAssocCtx(in, &out));
+  fidl::Arena fidl_arena;
+  EXPECT_EQ(ZX_OK, ConvertAssocCtx(in, fidl_arena, &out));
 
   // Verify outputs
-  EXPECT_EQ(0, memcmp(out.bssid.data(), kFakeMacAddr, wlan_ieee80211::kMacAddrLen));
-  EXPECT_EQ(kRandomPopulaterUint16, out.aid);
-  EXPECT_EQ(kRandomPopulaterUint16, out.listen_interval);
+  EXPECT_EQ(0, memcmp(out.bssid().data(), kFakeMacAddr, wlan_ieee80211::kMacAddrLen));
+  EXPECT_EQ(kRandomPopulaterUint16, out.aid());
+  EXPECT_EQ(kRandomPopulaterUint16, out.listen_interval());
 
-  EXPECT_EQ(kFakeChannel, out.channel.primary);
-  EXPECT_EQ(kFakeFidlChannelBandwidth, out.channel.cbw);
-  EXPECT_EQ(kFakeChannel, out.channel.secondary80);
+  EXPECT_EQ(kFakeChannel, out.channel().primary);
+  EXPECT_EQ(kFakeFidlChannelBandwidth, out.channel().cbw);
+  EXPECT_EQ(kFakeChannel, out.channel().secondary80);
 
-  EXPECT_EQ(kPopulaterBool, out.qos);
-  EXPECT_EQ(kPopulaterBool, out.wmm_params.apsd);
-  VerifyWlanWmmAcParams(out.wmm_params.ac_be_params);
-  VerifyWlanWmmAcParams(out.wmm_params.ac_bk_params);
-  VerifyWlanWmmAcParams(out.wmm_params.ac_vi_params);
-  VerifyWlanWmmAcParams(out.wmm_params.ac_vo_params);
+  EXPECT_EQ(kPopulaterBool, out.qos());
+  EXPECT_EQ(kPopulaterBool, out.wmm_params().apsd);
+  VerifyWlanWmmAcParams(out.wmm_params().ac_be_params);
+  VerifyWlanWmmAcParams(out.wmm_params().ac_bk_params);
+  VerifyWlanWmmAcParams(out.wmm_params().ac_vi_params);
+  VerifyWlanWmmAcParams(out.wmm_params().ac_vo_params);
 
-  EXPECT_EQ(kFakeAssocCtxRateCount, out.rates_cnt);
+  EXPECT_EQ(kFakeAssocCtxRateCount, out.rates_cnt());
   for (size_t i = 0; i < kFakeAssocCtxRateCount; i++) {
-    EXPECT_EQ(out.rates.data()[i], kFakeRate);
+    EXPECT_EQ(out.rates().data()[i], kFakeRate);
   }
-  EXPECT_EQ(kRandomPopulaterUint16, out.capability_info);
+  EXPECT_EQ(kRandomPopulaterUint16, out.capability_info());
 
-  EXPECT_EQ(kPopulaterBool, out.has_ht_cap);
-  EXPECT_EQ(0, memcmp(out.ht_cap.bytes.data(), kFakeHtCapBytes, wlan_ieee80211::kHtCapLen));
+  EXPECT_EQ(kPopulaterBool, out.ht_cap_is_valid());
+  EXPECT_EQ(0, memcmp(out.ht_cap().bytes.data(), kFakeHtCapBytes, wlan_ieee80211::kHtCapLen));
 
-  EXPECT_EQ(kPopulaterBool, out.has_ht_op);
-  EXPECT_EQ(kFakeChannel, out.ht_op.primary_channel);
-  EXPECT_EQ(kRandomPopulaterUint32, out.ht_op.head);
-  EXPECT_EQ(kRandomPopulaterUint8, out.ht_op.tail);
+  EXPECT_EQ(kPopulaterBool, out.ht_op_is_valid());
+  EXPECT_EQ(kFakeChannel, out.ht_op().primary_channel);
+  EXPECT_EQ(kRandomPopulaterUint32, out.ht_op().head);
+  EXPECT_EQ(kRandomPopulaterUint8, out.ht_op().tail);
   for (size_t i = 0; i < kFakeMcsSetLen; i++) {
-    EXPECT_EQ(out.ht_op.mcs_set.data()[i], kRandomPopulaterUint8);
+    EXPECT_EQ(out.ht_op().mcs_set.data()[i], kRandomPopulaterUint8);
   }
 
-  EXPECT_EQ(kPopulaterBool, out.has_vht_cap);
-  EXPECT_EQ(0, memcmp(out.vht_cap.bytes.data(), kFakeVhtCapBytes, wlan_ieee80211::kVhtCapLen));
+  EXPECT_EQ(kPopulaterBool, out.vht_cap_is_valid());
+  EXPECT_EQ(0, memcmp(out.vht_cap().bytes.data(), kFakeVhtCapBytes, wlan_ieee80211::kVhtCapLen));
 
-  EXPECT_EQ(kPopulaterBool, out.has_vht_op);
-  EXPECT_EQ(kRandomPopulaterUint8, out.vht_op.vht_cbw);
-  EXPECT_EQ(kRandomPopulaterUint8, out.vht_op.center_freq_seg0);
-  EXPECT_EQ(kRandomPopulaterUint8, out.vht_op.center_freq_seg1);
-  EXPECT_EQ(kRandomPopulaterUint16, out.vht_op.basic_mcs);
+  EXPECT_EQ(kPopulaterBool, out.vht_op_is_valid());
+  EXPECT_EQ(kRandomPopulaterUint8, out.vht_op().vht_cbw);
+  EXPECT_EQ(kRandomPopulaterUint8, out.vht_op().center_freq_seg0);
+  EXPECT_EQ(kRandomPopulaterUint8, out.vht_op().center_freq_seg1);
+  EXPECT_EQ(kRandomPopulaterUint16, out.vht_op().basic_mcs);
 }
 
 }  // namespace

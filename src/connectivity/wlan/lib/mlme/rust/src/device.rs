@@ -1517,17 +1517,17 @@ mod tests {
             rates: [0; banjo_fuchsia_wlan_softmac::WLAN_MAC_MAX_RATES as usize],
             capability_info: 0x0102,
 
-            has_ht_cap: false,
+            ht_cap_is_valid: false,
             // Safe: This is not read by the driver.
             ht_cap: unsafe { std::mem::zeroed::<HtCapabilities>() },
-            has_ht_op: false,
+            ht_op_is_valid: false,
             // Safe: This is not read by the driver.
             ht_op: unsafe { std::mem::zeroed::<banjo_wlan_softmac::WlanHtOp>() },
 
-            has_vht_cap: false,
+            vht_cap_is_valid: false,
             // Safe: This is not read by the driver.
             vht_cap: unsafe { std::mem::zeroed::<VhtCapabilities>() },
-            has_vht_op: false,
+            vht_op_is_valid: false,
             // Safe: This is not read by the driver.
             vht_op: unsafe { std::mem::zeroed::<banjo_wlan_softmac::WlanVhtOp>() },
         })
