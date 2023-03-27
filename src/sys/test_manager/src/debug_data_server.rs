@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    crate::constants,
     crate::run_events::RunEvent,
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::{create_endpoints, create_request_stream, ClientEnd},
@@ -66,7 +67,6 @@ async fn copy_kernel_debug_data(
 
 const DEBUG_DATA_TIMEOUT_SECONDS: i64 = 15;
 const DEBUG_DATA_PATH: &'static str = "/debugdata";
-const DEBUG_DATA_SERVE_PATH: &'static str = "/tmp";
 
 // TODO(fxbug.dev/110062): Once scp is no longer needed this can just call serve_iterator instead.
 pub(crate) async fn send_kernel_debug_data(
@@ -149,9 +149,12 @@ pub(crate) async fn send_kernel_debug_data(
         // We copy the files to a well known directory in /tmp. This supports exporting the
         // files off device via SCP. Once this flow is no longer needed, we can use something
         // like an ephemeral directory which is torn down once we're done instead.
-        copy_kernel_debug_data(files, Path::new(DEBUG_DATA_SERVE_PATH).to_path_buf())
-            .await
-            .unwrap_or_else(|e| warn!("Error copying kernel debug data: {:?}", e));
+        copy_kernel_debug_data(
+            files,
+            Path::new(constants::KERNEL_DEBUG_DATA_FOR_SCP).to_path_buf(),
+        )
+        .await
+        .unwrap_or_else(|e| warn!("Error copying kernel debug data: {:?}", e));
         // deliberately hold event_sender open even though we aren't sending anything... this
         // keeps RunController channel open, and run-test-suite running until copying files to
         // tmp/ is complete. See fxbug.dev/14996#c11 for details.
