@@ -4,7 +4,7 @@
 
 use {
     crate::{buffer::OutBuf, key},
-    banjo_fuchsia_hardware_wlan_associnfo::*,
+    banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
     banjo_fuchsia_wlan_common::{self as banjo_common, WlanTxStatus},
     banjo_fuchsia_wlan_ieee80211 as banjo_ieee80211,
     banjo_fuchsia_wlan_internal::JoinBssRequest,
@@ -93,7 +93,7 @@ impl Device {
                 let mcs_idx = if frame_control.is_data() { 7 } else { 3 };
                 tx_vector::TxVector::new(
                     banjo_common::WlanPhyType::ERP,
-                    WlanGi::G_800NS,
+                    banjo_wlan_associnfo::WlanGi::G_800NS,
                     banjo_common::ChannelBandwidth::CBW20,
                     mcs_idx,
                 )
@@ -490,10 +490,10 @@ impl DeviceInterface {
             cipher_oui: key.cipher_oui,
             cipher_type: key.cipher_type,
             key_type: match key.key_type {
-                key::KeyType::PAIRWISE => WlanKeyType::PAIRWISE,
-                key::KeyType::GROUP => WlanKeyType::GROUP,
-                key::KeyType::IGTK => WlanKeyType::IGTK,
-                key::KeyType::PEER => WlanKeyType::PEER,
+                key::KeyType::PAIRWISE => banjo_wlan_associnfo::WlanKeyType::PAIRWISE,
+                key::KeyType::GROUP => banjo_wlan_associnfo::WlanKeyType::GROUP,
+                key::KeyType::IGTK => banjo_wlan_associnfo::WlanKeyType::IGTK,
+                key::KeyType::PEER => banjo_wlan_associnfo::WlanKeyType::PEER,
                 _ => return Err(zx::Status::INVALID_ARGS),
             },
             peer_addr: key.peer_addr,
