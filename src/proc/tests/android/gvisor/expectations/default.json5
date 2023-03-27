@@ -627,8 +627,11 @@
                 "ProcPidFile.SubprocessRunning",
                 "ProcPidFile.SubprocessZombie",
                 "ProcPidFile.SubprocessExited",
-                "ProcTask.VerifyTaskDir",
+                "ProcTask.CommCanSetSelfThreadName",
+                "ProcTask.CommCanSetPeerThreadName",
+                "ProcTask.CommCannotSetAnotherProcessThreadName",
                 "ProcTask.TaskDirHasCorrectMetadata",
+                "ProcTask.VerifyTaskDir",
                 "ProcTask.VerifyTaskDirNlinks",
                 "ProcSysKernelHostname.Exists",
                 "ProcSysKernelHostname.MatchesUname",
@@ -761,6 +764,7 @@
                 "ReadaheadTest.CrossesEnd",
 
                 // rlimits_test
+                "RlimitTest.ParseProcPidLimits",
                 "RlimitTest.UnprivilegedSetRlimit",
                 "RlimitTest.SetSoftRlimitAboveHard",
                 "RlimitTest.RlimitNProc",
@@ -860,6 +864,7 @@
                 "AllUnixDomainSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
                 "AllTCPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
                 "AllTCPSockets/AllSocketPairTest.SendmsgRecvmsgMsgCtruncNoop/*",
+                "AllTCPSockets/AllSocketPairTest.SetAndGetBooleanSocketOptions/*",
                 "AllTCPSockets/AllSocketPairTest.SetSocketRecvBufForceAboveMax/*",
 
                 // socket_ip_udp_loopback_test
@@ -1001,6 +1006,9 @@
                 "TeeTest.TwoPipesPartialWrite",
                 "SpliceTest.WriteOverflow",
 
+                // stat_test
+                "StatTest.StatxIgnoreNoAutomount",
+
                 // statfs_test
                 "FstatfsTest.BlocksFree",
 
@@ -1086,6 +1094,7 @@
                 "AllInetTests/TcpSocketTest.NoDelayDefault/*",
                 "AllInetTests/TcpSocketTest.MsgTruncWithCtruncOnly/*",
                 "AllInetTests/TcpSocketTest.TcpInqSetSockOpt/*",
+                "AllInetTests/SimpleTcpSocketTest.PollAroundAccept/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectSend/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectRecvShutdownRead/*",
                 "AllInetTests/TcpSocketTest.PollAfterShutdown/*",
