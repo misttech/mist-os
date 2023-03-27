@@ -80,10 +80,8 @@ impl LegacyComponent {
             }
         }
 
-        let runner_svc_dir_proxy = fuchsia_fs::directory::open_in_namespace(
-            "/svc",
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        )?;
+        let runner_svc_dir_proxy =
+            fuchsia_fs::directory::open_in_namespace("/svc", fio::OpenFlags::empty())?;
         let host_pseudo_dir = pfs::simple();
         host_pseudo_dir.clone().add_entry(
         fsysv1::LoaderMarker::PROTOCOL_NAME,

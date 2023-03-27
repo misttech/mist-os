@@ -13,9 +13,6 @@
 constexpr uint64_t fuchsia_io_MAX_PATH_LENGTH = 4095;
 constexpr uint64_t fuchsia_io_MAX_NAME_LENGTH = 255;
 
-constexpr uint32_t fuchsia_io_OpenFlags_RIGHT_READABLE = 1;
-constexpr uint32_t fuchsia_io_OpenFlags_RIGHT_WRITABLE = 2;
-
 // This definition of a bit of fuchsia.io.Directory/Open is here because llcpp has dependencies on
 // new/delete, which aren't possible when this code is used in libc.
 constexpr uint64_t fuchsia_io_DirectoryOpenOrdinal = 0x2C5044561D685EC0ull;

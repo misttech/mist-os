@@ -47,8 +47,7 @@ pub mod tests {
         instance.driver_test_realm_start(fidl_fuchsia_driver_test::RealmArgs::EMPTY).await?;
         let dev = instance.driver_test_realm_connect_to_dev()?;
         let dir =
-            fuchsia_fs::directory::open_directory(&dev, dev_dir, fio::OpenFlags::RIGHT_READABLE)
-                .await?;
+            fuchsia_fs::directory::open_directory(&dev, dev_dir, fio::OpenFlags::empty()).await?;
         // Wait for the first node.
         let stream = device_watcher::watch_for_files(&dir).await?;
         let path: Option<_> = stream

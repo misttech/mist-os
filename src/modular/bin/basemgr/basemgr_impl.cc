@@ -116,12 +116,8 @@ void BasemgrImpl::CreateSessionProvider(const ModularConfigAccessor* const confi
   if (files::IsDirectory(path)) {
     FX_LOGS(INFO) << "Found svc_for_v1_sessionmgr";
 
-    zx_status_t status;
-    status = fdio_open(path.c_str(),
-                       static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE |
-                                             fuchsia::io::OpenFlags::RIGHT_WRITABLE |
-                                             fuchsia::io::OpenFlags::DIRECTORY),
-                       svc_for_v1_sessionmgr.host_directory.NewRequest().TakeChannel().release());
+    zx_status_t status = fdio_service_connect(
+        path.c_str(), svc_for_v1_sessionmgr.host_directory.NewRequest().TakeChannel().release());
     FX_CHECK(status == ZX_OK) << "failed to open " << path << ": " << zx_status_get_string(status);
 
     std::vector<std::string> v2_services;

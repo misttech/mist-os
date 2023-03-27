@@ -64,7 +64,7 @@ impl PathSource {
         let path = self.path;
         let is_nand = self.is_nand;
         let dir_proxy =
-            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::RIGHT_READABLE)
+            fuchsia_fs::directory::open_in_namespace(path, fuchsia_fs::OpenFlags::empty())
                 .context(format!("Failed to open directory at {path}"))?;
         let watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await

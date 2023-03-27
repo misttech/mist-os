@@ -104,13 +104,11 @@ where
 }
 
 fn get_dev_directory() -> fio::DirectoryProxy {
-    open_in_namespace("/dev", fio::OpenFlags::RIGHT_READABLE)
-        .expect("open /dev root for disk manager")
+    open_in_namespace("/dev", fio::OpenFlags::empty()).expect("open /dev root for disk manager")
 }
 
 fn get_svc_directory() -> fio::DirectoryProxy {
-    open_in_namespace("/svc", fio::OpenFlags::RIGHT_READABLE)
-        .expect("open /svc root for disk manager")
+    open_in_namespace("/svc", fio::OpenFlags::empty()).expect("open /svc root for disk manager")
 }
 
 fn get_storage_manager(account_id: &AccountId) -> StorageManagerEnum {

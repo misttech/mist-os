@@ -200,7 +200,7 @@ pub async fn get_accessor_selectors(
             let out_svc_dir_proxy = match fuchsia_fs::directory::open_directory_no_describe(
                 &out_dir_proxy,
                 "svc",
-                fuchsia_fs::OpenFlags::RIGHT_READABLE,
+                fuchsia_fs::OpenFlags::empty(),
             ) {
                 Ok(proxy) => proxy,
                 Err(_) => continue,

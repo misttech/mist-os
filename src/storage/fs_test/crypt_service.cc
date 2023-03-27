@@ -61,10 +61,7 @@ zx::result<zx::channel> GetCryptService() {
     }
 
     if (zx_status_t status =
-            fdio_open("/svc",
-                      static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                            fuchsia_io::wire::OpenFlags::kRightWritable),
-                      service_endpoints_or->server.TakeChannel().release());
+            fdio_service_connect("/svc", service_endpoints_or->server.TakeChannel().release());
         status != ZX_OK) {
       FX_LOGS(ERROR) << "Unable to open /svc: " << zx_status_get_string(status);
       return zx::error(status);

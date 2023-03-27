@@ -126,9 +126,7 @@ class AdbShellTest : public zxtest::Test, public loop_fixture::RealLoop {
                          .status_value());
     ASSERT_EQ(ZX_OK, incoming_->Serve(std::move(endpoints->server)).status_value());
     ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
-                             fuchsia_io::wire::OpenFlags::kRightReadable,
-                         {}, "svc", fidl::ServerEnd<fuchsia_io::Node>(svc.TakeChannel())));
+                  ->Open({}, {}, "svc", fidl::ServerEnd<fuchsia_io::Node>(svc.TakeChannel())));
   }
 
  protected:

@@ -997,7 +997,7 @@ mod tests {
             .open(
                 "./",
                 fsys::OpenDirType::NamespaceDir,
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
                 fio::ModeType::empty(),
                 "svc",
                 server_end,
@@ -1520,13 +1520,10 @@ mod deprecated {
                     },
                 ]
             );
-            let svc_dir = fuchsia_fs::directory::open_directory(
-                &ns_dir,
-                "svc",
-                fio::OpenFlags::RIGHT_READABLE,
-            )
-            .await
-            .unwrap();
+            let svc_dir =
+                fuchsia_fs::directory::open_directory(&ns_dir, "svc", fio::OpenFlags::empty())
+                    .await
+                    .unwrap();
             let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
             assert_eq!(
                 entries,

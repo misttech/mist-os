@@ -504,9 +504,7 @@ impl lazy_immutable_dir::LazyDirectory for AggregateServiceDirectory {
                 let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .map_err(|_| zx::Status::INTERNAL)?;
                 if let Ok(()) = OpenRequest::new_outgoing_directory(
-                    fio::OpenFlags::RIGHT_READABLE
-                        | fio::OpenFlags::RIGHT_WRITABLE
-                        | fio::OpenFlags::DIRECTORY,
+                    fio::OpenFlags::DIRECTORY,
                     PathBuf::new(),
                     source,
                     &target,
@@ -762,9 +760,7 @@ impl CollectionServiceDirectory {
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
         OpenRequest::new_outgoing_directory(
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
+            fio::OpenFlags::DIRECTORY,
             PathBuf::new(),
             source.clone(),
             &target,

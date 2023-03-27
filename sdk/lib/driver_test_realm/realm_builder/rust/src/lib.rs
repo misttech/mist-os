@@ -143,7 +143,7 @@ impl DriverTestRealmInstance for RealmInstance {
         fuchsia_fs::directory::open_directory_no_describe(
             self.root.get_exposed_dir(),
             "dev",
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )
         .map_err(Into::into)
     }

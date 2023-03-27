@@ -44,7 +44,7 @@
         // https://fuchsia.dev/fuchsia-src/development/components/v2/migration/components#route-to-v1
         {
             directory: "svc_from_sys",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/svc",
         },
         { protocol: "fuchsia.sys.Launcher" },
@@ -52,7 +52,7 @@
     use: [
         {
             directory: "svc_for_sys",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/svc_for_sys",
         },
         {

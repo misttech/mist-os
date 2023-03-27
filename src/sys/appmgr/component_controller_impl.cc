@@ -133,19 +133,15 @@ ComponentControllerBase::ComponentControllerBase(
   exported_dir_.Bind(std::move(exported_dir), async_get_default_dispatcher());
 
   if (client_request) {
-    // TODO(https://fxbug.dev/101092): revert this to fdio_service_connect_at once all downstream
-    // consumers contain this commit.
-    fdio_open_at(exported_dir_.channel().get(), "svc",
-                 static_cast<uint32_t>(fuchsia::io::OpenFlags::RIGHT_READABLE),
-                 client_request.TakeChannel().release());
+    fdio_service_connect_at(exported_dir_.channel().get(), "svc",
+                            client_request.TakeChannel().release());
   }
 
   ns_->set_component_id(hub_instance_id_);
   hub_.SetName(label_);
   hub_.AddEntry("url", url_);
   hub_.AddEntry("args", std::move(args));
-  exported_dir_->Clone(fuchsia::io::OpenFlags::DESCRIBE | fuchsia::io::OpenFlags::RIGHT_READABLE |
-                           fuchsia::io::OpenFlags::RIGHT_WRITABLE,
+  exported_dir_->Clone(fuchsia::io::OpenFlags::DESCRIBE | fuchsia::io::OpenFlags::CLONE_SAME_RIGHTS,
                        cloned_exported_dir_.NewRequest());
 
   cloned_exported_dir_.events().OnOpen =

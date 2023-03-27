@@ -125,13 +125,10 @@ pub async fn query_echo_server_child() {
         ]
     );
 
-    let svc_dir = fuchsia_fs::directory::open_directory(
-        &ns_dir,
-        "svc",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )
-    .await
-    .unwrap();
+    let svc_dir =
+        fuchsia_fs::directory::open_directory(&ns_dir, "svc", fuchsia_fs::OpenFlags::empty())
+            .await
+            .unwrap();
     let entries = fuchsia_fs::directory::readdir(&svc_dir).await.unwrap();
     assert_eq!(
         entries,

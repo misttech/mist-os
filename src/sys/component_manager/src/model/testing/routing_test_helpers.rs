@@ -1145,18 +1145,15 @@ pub mod capability_util {
         let service_dir = fuchsia_fs::directory::open_directory(
             &dir_proxy,
             &path.basename,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )
         .await
         .expect("failed to open service dir");
         add_dir_to_namespace(namespace, &path.dirname, dir_proxy).await;
-        let instance_dir = fuchsia_fs::directory::open_directory(
-            &service_dir,
-            instance,
-            fio::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .expect("failed to open instance dir");
+        let instance_dir =
+            fuchsia_fs::directory::open_directory(&service_dir, instance, fio::OpenFlags::empty())
+                .await
+                .expect("failed to open instance dir");
         connect_to_named_protocol_at_dir_root::<T>(&instance_dir, member)
             .expect("failed to open service")
     }
@@ -1224,7 +1221,7 @@ pub mod capability_util {
         let _file_proxy = fuchsia_fs::directory::open_file(
             &dir_proxy,
             &path.basename.to_string(),
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
         )
         .await
         .expect("failed to open file");

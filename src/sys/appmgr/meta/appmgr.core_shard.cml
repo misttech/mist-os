@@ -22,7 +22,7 @@
         },
         {
             directory: "svc_from_sys",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/svc_from_sys",
         },
     ],
@@ -30,7 +30,7 @@
         {
             directory: "svc_from_sys",
             from: "#appmgr",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             path: "/svc_from_sys",
             dependency: "weak_for_migration",
         },

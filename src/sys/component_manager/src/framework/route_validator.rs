@@ -990,13 +990,9 @@ mod tests {
             let ns = ns.remove(1);
             assert_eq!(ns.path.as_ref().unwrap(), "/svc");
             let svc_dir = ns.directory.unwrap().into_proxy().unwrap();
-            fuchsia_fs::directory::open_directory(
-                &svc_dir,
-                "foo.bar",
-                fio::OpenFlags::RIGHT_WRITABLE,
-            )
-            .await
-            .unwrap();
+            fuchsia_fs::directory::open_directory(&svc_dir, "foo.bar", fio::OpenFlags::empty())
+                .await
+                .unwrap();
         }
 
         let mut targets =

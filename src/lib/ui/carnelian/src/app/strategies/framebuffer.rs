@@ -46,7 +46,7 @@ async fn watch_directory_async(
 ) -> Result<(), Error> {
     let dir_proxy = fuchsia_fs::directory::open_in_namespace(
         dir.to_str().expect("to_str"),
-        OpenFlags::RIGHT_READABLE,
+        OpenFlags::empty(),
     )?;
     let mut watcher = vfs_watcher::Watcher::new(&dir_proxy).await?;
     fasync::Task::local(async move {

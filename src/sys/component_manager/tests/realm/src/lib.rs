@@ -223,7 +223,7 @@ pub async fn echo_server() {
         .open(
             "./echo_server",
             fsys::OpenDirType::NamespaceDir,
-            fio::OpenFlags::RIGHT_READABLE,
+            fio::OpenFlags::empty(),
             fio::ModeType::empty(),
             "svc",
             server_end,

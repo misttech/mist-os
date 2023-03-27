@@ -57,7 +57,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
         self.svc_dir
             .borrow()
             .open(
-                fio::OpenFlags::RIGHT_READABLE,
+                fio::OpenFlags::empty(),
                 fio::ModeType::empty(),
                 P::PROTOCOL_NAME,
                 ServerEnd::new(server_end),
@@ -81,7 +81,7 @@ impl<D: Borrow<fio::DirectoryProxy>, P: DiscoverableProtocolMarker> ProtocolConn
 
 /// Clone the handle to the service directory in the application's root namespace.
 pub fn clone_namespace_svc() -> Result<fio::DirectoryProxy, Error> {
-    fuchsia_fs::directory::open_in_namespace(SVC_DIR, fio::OpenFlags::RIGHT_READABLE)
+    fuchsia_fs::directory::open_in_namespace(SVC_DIR, fio::OpenFlags::empty())
         .context("error opening svc directory")
 }
 
@@ -99,11 +99,9 @@ pub fn new_protocol_connector<P: DiscoverableProtocolMarker>(
 pub fn new_protocol_connector_at<P: DiscoverableProtocolMarker>(
     service_directory_path: &str,
 ) -> Result<ProtocolConnector<fio::DirectoryProxy, P>, Error> {
-    let dir = fuchsia_fs::directory::open_in_namespace(
-        service_directory_path,
-        fio::OpenFlags::RIGHT_READABLE,
-    )
-    .context("error opening service directory")?;
+    let dir =
+        fuchsia_fs::directory::open_in_namespace(service_directory_path, fio::OpenFlags::empty())
+            .context("error opening service directory")?;
 
     Ok(ProtocolConnector::new(dir))
 }
@@ -392,7 +390,7 @@ mod tests {
         let scope = ExecutionScope::new();
         dir.open(
             scope,
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
+            fio::OpenFlags::DIRECTORY,
             vfs::path::Path::dot(),
             ServerEnd::new(dir_server.into_channel()),
         );

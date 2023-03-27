@@ -1061,9 +1061,7 @@ class FastbootRebootTest : public zxtest::Test {
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
-                             fuchsia_io::wire::OpenFlags::kRightReadable,
-                         {}, "svc",
+                  ->Open({}, {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
   }
@@ -1233,9 +1231,7 @@ class FastbootFshostTest : public FastbootDownloadTest {
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
-                             fuchsia_io::wire::OpenFlags::kRightReadable,
-                         {}, "svc",
+                  ->Open({}, {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
 
@@ -1464,9 +1460,7 @@ class FastbootBuildInfoTest : public FastbootDownloadTest {
     auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_TRUE(svc_endpoints.is_ok());
     ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open(fuchsia_io::wire::OpenFlags::kRightWritable |
-                             fuchsia_io::wire::OpenFlags::kRightReadable,
-                         {}, "svc",
+                  ->Open({}, {}, "svc",
                          fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
     svc_local_ = std::move(svc_endpoints->client);
 

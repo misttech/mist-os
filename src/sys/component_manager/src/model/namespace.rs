@@ -499,24 +499,19 @@ fn serve_and_install_svc_dirs(
     svc_dirs: HashMap<String, Directory>,
 ) {
     for (target_dir_path, pseudo_dir) in svc_dirs {
-        let (client_end, server_end) = create_endpoints::<fio::NodeMarker>();
+        let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
         pseudo_dir.clone().open(
             ExecutionScope::new(),
-            // TODO(https://fxbug.dev/101092): remove RIGHT_WRITABLE once all downstream consumers
-            // contain commit 333c0fb2b6de303972e89629ba5485d5cd21a41a.
-            //
-            // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE once all downstream consumers
-            // contain this commit.
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DIRECTORY,
+            // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE svc_{for,from}_sys have been
+            // dismantled.
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DIRECTORY,
             Path::dot(),
             server_end.into_channel().into(),
         );
 
         ns.push(fcrunner::ComponentNamespaceEntry {
-            path: Some(target_dir_path.as_str().to_string()),
-            directory: Some(ClientEnd::new(client_end.into_channel())), // coerce to ClientEnd<Dir>
+            path: Some(target_dir_path),
+            directory: Some(client_end),
             ..fcrunner::ComponentNamespaceEntry::EMPTY
         });
     }

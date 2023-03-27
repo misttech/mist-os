@@ -102,11 +102,7 @@ int main(int argc, char** argv) {
     FX_LOGS(ERROR) << "failed to create channel: " << zx_status_get_string(status);
     return status;
   }
-  status = fdio_open("/svc_for_sys",
-                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                           fuchsia_io::wire::OpenFlags::kDirectory |
-                                           fuchsia_io::wire::OpenFlags::kRightWritable),
-                     svc_for_sys_server.release());
+  status = fdio_service_connect("/svc_for_sys", svc_for_sys_server.release());
   if (status != ZX_OK) {
     FX_LOGS(WARNING) << "failed to open /svc_for_sys (" << zx_status_get_string(status)
                      << "), not forwarding services to sys realm";

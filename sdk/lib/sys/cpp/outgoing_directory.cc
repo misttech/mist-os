@@ -61,11 +61,6 @@ zx_status_t OutgoingDirectory::Serve(zx::channel directory_request,
   if (!directory_request.is_valid()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  // TODO(https://fxbug.dev/101092): remove RIGHT_WRITABLE once all downstream consumers contain
-  // commit 333c0fb2b6de303972e89629ba5485d5cd21a41a.
-  //
-  // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE once all downstream consumers contain
-  // this commit.
   return root_->Serve(
       fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
       std::move(directory_request), dispatcher);
@@ -77,11 +72,6 @@ zx_status_t OutgoingDirectory::Serve(
   if (!directory_request.is_valid()) {
     return ZX_ERR_BAD_HANDLE;
   }
-  // TODO(https://fxbug.dev/101092): remove RIGHT_WRITABLE once all downstream consumers contain
-  // commit 333c0fb2b6de303972e89629ba5485d5cd21a41a.
-  //
-  // TODO(https://fxbug.dev/101092): remove RIGHT_READABLE once all downstream consumers contain
-  // this commit.
   return root_->Serve(
       fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::RIGHT_WRITABLE,
       directory_request.TakeChannel(), dispatcher);

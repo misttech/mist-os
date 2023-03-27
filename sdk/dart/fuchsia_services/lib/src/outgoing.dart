@@ -45,9 +45,7 @@ class Outgoing {
   /// over it.
   void serve(InterfaceRequest<Node> request) {
     _ensureNotClosed();
-    // TODO(https://fxbug.dev/101092): reduce these rights.
-    // TODO(https://fxbug.dev/118292): reduce these rights (readable?).
-    _root.serve(request);
+    _root.serve(request, rights: OpenFlags.rightReadable);
   }
 
   /// Serves root dir to the out/ directory.

@@ -73,16 +73,15 @@ async fn list_files_auto_proxy(monikers: &[String]) -> Result<Vec<ListFilesResul
 /// Helper method to connect to both the `RealmQuery` and the `RealmExplorer`.
 pub(crate) async fn connect_realm_protocols(
 ) -> Result<(fsys2::RealmQueryProxy, fsys2::RealmExplorerProxy), Error> {
-    let dir_proxy = fuchsia_fs::directory::open_in_namespace(
-        "/svc",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
-    )
-    .map_err(|e| {
-        Error::IOError(
-            "unable to connect to DirectoryProxy for /svc".to_owned(),
-            anyhow!("{:?}", e),
-        )
-    })?;
+    let dir_proxy =
+        fuchsia_fs::directory::open_in_namespace("/svc", fuchsia_fs::OpenFlags::empty()).map_err(
+            |e| {
+                Error::IOError(
+                    "unable to connect to DirectoryProxy for /svc".to_owned(),
+                    anyhow!("{:?}", e),
+                )
+            },
+        )?;
 
     let realm_query_proxy =
         client::connect_to_named_protocol_at_dir_root::<fsys2::RealmQueryMarker>(

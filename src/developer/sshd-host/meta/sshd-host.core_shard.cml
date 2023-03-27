@@ -52,7 +52,7 @@
             directory: "svc_from_sys",
             from: "#appmgr",
             to: "#sshd-host",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
             source_availability: "unknown",
         },
 
@@ -61,7 +61,7 @@
             directory: "svc_for_sys",
             from: "self",
             to: "#sshd-host",
-            rights: [ "rw*" ],
+            rights: [ "r*" ],
         },
 
         // Directories in legacy shell namespace

@@ -208,11 +208,9 @@ zx::result<zx::channel> RecursiveWaitForFile(const char* path, zx::duration time
     return zx::error(status);
   }
 
-  if (zx_status_t status =
-          fdio_open(std::string(directory).c_str(),
-                    static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kRightReadable |
-                                          fuchsia_io::wire::OpenFlags::kDirectory),
-                    server.release());
+  if (zx_status_t status = fdio_open(std::string(directory).c_str(),
+                                     static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory),
+                                     server.release());
       status != ZX_OK) {
     return zx::error(status);
   }

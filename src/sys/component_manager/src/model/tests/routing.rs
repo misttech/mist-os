@@ -2898,7 +2898,7 @@ async fn use_service_from_sibling_collection() {
     let service_dir = fuchsia_fs::directory::open_directory(
         &dir,
         "my.service.Service",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::OpenFlags::empty(),
     )
     .await
     .expect("failed to open service");
@@ -3042,7 +3042,7 @@ async fn use_filtered_service_from_sibling() {
     let service_dir_c = fuchsia_fs::directory::open_directory(
         &dir_c,
         "my.service.Service",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::OpenFlags::empty(),
     )
     .await
     .expect("failed to open service");
@@ -3062,7 +3062,7 @@ async fn use_filtered_service_from_sibling() {
     let service_dir_d = fuchsia_fs::directory::open_directory(
         &dir_d,
         "my.service.Service",
-        fuchsia_fs::OpenFlags::RIGHT_READABLE | fuchsia_fs::OpenFlags::RIGHT_WRITABLE,
+        fuchsia_fs::OpenFlags::empty(),
     )
     .await
     .expect("failed to open service");
