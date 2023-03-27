@@ -554,6 +554,7 @@ impl<T: Debug> Debug for Chained<T> {
 }
 
 impl<T> Chained<T> {
+    #[allow(clippy::uninit_assumed_init)]
     fn empty() -> Self {
         // Create an uninitialized array of `MaybeUninit`. The `assume_init` is
         // safe because the type we are claiming to have initialized here is a
@@ -593,7 +594,12 @@ impl<T> IntoIterator for Chained<T> {
         let len = self.len;
         self.len = ChainLength::ZERO;
         // Safety: we have reset the length to zero, it is now safe to move out
-        // the values and set them to be uninitialized.
+        // the values and set them to be uninitialized. The `assume_init` is
+        // safe because the type we are claiming to have initialized here is a
+        // bunch of `MaybeUninit`s, which do not require initialization.
+        // TODO(https://fxbug.dev/80114): use MaybeUninit::uninit_array once it
+        // is stablized.
+        #[allow(clippy::uninit_assumed_init)]
         let storage =
             std::mem::replace(&mut self.storage, unsafe { MaybeUninit::uninit().assume_init() });
         ChainedIter { storage, len, consumed: 0 }
