@@ -6,6 +6,7 @@
 
 #include <lib/devicetree/devicetree.h>
 #include <lib/stdcompat/array.h>
+#include <lib/stdcompat/source_location.h>
 #include <lib/stdcompat/span.h>
 #include <limits.h>
 #include <stdio.h>
@@ -51,7 +52,7 @@ TEST(DevicetreeTest, EmptyTree) {
   devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   size_t seen = 0;
-  auto walker = [&seen](const devicetree::NodePath& path, devicetree::Properties) {
+  auto walker = [&seen](const devicetree::NodePath& path, const devicetree::PropertyDecoder&) {
     if (seen++ == 0) {
       size_t size = path.size_slow();
       EXPECT_EQ(1, size);
@@ -77,7 +78,8 @@ void DoAndVerifyWalk(devicetree::Devicetree& tree, cpp20::span<const Node> nodes
                      cpp20::span<const size_t> post_order) {
   // PreWalk Only check.
   size_t seen = 0;
-  auto pre_walker = [&](const devicetree::NodePath& path, devicetree::Properties props) {
+  auto pre_walker = [&](const devicetree::NodePath& path,
+                        const devicetree::PropertyDecoder& props) {
     bool prune = false;
     if (seen < nodes.size()) {
       auto node = nodes[seen];
@@ -98,7 +100,8 @@ void DoAndVerifyWalk(devicetree::Devicetree& tree, cpp20::span<const Node> nodes
   seen = 0;
 
   size_t post_seen = 0;
-  auto post_walker = [&](const devicetree::NodePath& path, devicetree::Properties props) {
+  auto post_walker = [&](const devicetree::NodePath& path,
+                         const devicetree::PropertyDecoder& props) {
     bool prune = false;
     if (post_seen < nodes.size()) {
       auto node = nodes[post_order[post_seen]];
@@ -225,7 +228,9 @@ TEST(DevicetreeTest, PropertiesAreTranslated) {
   devicetree::Devicetree dt(cpp20::as_bytes(cpp20::span{fdt}));
 
   size_t seen = 0;
-  auto walker = [&seen](const devicetree::NodePath& path, devicetree::Properties props) {
+  auto walker = [&seen](const devicetree::NodePath& path,
+                        const devicetree::PropertyDecoder& decoder) {
+    auto& props = decoder.properties();
     switch (seen++) {
       case 0: {  // root
         size_t size = path.size_slow();
@@ -413,6 +418,98 @@ TEST(DevicetreeTest, StringList) {
     }
   }
   EXPECT_EQ(i, 3);
+}
+
+auto as_bytes = [](auto& val) {
+  using byte_type = std::conditional_t<std::is_const_v<std::remove_reference_t<decltype(val)>>,
+                                       const uint8_t, uint8_t>;
+  return cpp20::span<byte_type>(reinterpret_cast<byte_type*>(&val), sizeof(val));
+};
+
+auto append = [](auto& vec, auto&& other) { vec.insert(vec.end(), other.begin(), other.end()); };
+
+uint32_t byte_swap(uint32_t val) {
+  if constexpr (cpp20::endian::native == cpp20::endian::big) {
+    return val;
+  } else {
+    auto bytes = as_bytes(val);
+    return static_cast<uint32_t>(bytes[0]) << 24 | static_cast<uint32_t>(bytes[1]) << 16 |
+           static_cast<uint32_t>(bytes[2]) << 8 | static_cast<uint32_t>(bytes[3]);
+  }
+}
+
+// Small helper so we can verify the behavior of CachedProperties.
+struct PropertyBuilder {
+  devicetree::Properties Build() {
+    return devicetree::Properties(
+        {property_block.data(), property_block.size()},
+        std::string_view(reinterpret_cast<const char*>(string_block.data()), string_block.size()));
+  }
+
+  void Add(std::string_view name, uint32_t value) {
+    uint32_t name_off = byte_swap(static_cast<uint32_t>(string_block.size()));
+    // String must be null terminated.
+    append(string_block, name);
+    string_block.push_back('\0');
+
+    uint32_t len = byte_swap(sizeof(uint32_t));
+
+    if (!property_block.empty()) {
+      const uint32_t kFdtPropToken = byte_swap(0x00000003);
+      append(property_block, as_bytes(kFdtPropToken));
+    }
+    // this are all 32b aliagned, no padding need.
+    append(property_block, as_bytes(len));
+    append(property_block, as_bytes(name_off));
+    uint32_t be_value = byte_swap(value);
+    append(property_block, as_bytes(be_value));
+  }
+
+  std::vector<uint8_t> property_block;
+  std::vector<uint8_t> string_block;
+};
+
+auto check_prop = [](auto& prop, uint32_t val,
+                     cpp20::source_location loc = cpp20::source_location::current()) {
+  ASSERT_TRUE(prop, "at %s:%u", loc.file_name(), loc.line());
+  auto pv = prop->AsUint32();
+  ASSERT_TRUE(pv, "at %s:%u", loc.file_name(), loc.line());
+  EXPECT_EQ(*pv, val, "at %s:%u", loc.file_name(), loc.line());
+};
+
+TEST(PropertyDecoderTest, FindProperties) {
+  PropertyBuilder builder;
+  builder.Add("property_1", 1);
+  builder.Add("property_2", 2);
+  builder.Add("property_3", 3);
+  auto props = builder.Build();
+
+  devicetree::PropertyDecoder decoder(props);
+
+  auto [p1, p2, p3, u4, rep_p3] =
+      decoder.FindProperties("property_1", "property_2", "property_3", "unknown", "property_3");
+
+  check_prop(p1, 1);
+  check_prop(p2, 2);
+  check_prop(p3, 3);
+  ASSERT_FALSE(u4);
+  ASSERT_FALSE(rep_p3);
+}
+
+TEST(PropertyDecoderTest, FindProperty) {
+  PropertyBuilder builder;
+  builder.Add("property_1", 1);
+  builder.Add("property_2", 2);
+  builder.Add("property_3", 3);
+  auto props = builder.Build();
+
+  devicetree::PropertyDecoder decoder(props);
+
+  auto prop = decoder.FindProperty("property_1");
+  auto not_found = decoder.FindProperty("not in there");
+
+  check_prop(prop, 1);
+  ASSERT_FALSE(not_found);
 }
 
 }  // namespace

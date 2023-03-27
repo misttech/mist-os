@@ -200,7 +200,8 @@ void Devicetree::WalkTree(NodeVisitor pre_order_visitor, NodeVisitor post_order_
       case FDT_NOP:
         break;
       case FDT_BEGIN_NODE:
-        unprocessed = WalkSubtree(unprocessed, &path, pre_order_visitor, post_order_visitor, true);
+        unprocessed =
+            WalkSubtree(unprocessed, &path, nullptr, pre_order_visitor, post_order_visitor, true);
         break;
       case FDT_END:
         return;
@@ -213,8 +214,9 @@ void Devicetree::WalkTree(NodeVisitor pre_order_visitor, NodeVisitor post_order_
 // Recursively walks a subtree and returns its unprocessed tail.
 // It should be invariant that the subtree begins just after the
 // FDT_BEGIN_NODE token.
-ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& pre_order_visitor,
-                                 NodeVisitor& post_order_visitor, bool visit) const {
+ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, PropertyDecoder* parent,
+                                 NodeVisitor& pre_order_visitor, NodeVisitor& post_order_visitor,
+                                 bool visit) const {
   ByteView unprocessed = subtree;
 
   // The node name follows the begin token.
@@ -227,6 +229,9 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& 
 
   // Seek past all no-op tokens and properties.
   ByteView props_block = unprocessed;
+
+  PropertyDecoder decoder;
+
   while (!unprocessed.empty()) {
     auto [token, tail] = ReadBigEndianUint32(unprocessed);
     switch (token) {
@@ -247,7 +252,7 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& 
   // just after a property token.
   props_block.remove_suffix(unprocessed.size());
 
-  auto call = [&](auto&& walker) { return walker(*path, Properties(props_block, string_block_)); };
+  auto call = [&](auto&& walker) { return walker(*path, decoder); };
   bool post_visit = visit;
   if (visit) {
     while (!props_block.empty()) {
@@ -263,6 +268,8 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& 
       // Reached only at the end of the property block.
       break;
     }
+    // Re-initialize the property decoder with this node's properties.
+    new (&decoder) PropertyDecoder(parent, Properties(props_block, string_block_));
     visit = call(pre_order_visitor);
   }
 
@@ -274,7 +281,8 @@ ByteView Devicetree::WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& 
       case FDT_NOP:
         continue;
       case FDT_BEGIN_NODE:
-        unprocessed = WalkSubtree(unprocessed, path, pre_order_visitor, post_order_visitor, visit);
+        unprocessed =
+            WalkSubtree(unprocessed, path, &decoder, pre_order_visitor, post_order_visitor, visit);
         continue;
       case FDT_END_NODE:
         break;

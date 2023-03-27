@@ -132,7 +132,7 @@ class StringList {
 // for the types and representations of possible property values.
 class PropertyValue {
  public:
-  PropertyValue(ByteView bytes) : bytes_(bytes) {}
+  constexpr PropertyValue(ByteView bytes) : bytes_(bytes) {}
 
   ByteView AsBytes() const { return bytes_; }
 
@@ -180,10 +180,12 @@ struct Property {
 // https://devicetree-specification.readthedocs.io/en/v0.3/flattened-format.html#structure-block
 class Properties {
  public:
+  constexpr Properties() = default;
+
   // Constructed from a byte span beginning just after the first internal::FDT_PROP token
   // in a flattened block of properties (or an otherwise empty one), along with
   // a string block for property name look-up.
-  Properties(ByteView property_block, std::string_view string_block)
+  constexpr Properties(ByteView property_block, std::string_view string_block)
       : property_block_(property_block), string_block_(string_block) {}
 
   // A property iterator is identified with the position in a block of
@@ -287,6 +289,85 @@ class MemoryReservations {
   ByteView mem_rsvmap_;
 };
 
+// Property decoder provides an interface for accessing |devicetree::Properties|
+// during a |Devicetree::Walk|.
+//
+// This class preserves node hierarchy of the properties, such that properties of arbitrary nodes
+// along the path can be accessed. This allows for things like register blocks, interrupts or others
+// to be parsed correctly.
+//
+// This class' object lifetime is tied to the walk, and no references or pointers should be kept
+// around, without this consideration.
+class PropertyDecoder {
+ public:
+  constexpr PropertyDecoder() = default;
+  constexpr PropertyDecoder(const PropertyDecoder&) = delete;
+  constexpr PropertyDecoder(PropertyDecoder&&) = delete;
+  explicit constexpr PropertyDecoder(PropertyDecoder* parent, Properties properties)
+      : parent_(parent), properties_(std::move(properties)) {}
+  explicit constexpr PropertyDecoder(Properties properties)
+      : PropertyDecoder(nullptr, std::move(properties)) {}
+
+  // Returns the decoder of the current node's parent if any.
+  // Root node will return |nullptr|.
+  constexpr PropertyDecoder* parent() const { return parent_; }
+
+  // Attempts to find a list of unique property names in a single iteration of the available
+  // properties. If the property is not found, and |std::nullopt| is returned in the respective
+  // location.
+  //
+  // E.g.:
+  // PropertyDecoder decoder(...);
+  // auto [name, foo, bar, other_foo] = decoder.FindProperties("name", "foo", "bar", "other_foo");
+  //
+  // if (name.has_value()) ....
+  template <typename... PropertyNames>
+  constexpr std::array<std::optional<PropertyValue>, sizeof...(PropertyNames)> FindProperties(
+      PropertyNames&&... property_names) const {
+    return FindProperties(std::make_index_sequence<sizeof...(PropertyNames)>{},
+                          std::forward<PropertyNames>(property_names)...);
+  }
+
+  constexpr std::optional<PropertyValue> FindProperty(std::string_view name) const {
+    return FindProperties(name)[0];
+  }
+
+  // Underlying |Properties| object.
+  constexpr const Properties& properties() const { return properties_; }
+
+ private:
+  template <size_t... Is, typename... PropertyNames>
+  constexpr std::array<std::optional<PropertyValue>, sizeof...(PropertyNames)> FindProperties(
+      std::index_sequence<Is...> is, PropertyNames&&... property_names) const {
+    std::array<std::optional<PropertyValue>, sizeof...(PropertyNames)> result = {};
+    int count = 0;
+    auto try_populate = [&](auto name, size_t index, const Property& property, bool& matched) {
+      if (!result[index].has_value() && property.name == name) {
+        matched = true;
+        result[index] = property.value;
+        count++;
+        return true;
+      }
+      return result[index].has_value();
+    };
+
+    for (auto property : properties_) {
+      // Like an if/elseif branch, where |matched| determines whether the branch
+      // should be evaluated or not.
+      bool matched = false;
+      std::ignore = ((!matched && try_populate(property_names, Is, property, matched)) && ...);
+      if (count == sizeof...(PropertyNames)) {
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  PropertyDecoder* parent_ = nullptr;
+  Properties properties_;
+};
+
 // Represents a devicetree. This class does not dynamically allocate
 // memory and is appropriate for use in all low-level environments.
 class Devicetree {
@@ -295,24 +376,26 @@ class Devicetree {
   // callback that will do proper cast.
   class NodeVisitor {
    public:
-    using TypedCallback = bool (*)(const NodePath&, Properties);
+    using TypedCallback = bool (*)(const NodePath&, const PropertyDecoder&);
 
     template <typename TypedCaller>
     explicit constexpr NodeVisitor(TypedCaller& callback)
-        : typed_callback_([](void* ctx, const NodePath& path, Properties props) -> bool {
-            return (*static_cast<TypedCaller*>(ctx))(path, props);
-          }),
+        : typed_callback_(
+              [](void* ctx, const NodePath& path, const PropertyDecoder& props) -> bool {
+                return (*static_cast<TypedCaller*>(ctx))(path, props);
+              }),
           callback_(&callback) {
-      static_assert(std::is_invocable_r_v<bool, TypedCaller, const NodePath&, Properties>,
-                    "wrong callback signature");
+      static_assert(
+          std::is_invocable_r_v<bool, TypedCaller, const NodePath&, const PropertyDecoder&>,
+          "wrong callback signature");
     }
 
-    auto operator()(const NodePath& path, Properties props) const {
+    auto operator()(const NodePath& path, const PropertyDecoder& props) const {
       return typed_callback_(callback_, path, props);
     }
 
    private:
-    using CallbackType = bool (*)(void*, const NodePath&, Properties);
+    using CallbackType = bool (*)(void*, const NodePath&, const PropertyDecoder&);
     CallbackType typed_callback_;
     void* callback_;
   };
@@ -366,7 +449,7 @@ class Devicetree {
   template <typename Visitor>
   void Walk(Visitor&& visitor) const {
     return Walk(std::forward<Visitor>(visitor),
-                [](const auto& NodePath, Properties props) { return true; });
+                [](const auto& NodePath, const PropertyDecoder& props) { return true; });
   }
 
   template <typename PreOrderVisitor, typename PostOrderVisitor>
@@ -397,8 +480,8 @@ class Devicetree {
   // Walks the tree with the provided walker arguments.
   void WalkTree(NodeVisitor pre_walker, NodeVisitor post_walker) const;
 
-  ByteView WalkSubtree(ByteView subtree, NodePath* path, NodeVisitor& pre_walker,
-                       NodeVisitor& post_walker, bool visit) const;
+  ByteView WalkSubtree(ByteView subtree, NodePath* path, PropertyDecoder* parent,
+                       NodeVisitor& pre_walker, NodeVisitor& post_walker, bool visit) const;
 
   ByteView fdt_;
   // https://devicetree-specification.readthedocs.io/en/v0.3/flattened-format.html#structure-block

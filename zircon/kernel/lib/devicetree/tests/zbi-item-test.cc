@@ -29,7 +29,7 @@ TEST(DevicetreeTest, DISABLED_SystemDevicetree) {
 
     devicetree::Devicetree dt(fdt);
     int node_count = 0;
-    dt.Walk([&node_count](const auto& path, auto props) {
+    dt.Walk([&node_count](const auto& path, const auto& props) {
       ++node_count;
       return true;
     });
