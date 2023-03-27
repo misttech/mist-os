@@ -13,6 +13,7 @@
 
 #include <re2/re2.h>
 
+#include "src/developer/forensics/utils/regexp.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -38,8 +39,8 @@ bool MatchesUnsymbolicatedDartStackTrace(const std::vector<std::string>& lines) 
 // Regexes and functions for extracting information from unsymbolicated Dart stack traces.
 //
 // Stack frame.
-static const re2::RE2* const kStackFrameRegex =
-    new re2::RE2(R"(\s*#\d{2} abs ([\da-f]+)(?: virt [\da-f]+)? .*$)");
+constexpr re2::LazyRE2 kStackFrameRegex =
+    MakeLazyRE2(R"(\s*#\d{2} abs ([\da-f]+)(?: virt [\da-f]+)? .*$)");
 
 std::optional<uint64_t> TryMatchStackAddress(const std::string& line) {
   std::string address;
@@ -53,7 +54,7 @@ std::optional<uint64_t> TryMatchStackAddress(const std::string& line) {
 }
 
 // Build id.
-static const re2::RE2* const kBuildIdRegex = new re2::RE2(R"(\s*build_id: '([a-f\d]+)')");
+constexpr re2::LazyRE2 kBuildIdRegex = MakeLazyRE2(R"(\s*build_id: '([a-f\d]+)')");
 
 std::optional<std::string> TryMatchBuildId(const std::string& line) {
   std::string build_id;
@@ -65,8 +66,8 @@ std::optional<std::string> TryMatchBuildId(const std::string& line) {
 }
 
 // Isolate DSO base address.
-static const re2::RE2* const kIsolateDsoBaseRegex =
-    new re2::RE2(R"(\s*isolate_dso_base: ([\da-f]+), vm_dso_base: [\da-f]+)");
+constexpr re2::LazyRE2 kIsolateDsoBaseRegex =
+    MakeLazyRE2(R"(\s*isolate_dso_base: ([\da-f]+), vm_dso_base: [\da-f]+)");
 
 std::optional<uint64_t> TryMatchIsolateDsoBase(const std::string& line) {
   std::string dso_base;

@@ -279,6 +279,7 @@ source_set("report_util") {
     ":errors",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_hlcpp",
     "//sdk/lib/syslog/cpp",
+    "//src/developer/forensics/utils:regexp",
     "//src/lib/files",
     "//src/lib/fsl",
     "//src/lib/fxl",

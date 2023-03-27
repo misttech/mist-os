@@ -17,6 +17,7 @@
 
 #include <re2/re2.h>
 
+#include "src/developer/forensics/utils/regexp.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
@@ -179,18 +180,18 @@ constexpr std::string_view kIPv4Pattern{R"(\b()"
 // 127.*.*.* = loopback
 // 169.254.*.* = link-local addresses
 // 224.0.0.* = link-local multicast
-static re2::RE2 kCleartextIPv4{R"(^0\..*)"
-                               R"(|)"
-                               R"(^127\..*)"
-                               R"(|)"
-                               R"(^169\.254\..*)"
-                               R"(|)"
-                               R"(^224\.0\.0\..*)"
-                               R"(|)"
-                               R"(^255.255.255.255$)"};
+constexpr re2::LazyRE2 kCleartextIPv4 = MakeLazyRE2(R"(^0\..*)"
+                                                    R"(|)"
+                                                    R"(^127\..*)"
+                                                    R"(|)"
+                                                    R"(^169\.254\..*)"
+                                                    R"(|)"
+                                                    R"(^224\.0\.0\..*)"
+                                                    R"(|)"
+                                                    R"(^255.255.255.255$)");
 
 std::string RedactIPv4(RedactionIdCache& cache, const std::string& match) {
-  return re2::RE2::FullMatch(match, kCleartextIPv4)
+  return re2::RE2::FullMatch(match, *kCleartextIPv4)
              ? match
              : fxl::StringPrintf("<REDACTED-IPV4: %d>", cache.GetId(match));
 }
@@ -217,34 +218,34 @@ constexpr std::string_view kIPv6Pattern{
     R"())"};
 
 // ff.1:** and ff.2:** = local multicast
-static re2::RE2 kCleartextIPv6{R"((?i)^ff[[:xdigit:]][12]:)"};
+constexpr re2::LazyRE2 kCleartextIPv6 = MakeLazyRE2(R"((?i)^ff[[:xdigit:]][12]:)");
 
 // ff..:** = multicast - display first 2 bytes and redact
-static re2::RE2 kMulticastIPv6{R"((?i)^(ff[[:xdigit:]][[:xdigit:]]:))"};
+constexpr re2::LazyRE2 kMulticastIPv6 = MakeLazyRE2(R"((?i)^(ff[[:xdigit:]][[:xdigit:]]:))");
 
 // fe80/10 = link-local - display first 2 bytes and redact
-static re2::RE2 kLinkLocalIPv6{R"((?i)^(fe[89ab][[:xdigit:]]:))"};
+constexpr re2::LazyRE2 kLinkLocalIPv6 = MakeLazyRE2(R"((?i)^(fe[89ab][[:xdigit:]]:))");
 
 // ::ffff:*:* = IPv4
-static re2::RE2 kIPv4InIPv6{R"((?i)^::f{4}(:[[:xdigit:]]{1,4}){2}$)"};
+constexpr re2::LazyRE2 kIPv4InIPv6 = MakeLazyRE2(R"((?i)^::f{4}(:[[:xdigit:]]{1,4}){2}$)");
 
 std::string RedactIPv6(RedactionIdCache& cache, const std::string& match) {
-  if (re2::RE2::PartialMatch(match, kCleartextIPv6)) {
+  if (re2::RE2::PartialMatch(match, *kCleartextIPv6)) {
     return match;
   }
 
   const int id = cache.GetId(match);
 
   std::string submatch;
-  if (re2::RE2::PartialMatch(match, kMulticastIPv6, &submatch)) {
+  if (re2::RE2::PartialMatch(match, *kMulticastIPv6, &submatch)) {
     return fxl::StringPrintf("%s<REDACTED-IPV6-MULTI: %d>", submatch.c_str(), id);
   }
 
-  if (re2::RE2::PartialMatch(match, kLinkLocalIPv6, &submatch)) {
+  if (re2::RE2::PartialMatch(match, *kLinkLocalIPv6, &submatch)) {
     return fxl::StringPrintf("%s<REDACTED-IPV6-LL: %d>", submatch.c_str(), id);
   }
 
-  if (re2::RE2::FullMatch(match, kIPv4InIPv6)) {
+  if (re2::RE2::FullMatch(match, *kIPv4InIPv6)) {
     return fxl::StringPrintf("::ffff:<REDACTED-IPV4: %d>", id);
   }
 
@@ -262,13 +263,13 @@ constexpr std::string_view kMacPattern{
     R"(\b(?:(?:[0-9a-fA-F]{1,2}(?:[\.:-])){3})(?:[0-9a-fA-F]{1,2}(?:[\.:-])){2}[0-9a-fA-F]{1,2}\b)"
     R"()\b)"};
 
-static re2::RE2 kOui{R"(^((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3}))"};
+constexpr re2::LazyRE2 kOui = MakeLazyRE2(R"(^((?:[0-9a-fA-F]{1,2}(?:[\.:-])){3}))");
 
 std::string RedactMac(RedactionIdCache& cache, const std::string& match) {
   const int id = cache.GetId(match);
 
   std::string oui;
-  if (!re2::RE2::PartialMatch(match, kOui, &oui)) {
+  if (!re2::RE2::PartialMatch(match, *kOui, &oui)) {
     oui = "regex error";
   }
 

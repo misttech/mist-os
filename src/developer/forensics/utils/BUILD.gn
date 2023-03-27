@@ -92,6 +92,11 @@ source_set("previous_boot_file") {
   deps = [ "//src/lib/files" ]
 }
 
+source_set("regexp") {
+  sources = [ "regexp.h" ]
+  public_deps = [ "//third_party/re2" ]
+}
+
 source_set("sized_data") {
   sources = [ "sized_data.h" ]
 }

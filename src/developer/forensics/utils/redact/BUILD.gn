@@ -19,6 +19,7 @@ source_set("redact") {
 
   deps = [
     "//sdk/lib/fit",
+    "//src/developer/forensics/utils:regexp",
     "//src/lib/fxl",
     "//third_party/re2",
   ]
