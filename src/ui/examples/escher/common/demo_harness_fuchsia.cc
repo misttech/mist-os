@@ -92,8 +92,7 @@ DemoHarnessFuchsia::DemoHarnessFuchsia(async::Loop* loop, WindowParams window_pa
     : DemoHarness(window_params),
       owned_loop_(loop ? nullptr : new async::Loop(&kAsyncLoopConfigAttachToCurrentThread)),
       loop_(loop ? loop : owned_loop_.get()),
-      component_context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()),
-      input_reader_(this) {
+      component_context_(sys::ComponentContext::CreateAndServeOutgoingDirectory()) {
   // Provide a PseudoDir where the demo can register debugging services.
   auto debug_dir = std::make_shared<vfs::PseudoDir>();
   component_context()->outgoing()->debug_dir()->AddSharedEntry("demo", debug_dir);
@@ -109,7 +108,8 @@ DemoHarnessFuchsia::DemoHarnessFuchsia(async::Loop* loop, WindowParams window_pa
 
 std::string DemoHarnessFuchsia::GetCacheDirectoryPath() { return kCacheDirectoryPath; }
 
-void DemoHarnessFuchsia::InitWindowSystem() { input_reader_.Start(); }
+// TODO(fxbug.dev/124389): Support input via /dev/class/input-report.
+void DemoHarnessFuchsia::InitWindowSystem() {}
 
 vk::SurfaceKHR DemoHarnessFuchsia::CreateWindowAndSurface(const WindowParams& params) {
   VkImagePipeSurfaceCreateInfoFUCHSIA create_info = {
@@ -142,17 +142,6 @@ void DemoHarnessFuchsia::RunForPlatform(Demo* demo) {
   async::PostDelayedTask(
       loop_->dispatcher(), [this, demo] { this->RenderFrameOrQuit(demo); }, zx::msec(1));
   loop_->Run();
-}
-
-void DemoHarnessFuchsia::RegisterDevice(
-    fuchsia::ui::input::DeviceDescriptor descriptor,
-    fidl::InterfaceRequest<fuchsia::ui::input::InputDevice> input_device) {
-  if (descriptor.keyboard) {
-    input_devices_.AddBinding(std::make_unique<DemoKeyDispatcher>([this](std::string key) {
-                                this->HandleKeyPress(std::move(key));
-                              }),
-                              std::move(input_device));
-  }
 }
 
 void DemoHarnessFuchsia::RenderFrameOrQuit(Demo* demo) {

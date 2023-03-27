@@ -72,7 +72,6 @@ source_set("demo_harness_fuchsia") {
   public_deps = [
     ":demo_base",
     ":headers",
-    "//src/ui/lib/input_report_reader",
   ]
 
   # TODO(fxbug.dev/58162): delete the below and fix compiler warnings

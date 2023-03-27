@@ -14,9 +14,8 @@
 #include <memory>
 
 #include "src/ui/examples/escher/common/demo_harness.h"
-#include "src/ui/lib/input_report_reader/input_reader.h"
 
-class DemoHarnessFuchsia : public DemoHarness, fuchsia::ui::input::InputDeviceRegistry {
+class DemoHarnessFuchsia : public DemoHarness {
  public:
   DemoHarnessFuchsia(async::Loop* loop, WindowParams window_params);
 
@@ -44,11 +43,6 @@ class DemoHarnessFuchsia : public DemoHarness, fuchsia::ui::input::InputDeviceRe
   // Called by Run().
   void RunForPlatform(Demo* demo) override;
 
-  // |fuchsia::ui::input::InputDeviceRegistry|
-  void RegisterDevice(
-      fuchsia::ui::input::DeviceDescriptor descriptor,
-      fidl::InterfaceRequest<fuchsia::ui::input::InputDevice> input_device) override;
-
   void RenderFrameOrQuit(Demo* demo);
 
   // DemoHarnessFuchsia can work with a pre-existing message loop, and also
@@ -58,10 +52,6 @@ class DemoHarnessFuchsia : public DemoHarness, fuchsia::ui::input::InputDeviceRe
   std::unique_ptr<trace::TraceProviderWithFdio> trace_provider_;
 
   std::unique_ptr<sys::ComponentContext> component_context_;
-  ui_input::InputReader input_reader_;
-  fidl::BindingSet<fuchsia::ui::input::InputDevice,
-                   std::unique_ptr<fuchsia::ui::input::InputDevice>>
-      input_devices_;
 };
 
 #endif  // SRC_UI_EXAMPLES_ESCHER_COMMON_DEMO_HARNESS_FUCHSIA_H_
