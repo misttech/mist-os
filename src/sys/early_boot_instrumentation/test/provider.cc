@@ -8,7 +8,7 @@
 #include <fidl/fuchsia.debugdata/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
@@ -30,183 +30,94 @@
 
 namespace {
 
-struct PublisherPayload {
-  static constexpr std::string_view kSink = "llvm-profile";
-  static constexpr std::string_view kCustomSink = "my-custom-sink";
-
-  bool Init(std::string_view name,
-            cpp20::source_location curr = cpp20::source_location::current()) {
-    if (auto res = zx::vmo::create(4096, 0, &vmo); res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to init PublisherPayload vmo at " << curr.line()
-                     << ". Error: " << zx_status_get_string(res);
-      return false;
-    }
-
-    if (!name.empty()) {
-      if (auto res = vmo.set_property(ZX_PROP_NAME, name.data(), name.size()); res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to init PublisherPayload vmo name at " << curr.line()
-                       << ". Error: " << zx_status_get_string(res);
-        return false;
-      }
-    }
-
-    if (auto res = zx::eventpair::create(0, &token_1, &token_2); res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to init PublisherPayload tokens at " << curr.line()
-                     << ". Error: " << zx_status_get_string(res);
-      return false;
-    }
-
-    return true;
-  }
-
-  zx::vmo vmo;
-  zx::eventpair token_1, token_2;
-};
-
-struct ChannelPair {
-  bool Init(cpp20::source_location curr = cpp20::source_location::current()) {
-    if (auto res = zx::channel::create(0, &read, &write); res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to init ChannelPair " << curr.line()
-                     << ". Error: " << zx_status_get_string(res);
-      return false;
-    }
-    return true;
-  }
-
-  zx::channel read, write;
-};
-
-struct Channels {
-  bool Init() {
-    // Using empty inline comments to force linebreak, so the source line is unique for each
-    // ChannelPair.
-    return svc.Init() &&        //
-           svc_stash.Init() &&  //
-           publisher.Init();
-  }
-
-  ChannelPair svc;
-  ChannelPair svc_stash;
-  ChannelPair publisher;
-};
-
 class ProviderServer final : public fidl::WireServer<fuchsia_boot::SvcStashProvider> {
  public:
   ProviderServer(async_dispatcher_t* dispatcher,
                  fidl::ServerEnd<fuchsia_boot::SvcStashProvider> server_end)
       : binding_(fidl::BindServer(dispatcher, std::move(server_end), this)) {
-    channels_ = std::make_unique<Channels>();
-    payload_1_ = std::make_unique<PublisherPayload>();
-    payload_2_ = std::make_unique<PublisherPayload>();
-    payload_3_ = std::make_unique<PublisherPayload>();
-    payload_4_ = std::make_unique<PublisherPayload>();
-    FillStash();
-  }
+    zx::result stash_client_end = fidl::CreateEndpoints(&stash_);
+    if (stash_client_end.is_error()) {
+      FX_PLOGS(ERROR, stash_client_end.status_value()) << "Failed to create stash endpoints";
+      return;
+    }
+    fidl::WireSyncClient stash_client(std::move(stash_client_end.value()));
 
-  void Get(GetCompleter::Sync& completer) final {
-    // So the test can be repeated, each call to Get refills the stash with the expected values.
-    fuchsia_boot::wire::SvcStashProviderGetResponse response;
-    response.resource = std::move(stash_);
-    completer.Reply(fit::ok(&response));
-  }
+    zx::result directory_server_end = fidl::CreateEndpoints(&svc_);
+    if (directory_server_end.is_error()) {
+      FX_PLOGS(ERROR, directory_server_end.status_value())
+          << "Failed to create directory endpoints";
+      return;
+    }
 
- private:
-  void FillStash() {
-    if (!channels_->Init()) {
-      FX_LOGS(ERROR) << "Failed to initialize channels for Publisher data.";
-    } else {
-      if (!payload_1_->Init("profraw") ||  // llvm-profile static
-          !payload_2_->Init("profraw") ||  // llvm-profile dynamic
-          !payload_3_->Init("custom") ||   // custom static
-          !payload_4_->Init("")) {         // custom dynamic
-        FX_LOGS(ERROR) << "Failed to initialize payloads for Publisher data.";
-      }
-
-      // payload_1 is static.
-      payload_1_->token_1.reset();
-      payload_3_->token_1.reset();
-
-      // Add some unique content to the vmos.
-      if (auto res = payload_1_->vmo.write("1234", 0, 4); res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to initialize payload_1_ content for Publisher data.";
-      }
-
-      if (auto res = payload_2_->vmo.write("567890123", 0, 9); res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to initialize payload_2_ content for Publisher data.";
-      }
-
-      // Add some unique content to the vmos.
-      if (auto res = payload_3_->vmo.write("789", 0, 3); res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to initialize payload_3_ content for Publisher data.";
-      }
-
-      if (auto res = payload_4_->vmo.write("43218765", 0, 8); res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to initialize payload_4_ content for Publisher data.";
-      }
+    const fidl::OneWayStatus status = stash_client->Store(std::move(directory_server_end.value()));
+    if (!status.ok()) {
+      FX_PLOGS(ERROR, status.status()) << "Failed to store directory in stash";
+      return;
     }
 
     // Publish data to publisher_client.
-    if (auto res =
-            fdio_service_connect_at(channels_->svc.write.get(),
-                                    fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>,
-                                    channels_->publisher.read.release());
-        res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to pipeline open request to svc.";
-    } else {
-      fidl::WireSyncClient<fuchsia_debugdata::Publisher> publisher;
-      fidl::ClientEnd<fuchsia_debugdata::Publisher> publisher_client_end(
-          std::move(channels_->publisher.write));
-      publisher.Bind(std::move(publisher_client_end));
+    zx::result publisher_client_end = component::ConnectAt<fuchsia_debugdata::Publisher>(svc_);
+    if (publisher_client_end.is_error()) {
+      FX_PLOGS(ERROR, publisher_client_end.status_value()) << "Failed to connect to publisher";
+      return;
+    }
+    fidl::WireSyncClient publisher(std::move(publisher_client_end.value()));
 
-      if (auto res = publisher
-                         ->Publish(fidl::StringView::FromExternal(PublisherPayload::kSink),
-                                   std::move(payload_1_->vmo), std::move(payload_1_->token_2))
-                         .status();
-          res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to publish payload_1_. Error: " << zx_status_get_string(res);
+    constexpr std::string_view kSink = "llvm-profile";
+    constexpr std::string_view kCustomSink = "my-custom-sink";
+    for (const auto& [name, vmo_content, data_sink, is_dynamic] :
+         (std::tuple<std::string_view, std::string_view, std::string_view, bool>[]){
+             {"profraw", "1234", kSink, false},      // llvm-profile static
+             {"profraw", "567890123", kSink, true},  // llvm-profile dynamic
+             {"custom", "789", kCustomSink, false},  // custom static
+             {{}, "43218765", kCustomSink, true},    // custom dynamic
+         }) {
+      zx::vmo vmo;
+      if (zx_status_t status = zx::vmo::create(4096, 0, &vmo); status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "Failed to create vmo for " << name;
+        return;
       }
 
-      if (auto res = publisher
-                         ->Publish(fidl::StringView::FromExternal(PublisherPayload::kSink),
-                                   std::move(payload_2_->vmo), std::move(payload_2_->token_2))
-                         .status();
-          res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to publish payload_2_. Error: " << zx_status_get_string(res);
+      if (!name.empty()) {
+        if (zx_status_t status = vmo.set_property(ZX_PROP_NAME, name.data(), name.size());
+            status != ZX_OK) {
+          FX_PLOGS(ERROR, status) << "Failed to set vmo name for " << name;
+          return;
+        }
       }
 
-      if (auto res = publisher
-                         ->Publish(fidl::StringView::FromExternal(PublisherPayload::kCustomSink),
-                                   std::move(payload_3_->vmo), std::move(payload_3_->token_2))
-                         .status();
-          res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to publish payload_3_. Error: " << zx_status_get_string(res);
+      if (zx_status_t status = vmo.write(vmo_content.data(), 0, vmo_content.size());
+          status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "Failed to write publisher data for " << name;
+        return;
       }
 
-      if (auto res = publisher
-                         ->Publish(fidl::StringView::FromExternal(PublisherPayload::kCustomSink),
-                                   std::move(payload_4_->vmo), std::move(payload_4_->token_2))
-                         .status();
-          res != ZX_OK) {
-        FX_LOGS(ERROR) << "Failed to publish payload_4_. Error: " << zx_status_get_string(res);
+      zx::eventpair token_1, token_2;
+      if (zx_status_t status = zx::eventpair::create(0, &token_1, &token_2); status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "Failed to create eventpair for " << name;
+        return;
+      }
+      if (is_dynamic) {
+        tokens_.push_back(std::move(token_1));
+      }
+
+      const fidl::OneWayStatus status = publisher->Publish(
+          fidl::StringView::FromExternal(data_sink), std::move(vmo), std::move(token_2));
+      if (!status.ok()) {
+        FX_PLOGS(ERROR, status.status()) << "Failed to publish " << name;
+        return;
       }
     }
-
-    fidl::WireSyncClient<fuchsia_boot::SvcStash> svc_stash;
-    fidl::ClientEnd<fuchsia_boot::SvcStash> svc_stash_client_end(
-        std::move(channels_->svc_stash.write));
-    svc_stash.Bind(std::move(svc_stash_client_end));
-    fidl::ServerEnd<fuchsia_io::Directory> svc_server_end(std::move(channels_->svc.read));
-    if (auto res = svc_stash->Store(std::move(svc_server_end)).status(); res != ZX_OK) {
-      FX_LOGS(ERROR) << "Failed to store svc in SvcStash. Error: " << zx_status_get_string(res);
-    }
-    stash_ = fidl::ServerEnd<fuchsia_boot::SvcStash>(std::move(channels_->svc_stash.read));
   }
 
+  void Get(GetCompleter::Sync& completer) final { completer.ReplySuccess(std::move(stash_)); }
+
+ private:
   fidl::ServerBindingRef<fuchsia_boot::SvcStashProvider> binding_;
   fidl::ServerEnd<fuchsia_boot::SvcStash> stash_;
+  fidl::ClientEnd<fuchsia_io::Directory> svc_;
 
-  std::unique_ptr<Channels> channels_;
-  std::unique_ptr<PublisherPayload> payload_1_, payload_2_, payload_3_, payload_4_;
+  std::vector<zx::eventpair> tokens_;
 };
 
 }  // namespace

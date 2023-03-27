@@ -11,7 +11,7 @@
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/namespace.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
@@ -316,25 +316,23 @@ class ExtractDebugDataTest : public ::testing::Test {
   // vmos[i]. |out| is the write end of the handle.
   void StashSvcWithPublishedData(cpp20::span<const PublishRequest> publish_info,
                                  cpp20::span<zx::eventpair> out_tokens) {
-    zx::channel svc_read, svc_write;
-
     ASSERT_EQ(publish_info.size(), out_tokens.size());
 
-    ASSERT_EQ(zx::channel::create(0, &svc_read, &svc_write), ZX_OK);
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_TRUE(endpoints.is_ok()) << endpoints.status_string();
+    auto& [client_end, server_end] = endpoints.value();
 
-    fidl::ServerEnd<fuchsia_io::Directory> dir(std::move(svc_read));
-    auto push_result = svc_stash_->Store(std::move(dir));
-    ASSERT_TRUE(push_result.ok()) << push_result.status_string();
+    const fidl::OneWayStatus status = svc_stash_->Store(std::move(server_end));
+    ASSERT_TRUE(status.ok()) << status.FormatDescription();
 
     for (uint32_t i = 0; i < publish_info.size(); ++i) {
-      auto vmo_or = MakeTestVmo(i);
+      zx::result vmo_or = MakeTestVmo(i);
       ASSERT_TRUE(vmo_or.is_ok()) << vmo_or.status_string();
       if (publish_info[i].sink == kLlvmSink) {
         vmo_or.value().set_property(ZX_PROP_NAME, kLlvmSinkExtension.data(),
                                     kLlvmSinkExtension.size());
       }
-      PublishOne(svc_write.borrow(), publish_info[i].sink, std::move(vmo_or).value(),
-                 out_tokens[i]);
+      PublishOne(client_end, publish_info[i].sink, std::move(vmo_or).value(), out_tokens[i]);
       if (publish_info[i].peer_closed) {
         out_tokens[i].reset();
       }
@@ -344,26 +342,19 @@ class ExtractDebugDataTest : public ::testing::Test {
   auto&& take_stash_read() { return std::move(svc_stash_read_); }
 
  private:
-  static void PublishOne(zx::unowned_channel svc_write, std::string_view sink_name, zx::vmo vmo,
-                         zx::eventpair& out_token) {
-    zx::channel debugdata_read, debugdata_write;
-    ASSERT_EQ(zx::channel::create(0, &debugdata_read, &debugdata_write), ZX_OK);
-
+  static void PublishOne(const fidl::ClientEnd<fuchsia_io::Directory>& directory,
+                         std::string_view sink_name, zx::vmo vmo, zx::eventpair& out_token) {
     zx::eventpair token1, token2;
     ASSERT_EQ(zx::eventpair::create(0, &token1, &token2), ZX_OK);
 
-    // Send an open request on the svc handle.
-    ASSERT_EQ(fdio_service_connect_at(svc_write->get(),
-                                      fidl::DiscoverableProtocolName<fuchsia_debugdata::Publisher>,
-                                      debugdata_read.release()),
-              ZX_OK);
+    zx::result client_end = component::ConnectAt<fuchsia_debugdata::Publisher>(directory);
+    ASSERT_TRUE(client_end.is_ok()) << client_end.status_string();
 
-    fidl::WireSyncClient<fuchsia_debugdata::Publisher> client;
-    fidl::ClientEnd<fuchsia_debugdata::Publisher> client_end(std::move(debugdata_write));
-    client.Bind(std::move(client_end));
-    auto res = client->Publish(fidl::StringView::FromExternal(sink_name), std::move(vmo),
-                               std::move(token1));
-    ASSERT_TRUE(res.ok());
+    fidl::WireSyncClient client(std::move(client_end.value()));
+    const fidl::OneWayStatus result = client->Publish(fidl::StringView::FromExternal(sink_name),
+                                                      std::move(vmo), std::move(token1));
+    ASSERT_TRUE(result.ok()) << result.FormatDescription();
+
     out_token = std::move(token2);
   }
 
