@@ -75,18 +75,15 @@ static void resume_thread_synchronous(zx_handle_t thread, zx_handle_t suspend_to
 // Updates the thread state to advance over a software breakpoint instruction, assuming the
 // breakpoint was just hit. This does not resume the thread, only updates its state.
 static void advance_over_breakpoint(zx_handle_t thread) {
-#if defined(__aarch64__)
-  // Advance 4 bytes to the next instruction after the debug break.
-  zx_thread_state_general_regs_t regs;
-  ASSERT_EQ(zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)), ZX_OK);
-  regs.pc += 4;
-  ASSERT_EQ(zx_thread_write_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)),
-            ZX_OK);
-#elif defined(__x86_64__)
-// x86 sets the instruction pointer to the following instruction so needs no update.
-#else
-#error Not supported on this platform.
-#endif
+  if (kBreakpointPcAdjustment != 0) {
+    // Advance to the next instruction after the debug break.
+    zx_thread_state_general_regs_t regs;
+    ASSERT_EQ(zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)),
+              ZX_OK);
+    regs.REG_PC += kBreakpointPcAdjustment;
+    ASSERT_EQ(zx_thread_write_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)),
+              ZX_OK);
+  }
 }
 
 // Waits for the exception type excp_type, ignoring exceptions of type ignore_type (these will
@@ -894,7 +891,7 @@ TEST(Threads, StartSuspendedAndResumedThread) {
 static void jump_to_thread_exit(zx_handle_t thread) {
   zx_thread_state_general_regs_t regs;
   ASSERT_EQ(zx_thread_read_state(thread, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)), ZX_OK);
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__riscv)
   regs.pc = reinterpret_cast<uint64_t>(&zx_thread_exit);
 #elif defined(__x86_64__)
   regs.rip = reinterpret_cast<uint64_t>(&zx_thread_exit);
@@ -1122,7 +1119,7 @@ class RegisterReadSetup {
         zx_thread_read_state(thread_handle_, ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)),
         ZX_OK);
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__riscv)
     regs.pc = reinterpret_cast<uintptr_t>(zx_thread_exit);
 #elif defined(__x86_64__)
     regs.rip = reinterpret_cast<uintptr_t>(zx_thread_exit);
@@ -1174,7 +1171,7 @@ TEST(Threads, ReadingFpRegisterState) {
   zx_thread_state_fp_regs_t regs;
   zx_status_t status =
       zx_thread_read_state(setup.thread_handle(), ZX_THREAD_STATE_FP_REGS, &regs, sizeof(regs));
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__riscv)
   ASSERT_EQ(status, ZX_OK);
   ASSERT_NO_FATAL_FAILURE(fp_regs_expect_eq(regs, fp_regs_expected));
 #elif defined(__aarch64__)
@@ -1367,7 +1364,7 @@ TEST(Threads, WritingFpRegisterState) {
   zx_status_t status = zx_thread_write_state(setup.thread_handle(), ZX_THREAD_STATE_FP_REGS,
                                              &regs_to_set, sizeof(regs_to_set));
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__riscv)
   ASSERT_EQ(status, ZX_OK);
 
   zx_thread_state_fp_regs_t regs;
@@ -1941,6 +1938,12 @@ TEST(Threads, SyscallSuspendedRegisterState) {
   EXPECT_EQ(actual_regs.r[2], ZX_TIME_INFINITE);                           // 3rd arg
   EXPECT_EQ(actual_regs.r[3], reinterpret_cast<uint64_t>(&arg.observed));  // 4th arg
   EXPECT_EQ(actual_regs.r[0], ZX_ERR_INTERNAL_INTR_RETRY);                 // syscall result
+#elif defined(__riscv)
+  // We can't check the 1st arg because a0 is also used to store the result.
+  EXPECT_EQ(actual_regs.a1, ZX_USER_SIGNAL_0);                           // 2nd arg
+  EXPECT_EQ(actual_regs.a2, ZX_TIME_INFINITE);                           // 3rd arg
+  EXPECT_EQ(actual_regs.a3, reinterpret_cast<uint64_t>(&arg.observed));  // 4th arg
+  EXPECT_EQ(actual_regs.a0, ZX_ERR_INTERNAL_INTR_RETRY);                 // syscall result
 #else
 #error unsupported platform
 #endif
@@ -1977,6 +1980,9 @@ TEST(Threads, SyscallDebuggerModifyResult) {
 #elif defined(__aarch64__)
   EXPECT_EQ(actual_regs.r[0], ZX_ERR_INTERNAL_INTR_RETRY);
   actual_regs.r[0] = ZX_ERR_CANCELED;
+#elif defined(__riscv)
+  EXPECT_EQ(actual_regs.a0, ZX_ERR_INTERNAL_INTR_RETRY);
+  actual_regs.a0 = ZX_ERR_CANCELED;
 #else
 #error unsupported platform
 #endif

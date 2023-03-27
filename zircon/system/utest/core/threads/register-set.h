@@ -14,7 +14,7 @@
 #if defined(__x86_64__)
 #define REG_PC rip
 #define REG_STACK_PTR rsp
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__riscv)
 #define REG_PC pc
 #define REG_STACK_PTR sp
 #else
@@ -27,6 +27,8 @@ struct thread_local_regs {
   uint64_t gs_base_value;
 #elif defined(__aarch64__)
   uint64_t tpidr_value;
+#elif defined(__riscv)
+  uint64_t tp_value;
 #else
 #error Unsupported architecture
 #endif

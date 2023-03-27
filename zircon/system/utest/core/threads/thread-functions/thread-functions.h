@@ -22,6 +22,9 @@ void threads_test_wait_detach_fn(void* arg);
 // it will issue a debug break instruction (causing a SW_BREAKPOINT exception), then it will exit.
 void threads_test_wait_break_fn(void* arg);
 
+// How far the PC must be advanced to skip over a breakpoint after it hits.
+extern const int kBreakpointPcAdjustment;
+
 // This thread issues an infinite wait on signal 0 of the event whose handle is passed in arg.
 void threads_test_infinite_wait_fn(void* arg);
 

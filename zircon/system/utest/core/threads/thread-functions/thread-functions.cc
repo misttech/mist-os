@@ -21,6 +21,14 @@
 #include <zircon/syscalls/port.h>
 // ** WARNING ** WARNING ** WARNING ** WARNING ** WARNING **
 
+#if defined(__aarch64__)
+const int kBreakpointPcAdjustment = 4;
+#elif defined(__riscv)
+const int kBreakpointPcAdjustment = 2;
+#elif defined(__x86_64__)
+const int kBreakpointPcAdjustment = 0;
+#endif
+
 namespace {
 
 // Determine if the two given buffers are equal.
@@ -64,8 +72,12 @@ void threads_test_wait_break_fn(void* arg) {
   // Don't use builtin_trap since the compiler might assume everything after that call can't
   // execute and might remove the function epilog. The test harness will catch the exception
   // and step over it.
-#if defined(__aarch64__)
+#if __has_builtin(__builtin_debugtrap)
+  __builtin_debugtrap();
+#elif defined(__aarch64__)
   __asm__ volatile("brk 0");
+#elif defined(__riscv)
+  __asm__ volatile("ebreak");
 #elif defined(__x86_64__)
   __asm__ volatile("int3");
 #else
@@ -125,9 +137,21 @@ void threads_bad_syscall_fn(void* arg_) {
   zx_object_wait_one(arg->event, ZX_USER_SIGNAL_0, ZX_TIME_INFINITE, NULL);
   uint64_t syscall_number = arg->syscall_number;
 #if defined(__aarch64__)
-  __asm__ volatile("mov x16, %0\nsvc #0" : : "r" (syscall_number));
+  __asm__ volatile(
+      "mov x16, %0\n"
+      "svc #0"
+      :
+      : "r"(syscall_number)
+      : "x16");
+#elif defined(__riscv)
+  __asm__ volatile(
+      "mv t0, %0\n"
+      "ecall"
+      :
+      : "r"(syscall_number)
+      : "t0");
 #elif defined(__x86_64__)
-  __asm__ volatile("syscall" : : "rax" (syscall_number));
+  __asm__ volatile("syscall" : : "a"(syscall_number));
 #else
 #error Not supported on this platform.
 #endif

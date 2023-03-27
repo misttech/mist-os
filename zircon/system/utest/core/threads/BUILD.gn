@@ -2,14 +2,19 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//zircon/system/ulib/hwreg/hwreg_asm_header.gni")
+
 source_set("threads") {
   testonly = true
   sources = [
+    "register-set.S",
     "register-set.cc",
     "threads.cc",
   ]
   deps = [
+    ":register-set-asm",
     ":thread-functions",
+    "//zircon/kernel/lib/arch",
     "//zircon/system/ulib/mini-process",
     "//zircon/system/ulib/runtime",
     "//zircon/system/ulib/test-exceptions",
@@ -24,4 +29,12 @@ source_set("thread-functions") {
   sources = [ "thread-functions/thread-functions.cc" ]
   configs += [ "//build/config/sanitizers:no_sanitizers" ]
   deps = [ "//zircon/system/ulib/runtime" ]
+}
+
+hwreg_asm_header("register-set-asm") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  output_name = "register-set-asm.h"
+  sources = [ "gen-register-set-asm.cc" ]
 }
