@@ -21,16 +21,6 @@
             environment: "#core-env",
         },
     ],
-    capabilities: [
-        {
-            // Test-only protocols from v1 components.
-            // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
-            // Capabilities here are test-only and used only by SL4F, they are not guaranteed to exist for every product.
-            protocol: [
-                "fuchsia.bluetooth.rfcomm.test.RfcommTest", // test-only
-            ],
-        },
-    ],
     use: [
         {
             protocol: [ "sl4f.Binder" ],
@@ -44,6 +34,7 @@
                 "fuchsia.bluetooth.gatt2.Server",
                 "fuchsia.bluetooth.le.Central",
                 "fuchsia.bluetooth.le.Peripheral",
+                "fuchsia.bluetooth.rfcomm.test.RfcommTest", //test only
                 "fuchsia.bluetooth.sys.Access",
                 "fuchsia.bluetooth.sys.Configuration",
                 "fuchsia.bluetooth.sys.HostWatcher",
@@ -177,14 +168,6 @@
             ],
             from: "parent",
             to: "#sl4f",
-        },
-        {
-            protocol: [
-                "fuchsia.bluetooth.rfcomm.test.RfcommTest", // test-only
-            ],
-            from: "self",
-            to: "#sl4f",
-            dependency: "weak_for_migration",
         },
         {
             protocol: "fuchsia.weave.FactoryDataManager",
