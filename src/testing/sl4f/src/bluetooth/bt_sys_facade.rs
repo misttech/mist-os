@@ -461,40 +461,42 @@ impl BluetoothSysFacade {
     pub async fn get_known_remote_devices(&self) -> Result<HashMap<u64, SerializablePeer>, Error> {
         let tag = "BluetoothSysFacade::get_known_remote_devices";
 
-        let default_return = self.inner.read().discovered_device_list.clone();
-        let (discovered_devices, removed_peers) = match &mut self.inner.write().peer_watcher_stream
-        {
-            Some(stream) => {
-                match stream.next().on_timeout(1.seconds().after_now(), || None).await {
-                    Some(r) => match r {
-                        Ok(d) => d,
-                        Err(e) => fx_err_and_bail!(
+        loop {
+            let (discovered_devices, removed_peers) = match &mut self
+                .inner
+                .write()
+                .peer_watcher_stream
+            {
+                Some(stream) => {
+                    match stream.next().on_timeout(100.millis().after_now(), || None).await {
+                        Some(Ok(d)) => d,
+                        Some(Err(e)) => fx_err_and_bail!(
                             &with_line!(tag),
                             format!("{:?}", format!("Peer Watcher Stream failed with: {:?}", e))
                         ),
-                    },
-                    None => return Ok(default_return),
+                        None => break,
+                    }
+                }
+                None => fx_err_and_bail!(
+                    &with_line!(tag),
+                    format!("{:?}", "Peer Watcher Stream not available")
+                ),
+            };
+
+            let serialized_peers_map: HashMap<u64, SerializablePeer> =
+                discovered_devices.iter().map(|d| (d.id.unwrap().value, d.into())).collect();
+
+            self.inner.write().discovered_device_list.extend(serialized_peers_map);
+
+            let mut known_devices = self.inner.write().discovered_device_list.clone();
+            for peer_id in removed_peers {
+                if known_devices.contains_key(&peer_id.value) {
+                    info!(tag, "Peer {:?} removed.", peer_id);
+                    known_devices.remove(&peer_id.value);
                 }
             }
-            None => fx_err_and_bail!(
-                &with_line!(tag),
-                format!("{:?}", "Peer Watcher Stream not available")
-            ),
-        };
-
-        let serialized_peers_map: HashMap<u64, SerializablePeer> =
-            discovered_devices.iter().map(|d| (d.id.unwrap().value, d.into())).collect();
-
-        self.inner.write().discovered_device_list.extend(serialized_peers_map);
-
-        let mut known_devices = self.inner.write().discovered_device_list.clone();
-        for peer_id in removed_peers {
-            if known_devices.contains_key(&peer_id.value) {
-                info!(tag, "Peer {:?} removed.", peer_id);
-                known_devices.remove(&peer_id.value);
-            }
+            self.inner.write().discovered_device_list = known_devices;
         }
-        self.inner.write().discovered_device_list = known_devices;
 
         Ok(self.inner.read().discovered_device_list.clone())
     }
