@@ -129,7 +129,21 @@ async fn calling_builder_kill_should_kill_test() {
     // let the test start
     let _initial_event = recv.next().await.unwrap();
     controller_proxy.kill().unwrap();
-    assert_eq!(controller_proxy.get_events().await.unwrap(), vec![]);
+    loop {
+        let events = controller_proxy.get_events().await.unwrap();
+        if events.is_empty() {
+            break;
+        }
+        for event in events {
+            if let Some(e) = &event.payload {
+                match e {
+                    // ignore, we sometimes see debugdata artifact
+                    ftest_manager::RunEventPayload::Artifact(_) => {}
+                    _ => panic!("should not get this event: {:?}", event),
+                }
+            }
+        }
+    }
     // collect rest of the events
     let events = recv.collect::<Vec<_>>().await;
     let events = events
