@@ -27,7 +27,6 @@
                 "fuchsia.bluetooth.sys.Bootstrap",
                 "fuchsia.castauth.CastKeySigner",
                 "fuchsia.lightsensor.Sensor",
-                "fuchsia.timezone.Timezone",
                 "fuchsia.ultrasound.Factory",
                 "fuchsia.web.ContextProvider",
                 "google.cast.cryptokey.NamedKeyProvider",

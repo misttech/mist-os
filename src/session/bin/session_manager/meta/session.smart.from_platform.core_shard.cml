@@ -23,10 +23,7 @@
         {
             // Protocols from v1 components.
             // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
-            protocol: [
-                "fuchsia.timezone.Timezone",
-                "google.cast.cryptokey.NamedKeyProvider",
-            ],
+            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
         },
     ],
 
@@ -47,10 +44,7 @@
         },
         {
             // Routed from v1 components.
-            protocol: [
-                "fuchsia.timezone.Timezone",
-                "google.cast.cryptokey.NamedKeyProvider",
-            ],
+            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
             from: "self",
             to: "#session-manager",
             dependency: "weak_for_migration",
