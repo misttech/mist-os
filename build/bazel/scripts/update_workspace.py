@@ -409,6 +409,26 @@ def maybe_regenerate_ninja(gn_output_dir, ninja):
     return False
 
 
+def get_git_head_path(git_path: str) -> str:
+    """Get the path of the .git/HEAD file of a given git directory.
+
+    This function handles git submodules properly when they are used.
+
+    Args:
+        git_path: Path to git repository, which can be a submodule file.
+
+    Returns:
+        Path to the final .git/HEAD file.
+    """
+    git_dir = os.path.join(git_path, '.git')
+    if os.path.isfile(git_dir):
+        with open(git_dir) as f:
+            submodule_dir = f.readlines()[0].split()[1]
+        git_dir = os.path.join(git_dir, submodule_dir)
+
+    return os.path.join(git_dir, 'HEAD')
+
+
 _VALID_TARGET_CPUS = ('arm64', 'x64')
 
 
@@ -763,22 +783,23 @@ common --experimental_enable_bzlmod
             'crosstool_template.BUILD'),
     ]
 
-    # When submodules are enabled, .git would be a file instead of a directory.
     googletest_dir = os.path.join(
         fuchsia_dir, 'third_party', 'googletest', 'src')
-    googletest_git = os.path.join(googletest_dir, '.git')
-    if os.path.isfile(googletest_git):
-      with open(googletest_git) as f:
-        googletest_git_subm_dir = f.readlines()[0].split()[1]
-      googletest_git_dir = os.path.join(googletest_dir, googletest_git_subm_dir)
-    else:
-      googletest_git_dir = googletest_git
+
     googletest_content_files = [
-        os.path.join(
-            googletest_git_dir, 'HEAD'),
+        get_git_head_path(googletest_dir),
         os.path.join(
             fuchsia_dir, 'build', 'bazel', 'patches', 'googletest',
             'fuchsia-support.bundle'),
+    ]
+
+    fuchsia_icu_config_files = [
+        get_git_head_path(
+            os.path.join(fuchsia_dir, 'third_party', 'icu', 'default')),
+        get_git_head_path(
+            os.path.join(fuchsia_dir, 'third_party', 'icu', 'stable')),
+        get_git_head_path(
+            os.path.join(fuchsia_dir, 'third_party', 'icu', 'latest')),
     ]
 
     # LINT.IfChange
@@ -788,6 +809,8 @@ common --experimental_enable_bzlmod
     generated_repositories_inputs['prebuilt_clang'] = clang_content_files
     generated_repositories_inputs[
         'com_google_googletest'] = googletest_content_files
+    generated_repositories_inputs[
+        'fuchsia_icu_config'] = fuchsia_icu_config_files
     # LINT.ThenChange(../templates/template.WORKSPACE.bazel)
     # LINT.ThenChange(../BUILD.gn)
 

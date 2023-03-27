@@ -36,10 +36,15 @@ load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 
-# based on instructions by digit@google.com
-
 def _fuchsia_icu_config_impl(repo_ctx):
     workspace_root = str(repo_ctx.path(Label("@//:WORKSPACE.bazel")).dirname)
+
+    # Ensure this repository is regenerated any time the content hash file
+    # changes. Creating a content hash file in update-workspace.py allows
+    # grabbing the correct path to the real .git/HEAD when submodules are
+    # used, which is harder to use in Starlark than in Python.
+    if hasattr(repo_ctx.attr, "content_hash_file"):
+        repo_ctx.path(Label("@//:" + repo_ctx.attr.content_hash_file))
 
     script = repo_ctx.path(Label("//:build/icu/gen-git-head-commit-id.sh"))
     cmd = " ".join([
@@ -67,10 +72,15 @@ def _fuchsia_icu_config_impl(repo_ctx):
 workspace(name = "fuchsia_icu_config")
 """)
     repo_ctx.file("BUILD.bazel", """# DO NOT EDIT! Automatically generated.
-exports_file(glob(["**/*"]))""")
+exports_files(glob(["**/*"]))""")
 
 fuchsia_icu_config_repository = repository_rule(
     implementation = _fuchsia_icu_config_impl,
     doc = "Create a repository that contains ICU configuration information in its //:constants.bzl file.",
-    attrs = {},
+    attrs = {
+        "content_hash_file": attr.string(
+            doc = "Path to content hash file for this repository, relative to workspace root.",
+            mandatory = False,
+        ),
+    },
 )

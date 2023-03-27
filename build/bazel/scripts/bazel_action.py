@@ -38,10 +38,6 @@ _FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..', '..'))
 #
 _BAZEL_BUILTIN_REPOSITORIES = ('@bazel_tools//',)
 
-# Generated repositories are under bazel's control, so should not need any
-# hashing examination, hopefully.
-_BAZEL_IGNORE_GENERATED_REPOSITORIES = ('@fuchsia_icu_config//',)
-
 # Technical notes on input (source and build files) located in Bazel external
 # repositories.
 #
@@ -742,9 +738,7 @@ as a bazel_inputs dependency to the GN target.
 
 def is_ignored_file_label(label: str) -> bool:
     '''Return True if the label of a build or source file should be ignored.'''
-    return (
-        label.startswith(_BAZEL_BUILTIN_REPOSITORIES) or
-        label.startswith(_BAZEL_IGNORE_GENERATED_REPOSITORIES))
+    return label.startswith(_BAZEL_BUILTIN_REPOSITORIES)
 
 
 def main():

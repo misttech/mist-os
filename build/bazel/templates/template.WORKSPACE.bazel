@@ -79,6 +79,9 @@ load(
 
 fuchsia_icu_config_repository(
     name = "fuchsia_icu_config",
+    # LINT.IfChange
+    content_hash_file = "generated_repository_hashes/fuchsia_icu_config.hash",
+    # LINT.ThenChange(../scripts/update-workspace.py)
 )
 
 # buildifier: disable=load-on-top
