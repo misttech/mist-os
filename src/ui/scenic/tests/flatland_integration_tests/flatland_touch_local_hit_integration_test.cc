@@ -119,13 +119,6 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public loop_fi
     root_instance_->CreateView2(std::move(child_token), std::move(identity),
                                 /*view bound protocols*/ {}, parent_viewport_watcher.NewRequest());
 
-    parent_viewport_watcher->GetLayout([this](auto layout_info) {
-      ASSERT_TRUE(layout_info.has_logical_size());
-      const auto [width, height] = layout_info.logical_size();
-      display_width_ = static_cast<float>(width);
-      display_height_ = static_cast<float>(height);
-    });
-
     fidl::InterfacePtr<ChildViewWatcher> child_view_watcher;
     flatland_display_->SetContent(std::move(parent_token), child_view_watcher.NewRequest());
 
@@ -133,8 +126,13 @@ class FlatlandTouchLocalHitIntegrationTest : public zxtest::Test, public loop_fi
     root_instance_->SetRootTransform(kRootTransform);
     BlockingPresent(root_instance_);
 
-    // Wait until we get the display size.
-    RunLoopUntil([this] { return display_width_ != 0 && display_height_ != 0; });
+    // Get the display's width and height. Since there is no Present in FlatlandDisplay, receiving
+    // this callback ensures that all |flatland_display_| calls are processed.
+    std::optional<fuchsia::ui::composition::LayoutInfo> info;
+    parent_viewport_watcher->GetLayout([&info](auto result) { info = std::move(result); });
+    RunLoopUntil([&info] { return info.has_value(); });
+    display_width_ = static_cast<float>(info->logical_size().width);
+    display_height_ = static_cast<float>(info->logical_size().height);
   }
 
   void BlockingPresent(FlatlandPtr& flatland) {

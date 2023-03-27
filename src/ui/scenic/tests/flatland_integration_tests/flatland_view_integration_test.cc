@@ -180,6 +180,12 @@ TEST_F(FlatlandViewIntegrationTest, ParentViewportWatcherUnbindsOnReleaseView) {
   auto identity = scenic::NewViewIdentityOnCreation();
   parent->CreateView2(std::move(parent_view_creation_token), std::move(identity), {},
                       parent_viewport_watcher.NewRequest());
+
+  // Since there is no Present in FlatlandDisplay, receiving this callback ensures that all
+  // |flatland_display_| calls are processed.
+  bool connected = false;
+  parent_viewport_watcher->GetLayout([&connected](auto) { connected = true; });
+  RunLoopUntil([&connected] { return connected; });
   BlockingPresent(parent);
 
   EXPECT_TRUE(parent_viewport_watcher.is_bound());

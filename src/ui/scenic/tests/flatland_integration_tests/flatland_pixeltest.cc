@@ -4,7 +4,6 @@
 
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
@@ -52,14 +51,12 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
   void SetUp() override {
     // Build the realm topology and route the protocols required by this test fixture from the
     // scenic subrealm.
-    realm_ = std::make_unique<RealmRoot>(
-        ScenicRealmBuilder()
-            .AddRealmProtocol(fuc::Flatland::Name_)
-            .AddRealmProtocol(fuc::FlatlandDisplay::Name_)
-            .AddRealmProtocol(fuc::Screenshot::Name_)
-            .AddRealmProtocol(fuc::Allocator::Name_)
-            .AddRealmProtocol(fuchsia::ui::display::singleton::Info::Name_)
-            .Build());
+    realm_ = std::make_unique<RealmRoot>(ScenicRealmBuilder()
+                                             .AddRealmProtocol(fuc::Flatland::Name_)
+                                             .AddRealmProtocol(fuc::FlatlandDisplay::Name_)
+                                             .AddRealmProtocol(fuc::Screenshot::Name_)
+                                             .AddRealmProtocol(fuc::Allocator::Name_)
+                                             .Build());
 
     // Connect to sysmem service.
     auto context = sys::ComponentContext::Create();
@@ -90,14 +87,13 @@ class FlatlandPixelTestBase : public gtest::RealLoopFixture {
     root_flatland_->CreateTransform(kRootTransform);
     root_flatland_->SetRootTransform(kRootTransform);
 
-    // Get the display's width and height.
-    auto singleton_display = realm_->component().Connect<fuchsia::ui::display::singleton::Info>();
-    std::optional<fuchsia::ui::display::singleton::Metrics> info;
-    singleton_display->GetMetrics([&info](auto result) { info = std::move(result); });
+    // Get the display's width and height. Since there is no Present in FlatlandDisplay, receiving
+    // this callback ensures that all |flatland_display_| calls are processed.
+    std::optional<fuchsia::ui::composition::LayoutInfo> info;
+    parent_viewport_watcher->GetLayout([&info](auto result) { info = std::move(result); });
     RunLoopUntil([&info] { return info.has_value(); });
-
-    display_width_ = info->extent_in_px().width;
-    display_height_ = info->extent_in_px().height;
+    display_width_ = info->logical_size().width;
+    display_height_ = info->logical_size().height;
 
     screenshotter_ = realm_->component().ConnectSync<fuc::Screenshot>();
   }

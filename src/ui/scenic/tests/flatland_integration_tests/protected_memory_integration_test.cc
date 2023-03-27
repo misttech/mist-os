@@ -59,13 +59,14 @@ class ProtectedMemoryIntegrationTest : public gtest::RealLoopFixture {
     fidl::InterfacePtr<ParentViewportWatcher> parent_viewport_watcher;
     root_flatland_->CreateView2(std::move(child_token), scenic::NewViewIdentityOnCreation(), {},
                                 parent_viewport_watcher.NewRequest());
-    parent_viewport_watcher->GetLayout([this](auto layout_info) {
-      ASSERT_TRUE(layout_info.has_logical_size());
-      const auto [width, height] = layout_info.logical_size();
-      display_width_ = width;
-      display_height_ = height;
-    });
-    BlockingPresent(root_flatland_);
+
+    // Get the display's width and height. Since there is no Present in FlatlandDisplay, receiving
+    // this callback ensures that all |flatland_display_| calls are processed.
+    std::optional<fuchsia::ui::composition::LayoutInfo> info;
+    parent_viewport_watcher->GetLayout([&info](auto result) { info = std::move(result); });
+    RunLoopUntil([&info] { return info.has_value(); });
+    display_width_ = info->logical_size().width;
+    display_height_ = info->logical_size().height;
 
     screenshotter_ = realm_.component().ConnectSync<fuchsia::ui::composition::Screenshot>();
   }
