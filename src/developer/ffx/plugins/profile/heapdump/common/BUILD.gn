@@ -4,15 +4,27 @@
 
 import("//build/rust/rustc_library.gni")
 
-rustc_library("ffx_heapdump") {
-  version = "0.1.0"
+rustc_library("ffx_profile_heapdump_common") {
   edition = "2021"
+  with_unit_tests = true
 
   deps = [
     "//sdk/fidl/fuchsia.memory.heapdump:fuchsia.memory.heapdump.client_rust",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/performance/memory/heapdump/lib/heapdump_snapshot",
+    "//src/performance/memory/pprof",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:prost",
   ]
 
-  sources = [ "src/lib.rs" ]
+  test_deps = [
+    "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:maplit",
+    "//third_party/rust_crates:tempfile",
+  ]
+
+  sources = [
+    "src/lib.rs",
+    "src/pprof.rs",
+  ]
 }

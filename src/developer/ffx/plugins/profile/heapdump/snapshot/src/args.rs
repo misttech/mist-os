@@ -12,4 +12,6 @@ pub struct SnapshotCommand {
     pub by_name: Option<String>,
     #[argh(option, description = "select process by koid")]
     pub by_koid: Option<u64>,
+    #[argh(option, description = "output protobuf file")]
+    pub output_file: String,
 }

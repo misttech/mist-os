@@ -5,7 +5,7 @@
 use thiserror::Error;
 
 mod snapshot;
-pub use snapshot::{Allocation, ExecutableRegion, Snapshot};
+pub use snapshot::{Allocation, ExecutableRegion, Snapshot, StackTrace};
 
 mod streamer;
 pub use streamer::Streamer;

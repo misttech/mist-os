@@ -5,6 +5,9 @@
 use errors::ffx_bail;
 use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 
+mod pprof;
+pub use crate::pprof::export_to_pprof;
+
 /// Builds a ProcessSelector value from command-line arguments.
 pub fn build_process_selector(
     by_name: Option<String>,
