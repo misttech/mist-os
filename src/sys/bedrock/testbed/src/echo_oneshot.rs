@@ -92,8 +92,9 @@ impl Start for EchoServer {
             .await
             .remove(ECHO_CAP_NAME)
             .context("no echo cap in incoming")?;
-        let echo_sender =
-            echo_cap.downcast::<cap::Sender>().map_err(|_| anyhow!("echo cap is not a Sender"))?;
+        let echo_sender = echo_cap
+            .downcast::<cap::oneshot::Sender>()
+            .map_err(|_| anyhow!("echo cap is not a Sender"))?;
         info!("(server) echo sender: {:?}", echo_sender);
 
         // Start the echo server and send the client end.
@@ -133,8 +134,9 @@ impl Start for EchoClient {
         let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
         let mut entries = incoming.entries.lock().await;
         let echo_cap = entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
-        let echo_receiver =
-            echo_cap.downcast_mut::<cap::Receiver>().context("echo cap is not a Receiver")?;
+        let echo_receiver = echo_cap
+            .downcast_mut::<cap::oneshot::Receiver>()
+            .context("echo cap is not a Receiver")?;
         info!("(client) echo receiver: {:?}", echo_receiver);
         // Get the echo client end from the receiver.
         let echo_handle = echo_receiver

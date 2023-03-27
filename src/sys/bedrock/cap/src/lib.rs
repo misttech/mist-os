@@ -5,13 +5,13 @@
 //! Component bedrock capabilities.
 
 mod cap;
-mod dict;
-mod handle;
-mod null;
-mod oneshot;
+pub mod dict;
+pub mod handle;
+pub mod null;
+pub mod oneshot;
 
-pub use self::cap::*;
-pub use self::dict::*;
-pub use self::handle::*;
-pub use self::null::*;
-pub use self::oneshot::*;
+pub use self::cap::{AnyCapability, Capability, Remote};
+pub use self::dict::Dict;
+pub use self::handle::Handle;
+pub use self::null::Null;
+pub use self::oneshot::oneshot;
