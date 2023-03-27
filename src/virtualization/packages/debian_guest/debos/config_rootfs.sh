@@ -26,8 +26,17 @@ chsh -s ${default_shell} ${username}
 # Squelch MOTD.
 touch ${home}/.hushlogin
 
+cat > ${home}/.profile << EOF
 # Make the prompt as simple as possible (useful for testing).
-echo "PS1='$ '" >> ${home}/.profile
+export PS1='$ '
+
+# Dash has a builtin 'echo' that is not very capable. This function will be
+# higher precedence than the builtin and will redirect to the binary version
+# of echo.
+echo() {
+  env echo \$*
+}
+EOF
 
 # Setup hostname.
 echo "machina-guest" > /etc/hostname
