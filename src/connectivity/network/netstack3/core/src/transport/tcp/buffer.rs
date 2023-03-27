@@ -565,6 +565,12 @@ impl Assembler {
         self.nxt
     }
 
+    /// Returns whether there are out-of-order segments waiting to be
+    /// acknowledged.
+    pub(super) fn has_out_of_order(&self) -> bool {
+        !self.outstanding.is_empty()
+    }
+
     /// Inserts a received segment.
     ///
     /// The newly added segment will be merged with as many existing ones as

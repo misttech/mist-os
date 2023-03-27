@@ -470,6 +470,17 @@ pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync {
     /// underlying data structure), `None` otherwise.
     fn checked_add(&self, duration: time::Duration) -> Option<Self>;
 
+    /// Unwraps the result from `checked_add`.
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the addition makes the clock wrap around.
+    fn add(&self, duration: time::Duration) -> Self {
+        self.checked_add(duration).unwrap_or_else(|| {
+            panic!("clock wraps around when adding {:?} to {:?}", duration, *self);
+        })
+    }
+
     /// Returns `Some(t)` where `t` is the time `self - duration` if `t` can be
     /// represented as `Instant` (which means it's inside the bounds of the
     /// underlying data structure), `None` otherwise.

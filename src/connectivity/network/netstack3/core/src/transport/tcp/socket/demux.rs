@@ -45,7 +45,7 @@ use crate::{
             TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
-        BufferSizes, Control, KeepAlive, Mss, SocketOptions, UserError,
+        BufferSizes, Control, Mss, SocketOptions, UserError,
     },
 };
 
@@ -281,16 +281,10 @@ where
         .get_by_id_mut(&conn_id)
         .expect("inconsistent state: invalid connection id");
 
-    let Connection {
-        acceptor: _,
-        state,
-        ip_sock,
-        defunct,
-        socket_options: SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _ },
-    } = conn;
+    let Connection { acceptor: _, state, ip_sock, defunct, socket_options } = conn;
 
     // Send the reply to the segment immediately.
-    let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, keep_alive);
+    let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, socket_options);
 
     // If the incoming segment caused the state machine to
     // enter Closed state, and the user has already promised
@@ -446,7 +440,7 @@ where
         socket_options.user_timeout,
     ));
     let reply = assert_matches!(
-        state.on_segment::<_, C>(incoming, now, &KeepAlive::default()),
+        state.on_segment::<_, C>(incoming, now, &SocketOptions::default()),
         (reply, None) => reply
     );
     if let Some(seg) = reply {

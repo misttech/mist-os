@@ -145,6 +145,8 @@ pub struct SocketOptions {
     /// The period of time after which the connection should be aborted if no
     /// ACK is received.
     pub user_timeout: Option<NonZeroDuration>,
+    /// Switch to turn delayed ACK on/off.
+    pub delayed_ack: bool,
 }
 
 impl Default for SocketOptions {
@@ -156,6 +158,12 @@ impl Default for SocketOptions {
             //   coalesce short segments
             nagle_enabled: true,
             user_timeout: None,
+            // RFC 9293 Section 4.2:
+            //   The delayed ACK algorithm specified in [RFC1122] SHOULD be used
+            //   by a TCP receiver.
+            // TODO(https://fxbug.dev/124309): After we support disabling
+            // delayed ACK through socket options, we should enable it by default.
+            delayed_ack: false,
         }
     }
 }

@@ -43,6 +43,10 @@ const MSL: Duration = Duration::from_secs(2 * 60);
 const DEFAULT_MAX_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(12_u8);
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
 
+/// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
+///  ... in particular, the delay MUST be less than 0.5 seconds.
+const ACK_DELAY_THRESHOLD: Duration = Duration::from_millis(500);
+
 /// A helper trait for duration socket options that use 0 to indicate default.
 trait NonZeroDurationOptionExt {
     fn get_or_default(&self, default: Duration) -> Duration;
@@ -400,6 +404,8 @@ impl<I: Instant + 'static, ActiveOpen: Takeable> SynSent<I, ActiveOpen> {
                                 rcv: Recv {
                                     buffer: rcv_buffer,
                                     assembler: Assembler::new(irs + 1),
+                                    timer: None,
+                                    mss: smss,
                                 },
                             };
                             let ack_seg = Segment::ack(
@@ -616,6 +622,12 @@ enum SendTimer<I> {
 
 #[derive(Debug, Clone, Copy)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
+enum ReceiveTimer<I> {
+    DelayedAck { at: I, received_bytes: NonZeroU32 },
+}
+
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 struct KeepAliveTimer<I> {
     at: I,
     already_sent: u8,
@@ -650,15 +662,25 @@ impl<I: Instant> SendTimer<I> {
     }
 }
 
+impl<I: Instant> ReceiveTimer<I> {
+    fn expiry(&self) -> I {
+        match self {
+            ReceiveTimer::DelayedAck { at, received_bytes: _ } => *at,
+        }
+    }
+}
+
 /// TCP control block variables that are responsible for receiving.
 #[derive(Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
-struct Recv<R> {
+struct Recv<I, R> {
     buffer: R,
     assembler: Assembler,
+    timer: Option<ReceiveTimer<I>>,
+    mss: Mss,
 }
 
-impl<R: ReceiveBuffer> Recv<R> {
+impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
     fn wnd(&self) -> WindowSize {
         let BufferLimits { capacity, len } = self.buffer.limits();
         WindowSize::new(capacity - len).unwrap_or(WindowSize::MAX)
@@ -669,21 +691,33 @@ impl<R: ReceiveBuffer> Recv<R> {
     }
 
     fn take(&mut self) -> Self {
-        let Self { buffer, assembler } = self;
+        let Self { buffer, assembler, timer, mss } = self;
         Self {
             buffer: buffer.take(),
             assembler: core::mem::replace(assembler, Assembler::new(SeqNum::new(0))),
+            timer: *timer,
+            mss: *mss,
         }
     }
 
     fn set_capacity(&mut self, size: usize) {
-        let Self { buffer, assembler: _ } = self;
+        let Self { buffer, assembler: _, timer: _, mss: _ } = self;
         buffer.request_capacity(size)
     }
 
     fn target_capacity(&self) -> usize {
-        let Self { buffer, assembler: _ } = self;
+        let Self { buffer, assembler: _, timer: _, mss: _ } = self;
         buffer.target_capacity()
+    }
+
+    fn poll_send(&mut self, snd_nxt: SeqNum, now: I) -> Option<Segment<()>> {
+        match self.timer {
+            Some(ReceiveTimer::DelayedAck { at, received_bytes: _ }) => (at <= now).then(|| {
+                self.timer = None;
+                Segment::ack(snd_nxt, self.nxt(), self.wnd())
+            }),
+            None => None,
+        }
     }
 }
 
@@ -705,7 +739,7 @@ impl<R: ReceiveBuffer> Recv<R> {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct Established<I, R, S> {
     snd: Send<I, S, { FinQueued::NO }>,
-    rcv: Recv<R>,
+    rcv: Recv<I, R>,
 }
 
 impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
@@ -734,7 +768,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         rcv_wnd: WindowSize,
         limit: u32,
         now: I,
-        SocketOptions { keep_alive, nagle_enabled, user_timeout }: &SocketOptions,
+        SocketOptions { keep_alive, nagle_enabled, user_timeout, delayed_ack: _ }: &SocketOptions,
     ) -> Option<Segment<SendPayload<'_>>> {
         let Self {
             nxt: snd_nxt,
@@ -1192,7 +1226,7 @@ pub(crate) struct LastAck<I, S> {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct FinWait1<I, R, S> {
     snd: Send<I, S, { FinQueued::YES }>,
-    rcv: Recv<R>,
+    rcv: Recv<I, R>,
 }
 
 #[derive(Debug)]
@@ -1210,9 +1244,9 @@ pub(crate) struct FinWait1<I, R, S> {
 ///   - accept
 ///   - listen
 ///   - connect
-pub(crate) struct FinWait2<R> {
+pub(crate) struct FinWait2<I, R> {
     last_seq: SeqNum,
-    rcv: Recv<R>,
+    rcv: Recv<I, R>,
 }
 
 #[derive(Debug)]
@@ -1276,7 +1310,7 @@ pub(crate) enum State<I, R, S, ActiveOpen> {
     CloseWait(CloseWait<I, S>),
     LastAck(LastAck<I, S>),
     FinWait1(FinWait1<I, R, S>),
-    FinWait2(FinWait2<R>),
+    FinWait2(FinWait2<I, R>),
     Closing(Closing<I, S>),
     TimeWait(TimeWait<I>),
 }
@@ -1334,7 +1368,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         &mut self,
         incoming: Segment<P>,
         now: I,
-        keep_alive: &KeepAlive,
+        SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _, delayed_ack }: &SocketOptions,
     ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>)
     where
         BP::PassiveOpen: Debug,
@@ -1542,6 +1576,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                                 rcv: Recv {
                                     buffer: rcv_buffer,
                                     assembler: Assembler::new(*irs + 1),
+                                    timer: None,
+                                    mss: *smss,
                                 },
                             });
                         }
@@ -1644,6 +1680,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     | State::FinWait2(FinWait2 { last_seq: _, rcv }) => {
                         // Write the segment data in the buffer and keep track if it fills
                         // any hole in the assembler.
+                        let had_out_of_order = rcv.assembler.has_out_of_order();
                         if contents.data().len() > 0 {
                             let offset = usize::try_from(seg_seq - rcv.nxt()).unwrap_or_else(|TryFromIntError {..}| {
                                 panic!("The segment was trimmed to fit the window, thus seg.seq({:?}) must not come before rcv.nxt({:?})", seg_seq, rcv.nxt());
@@ -1653,7 +1690,45 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                             rcv.buffer.make_readable(readable);
                             rcv_nxt = rcv.nxt();
                         }
-                        Some(Segment::ack(snd_nxt, rcv.nxt(), rcv.wnd()))
+                        // Per RFC 5681 Section 4.2:
+                        //  Out-of-order data segments SHOULD be acknowledged
+                        //  immediately, ...  the receiver SHOULD send an
+                        //  immediate ACK when it receives a data segment that
+                        //  fills in all or part of a gap in the sequence space.
+                        let immediate_ack =
+                            !*delayed_ack || had_out_of_order || rcv.assembler.has_out_of_order();
+                        if immediate_ack {
+                            rcv.timer = None;
+                        } else {
+                            match &mut rcv.timer {
+                                Some(ReceiveTimer::DelayedAck { at: _, received_bytes }) => {
+                                    *received_bytes = received_bytes.saturating_add(
+                                        u32::try_from(contents.data().len()).unwrap_or(u32::MAX),
+                                    );
+                                    // Per RFC 5681 Section 4.2:
+                                    //  An implementation is deemed to comply
+                                    //  with this requirement if it sends at
+                                    //  least one acknowledgment every time it
+                                    //  receives 2*RMSS bytes of new data from
+                                    //  the sender
+                                    if received_bytes.get() >= 2 * u32::from(rcv.mss) {
+                                        rcv.timer = None;
+                                    }
+                                }
+                                None => {
+                                    if let Some(received_bytes) = NonZeroU32::new(
+                                        u32::try_from(contents.data().len()).unwrap_or(u32::MAX),
+                                    ) {
+                                        rcv.timer = Some(ReceiveTimer::DelayedAck {
+                                            at: now.add(ACK_DELAY_THRESHOLD),
+                                            received_bytes,
+                                        })
+                                    }
+                                }
+                            }
+                        }
+                        (!matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. })))
+                            .then_some(Segment::ack(snd_nxt, rcv.nxt(), rcv.wnd()))
                     }
                     State::CloseWait(_)
                     | State::LastAck(_)
@@ -1749,6 +1824,36 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         if self.poll_close(now, socket_options) {
             return None;
         }
+        fn poll_rcv_then_snd<
+            'a,
+            I: Instant,
+            R: ReceiveBuffer,
+            S: SendBuffer,
+            const FIN_QUEUED: bool,
+        >(
+            snd: &'a mut Send<I, S, FIN_QUEUED>,
+            rcv: &'a mut Recv<I, R>,
+            limit: u32,
+            now: I,
+            socket_options: &SocketOptions,
+        ) -> Option<Segment<SendPayload<'a>>> {
+            // We favor `rcv` over `snd` if both are present. The alternative
+            // will also work (sending whatever is ready at the same time of
+            // sending the delayed ACK) but we need special treatment for
+            // FIN_WAIT_1 if we choose the alternative, because otherwise we
+            // will have a spurious retransmitted FIN.
+            let rcv_nxt = rcv.nxt();
+            let rcv_wnd = rcv.wnd();
+            let seg = rcv
+                .poll_send(snd.nxt, now)
+                .map(Into::into)
+                .or_else(|| snd.poll_send(rcv_nxt, rcv_wnd, limit, now, socket_options));
+            // We must have piggybacked an ACK so we can cancel the timer now.
+            if seg.is_some() && matches!(rcv.timer, Some(ReceiveTimer::DelayedAck { .. })) {
+                rcv.timer = None;
+            }
+            seg
+        }
         match self {
             State::SynSent(SynSent {
                 iss,
@@ -1778,7 +1883,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     .into()
             }),
             State::Established(Established { snd, rcv }) => {
-                snd.poll_send(rcv.nxt(), rcv.wnd(), limit, now, socket_options)
+                poll_rcv_then_snd(snd, rcv, limit, now, socket_options)
             }
             State::CloseWait(CloseWait { snd, last_ack, last_wnd }) => {
                 snd.poll_send(*last_ack, *last_wnd, limit, now, socket_options)
@@ -1788,9 +1893,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 snd.poll_send(*last_ack, *last_wnd, limit, now, socket_options)
             }
             State::FinWait1(FinWait1 { snd, rcv }) => {
-                snd.poll_send(rcv.nxt(), rcv.wnd(), limit, now, socket_options)
+                poll_rcv_then_snd(snd, rcv, limit, now, socket_options)
             }
-            State::Closed(_) | State::Listen(_) | State::FinWait2(_) | State::TimeWait(_) => None,
+            State::FinWait2(FinWait2 { last_seq, rcv }) => {
+                rcv.poll_send(*last_seq, now).map(Into::into)
+            }
+            State::Closed(_) | State::Listen(_) | State::TimeWait(_) => None,
         }
     }
 
@@ -1798,7 +1906,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     fn poll_close(
         &mut self,
         now: I,
-        SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _ }: &SocketOptions,
+        SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _, delayed_ack: _ }: &SocketOptions,
     ) -> bool {
         let alive = match self {
             State::Established(Established { snd, rcv: _ }) => snd.still_alive(now, keep_alive),
@@ -1844,19 +1952,32 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     /// `poll_send_at` and to `install_timer`/`cancel_timer` should not
     /// interleave, otherwise timers may be lost.
     pub(crate) fn poll_send_at(&self) -> Option<I> {
+        let combine_timers =
+            |snd_timer: &Option<SendTimer<I>>, rcv_timer: &Option<ReceiveTimer<I>>| match (
+                snd_timer.as_ref().map(SendTimer::expiry),
+                rcv_timer.as_ref().map(ReceiveTimer::expiry),
+            ) {
+                (None, None) => None,
+                (None, Some(rcv_timer_expiry)) => Some(rcv_timer_expiry),
+                (Some(snd_timer_expiry), None) => Some(snd_timer_expiry),
+                (Some(snd_timer_expiry), Some(rcv_timer_expiry)) => {
+                    Some(snd_timer_expiry.min(rcv_timer_expiry))
+                }
+            };
         match self {
-            State::Established(Established { snd, rcv: _ })
-            | State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
+            State::Established(Established { snd, rcv }) => combine_timers(&snd.timer, &rcv.timer),
+            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
                 Some(snd.timer?.expiry())
             }
             State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ })
             | State::Closing(Closing { snd, last_ack: _, last_wnd: _ }) => {
                 Some(snd.timer?.expiry())
             }
-            State::FinWait1(FinWait1 { snd, rcv: _ }) => Some(snd.timer?.expiry()),
+            State::FinWait1(FinWait1 { snd, rcv }) => combine_timers(&snd.timer, &rcv.timer),
+            State::FinWait2(FinWait2 { last_seq: _, rcv }) => Some(rcv.timer?.expiry()),
             State::SynRcvd(syn_rcvd) => Some(syn_rcvd.retrans_timer.at),
             State::SynSent(syn_sent) => Some(syn_sent.retrans_timer.at),
-            State::Closed(_) | State::Listen(_) | State::FinWait2(_) => None,
+            State::Closed(_) | State::Listen(_) => None,
             State::TimeWait(TimeWait { last_seq: _, last_ack: _, last_wnd: _, expiry }) => {
                 Some(*expiry)
             }
@@ -1922,7 +2043,12 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         timer: None,
                         congestion_control: CongestionControl::cubic_with_mss(*smss),
                     },
-                    rcv: Recv { buffer: rcv_buffer, assembler: Assembler::new(*irs + 1) },
+                    rcv: Recv {
+                        buffer: rcv_buffer,
+                        assembler: Assembler::new(*irs + 1),
+                        timer: None,
+                        mss: *smss,
+                    },
                 });
                 Ok(())
             }
@@ -2276,7 +2402,8 @@ mod test {
             R: Default,
             S: Default,
         {
-            self.on_segment::<P, BP>(incoming, now, &KeepAlive::default())
+            // In testing, it is convenient to disable delayed ack by default.
+            self.on_segment::<P, BP>(incoming, now, &SocketOptions::default())
         }
     }
 
@@ -2457,7 +2584,12 @@ mod test {
                     timer: None,
                     congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
                 },
-                rcv: Recv { buffer: NullBuffer, assembler: Assembler::new(ISS_1 + 1) },
+                rcv: Recv {
+                    buffer: NullBuffer,
+                    assembler: Assembler::new(ISS_1 + 1),
+                    timer: None,
+                    mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
+                },
             }
         ))
     => None; "acceptable ack (ISS + 1)")]
@@ -2622,7 +2754,12 @@ mod test {
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 ),
             },
-            rcv: Recv { buffer: RingBuffer::new(2), assembler: Assembler::new(ISS_2 + 1) },
+            rcv: Recv {
+                buffer: RingBuffer::new(2),
+                assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
         });
         let (seg, passive_open) = state
             .on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -2659,6 +2796,8 @@ mod test {
         let new_rcv = || Recv {
             buffer: RingBuffer::new(TEST_BYTES.len()),
             assembler: Assembler::new(ISS_2 + 1),
+            timer: None,
+            mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
         };
         for mut state in [
             State::Established(Established { snd: new_snd(), rcv: new_rcv() }),
@@ -2704,7 +2843,12 @@ mod test {
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             ),
         };
-        let new_rcv = || Recv { buffer: NullBuffer, assembler: Assembler::new(ISS_2 + 1) };
+        let new_rcv = || Recv {
+            buffer: NullBuffer,
+            assembler: Assembler::new(ISS_2 + 1),
+            timer: None,
+            mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+        };
         for mut state in [
             State::Established(Established { snd: new_snd(), rcv: new_rcv() }),
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin(), rcv: new_rcv() }),
@@ -2909,7 +3053,12 @@ mod test {
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
             },
-            rcv: Recv { buffer: NullBuffer, assembler: Assembler::new(ISS_2 + 1) }
+            rcv: Recv {
+                buffer: NullBuffer,
+                assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE
+            }
         });
         clock.sleep(RTT / 2);
         assert_eq!(
@@ -2936,7 +3085,12 @@ mod test {
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
             },
-            rcv: Recv { buffer: NullBuffer, assembler: Assembler::new(ISS_1 + 1) }
+            rcv: Recv {
+                buffer: NullBuffer,
+                assembler: Assembler::new(ISS_1 + 1),
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE
+            }
         })
     }
 
@@ -3068,6 +3222,8 @@ mod test {
             rcv: Recv {
                 buffer: NullBuffer,
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
             }
         });
 
@@ -3091,6 +3247,8 @@ mod test {
             rcv: Recv {
                 buffer: NullBuffer,
                 assembler: Assembler::new(ISS_1 + 1),
+                timer: None,
+                mss: DEVICE_MAXIMUM_SEGMENT_SIZE,
             }
         });
     }
@@ -3120,6 +3278,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
 
@@ -3227,6 +3387,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         // Data queued but the window is not opened, nothing to send.
@@ -3441,6 +3603,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         let last_wnd = WindowSize::new(BUFFER_SIZE - 1).unwrap();
@@ -3577,6 +3741,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         assert_eq!(state.close(), Ok(()));
@@ -3746,6 +3912,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         assert_eq!(
@@ -3786,6 +3954,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_1 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         assert_eq!(state.close(), Ok(()));
@@ -3890,7 +4060,12 @@ mod test {
                 timer: None,
                 congestion_control: CongestionControl::cubic_with_mss(DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE),
             },
-            rcv: Recv { buffer: RingBuffer::default(), assembler: Assembler::new(ISS_2 + 5) },
+            rcv: Recv {
+                buffer: RingBuffer::default(),
+                assembler: Assembler::new(ISS_2 + 5),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE
+            },
         }),
         Segment::data(ISS_2, ISS_1, WindowSize::DEFAULT, TEST_BYTES) =>
         Some(Segment::ack(ISS_1, ISS_2 + 5, WindowSize::DEFAULT)); "retransmit data"
@@ -3952,7 +4127,12 @@ mod test {
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 ),
             },
-            rcv: Recv { buffer: RingBuffer::default(), assembler: Assembler::new(ISS_2) },
+            rcv: Recv {
+                buffer: RingBuffer::default(),
+                assembler: Assembler::new(ISS_2),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
         });
 
         assert_eq!(
@@ -4045,7 +4225,12 @@ mod test {
                     DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
                 ),
             },
-            rcv: Recv { buffer: RingBuffer::default(), assembler: Assembler::new(ISS_2) },
+            rcv: Recv {
+                buffer: RingBuffer::default(),
+                assembler: Assembler::new(ISS_2),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
         });
 
         let socket_options = {
@@ -4078,7 +4263,7 @@ mod test {
             state.on_segment::<&[u8], ClientlessBufferProvider>(
                 Segment::ack(ISS_2, ISS_1, WindowSize::DEFAULT).into(),
                 clock.now(),
-                keep_alive,
+                socket_options,
             ),
             (None, None),
         );
@@ -4253,6 +4438,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
@@ -4349,6 +4536,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         let mut socket_options = SocketOptions::default();
@@ -4462,6 +4651,8 @@ mod test {
             rcv: Recv {
                 buffer: RingBuffer::new(BUFFER_SIZE),
                 assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
         let mut times = 1;
@@ -4505,5 +4696,246 @@ mod test {
         // The timer should adjust its expiration time to be the current time
         // instead of panicking.
         assert_eq!(timer.at, clock.now());
+    }
+
+    #[test_case(
+        State::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                wl1: ISS_2,
+                wl2: ISS_1,
+                last_seq_ts: None,
+                rtt_estimator: Estimator::Measured {
+                    srtt: Estimator::RTO_INIT,
+                    rtt_var: Duration::ZERO,
+                },
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(
+                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                ),
+            },
+            rcv: Recv {
+                buffer: RingBuffer::new(
+                    TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
+                ),
+                assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
+        }); "established")]
+    #[test_case(
+        State::FinWait1(FinWait1 {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                wl1: ISS_2,
+                wl2: ISS_1,
+                last_seq_ts: None,
+                rtt_estimator: Estimator::Measured {
+                    srtt: Estimator::RTO_INIT,
+                    rtt_var: Duration::ZERO,
+                },
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(
+                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                ),
+            },
+            rcv: Recv {
+                buffer: RingBuffer::new(
+                    TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
+                ),
+                assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
+        }); "fin_wait_1")]
+    #[test_case(
+        State::FinWait2(FinWait2 {
+            last_seq: ISS_1 + 1,
+            rcv: Recv {
+                buffer: RingBuffer::new(
+                    TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize,
+                ),
+                assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
+        }); "fin_wait_2")]
+    fn delayed_ack(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) {
+        let mut clock = FakeInstantCtx::default();
+        // TODO(https://fxbug.dev/124309): Enable delayed ack by default.
+        let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                Segment::data(
+                    ISS_2 + 1,
+                    ISS_1 + 1,
+                    WindowSize::DEFAULT,
+                    SendPayload::Contiguous(TEST_BYTES),
+                ),
+                clock.now(),
+                &socket_options,
+            ),
+            (None, None)
+        );
+        assert_eq!(
+            state.poll_send_at(),
+            Some(clock.now().checked_add(ACK_DELAY_THRESHOLD).unwrap())
+        );
+        clock.sleep(ACK_DELAY_THRESHOLD);
+        assert_eq!(
+            state.poll_send(u32::MAX, clock.now(), &socket_options),
+            Some(
+                Segment::ack(
+                    ISS_1 + 1,
+                    ISS_2 + 1 + TEST_BYTES.len(),
+                    WindowSize::from_u32(2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE)).unwrap()
+                )
+                .into()
+            )
+        );
+        let full_segment_sized_payload =
+            vec![b'0'; u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE) as usize];
+        // The first full sized segment should not trigger an immediate ACK,
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                Segment::data(
+                    ISS_2 + 1 + TEST_BYTES.len(),
+                    ISS_1 + 1,
+                    WindowSize::DEFAULT,
+                    SendPayload::Contiguous(&full_segment_sized_payload[..]),
+                ),
+                clock.now(),
+                &socket_options,
+            ),
+            (None, None)
+        );
+        // ... but just a timer.
+        assert_eq!(
+            state.poll_send_at(),
+            Some(clock.now().checked_add(ACK_DELAY_THRESHOLD).unwrap())
+        );
+        // Now the second full sized segment arrives, an ACK should be sent
+        // immediately.
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                Segment::data(
+                    ISS_2 + 1 + TEST_BYTES.len() + full_segment_sized_payload.len(),
+                    ISS_1 + 1,
+                    WindowSize::DEFAULT,
+                    SendPayload::Contiguous(&full_segment_sized_payload[..]),
+                ),
+                clock.now(),
+                &socket_options,
+            ),
+            (
+                Some(Segment::ack(
+                    ISS_1 + 1,
+                    ISS_2 + 1 + TEST_BYTES.len() + 2 * u32::from(DEVICE_MAXIMUM_SEGMENT_SIZE),
+                    WindowSize::ZERO
+                )),
+                None
+            )
+        );
+        assert_eq!(state.poll_send_at(), None);
+    }
+
+    #[test]
+    fn immediate_ack_if_out_of_order_or_fin() {
+        let clock = FakeInstantCtx::default();
+        // TODO(https://fxbug.dev/124309): Enable delayed ack by default.
+        let socket_options = SocketOptions { delayed_ack: true, ..SocketOptions::default() };
+        let mut state: State<_, _, _, ()> = State::Established(Established {
+            snd: Send {
+                nxt: ISS_1 + 1,
+                max: ISS_1 + 1,
+                una: ISS_1 + 1,
+                wnd: WindowSize::DEFAULT,
+                buffer: RingBuffer::new(BUFFER_SIZE),
+                wl1: ISS_2,
+                wl2: ISS_1,
+                last_seq_ts: None,
+                rtt_estimator: Estimator::Measured {
+                    srtt: Estimator::RTO_INIT,
+                    rtt_var: Duration::ZERO,
+                },
+                timer: None,
+                congestion_control: CongestionControl::cubic_with_mss(
+                    DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+                ),
+            },
+            rcv: Recv {
+                buffer: RingBuffer::new(TEST_BYTES.len() + 1),
+                assembler: Assembler::new(ISS_2 + 1),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
+        });
+        // Upon receiving an out-of-order segment, we should send an ACK
+        // immediately.
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                Segment::data(
+                    ISS_2 + 2,
+                    ISS_1 + 1,
+                    WindowSize::DEFAULT,
+                    SendPayload::Contiguous(&TEST_BYTES[1..])
+                ),
+                clock.now(),
+                &socket_options,
+            ),
+            (
+                Some(Segment::ack(
+                    ISS_1 + 1,
+                    ISS_2 + 1,
+                    WindowSize::new(TEST_BYTES.len() + 1).unwrap()
+                )),
+                None
+            )
+        );
+        assert_eq!(state.poll_send_at(), None);
+        // The next segment fills a gap, so it should trigger an immediate
+        // ACK.
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                Segment::data(
+                    ISS_2 + 1,
+                    ISS_1 + 1,
+                    WindowSize::DEFAULT,
+                    SendPayload::Contiguous(&TEST_BYTES[..1])
+                ),
+                clock.now(),
+                &socket_options
+            ),
+            (
+                Some(Segment::ack(
+                    ISS_1 + 1,
+                    ISS_2 + 1 + TEST_BYTES.len(),
+                    WindowSize::new(1).unwrap()
+                )),
+                None
+            )
+        );
+        assert_eq!(state.poll_send_at(), None);
+        // We should also respond immediately with an ACK to a FIN.
+        assert_eq!(
+            state.on_segment::<_, ClientlessBufferProvider>(
+                Segment::fin(ISS_2 + 1 + TEST_BYTES.len(), ISS_1 + 1, WindowSize::DEFAULT,),
+                clock.now(),
+                &socket_options,
+            ),
+            (
+                Some(Segment::ack(ISS_1 + 1, ISS_2 + 1 + TEST_BYTES.len() + 1, WindowSize::ZERO,)),
+                None
+            )
+        );
+        assert_eq!(state.poll_send_at(), None);
     }
 }
