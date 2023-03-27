@@ -74,6 +74,7 @@ group("tests") {
   testonly = true
   deps = [
     "core:tests",
+    "examples:tests",
     "hci:tests",
     "lib:tests",
     "profiles:tests",

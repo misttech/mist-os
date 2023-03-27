@@ -17,5 +17,12 @@ group("examples") {
     ":bt-shell-examples",
     "bt-device-id-client",
     "bt-fastpair-client",
+    "bt-le-battery-monitor",
   ]
+}
+
+group("tests") {
+  testonly = true
+
+  deps = [ "bt-le-battery-monitor:tests" ]
 }
