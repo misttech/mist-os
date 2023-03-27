@@ -72,6 +72,7 @@ pub enum Error {
 
     #[error("The `availability` field in {0} for {1} must be set to \"optional\" because the source is \"void\".")]
     AvailabilityMustBeOptional(DeclField, String),
+
     #[error("Invalid aggregate offer: {0}")]
     InvalidAggregateOffer(String),
 }

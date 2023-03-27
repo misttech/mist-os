@@ -1404,6 +1404,7 @@ impl<'a> ValidationContext<'a> {
                     e.source_name.as_ref(),
                     e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.availability.as_ref(),
                     prev_target_ids,
                 );
                 // If the expose source is `self`, ensure we have a corresponding Service.
@@ -1424,6 +1425,7 @@ impl<'a> ValidationContext<'a> {
                     e.source_name.as_ref(),
                     e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.availability.as_ref(),
                     prev_target_ids,
                 );
                 // If the expose source is `self`, ensure we have a corresponding Protocol.
@@ -1444,6 +1446,7 @@ impl<'a> ValidationContext<'a> {
                     e.source_name.as_ref(),
                     e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.availability.as_ref(),
                     prev_target_ids,
                 );
                 // If the expose source is `self`, ensure we have a corresponding Directory.
@@ -1482,6 +1485,7 @@ impl<'a> ValidationContext<'a> {
                     e.source_name.as_ref(),
                     e.target_name.as_ref(),
                     e.target.as_ref(),
+                    Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
                 // If the expose source is `self`, ensure we have a corresponding Runner.
@@ -1501,6 +1505,7 @@ impl<'a> ValidationContext<'a> {
                     e.source_name.as_ref(),
                     e.target_name.as_ref(),
                     e.target.as_ref(),
+                    Some(&fdecl::Availability::Required),
                     prev_target_ids,
                 );
                 // If the expose source is `self`, ensure we have a corresponding Resolver.
@@ -1520,6 +1525,7 @@ impl<'a> ValidationContext<'a> {
                     e.source_name.as_ref(),
                     e.target_name.as_ref(),
                     e.target.as_ref(),
+                    e.availability.as_ref(),
                     prev_target_ids,
                 );
                 // Exposing to framework from framework should never be valid.
@@ -1571,12 +1577,12 @@ impl<'a> ValidationContext<'a> {
         source_name: Option<&String>,
         target_name: Option<&'a String>,
         target: Option<&fdecl::Ref>,
+        availability: Option<&fdecl::Availability>,
         prev_child_target_ids: &mut HashMap<&'a str, AllowableIds>,
     ) {
         match source {
             Some(r) => match r {
-                fdecl::Ref::Self_(_) => {}
-                fdecl::Ref::Framework(_) => {}
+                fdecl::Ref::Self_(_) | fdecl::Ref::VoidType(_) | fdecl::Ref::Framework(_) => {}
                 fdecl::Ref::Child(child) => {
                     let _ = self.validate_child_ref(decl, "source", &child, OfferType::Static);
                 }
@@ -1594,6 +1600,7 @@ impl<'a> ValidationContext<'a> {
                 self.errors.push(Error::missing_field(decl, "source"));
             }
         }
+        check_route_availability(decl, availability, source, source_name, &mut self.errors);
         match target {
             Some(r) => match r {
                 fdecl::Ref::Parent(_) => {}
@@ -1993,7 +2000,7 @@ impl<'a> ValidationContext<'a> {
             Some(_) => self.errors.push(Error::invalid_field(decl, "source")),
             None => self.errors.push(Error::missing_field(decl, "source")),
         }
-        check_offer_availability(decl, availability, source, source_name, &mut self.errors);
+        check_route_availability(decl, availability, source, source_name, &mut self.errors);
         check_offer_name(source_name, decl, "source_name", offer_type, &mut self.errors);
         match target {
             Some(fdecl::Ref::Child(c)) => {
@@ -2044,7 +2051,7 @@ impl<'a> ValidationContext<'a> {
                 self.errors.push(Error::missing_field(decl, "source"));
             }
         }
-        check_offer_availability(decl, availability, source, source_name, &mut self.errors);
+        check_route_availability(decl, availability, source, source_name, &mut self.errors);
         self.validate_storage_target(decl, target, offer_type);
     }
 
@@ -2102,7 +2109,7 @@ impl<'a> ValidationContext<'a> {
             }
         };
 
-        check_offer_availability(
+        check_route_availability(
             decl,
             event_stream.availability.as_ref(),
             event_stream.source.as_ref(),
@@ -2148,7 +2155,7 @@ impl<'a> ValidationContext<'a> {
             }
         };
 
-        check_offer_availability(
+        check_route_availability(
             decl,
             event.availability.as_ref(),
             event.source.as_ref(),
@@ -5442,6 +5449,230 @@ mod tests {
                 Error::invalid_capability("ExposeRunner", "source", "source_elf"),
                 Error::invalid_capability("ExposeResolver", "source", "source_pkg"),
             ])),
+        },
+
+        test_validate_exposes_availability_service => {
+            input = {
+                let mut decl = generate_expose_different_source_and_availability_decl(
+                    |source, availability, target_name|
+                        fdecl::Expose::Service(fdecl::ExposeService {
+                            source: Some(source),
+                            source_name: Some("fuchsia.examples.Echo".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some(target_name.to_string()),
+                            availability: Some(availability),
+                            ..fdecl::ExposeService::EMPTY
+                        })
+                );
+                decl.capabilities = Some(vec![
+                    fdecl::Capability::Service(fdecl::Service {
+                        name: Some("fuchsia.examples.Echo".to_string()),
+                        source_path: Some("/svc/fuchsia.examples.Echo".to_string()),
+                        ..fdecl::Service::EMPTY
+                    }),
+                ]);
+                decl
+            },
+            result = {
+                Err(ErrorList::new(vec![
+                    Error::availability_must_be_optional(
+                        "ExposeService",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                    Error::availability_must_be_optional(
+                        "ExposeService",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                ]))
+            },
+        },
+        test_validate_exposes_availability_protocol => {
+            input = {
+                let mut decl = generate_expose_different_source_and_availability_decl(
+                    |source, availability, target_name|
+                        fdecl::Expose::Protocol(fdecl::ExposeProtocol {
+                            source: Some(source),
+                            source_name: Some("fuchsia.examples.Echo".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some(target_name.to_string()),
+                            availability: Some(availability),
+                            ..fdecl::ExposeProtocol::EMPTY
+                        })
+                );
+                decl.capabilities = Some(vec![
+                    fdecl::Capability::Protocol(fdecl::Protocol {
+                        name: Some("fuchsia.examples.Echo".to_string()),
+                        source_path: Some("/svc/fuchsia.examples.Echo".to_string()),
+                        ..fdecl::Protocol::EMPTY
+                    }),
+                ]);
+                decl
+            },
+            result = {
+                Err(ErrorList::new(vec![
+                    Error::availability_must_be_optional(
+                        "ExposeProtocol",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                    Error::availability_must_be_optional(
+                        "ExposeProtocol",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                ]))
+            },
+        },
+        test_validate_exposes_availability_directory => {
+            input = {
+                let mut decl = generate_expose_different_source_and_availability_decl(
+                    |source, availability, target_name|
+                        fdecl::Expose::Directory(fdecl::ExposeDirectory {
+                            source: Some(source),
+                            source_name: Some("fuchsia.examples.Echo".to_string()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some(target_name.to_string()),
+                            availability: Some(availability),
+                            ..fdecl::ExposeDirectory::EMPTY
+                        })
+                );
+                decl.capabilities = Some(vec![
+                    fdecl::Capability::Directory(fdecl::Directory {
+                        name: Some("fuchsia.examples.Echo".to_string()),
+                        source_path: Some("/svc/fuchsia.examples.Echo".to_string()),
+                        rights: Some(fio::Operations::READ_BYTES),
+                        ..fdecl::Directory::EMPTY
+                    }),
+                ]);
+                decl
+            },
+            result = {
+                Err(ErrorList::new(vec![
+                    Error::availability_must_be_optional(
+                        "ExposeDirectory",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                    Error::availability_must_be_optional(
+                        "ExposeDirectory",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                ]))
+            },
+        },
+        test_validate_exposes_availability_event_stream => {
+            input = {
+                let new_expose = |source, availability, target_name: &str|
+                    fdecl::Expose::EventStream(fdecl::ExposeEventStream {
+                        source: Some(source),
+                        source_name: Some("fuchsia.examples.Echo".to_string()),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some(target_name.to_string()),
+                        availability: Some(availability),
+                        ..fdecl::ExposeEventStream::EMPTY
+                    });
+
+                let child = "child";
+                let mut decl = new_component_decl();
+                decl.children = Some(vec![fdecl::Child {
+                    name: Some(child.to_string()),
+                    url: Some("fuchsia-pkg://fuchsia.com/source#meta/source.cm".to_string()),
+                    startup: Some(fdecl::StartupMode::Lazy),
+                    ..fdecl::Child::EMPTY
+                }]);
+                decl.exposes = Some(vec![
+                    // Optional expose from child is okay.
+                    new_expose(
+                        fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None }),
+                        fdecl::Availability::Optional,
+                        "fuchsia.examples.Echo2",
+                    ),
+                    // Optional expose from void is okay.
+                    new_expose(
+                        fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                        fdecl::Availability::Optional,
+                        "fuchsia.examples.Echo3",
+                    ),
+                    // Optional expose from framework is okay.
+                    fdecl::Expose::EventStream(fdecl::ExposeEventStream {
+                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        source_name: Some("fuchsia.examples.Echo".to_string()),
+                        scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None })]),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("fuchsia.examples.Echo4".to_string()),
+                        availability: Some(fdecl::Availability::Optional),
+                        ..fdecl::ExposeEventStream::EMPTY
+                    }),
+                    // Transitional expose from child is okay.
+                    new_expose(
+                        fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None }),
+                        fdecl::Availability::Transitional,
+                        "fuchsia.examples.Echo6",
+                    ),
+                    // Transitional expose from void is okay.
+                    new_expose(
+                        fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                        fdecl::Availability::Transitional,
+                        "fuchsia.examples.Echo7",
+                    ),
+                    // Transitional expose from framework is okay.
+                    fdecl::Expose::EventStream(fdecl::ExposeEventStream {
+                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        source_name: Some("fuchsia.examples.Echo".to_string()),
+                        scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None })]),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("fuchsia.examples.Echo8".to_string()),
+                        availability: Some(fdecl::Availability::Transitional),
+                        ..fdecl::ExposeEventStream::EMPTY
+                    }),
+                    // Same-as-target expose from child is okay.
+                    new_expose(
+                        fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None }),
+                        fdecl::Availability::SameAsTarget,
+                        "fuchsia.examples.Echo10",
+                    ),
+                    // Same-as-target expose from framework is okay.
+                    fdecl::Expose::EventStream(fdecl::ExposeEventStream {
+                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
+                        source_name: Some("fuchsia.examples.Echo".to_string()),
+                        scope: Some(vec![fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None })]),
+                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                        target_name: Some("fuchsia.examples.Echo11".to_string()),
+                        availability: Some(fdecl::Availability::SameAsTarget),
+                        ..fdecl::ExposeEventStream::EMPTY
+                    }),
+                    // Required expose from void is an error.
+                    new_expose(
+                        fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                        fdecl::Availability::Required,
+                        "fuchsia.examples.Echo12",
+                    ),
+                    // Same-as-target expose from void is an error.
+                    new_expose(
+                        fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                        fdecl::Availability::SameAsTarget,
+                        "fuchsia.examples.Echo13",
+                    ),
+                ]);
+                decl
+            },
+            result = {
+                Err(ErrorList::new(vec![
+                    Error::availability_must_be_optional(
+                        "ExposeEventStream",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                    Error::availability_must_be_optional(
+                        "ExposeEventStream",
+                        "availability",
+                        Some(&"fuchsia.examples.Echo".to_string()),
+                    ),
+                ]))
+            },
         },
 
         // offers
@@ -8891,6 +9122,102 @@ mod tests {
                 Error::invalid_capability_type("RuntimeConfig", "capability", "storage"),
             ])),
         },
+    }
+
+    /// Passes different source and availability options to `new_expose` to
+    /// generate a component declaration.
+    fn generate_expose_different_source_and_availability_decl(
+        new_expose: impl Fn(fdecl::Ref, fdecl::Availability, &str) -> fdecl::Expose,
+    ) -> fdecl::Component {
+        let mut decl = new_component_decl();
+        let child = "child";
+        decl.children = Some(vec![fdecl::Child {
+            name: Some(child.to_string()),
+            url: Some("fuchsia-pkg://fuchsia.com/source#meta/source.cm".to_string()),
+            startup: Some(fdecl::StartupMode::Lazy),
+            ..fdecl::Child::EMPTY
+        }]);
+        decl.exposes = Some(vec![
+            // Optional expose from self is okay.
+            new_expose(
+                fdecl::Ref::Self_(fdecl::SelfRef {}),
+                fdecl::Availability::Optional,
+                "fuchsia.examples.Echo1",
+            ),
+            // Optional expose from child is okay.
+            new_expose(
+                fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None }),
+                fdecl::Availability::Optional,
+                "fuchsia.examples.Echo2",
+            ),
+            // Optional expose from void is okay.
+            new_expose(
+                fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                fdecl::Availability::Optional,
+                "fuchsia.examples.Echo3",
+            ),
+            // Optional expose from framework is okay.
+            new_expose(
+                fdecl::Ref::Framework(fdecl::FrameworkRef {}),
+                fdecl::Availability::Optional,
+                "fuchsia.examples.Echo4",
+            ),
+            // Transitional expose from self is okay.
+            new_expose(
+                fdecl::Ref::Self_(fdecl::SelfRef {}),
+                fdecl::Availability::Transitional,
+                "fuchsia.examples.Echo5",
+            ),
+            // Transitional expose from child is okay.
+            new_expose(
+                fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None }),
+                fdecl::Availability::Transitional,
+                "fuchsia.examples.Echo6",
+            ),
+            // Transitional expose from void is okay.
+            new_expose(
+                fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                fdecl::Availability::Transitional,
+                "fuchsia.examples.Echo7",
+            ),
+            // Transitional expose from framework is okay.
+            new_expose(
+                fdecl::Ref::Framework(fdecl::FrameworkRef {}),
+                fdecl::Availability::Transitional,
+                "fuchsia.examples.Echo8",
+            ),
+            // Same-as-target expose from self is okay.
+            new_expose(
+                fdecl::Ref::Self_(fdecl::SelfRef {}),
+                fdecl::Availability::SameAsTarget,
+                "fuchsia.examples.Echo9",
+            ),
+            // Same-as-target expose from child is okay.
+            new_expose(
+                fdecl::Ref::Child(fdecl::ChildRef { name: child.to_string(), collection: None }),
+                fdecl::Availability::SameAsTarget,
+                "fuchsia.examples.Echo10",
+            ),
+            // Same-as-target expose from framework is okay.
+            new_expose(
+                fdecl::Ref::Framework(fdecl::FrameworkRef {}),
+                fdecl::Availability::SameAsTarget,
+                "fuchsia.examples.Echo11",
+            ),
+            // Required expose from void is an error.
+            new_expose(
+                fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                fdecl::Availability::Required,
+                "fuchsia.examples.Echo12",
+            ),
+            // Same-as-target expose from void is an error.
+            new_expose(
+                fdecl::Ref::VoidType(fdecl::VoidRef {}),
+                fdecl::Availability::SameAsTarget,
+                "fuchsia.examples.Echo13",
+            ),
+        ]);
+        decl
     }
 
     /// Passes different source and availability options to `new_offer` to

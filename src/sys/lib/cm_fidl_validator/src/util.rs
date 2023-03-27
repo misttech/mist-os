@@ -185,7 +185,7 @@ pub(crate) fn check_use_availability(
     }
 }
 
-pub(crate) fn check_offer_availability(
+pub(crate) fn check_route_availability(
     decl: &str,
     availability: Option<&fdecl::Availability>,
     source: Option<&fdecl::Ref>,
