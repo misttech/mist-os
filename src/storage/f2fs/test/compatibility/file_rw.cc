@@ -192,7 +192,7 @@ TEST_F(FileRWCompatibilityTest, TruncateFuchsiaToLinux) {
     GetEnclosedGuest().GetLinuxOperator().ExecuteWithAssert(
         {"<" + GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) +
                                                                  extend_filename),
-         "tr -d '\\0'", "|", "read -n 1", "||", "echo -n \"0\""},
+         "tr -d '\\0'", "|", "wc -c", "|", "tr -d '\\n'"},
         &result);
 
     ASSERT_EQ(result, "0");
