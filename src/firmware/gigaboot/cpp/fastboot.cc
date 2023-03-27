@@ -73,6 +73,7 @@ cpp20::span<Fastboot::VariableEntry> Fastboot::GetVariableTable() {
       {"slot-count", {"2"}},
       {"slot-suffixes", {"a,b"}},
       {"hw-revision", {BOARD_NAME}},
+      {"version", {"0.4"}},
   };
 
   return var_entries;
