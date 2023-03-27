@@ -567,12 +567,8 @@ struct RetransTimer<I> {
 impl<I: Instant> RetransTimer<I> {
     fn new(now: I, rto: Duration, user_timeout: Duration) -> Self {
         let wakeup_after = rto.min(user_timeout);
-        let at = now.checked_add(wakeup_after).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", wakeup_after, now);
-        });
-        let user_timeout_until = now.checked_add(user_timeout).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", user_timeout, now);
-        });
+        let at = now.add(wakeup_after);
+        let user_timeout_until = now.add(user_timeout);
         Self { at, rto, user_timeout_until, remaining_retries: Some(DEFAULT_MAX_RETRIES) }
     }
 
@@ -587,16 +583,12 @@ impl<I: Instant> RetransTimer<I> {
             // timer to expire as soon as possible.
             Duration::ZERO
         };
-        *at = now.checked_add(core::cmp::min(*rto, remaining)).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", rto, now);
-        });
+        *at = now.add(core::cmp::min(*rto, remaining));
     }
 
     fn rearm(&mut self, now: I) {
         let Self { at, rto, user_timeout_until: _, remaining_retries: _ } = self;
-        *at = now.checked_add(*rto).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", rto, now);
-        });
+        *at = now.add(*rto);
     }
 }
 
@@ -635,9 +627,7 @@ struct KeepAliveTimer<I> {
 
 impl<I: Instant> KeepAliveTimer<I> {
     fn idle(now: I, keep_alive: &KeepAlive) -> Self {
-        let at = now.checked_add(keep_alive.idle.into()).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", keep_alive.idle, now);
-        });
+        let at = now.add(keep_alive.idle.into());
         Self { at, already_sent: 0 }
     }
 }
@@ -823,12 +813,7 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
                 //   been received for the connection within an interval.
                 if keep_alive.enabled && !FIN_QUEUED && readable_bytes == 0 {
                     if *at <= now {
-                        *at = now.checked_add(keep_alive.interval.into()).unwrap_or_else(|| {
-                            panic!(
-                                "clock wraps around when adding {:?} to {:?}",
-                                keep_alive.interval, now
-                            );
-                        });
+                        *at = now.add(keep_alive.interval.into());
                         *already_sent = already_sent.saturating_add(1);
                         // Per RFC 9293 Section 3.8.4:
                         //   Such a segment generally contains SEG.SEQ = SND.NXT-1
@@ -1294,9 +1279,7 @@ pub(crate) struct TimeWait<I> {
 }
 
 fn new_time_wait_expiry<I: Instant>(now: I) -> I {
-    now.checked_add(MSL * 2).unwrap_or_else(|| {
-        panic!("clock wraps around when adding {:?} * 2 ({:?}) to {:?}", MSL, MSL * 2, now);
-    })
+    now.add(MSL * 2)
 }
 
 #[derive(Debug)]
@@ -4252,10 +4235,7 @@ mod test {
         );
         // so the above poll_send call will install a timer, which will fire
         // after `keep_alive.idle`.
-        assert_eq!(
-            state.poll_send_at(),
-            Some(clock.now().checked_add(keep_alive.idle.into())).unwrap()
-        );
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(keep_alive.idle.into())));
 
         // Now we receive an ACK after an hour.
         clock.sleep(Duration::from_secs(60 * 60));
@@ -4268,10 +4248,7 @@ mod test {
             (None, None),
         );
         // the timer is reset to fire in 2 hours.
-        assert_eq!(
-            state.poll_send_at(),
-            Some(clock.now().checked_add(keep_alive.idle.into()).unwrap()),
-        );
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(keep_alive.idle.into())),);
         clock.sleep(keep_alive.idle.into());
 
         // Then there should be `count` probes being sent out after `count`
@@ -4443,10 +4420,7 @@ mod test {
             },
         });
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
-        assert_eq!(
-            state.poll_send_at(),
-            Some(clock.now().checked_add(Estimator::RTO_INIT).unwrap())
-        );
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(Estimator::RTO_INIT)));
 
         // Send the first probe after first RTO.
         clock.sleep(Estimator::RTO_INIT);
@@ -4470,10 +4444,7 @@ mod test {
         );
         // The timer should backoff exponentially.
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
-        assert_eq!(
-            state.poll_send_at(),
-            Some(clock.now().checked_add(Estimator::RTO_INIT * 2).unwrap())
-        );
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(Estimator::RTO_INIT * 2)));
 
         // No probe should be sent before the timeout.
         clock.sleep(Estimator::RTO_INIT);
@@ -4785,10 +4756,7 @@ mod test {
             ),
             (None, None)
         );
-        assert_eq!(
-            state.poll_send_at(),
-            Some(clock.now().checked_add(ACK_DELAY_THRESHOLD).unwrap())
-        );
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
         clock.sleep(ACK_DELAY_THRESHOLD);
         assert_eq!(
             state.poll_send(u32::MAX, clock.now(), &socket_options),
@@ -4818,10 +4786,7 @@ mod test {
             (None, None)
         );
         // ... but just a timer.
-        assert_eq!(
-            state.poll_send_at(),
-            Some(clock.now().checked_add(ACK_DELAY_THRESHOLD).unwrap())
-        );
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(ACK_DELAY_THRESHOLD)));
         // Now the second full sized segment arrives, an ACK should be sent
         // immediately.
         assert_eq!(
