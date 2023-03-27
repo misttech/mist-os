@@ -15,6 +15,7 @@ config("logging_config") {
 
 source_set("utils") {
   sources = [
+    "dispatcher_holder.cc",
     "dispatcher_holder.h",
     "helpers.cc",
     "helpers.h",
@@ -45,6 +46,7 @@ source_set("utils") {
   deps = [
     "//sdk/lib/fdio",
     "//sdk/lib/fidl/cpp:cpp_base",
+    "//sdk/lib/fit",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//zircon/system/ulib/zx",

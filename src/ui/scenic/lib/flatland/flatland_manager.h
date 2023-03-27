@@ -182,6 +182,11 @@ class FlatlandManager {
   fit::function<void(fidl::InterfaceRequest<fuchsia::ui::pointer::MouseSource>, zx_koid_t)>
       register_mouse_source_;
 
+  // This loop executes tasks related to shutting down Flatland sessions and FlatlandDisplays.
+  // It avoids potential jank that might be caused by executing these on the main thread, and
+  // also lets the ~FlatlandManager() destructor spin until all of these tasks are completed.
+  async::Loop cleanup_loop_;
+
   // Stores and executes async tasks on the dispatcher provided in this object's constructor.
   // NOTE: This object MUST BE the final member of this class to ensure that async tasks are
   // cancelled and destroyed first during destruction, else they might access already-destroyed

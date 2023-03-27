@@ -1,0 +1,28 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+
+group("tests") {
+  testonly = true
+  public_deps = [ ":unittests" ]
+}
+
+executable("unittests") {
+  output_name = "scenic_utils_unittests"
+
+  testonly = true
+  sources = [ "dispatcher_holder_unittest.cc" ]
+  deps = [
+    "//sdk/lib/fit",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
+    "//src/ui/scenic/lib/utils",
+    "//third_party/googletest:gmock",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+  ]
+
+  include_dirs = [ "//src/ui/lib/escher" ]
+}

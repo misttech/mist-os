@@ -210,14 +210,6 @@ Flatland::~Flatland() {
             }
           }
           images_to_release->clear();
-
-          // This is bullet-proofing against a subtle issue.  When we capture the "keepalive"
-          // dispatcher/wait/event, we intentionally capture the dispatcher first, so that it is
-          // destroyed last.  Otherwise, if it is destroyed before the wait and/or event, we cannot
-          // rely on RAII to clean them up (for some reason).  Instead of relying on that subtle
-          // detail, we explicitly release the wait/event.
-          keepalive_evt.reset();
-          keepalive_wait.reset();
         });
     FX_DCHECK(status == ZX_OK);
   }
@@ -294,7 +286,7 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
     // Use a self-referencing async::WaitOnce to perform ImageImporter deregistration.
     // This is primarily so the handler does not have to live in the Flatland instance, which may
-    // be destroyed before the release fence is signaled. WaitOnce moves the handler to the stack
+    // be destroyed before the release fence is signaled.  `WaitOnce` moves the handler to the stack
     // prior to invoking it, so it is safe for the handler to delete the WaitOnce on exit.
     // Specifically, we move the wait object into the lambda function via |copy_ref = wait| to
     // ensure that the wait object lives. The callback will not trigger without this.
@@ -317,7 +309,9 @@ void Flatland::Present(fuchsia::ui::composition::PresentArgs args) {
 
           for (auto& image_id : images_to_release) {
             if (!all_images_to_release->erase(image_id.identifier)) {
-              // This is harmless, but is not expected to happen.
+              // This is harmless, but typically shouldn't happen.  The rare exception is a race
+              // when the Flatland session is being torn down, if this runs after the session is
+              // destroyed, but before the session's loop/thread is stopped.
               FX_LOGS(WARNING) << "Flatland session << " << session_id
                                << " did not find expected image " << image_id.identifier
                                << " in images_to_release_";

@@ -7,7 +7,10 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/dispatcher.h>
+#include <lib/fit/function.h>
 #include <lib/zx/event.h>
+
+#include <memory>
 
 namespace utils {
 
@@ -34,14 +37,21 @@ class DispatcherHolder {
 // Concrete implementation of DispatcherHolder which wraps an async::Loop.
 class LoopDispatcherHolder : public DispatcherHolder {
  public:
-  explicit LoopDispatcherHolder(const async_loop_config_t* config) : loop_(config) {}
+  using DestroyLoop = fit::function<void(std::unique_ptr<async::Loop>)>;
 
-  async_dispatcher_t* dispatcher() const override { return loop_.dispatcher(); }
+  explicit LoopDispatcherHolder(
+      const async_loop_config_t* config,
+      DestroyLoop destroy_loop = [](std::unique_ptr<async::Loop> loop) mutable { loop.reset(); });
 
-  async::Loop& loop() { return loop_; }
+  ~LoopDispatcherHolder() override;
+
+  async_dispatcher_t* dispatcher() const override { return loop_->dispatcher(); }
+
+  async::Loop& loop() { return *loop_; }
 
  private:
-  async::Loop loop_;
+  std::unique_ptr<async::Loop> loop_;
+  DestroyLoop destroy_loop_;
 };
 
 // Concrete implementation of DispatcherHolder which doesn't own the dispatcher: the client is

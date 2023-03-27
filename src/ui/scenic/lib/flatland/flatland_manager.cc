@@ -13,6 +13,7 @@
 
 #include "lib/syslog/cpp/macros.h"
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/ui/scenic/lib/utils/dispatcher_holder.h"
 
 namespace flatland {
 
@@ -39,6 +40,7 @@ FlatlandManager::FlatlandManager(
       register_view_ref_focused_(std::move(register_view_ref_focused)),
       register_touch_source_(std::move(register_touch_source)),
       register_mouse_source_(std::move(register_mouse_source)),
+      cleanup_loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
       executor_(dispatcher) {
   FX_DCHECK(dispatcher);
   FX_DCHECK(flatland_presenter_);
@@ -53,6 +55,8 @@ FlatlandManager::FlatlandManager(
     FX_DCHECK(buffer_collection_importer);
   }
 #endif
+
+  cleanup_loop_.StartThread("FlatlandManager Cleanup");
 }
 
 FlatlandManager::~FlatlandManager() {
@@ -90,8 +94,15 @@ void FlatlandManager::CreateFlatland(
   FX_DCHECK(result.second);
 
   auto& instance = result.first->second;
-  instance->loop =
-      std::make_shared<utils::LoopDispatcherHolder>(&kAsyncLoopConfigNoAttachToCurrentThread);
+  instance->loop = std::make_shared<utils::LoopDispatcherHolder>(
+      &kAsyncLoopConfigNoAttachToCurrentThread,
+      [this](std::unique_ptr<async::Loop> loop_to_destroy) {
+        // Destroying a loop on its own dispatcher deadlocks, as it tries to join its own thread.
+        FX_DCHECK(loop_to_destroy->dispatcher() != this->cleanup_loop_.dispatcher());
+
+        async::PostTask(this->cleanup_loop_.dispatcher(),
+                        [loop_to_destroy = std::move(loop_to_destroy)]() {});
+      });
   instance->impl = NewFlatland(
       instance->loop, std::move(request), id,
       std::bind(&FlatlandManager::DestroyInstanceFunction, this, id), flatland_presenter_,
@@ -183,8 +194,15 @@ void FlatlandManager::CreateFlatlandDisplay(
   FX_DCHECK(result.second);
 
   auto& instance = result.first->second;
-  instance->loop =
-      std::make_shared<utils::LoopDispatcherHolder>(&kAsyncLoopConfigNoAttachToCurrentThread);
+  instance->loop = std::make_shared<utils::LoopDispatcherHolder>(
+      &kAsyncLoopConfigNoAttachToCurrentThread,
+      [this](std::unique_ptr<async::Loop> loop_to_destroy) {
+        // Destroying a loop on its own dispatcher deadlocks, as it tries to join its own thread.
+        FX_DCHECK(loop_to_destroy->dispatcher() != this->cleanup_loop_.dispatcher());
+
+        async::PostTask(this->cleanup_loop_.dispatcher(),
+                        [loop_to_destroy = std::move(loop_to_destroy)]() {});
+      });
   instance->display = hw_display;
   instance->impl = FlatlandDisplay::New(
       instance->loop, std::move(request), id, hw_display,

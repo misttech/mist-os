@@ -187,8 +187,8 @@ std::unique_ptr<ReleaseFenceManager::FrameRecord> ReleaseFenceManager::NewGpuCom
         if (status == ZX_ERR_CANCELED) {
           // Must return immediately if canceled.  In particular, we cannot rely on the validity of
           // the |this| pointer, because we may have been canceled due to the destruction of the
-          // manager (because this would the destruction of all frame-records, and hence also this
-          // wait).
+          // manager (because this would cause the destruction of all frame-records, and hence also
+          // this wait).
           return;
         }
 

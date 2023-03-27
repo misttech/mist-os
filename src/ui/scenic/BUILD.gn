@@ -45,6 +45,7 @@ group("tests") {
     ":input_unittests",
     ":scenic_unittests",
     ":scenic_util_tests",
+    ":scenic_utils_unittests",
     ":scheduling_unittests",
     ":screen_capture2_unittests",
     ":screen_capture_unittests",
@@ -251,6 +252,11 @@ fuchsia_unittest_package("scenic_unittests") {
 fuchsia_unittest_package("scenic_util_tests") {
   manifest = "meta/scenic_util_tests.cml"
   deps = [ "lib/scenic/util/tests:unittests" ]
+}
+
+fuchsia_unittest_package("scenic_utils_unittests") {
+  manifest = "meta/scenic_utils_unittests.cml"
+  deps = [ "lib/utils/tests:unittests" ]
 }
 
 fuchsia_unittest_package("scheduling_unittests") {
