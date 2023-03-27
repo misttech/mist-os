@@ -644,6 +644,9 @@ fn check_config_errors(
                 }
             }
             Credential::Psk(ref psk) => {
+                if security_type == &SecurityType::Wpa3 {
+                    return Err(NetworkConfigError::Wpa3Psk);
+                }
                 if psk.len() != WPA_PSK_BYTE_LEN {
                     return Err(NetworkConfigError::PskLen);
                 }
@@ -660,6 +663,7 @@ fn check_config_errors(
 /// or removing a network config, or for invalid values when trying to create a network config.
 pub enum NetworkConfigError {
     OpenNetworkPassword,
+    Wpa3Psk,
     PasswordLen,
     PskLen,
     SsidEmpty,
@@ -676,6 +680,9 @@ impl Debug for NetworkConfigError {
         match self {
             NetworkConfigError::OpenNetworkPassword => {
                 write!(f, "can't have an open network with a password or PSK")
+            }
+            NetworkConfigError::Wpa3Psk => {
+                write!(f, "can't use a PSK to connect to a WPA3 network")
             }
             NetworkConfigError::PasswordLen => write!(f, "invalid password length"),
             NetworkConfigError::PskLen => write!(f, "invalid PSK length"),
@@ -707,7 +714,9 @@ impl Debug for NetworkConfigError {
 impl From<NetworkConfigError> for fidl_policy::NetworkConfigChangeError {
     fn from(err: NetworkConfigError) -> Self {
         match err {
-            NetworkConfigError::OpenNetworkPassword | NetworkConfigError::MissingPasswordPsk => {
+            NetworkConfigError::OpenNetworkPassword
+            | NetworkConfigError::MissingPasswordPsk
+            | NetworkConfigError::Wpa3Psk => {
                 fidl_policy::NetworkConfigChangeError::InvalidSecurityCredentialError
             }
             NetworkConfigError::PasswordLen | NetworkConfigError::PskLen => {
@@ -1045,6 +1054,15 @@ mod tests {
                 &password
             ),
             Err(NetworkConfigError::MissingPasswordPsk)
+        );
+
+        assert_variant!(
+            check_config_errors(
+                &client_types::Ssid::try_from("valid_ssid").unwrap(),
+                &SecurityType::Wpa3,
+                &psk
+            ),
+            Err(NetworkConfigError::Wpa3Psk)
         );
     }
 

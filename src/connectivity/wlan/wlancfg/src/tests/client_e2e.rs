@@ -129,7 +129,7 @@ lazy_static! {
                     .unwrap()
                 )
             )))
-        }
+        },
     };
 }
 
@@ -878,9 +878,7 @@ fn test_save_and_connect(
 #[test_case(Saved::Wpa2, Scanned::Wep, TEST_CREDS.wep_64_hex.clone())] // Use credentials which are valid len for WEP and WPA
 #[test_case(Saved::Wpa2, Scanned::Wep, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa3, Scanned::Open, TEST_CREDS.wpa_pass_min.clone())]
-#[test_case(Saved::Wpa3, Scanned::Open, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wep, TEST_CREDS.wep_64_hex.clone())] // Use credentials which are valid len for WEP and WPA
-#[test_case(Saved::Wpa3, Scanned::Wep, TEST_CREDS.wpa_psk.clone())]
 // PSKs should never be used for WPA3
 #[test_case(Saved::Wpa, Scanned::Wpa3Personal, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa2, Scanned::Wpa3Personal, TEST_CREDS.wpa_psk.clone())]
@@ -891,19 +889,14 @@ fn test_save_and_connect(
 // Saved credential: WPA3: downgrades are disallowed
 #[test_case(Saved::Wpa3, Scanned::Wpa1, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa1, TEST_CREDS.wpa_pass_max.clone())]
-#[test_case(Saved::Wpa3, Scanned::Wpa1, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa1Wpa2Personal, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa1Wpa2Personal, TEST_CREDS.wpa_pass_max.clone())]
-#[test_case(Saved::Wpa3, Scanned::Wpa1Wpa2Personal, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa1Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa1Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_max.clone())]
-#[test_case(Saved::Wpa3, Scanned::Wpa1Wpa2PersonalTkipOnly, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa2Personal, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa2Personal, TEST_CREDS.wpa_pass_max.clone())]
-#[test_case(Saved::Wpa3, Scanned::Wpa2Personal, TEST_CREDS.wpa_psk.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_min.clone())]
 #[test_case(Saved::Wpa3, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_pass_max.clone())]
-#[test_case(Saved::Wpa3, Scanned::Wpa2PersonalTkipOnly, TEST_CREDS.wpa_psk.clone())]
 #[fuchsia::test(add_test_attr = false)]
 /// Tests saving and connecting across various security types, where the connection is expected to fail
 fn test_save_and_fail_to_connect(
@@ -1038,6 +1031,46 @@ fn test_save_and_fail_to_connect(
     let network = networks.pop().unwrap();
     assert_eq!(network.state.unwrap(), types::ConnectionState::Failed);
     assert_eq!(network.id.unwrap(), network_id.clone());
+}
+
+// Saving this network should fail because a PSK cannot be used to connect to a WPA3 network.
+#[test_case(fidl_policy::NetworkConfigChangeError::InvalidSecurityCredentialError, TEST_SSID.clone().into(), Saved::Wpa3, TEST_CREDS.wpa_psk.policy.clone())]
+#[test_case(fidl_policy::NetworkConfigChangeError::SsidEmptyError, vec![], Saved::Wpa3, TEST_CREDS.wpa_psk.policy.clone())]
+// Saving this network should fail because the PSK is too short.
+#[test_case(fidl_policy::NetworkConfigChangeError::CredentialLenError, TEST_SSID.clone().into(), Saved::Wpa2, fidl_policy::Credential::Psk(hex::decode(b"12345678").unwrap()))]
+// Saving this network should fail because the password is too short.
+#[test_case(fidl_policy::NetworkConfigChangeError::CredentialLenError, TEST_SSID.clone().into(), Saved::Wpa2, fidl_policy::Credential::Password(b"12".to_vec()))]
+fn test_fail_to_save(
+    save_error: fidl_policy::NetworkConfigChangeError,
+    ssid: Vec<u8>,
+    saved_security: fidl_policy::SecurityType,
+    saved_credential: fidl_policy::Credential,
+) {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values = test_setup(&mut exec);
+
+    // Generate network ID
+    let network_id = fidl_policy::NetworkIdentifier { ssid: ssid, type_: saved_security };
+    let network_config = fidl_policy::NetworkConfig {
+        id: Some(network_id.clone()),
+        credential: Some(saved_credential),
+        ..fidl_policy::NetworkConfig::EMPTY
+    };
+
+    // Save the network
+    let save_fut = test_values.external_interfaces.client_controller.save_network(network_config);
+    pin_mut!(save_fut);
+
+    // Progress the WLAN policy side of the future
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Saving the network should return an error
+    assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(Err(error))) => {
+        assert_eq!(error, save_error);
+    });
 }
 
 // Tests the connect request path to a new network while already connected.
