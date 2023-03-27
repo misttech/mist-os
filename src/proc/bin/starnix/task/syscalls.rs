@@ -18,7 +18,7 @@ use crate::mm::*;
 use crate::syscalls::*;
 use crate::task::*;
 
-fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
+pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
     let child_exit_signal = if args.exit_signal == 0 {
         None
     } else {
@@ -56,56 +56,6 @@ fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errn
         task_ref.wait_for_execve()?;
     }
     Ok(tid)
-}
-
-#[cfg(target_arch = "x86_64")]
-pub fn sys_clone(
-    current_task: &CurrentTask,
-    flags: u64,
-    user_stack: UserAddress,
-    user_parent_tid: UserRef<pid_t>,
-    user_child_tid: UserRef<pid_t>,
-    user_tls: UserAddress,
-) -> Result<pid_t, Errno> {
-    // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
-    // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
-    do_clone(
-        current_task,
-        &clone_args {
-            flags: flags & !(CSIGNAL as u64),
-            child_tid: user_child_tid.addr().ptr() as u64,
-            parent_tid: user_parent_tid.addr().ptr() as u64,
-            exit_signal: flags & (CSIGNAL as u64),
-            stack: user_stack.ptr() as u64,
-            tls: user_tls.ptr() as u64,
-            ..Default::default()
-        },
-    )
-}
-
-#[cfg(target_arch = "aarch64")]
-pub fn sys_clone(
-    current_task: &CurrentTask,
-    flags: u64,
-    user_stack: UserAddress,
-    user_parent_tid: UserRef<pid_t>,
-    user_tls: UserAddress,
-    user_child_tid: UserRef<pid_t>,
-) -> Result<pid_t, Errno> {
-    // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
-    // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
-    do_clone(
-        current_task,
-        &clone_args {
-            flags: flags & !(CSIGNAL as u64),
-            child_tid: user_child_tid.addr().ptr() as u64,
-            parent_tid: user_parent_tid.addr().ptr() as u64,
-            exit_signal: flags & (CSIGNAL as u64),
-            stack: user_stack.ptr() as u64,
-            tls: user_tls.ptr() as u64,
-            ..Default::default()
-        },
-    )
 }
 
 pub fn sys_clone3(

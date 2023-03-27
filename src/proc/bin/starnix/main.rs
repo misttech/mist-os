@@ -22,6 +22,7 @@ use futures::{StreamExt, TryStreamExt};
 #[macro_use]
 mod trace;
 
+mod arch;
 mod auth;
 mod bpf;
 mod collections;

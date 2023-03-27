@@ -4,6 +4,7 @@
 
 use paste::paste;
 
+use crate::arch::syscalls::*;
 use crate::fs::FdNumber;
 use crate::syscalls::{decls::Syscall, CurrentTask, SyscallResult};
 use crate::types::*;
