@@ -374,31 +374,41 @@ class Devicetree {
  private:
   // A Walker for visiting each node. It is presented as a type erased
   // callback that will do proper cast.
+  template <typename ReturnType>
   class NodeVisitor {
    public:
-    using TypedCallback = bool (*)(const NodePath&, const PropertyDecoder&);
+    using TypedCallback = ReturnType (*)(const NodePath&, const PropertyDecoder&);
 
     template <typename TypedCaller>
     explicit constexpr NodeVisitor(TypedCaller& callback)
         : typed_callback_(
-              [](void* ctx, const NodePath& path, const PropertyDecoder& props) -> bool {
-                return (*static_cast<TypedCaller*>(ctx))(path, props);
+              [](void* ctx, const NodePath& path, const PropertyDecoder& decoder) -> ReturnType {
+                if constexpr (std::is_void_v<ReturnType>) {
+                  (*static_cast<TypedCaller*>(ctx))(path, decoder);
+                } else {
+                  return (*static_cast<TypedCaller*>(ctx))(path, decoder);
+                }
               }),
           callback_(&callback) {
       static_assert(
-          std::is_invocable_r_v<bool, TypedCaller, const NodePath&, const PropertyDecoder&>,
-          "wrong callback signature");
+          std::is_invocable_r_v<ReturnType, TypedCaller, const NodePath&, PropertyDecoder&>,
+          "Invalid signature for NodeVisitor");
     }
 
-    auto operator()(const NodePath& path, const PropertyDecoder& props) const {
-      return typed_callback_(callback_, path, props);
+    ReturnType operator()(const NodePath& path, const PropertyDecoder& decoder) const {
+      return typed_callback_(callback_, path, decoder);
     }
 
    private:
-    using CallbackType = bool (*)(void*, const NodePath&, const PropertyDecoder&);
+    using CallbackType = ReturnType (*)(void*, const NodePath&, const PropertyDecoder&);
     CallbackType typed_callback_;
     void* callback_;
   };
+
+  // Pre order is able to prune walks.
+  using PreOrderNodeVisitor = NodeVisitor<bool>;
+  // Post order cant, since the subtree has already been visited.
+  using PostOrderNodeVisitor = NodeVisitor<void>;
 
  public:
   // Consumes a view representing the range of memory the flattened devicetree
@@ -449,7 +459,7 @@ class Devicetree {
   template <typename Visitor>
   void Walk(Visitor&& visitor) const {
     return Walk(std::forward<Visitor>(visitor),
-                [](const auto& NodePath, const PropertyDecoder& props) { return true; });
+                [](const auto& NodePath, const PropertyDecoder& props) {});
   }
 
   template <typename PreOrderVisitor, typename PostOrderVisitor>
@@ -473,15 +483,17 @@ class Devicetree {
 
   // Extra step for dealing with rvalue references.
   template <typename T, typename U>
-  void WalkInternal(T& pre, U& post) const {
-    WalkTree(NodeVisitor(pre), NodeVisitor(post));
+  void WalkInternal(T& pre_order_visitor, U& post_order_visitor) const {
+    WalkTree(PreOrderNodeVisitor(pre_order_visitor), PostOrderNodeVisitor(post_order_visitor));
   }
 
   // Walks the tree with the provided walker arguments.
-  void WalkTree(NodeVisitor pre_walker, NodeVisitor post_walker) const;
+  void WalkTree(PreOrderNodeVisitor pre_order_visitor,
+                PostOrderNodeVisitor post_order_visitor) const;
 
   ByteView WalkSubtree(ByteView subtree, NodePath* path, PropertyDecoder* parent,
-                       NodeVisitor& pre_walker, NodeVisitor& post_walker, bool visit) const;
+                       PreOrderNodeVisitor& pre_order_visitor,
+                       PostOrderNodeVisitor& post_order_visitor, bool visit) const;
 
   ByteView fdt_;
   // https://devicetree-specification.readthedocs.io/en/v0.3/flattened-format.html#structure-block
