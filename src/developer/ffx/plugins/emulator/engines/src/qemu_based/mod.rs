@@ -252,6 +252,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         .arg("extend")
                         .arg("--length")
                         .arg(&image_size)
+                        .arg("--length-is-lowerbound")
                         .output()?;
 
                     if !resize_result.status.success() {
