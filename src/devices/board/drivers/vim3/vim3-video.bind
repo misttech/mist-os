@@ -18,8 +18,8 @@ primary node "pdev" {
     fuchsia.BIND_PLATFORM_DEV_INSTANCE_ID == 0;
 }
 
-node "sysmem" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
+node "sysmem-fidl" {
+  fuchsia.BIND_FIDL_PROTOCOL == fuchsia.sysmem.BIND_FIDL_PROTOCOL.DEVICE;
 }
 
 node "canvas" {

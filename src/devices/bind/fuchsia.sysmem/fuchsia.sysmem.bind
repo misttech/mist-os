@@ -8,3 +8,6 @@ extend uint fuchsia.BIND_PROTOCOL {
   DEVICE = 118,
 };
 
+extend uint fuchsia.BIND_FIDL_PROTOCOL {
+  DEVICE = 9,
+};

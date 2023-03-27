@@ -656,15 +656,19 @@ void AmlogicVideo::SwapInCurrentInstance() {
   video_decoder_->SwappedIn();
 }
 
-fidl::InterfaceHandle<fuchsia::sysmem::Allocator> AmlogicVideo::ConnectToSysmem() {
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> client_end;
-  fidl::InterfaceRequest<fuchsia::sysmem::Allocator> server_end = client_end.NewRequest();
-  zx_status_t connect_status = sysmem_.Connect(server_end.TakeChannel());
-  if (connect_status != ZX_OK) {
-    // failure
-    return fidl::InterfaceHandle<fuchsia::sysmem::Allocator>();
+zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> AmlogicVideo::ConnectToSysmem() {
+  auto endpoints = fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
+  if (!endpoints.is_ok()) {
+    DECODE_ERROR("Failed to create sysmem allocator endpoints: %s", endpoints.status_string());
+    return endpoints.take_error();
   }
-  return client_end;
+
+  auto status = sysmem_->ConnectServer(std::move(endpoints->server));
+  if (!status.ok()) {
+    DECODE_ERROR("Failed to connect server: %s", status.status_string());
+    return zx::error(status.status());
+  }
+  return zx::ok(std::move(endpoints->client));
 }
 
 namespace tee_smc {
@@ -819,11 +823,15 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     return ZX_ERR_NO_RESOURCES;
   }
 
-  sysmem_ = ddk::SysmemProtocolClient(parent_, "sysmem");
-  if (!sysmem_.is_valid()) {
-    DECODE_ERROR("Could not get SYSMEM protocol");
-    return ZX_ERR_NO_RESOURCES;
+  zx::result sysmem_client =
+      ddk::Device<void>::DdkConnectFragmentFidlProtocol<fuchsia_hardware_sysmem::Service::Sysmem>(
+          parent, "sysmem-fidl");
+  if (sysmem_client.is_error()) {
+    zxlogf(ERROR, "Failed to get sysmem protocol: %s", sysmem_client.status_string());
+    return sysmem_client.status_value();
   }
+
+  sysmem_.Bind(std::move(*sysmem_client));
 
   canvas_ = ddk::AmlogicCanvasProtocolClient(parent_, "canvas");
   if (!canvas_.is_valid()) {
@@ -978,7 +986,12 @@ zx_status_t AmlogicVideo::InitRegisters(zx_device_t* parent) {
     return status;
   }
 
-  sysmem_sync_ptr_.Bind(ConnectToSysmem());
+  zx::result allocator_client = ConnectToSysmem();
+  if (allocator_client.is_error()) {
+    DECODE_ERROR("Failed to connect to sysmem: %s", allocator_client.status_string());
+    return allocator_client.status_value();
+  }
+  sysmem_sync_ptr_.Bind(allocator_client->TakeChannel());
   if (!sysmem_sync_ptr_) {
     DECODE_ERROR("ConnectToSysmem() failed");
     status = ZX_ERR_INTERNAL;

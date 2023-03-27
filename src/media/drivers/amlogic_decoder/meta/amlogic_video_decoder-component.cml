@@ -19,5 +19,6 @@
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.tee.Service" },
+        { service: "fuchsia.hardware.sysmem.Service" },
     ],
 }

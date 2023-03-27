@@ -5,6 +5,7 @@
 #ifndef SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 #define SRC_MEDIA_DRIVERS_AMLOGIC_DECODER_AMLOGIC_VIDEO_H_
 
+#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.hardware.tee/cpp/wire.h>
 #include <fuchsia/hardware/amlogiccanvas/cpp/banjo.h>
 #include <fuchsia/hardware/clock/cpp/banjo.h>
@@ -193,9 +194,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
                                                  std::optional<InternalBuffer> saved_stream_buffer,
                                                  bool use_parser, bool is_secure);
 
-  // This gets started connecting to sysmem, but returns an InterfaceHandle
-  // instead of InterfacePtr so that the caller can bind to the dispatcher.
-  fidl::InterfaceHandle<fuchsia::sysmem::Allocator> ConnectToSysmem();
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> ConnectToSysmem();
 
  private:
   friend class test::TestH264;
@@ -224,7 +223,7 @@ class AmlogicVideo final : public VideoDecoder::Owner,
   Owner* owner_ = nullptr;
   zx_device_t* parent_ = nullptr;
   ddk::PDevFidl pdev_;
-  ddk::SysmemProtocolClient sysmem_;
+  fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> sysmem_;
   ddk::AmlogicCanvasProtocolClient canvas_;
 
   ddk::ClockProtocolClient clocks_[static_cast<int>(ClockType::kMax)];

@@ -181,6 +181,7 @@ if (target_cpu == "arm64") {
       "//sdk/banjo/fuchsia.hardware.clock:fuchsia.hardware.clock_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_banjo_cpp",
       "//sdk/fidl/fuchsia.hardware.mediacodec:fuchsia.hardware.mediacodec_cpp_wire",
+      "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp_wire",
       "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_cpp_wire",
       "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
       "//sdk/lib/fit",
