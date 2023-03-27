@@ -51,7 +51,7 @@ impl Control {
 }
 
 /// Errors surfaced to the user.
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) enum UserError {
     /// The connection was reset because of a RST segment.

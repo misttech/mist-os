@@ -39,10 +39,10 @@ use crate::{
         segment::{Options, Segment},
         seqnum::WindowSize,
         socket::{
-            do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId, Listener,
-            ListenerAddrState, ListenerId, ListenerSharingState, MaybeClosedConnectionId,
-            MaybeListener, MaybeListenerId, NonSyncContext, Sockets, SyncContext,
-            TcpIpTransportContext, TimerId,
+            do_send_inner, isn::IsnGenerator, Acceptor, Connection, ConnectionId,
+            ConnectionStatusUpdate, Listener, ListenerAddrState, ListenerId, ListenerSharingState,
+            MaybeClosedConnectionId, MaybeListener, MaybeListenerId, NonSyncContext, Sockets,
+            SyncContext, TcpIpTransportContext, TimerId,
         },
         state::{BufferProvider, Closed, Initial, State},
         BufferSizes, Control, Mss, SocketOptions, UserError,
@@ -168,7 +168,7 @@ fn handle_incoming_packet<I, B, C, SC>(
             AddrVec::Conn(conn_addr) => {
                 if let Some(conn_addr_state) = sockets.socketmap.conns().get_by_addr(&conn_addr) {
                     let conn_id = conn_addr_state.id();
-                    try_handle_incoming_for_connection::<I, SC, C, B>(
+                    match try_handle_incoming_for_connection::<I, SC, C, B>(
                         ip_transport_ctx,
                         ctx,
                         sockets,
@@ -176,7 +176,10 @@ fn handle_incoming_packet<I, B, C, SC>(
                         conn_id,
                         incoming,
                         now,
-                    )
+                    ) {
+                        HandleIncomingSegmentDisposition::FoundSocket => true,
+                        HandleIncomingSegmentDisposition::NoMatchingSocket => false,
+                    }
                 } else {
                     return false;
                 }
@@ -197,7 +200,7 @@ fn handle_incoming_packet<I, B, C, SC>(
                         | ListenerAddrState::Shared { listener: None, bound: _ } => return false,
                     };
 
-                    try_handle_incoming_for_listener::<I, SC, C, B>(
+                    match try_handle_incoming_for_listener::<I, SC, C, B>(
                         ip_transport_ctx,
                         ctx,
                         sockets,
@@ -207,7 +210,10 @@ fn handle_incoming_packet<I, B, C, SC>(
                         conn_addr,
                         incoming_device,
                         now,
-                    )
+                    ) {
+                        HandleIncomingSegmentDisposition::FoundSocket => true,
+                        HandleIncomingSegmentDisposition::NoMatchingSocket => false,
+                    }
                 } else {
                     return false;
                 }
@@ -250,6 +256,11 @@ fn handle_incoming_packet<I, B, C, SC>(
     }
 }
 
+enum HandleIncomingSegmentDisposition {
+    FoundSocket,
+    NoMatchingSocket,
+}
+
 /// Tries to handle the incoming segment by providing it to a connected socket.
 ///
 /// Returns `true` if the segment was handled, `false` if a different socket
@@ -262,7 +273,7 @@ fn try_handle_incoming_for_connection<I, SC, C, B>(
     conn_id: MaybeClosedConnectionId<I>,
     incoming: Segment<&[u8]>,
     now: C::Instant,
-) -> bool
+) -> HandleIncomingSegmentDisposition
 where
     I: IpLayerIpExt,
     B: BufferMut,
@@ -281,19 +292,90 @@ where
         .get_by_id_mut(&conn_id)
         .expect("inconsistent state: invalid connection id");
 
-    let Connection { acceptor: _, state, ip_sock, defunct, socket_options } = conn;
+    let Connection { acceptor, state, ip_sock, defunct, socket_options } = conn;
+
+    #[derive(Debug)]
+    enum StateCategory {
+        Connecting,
+        Connected,
+        Closed(UserError),
+    }
+    impl StateCategory {
+        fn new<I, R, S, A>(state: &State<I, R, S, A>) -> Self {
+            match state {
+                State::Established(_)
+                | State::CloseWait(_)
+                | State::LastAck(_)
+                | State::FinWait1(_)
+                | State::FinWait2(_)
+                | State::Closing(_)
+                | State::TimeWait(_) => StateCategory::Connected,
+                State::Closed(Closed { reason }) => StateCategory::Closed(*reason),
+                State::Listen(_) | State::SynRcvd(_) | State::SynSent(_) => {
+                    StateCategory::Connecting
+                }
+            }
+        }
+    }
+
+    let prev_state = StateCategory::new(state);
 
     // Send the reply to the segment immediately.
     let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, socket_options);
 
-    // If the incoming segment caused the state machine to
-    // enter Closed state, and the user has already promised
-    // not to use the connection again, we can remove the
-    // connection from the socketmap.
-    if *defunct && matches!(state, State::Closed(_)) {
-        assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id), Some(_));
-        let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
-        return true;
+    let current_state = StateCategory::new(state);
+
+    match current_state {
+        StateCategory::Connecting => (),
+        StateCategory::Closed(reason) => {
+            if *defunct {
+                // If the incoming segment caused the state machine to
+                // enter Closed state, and the user has already promised
+                // not to use the connection again, we can remove the
+                // connection from the socketmap.
+                assert_matches!(sockets.socketmap.conns_mut().remove(&conn_id), Some(_));
+                let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(conn_id));
+                return HandleIncomingSegmentDisposition::FoundSocket;
+            }
+
+            // If the socket does have an acceptor, it hasn't been pulled from
+            // the accept queue of a listener and so its ID isn't yet known to
+            // bindings. We only want to notify of connection status updates for
+            // IDs that bindings is aware of.
+            if acceptor.is_none() {
+                match (prev_state, reason) {
+                    (
+                        StateCategory::Connected | StateCategory::Connecting,
+                        UserError::ConnectionReset,
+                    ) => {
+                        let MaybeClosedConnectionId(id, marker) = conn_id;
+                        let conn_id = ConnectionId(id, marker);
+                        ctx.on_connection_status_change(conn_id, ConnectionStatusUpdate::Reset)
+                    }
+                    (StateCategory::Closed(_), _) => {
+                        // No change, no need to signal.
+                    }
+                    (_, UserError::ConnectionClosed) => (),
+                }
+            }
+        }
+        StateCategory::Connected => {
+            match prev_state {
+                StateCategory::Connected => {
+                    // No change, no need to signal
+                }
+                StateCategory::Connecting => {
+                    if acceptor.is_none() {
+                        let MaybeClosedConnectionId(id, marker) = conn_id;
+                        let conn_id = ConnectionId(id, marker);
+                        ctx.on_connection_status_change(conn_id, ConnectionStatusUpdate::Connected)
+                    }
+                }
+                StateCategory::Closed(_) => {
+                    unreachable!("can't go from closed to established")
+                }
+            }
+        }
     }
 
     if let Some(seg) = reply {
@@ -336,7 +418,7 @@ where
     }
 
     // We found a valid connection for the segment.
-    true
+    HandleIncomingSegmentDisposition::FoundSocket
 }
 
 /// Tries to handle an incoming segment by passing it to a listening socket.
@@ -352,7 +434,7 @@ fn try_handle_incoming_for_listener<I, SC, C, B>(
     incoming_addrs: ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &SC::DeviceId,
     now: C::Instant,
-) -> bool
+) -> HandleIncomingSegmentDisposition
 where
     I: IpLayerIpExt,
     B: BufferMut,
@@ -375,7 +457,7 @@ where
     let Listener { pending, backlog, buffer_sizes, ready, socket_options } = match maybe_listener {
         MaybeListener::Bound(_bound) => {
             // If the socket is only bound, but not listening.
-            return false;
+            return HandleIncomingSegmentDisposition::NoMatchingSocket;
         }
         MaybeListener::Listener(listener) => listener,
     };
@@ -383,7 +465,7 @@ where
     if pending.len() + ready.len() == backlog.get() {
         // TODO(https://fxbug.dev/101993): Increment the counter.
         trace!("incoming SYN dropped because of the full backlog of the listener");
-        return true;
+        return HandleIncomingSegmentDisposition::FoundSocket;
     }
 
     let ListenerAddr { ip: _, device: bound_device } = listener_addr;
@@ -409,7 +491,7 @@ where
         Err(err) => {
             // TODO(https://fxbug.dev/101993): Increment the counter.
             trace!("cannot construct an ip socket to the SYN originator: {:?}, ignoring", err);
-            return false;
+            return HandleIncomingSegmentDisposition::NoMatchingSocket;
         }
     };
 
@@ -426,11 +508,15 @@ where
             // impossible, we just need to silent drop the segment.
             log::error!("Cannot find a device with large enough MTU for the connection");
             match err {
-                MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => return true,
+                MmsError::NoDevice(_) | MmsError::MTUTooSmall(_) => {
+                    return HandleIncomingSegmentDisposition::FoundSocket
+                }
             }
         }
     };
-    let Some(device_mss) = Mss::from_mms::<I>(device_mms) else { return true };
+    let Some(device_mss) = Mss::from_mms::<I>(device_mms) else {
+        return HandleIncomingSegmentDisposition::FoundSocket
+    };
 
     let mut state = State::Listen(Closed::<Initial>::listen(
         isn,
@@ -505,7 +591,7 @@ where
     }
 
     // We found a valid listener for the segment.
-    true
+    HandleIncomingSegmentDisposition::FoundSocket
 }
 
 #[derive(Error, Debug)]

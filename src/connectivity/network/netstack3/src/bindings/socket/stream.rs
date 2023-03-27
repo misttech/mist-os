@@ -45,8 +45,8 @@ use netstack3_core::{
             set_reuseaddr_bound, set_reuseaddr_listener, set_reuseaddr_unbound,
             set_send_buffer_size, set_unbound_device, shutdown_conn, shutdown_listener,
             with_socket_options, with_socket_options_mut, AcceptError, BoundId, BoundInfo,
-            ConnectError, ConnectionId, ConnectionInfo, ListenError, ListenerId, NoConnection,
-            SetReuseAddrError, SocketAddr, UnboundId,
+            ConnectError, ConnectionId, ConnectionInfo, ConnectionStatusUpdate, ListenError,
+            ListenerId, NoConnection, SetReuseAddrError, SocketAddr, UnboundId,
         },
         state::Takeable,
         BufferSizes, SocketOptions,
@@ -214,6 +214,15 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
         let (rbuf, sbuf) =
             LocalZirconSocketAndNotifier(Arc::clone(&socket), notifier).into_buffers(buffer_sizes);
         (rbuf, sbuf, PeerZirconSocketAndWatcher { peer, socket, watcher })
+    }
+
+    fn on_connection_status_change<I: Ip>(
+        &mut self,
+        _connection: ConnectionId<I>,
+        _update: ConnectionStatusUpdate,
+    ) {
+        // TODO(https://fxbug.dev/103982): Record state and signal peer
+        // appropriately.
     }
 
     fn default_buffer_sizes() -> BufferSizes {

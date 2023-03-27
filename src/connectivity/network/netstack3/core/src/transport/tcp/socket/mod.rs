@@ -147,6 +147,16 @@ pub trait NonSyncContext: TimerContext<TimerId> {
     /// connections for `listener`.
     fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize);
 
+    /// Called when a connection's status changes due to external events.
+    ///
+    /// See [`ConnectionStatusUpdate`] for the set of events that may result in
+    /// this method being called.
+    fn on_connection_status_change<I: Ip>(
+        &mut self,
+        connection: ConnectionId<I>,
+        status: ConnectionStatusUpdate,
+    );
+
     /// Creates new buffers and returns the object that Bindings need to
     /// read/write from/into the created buffers.
     fn new_passive_open_buffers(
@@ -2510,6 +2520,16 @@ where
     )
 }
 
+/// The new status of a connection.
+#[derive(Copy, Clone, Debug, GenericOverIp)]
+#[cfg_attr(test, derive(Eq, PartialEq))]
+pub enum ConnectionStatusUpdate {
+    /// The connection has been established on both ends.
+    Connected,
+    /// The connection was reset by the remote end.
+    Reset,
+}
+
 /// Removes an unbound socket.
 pub fn remove_unbound<I, C>(sync_ctx: &SyncCtx<C>, id: UnboundId<I>)
 where
@@ -2965,6 +2985,13 @@ impl<I: Ip> Into<usize> for UnboundId<I> {
     }
 }
 
+impl<I: Ip> Into<usize> for ConnectionId<I> {
+    fn into(self) -> usize {
+        let Self(x, _marker) = self;
+        x
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::{cell::RefCell, fmt::Debug};
@@ -3098,9 +3125,21 @@ mod tests {
         }
     }
 
+    impl<I: Ip> From<ConnectionId<I>> for EitherId<ConnectionId<Ipv4>, ConnectionId<Ipv6>> {
+        fn from(value: ConnectionId<I>) -> Self {
+            let IpInvariant(either) =
+                I::map_ip(value, |v4| IpInvariant(Self::V4(v4)), |v6| IpInvariant(Self::V6(v6)));
+            either
+        }
+    }
+
     #[derive(Debug, Eq, PartialEq)]
     enum NonSyncEvent {
         ListenerConnectionCount(EitherId<ListenerId<Ipv4>, ListenerId<Ipv6>>, usize),
+        ConnectionStatusUpdate(
+            EitherId<ConnectionId<Ipv4>, ConnectionId<Ipv6>>,
+            ConnectionStatusUpdate,
+        ),
     }
 
     type TcpNonSyncCtx = FakeNonSyncCtx<TimerId, (), NonSyncState>;
@@ -3226,6 +3265,15 @@ mod tests {
                 TestSendBuffer::new(Rc::clone(&client.send), RingBuffer::default()),
                 client,
             )
+        }
+
+        fn on_connection_status_change<I: Ip>(
+            &mut self,
+            connection: ConnectionId<I>,
+            status: ConnectionStatusUpdate,
+        ) {
+            let NonSyncState(events) = self.state_mut();
+            events.push(NonSyncEvent::ConnectionStatusUpdate(connection.into(), status))
         }
 
         fn default_buffer_sizes() -> BufferSizes {
@@ -3591,6 +3639,16 @@ mod tests {
         assert_connected(LOCAL, client);
         assert_connected(REMOTE, accepted);
 
+        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    client.into(),
+                    ConnectionStatusUpdate::Connected
+                )]
+            );
+        });
+
         let ClientBuffers { send: client_snd_end, receive: client_rcv_end } =
             client_ends.as_ref().borrow_mut().take().unwrap();
         let ClientBuffers { send: accepted_snd_end, receive: accepted_rcv_end } = accepted_ends;
@@ -3842,7 +3900,8 @@ mod tests {
         });
 
         net.run_until_idle(handle_frame, handle_timer);
-        // Finally, the connection should be reset.
+        // Finally, the connection should be reset and bindings should have been
+        // signaled.
         let (conn, _, _): (_, _, &ConnAddr<_, _, _, _>) =
             client.get_from_socketmap(&net.sync_ctx(LOCAL).outer.sockets.socketmap);
         assert_matches!(
@@ -3855,6 +3914,15 @@ mod tests {
                 socket_options: _,
             }
         );
+        net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    client.into(),
+                    ConnectionStatusUpdate::Reset
+                )]
+            );
+        });
     }
 
     #[ip_test]
@@ -4119,6 +4187,12 @@ mod tests {
 
         net.run_until_idle(handle_frame, handle_timer);
 
+        // Ignore non-sync events for the remote connection.
+        let _: Vec<NonSyncEvent> = net
+            .with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+                non_sync_ctx.take_tcp_events()
+            });
+
         let ConnectionInfo { remote_addr, local_addr, device } =
             net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
                 let (server_conn, _addr, _buffers) =
@@ -4342,19 +4416,29 @@ mod tests {
         // shutdown.
         net.run_until_idle(handle_frame, handle_timer);
 
-        // The incoming connection was signaled.
+        // The incoming connection was signaled, and the remote end was notified
+        // of connection establishment.
         net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
             assert_eq!(
                 non_sync_ctx.take_tcp_events(),
                 &[NonSyncEvent::ListenerConnectionCount(local_listener.into(), 1)]
             );
         });
+        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    remote_connection.into(),
+                    ConnectionStatusUpdate::Connected,
+                )]
+            );
+        });
 
         // Create a second half-open connection so that we have one entry in the
         // pending queue.
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+        let second_connection = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
-            let _: ConnectionId<_> = SocketHandler::connect_unbound(
+            SocketHandler::connect_unbound(
                 sync_ctx,
                 non_sync_ctx,
                 unbound,
@@ -4362,7 +4446,7 @@ mod tests {
                 PORT_1,
                 Default::default(),
             )
-            .expect("connect should succeed");
+            .expect("connect should succeed")
         });
 
         let _: StepResult = net.step(handle_frame, handle_timer);
@@ -4383,8 +4467,30 @@ mod tests {
 
         net.run_until_idle(handle_frame, handle_timer);
 
-        // The remote socket should now be reset to Closed state.
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        // Both remote sockets should now be reset to Closed state.
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[
+                    // Before it receives the RST, the second connection
+                    // receives the SYN and is connected.
+                    NonSyncEvent::ConnectionStatusUpdate(
+                        second_connection.into(),
+                        ConnectionStatusUpdate::Connected
+                    ),
+                    // Both connections are reset in the order they were
+                    // established in.
+                    NonSyncEvent::ConnectionStatusUpdate(
+                        remote_connection.into(),
+                        ConnectionStatusUpdate::Reset
+                    ),
+                    NonSyncEvent::ConnectionStatusUpdate(
+                        second_connection.into(),
+                        ConnectionStatusUpdate::Reset
+                    ),
+                ]
+            );
+
             sync_ctx.with_tcp_sockets(|sockets| {
                 let (conn, _, _addr) = remote_connection.get_from_socketmap(&sockets.socketmap);
                 assert_matches!(
@@ -4432,11 +4538,18 @@ mod tests {
 
         net.run_until_idle(handle_frame, handle_timer);
 
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             sync_ctx.with_tcp_sockets(|sockets| {
                 let (conn, _, _addr) = new_remote_connection.get_from_socketmap(&sockets.socketmap);
                 assert_matches!(conn.state, State::Established(_));
             });
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    new_remote_connection.into(),
+                    ConnectionStatusUpdate::Connected
+                )]
+            );
         });
 
         net.with_context(LOCAL, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
@@ -4565,14 +4678,6 @@ mod tests {
         let local_connection = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let (conn, _, _) = SocketHandler::accept(sync_ctx, non_sync_ctx, local_listener)
                 .expect("received connection");
-
-            assert_eq!(
-                non_sync_ctx.take_tcp_events(),
-                &[
-                    NonSyncEvent::ListenerConnectionCount(local_listener.into(), 1),
-                    NonSyncEvent::ListenerConnectionCount(local_listener.into(), 0)
-                ]
-            );
             conn
         });
 
@@ -4603,6 +4708,13 @@ mod tests {
             local_connection.into(),
             remote_connection.into(),
         );
+
+        // Ignore events since that's not the focus of this test.
+        for d in [LOCAL, REMOTE] {
+            net.with_context(d, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+                let _: Vec<NonSyncEvent> = non_sync_ctx.take_tcp_events();
+            });
+        }
     }
 
     #[ip_test]
@@ -4762,7 +4874,7 @@ mod tests {
                 .expect("can listen")
         });
 
-        let _client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+        let client = net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
             let unbound = SocketHandler::create_socket(sync_ctx, non_sync_ctx);
             SocketHandler::connect_unbound(
                 sync_ctx,
@@ -4776,6 +4888,15 @@ mod tests {
         });
         // Finish the connection establishment.
         net.run_until_idle(handle_frame, handle_timer);
+        net.with_context(REMOTE, |TcpCtx { sync_ctx: _, non_sync_ctx }| {
+            assert_eq!(
+                non_sync_ctx.take_tcp_events(),
+                &[NonSyncEvent::ConnectionStatusUpdate(
+                    client.into(),
+                    ConnectionStatusUpdate::Connected
+                )]
+            );
+        });
 
         // Now accept the connection and close the listening socket. Then
         // binding a new socket on the same local address should fail unless the

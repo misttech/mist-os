@@ -74,8 +74,6 @@ impl NonZeroDurationOptionExt for Option<NonZeroDuration> {
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub(crate) struct Closed<Error> {
     /// Describes a reason why the connection was closed.
-    // TODO(https://fxbug.dev/103982): Read from the field.
-    #[allow(dead_code)]
     pub(crate) reason: Error,
 }
 
