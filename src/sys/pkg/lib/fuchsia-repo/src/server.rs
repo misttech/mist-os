@@ -828,26 +828,40 @@ mod tests {
         camino::Utf8Path,
         fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder},
         fuchsia_async as fasync,
+        fuchsia_hyper::HttpClient,
         http_sse::Client as SseClient,
         std::convert::TryInto,
         std::{fs::remove_file, io::Write as _, net::Ipv4Addr},
     };
 
-    async fn get(url: impl AsRef<str>) -> Result<Response<Body>> {
+    /// Make a GET request to some `url`.
+    ///
+    /// This takes a `client`, which allows hyper to do connection pooling.
+    async fn get(client: &HttpClient, url: impl AsRef<str>) -> Result<Response<Body>> {
         let req = Request::get(url.as_ref()).body(Body::empty())?;
-        let client = fuchsia_hyper::new_client();
         let response = client.request(req).await?;
         Ok(response)
     }
 
-    async fn get_bytes(url: impl AsRef<str> + std::fmt::Debug) -> Result<Bytes> {
-        let response = get(url).await?;
+    /// Make a GET request to some `url`, which will collect the response into a single `Bytes`
+    /// chunk.
+    ///
+    /// This takes a `client`, which allows hyper to do connection pooling.
+    async fn get_bytes(
+        client: &HttpClient,
+        url: impl AsRef<str> + std::fmt::Debug,
+    ) -> Result<Bytes> {
+        let response = get(client, url).await?;
         assert_eq!(response.status(), StatusCode::OK);
         assert_eq!(response.headers()["Accept-Ranges"], "bytes");
         Ok(hyper::body::to_bytes(response).await?)
     }
 
+    /// Make a GET request to some `url` for some range of bytes.
+    ///
+    /// This takes a `client`, which allows hyper to do connection pooling.
     async fn get_range(
+        client: &HttpClient,
         url: impl AsRef<str>,
         start: Option<u64>,
         end: Option<u64>,
@@ -863,18 +877,22 @@ mod tests {
         let req = Request::get(url.as_ref())
             .header("Range", format!("bytes={start_str}-{end_str}"))
             .body(Body::empty())?;
-        let client = fuchsia_hyper::new_client();
         let response = client.request(req).await?;
         Ok(response)
     }
 
+    /// Make a GET request to some `url` for some range of bytes, which will collect the response
+    /// into a single `Bytes` chunk.
+    ///
+    /// This takes a `client`, which allows hyper to do connection pooling.
     async fn get_bytes_range(
+        client: &HttpClient,
         url: impl AsRef<str> + std::fmt::Debug,
         start: Option<u64>,
         end: Option<u64>,
         total_len: u64,
     ) -> Result<Bytes> {
-        let response = get_range(url, start, end).await?;
+        let response = get_range(client, url, start, end).await?;
         assert_eq!(response.status(), StatusCode::PARTIAL_CONTENT);
 
         // http ranges are inclusive, so we need to add one to `end` to compute the content length.
@@ -897,9 +915,9 @@ mod tests {
         tmp.persist(path).unwrap();
     }
 
-    async fn verify_repo_json(devhost: &str, server_url: &str) {
+    async fn verify_repo_json(client: &HttpClient, devhost: &str, server_url: &str) {
         let json: RepositoryConfig = serde_json::from_slice(
-            &get_bytes(&format!("{server_url}/{devhost}/repo.config")).await.unwrap(),
+            &get_bytes(client, &format!("{server_url}/{devhost}/repo.config")).await.unwrap(),
         )
         .unwrap();
 
@@ -958,10 +976,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_empty_server() {
+        let client = fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
-        run_test(manager, |server_url| async move {
-            let result = get(server_url).await.unwrap();
+        run_test(manager, |server_url| async {
+            let result = get(&client, server_url).await.unwrap();
             assert_eq!(result.status(), StatusCode::OK);
             let body = format!("{REPOSITORY_PREFIX}{REPOSITORY_SUFFIX}");
             let body_bytes = body.as_bytes();
@@ -973,6 +992,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_repositories_from_empty_path() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -992,7 +1012,7 @@ mod tests {
         }
 
         run_test(manager, |server_url| async move {
-            let result = get(server_url).await.unwrap();
+            let result = get(client, server_url).await.unwrap();
             assert_eq!(result.status(), StatusCode::OK);
             let result_body_bytes = hyper::body::to_bytes(result.into_body()).await.unwrap();
 
@@ -1006,6 +1026,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_packages_from_empty_resource_path() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1021,9 +1042,8 @@ mod tests {
         manager.add(devhost, repo);
 
         run_test(manager, |server_url| async move {
-
             let url =  format!("{server_url}/{devhost}");
-            let result = get(url).await.unwrap();
+            let result = get(client, url).await.unwrap();
             assert_eq!(result.status(), StatusCode::OK);
             let result_body_bytes = hyper::body::to_bytes(result.into_body()).await.unwrap();
 
@@ -1045,6 +1065,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_empty_packages_from_empty_resource_path() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1062,7 +1083,7 @@ mod tests {
         run_test(manager, |server_url| async move {
             for devhost in &test_cases {
                 let url = format!("{server_url}/{devhost}");
-                let result = get(url).await.unwrap();
+                let result = get(client, url).await.unwrap();
                 assert_eq!(result.status(), StatusCode::OK);
                 let result_body_bytes = hyper::body::to_bytes(result.into_body()).await.unwrap();
 
@@ -1076,6 +1097,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_404_from_repositories() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1089,7 +1111,7 @@ mod tests {
 
         run_test(manager, |server_url| async move {
             let url = format!("{server_url}/wrong_repo_name");
-            let result = get(url).await.unwrap();
+            let result = get(client, url).await.unwrap();
             assert_eq!(result.status(), StatusCode::NOT_FOUND);
         })
         .await
@@ -1097,6 +1119,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_files_from_repositories() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1119,7 +1142,7 @@ mod tests {
             for (devhost, bodies) in &test_cases {
                 for body in &bodies[..] {
                     let url = format!("{server_url}/{devhost}/{body}");
-                    assert_matches!(get_bytes(&url).await, Ok(bytes) if bytes == body[..]);
+                    assert_matches!(get_bytes(client, &url).await, Ok(bytes) if bytes == body[..]);
                 }
             }
         })
@@ -1128,6 +1151,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_files_with_close_range_from_repositories() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1154,6 +1178,7 @@ mod tests {
                     assert_eq!(
                         &body[1..=2],
                         get_bytes_range(
+                            client,
                             &url,
                             Some(1),
                             Some(2),
@@ -1163,7 +1188,7 @@ mod tests {
                         .unwrap()
                     );
                 }
-                verify_repo_json(devhost, &server_url).await;
+                verify_repo_json(client, devhost, &server_url).await;
             }
         })
         .await
@@ -1171,6 +1196,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_get_files_with_get_416_when_range_too_big() {
+        let client = &fuchsia_hyper::new_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1193,7 +1219,7 @@ mod tests {
             for (devhost, bodies) in &test_cases {
                 for body in &bodies[..] {
                     let url = format!("{server_url}/{devhost}/{body}");
-                    let response = get_range(&url, Some(1), Some(5)).await.unwrap();
+                    let response = get_range(client, &url, Some(1), Some(5)).await.unwrap();
                     assert_eq!(response.status(), StatusCode::RANGE_NOT_SATISFIABLE);
                 }
             }
@@ -1203,6 +1229,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_auto_inner() {
+        let client = &fuchsia_hyper::new_https_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1224,11 +1251,10 @@ mod tests {
             let timestamp_file = timestamp_file.clone();
             async move {
                 let url = format!("{server_url}/devhost/auto");
-                let mut client =
-                    SseClient::connect(fuchsia_hyper::new_https_client(), url).await.unwrap();
+                let mut sse_client = SseClient::connect(client.clone(), url).await.unwrap();
 
                 futures::select! {
-                    value = client.next().fuse() => {
+                    value = sse_client.next().fuse() => {
                         assert_eq!(value.unwrap().unwrap().data(), "1");
                     },
                     () = fuchsia_async::Timer::new(Duration::from_secs(3)).fuse() => {
@@ -1244,7 +1270,7 @@ mod tests {
                     .unwrap()
                     .as_bytes(),
                 );
-                assert_eq!(client.next().await.unwrap().unwrap().data(), "2");
+                assert_eq!(sse_client.next().await.unwrap().unwrap().data(), "2");
 
                 write_file(
                     &timestamp_file,
@@ -1254,7 +1280,7 @@ mod tests {
                     .unwrap()
                     .as_bytes(),
                 );
-                assert_eq!(client.next().await.unwrap().unwrap().data(), "3");
+                assert_eq!(sse_client.next().await.unwrap().unwrap().data(), "3");
 
                 remove_file(&timestamp_file).unwrap();
                 write_file(
@@ -1265,7 +1291,7 @@ mod tests {
                     .unwrap()
                     .as_bytes(),
                 );
-                assert_eq!(client.next().await.unwrap().unwrap().data(), "4");
+                assert_eq!(sse_client.next().await.unwrap().unwrap().data(), "4");
             }
         })
         .await;
@@ -1280,6 +1306,7 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_shutdown_timeout() {
+        let client = fuchsia_hyper::new_https_client();
         let manager = RepositoryManager::new();
 
         let tmp = tempfile::tempdir().unwrap();
@@ -1310,7 +1337,7 @@ mod tests {
         // wait for an SSE event in the background.
         let (tx_sse_connected, rx_sse_connected) = futures::channel::oneshot::channel();
         let sse_task = fasync::Task::local(async move {
-            let mut sse = SseClient::connect(fuchsia_hyper::new_https_client(), url).await.unwrap();
+            let mut sse = SseClient::connect(client.clone(), url).await.unwrap();
 
             // We should receive one event for the current timestamp.
             sse.next().await.unwrap().unwrap();
