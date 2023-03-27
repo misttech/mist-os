@@ -62,6 +62,10 @@ fuchsia::feedback::CrashReportingProductRegister* CrashReports::CrashRegister() 
   return &crash_register_;
 }
 
+void CrashReports::SetNetworkIsReachable(const bool is_reachable) {
+  crash_reporter_.SetNetworkIsReachable(is_reachable);
+}
+
 void CrashReports::ShutdownImminent() { crash_reporter_.PersistAllCrashReports(); }
 
 }  // namespace forensics::feedback

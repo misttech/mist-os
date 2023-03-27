@@ -25,6 +25,7 @@
 #include "src/developer/forensics/feedback/crash_reports.h"
 #include "src/developer/forensics/feedback/feedback_data.h"
 #include "src/developer/forensics/feedback/last_reboot.h"
+#include "src/developer/forensics/feedback/network_watcher.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/component/component.h"
 #include "src/developer/forensics/utils/inspect_node_manager.h"
@@ -66,6 +67,7 @@ class MainService {
   InspectNodeManager inspect_node_manager_;
 
   AnnotationProviders annotations_;
+  NetworkWatcher network_watcher_;
 
   FeedbackData feedback_data_;
   CrashReports crash_reports_;

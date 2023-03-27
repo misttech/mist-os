@@ -17,7 +17,6 @@
 #include "src/developer/forensics/crash_reports/constants.h"
 #include "src/developer/forensics/crash_reports/filing_result.h"
 #include "src/developer/forensics/crash_reports/info/info_context.h"
-#include "src/developer/forensics/crash_reports/network_watcher.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
 #include "src/developer/forensics/crash_reports/tests/scoped_test_report_store.h"
 #include "src/developer/forensics/crash_reports/tests/stub_crash_server.h"
@@ -25,7 +24,6 @@
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
-#include "src/developer/forensics/testing/stubs/network_reachability_provider.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
 #include "src/developer/forensics/utils/storage_size.h"
@@ -114,8 +112,7 @@ class TestReportingPolicyWatcher : public ReportingPolicyWatcher {
 
 class QueueTest : public UnitTestFixture {
  public:
-  QueueTest()
-      : network_watcher_(dispatcher(), *services()), annotation_manager_(dispatcher(), {}) {}
+  QueueTest() : annotation_manager_(dispatcher(), {}) {}
 
   void SetUp() override {
     info_context_ =
@@ -123,16 +120,10 @@ class QueueTest : public UnitTestFixture {
     report_store_ = std::make_unique<ScopedTestReportStore>(&annotation_manager_, info_context_);
 
     SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
-    SetUpNetworkReachabilityProvider();
     RunLoopUntilIdle();
   }
 
  protected:
-  void SetUpNetworkReachabilityProvider() {
-    network_reachability_provider_ = std::make_unique<stubs::NetworkReachabilityProvider>();
-    InjectServiceProvider(network_reachability_provider_.get());
-  }
-
   void SetUpQueue(const std::vector<CrashServer::UploadStatus>& upload_attempt_results =
                       std::vector<CrashServer::UploadStatus>{}) {
     report_id_ = 1;
@@ -147,7 +138,6 @@ class QueueTest : public UnitTestFixture {
     queue_ = std::make_unique<Queue>(dispatcher(), services(), info_context_, &tags_,
                                      &report_store_->GetReportStore(), crash_server_.get());
     queue_->WatchReportingPolicy(&reporting_policy_watcher_);
-    queue_->WatchNetwork(&network_watcher_);
   }
 
   SnapshotStore* GetSnapshotStore() { return report_store_->GetReportStore().GetSnapshotStore(); }
@@ -222,9 +212,7 @@ class QueueTest : public UnitTestFixture {
 
   size_t report_id_ = 1;
 
-  NetworkWatcher network_watcher_;
   timekeeper::TestClock clock_;
-  std::unique_ptr<stubs::NetworkReachabilityProvider> network_reachability_provider_;
   feedback::AnnotationManager annotation_manager_;
   std::unique_ptr<StubCrashServer> crash_server_;
   std::unique_ptr<ScopedTestReportStore> report_store_;
@@ -351,7 +339,7 @@ TEST_F(QueueTest, ReportingPolicyChangedToDoNotFileAndDelete_DuringUploadFromSto
   ASSERT_TRUE(report_store_->GetReportStore().Contains(*report_id));
 
   reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
-  network_reachability_provider_->TriggerOnNetworkReachable(true);
+  queue_->SetNetworkIsReachable(true);
 
   reporting_policy_watcher_.Set(ReportingPolicy::kDoNotFileAndDelete);
 
@@ -759,7 +747,7 @@ TEST_F(QueueTest, UploadOnNetworkReachable) {
   ASSERT_TRUE(queue_->IsPeriodicUploadScheduled());
   RunLoopFor(kUploadResponseDelay * report_ids.size());
 
-  network_reachability_provider_->TriggerOnNetworkReachable(true);
+  queue_->SetNetworkIsReachable(true);
   RunLoopFor(kUploadResponseDelay * report_ids.size());
   for (const auto& report_id : report_ids) {
     EXPECT_FALSE(queue_->Contains(report_id));
@@ -1119,7 +1107,7 @@ TEST_F(QueueTest, Check_SnapshotClientsReloaded) {
   ASSERT_TRUE(queue_->Contains(report2_id));
 
   reporting_policy_watcher_.Set(ReportingPolicy::kUpload);
-  network_reachability_provider_->TriggerOnNetworkReachable(true);
+  queue_->SetNetworkIsReachable(true);
 
   RunLoopFor(kUploadResponseDelay);
   EXPECT_FALSE(queue_->Contains(report_id));

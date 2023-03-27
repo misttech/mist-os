@@ -37,7 +37,6 @@
 #include "src/developer/forensics/testing/stubs/channel_control.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
 #include "src/developer/forensics/testing/stubs/data_provider.h"
-#include "src/developer/forensics/testing/stubs/network_reachability_provider.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/cobalt/event.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
@@ -152,7 +151,6 @@ class CrashReporterTest : public UnitTestFixture {
     crash_register_ = std::make_unique<CrashRegister>(info_context_, RegisterJsonPath());
 
     SetUpCobaltServer(std::make_unique<stubs::CobaltLoggerFactory>());
-    SetUpNetworkReachabilityProviderServer();
     RunLoopUntilIdle();
   }
 
@@ -217,11 +215,6 @@ class CrashReporterTest : public UnitTestFixture {
 
   void SetUpDataProviderServer(std::unique_ptr<stubs::DataProviderBase> server) {
     data_provider_server_ = std::move(server);
-  }
-
-  void SetUpNetworkReachabilityProviderServer() {
-    network_reachability_provider_server_ = std::make_unique<stubs::NetworkReachabilityProvider>();
-    InjectServiceProvider(network_reachability_provider_server_.get());
   }
 
   void SetUpPrivacySettingsServer(std::unique_ptr<fakes::PrivacySettings> server) {
@@ -431,7 +424,6 @@ class CrashReporterTest : public UnitTestFixture {
   // Stubs and fake servers.
   std::unique_ptr<stubs::ChannelControlBase> channel_provider_server_;
   std::unique_ptr<stubs::DataProviderBase> data_provider_server_;
-  std::unique_ptr<stubs::NetworkReachabilityProvider> network_reachability_provider_server_;
   std::unique_ptr<fakes::PrivacySettings> privacy_settings_server_;
 
  protected:

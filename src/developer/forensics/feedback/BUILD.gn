@@ -84,6 +84,7 @@ source_set("main_service") {
     ":config",
     ":constants",
     ":namespace_init",
+    ":network_watcher",
     ":stop_signals",
     "reboot_log",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_hlcpp",
@@ -153,6 +154,24 @@ source_set("namespace_init") {
     "//src/lib/files",
     "//src/lib/fxl",
   ]
+}
+
+source_set("network_watcher") {
+  sources = [
+    "network_watcher.cc",
+    "network_watcher.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_hlcpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/sys/cpp",
+    "//src/connectivity/network/lib/net_interfaces/cpp",
+    "//src/lib/backoff",
+    "//zircon/system/ulib/async",
+  ]
+
+  deps = [ "//sdk/lib/syslog/cpp" ]
 }
 
 source_set("redactor_factory") {

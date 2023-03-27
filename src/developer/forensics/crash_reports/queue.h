@@ -17,7 +17,6 @@
 #include "src/developer/forensics/crash_reports/info/info_context.h"
 #include "src/developer/forensics/crash_reports/info/queue_info.h"
 #include "src/developer/forensics/crash_reports/log_tags.h"
-#include "src/developer/forensics/crash_reports/network_watcher.h"
 #include "src/developer/forensics/crash_reports/report.h"
 #include "src/developer/forensics/crash_reports/report_id.h"
 #include "src/developer/forensics/crash_reports/report_store.h"
@@ -39,7 +38,7 @@ class Queue {
   //  1) the reporting policy changing or
   //  2) the network status changing.
   void WatchReportingPolicy(ReportingPolicyWatcher* watcher);
-  void WatchNetwork(NetworkWatcher* network_watcher);
+  void SetNetworkIsReachable(bool is_reachable);
 
   bool Add(Report report, FilingResultFn callback);
 

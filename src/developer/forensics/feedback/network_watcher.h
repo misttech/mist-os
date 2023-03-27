@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_NETWORK_WATCHER_H_
-#define SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_NETWORK_WATCHER_H_
+#ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_NETWORK_WATCHER_H_
+#define SRC_DEVELOPER_FORENSICS_FEEDBACK_NETWORK_WATCHER_H_
 
 #include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
@@ -13,7 +13,7 @@
 
 #include "src/connectivity/network/lib/net_interfaces/cpp/reachability.h"
 
-namespace forensics::crash_reports {
+namespace forensics::feedback {
 
 // Watches for changes to the network reachability status and calls registered callbacks whenever
 // this occurs.
@@ -32,6 +32,6 @@ class NetworkWatcher {
   std::optional<bool> reachable_;
 };
 
-}  // namespace forensics::crash_reports
+}  // namespace forensics::feedback
 
-#endif  // SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_NETWORK_WATCHER_H_
+#endif  // SRC_DEVELOPER_FORENSICS_FEEDBACK_NETWORK_WATCHER_H_

@@ -118,7 +118,6 @@ CrashReporter::CrashReporter(
                       feedback::kProductQuotasPath, &utc_clock_ready_watcher_,
                       product_quota_reset_offset),
       info_(info_context),
-      network_watcher_(dispatcher_, *services_),
       reporting_policy_watcher_(MakeReportingPolicyWatcher(
           dispatcher_, services, build_type_config.crash_report_upload_policy)) {
   FX_CHECK(dispatcher_);
@@ -137,8 +136,6 @@ CrashReporter::CrashReporter(
   next_report_id_ = SeedReportId();
 
   queue_.WatchReportingPolicy(reporting_policy_watcher_.get());
-  queue_.WatchNetwork(&network_watcher_);
-
   info_.ExposeReportingPolicy(reporting_policy_watcher_.get());
 
   if (build_type_config.enable_hourly_snapshots) {
@@ -146,6 +143,10 @@ CrashReporter::CrashReporter(
     // every hour after that.
     ScheduleHourlySnapshot(zx::min(5));
   }
+}
+
+void CrashReporter::SetNetworkIsReachable(const bool is_reachable) {
+  queue_.SetNetworkIsReachable(is_reachable);
 }
 
 void CrashReporter::PersistAllCrashReports() {

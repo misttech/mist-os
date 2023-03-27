@@ -9,6 +9,7 @@
 #include <fuchsia/process/lifecycle/cpp/fidl.h>
 #include <lib/fidl/cpp/interface_request.h>
 #include <lib/fit/defer.h>
+#include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -43,7 +44,7 @@ std::unique_ptr<CachedAsyncAnnotationProvider> MakeDeviceIdProvider(
 }  // namespace
 
 MainService::MainService(
-    async_dispatcher_t* dispatcher, std::shared_ptr<sys::ServiceDirectory> services,
+    async_dispatcher_t* dispatcher, const std::shared_ptr<sys::ServiceDirectory> services,
     timekeeper::Clock* clock, inspect::Node* inspect_root, cobalt::Logger* cobalt,
     const Annotations& startup_annotations,
     fidl::InterfaceRequest<fuchsia::process::lifecycle::Lifecycle> lifecycle_channel,
@@ -59,6 +60,7 @@ MainService::MainService(
       annotations_(dispatcher_, services_,
                    options.feedback_data_options.config.annotation_allowlist, startup_annotations,
                    MakeDeviceIdProvider(options.local_device_id_path, dispatcher_, services_)),
+      network_watcher_(dispatcher, *services),
       feedback_data_(dispatcher_, services_, clock_, inspect_root_, cobalt_, redactor_.get(),
                      annotations_.GetAnnotationManager(), options.feedback_data_options),
       crash_reports_(dispatcher_, services_, clock_, inspect_root_,
@@ -117,6 +119,9 @@ MainService::MainService(
   // state.
   services->Connect<fuchsia::hardware::power::statecontrol::RebootMethodsWatcherRegister>()
       ->RegisterWithAck(std::move(handle), [] {});
+
+  network_watcher_.Register(
+      fit::bind_member(&crash_reports_, &CrashReports::SetNetworkIsReachable));
 }
 
 template <>

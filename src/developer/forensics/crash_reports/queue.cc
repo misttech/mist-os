@@ -528,16 +528,14 @@ void Queue::WatchReportingPolicy(ReportingPolicyWatcher* watcher) {
   watcher->OnPolicyChange([=](const ReportingPolicy policy) { OnReportingPolicyChange(policy); });
 }
 
-void Queue::WatchNetwork(NetworkWatcher* network_watcher) {
-  network_watcher->Register([this](const bool network_is_reachable) {
-    if (!stop_uploading_ && network_is_reachable && reporting_policy_ == ReportingPolicy::kUpload) {
-      if (!blocked_reports_.empty()) {
-        FX_LOGS(INFO) << "Uploading " << blocked_reports_.size()
-                      << " reports on network reachable: " << ReportIdsStr(blocked_reports_);
-        UnblockAll();
-      }
+void Queue::SetNetworkIsReachable(const bool is_reachable) {
+  if (!stop_uploading_ && is_reachable && reporting_policy_ == ReportingPolicy::kUpload) {
+    if (!blocked_reports_.empty()) {
+      FX_LOGS(INFO) << "Uploading " << blocked_reports_.size()
+                    << " reports on network reachable: " << ReportIdsStr(blocked_reports_);
+      UnblockAll();
     }
-  });
+  }
 }
 
 void Queue::UnblockAllEveryFifteenMinutes() {

@@ -18,7 +18,6 @@
 #include "src/developer/forensics/crash_reports/info/crash_reporter_info.h"
 #include "src/developer/forensics/crash_reports/info/info_context.h"
 #include "src/developer/forensics/crash_reports/log_tags.h"
-#include "src/developer/forensics/crash_reports/network_watcher.h"
 #include "src/developer/forensics/crash_reports/product_quotas.h"
 #include "src/developer/forensics/crash_reports/queue.h"
 #include "src/developer/forensics/crash_reports/report_id.h"
@@ -47,6 +46,10 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
                 feedback_data::DataProviderInternal* data_provider,
                 zx::duration snapshot_collector_window_duration,
                 zx::duration product_quota_reset_offset = ProductQuotas::RandomResetOffset());
+
+  // The crash reporter should stop / start uploading crash reports if the network is reachable /
+  // unreachable.
+  void SetNetworkIsReachable(bool is_reachable);
 
   // The crash reporter should stop uploading crash reports and persist any future and pending crash
   // reports.
@@ -77,7 +80,6 @@ class CrashReporter : public fuchsia::feedback::CrashReporter {
 
   ProductQuotas product_quotas_;
   CrashReporterInfo info_;
-  NetworkWatcher network_watcher_;
   std::unique_ptr<ReportingPolicyWatcher> reporting_policy_watcher_;
 
   ReportId next_report_id_;

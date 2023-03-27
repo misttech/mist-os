@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/forensics/crash_reports/network_watcher.h"
+#include "src/developer/forensics/feedback/network_watcher.h"
 
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 
-namespace forensics::crash_reports {
+namespace forensics::feedback {
 
 NetworkWatcher::NetworkWatcher(async_dispatcher_t* dispatcher,
                                const sys::ServiceDirectory& services) {
@@ -44,4 +44,4 @@ void NetworkWatcher::Register(fit::function<void(bool)> on_reachable) {
   callbacks_.push_back(std::move(on_reachable));
 }
 
-}  // namespace forensics::crash_reports
+}  // namespace forensics::feedback

@@ -41,6 +41,7 @@ class CrashReports {
   fuchsia::feedback::CrashReporter* CrashReporter();
   fuchsia::feedback::CrashReportingProductRegister* CrashRegister();
 
+  void SetNetworkIsReachable(bool is_reachable);
   void ShutdownImminent();
 
  private:
