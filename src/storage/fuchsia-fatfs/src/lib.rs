@@ -5,11 +5,10 @@ use {
     crate::{directory::FatDirectory, filesystem::FatFilesystem, node::Node},
     anyhow::Error,
     fatfs::FsOptions,
-    fidl_fuchsia_fs::AdminRequest,
+    fidl_fuchsia_fs::{AdminRequest, AdminShutdownResponder},
     fuchsia_zircon::Status,
     std::pin::Pin,
     std::sync::Arc,
-    tracing::error,
     vfs::{
         directory::{entry::DirectoryEntry, entry_container::Directory},
         execution_scope::ExecutionScope,
@@ -95,15 +94,13 @@ impl FatFs {
         &self,
         scope: &ExecutionScope,
         req: AdminRequest,
-    ) -> Result<(), Error> {
+    ) -> Option<AdminShutdownResponder> {
         match req {
             AdminRequest::Shutdown { responder } => {
                 scope.shutdown();
-                self.shut_down().unwrap_or_else(|e| error!("Shutdown failed {:?}", e));
-                responder.send()?;
+                Some(responder)
             }
-        };
-        Ok(())
+        }
     }
 
     /// Shut down the filesystem.

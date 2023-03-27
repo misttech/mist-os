@@ -4,13 +4,12 @@
 
 use {
     anyhow::{format_err, Context, Error},
-    fidl_fuchsia_fs::AdminRequestStream,
+    fidl_fuchsia_fs::{AdminRequestStream, AdminShutdownResponder},
     fidl_fuchsia_io as fio,
     fuchsia_component::server::ServiceFs,
     fuchsia_fatfs::FatFs,
     fuchsia_runtime::HandleType,
     fuchsia_zircon::{self as zx, Status},
-    futures::future::TryFutureExt,
     futures::stream::{StreamExt, TryStreamExt},
     remote_block_device::RemoteBlockClientSync,
     std::sync::Arc,
@@ -22,16 +21,21 @@ enum Services {
     Admin(AdminRequestStream),
 }
 
-async fn handle(stream: Services, fs: Arc<FatFs>, scope: &ExecutionScope) -> Result<(), Error> {
+async fn handle(
+    stream: Services,
+    fs: Arc<FatFs>,
+    scope: &ExecutionScope,
+) -> Result<Option<AdminShutdownResponder>, Error> {
     match stream {
         Services::Admin(mut stream) => {
             while let Some(request) = stream.try_next().await.context("Reading request")? {
-                fs.handle_admin(scope, request).await?;
+                if let Some(shutdown_responder) = fs.handle_admin(scope, request).await {
+                    return Ok(Some(shutdown_responder));
+                }
             }
         }
     }
-
-    Ok(())
+    Ok(None)
 }
 
 #[fuchsia::main(threads = 10)]
@@ -72,10 +76,18 @@ async fn main() -> Result<(), Error> {
 
     // Handle all ServiceFs connections. VFS connections will be spawned as separate tasks.
     const MAX_CONCURRENT: usize = 10_000;
-    fs.for_each_concurrent(MAX_CONCURRENT, |request| {
-        handle(request, Arc::clone(&fatfs), &scope).unwrap_or_else(|err| error!(?err))
-    })
-    .await;
+
+    let shutdown_responder = fs
+        .map(|r| Ok(r)) // <- so that we can use try_for_each_concurrent.
+        .try_for_each_concurrent(MAX_CONCURRENT, |request| async {
+            match handle(request, Arc::clone(&fatfs), &scope).await {
+                Ok(Some(shutdown_responder)) => return Err(shutdown_responder),
+                Ok(None) => {}
+                Err(error) => error!(?error),
+            }
+            Ok(())
+        })
+        .await;
 
     // At this point all direct connections to ServiceFs will have been closed (and cannot be
     // resurrected), but before we finish, we must wait for all VFS connections to be closed.
@@ -85,6 +97,10 @@ async fn main() -> Result<(), Error> {
 
     // Make sure that fatfs has been cleanly shut down.
     fatfs.shut_down().unwrap_or_else(|e| error!("Failed to shutdown fatfs: {:?}", e));
+
+    if let Err(r) = shutdown_responder {
+        let _ = r.send();
+    }
 
     Ok(())
 }

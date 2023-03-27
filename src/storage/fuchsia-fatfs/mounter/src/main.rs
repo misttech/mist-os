@@ -37,6 +37,8 @@ impl FatServer {
         }
 
         if let Some(device) = device.take() {
+            device.scope.shutdown();
+            device.scope.wait().await;
             // Clean up the old device.
             device.shut_down().unwrap_or_else(|e| {
                 info!("Failed to shut down removed disk (this is probably expected): {:?}", e)
@@ -65,14 +67,23 @@ impl FatServer {
         };
 
         while let Some(req) = stream.try_next().await? {
-            let device = self.device.lock().await;
+            let mut device = self.device.lock().await;
             if device.as_ref().map_or(true, |d| !d.is_present()) {
                 // Device has gone away.
                 stream.control_handle().shutdown_with_epitaph(Status::IO_NOT_PRESENT);
                 break;
             }
-            let device = device.as_ref().unwrap();
-            device.handle_admin(&device.scope, req).await?;
+            let device_ref = device.as_ref().unwrap();
+            if let Some(shutdown_responder) = device_ref.handle_admin(&device_ref.scope, req).await
+            {
+                if let Some(device) = device.take() {
+                    device.scope.wait().await;
+                    device
+                        .shut_down()
+                        .unwrap_or_else(|error| error!(?error, "Failed to shutdown fatfs"));
+                }
+                let _ = shutdown_responder.send();
+            }
         }
         Ok(())
     }
