@@ -88,6 +88,7 @@ test("fusb302-test-bin") {
     "fusb302.cc",
     "registers-test.cc",
     "registers.cc",
+    "state-machine-base-test.cc",
     "state-machine.cc",
     "usb-pd-defs.cc",
     "usb-pd-message-objects-test.cc",
