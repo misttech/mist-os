@@ -282,7 +282,7 @@ TEST_F(InlineCompatibilityTest, InlineDataFuchsiaToLinux) {
       std::string result;
       GetEnclosedGuest().GetLinuxOperator().ExecuteWithAssert(
           {"od -An -j", std::to_string(i * sizeof(uint32_t)), "-N",
-           std::to_string(sizeof(uint32_t)), "-i",
+           std::to_string(sizeof(uint32_t)), "-td4",
            GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) +
                                                              inline_file_name),
            "| tr -d ' \\n'"},
