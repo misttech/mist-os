@@ -1,0 +1,57 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.display;
+
+// A display mode configuration.
+type Mode = struct {
+    // Resolution in pixels.
+    horizontal_resolution uint32;
+    vertical_resolution uint32;
+    // Vertical refresh rate in units of (Hz / 100).
+    refresh_rate_e2 uint32;
+
+    // Bitfield of flags defined below which further specify the mode.
+    flags uint32;
+};
+
+// === Mode flags ===
+
+// Flag for interlaced display modes.
+const MODE_INTERLACED int32 = 0x1;
+
+// Info contains the information about a particular attached display.
+type Info = struct {
+    id uint64;
+
+    // Modes supported by the attached display. The first entry is the
+    // preferred mode.
+    modes vector<Mode>:MAX;
+    // zx_pixel_format_t constants supported by the attached display. The
+    // first entry is the preferred mode.
+    pixel_format vector<uint32>:MAX;
+
+    // A list of cursor configurations most likely to be accepted by the
+    // driver. Maybe be empty if there is no hardware support for cursors.
+    //
+    // The driver may reject some of these configurations in some
+    // circumstances, and it may accept other configurations, but at least
+    // one of these configurations should be valid at most times.
+    cursor_configs vector<CursorInfo>:MAX;
+
+    manufacturer_name string:IDENTIFIER_MAX_LEN;
+    monitor_name string:IDENTIFIER_MAX_LEN;
+    monitor_serial string:IDENTIFIER_MAX_LEN;
+
+    /// Physical horizontal size in millimeters.
+    /// If this value is not available, set to a best guess value and set the flag
+    horizontal_size_mm uint32;
+    /// Physical vertical size in millimeters
+    /// If this value is not available, set to a best guess value and set the flag
+    vertical_size_mm uint32;
+    /// This flag is set if fallback horizontal and vertical sizes were used as opposed
+    /// to actual values reported by the display.
+    using_fallback_size bool;
+};
+
+const IDENTIFIER_MAX_LEN uint32 = 128;

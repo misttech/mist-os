@@ -1,0 +1,32 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.display;
+
+type ConfigResult = strict enum : uint32 {
+    OK = 0;
+    // The requested layer configuration is invalid.
+    INVALID_CONFIG = 1;
+    // The requested layer configuration cannot be supported by the hardware. See
+    // CheckConfig struct for mode details.
+    UNSUPPORTED_CONFIG = 2;
+    // The number of requested displays cannot be supported.
+    TOO_MANY_DISPLAYS = 3;
+    // The hardware cannot support the requested modes for the displays. The client
+    // should try a different set of displays or display modes.
+    UNSUPPORTED_DISPLAY_MODES = 4;
+};
+
+/// Maximum number of fences supported by ApplyConfig2().
+const APPLY_CONFIG_MAX_SIGNAL_FENCES uint64 = 32;
+
+/// Each set of configurations in ApplyConfig() call corresponds to a
+/// |ConfigStamp| value; the value will be referred in Vsync events to indicate
+/// that a configuration is fully applied.
+type ConfigStamp = struct {
+    /// The value of config stamp. Valid configurations should have a stamp
+    /// not equal to `INVALID_CONFIG_STAMP_VALUE`.
+    value uint64;
+};
+
+const INVALID_CONFIG_STAMP_VALUE uint64 = 0;

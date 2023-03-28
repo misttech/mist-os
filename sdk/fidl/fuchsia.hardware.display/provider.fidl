@@ -1,0 +1,39 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.hardware.display;
+
+using zx;
+
+/// Provider for display controllers.
+///
+/// The driver supports two simultaneous clients - a main client and a virtcon
+/// client.  In some cases, the provider service may provide access to only one or
+/// the other; if the client tries to open the other then `ZX_ERR_NOT_SUPPORTED` will
+/// be returned.
+@discoverable
+protocol Provider {
+    /// Open a virtcon client.
+    ///
+    /// A protocol request `controller` provides an interface to the Controller.
+    ///
+    /// If the display device already has a virtcon controller then this method
+    /// will return `ZX_ERR_ALREADY_BOUND`.
+    OpenVirtconController(resource struct {
+        controller server_end:Controller;
+    }) -> (struct {
+        s zx.status;
+    });
+
+    /// Open a main client.
+    ///
+    /// A protocol request `controller` provides an interface to the Controller.
+    ///
+    /// If the display device already has a main controller then this method
+    /// will return `ZX_ERR_ALREADY_BOUND`.
+    OpenController(resource struct {
+        controller server_end:Controller;
+    }) -> (struct {
+        s zx.status;
+    });
+};
