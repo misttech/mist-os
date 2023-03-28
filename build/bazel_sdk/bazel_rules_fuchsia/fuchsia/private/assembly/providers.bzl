@@ -159,6 +159,13 @@ FuchsiaProductImageInfo = provider(
     },
 )
 
+FuchsiaProductAssemblyInfo = provider(
+    doc = "Info populated by product assembly",
+    fields = {
+        "product_assembly_out": "product assembly out directory",
+    },
+)
+
 FuchsiaProductBundleInfo = _FuchsiaProductBundleInfo
 
 FuchsiaPartitionInfo = provider(

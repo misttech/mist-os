@@ -18,13 +18,15 @@ load(
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_image.bzl",
+    _fuchsia_product_assembly = "fuchsia_product_assembly",
+    _fuchsia_product_create_system = "fuchsia_product_create_system",
     _fuchsia_product_image = "fuchsia_product_image",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_product_configuration.bzl",
-    _fuchsia_product_configuration = "fuchsia_product_configuration",
+    _BUILD_TYPES = "BUILD_TYPES",
     _INPUT_DEVICE_TYPE = "INPUT_DEVICE_TYPE",
-    _BUILD_TYPES = "BUILD_TYPES"
+    _fuchsia_product_configuration = "fuchsia_product_configuration",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_virtual_device.bzl",
@@ -38,6 +40,7 @@ load(
 load(
     "//fuchsia/private/assembly:providers.bzl",
     _FuchsiaProductAssemblyBundleInfo = "FuchsiaProductAssemblyBundleInfo",
+    _FuchsiaProductAssemblyInfo = "FuchsiaProductAssemblyInfo",
     _FuchsiaProductImageInfo = "FuchsiaProductImageInfo",
     _FuchsiaScrutinyConfigInfo = "FuchsiaScrutinyConfigInfo",
 )
@@ -132,6 +135,8 @@ fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_virtual_device = _fuchsia_virtual_device
 fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_product_image = _fuchsia_product_image
+fuchsia_product_create_system = _fuchsia_product_create_system
+fuchsia_product_assembly = _fuchsia_product_assembly
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_product_bundle = _fuchsia_product_bundle
 fuchsia_product_size_check = _fuchsia_product_size_check
@@ -157,6 +162,7 @@ fuchsia_partition = _fuchsia_partition
 FuchsiaProductImageInfo = _FuchsiaProductImageInfo
 FuchsiaProductAssemblyBundleInfo = _FuchsiaProductAssemblyBundleInfo
 FuchsiaScrutinyConfigInfo = _FuchsiaScrutinyConfigInfo
+FuchsiaProductAssemblyInfo = _FuchsiaProductAssemblyInfo
 
 # constants
 BUILD_TYPES = _BUILD_TYPES
