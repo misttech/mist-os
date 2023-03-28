@@ -100,6 +100,7 @@ fn initialize_fvm(fvm_slice_size: u64, device: &BlockProxy) -> Result<(), Error>
     Ok(())
 }
 
+// TODO(https://fxbug.dev/122942) Add support for fxblob.
 async fn wipe_storage(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
@@ -200,6 +201,7 @@ async fn wipe_storage(
     Ok(())
 }
 
+// TODO(https://fxbug.dev/122943) Add support for fxblob.
 async fn write_data_file(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
@@ -276,7 +278,7 @@ async fn write_data_file(
         _ => unreachable!(),
     };
 
-    let data_root = filesystem.root().context("Failed to get data root")?;
+    let data_root = filesystem.root(None).context("Failed to get data root")?;
     let (directory_proxy, file_path) = match filename.rsplit_once("/") {
         Some((directory_path, relative_file_path)) => {
             let directory_proxy = create_directory_recursive(
@@ -303,7 +305,7 @@ async fn write_data_file(
     payload.read(&mut data, 0).context("reading payload vmo")?;
     write(&file_proxy, &data).await.context("writing file contents")?;
 
-    filesystem.shutdown().await.context("shutting down data filesystem")?;
+    filesystem.shutdown(None).await.context("shutting down data filesystem")?;
     return Ok(());
 }
 
@@ -320,6 +322,7 @@ async fn shred_data_volume(
         debug_log("Erased key bag");
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
+        // TODO(https://fxbug.dev/122940) Add support for fxblob.
         let partition_path =
             find_data_partition(ramdisk_prefix).await.map_err(|_| zx::Status::NOT_FOUND)?;
 

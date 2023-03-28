@@ -11,7 +11,7 @@ use {
     },
     fidl::endpoints::Proxy as _,
     fidl_fuchsia_device::ControllerProxy,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
     fidl_fuchsia_io as fio,
     fs_management::{
         filesystem::{Filesystem, ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem},
@@ -102,7 +102,9 @@ impl FsTree {
         let crypt_service = Some(
             connect_to_protocol::<CryptMarker>()?.into_channel().unwrap().into_zx_channel().into(),
         );
-        let _ = fs.open_volume("default", crypt_service).await?;
+        let _ = fs
+            .open_volume("default", MountOptions { crypt: crypt_service, as_blob: false })
+            .await?;
         Ok(FsInstance::Fxfs(fs))
     }
 

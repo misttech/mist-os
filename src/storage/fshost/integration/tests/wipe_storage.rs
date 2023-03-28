@@ -7,7 +7,8 @@
 
 use {
     crate::{
-        data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder, VFS_TYPE_BLOBFS,
+        blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder,
+        volumes_spec,
     },
     device_watcher::recursive_wait,
     fidl::endpoints::{create_proxy, Proxy as _},
@@ -71,19 +72,17 @@ async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) 
 }
 
 // Ensure fuchsia.fshost.Admin/WipeStorage fails if we cannot identify a storage device to wipe.
+// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
+// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
+#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn no_fvm_device() {
-    // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if data_fs_name() == "f2fs" {
-        return;
-    }
-
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_zbi_ramdisk();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let admin =
@@ -99,24 +98,22 @@ async fn no_fvm_device() {
 }
 
 // Demonstrate high level usage of the fuchsia.fshost.Admin/WipeStorage method.
+// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
+// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
+#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn write_blob() {
-    // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if data_fs_name() == "f2fs" {
-        return;
-    }
-
     let mut builder = new_builder();
     // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
     // treating them as "real" storage devices.
     builder.fshost().set_config_value("fvm_ramdisk", true);
     // We need to use a GPT as WipeStorage relies on the reported partition type GUID, rather than
     // content sniffing of the FVM magic.
-    builder.with_disk().with_gpt();
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
 
@@ -133,20 +130,18 @@ async fn write_blob() {
 }
 
 // Verify that all existing blobs are purged after running fuchsia.fshost.Admin/WipeStorage.
+// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
+// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
+#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn blobfs_formatted() {
-    // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if data_fs_name() == "f2fs" {
-        return;
-    }
-
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().with_gpt();
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
 
@@ -203,21 +198,19 @@ async fn blobfs_formatted() {
 }
 
 // Verify that the data partition is wiped and remains unformatted.
+// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
+// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
+#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn data_unformatted() {
-    // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if data_fs_name() == "f2fs" {
-        return;
-    }
-
     const BUFF_LEN: usize = 512;
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().format_data(data_fs_spec()).with_gpt();
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ true).await;
     let test_disk = fixture.ramdisks.first().unwrap();
@@ -291,23 +284,21 @@ async fn data_unformatted() {
 }
 
 // Verify that WipeStorage can handle a completely corrupted FVM.
+// TODO(https://fxbug.dev/122942) wipe_storage is not supported for fxblob.
+// TODO(fxbug.dev/113970): this test doesn't work on f2fs.
 #[fuchsia::test]
+#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
 async fn handles_corrupt_fvm() {
-    // TODO(fxbug.dev/113970): this test doesn't work on f2fs
-    if data_fs_name() == "f2fs" {
-        return;
-    }
-
     let mut builder = new_builder();
     // Ensure the ramdisk prefix will **not** match the ramdisks we create in the fixture, thus
     // treating them as "real" storage devices.
     builder.fshost().set_config_value("fvm_ramdisk", true);
     // Ensure that, while we allocate an FVM partition inside the GPT, we leave it empty.
-    builder.with_disk().with_gpt().with_unformatted_fvm();
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().with_unformatted_fvm();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     wait_for_block_watcher(&fixture, /*has_formatted_fvm*/ false).await;
 

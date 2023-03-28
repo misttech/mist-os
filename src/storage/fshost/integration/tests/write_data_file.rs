@@ -6,7 +6,7 @@
 //! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
 
 use {
-    super::{data_fs_name, data_fs_spec, data_fs_type, new_builder, VFS_TYPE_BLOBFS},
+    super::{blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, new_builder, volumes_spec},
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fshost::{AdminProxy, AdminWriteDataFileResult},
     fuchsia_zircon::{self as zx, HandleBased as _},
@@ -26,15 +26,17 @@ async fn call_write_data_file(admin: &AdminProxy) -> AdminWriteDataFileResult {
         .expect("write_data_file failed: transport error")
 }
 
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk();
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let admin =
@@ -58,11 +60,13 @@ async fn unformatted() {
     fixture.tear_down().await;
 }
 
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted_netboot() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("netboot", true);
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let admin =
@@ -86,15 +90,22 @@ async fn unformatted_netboot() {
     fixture.tear_down().await;
 }
 
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn unformatted_small_disk() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().size(SMALL_DISK_SIZE).data_volume_size(SMALL_DISK_SIZE / 2);
-    builder.with_zbi_ramdisk();
+    builder
+        .with_disk()
+        .format_volumes(volumes_spec())
+        .size(SMALL_DISK_SIZE)
+        .data_volume_size(SMALL_DISK_SIZE / 2);
+
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let admin =
@@ -123,15 +134,17 @@ async fn unformatted_small_disk() {
     fixture.tear_down().await;
 }
 
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().format_data(data_fs_spec());
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let admin =
@@ -159,15 +172,17 @@ async fn formatted() {
     fixture.tear_down().await;
 }
 
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted_file_in_root() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().format_data(data_fs_spec());
-    builder.with_zbi_ramdisk();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
 
     let fixture = builder.build().await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let admin =
@@ -204,11 +219,13 @@ async fn formatted_file_in_root() {
     fixture.tear_down().await;
 }
 
+// TODO(https://fxbug.dev/122943) write_data_file not supported for fxblob.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn formatted_netboot() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("netboot", true);
-    builder.with_disk().format_data(data_fs_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     let admin =

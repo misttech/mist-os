@@ -476,6 +476,7 @@ impl<'a> Fsck<'a> {
         store_object_ids: &HashSet<u64>,
     ) -> Result<(), Error> {
         let allocator = filesystem.allocator();
+        let objects_pending_deletion = allocator.objects_pending_deletion();
         let layer_set = allocator.tree().layer_set();
         let mut merger = layer_set.merger();
         let mut actual =
@@ -500,10 +501,14 @@ impl<'a> Fsck<'a> {
                 AllocatorValue::Abs { owner_object_id, .. } => *owner_object_id,
             };
             let r = &actual_item.key.device_range;
-            *expected_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
-                (r.end - r.start) as i64;
+            if !objects_pending_deletion.contains(&owner_object_id) {
+                *expected_owner_allocated_bytes.entry(owner_object_id).or_insert(0) +=
+                    (r.end - r.start) as i64;
+            }
             if !store_object_ids.contains(&owner_object_id) {
-                if filesystem.object_manager().store(owner_object_id).is_none() {
+                if filesystem.object_manager().store(owner_object_id).is_none()
+                    && !objects_pending_deletion.contains(&owner_object_id)
+                {
                     self.error(FsckError::AllocationForNonexistentOwner(actual_item.into()))?;
                 }
                 actual.advance().await?;

@@ -4,17 +4,20 @@
 
 use {
     device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory},
-    fidl::endpoints::Proxy as _,
+    fidl::endpoints::{create_proxy, Proxy as _, ServerEnd},
     fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{
+        filesystem::ServingMultiVolumeFilesystem,
         format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC},
         Blobfs, Fxfs, BLOBFS_TYPE_GUID, DATA_TYPE_GUID, FVM_TYPE_GUID_STR,
     },
     fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
+    fuchsia_hash::Hash,
+    fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_runtime::vmar_root_self,
     fuchsia_zircon::{self as zx, HandleBased},
     gpt::{partition_types, GptConfig},
@@ -65,6 +68,8 @@ const KEY_BAG_CONTENTS: &'static str = "\
         }
     }
 }";
+
+pub const BLOB_CONTENTS: [u8; 1000] = [1; 1000];
 
 const DATA_KEY: Aes256Key = Aes256Key::create([
     0xcf, 0x9e, 0x45, 0x2a, 0x22, 0xa5, 0x70, 0x31, 0x33, 0x3b, 0x4d, 0x6b, 0x6f, 0x78, 0x58, 0x29,
@@ -209,10 +214,22 @@ pub struct DataSpec {
     pub zxcrypt: bool,
 }
 
+#[derive(Default, Debug)]
+pub struct VolumesSpec {
+    pub fxfs_blob: bool,
+}
+
+enum FxfsType {
+    Fxfs(ControllerProxy),
+    FxBlob(ServingMultiVolumeFilesystem, RealmInstance),
+}
+
 pub struct DiskBuilder {
     size: u64,
+    blob_hash: Option<Hash>,
     data_volume_size: u64,
     data_spec: DataSpec,
+    volumes_spec: VolumesSpec,
     // Only used if `format` is Some.
     corrupt_contents: bool,
     gpt: bool,
@@ -225,8 +242,10 @@ impl DiskBuilder {
     pub fn new() -> DiskBuilder {
         DiskBuilder {
             size: DEFAULT_DISK_SIZE,
+            blob_hash: None,
             data_volume_size: DEFAULT_DATA_VOLUME_SIZE,
             data_spec: DataSpec { format: None, zxcrypt: false },
+            volumes_spec: VolumesSpec { fxfs_blob: false },
             corrupt_contents: false,
             gpt: false,
             with_account_and_virtualization: false,
@@ -245,9 +264,20 @@ impl DiskBuilder {
         self
     }
 
+    pub fn format_volumes(&mut self, volumes_spec: VolumesSpec) -> &mut Self {
+        self.volumes_spec = volumes_spec;
+        self
+    }
+
     pub fn format_data(&mut self, data_spec: DataSpec) -> &mut Self {
         tracing::info!(?data_spec, "formatting data volume");
-        assert!(self.format_fvm);
+        if !self.volumes_spec.fxfs_blob {
+            assert!(self.format_fvm);
+        } else {
+            if let Some(format) = data_spec.format {
+                assert_eq!(format, "fxfs");
+            }
+        }
         self.data_spec = data_spec;
         self
     }
@@ -278,8 +308,44 @@ impl DiskBuilder {
         self
     }
 
-    pub async fn build(self) -> zx::Vmo {
+    async fn build_no_fvm(mut self) -> zx::Vmo {
         let vmo = zx::Vmo::create(self.size).unwrap();
+        let mut ramdisk = RamdiskClientBuilder::new_with_vmo(
+            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+            Some(RAMDISK_BLOCK_SIZE),
+        )
+        .build()
+        .await
+        .unwrap();
+
+        // There is no fvm for fxfs_blob so we directly format Fxfs onto the ramdisk.
+        let ramdisk_controller = ramdisk.take_controller().expect("invalid ramdisk controller");
+        let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
+        let mut fxfs = Fxfs::new(ramdisk_controller);
+        // Wipes the device
+        fxfs.format().await.expect("format failed");
+        let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
+        let blob_volume =
+            fs.create_volume("blob", None).await.expect("failed to create blob volume");
+        let blob_volume_root = blob_volume.root();
+        self.blob_hash = Some(self.write_test_blob(blob_volume_root, &BLOB_CONTENTS).await);
+
+        if self.data_spec.format.is_some() {
+            self.init_data_fxfs(FxfsType::FxBlob(fs, crypt_realm)).await;
+        } else {
+            fs.shutdown().await.expect("shutdown failed");
+        }
+        // Destroy the ramdisk device and return a VMO containing the partitions/filesystems.
+        ramdisk.destroy().await.expect("destroy failed");
+        vmo
+    }
+
+    pub async fn build(mut self) -> zx::Vmo {
+        let vmo = zx::Vmo::create(self.size).unwrap();
+
+        if self.volumes_spec.fxfs_blob {
+            return self.build_no_fvm().await;
+        }
 
         // Initialize the VMO with GPT headers and an *empty* FVM partition.
         if self.gpt {
@@ -344,6 +410,10 @@ impl DiskBuilder {
 
         let mut blobfs = Blobfs::new(blobfs_controller);
         blobfs.format().await.expect("format failed");
+        blobfs.fsck().await.expect("failed to fsck blobfs");
+        let serving_blobfs = blobfs.serve().await.expect("failed to serve blobfs");
+        self.blob_hash = Some(self.write_test_blob(serving_blobfs.root(), &BLOB_CONTENTS).await);
+        serving_blobfs.shutdown().await.expect("shutdown failed");
 
         let data_label = if self.legacy_data_label { "minfs" } else { "data" };
         // Create and format the data partition.
@@ -379,7 +449,7 @@ impl DiskBuilder {
 
         if let Some(format) = self.data_spec.format {
             match format {
-                "fxfs" => self.init_data_fxfs(data_controller).await,
+                "fxfs" => self.init_data_fxfs(FxfsType::Fxfs(data_controller)).await,
                 "minfs" => self.init_data_minfs(data_controller).await,
                 "f2fs" => self.init_data_f2fs(data_controller).await,
                 _ => panic!("unsupported data filesystem format type"),
@@ -450,19 +520,28 @@ impl DiskBuilder {
         fs.shutdown().await.expect("shutdown failed");
     }
 
-    async fn init_data_fxfs(&self, data_device: ControllerProxy) {
-        if self.corrupt_contents {
-            let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
-            let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
+    async fn init_data_fxfs(&self, fxfs: FxfsType) {
+        let mut fxblob = false;
+        let (mut fs, crypt_realm) = match fxfs {
+            FxfsType::Fxfs(data_device) => {
+                if self.corrupt_contents {
+                    let (block, server) = fidl::endpoints::create_proxy::<BlockMarker>().unwrap();
+                    let () = data_device.connect_to_device_fidl(server.into_channel()).unwrap();
 
-            // Just write the magic so it appears formatted to fshost.
-            return self.write_magic(block, FXFS_MAGIC, 0).await;
-        }
+                    // Just write the magic so it appears formatted to fshost.
+                    return self.write_magic(block, FXFS_MAGIC, 0).await;
+                }
+                let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
+                let mut fxfs = Fxfs::new(data_device);
+                fxfs.format().await.expect("format failed");
+                (fxfs.serve_multi_volume().await.expect("serve_multi_volume failed"), crypt_realm)
+            }
+            FxfsType::FxBlob(fs, crypt_realm) => {
+                fxblob = true;
+                (fs, crypt_realm)
+            }
+        };
 
-        let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
-        let mut fxfs = Fxfs::new(data_device);
-        fxfs.format().await.expect("format failed");
-        let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
         let vol = {
             let vol = fs.create_volume("unencrypted", None).await.expect("create_volume failed");
             vol.bind_to_path("/unencrypted_volume").unwrap();
@@ -470,7 +549,11 @@ impl DiskBuilder {
             std::fs::create_dir("/unencrypted_volume/keys").expect("create_dir failed");
             let mut file = std::fs::File::create("/unencrypted_volume/keys/fxfs-data")
                 .expect("create file failed");
-            file.write_all(KEY_BAG_CONTENTS.as_bytes()).expect("write file failed");
+            let mut key_bag = KEY_BAG_CONTENTS.as_bytes();
+            if self.corrupt_contents && fxblob {
+                key_bag = &BLOB_CONTENTS;
+            }
+            file.write_all(key_bag).expect("write file failed");
 
             let crypt_service = Some(
                 crypt_realm
@@ -486,6 +569,33 @@ impl DiskBuilder {
         };
         self.write_test_data(&vol.root()).await;
         fs.shutdown().await.expect("shutdown failed");
+    }
+
+    /// Write a blob to the fxfs blob volume to ensure that on format, the blob volume does not get
+    /// wiped.
+    async fn write_test_blob(&self, blob_volume_root: &fio::DirectoryProxy, data: &[u8]) -> Hash {
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&data);
+        let hash = builder.finish().root();
+
+        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+        let flags = fio::OpenFlags::CREATE
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE;
+        let path = &format!("{}", hash);
+        blob_volume_root
+            .open(flags, fio::ModeType::empty(), path, ServerEnd::new(server_end.into_channel()))
+            .expect("open failed");
+        let _: Vec<_> = blob.query().await.expect("open file failed");
+
+        blob.resize(data.len() as u64).await.expect("FIDL call failed").expect("truncate failed");
+        for chunk in data.chunks(fio::MAX_TRANSFER_SIZE as usize) {
+            assert_eq!(
+                blob.write(&chunk).await.expect("FIDL call failed").expect("write failed"),
+                chunk.len() as u64
+            );
+        }
+        hash
     }
 
     /// Create a small set of known files to test for presence. The test tree is

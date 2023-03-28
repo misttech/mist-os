@@ -8,7 +8,7 @@ use {
     fidl::encoding::Decodable,
     fidl_fuchsia_fs::AdminMarker,
     fidl_fuchsia_fs_startup::{StartOptions, StartupMarker},
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
     fidl_fuchsia_hardware_block::BlockMarker,
     fidl_fuchsia_io as fio,
     fs_management::{
@@ -79,7 +79,13 @@ impl Filesystem for FsmFilesystem {
                 let mut serving_filesystem =
                     self.fs.serve_multi_volume().await.expect("Failed to start the filesystem");
                 let vol = serving_filesystem
-                    .open_volume("default", self.fs.config().crypt_client().map(|c| c.into()))
+                    .open_volume(
+                        "default",
+                        MountOptions {
+                            crypt: self.fs.config().crypt_client().map(|c| c.into()),
+                            as_blob: false,
+                        },
+                    )
                     .await
                     .expect("Failed to create volume");
                 vol.bind_to_path(MOUNT_PATH).expect("Failed to bind the volume");

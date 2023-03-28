@@ -87,8 +87,8 @@ async fn main() -> Result<(), Error> {
                 service::fshost_block_watcher(watcher),
         },
         "fs" => vfs::pseudo_directory! {
-            "blob" => remote_dir(env.blobfs_root()?),
-            "data" => remote_dir(env.data_root()?),
+            "blob" => remote_dir(env.blobfs_root().await?),
+            "data" => remote_dir(env.data_root().await?),
         },
         "mnt" => vfs::pseudo_directory! {},
         inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(
@@ -96,7 +96,7 @@ async fn main() -> Result<(), Error> {
         ),
     };
     // Records inspect metrics
-    register_stats(inspector.root(), env.data_root()?).await;
+    register_stats(inspector.root(), env.data_root().await?).await;
 
     // The inspector is global and will maintain strong references to callbacks used to gather
     // inspect data which will include env.data_root() which is a proxy with an async channel that
@@ -109,7 +109,10 @@ async fn main() -> Result<(), Error> {
     let scope = ExecutionScope::new();
     export.open(
         scope.clone(),
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::DIRECTORY,
+        fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_WRITABLE
+            | fio::OpenFlags::DIRECTORY
+            | fio::OpenFlags::RIGHT_EXECUTABLE,
         Path::dot(),
         directory_request.into(),
     );

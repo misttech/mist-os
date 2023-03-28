@@ -12,7 +12,7 @@ use {
     either::Either,
     fidl::endpoints::Proxy as _,
     fidl_fuchsia_device::ControllerMarker,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
     fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
     fs_management::{filesystem::Filesystem, FSConfig},
     fuchsia_async as fasync,
@@ -373,7 +373,10 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                         .into_zx_channel()
                         .into(),
                 );
-                let vol = instance.open_volume("default", crypt).await.unwrap();
+                let vol = instance
+                    .open_volume("default", MountOptions { crypt, as_blob: false })
+                    .await
+                    .unwrap();
                 vol.bind_to_path(MOUNT_PATH).unwrap();
                 Either::Right(instance)
             } else {

@@ -47,6 +47,8 @@ rustc_library("fshost_test_fixture") {
     "//src/storage/fxfs-crypt",
     "//src/storage/testing/rust:storage-isolated-driver-manager",
     "//src/sys/lib/cm_rust",
+    "//src/sys/pkg/lib/fuchsia-hash",
+    "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:gpt",
@@ -98,7 +100,10 @@ template("fshost_integration_test") {
       "DATA_FILESYSTEM_FORMAT=${invoker.data_filesystem_format}",
       "DATA_FILESYSTEM_VARIANT=${invoker.data_filesystem_variant}",
     ]
-    features = [ invoker.data_filesystem_format ]
+    features = [
+      invoker.data_filesystem_format,
+      invoker.data_filesystem_variant,
+    ]
     deps = [
       ":fshost_test_fixture",
       "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
@@ -176,6 +181,14 @@ fshost_integration_test("fshost_integration_tests_minfs") {
   options.data_filesystem_format = "minfs"
 }
 
+fshost_integration_test("fshost_integration_tests_fxfs_fxblob") {
+  data_filesystem_format = "fxfs"
+  data_filesystem_variant = "fxblob"
+  options = default_integration_test_options
+  options.fxfs_blob = true
+  options.data_filesystem_format = "fxfs"
+}
+
 fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
   data_filesystem_format = "f2fs"
   data_filesystem_variant = "f2fs-no-zxcrypt"
@@ -206,6 +219,7 @@ fuchsia_test_package("fshost_integration_tests") {
     ":fshost_integration_tests_minfs",
     ":fshost_integration_tests_f2fs_no_zxcrypt",
     ":fshost_integration_tests_minfs_no_zxcrypt",
+    ":fshost_integration_tests_fxfs_fxblob",
   ]
   deps = [ "//src/storage/testing:storage_driver_test_realm" ]
 }

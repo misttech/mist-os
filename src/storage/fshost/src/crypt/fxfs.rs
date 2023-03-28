@@ -8,7 +8,7 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_component::{self as fcomponent, RealmMarker},
     fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose},
+    fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions},
     fidl_fuchsia_io as fio,
     fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume},
     fuchsia_component::client::{
@@ -103,7 +103,9 @@ async fn unlock_or_init_data_volume<'a>(
         if config.check_filesystems {
             fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
         }
-        fs.open_volume("unencrypted", None).await.context("Failed to open unencrypted")?
+        fs.open_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+            .await
+            .context("Failed to open unencrypted")?
     };
     root_vol.bind_to_path("/unencrypted_volume")?;
     if create {
@@ -124,7 +126,7 @@ async fn unlock_or_init_data_volume<'a>(
     let crypt_service = CryptService::new(data_unwrapped, metadata_unwrapped)
         .await
         .context("init_crypt_service")?;
-    let crypt_proxy = Some(
+    let crypt = Some(
         connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
             .expect("Unable to connect to Crypt service")
             .into_channel()
@@ -134,10 +136,10 @@ async fn unlock_or_init_data_volume<'a>(
     );
 
     let volume = if create {
-        fs.create_volume("data", crypt_proxy).await.context("Failed to create data")?
+        fs.create_volume("data", crypt).await.context("Failed to create data")?
     } else {
-        let crypt_proxy = if config.check_filesystems {
-            fs.check_volume("data", crypt_proxy).await.context("Failed to verify data")?;
+        let crypt = if config.check_filesystems {
+            fs.check_volume("data", crypt).await.context("Failed to verify data")?;
             Some(
                 connect_to_protocol_at_dir_root::<CryptMarker>(&crypt_service.exposed_dir)
                     .expect("Unable to connect to Crypt service")
@@ -147,9 +149,11 @@ async fn unlock_or_init_data_volume<'a>(
                     .into(),
             )
         } else {
-            crypt_proxy
+            crypt
         };
-        fs.open_volume("data", crypt_proxy).await.context("Failed to open data")?
+        fs.open_volume("data", MountOptions { crypt, as_blob: false })
+            .await
+            .context("Failed to open data")?
     };
 
     Ok((crypt_service, "data".to_string(), volume))

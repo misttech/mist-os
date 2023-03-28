@@ -71,49 +71,58 @@ impl Matchers {
         if config.nand {
             matchers.push(Box::new(NandMatcher::new()));
         }
+        // TODO(https://fxbug.dev/124455): Figure out fvm_ramdisk semantics for fxblob.
+        if config.fxfs_blob {
+            if !config.netboot {
+                matchers.push(Box::new(FxblobMatcher::new(
+                    DiskFormat::Fxfs,
+                    if config.fvm_ramdisk { ramdisk_path } else { None },
+                )));
+            }
+        } else {
+            // If fvm_ramdisk is true but we don't actually have a ramdisk launching, we skip making
+            // the fvm+blobfs+data matcher entirely.
+            if !config.fvm_ramdisk || ramdisk_path.is_some() {
+                let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
+                    DiskFormat::Fvm,
+                    false,
+                    FVM_DRIVER_PATH,
+                    "/fvm",
+                    if config.fvm_ramdisk { ramdisk_path } else { None },
+                ));
+                if !config.netboot {
+                    if config.blobfs {
+                        fvm_matcher.child_matchers.push(Box::new(BlobfsMatcher::new()));
+                    }
+                    if config.data {
+                        fvm_matcher.child_matchers.push(Box::new(DataMatcher::new()));
+                    }
+                }
+                if config.fvm || !fvm_matcher.child_matchers.is_empty() {
+                    matchers.push(fvm_matcher);
+                }
+            }
+
+            if config.fvm && config.fvm_ramdisk {
+                // Add another matcher for the non-ramdisk version of fvm.
+                let mut non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
+                    DiskFormat::Fvm,
+                    false,
+                    FVM_DRIVER_PATH,
+                    "/fvm",
+                    None,
+                ));
+                if config.data_filesystem_format != "fxfs" && !config.no_zxcrypt {
+                    non_ramdisk_fvm_matcher.child_matchers.push(Box::new(ZxcryptMatcher::new()));
+                }
+                matchers.push(non_ramdisk_fvm_matcher);
+            }
+        }
 
         let gpt_matcher =
             Box::new(PartitionMapMatcher::new(DiskFormat::Gpt, false, GPT_DRIVER_PATH, "", None));
         if config.gpt || !gpt_matcher.child_matchers.is_empty() {
             matchers.push(gpt_matcher);
-        }
-
-        // If fvm_ramdisk is true but we don't actually have a ramdisk launching, we skip making
-        // the fvm+blobfs+data matcher entirely.
-        if !config.fvm_ramdisk || ramdisk_path.is_some() {
-            let mut fvm_matcher = Box::new(PartitionMapMatcher::new(
-                DiskFormat::Fvm,
-                false,
-                FVM_DRIVER_PATH,
-                "/fvm",
-                if config.fvm_ramdisk { ramdisk_path } else { None },
-            ));
-            if !config.netboot {
-                if config.blobfs {
-                    fvm_matcher.child_matchers.push(Box::new(BlobfsMatcher::new()));
-                }
-                if config.data {
-                    fvm_matcher.child_matchers.push(Box::new(DataMatcher::new()));
-                }
-            }
-            if config.fvm || !fvm_matcher.child_matchers.is_empty() {
-                matchers.push(fvm_matcher);
-            }
-        }
-
-        if config.fvm && config.fvm_ramdisk {
-            // Add another matcher for the non-ramdisk version of fvm.
-            let mut non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
-                DiskFormat::Fvm,
-                false,
-                FVM_DRIVER_PATH,
-                "/fvm",
-                None,
-            ));
-            if config.data_filesystem_format != "fxfs" && !config.no_zxcrypt {
-                non_ramdisk_fvm_matcher.child_matchers.push(Box::new(ZxcryptMatcher::new()));
-            }
-            matchers.push(non_ramdisk_fvm_matcher);
         }
 
         if config.gpt_all {
@@ -218,6 +227,44 @@ impl Matcher for NandMatcher {
         env: &mut dyn Environment,
     ) -> Result<(), Error> {
         env.attach_driver(device, NAND_BROKER_DRIVER_PATH).await
+    }
+}
+
+// Matches against a data partition that exists independent of FVM using the DiskFormat.
+struct FxblobMatcher {
+    // The content format expected.
+    content_format: DiskFormat,
+    // If this partition is required to exist on a ramdisk, then this contains the prefix it should
+    // have.
+    ramdisk_required: Option<String>,
+}
+
+impl FxblobMatcher {
+    fn new(content_format: DiskFormat, ramdisk_required: Option<String>) -> Self {
+        Self { content_format, ramdisk_required }
+    }
+}
+
+#[async_trait]
+impl Matcher for FxblobMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        if let Some(ramdisk_prefix) = &self.ramdisk_required {
+            if !device.topological_path().starts_with(ramdisk_prefix) {
+                return false;
+            }
+        }
+        device.content_format().await.ok() == Some(self.content_format)
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<(), Error> {
+        env.mount_fxblob(device).await?;
+        env.mount_blob_volume().await?;
+        env.mount_data_volume().await?;
+        Ok(())
     }
 }
 
@@ -556,6 +603,9 @@ mod tests {
         expect_format_zxcrypt: Mutex<bool>,
         expect_mount_blobfs: Mutex<bool>,
         expect_mount_data: Mutex<bool>,
+        expect_mount_fxblob: Mutex<bool>,
+        expect_mount_blob_volume: Mutex<bool>,
+        expect_mount_data_volume: Mutex<bool>,
     }
 
     impl MockEnv {
@@ -566,6 +616,9 @@ mod tests {
                 expect_format_zxcrypt: Mutex::new(false),
                 expect_mount_blobfs: Mutex::new(false),
                 expect_mount_data: Mutex::new(false),
+                expect_mount_fxblob: Mutex::new(false),
+                expect_mount_blob_volume: Mutex::new(false),
+                expect_mount_data_volume: Mutex::new(false),
             }
         }
         fn expect_attach_driver(mut self, path: impl ToString) -> Self {
@@ -586,6 +639,18 @@ mod tests {
         }
         fn expect_mount_data(mut self) -> Self {
             *self.expect_mount_data.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_mount_fxblob(mut self) -> Self {
+            *self.expect_mount_fxblob.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_mount_blob_volume(mut self) -> Self {
+            *self.expect_mount_blob_volume.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_mount_data_volume(mut self) -> Self {
+            *self.expect_mount_data_volume.get_mut().unwrap() = true;
             self
         }
     }
@@ -645,6 +710,33 @@ mod tests {
                 std::mem::take(&mut *self.expect_mount_data.lock().unwrap()),
                 true,
                 "Unexpected call to mount_data"
+            );
+            Ok(())
+        }
+
+        async fn mount_fxblob(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_mount_fxblob.lock().unwrap()),
+                true,
+                "Unexpected call to mount_fxblob"
+            );
+            Ok(())
+        }
+
+        async fn mount_blob_volume(&mut self) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_mount_blob_volume.lock().unwrap()),
+                true,
+                "Unexpected call to mount_blob_volume"
+            );
+            Ok(())
+        }
+
+        async fn mount_data_volume(&mut self) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_mount_data_volume.lock().unwrap()),
+                true,
+                "Unexpected call to mount_data_volume"
             );
             Ok(())
         }
@@ -1026,6 +1118,33 @@ mod tests {
                     .expect_attach_driver(ZXCRYPT_DRIVER_PATH)
                     .expect_format_zxcrypt()
                     .expect_unseal_zxcrypt()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_fxblob_matcher() {
+        let mut matchers = Matchers::new(
+            &fshost_config::Config {
+                fxfs_blob: true,
+                data_filesystem_format: "fxfs".to_string(),
+                ..default_config()
+            },
+            None,
+        );
+        // Check that the data partition is mounted.
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_content_format(DiskFormat::Fxfs)
+                    .set_topological_path("mock_device/data-p-2/block")
+                    .set_partition_label(DATA_PARTITION_LABEL)
+                    .set_partition_type(&DATA_TYPE_GUID),
+                &mut MockEnv::new()
+                    .expect_mount_fxblob()
+                    .expect_mount_blob_volume()
+                    .expect_mount_data_volume()
             )
             .await
             .expect("match_device failed"));

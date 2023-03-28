@@ -638,6 +638,10 @@ impl SimpleAllocator {
         Ok(iter)
     }
 
+    pub fn objects_pending_deletion(&self) -> Vec<u64> {
+        self.inner.lock().unwrap().committed_marked_for_deletion.keys().cloned().collect::<Vec<_>>()
+    }
+
     /// Creates a new (empty) allocator.
     pub async fn create(&self, transaction: &mut Transaction<'_>) -> Result<(), Error> {
         // Mark the allocator as opened before creating the file because creating a new

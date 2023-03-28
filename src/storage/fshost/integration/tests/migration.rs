@@ -30,17 +30,14 @@
 //! filesystems which use zxcrypt, there is a set for both with and without zxcrypt. This covers
 //! all the goal states, so we just need one test for each original state.
 
-use {
-    crate::{data_fs_name, data_fs_type, data_fs_zxcrypt, new_builder},
-    fshost_test_fixture::disk_builder::DataSpec,
-};
+use crate::{data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder, volumes_spec};
 
 // Original state - unknown/blank
 
 #[fuchsia::test]
 async fn none_to_format() {
     let mut builder = new_builder();
-    builder.with_disk();
+    builder.with_disk(data_fs_spec());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -53,7 +50,10 @@ async fn none_to_format() {
 #[fuchsia::test]
 async fn fxfs_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(DataSpec { format: Some("fxfs"), ..Default::default() });
+    builder
+        .with_disk()
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("fxfs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -65,7 +65,10 @@ async fn fxfs_to_format() {
 #[fuchsia::test]
 async fn minfs_no_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(DataSpec { format: Some("minfs"), ..Default::default() });
+    builder
+        .with_disk()
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("minfs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -77,7 +80,10 @@ async fn minfs_no_zxcrypt_to_format() {
 #[fuchsia::test]
 async fn f2fs_no_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(DataSpec { format: Some("f2fs"), ..Default::default() });
+    builder
+        .with_disk()
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { format: Some("f2fs"), ..Default::default() });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -89,7 +95,11 @@ async fn f2fs_no_zxcrypt_to_format() {
 #[fuchsia::test]
 async fn zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(DataSpec { format: None, zxcrypt: true, ..Default::default() });
+    builder.with_disk().format_volumes(volumes_spec()).format_data(DataSpec {
+        format: None,
+        zxcrypt: true,
+        ..Default::default()
+    });
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -102,7 +112,7 @@ async fn zxcrypt_to_format() {
 #[fuchsia::test]
 async fn minfs_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(DataSpec {
+    builder.with_disk().format_volumes(volumes_spec()).format_data(DataSpec {
         format: Some("minfs"),
         zxcrypt: true,
         ..Default::default()
@@ -118,7 +128,7 @@ async fn minfs_zxcrypt_to_format() {
 #[fuchsia::test]
 async fn f2fs_zxcrypt_to_format() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(DataSpec {
+    builder.with_disk().format_volumes(volumes_spec()).format_data(DataSpec {
         format: Some("f2fs"),
         zxcrypt: true,
         ..Default::default()

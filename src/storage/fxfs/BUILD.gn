@@ -213,7 +213,7 @@ cmc_merge("fxfs_with_vmex.cml") {
 }
 
 fuchsia_component_manifest("fxfs_with_vmex_manifest") {
-  component_name = "fxfs"
+  component_name = "fxfs_with_vmex"
   deps = [ ":fxfs_with_vmex.cml" ]
   _target_outputs = get_target_outputs(":fxfs_with_vmex.cml")
   manifest = _target_outputs[0]

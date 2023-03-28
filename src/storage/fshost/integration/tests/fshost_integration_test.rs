@@ -17,7 +17,7 @@ use {
     },
     fshost_test_fixture::disk_builder::DEFAULT_DATA_VOLUME_SIZE,
     fshost_test_fixture::{
-        disk_builder::{DataSpec, FVM_SLICE_SIZE},
+        disk_builder::{DataSpec, VolumesSpec, FVM_SLICE_SIZE},
         TestFixtureBuilder,
     },
     fuchsia_async as fasync,
@@ -37,8 +37,8 @@ fn new_builder() -> TestFixtureBuilder {
     TestFixtureBuilder::new(FSHOST_COMPONENT_NAME)
 }
 
-const VFS_TYPE_BLOBFS: u32 = 0x9e694d21;
 // const VFS_TYPE_FATFS: u32 = 0xce694d21;
+const VFS_TYPE_BLOBFS: u32 = 0x9e694d21;
 const VFS_TYPE_MINFS: u32 = 0x6e694d21;
 const VFS_TYPE_MEMFS: u32 = 0x3e694d21;
 // const VFS_TYPE_FACTORYFS: u32 = 0x1e694d21;
@@ -49,6 +49,14 @@ const BLOBFS_MAX_BYTES: u64 = 8765432;
 // (defined in device/constants.rs) to ensure that when f2fs is
 // the data filesystem format, we don't run out of space
 const DATA_MAX_BYTES: u64 = 109876543;
+
+fn blob_fs_type() -> u32 {
+    if DATA_FILESYSTEM_VARIANT == "fxblob" {
+        VFS_TYPE_FXFS
+    } else {
+        VFS_TYPE_BLOBFS
+    }
+}
 
 fn data_fs_type() -> u32 {
     match DATA_FILESYSTEM_FORMAT {
@@ -72,6 +80,10 @@ fn data_fs_zxcrypt() -> bool {
     !DATA_FILESYSTEM_VARIANT.ends_with("no-zxcrypt")
 }
 
+fn volumes_spec() -> VolumesSpec {
+    VolumesSpec { fxfs_blob: DATA_FILESYSTEM_VARIANT == "fxblob" }
+}
+
 fn data_fs_spec() -> DataSpec {
     DataSpec { format: Some(data_fs_name()), zxcrypt: data_fs_zxcrypt() }
 }
@@ -79,12 +91,13 @@ fn data_fs_spec() -> DataSpec {
 #[fuchsia::test]
 async fn blobfs_and_data_mounted() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(data_fs_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
+    fixture.check_test_blob().await;
 
     fixture.tear_down().await;
 }
@@ -92,12 +105,17 @@ async fn blobfs_and_data_mounted() {
 #[fuchsia::test]
 async fn blobfs_and_data_mounted_legacy_label() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(data_fs_spec()).with_legacy_data_label();
+    builder
+        .with_disk()
+        .format_volumes(volumes_spec())
+        .format_data(data_fs_spec())
+        .with_legacy_data_label();
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
+    fixture.check_test_blob().await;
 
     fixture.tear_down().await;
 }
@@ -105,10 +123,10 @@ async fn blobfs_and_data_mounted_legacy_label() {
 #[fuchsia::test]
 async fn data_formatted() {
     let mut builder = new_builder();
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
@@ -117,10 +135,10 @@ async fn data_formatted() {
 #[fuchsia::test]
 async fn data_formatted_legacy_label() {
     let mut builder = new_builder();
-    builder.with_disk().with_legacy_data_label();
+    builder.with_disk().format_volumes(volumes_spec()).with_legacy_data_label();
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
@@ -129,7 +147,7 @@ async fn data_formatted_legacy_label() {
 #[fuchsia::test]
 async fn data_reformatted_when_corrupt() {
     let mut builder = new_builder();
-    builder.with_disk().format_data(data_fs_spec()).corrupt_data();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).corrupt_data();
     let mut fixture = builder.build().await;
 
     fixture.check_fs_type("data", data_fs_type()).await;
@@ -154,10 +172,10 @@ async fn data_reformatted_when_corrupt() {
 #[fuchsia::test]
 async fn data_formatted_no_fuchsia_boot() {
     let mut builder = new_builder().no_fuchsia_boot();
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
@@ -166,10 +184,10 @@ async fn data_formatted_no_fuchsia_boot() {
 #[fuchsia::test]
 async fn data_formatted_with_small_initial_volume() {
     let mut builder = new_builder();
-    builder.with_disk().data_volume_size(1);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
@@ -184,10 +202,10 @@ async fn data_formatted_with_small_initial_volume_big_target() {
         "data_max_bytes",
         fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
     );
-    builder.with_disk().data_volume_size(1);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(1);
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
@@ -219,43 +237,55 @@ async fn wipe_storage_not_supported() {
 async fn ramdisk_blob_and_data_mounted() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_zbi_ramdisk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
+    builder
+        .with_zbi_ramdisk()
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
+    fixture.check_test_blob().await;
 
     fixture.tear_down().await;
 }
 
 #[fuchsia::test]
+// TODO(https://fxbug.dev/124455): Figure out fvm_ramdisk semantics for fxblob and fake out the
+// fshost ramdisk accordingly in this test.
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn ramdisk_data_ignores_non_ramdisk() {
     let mut builder = new_builder();
     // Fake out the cpp fshost ramdisk checking by providing a nonsense ramdisk prefix. The rust
     // fshost has tighter behavior - it only matches on the ramdisk path it created itself (which
     // is also not this one).
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_disk().format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
+    builder
+        .with_disk()
+        .format_volumes(volumes_spec())
+        .format_data(DataSpec { zxcrypt: false, ..data_fs_spec() });
     let fixture = builder.build().await;
 
-    let dev = fixture.dir("dev-topological/class/block");
+    if DATA_FILESYSTEM_VARIANT != "fxblob" {
+        let dev = fixture.dir("dev-topological/class/block");
 
-    // The filesystems won't be mounted, but make sure fvm and potentially zxcrypt are bound.
-    device_watcher::wait_for_device_with(&dev, |info| {
-        info.topological_path.ends_with("fvm/data-p-2/block").then_some(())
-    })
-    .await
-    .unwrap();
-
-    if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
+        // The filesystems won't be mounted, but make sure fvm and potentially zxcrypt are bound.
         device_watcher::wait_for_device_with(&dev, |info| {
-            info.topological_path
-                .ends_with("fvm/data-p-2/block/zxcrypt/unsealed/block")
-                .then_some(())
+            info.topological_path.ends_with("fvm/data-p-2/block").then_some(())
         })
         .await
         .unwrap();
+
+        if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
+            device_watcher::wait_for_device_with(&dev, |info| {
+                info.topological_path
+                    .ends_with("fvm/data-p-2/block/zxcrypt/unsealed/block")
+                    .then_some(())
+            })
+            .await
+            .unwrap();
+        }
     }
 
     // There isn't really a good way to tell that something is not mounted, but at this point we
@@ -265,7 +295,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
         _ = fixture.check_fs_type("data", data_fs_type()).fuse() => {
             panic!("check_fs_type returned unexpectedly - data was mounted");
         },
-        _ = fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).fuse() => {
+        _ = fixture.check_fs_type("blob", blob_fs_type()).fuse() => {
             panic!("check_fs_type returned unexpectedly - blob was mounted");
         },
         _ = fasync::Timer::new(std::time::Duration::from_secs(2)).fuse() => (),
@@ -284,16 +314,17 @@ async fn get_instance_guid_from_path(dir_proxy: &fio::DirectoryProxy, path: &str
 }
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn partition_max_size_set() {
     let mut builder = new_builder();
     builder
         .fshost()
         .set_config_value("data_max_bytes", DATA_MAX_BYTES)
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     // get blobfs instance guid
@@ -356,17 +387,19 @@ async fn tmp_is_available() {
 async fn netboot_set() {
     // Set the netboot flag
     let mut builder = new_builder().netboot();
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let dev = fixture.dir("dev-topological/class/block");
+    if DATA_FILESYSTEM_VARIANT != "fxblob" {
+        let dev = fixture.dir("dev-topological/class/block");
 
-    // Filesystems will not be mounted but make sure that fvm is bound
-    device_watcher::wait_for_device_with(&dev, |info| {
-        info.topological_path.ends_with("fvm/data-p-2/block").then_some(())
-    })
-    .await
-    .unwrap();
+        // Filesystems will not be mounted but make sure that fvm is bound
+        device_watcher::wait_for_device_with(&dev, |info| {
+            info.topological_path.ends_with("fvm/data-p-2/block").then_some(())
+        })
+        .await
+        .unwrap();
+    }
 
     // Use the same approach as ramdisk_data_ignores_non_ramdisk() to ensure that
     // neither blobfs nor data were mounted using a timeout
@@ -374,10 +407,11 @@ async fn netboot_set() {
         _ = fixture.check_fs_type("data", data_fs_type()).fuse() => {
             panic!("check_fs_type returned unexpectedly - data was mounted");
         },
-        _ = fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).fuse() => {
+        _ = fixture.check_fs_type("blob", blob_fs_type()).fuse() => {
             panic!("check_fs_type returned unexpectedly - blob was mounted");
         },
-        _ = fasync::Timer::new(std::time::Duration::from_secs(2)).fuse() => (),
+        _ = fasync::Timer::new(std::time::Duration::from_secs(2)).fuse() => {
+        },
     }
 
     fixture.tear_down().await;
@@ -387,10 +421,10 @@ async fn netboot_set() {
 async fn fvm_ramdisk_serves_zbi_ramdisk_contents_with_unformatted_data() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_zbi_ramdisk();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     fixture.tear_down().await;
@@ -398,9 +432,10 @@ async fn fvm_ramdisk_serves_zbi_ramdisk_contents_with_unformatted_data() {
 
 // Test that fshost handles the case where the FVM is within a GPT partition.
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn fvm_within_gpt() {
     let mut builder = new_builder();
-    builder.with_disk().with_gpt().format_data(data_fs_spec());
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
     let fixture = builder.build().await;
     let dev = fixture.dir("dev-topological/class/block");
 
@@ -424,9 +459,10 @@ async fn fvm_within_gpt() {
     .unwrap();
 
     // Make sure we can access the blob/data partitions within the FVM.
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     fixture.check_test_data_file().await;
+    fixture.check_test_blob().await;
 
     fixture.tear_down().await;
 }
@@ -434,11 +470,13 @@ async fn fvm_within_gpt() {
 #[fuchsia::test]
 async fn pausing_block_watcher_ignores_devices() {
     // The first disk has a blank data filesystem
-    let disk_vmo = fshost_test_fixture::disk_builder::DiskBuilder::new().build().await;
+    let mut disk_builder1 = fshost_test_fixture::disk_builder::DiskBuilder::new();
+    disk_builder1.format_volumes(volumes_spec());
+    let disk_vmo = disk_builder1.build().await;
 
     // The second disk has a formatted data filesystem with a test file inside it.
     let mut disk_builder2 = fshost_test_fixture::disk_builder::DiskBuilder::new();
-    disk_builder2.format_data(data_fs_spec());
+    disk_builder2.format_volumes(volumes_spec()).format_data(data_fs_spec());
     let disk_vmo2 = disk_builder2.build().await;
 
     let mut fixture = new_builder().build().await;
@@ -462,11 +500,12 @@ async fn pausing_block_watcher_ignores_devices() {
     // A block device added after the block watcher is resumed is processed.
     assert_eq!(pauser.resume().await.unwrap(), zx::Status::OK.into_raw());
     fixture.add_ramdisk(disk_vmo2).await;
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
     // Only the second disk we attached has a file inside. We use it as a proxy for testing that
     // only the second one was processed.
     fixture.check_test_data_file().await;
+    fixture.check_test_blob().await;
 
     fixture.tear_down().await;
 }
@@ -489,7 +528,7 @@ async fn block_watcher_second_pause_fails() {
 #[cfg_attr(not(feature = "fxfs"), ignore)]
 async fn shred_data_volume_when_mounted() {
     let mut builder = new_builder();
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
@@ -528,11 +567,12 @@ async fn shred_data_volume_when_mounted() {
     );
 }
 
+// TODO(https://fxbug.dev/122940) shred_data_volume in recovery is not supported for fxblob.
 #[fuchsia::test]
-#[cfg_attr(not(feature = "fxfs"), ignore)]
+#[cfg_attr(any(not(feature = "fxfs"), feature = "fxblob"), ignore)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
-    builder.with_disk();
+    builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
@@ -548,7 +588,7 @@ async fn shred_data_volume_from_recovery() {
     let mut builder =
         new_builder().with_disk_from_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap());
     builder.fshost().set_config_value("fvm_ramdisk", true);
-    builder.with_zbi_ramdisk();
+    builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
     let admin = fixture
@@ -585,7 +625,7 @@ async fn shred_data_volume_from_recovery() {
 async fn disable_block_watcher() {
     let mut builder = new_builder();
     builder.fshost().set_config_value("disable_block_watcher", true);
-    builder.with_disk().format_data(data_fs_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     // The filesystems are not mounted when the block watcher is disabled.
@@ -593,7 +633,7 @@ async fn disable_block_watcher() {
         _ = fixture.check_fs_type("data", data_fs_type()).fuse() => {
             panic!("check_fs_type returned unexpectedly - data was mounted");
         },
-        _ = fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).fuse() => {
+        _ = fixture.check_fs_type("blob", blob_fs_type()).fuse() => {
             panic!("check_fs_type returned unexpectedly - blob was mounted");
         },
         _ = fasync::Timer::new(std::time::Duration::from_secs(2)).fuse() => (),
@@ -603,15 +643,17 @@ async fn disable_block_watcher() {
 }
 
 #[fuchsia::test]
+#[cfg_attr(feature = "fxblob", ignore)]
 async fn reset_fvm_partitions() {
     let mut builder = new_builder();
     builder
         .with_disk()
+        .format_volumes(volumes_spec())
         .with_account_and_virtualization()
         .data_volume_size(DEFAULT_DATA_VOLUME_SIZE / 2);
     let fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", VFS_TYPE_BLOBFS).await;
+    fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let fvm_proxy = fuchsia_fs::directory::open_directory(

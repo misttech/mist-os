@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::create_proxy,
+    fidl::endpoints::{create_proxy, ServerEnd},
     fidl_fuchsia_boot as fboot, fidl_fuchsia_feedback as ffeedback, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
+    fuchsia_merkle::MerkleTreeBuilder,
     fuchsia_zircon as zx,
     futures::{
         channel::mpsc::{self},
@@ -200,6 +201,25 @@ impl TestFixture {
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert!(info.is_some());
         assert_eq!(info.unwrap().fs_type, fs_type);
+    }
+
+    pub async fn check_test_blob(&self) {
+        let mut builder = MerkleTreeBuilder::new();
+        builder.write(&disk_builder::BLOB_CONTENTS);
+        let expected_blob_hash = builder.finish().root();
+
+        let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
+        let path = &format!("{}", expected_blob_hash);
+        self.dir("blob")
+            .open(
+                fio::OpenFlags::RIGHT_READABLE,
+                fio::ModeType::empty(),
+                path,
+                ServerEnd::new(server_end.into_channel()),
+            )
+            .expect("open failed");
+        println!("About to query the blob file");
+        blob.query().await.expect("open file failed");
     }
 
     /// Check for the existence of a well-known test file in the data volume. This file is placed
