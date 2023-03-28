@@ -155,6 +155,11 @@ impl TestFixtureBuilder {
             crash_reports,
         };
 
+        tracing::info!(
+            realm_name = ?fixture.realm.root.child_name(),
+            "built new test realm",
+        );
+
         if let Some(disk) = self.disk {
             let vmo = disk.get_vmo().await;
             let vmo_clone =

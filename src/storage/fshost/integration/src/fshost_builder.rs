@@ -66,7 +66,7 @@ impl FshostBuilder {
 
     pub(crate) async fn build(self, realm_builder: &RealmBuilder) -> ChildRef {
         let fshost_url = format!("#meta/{}.cm", self.component_name);
-        println!("using {} as test-fshost", fshost_url);
+        tracing::info!(%fshost_url, "building test fshost instance");
         let fshost = realm_builder
             .add_child("test-fshost", fshost_url, ChildOptions::new().eager())
             .await

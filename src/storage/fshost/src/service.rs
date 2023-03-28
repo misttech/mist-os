@@ -81,9 +81,11 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<String, E
         ..Default::default()
     };
 
-    Ok(find_partition(data_matcher, FIND_PARTITION_DURATION)
+    let data_partition_path = find_partition(data_matcher, FIND_PARTITION_DURATION)
         .await
-        .context("Failed to open partition")?)
+        .context("Failed to open partition")?;
+    tracing::info!(%data_partition_path, "Found data partition");
+    Ok(data_partition_path)
 }
 
 #[link(name = "fvm")]

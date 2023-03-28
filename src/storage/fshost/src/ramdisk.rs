@@ -73,7 +73,7 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
         .await
         .context("building ramdisk from vmo")?;
 
-    let topo_path = ramdisk
+    let topological_path = ramdisk
         .as_controller()
         .ok_or_else(|| anyhow::anyhow!("ramdisk instance missing controller"))?
         .get_topological_path()
@@ -82,10 +82,12 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo) -> Result<String, Error> {
         .map_err(zx::Status::from_raw)
         .context("get_topological_path returned an error")?;
 
+    tracing::info!(%topological_path, "launched ramdisk filesystem");
+
     // Ensure the boot image remains attached for the system lifetime.
     ramdisk.forget().context("detaching/forgetting ramdisk client")?;
 
-    Ok(topo_path)
+    Ok(topological_path)
 }
 
 /// Set up a ramdisk provided by the boot items service as a vmo. If there is no vmo provided, None
