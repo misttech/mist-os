@@ -38,8 +38,6 @@ board_zedboot_bootfs_labels += _common_bootfs_deps
 
 board_recovery_bootfs_labels += _common_bootfs_deps
 
-board_package_labels += [ "//src/devices/sysmem/bin/sysmem_connector" ]
-
 use_gigaboot = false
 use_vbmeta = true
 

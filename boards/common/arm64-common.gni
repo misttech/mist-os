@@ -33,7 +33,6 @@ board_driver_package_labels += [
 
 board_package_labels += [
   "//src/hwinfo:default_board_config",
-  "//src/devices/sysmem/bin/sysmem_connector",
   "//src/graphics/bin/vulkan_loader",
 ]
 

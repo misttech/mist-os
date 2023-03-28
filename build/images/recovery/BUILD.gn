@@ -81,10 +81,7 @@ if (is_fuchsia) {
   # vendor assemblies can be moved to utility with it being the same as
   # bootstrap
   # TODO(122863) Remove use of transitional labels
-  core_realm_aib_pkgs = [
-    # Other
-    "//src/devices/sysmem/bin/sysmem_connector:for_transition",
-  ]
+  core_realm_aib_pkgs = []
   core_realm_aib_shards = []
   core_realm_network_aib_pkgs = [
     # Newtorking itself

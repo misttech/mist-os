@@ -207,6 +207,9 @@ assembly_input_bundle("core_realm") {
 
     # Build-Information
     "//src/developer/build_info:build-info-service",
+
+    # Driver system memory connector
+    "//src/devices/sysmem/bin/sysmem_connector:pkg",
   ]
 
   compiled_packages = [

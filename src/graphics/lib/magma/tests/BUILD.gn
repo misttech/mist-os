@@ -23,7 +23,6 @@ group("tests") {
 
   # Add driver dependencies:
   public_deps += [
-    "//src/devices/sysmem/bin/sysmem_connector",
     "//src/graphics/bin/vulkan_loader",
     "//src/graphics/drivers/msd-arm-mali/tests",
     "//src/graphics/drivers/msd-intel-gen/tests",

@@ -54,7 +54,6 @@ legacy_base_package_labels += [
   "//src/developer/forensics/snapshot:pkg",
   "//src/diagnostics/log_listener:log_listener_shell",
   "//src/connectivity/bluetooth:core",
-  "//src/devices/sysmem/bin/sysmem_connector",
   "//src/intl/intl_services:pkg_small",
   "//src/intl/tzdata_provider:pkg",
   "//src/settings/service:setui_service",
