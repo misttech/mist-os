@@ -231,11 +231,11 @@ async fn create_interface(
     device_stopped_fut: async_utils::event::EventWaitResult,
 ) -> Option<fuchsia_async::Task<()>> {
     log::debug!("creating interface from {:?} with {:?}", port, options);
-    let fnet_interfaces_admin::Options { name, metric: _, .. } = options;
+    let fnet_interfaces_admin::Options { name, metric, .. } = options;
     let (control_sender, mut control_receiver) =
         OwnedControlHandle::new_channel_with_owned_handle(control).await;
     match handler
-        .add_port(&ns, netdevice_worker::InterfaceOptions { name }, port, control_sender)
+        .add_port(&ns, netdevice_worker::InterfaceOptions { name, metric }, port, control_sender)
         .await
     {
         Ok((binding_id, status_stream)) => {
@@ -1372,10 +1372,11 @@ mod tests {
 
     use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
     use net_declare::fidl_subnet;
+    use netstack3_core::ip::types::RawMetric;
 
     use crate::bindings::{
         interfaces_watcher::InterfaceEvent, interfaces_watcher::InterfaceUpdate, util::IntoFidl,
-        InterfaceEventProducer, NetstackContext, DEFAULT_LOOPBACK_MTU,
+        InterfaceEventProducer, NetstackContext, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
     };
 
     // Verifies that when an an interface is removed, its addresses are
@@ -1398,6 +1399,7 @@ mod tests {
             let core_id = netstack3_core::device::add_loopback_device_with_state(
                 sync_ctx,
                 DEFAULT_LOOPBACK_MTU,
+                RawMetric(DEFAULT_INTERFACE_METRIC),
                 || {
                     const LOOPBACK_NAME: &'static str = "lo";
                     devices::LoopbackInfo {

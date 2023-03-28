@@ -594,7 +594,10 @@ mod tests {
             device::update_ipv6_configuration, icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
             receive_ipv6_packet, FrameDestination,
         },
-        testutil::{FakeEventDispatcherConfig, TestIpExt as _, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+        testutil::{
+            FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        },
     };
 
     struct FakeNudContext<I: Ip, LinkAddr> {
@@ -1175,6 +1178,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::ip::device::update_ipv6_configuration(
@@ -1263,6 +1267,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
         crate::ip::device::update_ipv6_configuration(

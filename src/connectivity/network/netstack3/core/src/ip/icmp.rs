@@ -3016,7 +3016,8 @@ mod tests {
             SendIpPacketMeta,
         },
         testutil::{
-            assert_empty, get_counter_val, handle_queued_rx_packets, FAKE_CONFIG_V4, FAKE_CONFIG_V6,
+            assert_empty, get_counter_val, handle_queued_rx_packets, DEFAULT_INTERFACE_METRIC,
+            FAKE_CONFIG_V4, FAKE_CONFIG_V6,
         },
         transport::udp::UdpStateBuilder,
         Ctx, StackStateBuilder,
@@ -3738,9 +3739,13 @@ mod tests {
 
         let loopback_device_id =
             net.with_context(LOCAL_CTX_NAME, |Ctx { sync_ctx, non_sync_ctx: _ }| {
-                crate::device::add_loopback_device(&mut &*sync_ctx, Mtu::new(u16::MAX as u32))
-                    .expect("create the loopback interface")
-                    .into()
+                crate::device::add_loopback_device(
+                    &mut &*sync_ctx,
+                    Mtu::new(u16::MAX as u32),
+                    DEFAULT_INTERFACE_METRIC,
+                )
+                .expect("create the loopback interface")
+                .into()
             });
 
         let echo_body = vec![1, 2, 3, 4];

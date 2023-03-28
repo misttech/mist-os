@@ -29,6 +29,7 @@ use packet_formats::{
 use crate::{
     context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt},
     device::{ethernet, EthernetDeviceId},
+    testutil::DEFAULT_INTERFACE_METRIC,
     Ctx, TimerId,
 };
 
@@ -343,6 +344,7 @@ pub(crate) fn single_device_arbitrary_packets(input: FuzzInput) {
         sync_ctx,
         UnicastAddr::new(net_mac!("10:20:30:40:50:60")).unwrap(),
         ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
+        DEFAULT_INTERFACE_METRIC,
     );
     crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &device_id.clone().into());
 

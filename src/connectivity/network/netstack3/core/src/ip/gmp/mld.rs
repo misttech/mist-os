@@ -441,7 +441,7 @@ mod tests {
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, StackStateBuilder, TimerId, TimerIdInner,
     };
@@ -1177,6 +1177,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
 

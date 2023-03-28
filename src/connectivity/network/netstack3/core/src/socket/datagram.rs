@@ -1632,7 +1632,7 @@ mod test {
                 FakeDeviceId, FakeIpDeviceIdCtx, FakeStrongIpDeviceId, FakeWeakDeviceId,
                 MultipleDevicesId,
             },
-            WeakIpDeviceId, DEFAULT_HOP_LIMITS,
+            IpLayerIpExt, WeakIpDeviceId, DEFAULT_HOP_LIMITS,
         },
         socket::{IncompatibleError, InsertError, RemoveResult},
         testutil::{FakeNonSyncCtx, TestIpExt},
@@ -1805,7 +1805,7 @@ mod test {
         state: FakeIpSocketCtx<I, D>,
     }
 
-    impl<I: DatagramIpExt, D: FakeStrongIpDeviceId + 'static>
+    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongIpDeviceId + 'static>
         DatagramStateContext<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
             FakeNonSyncCtx,
@@ -1901,7 +1901,7 @@ mod test {
     }
 
     #[ip_test]
-    fn set_get_hop_limits<I: Ip + DatagramIpExt>() {
+    fn set_get_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
         let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId>::default();
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
@@ -1920,7 +1920,7 @@ mod test {
     }
 
     #[ip_test]
-    fn set_get_device_hop_limits<I: Ip + DatagramIpExt>() {
+    fn set_get_device_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
         let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId> {
             sockets: Default::default(),
             state: FakeIpSocketCtx::new([FakeDeviceConfig {
@@ -1952,7 +1952,7 @@ mod test {
     }
 
     #[ip_test]
-    fn default_hop_limits<I: Ip + DatagramIpExt>() {
+    fn default_hop_limits<I: Ip + DatagramIpExt + IpLayerIpExt>() {
         let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId>::default();
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 
@@ -1977,7 +1977,7 @@ mod test {
     }
 
     #[ip_test]
-    fn bind_device_unbound<I: Ip + DatagramIpExt>() {
+    fn bind_device_unbound<I: Ip + DatagramIpExt + IpLayerIpExt>() {
         let mut sync_ctx = FakeDatagramState::<I, FakeDeviceId>::default();
         let mut non_sync_ctx = FakeNonSyncCtx::default();
 

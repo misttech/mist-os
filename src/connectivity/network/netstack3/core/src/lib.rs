@@ -578,9 +578,9 @@ mod tests {
     use crate::{
         ip::{
             forwarding::AddRouteError,
-            types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
+            types::{AddableEntry, AddableEntryEither, AddableMetric, Entry, Metric, RawMetric},
         },
-        testutil::{FakeCtx, TestIpExt, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
+        testutil::{FakeCtx, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
     };
 
     fn test_add_remove_ip_addresses<I: Ip + TestIpExt>() {
@@ -590,6 +590,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -696,6 +697,7 @@ mod tests {
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         assert_eq!(
@@ -722,6 +724,44 @@ mod tests {
                 ))
             ),
             Ok(())
+        );
+    }
+
+    #[ip_test]
+    fn test_route_tracks_interface_metric<I: Ip + TestIpExt>() {
+        let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
+            Ctx::new_with_builder(crate::StackStateBuilder::default());
+        non_sync_ctx.timer_ctx().assert_no_timers_installed();
+
+        let metric = RawMetric(9999);
+        //let device_id = sync_ctx.state.device.add_ethernet_device(
+        let device_id = crate::device::add_ethernet_device(
+            &mut sync_ctx,
+            I::FAKE_CONFIG.local_mac,
+            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            metric,
+        );
+        assert_eq!(
+            crate::add_route(
+                &mut sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntryEither::from(AddableEntry::without_gateway(
+                    I::FAKE_CONFIG.subnet.into(),
+                    device_id.clone().into(),
+                    AddableMetric::MetricTracksInterface
+                ))
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            crate::ip::get_all_routes(&sync_ctx),
+            &[Entry {
+                subnet: I::FAKE_CONFIG.subnet,
+                device: device_id.into(),
+                gateway: None,
+                metric: Metric::MetricTracksInterface(metric)
+            }
+            .into()]
         );
     }
 }

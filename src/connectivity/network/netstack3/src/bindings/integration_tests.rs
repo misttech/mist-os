@@ -25,9 +25,7 @@ use netstack3_core::{
     device::update_ipv6_configuration,
     ip::{
         device::slaac::STABLE_IID_SECRET_KEY_BYTES,
-        types::{
-            AddableEntry, AddableEntryEither, AddableMetric, RawMetric, DEFAULT_INTERFACE_METRIC,
-        },
+        types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric},
     },
     Ctx,
 };
@@ -35,7 +33,7 @@ use netstack3_core::{
 use crate::bindings::{
     devices::Devices,
     util::{ConversionContext as _, IntoFidl as _},
-    BindingsNonSyncCtxImpl, RequestStreamExt as _, LOOPBACK_NAME,
+    BindingsNonSyncCtxImpl, RequestStreamExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
 mod util {
@@ -706,43 +704,43 @@ async fn test_list_del_routes() {
             subnet: Ipv4::LOOPBACK_SUBNET.into_ext(),
             device_id: loopback_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
             device_id: loopback_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
             device_id: if_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv6::LOOPBACK_SUBNET.into_ext(),
             device_id: loopback_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: net_subnet_v6!("fe80::/64").into_ext(),
             device_id: if_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
             device_id: loopback_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
             device_id: if_id,
             next_hop: None,
-            metric: DEFAULT_INTERFACE_METRIC.into(),
+            metric: DEFAULT_INTERFACE_METRIC,
         },
     ];
 

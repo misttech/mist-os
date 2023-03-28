@@ -523,6 +523,7 @@ mod tests {
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,
+            DEFAULT_INTERFACE_METRIC,
         },
         Ctx, StackStateBuilder, TimerId, TimerIdInner,
     };
@@ -1252,6 +1253,7 @@ mod tests {
             sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
         crate::ip::device::add_ipv4_addr_subnet(

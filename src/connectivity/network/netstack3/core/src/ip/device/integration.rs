@@ -46,6 +46,7 @@ use crate::{
             mld::{MldContext, MldFrameMetadata, MldGroupState},
             GmpHandler, GmpState,
         },
+        types::RawMetric,
         AddressStatus, IpLayerIpExt, IpLayerNonSyncContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, DEFAULT_TTL,
     },
@@ -533,6 +534,10 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         DEFAULT_TTL
     }
 
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
+        device::IpDeviceContext::get_routing_metric(self, device_id)
+    }
+
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         self.get_mtu(device_id)
     }
@@ -588,6 +593,10 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
 
     fn get_hop_limit(&mut self, device_id: &SC::DeviceId) -> NonZeroU8 {
         get_ipv6_hop_limit(self, device_id)
+    }
+
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
+        device::IpDeviceContext::get_routing_metric(self, device_id)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {

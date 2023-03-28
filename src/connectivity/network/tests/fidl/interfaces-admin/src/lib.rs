@@ -24,7 +24,7 @@ use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     devices::create_tun_device,
     interfaces,
-    realms::{Netstack, Netstack2, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
+    realms::{Netstack, NetstackVersion, TestRealmExt as _, TestSandboxExt as _},
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -1610,16 +1610,15 @@ enum SetupOrder {
 // within the same subnet (and add subnet routes). Finally, verify (by checking
 // the source addr) that sending from the send side to the receive side uses the
 // preferred send interface.
-// TODO(https://fxbug.dev/122489): Test against NS3 once it supports interface
-// metrics.
-async fn interface_routing_metric<I: net_types::ip::Ip>(name: &str, order: SetupOrder) {
+async fn interface_routing_metric<N: Netstack, I: net_types::ip::Ip>(
+    name: &str,
+    order: SetupOrder,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let send_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{name}_send"))
-        .expect("create realm");
-    let recv_realm = sandbox
-        .create_netstack_realm::<Netstack2, _>(format!("{name}_recv"))
-        .expect("create realm");
+    let send_realm =
+        sandbox.create_netstack_realm::<N, _>(format!("{name}_send")).expect("create realm");
+    let recv_realm =
+        sandbox.create_netstack_realm::<N, _>(format!("{name}_recv")).expect("create realm");
     let network = sandbox.create_network(name).await.expect("create network");
 
     async fn setup_interface_in_realm<'a>(

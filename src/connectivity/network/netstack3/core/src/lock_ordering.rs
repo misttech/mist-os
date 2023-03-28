@@ -154,8 +154,6 @@ impl_lock_after!(TcpSockets<Ipv6> => UdpSockets<Ipv4>);
 impl_lock_after!(UdpSockets<Ipv4> => UdpSockets<Ipv6>);
 impl_lock_after!(UdpSockets<Ipv6> => IpState<Ipv4>);
 
-impl_lock_after!(IpState<Ipv4> => IpStateRoutingTable<Ipv4>);
-impl_lock_after!(IpState<Ipv6> => IpStateRoutingTable<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => IpStatePmtuCache<Ipv4>);
 impl_lock_after!(IpState<Ipv6> => IpStatePmtuCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => IpStateFragmentCache<Ipv4>);
@@ -163,13 +161,15 @@ impl_lock_after!(IpState<Ipv6> => IpStateFragmentCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => EthernetIpv4Arp);
 impl_lock_after!(IpState<Ipv6> => EthernetIpv6Nud);
 
-// Ideally we'd say `IpState<Ipv4> => SomeLowerLock` and then separately
-// `IpState<Ipv6> => SomeLowerLock`. The compiler doesn't like that because
+// Ideally we'd say `SomeUpperLockA => SomeLowerLock` and then separately
+// `SomeUpperLockB => SomeLowerLock`. The compiler doesn't like that because
 // it introduces duplicate blanket impls of `LockAfter<L> for SomeLowerLock`
 // that we need to get the transitivity of lock ordering. It's safe to linearize
 // IPv4 and IPv6 state access and it lets us continue getting transitivity, so
 // we do that here.
-impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
+impl_lock_after!(IpState<Ipv4> => IpStateRoutingTable<Ipv4>);
+impl_lock_after!(IpStateRoutingTable<Ipv4> => IpState<Ipv6>);
+impl_lock_after!(IpState<Ipv6> => IpStateRoutingTable<Ipv6>);
 
 // The loopback data path operates at L3 so we can enqueue packets without going
 // through the device layer lock.
@@ -177,7 +177,7 @@ impl_lock_after!(IpState<Ipv6> => LoopbackTxQueue);
 impl_lock_after!(IpState<Ipv6> => EthernetTxQueue);
 impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
 
-impl_lock_after!(IpState<Ipv6> => AnyDeviceSockets);
+impl_lock_after!(IpStateRoutingTable<Ipv6> => AnyDeviceSockets);
 
 impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);

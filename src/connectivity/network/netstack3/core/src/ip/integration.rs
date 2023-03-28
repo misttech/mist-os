@@ -104,7 +104,7 @@ impl<
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
         SC: ip::BufferIpDeviceContext<Ipv4, C, B>
-            + Ipv4StateContext<C::Instant>
+            + Ipv4StateContext<C>
             + IpSocketContext<Ipv4, C>
             + NonTestCtxMarker,
     > BufferIpSocketContext<Ipv4, C, B> for SC
@@ -128,7 +128,7 @@ impl<
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv6, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>,
         SC: ip::BufferIpDeviceContext<Ipv6, C, B>
-            + IpStateContext<Ipv6, C::Instant>
+            + IpStateContext<Ipv6, C>
             + IpSocketContext<Ipv6, C>
             + NonTestCtxMarker,
     > BufferIpSocketContext<Ipv6, C, B> for SC

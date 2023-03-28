@@ -18,19 +18,19 @@ use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
     device::{ethernet, EthernetWeakDeviceId},
-    ip::device::{
-        slaac::{
+    ip::{
+        device::slaac::{
             SlaacConfiguration, TemporarySlaacAddressConfiguration, STABLE_IID_SECRET_KEY_BYTES,
         },
-        state::{IpDeviceConfiguration, Ipv6DeviceConfiguration},
+        types::RawMetric,
     },
     Ctx,
 };
 use rand::Rng as _;
 
 use crate::bindings::{
-    devices, interfaces_admin, BindingId, DeviceId, Netstack, NetstackContext, NonSyncContext,
-    StackTime, SyncCtx,
+    devices, interfaces_admin, BindingId, DeviceId, IpDeviceConfiguration, Ipv6DeviceConfiguration,
+    Netstack, NetstackContext, NonSyncContext, StackTime, SyncCtx, DEFAULT_INTERFACE_METRIC,
 };
 
 #[derive(Clone)]
@@ -151,6 +151,7 @@ impl NetdeviceWorker {
 
 pub(crate) struct InterfaceOptions {
     pub name: Option<String>,
+    pub metric: Option<u32>,
 }
 
 pub(crate) struct DeviceHandler {
@@ -161,7 +162,7 @@ impl DeviceHandler {
     pub(crate) async fn add_port(
         &self,
         ns: &Netstack,
-        InterfaceOptions { name }: InterfaceOptions,
+        InterfaceOptions { name, metric }: InterfaceOptions,
         port: fhardware_network::PortId,
         control_hook: futures::channel::mpsc::Sender<interfaces_admin::OwnedControlHandle>,
     ) -> Result<
@@ -279,6 +280,7 @@ impl DeviceHandler {
             sync_ctx,
             mac_addr,
             max_frame_size,
+            RawMetric(metric.unwrap_or(DEFAULT_INTERFACE_METRIC)),
             || {
                 let binding_id = non_sync_ctx.devices.alloc_new_id();
 
@@ -379,7 +381,7 @@ fn add_initial_routes<NonSyncCtx: NonSyncContext>(
     non_sync_ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
-    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
+    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric};
     const LINK_LOCAL_SUBNET: Subnet<Ipv6Addr> = net_declare::net_subnet_v6!("fe80::/64");
     for entry in [
         AddableEntryEither::from(AddableEntry::without_gateway(

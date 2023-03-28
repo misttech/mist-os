@@ -1106,7 +1106,7 @@ mod tests {
 
     use crate::bindings::{
         devices, interfaces_admin::OwnedControlHandle, DeviceIdExt as _, InterfaceEventProducer,
-        NetstackContext, DEFAULT_LOOPBACK_MTU,
+        NetstackContext, DEFAULT_INTERFACE_METRIC, DEFAULT_LOOPBACK_MTU,
     };
 
     use super::*;
@@ -1143,6 +1143,7 @@ mod tests {
                 netstack3_core::device::add_loopback_device_with_state(
                     &state.sync_ctx,
                     DEFAULT_LOOPBACK_MTU,
+                    RawMetric(DEFAULT_INTERFACE_METRIC),
                     || {
                         const LOOPBACK_NAME: &'static str = "lo";
 

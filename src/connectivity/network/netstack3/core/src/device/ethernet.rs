@@ -59,9 +59,12 @@ use crate::{
         DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
         RecvIpFrameMeta,
     },
-    ip::device::{
-        nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
-        state::{DualStackIpDeviceState, Ipv4DeviceState, Ipv6DeviceState},
+    ip::{
+        device::{
+            nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
+            state::{DualStackIpDeviceState, Ipv4DeviceState, Ipv6DeviceState},
+        },
+        types::RawMetric,
     },
     sync::{Mutex, RwLock},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -448,11 +451,16 @@ impl MaxFrameSize {
 pub(crate) struct EthernetDeviceStateBuilder {
     mac: UnicastAddr<Mac>,
     max_frame_size: MaxFrameSize,
+    metric: RawMetric,
 }
 
 impl EthernetDeviceStateBuilder {
     /// Create a new `EthernetDeviceStateBuilder`.
-    pub(crate) fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxFrameSize) -> Self {
+    pub(crate) fn new(
+        mac: UnicastAddr<Mac>,
+        max_frame_size: MaxFrameSize,
+        metric: RawMetric,
+    ) -> Self {
         // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
         // Ethernet devices such that you can't create an `EthernetDeviceState`
         // with a `MaxFrameSize` smaller than the minimum. The absolute minimum
@@ -466,17 +474,17 @@ impl EthernetDeviceStateBuilder {
         // A few questions:
         // - How do we wire error information back up the call stack? Should
         //   this just return a Result or something?
-        Self { mac, max_frame_size }
+        Self { mac, max_frame_size, metric }
     }
 
     /// Build the `EthernetDeviceState` from this builder.
     pub(super) fn build(self) -> EthernetDeviceState {
-        let Self { mac, max_frame_size } = self;
+        let Self { mac, max_frame_size, metric } = self;
 
         EthernetDeviceState {
             ipv4_arp: Default::default(),
             ipv6_nud: Default::default(),
-            static_state: StaticEthernetDeviceState { mac, max_frame_size },
+            static_state: StaticEthernetDeviceState { mac, max_frame_size, metric },
             dynamic_state: RwLock::new(DynamicEthernetDeviceState::new(max_frame_size)),
             tx_queue: Default::default(),
             sockets: Default::default(),
@@ -509,6 +517,9 @@ pub(crate) struct StaticEthernetDeviceState {
 
     /// The maximum frame size allowed by the hardware.
     max_frame_size: MaxFrameSize,
+
+    /// The routing metric of the device this state is for.
+    metric: RawMetric,
 }
 
 /// The state associated with an Ethernet device.
@@ -1101,6 +1112,17 @@ pub(super) fn leave_link_multicast<
     })
 }
 
+/// Get the routing metric associated with this device.
+pub(super) fn get_routing_metric<
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+    SC: EthernetIpLinkDeviceContext<C>,
+>(
+    sync_ctx: &mut SC,
+    device_id: &SC::DeviceId,
+) -> RawMetric {
+    sync_ctx.with_static_ethernet_device_state(device_id, |static_state| static_state.metric)
+}
+
 /// Get the MTU associated with this device.
 pub(super) fn get_mtu<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
@@ -1362,7 +1384,8 @@ mod tests {
         },
         testutil::{
             add_arp_or_ndp_table_entry, assert_empty, get_counter_val, new_rng,
-            FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V4,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx,
     };
@@ -1377,7 +1400,11 @@ mod tests {
     impl FakeEthernetCtx {
         fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxFrameSize) -> FakeEthernetCtx {
             FakeEthernetCtx {
-                static_state: StaticEthernetDeviceState { max_frame_size, mac },
+                static_state: StaticEthernetDeviceState {
+                    max_frame_size,
+                    mac,
+                    metric: DEFAULT_INTERFACE_METRIC,
+                },
                 dynamic_state: DynamicEthernetDeviceState::new(max_frame_size),
                 static_arp_entries: Default::default(),
                 tx_queue: Default::default(),
@@ -1616,6 +1643,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let device = eth_device.clone().into();
         let mut bytes = match I::VERSION {
@@ -1662,6 +1690,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
 
@@ -1726,6 +1755,7 @@ mod tests {
             &mut sync_ctx,
             FAKE_CONFIG_V4.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -1970,6 +2000,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2083,6 +2114,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2250,6 +2282,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2300,6 +2333,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2327,6 +2361,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2448,6 +2483,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
 

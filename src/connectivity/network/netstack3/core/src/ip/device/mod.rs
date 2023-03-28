@@ -45,6 +45,7 @@ use crate::{
             igmp::IgmpTimerId, mld::MldDelayedReportTimerId, GmpHandler, GroupJoinResult,
             GroupLeaveResult,
         },
+        types::RawMetric,
         DualStackDeviceIdContext, IpDeviceId as _, IpDeviceIdContext,
     },
     Instant,
@@ -385,6 +386,9 @@ where
         &mut self,
         cb: F,
     ) -> O;
+
+    /// Gets the default metric for routes through a device.
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
 
     /// Gets the MTU for a device.
     ///
@@ -1454,7 +1458,7 @@ mod tests {
         ip::gmp::GmpDelayedReportTimerId,
         testutil::{
             assert_empty, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, StackStateBuilder, TimerId, TimerIdInner,
     };
@@ -1470,6 +1474,7 @@ mod tests {
             sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
 
@@ -1597,6 +1602,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         let ll_addr = local_mac.to_ipv6_link_local();
@@ -1835,6 +1841,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {

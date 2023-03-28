@@ -43,6 +43,9 @@ use crate::{
     Ctx, StackStateBuilder, SyncCtx, TimerId,
 };
 
+/// The default interface routing metric for test interfaces.
+pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
+
 /// Asserts that an iterable object produces zero items.
 ///
 /// `assert_empty` drains `into_iter.into_iter()` and asserts that zero
@@ -387,7 +390,7 @@ pub(crate) fn get_counter_val(ctx: &FakeNonSyncCtx, key: &str) -> usize {
 }
 
 /// An extension trait for `Ip` providing test-related functionality.
-pub(crate) trait TestIpExt: crate::ip::IpExt {
+pub(crate) trait TestIpExt: crate::ip::IpExt + crate::ip::IpLayerIpExt {
     /// Either [`FAKE_CONFIG_V4`] or [`FAKE_CONFIG_V6`].
     const FAKE_CONFIG: FakeEventDispatcherConfig<Self::Addr>;
 
@@ -655,6 +658,7 @@ impl FakeEventDispatcherBuilder {
                     sync_ctx,
                     mac,
                     IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                    DEFAULT_INTERFACE_METRIC,
                 );
                 let id = eth_id.clone().into();
                 crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &id);

@@ -78,7 +78,9 @@ use netstack3_core::{
             state::{IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6DeviceConfiguration},
             IpDeviceEvent, RemovedReason,
         },
-        icmp, IpExt,
+        icmp,
+        types::RawMetric,
+        IpExt,
     },
     transport::udp,
     Ctx, NonSyncContext, SyncCtx, TimerId,
@@ -121,6 +123,11 @@ const IPV4_LIMITED_BROADCAST_SUBNET: Subnet<Ipv4Addr> = net_subnet_v4!("255.255.
 ///
 /// The value is currently kept in sync with the Netstack2 implementation.
 const DEFAULT_LOW_PRIORITY_METRIC: u32 = 99999;
+
+/// Default routing metric for newly created interfaces, if unspecified.
+///
+/// The value is currently kept in sync with the Netstack2 implementation.
+const DEFAULT_INTERFACE_METRIC: u32 = 100;
 
 type IcmpEchoSockets = socket::datagram::SocketCollectionPair<socket::datagram::IcmpEcho>;
 type UdpSockets = socket::datagram::SocketCollectionPair<socket::datagram::Udp>;
@@ -660,7 +667,7 @@ fn add_loopback_routes<NonSyncCtx: NonSyncContext>(
     non_sync_ctx: &mut NonSyncCtx,
     loopback: &DeviceId<NonSyncCtx>,
 ) -> Result<(), netstack3_core::ip::forwarding::AddRouteError> {
-    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric, RawMetric};
+    use netstack3_core::ip::types::{AddableEntry, AddableEntryEither, AddableMetric};
     for entry in [
         AddableEntryEither::from(AddableEntry::without_gateway(
             Ipv4::LOOPBACK_SUBNET,
@@ -776,6 +783,7 @@ impl Netstack {
         let loopback = netstack3_core::device::add_loopback_device_with_state(
             sync_ctx,
             DEFAULT_LOOPBACK_MTU,
+            RawMetric(DEFAULT_INTERFACE_METRIC),
             || {
                 let binding_id = devices.alloc_new_id();
 

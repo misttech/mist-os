@@ -1514,10 +1514,13 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) =
             FakeEventDispatcherBuilder::from_config(cfg).build();
         let mut sync_ctx = &sync_ctx;
-        let loopback_device_id =
-            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(u16::MAX as u32))
-                .expect("create the loopback interface")
-                .into();
+        let loopback_device_id = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            Mtu::new(u16::MAX as u32),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .expect("create the loopback interface")
+        .into();
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1682,10 +1685,13 @@ mod tests {
             .expect("install IPv6 device route on a fresh stack without routes"),
         }
 
-        let loopback_device_id =
-            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(u16::MAX as u32))
-                .expect("create the loopback interface")
-                .into();
+        let loopback_device_id = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            Mtu::new(u16::MAX as u32),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .expect("create the loopback interface")
+        .into();
         crate::device::testutil::enable_device(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -1754,7 +1760,7 @@ mod tests {
     where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>,
+            + IpStateContext<I, FakeNonSyncCtx>,
         FakeNonSyncCtx: EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>,
     {
         // Test various edge cases of the
@@ -1891,7 +1897,7 @@ mod tests {
     where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>,
+            + IpStateContext<I, FakeNonSyncCtx>,
     {
         set_logger_for_test();
 
@@ -2023,7 +2029,7 @@ mod tests {
     where
         for<'a> &'a FakeSyncCtx: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
-            + IpStateContext<I, <FakeNonSyncCtx as InstantContext>::Instant>
+            + IpStateContext<I, FakeNonSyncCtx>
             + DeviceIpSocketHandler<I, FakeNonSyncCtx>,
     {
         set_logger_for_test();

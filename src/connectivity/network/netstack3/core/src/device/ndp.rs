@@ -89,7 +89,8 @@ mod tests {
         },
         testutil::{
             assert_empty, get_counter_val, handle_timer, set_logger_for_test,
-            FakeEventDispatcherBuilder, TestIpExt, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            FakeEventDispatcherBuilder, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, Instant, TimerId, TimerIdInner,
     };
@@ -300,8 +301,12 @@ mod tests {
         let make_ctx_and_dev = || {
             let mut ctx = crate::testutil::FakeCtx::default();
             let Ctx { sync_ctx, non_sync_ctx: _ } = &mut ctx;
-            let device_id =
-                crate::device::add_ethernet_device(sync_ctx, mac, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE);
+            let device_id = crate::device::add_ethernet_device(
+                sync_ctx,
+                mac,
+                IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                DEFAULT_INTERFACE_METRIC,
+            );
             (ctx, device_id)
         };
 
@@ -477,6 +482,7 @@ mod tests {
             &mut sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::update_ipv6_configuration(
@@ -524,6 +530,7 @@ mod tests {
             &mut sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let dev_id = eth_dev_id.clone().into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &dev_id);
@@ -667,6 +674,7 @@ mod tests {
             &mut sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let dev_id = eth_dev_id.clone().into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &dev_id);
@@ -781,6 +789,7 @@ mod tests {
             &mut sync_ctx,
             local_mac(),
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let dev_id = eth_dev_id.clone().into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &dev_id);
@@ -1109,6 +1118,7 @@ mod tests {
             &mut sync_ctx,
             local_mac(),
             ethernet::MaxFrameSize::from_mtu(hw_mtu).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         let src_mac = Mac::new([10, 11, 12, 13, 14, 15]);
@@ -1212,6 +1222,7 @@ mod tests {
             &mut sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
         crate::device::update_ipv6_configuration(
@@ -1304,6 +1315,7 @@ mod tests {
             &mut sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let device_id = eth_device_id.clone().into();
         crate::device::update_ipv6_configuration(
@@ -1374,6 +1386,7 @@ mod tests {
             &mut sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::update_ipv6_configuration(
@@ -1460,6 +1473,7 @@ mod tests {
             &mut sync_ctx,
             fake_config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -1620,6 +1634,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -1761,6 +1776,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, non_sync_ctx, &device);
@@ -2076,6 +2092,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2124,6 +2141,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -2349,6 +2367,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::update_ipv6_configuration(
@@ -2567,6 +2586,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
 
@@ -2721,6 +2741,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
 
@@ -2855,6 +2876,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
 
@@ -3038,6 +3060,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         );
         let device = device_id.clone().into();
         // No DAD for the auto-generated link-local address.
@@ -3392,6 +3415,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::update_ipv6_configuration(

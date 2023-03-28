@@ -39,6 +39,7 @@ use crate::{
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, FrameDestination,
     },
+    ip::types::RawMetric,
     sync::{RwLock, StrongRc, WeakRc},
     Instant, NonSyncContext, SyncCtx,
 };
@@ -162,15 +163,18 @@ impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
 
 pub(super) struct LoopbackDeviceState {
     mtu: Mtu,
+    /// The routing metric of the loopback device this state is for.
+    metric: RawMetric,
     rx_queue: ReceiveQueue<IpVersion, Buf<Vec<u8>>>,
     tx_queue: TransmitQueue<IpVersion, Buf<Vec<u8>>, BufVecU8Allocator>,
     sockets: RwLock<DeviceSockets>,
 }
 
 impl LoopbackDeviceState {
-    pub(super) fn new(mtu: Mtu) -> LoopbackDeviceState {
+    pub(super) fn new(mtu: Mtu, metric: RawMetric) -> LoopbackDeviceState {
         LoopbackDeviceState {
             mtu,
+            metric,
             rx_queue: Default::default(),
             tx_queue: Default::default(),
             sockets: Default::default(),
@@ -267,6 +271,14 @@ pub(super) fn send_ip_frame<
             Err(s)
         }
     }
+}
+
+/// Get the routing metric associated with this device.
+pub(super) fn get_routing_metric<NonSyncCtx: NonSyncContext, L>(
+    ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
+    device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
+) -> RawMetric {
+    with_loopback_state(ctx, device_id, |mut state| state.cast_with(|s| &s.link.metric).copied())
 }
 
 /// Gets the MTU associated with this device.
@@ -457,7 +469,7 @@ mod tests {
         device::{DeviceId, Mtu},
         error::NotFoundError,
         ip::device::state::{AssignedAddress, IpDeviceStateIpExt},
-        testutil::{FakeEventDispatcherConfig, TestIpExt},
+        testutil::{FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC},
         Ctx, NonSyncContext, SyncCtx,
     };
 
@@ -466,9 +478,10 @@ mod tests {
         const MTU: Mtu = Mtu::new(66);
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
-        let device = crate::device::add_loopback_device(&mut sync_ctx, MTU)
-            .expect("error adding loopback device")
-            .into();
+        let device =
+            crate::device::add_loopback_device(&mut sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+                .expect("error adding loopback device")
+                .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         assert_eq!(crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut sync_ctx, &device), MTU);

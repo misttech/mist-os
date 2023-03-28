@@ -67,6 +67,7 @@ use crate::{
             BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
             IpDeviceContext, IpDeviceStateAccessor, Ipv6DeviceContext,
         },
+        types::RawMetric,
         DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext, StrongIpDeviceId, WeakIpDeviceId,
     },
     sync::{PrimaryRc, RwLock, StrongRc, WeakRc},
@@ -302,6 +303,18 @@ fn with_ip_device_state<
     }
 }
 
+fn get_routing_metric<
+    NonSyncCtx: NonSyncContext,
+    L: LockBefore<crate::lock_ordering::DeviceLayerState>,
+>(
+    ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
+    device: &DeviceId<NonSyncCtx>,
+) -> RawMetric {
+    match device {
+        DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(ctx, &id),
+        DeviceId::Loopback(id) => self::loopback::get_routing_metric(ctx, &id),
+    }
+}
 fn get_mtu<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>(
     ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, L>,
     device: &DeviceId<NonSyncCtx>,
@@ -436,6 +449,10 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncC
         IpDeviceContext::<Ipv4, _>::with_devices_and_state(&mut Locked::new(*self), cb)
     }
 
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
+        IpDeviceContext::<Ipv4, _>::get_routing_metric(&mut Locked::new(*self), device_id)
+    }
+
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(*self), device_id)
     }
@@ -524,6 +541,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayer
         let Devices { ethernet, loopback } = &*devices;
 
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, locked)
+    }
+
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
+        get_routing_metric(self, device_id)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -752,6 +773,10 @@ impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncC
         IpDeviceContext::<Ipv6, _>::with_devices_and_state(&mut Locked::new(*self), cb)
     }
 
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
+        IpDeviceContext::<Ipv6, _>::get_routing_metric(&mut Locked::new(*self), device_id)
+    }
+
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
         IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(*self), device_id)
     }
@@ -826,6 +851,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayer
         let Devices { ethernet, loopback } = &*devices;
 
         cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() }, locked)
+    }
+
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
+        get_routing_metric(self, device_id)
     }
 
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
@@ -1499,12 +1528,13 @@ impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
         &self,
         mac: UnicastAddr<Mac>,
         max_frame_size: ethernet::MaxFrameSize,
+        metric: RawMetric,
         external_state: F,
     ) -> EthernetDeviceId<C::Instant, C::EthernetDeviceState> {
         let Devices { ethernet, loopback: _ } = &mut *self.devices.write();
 
         let ptr = PrimaryRc::new(IpLinkDeviceState::new(
-            EthernetDeviceStateBuilder::new(mac, max_frame_size).build(),
+            EthernetDeviceStateBuilder::new(mac, max_frame_size, metric).build(),
             external_state(),
             self.origin.clone(),
         ));
@@ -1518,6 +1548,7 @@ impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
     pub(crate) fn add_loopback_device<F: FnOnce() -> C::LoopbackDeviceState>(
         &self,
         mtu: Mtu,
+        metric: RawMetric,
         external_state: F,
     ) -> Result<LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>, ExistsError> {
         let Devices { ethernet: _, loopback } = &mut *self.devices.write();
@@ -1527,7 +1558,7 @@ impl<C: DeviceLayerEventDispatcher> DeviceLayerState<C> {
         }
 
         let ptr = PrimaryRc::new(IpLinkDeviceState::new(
-            LoopbackDeviceState::new(mtu),
+            LoopbackDeviceState::new(mtu, metric),
             external_state(),
             self.origin.clone(),
         ));
@@ -1681,21 +1712,24 @@ pub fn add_ethernet_device_with_state<
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
+    metric: RawMetric,
     external_state: F,
 ) -> EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState> {
-    sync_ctx.state.device.add_ethernet_device(mac, max_frame_size, external_state)
+    sync_ctx.state.device.add_ethernet_device(mac, max_frame_size, metric, external_state)
 }
 
 /// Adds a new Ethernet device to the stack.
-pub fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
+#[cfg(test)]
+pub(crate) fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
     max_frame_size: ethernet::MaxFrameSize,
+    metric: RawMetric,
 ) -> EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState>
 where
     NonSyncCtx::EthernetDeviceState: Default,
 {
-    add_ethernet_device_with_state(sync_ctx, mac, max_frame_size, Default::default)
+    add_ethernet_device_with_state(sync_ctx, mac, max_frame_size, metric, Default::default)
 }
 
 /// Adds a new loopback device to the stack.
@@ -1709,12 +1743,13 @@ pub fn add_loopback_device_with_state<
 >(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
+    metric: RawMetric,
     external_state: F,
 ) -> Result<
     LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
     crate::error::ExistsError,
 > {
-    sync_ctx.state.device.add_loopback_device(mtu, external_state)
+    sync_ctx.state.device.add_loopback_device(mtu, metric, external_state)
 }
 
 /// Adds a new loopback device to the stack.
@@ -1722,9 +1757,11 @@ pub fn add_loopback_device_with_state<
 /// Adds a new loopback device to the stack. Only one loopback device may be
 /// installed at any point in time, so if there is one already, an error is
 /// returned.
-pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
+#[cfg(test)]
+pub(crate) fn add_loopback_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mtu: Mtu,
+    metric: RawMetric,
 ) -> Result<
     LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
     crate::error::ExistsError,
@@ -1732,7 +1769,7 @@ pub fn add_loopback_device<NonSyncCtx: NonSyncContext>(
 where
     NonSyncCtx::LoopbackDeviceState: Default,
 {
-    add_loopback_device_with_state(sync_ctx, mtu, Default::default)
+    add_loopback_device_with_state(sync_ctx, mtu, metric, Default::default)
 }
 
 /// Receive a device layer frame from the network.
@@ -2022,8 +2059,8 @@ mod tests {
     use super::*;
     use crate::{
         testutil::{
-            FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, FAKE_CONFIG_V4,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
+            FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx,
     };
@@ -2061,10 +2098,13 @@ mod tests {
         }
         check(&mut sync_ctx, &[][..]);
 
-        let loopback_device: DeviceId<_> =
-            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
-                .expect("error adding loopback device")
-                .into();
+        let loopback_device: DeviceId<_> = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            Mtu::new(55),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .expect("error adding loopback device")
+        .into();
         check(&mut sync_ctx, &[loopback_device.clone()][..]);
 
         let FakeEventDispatcherConfig {
@@ -2078,6 +2118,7 @@ mod tests {
             &mut sync_ctx,
             local_mac,
             ethernet::MaxFrameSize::MIN,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         check(&mut sync_ctx, &[ethernet_device, loopback_device][..]);
@@ -2087,15 +2128,19 @@ mod tests {
     fn test_no_default_routes() {
         let Ctx { mut sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
 
-        let _loopback_device: LoopbackDeviceId<_, _> =
-            crate::device::add_loopback_device(&mut sync_ctx, Mtu::new(55))
-                .expect("error adding loopback device");
+        let _loopback_device: LoopbackDeviceId<_, _> = crate::device::add_loopback_device(
+            &mut sync_ctx,
+            Mtu::new(55),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .expect("error adding loopback device");
 
         assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
         let _ethernet_device: EthernetDeviceId<_, _> = crate::device::add_ethernet_device(
             &mut sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::MIN,
+            DEFAULT_INTERFACE_METRIC,
         );
         assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
     }
@@ -2108,6 +2153,7 @@ mod tests {
             &mut sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
             ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
         );
 
         {
@@ -2148,6 +2194,7 @@ mod tests {
             sync_ctx,
             Ipv6::FAKE_CONFIG.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into()
     }
@@ -2156,8 +2203,13 @@ mod tests {
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
     ) -> DeviceId<crate::testutil::FakeNonSyncCtx> {
-        let device =
-            crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap().into();
+        let device = crate::device::add_loopback_device(
+            sync_ctx,
+            Ipv6::MINIMUM_LINK_MTU,
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .unwrap()
+        .into();
         crate::device::add_ip_addr_subnet(
             sync_ctx,
             non_sync_ctx,

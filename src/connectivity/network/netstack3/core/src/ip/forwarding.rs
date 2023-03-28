@@ -16,8 +16,8 @@ use thiserror::Error;
 
 use crate::ip::{
     self,
-    types::{AddableMetric, Metric, DEFAULT_INTERFACE_METRIC},
-    ExistsError, IpDeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt,
+    types::{AddableMetric, Metric},
+    ExistsError, IpDeviceContext, IpDeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt,
     IpLayerNonSyncContext,
 };
 
@@ -47,7 +47,7 @@ pub(crate) fn add_gateway_route<
                 }
             },
         )?;
-        let metric = observe_metric(metric);
+        let metric = observe_metric(sync_ctx, &device, metric);
         let entry = table
             .add_entry(crate::ip::types::Entry { subnet, device, gateway: Some(next_hop), metric })
             .map_err::<AddRouteError, _>(From::from)?;
@@ -68,8 +68,8 @@ pub(crate) fn add_device_route<
     device: SC::DeviceId,
     metric: AddableMetric,
 ) -> Result<(), ExistsError> {
-    sync_ctx.with_ip_routing_table_mut(|_sync_ctx, table| {
-        let metric = observe_metric(metric);
+    sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
+        let metric = observe_metric(sync_ctx, &device, metric);
         let entry =
             table.add_entry(crate::ip::types::Entry { subnet, device, gateway: None, metric })?;
         Ok(ctx.on_event(IpLayerEvent::RouteAdded(entry.clone())))
@@ -78,12 +78,15 @@ pub(crate) fn add_device_route<
 
 // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
 // observing the device's metric, if applicable.
-fn observe_metric(metric: AddableMetric) -> Metric {
-    // TODO(https://fxbug.dev/122489): Lookup the interface's metric.
+fn observe_metric<I: IpLayerIpExt, C, SC: IpDeviceContext<I, C>>(
+    sync_ctx: &mut SC,
+    device: &SC::DeviceId,
+    metric: AddableMetric,
+) -> Metric {
     match metric {
         AddableMetric::ExplicitMetric(value) => Metric::ExplicitMetric(value),
         AddableMetric::MetricTracksInterface => {
-            Metric::MetricTracksInterface(DEFAULT_INTERFACE_METRIC)
+            Metric::MetricTracksInterface(sync_ctx.get_routing_metric(device))
         }
     }
 }

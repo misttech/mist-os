@@ -1587,7 +1587,7 @@ mod tests {
         },
         testutil::{
             assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx,
     };
@@ -2669,6 +2669,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::ip::device::update_ipv6_configuration(

@@ -76,6 +76,7 @@ use crate::{
             BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockRoute, IpSockRouteError,
             IpSockUnroutableError, IpSocketContext, IpSocketHandler,
         },
+        types::RawMetric,
     },
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -595,14 +596,9 @@ impl IpLayerIpExt for Ipv6 {
 // TODO(https://fxbug.dev/48578): Do not return references to state. Instead,
 // callers of methods on this trait should provide a callback that takes a state
 // reference.
-pub(crate) trait IpStateContext<I: IpLayerIpExt, Instant: crate::Instant>:
-    IpDeviceIdContext<I>
-{
-    type IpDeviceIdCtx<'a>: IpDeviceIdContext<
-        I,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
+pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
+    type IpDeviceIdCtx<'a>: IpDeviceIdContext<I, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + IpDeviceContext<I, C>;
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<
@@ -623,9 +619,7 @@ pub(crate) trait IpStateContext<I: IpLayerIpExt, Instant: crate::Instant>:
     ) -> O;
 }
 
-pub(crate) trait Ipv4StateContext<Instant: crate::Instant>:
-    IpStateContext<Ipv4, Instant>
-{
+pub(crate) trait Ipv4StateContext<C>: IpStateContext<Ipv4, C> {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O;
 }
 
@@ -673,6 +667,9 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
     /// Returns the hop limit.
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
 
+    /// Gets the routing metric for a device.
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
+
     /// Returns the MTU of the device.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
 }
@@ -703,14 +700,14 @@ impl<
 pub(crate) trait IpLayerContext<
     I: IpLayerIpExt,
     C: IpLayerNonSyncContext<I, <Self as IpDeviceIdContext<I>>::DeviceId>,
->: IpStateContext<I, C::Instant> + IpDeviceContext<I, C>
+>: IpStateContext<I, C> + IpDeviceContext<I, C>
 {
 }
 
 impl<
         I: IpLayerIpExt,
         C: IpLayerNonSyncContext<I, <SC as IpDeviceIdContext<I>>::DeviceId>,
-        SC: IpStateContext<I, C::Instant> + IpDeviceContext<I, C>,
+        SC: IpStateContext<I, C> + IpDeviceContext<I, C>,
     > IpLayerContext<I, C> for SC
 {
 }
@@ -852,13 +849,11 @@ impl<
 }
 
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
-    for &'_ SyncCtx<NonSyncCtx>
-{
+impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
     type IpDeviceIdCtx<'a> =
         <Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked> as IpStateContext<
             Ipv4,
-            NonSyncCtx::Instant,
+            NonSyncCtx,
         >>::IpDeviceIdCtx<'a>;
 
     fn with_ip_routing_table<
@@ -883,20 +878,18 @@ impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx::Instant>
 }
 
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> Ipv4StateContext<NonSyncCtx::Instant> for &'_ SyncCtx<NonSyncCtx> {
+impl<NonSyncCtx: NonSyncContext> Ipv4StateContext<NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
         Locked::new(*self).with_next_packet_id(cb)
     }
 }
 
 // TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx::Instant>
-    for &'_ SyncCtx<NonSyncCtx>
-{
+impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
     type IpDeviceIdCtx<'a> =
         <Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked> as IpStateContext<
             Ipv6,
-            NonSyncCtx::Instant,
+            NonSyncCtx,
         >>::IpDeviceIdCtx<'a>;
 
     fn with_ip_routing_table<
@@ -921,7 +914,7 @@ impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx::Instant>
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    Ipv4StateContext<NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    Ipv4StateContext<NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
@@ -929,7 +922,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    IpStateContext<Ipv4, NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    IpStateContext<Ipv4, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
     type IpDeviceIdCtx<'a> =
         Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv4>>;
@@ -960,7 +953,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    IpStateContext<Ipv6, NonSyncCtx::Instant> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    IpStateContext<Ipv6, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
     type IpDeviceIdCtx<'a> =
         Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv6>>;
@@ -1225,7 +1218,7 @@ impl<I: Instant, StrongDeviceId: StrongIpDeviceId> AsRef<IpStateInner<Ipv4, I, S
     }
 }
 
-fn gen_ipv4_packet_id<I: Instant, C: Ipv4StateContext<I>>(sync_ctx: &mut C) -> u16 {
+fn gen_ipv4_packet_id<C, SC: Ipv4StateContext<C>>(sync_ctx: &mut SC) -> u16 {
     // Relaxed ordering as we only need atomicity without synchronization. See
     // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
     // for more details.
@@ -2582,7 +2575,7 @@ pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C::Instant> + NonTestCtxMarker,
+        SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv4, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2598,7 +2591,7 @@ impl<
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv6, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv6, C, B> + IpStateContext<Ipv6, C::Instant> + NonTestCtxMarker,
+        SC: BufferIpDeviceContext<Ipv6, C, B> + IpStateContext<Ipv6, C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv6, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2620,7 +2613,7 @@ impl<
 pub(crate) fn send_ipv4_packet_from_device<
     B: BufferMut,
     C: IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C::Instant>,
+    SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C>,
     S: Serializer<Buffer = B>,
 >(
     sync_ctx: &mut SC,
@@ -3139,8 +3132,8 @@ mod tests {
         },
         testutil::{
             assert_empty, get_counter_val, handle_timer, new_rng, set_logger_for_test, FakeCtx,
-            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, FAKE_CONFIG_V4, FAKE_CONFIG_V6,
-            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+            FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, DeviceId, StackState,
     };
@@ -4425,6 +4418,7 @@ mod tests {
             &mut sync_ctx,
             config.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::ip::device::update_ipv6_configuration(
@@ -4517,6 +4511,7 @@ mod tests {
             &mut sync_ctx,
             cfg.local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
@@ -4657,6 +4652,7 @@ mod tests {
                 &mut sync_ctx,
                 local_mac,
                 IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+                DEFAULT_INTERFACE_METRIC,
             )
             .into();
             crate::ip::device::update_ipv6_configuration(
@@ -4900,8 +4896,13 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
         let mut device_ids = device_ids.into_iter().map(Into::into).collect::<Vec<_>>();
         let mut sync_ctx = &sync_ctx;
-        let loopback_id =
-            crate::device::add_loopback_device(sync_ctx, Ipv6::MINIMUM_LINK_MTU).unwrap().into();
+        let loopback_id = crate::device::add_loopback_device(
+            sync_ctx,
+            Ipv6::MINIMUM_LINK_MTU,
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .unwrap()
+        .into();
         crate::device::testutil::enable_device(sync_ctx, &mut non_sync_ctx, &loopback_id);
         crate::add_ip_addr_subnet(
             sync_ctx,
@@ -4957,6 +4958,7 @@ mod tests {
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
             crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         let addable_metric = AddableMetric::ExplicitMetric(RawMetric(0));

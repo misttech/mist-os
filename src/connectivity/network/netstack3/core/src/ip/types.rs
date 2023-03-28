@@ -197,14 +197,15 @@ pub enum EntryEither<D> {
     V6(Entry<Ipv6Addr, D>),
 }
 
-impl<D> From<Entry<Ipv4Addr, D>> for EntryEither<D> {
-    fn from(entry: Entry<Ipv4Addr, D>) -> EntryEither<D> {
-        EntryEither::V4(entry)
-    }
-}
-
-impl<D> From<Entry<Ipv6Addr, D>> for EntryEither<D> {
-    fn from(entry: Entry<Ipv6Addr, D>) -> EntryEither<D> {
-        EntryEither::V6(entry)
+impl<A: IpAddress, D> From<Entry<A, D>> for EntryEither<D> {
+    fn from(entry: Entry<A, D>) -> EntryEither<D> {
+        #[derive(GenericOverIp)]
+        struct EntryHolder<I: Ip, D>(Entry<I::Addr, D>);
+        let IpInvariant(entry_either) = A::Version::map_ip(
+            EntryHolder(entry),
+            |EntryHolder(entry)| IpInvariant(EntryEither::V4(entry)),
+            |EntryHolder(entry)| IpInvariant(EntryEither::V6(entry)),
+        );
+        entry_either
     }
 }

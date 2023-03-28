@@ -246,7 +246,7 @@ mod tests {
             IPV6_DEFAULT_SUBNET,
         },
         testutil::{
-            DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _,
+            DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         Ctx, DeviceId, TimerId, TimerIdInner,
@@ -605,6 +605,7 @@ mod tests {
             sync_ctx,
             local_mac,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
         )
         .into();
         crate::ip::device::update_ipv6_configuration(
