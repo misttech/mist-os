@@ -13,6 +13,7 @@ zx_library("elf-search") {
     "//zircon/system/ulib/zx",
   ]
   deps = [
+    "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

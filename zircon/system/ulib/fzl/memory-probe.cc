@@ -50,15 +50,36 @@ extern "C" void write_thread_func(uintptr_t address, uintptr_t);
           ".popsection");
 
 #ifdef __aarch64__
+
+constexpr auto kPcRegister = &zx_thread_state_general_regs_t::pc;
+constexpr int kProbeInsnSize = 4;
+
 #define CALL_INSN "bl"
 #define READ_PROBE_INSN "ldrb w1, [x0]"
-#define WRITE_PROBE_INSN "strb wzr, [x0]"
+#define WRITE_PROBE_INSN "strb w1, [x0]"
+
+#elif defined(__riscv)
+
+constexpr auto kPcRegister = &zx_thread_state_general_regs_t::pc;
+constexpr int kProbeInsnSize = 4;
+
+#define CALL_INSN "call"
+#define READ_PROBE_INSN "lb a1, (a0)"
+#define WRITE_PROBE_INSN "sb a1, (a0)"
+
 #elif defined(__x86_64__)
+
+constexpr auto kPcRegister = &zx_thread_state_general_regs_t::rip;
+constexpr int kProbeInsnSize = 2;
+
 #define CALL_INSN "call"
 #define READ_PROBE_INSN "movb (%rdi), %al"
 #define WRITE_PROBE_INSN "movb %al, (%rdi)"
+
 #else
+
 #error "what machine?"
+
 #endif
 
 PROBE_FUNC(read_thread_func, READ_PROBE_INSN)
@@ -71,13 +92,7 @@ zx_status_t advance_program_counter(const zx::thread& thread) {
     return status;
   }
 
-#if defined(__aarch64__)
-  regs.pc += 4u;
-#elif defined(__x86_64__)
-  regs.rip += 2u;
-#else
-#error "what machine?"
-#endif
+  regs.*kPcRegister += kProbeInsnSize;
 
   return thread.write_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs));
 }

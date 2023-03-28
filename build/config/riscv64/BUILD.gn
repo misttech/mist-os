@@ -7,10 +7,16 @@ import("riscv64.gni")
 # Platform baseline.
 # This tracks the minimum hardware requirements for Fuchsia on RISC-V.
 config("riscv64") {
+  _features = fuchsia_riscv_profile.u64_mandatory
+  _features += fuchsia_riscv_implicit_features
+  _features -= fuchsia_riscv_implicit_features
+  _features += fuchsia_riscv_implicit_features
+
   _march = fuchsia_riscv_profile.base
-  foreach(feature, fuchsia_riscv_profile.u64_mandatory) {
+  foreach(feature, _features) {
     _march += "_$feature"
   }
+
   cflags = [
     "-march=$_march",
     "-mabi=$fuchsia_riscv_abi",

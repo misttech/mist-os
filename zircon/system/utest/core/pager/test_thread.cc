@@ -13,7 +13,9 @@
 #include <zircon/syscalls/debug.h>
 #include <zircon/threads.h>
 
+#ifndef __riscv
 #include <inspector/inspector.h>
+#endif
 
 namespace pager_tests {
 
@@ -22,11 +24,7 @@ static int test_thread_fn(void* arg) {
   return 0;
 }
 
-TestThread::TestThread(fit::function<bool()> fn) : fn_(std::move(fn)) {
-#if !defined(__x86_64__) and !defined(__aarch64__)
-  static_assert(false, "Unsupported architecture");
-#endif
-}
+TestThread::TestThread(fit::function<bool()> fn) : fn_(std::move(fn)) {}
 
 TestThread::~TestThread() {
   // TODO: UserPagers need to be destroyed before TestThreads to ensure threads aren't blocked
@@ -82,8 +80,12 @@ bool TestThread::Wait(bool expect_failure, bool expect_crash, uintptr_t crash_ad
     if (res) {
 #if defined(__x86_64__)
       uintptr_t actual_crash_addr = report.context.arch.u.x86_64.cr2;
-#else
+#elif defined(__aarch64__)
       uintptr_t actual_crash_addr = report.context.arch.u.arm_64.far;
+#elif defined(__riscv)
+      uintptr_t actual_crash_addr = report.context.arch.u.riscv_64.tval;
+#else
+#error Unsupported architecture
 #endif
       res &= crash_addr == actual_crash_addr;
     }
@@ -101,8 +103,10 @@ bool TestThread::Wait(bool expect_failure, bool expect_crash, uintptr_t crash_ad
     ZX_ASSERT(zx_thread_.read_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)) == ZX_OK);
 #if defined(__x86_64__)
     regs.rip = reinterpret_cast<uintptr_t>(thrd_exit);
-#else
+#elif defined(__aarch64__) || defined(__riscv)
     regs.pc = reinterpret_cast<uintptr_t>(thrd_exit);
+#else
+#error Unsupported architecture
 #endif
     ZX_ASSERT(zx_thread_.write_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)) == ZX_OK);
 
@@ -122,6 +126,12 @@ bool TestThread::Wait(bool expect_failure, bool expect_crash, uintptr_t crash_ad
 void TestThread::PrintDebugInfo(const zx_exception_report_t& report) {
   printf("\nCrash info:\n");
 
+#ifdef __riscv
+
+  printf("*** inspector library not supported on riscv64 ***\n");
+
+#else
+
   zx_thread_state_general_regs_t regs;
   zx_vaddr_t pc = 0, sp = 0, fp = 0;
 
@@ -132,15 +142,19 @@ void TestThread::PrintDebugInfo(const zx_exception_report_t& report) {
   pc = regs.rip;
   sp = regs.rsp;
   fp = regs.rbp;
-#else
+#elif defined(__aarch64__)
   inspector_print_general_regs(stdout, &regs, &report.context.arch.u.arm_64);
   pc = regs.pc;
   sp = regs.sp;
   fp = regs.r[29];
+#else
+#error Unsupported architecture
 #endif
   inspector_dsoinfo_t* dso_list = inspector_dso_fetch_list(zx_process_self());
   inspector_print_backtrace_markup(stdout, zx_process_self(), zx_thread_.get(), dso_list, pc, sp,
                                    fp);
+
+#endif
 }
 
 bool TestThread::WaitForBlocked() {

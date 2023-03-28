@@ -6,6 +6,7 @@
 #include <elf-search.h>
 #include <elf.h>
 #include <inttypes.h>
+#include <lib/elfldltl/constants.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -51,9 +52,10 @@ bool IsPossibleLoadedEhdr(const Elf64_Ehdr& ehdr) {
          ehdr.e_ident[EI_MAG2] == ELFMAG2 && ehdr.e_ident[EI_MAG3] == ELFMAG3 &&
          ehdr.e_ident[EI_CLASS] == ELFCLASS64 && ehdr.e_ident[EI_DATA] == ELFDATA2LSB &&
          ehdr.e_ident[EI_VERSION] == EV_CURRENT && ehdr.e_type == ET_DYN &&
-         ehdr.e_machine == kNativeElfMachine && ehdr.e_version == EV_CURRENT &&
-         ehdr.e_ehsize == sizeof(Elf64_Ehdr) && ehdr.e_phentsize == sizeof(Elf64_Phdr) &&
-         ehdr.e_phnum > 0 && (ehdr.e_phoff % alignof(Elf64_Phdr) == 0);
+         ehdr.e_machine == static_cast<uint16_t>(elfldltl::ElfMachine::kNative) &&
+         ehdr.e_version == EV_CURRENT && ehdr.e_ehsize == sizeof(Elf64_Ehdr) &&
+         ehdr.e_phentsize == sizeof(Elf64_Phdr) && ehdr.e_phnum > 0 &&
+         (ehdr.e_phoff % alignof(Elf64_Phdr) == 0);
 }
 
 // TODO(jakehehrlich): Switch uses of uint8_t to std::byte where appropriate.

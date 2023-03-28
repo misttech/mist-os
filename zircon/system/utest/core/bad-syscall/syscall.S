@@ -11,6 +11,10 @@ bad_syscall:
     mov x16, x0
     svc #0
     ret
+#elif defined(__riscv)
+    mv t0, a0
+    ecall
+    ret
 #elif defined(__x86_64__)
     mov %rdi, %rax
     syscall

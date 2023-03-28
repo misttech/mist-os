@@ -49,8 +49,6 @@ __asm__(
     ".type ThreadEntry,%function\n"
     "ThreadEntry:\n"
 #ifdef __aarch64__
-    "  mov w20, w0\n"           // Save handle in callee-saves register.
-    "  mov w0, w20\n"           // Load saved handle into argument register.
     "  mov x1, xzr\n"           // Load nullptr into argument register.
     "  bl zx_interrupt_wait\n"  // Call.
     "  cbz w0, exit\n"          // Exit if returned ZX_OK.
@@ -58,9 +56,15 @@ __asm__(
     "exit:\n"
     "  bl zx_thread_exit\n"
     "  brk #0\n"  // Crash if we didn't exit.
+#elif defined(__riscv)
+    "  mv a1, zero\n"             // nullptr in second argument register.
+    "  call zx_interrupt_wait\n"  // Call.
+    "  beqz a0, 0f\n"             // Exit if returned ZX_OK.
+    "  unimp\n"                   // Else crash.
+    "0:\n"
+    "  call zx_thread_exit\n"
+    "  unimp\n"  // Crash if we didn't exit.
 #elif defined(__x86_64__)
-    "  mov %edi, %ebx\n"          // Save handle in callee-saves register.
-    "  mov %ebx, %edi\n"          // Load saved handle into argument register.
     "  xor %edx, %edx\n"          // Load nullptr into argument register.
     "  call zx_interrupt_wait\n"  // Call.
     "  testl %eax, %eax\n"        // If returned ZX_OK...

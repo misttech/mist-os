@@ -15,12 +15,6 @@
 
 namespace elf_search {
 
-#if defined(__aarch64__)
-constexpr Elf64_Half kNativeElfMachine = EM_AARCH64;
-#elif defined(__x86_64__)
-constexpr Elf64_Half kNativeElfMachine = EM_X86_64;
-#endif
-
 struct ModuleInfo {
   std::string_view name;
   uintptr_t vaddr;

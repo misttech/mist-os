@@ -31,6 +31,8 @@ namespace {
 
 #ifdef __aarch64__
 constexpr auto kThreadRegister = &zx_thread_state_general_regs_t::tpidr;
+#elif defined(__riscv)
+constexpr auto kThreadRegister = &zx_thread_state_general_regs_t::tp;
 #elif defined(__x86_64__)
 constexpr auto kThreadRegister = &zx_thread_state_general_regs_t::fs_base;
 #endif

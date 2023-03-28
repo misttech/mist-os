@@ -5,6 +5,7 @@
 #include <elf-search.h>
 #include <elf.h>
 #include <inttypes.h>
+#include <lib/elfldltl/constants.h>
 #include <lib/elfldltl/container.h>
 #include <lib/elfldltl/diagnostics.h>
 #include <lib/elfldltl/load.h>
@@ -55,7 +56,7 @@ void WriteHeaders(const cpp20::span<const Elf64_Phdr>& phdrs, const zx::vmo& vmo
 #pragma GCC diagnostic pop
 #endif
     .e_type = ET_DYN,
-    .e_machine = elf_search::kNativeElfMachine,
+    .e_machine = static_cast<uint16_t>(elfldltl::ElfMachine::kNative),
     .e_version = EV_CURRENT,
     .e_entry = 0,
     .e_phoff = sizeof(Elf64_Ehdr),

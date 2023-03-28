@@ -28,7 +28,7 @@ zx_status_t ExitExceptionThread(zx::exception exception, uintptr_t task_exit_fn)
     return status;
   }
 
-#if defined(__aarch64__)
+#if defined(__aarch64__) || defined(__riscv)
   regs.pc = task_exit_fn;
 #elif defined(__x86_64__)
   regs.rip = task_exit_fn;

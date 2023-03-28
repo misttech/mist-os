@@ -116,6 +116,9 @@ __asm__(
 #elif defined(__aarch64__)
     "add x0, x0, x1\n"
     "ret\n"
+#elif defined(__riscv)
+    "add a0, a0, a1\n"
+    "ret\n"
 #else
 #error "what machine?"
 #endif

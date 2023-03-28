@@ -66,6 +66,8 @@ void* DoStackTest(void* arg) {
 #if __has_feature(shadow_call_stack)
 #ifdef __aarch64__
   __asm__("mov %0, x18" : "=r"(info->scs_ptr));
+#elif defined(__riscv)
+  __asm__("mv %0, s2" : "=r"(info->scs_ptr));
 #else
 #error "what shadow-call-stack ABI??"
 #endif
