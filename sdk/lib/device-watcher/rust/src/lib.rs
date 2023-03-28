@@ -107,11 +107,15 @@ async fn wait_for_file(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
 /// Open the path `name` within `dir`. This function waits for each directory to
 /// be available before it opens it. If the path never appears this function
 /// will wait forever.
-async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
+async fn recursive_wait_and_open_with_flags<T, F>(
     mut dir: fio::DirectoryProxy,
     name: &str,
     flags: fio::OpenFlags,
-) -> Result<P::Proxy> {
+    op: F,
+) -> Result<T>
+where
+    F: FnOnce(&fio::DirectoryProxy, &str, fio::OpenFlags) -> T,
+{
     let path = std::path::Path::new(name);
     let mut components = path.components().peekable();
     loop {
@@ -134,8 +138,7 @@ async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
         if components.peek().is_some() {
             dir = fuchsia_fs::directory::open_directory_no_describe(&dir, file, flags)?;
         } else {
-            break fuchsia_fs::directory::open_no_describe::<P>(&dir, file, flags)
-                .map_err(Into::into);
+            break Ok(op(&dir, file, flags));
         }
     }
 }
@@ -144,9 +147,13 @@ async fn recursive_wait_and_open_with_flags<P: fidl::endpoints::ProtocolMarker>(
 /// the path and returns once it has waited on the final component in the path. If the path
 /// never appears this function will wait forever.
 pub async fn recursive_wait(dir: &fio::DirectoryProxy, name: &str) -> Result<()> {
-    // TODO(https://fxbug.dev/120890): Eventually, we want to avoid even opening the end node here.
-    let _proxy: fio::NodeProxy = recursive_wait_and_open::<fio::NodeMarker>(dir, name).await?;
-    Ok(())
+    recursive_wait_and_open_with_flags(
+        Clone::clone(dir),
+        name,
+        fio::OpenFlags::empty(),
+        |_, _, _| (),
+    )
+    .await
 }
 
 /// Open the path `name` within `dir`. This function waits for each directory to
@@ -156,12 +163,14 @@ pub async fn recursive_wait_and_open_directory(
     dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<fio::DirectoryProxy> {
-    recursive_wait_and_open_with_flags::<fio::DirectoryMarker>(
+    recursive_wait_and_open_with_flags(
         Clone::clone(dir),
         name,
         fio::OpenFlags::DIRECTORY,
+        fuchsia_fs::directory::open_no_describe::<fio::DirectoryMarker>,
     )
     .await
+    .and_then(|res| res.map_err(Into::into))
 }
 
 /// Open the path `name` within `dir`. This function waits for each directory to be available
@@ -172,7 +181,14 @@ pub async fn recursive_wait_and_open<P: fidl::endpoints::ProtocolMarker>(
     dir: &fio::DirectoryProxy,
     name: &str,
 ) -> Result<P::Proxy> {
-    recursive_wait_and_open_with_flags::<P>(Clone::clone(dir), name, fio::OpenFlags::empty()).await
+    recursive_wait_and_open_with_flags(
+        Clone::clone(dir),
+        name,
+        fio::OpenFlags::empty(),
+        fuchsia_fs::directory::open_no_describe::<P>,
+    )
+    .await
+    .and_then(|res| res.map_err(Into::into))
 }
 
 #[cfg(test)]
@@ -289,53 +305,37 @@ mod tests {
     async fn open_two_directories() {
         let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        let fs_scope = vfs::execution_scope::ExecutionScope::new();
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {
                 "dir" => vfs::pseudo_directory! {},
             },
         };
-        root.open(
-            fs_scope.clone(),
+        let () = root.open(
+            vfs::execution_scope::ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
-        fasync::Task::spawn(async move { fs_scope.wait().await }).detach();
 
-        recursive_wait_and_open_with_flags::<fio::NodeMarker>(
-            client,
-            "test/dir",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
+        let directory = recursive_wait_and_open_directory(&client, "test/dir").await.unwrap();
+        let () = directory.close().await.unwrap().unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn open_directory_with_leading_slash() {
         let (client, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        let fs_scope = vfs::execution_scope::ExecutionScope::new();
         let root = vfs::pseudo_directory! {
             "test" => vfs::pseudo_directory! {},
         };
-        root.open(
-            fs_scope.clone(),
+        let () = root.open(
+            vfs::execution_scope::ExecutionScope::new(),
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
             vfs::path::Path::dot(),
             fidl::endpoints::ServerEnd::new(server.into_channel()),
         );
-        fasync::Task::spawn(async move { fs_scope.wait().await }).detach();
 
-        let node_proxy = recursive_wait_and_open_with_flags::<fio::NodeMarker>(
-            client,
-            "/test",
-            fuchsia_fs::OpenFlags::RIGHT_READABLE,
-        )
-        .await
-        .unwrap();
-        let (_status, _node_attrs) =
-            node_proxy.get_attr().await.expect("transport error on get_attr");
+        let directory = recursive_wait_and_open_directory(&client, "/test").await.unwrap();
+        let () = directory.close().await.unwrap().unwrap();
     }
 }
