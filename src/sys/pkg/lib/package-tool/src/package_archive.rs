@@ -82,8 +82,17 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
     std::fs::create_dir_all(&blobs_dir)
         .with_context(|| format!("creating directory {blobs_dir}"))?;
 
-    let mut package_manifest = PackageManifest::from_archive(&cmd.archive, blobs_dir.as_std_path())
-        .with_context(|| format!("extracting package manifest {}", cmd.archive.display()))?;
+    let manifests_dir = cmd.out.join("manifests");
+
+    std::fs::create_dir_all(&manifests_dir)
+        .with_context(|| format!("creating directory {manifests_dir}"))?;
+
+    let mut package_manifest = PackageManifest::from_archive(
+        &cmd.archive,
+        blobs_dir.as_std_path(),
+        manifests_dir.as_std_path(),
+    )
+    .with_context(|| format!("extracting package manifest {}", cmd.archive.display()))?;
 
     if let Some(repository) = cmd.repository {
         package_manifest.set_repository(Some(repository));

@@ -18,13 +18,20 @@ const FAIL_MISSING_CONFIG: &str = "meta/fail_missing_config.cm";
 fn test_package_manifest() -> (PackageManifest, TempDir) {
     // unpack the archive and create a manifest
     let archive_path = env!("TEST_PACKAGE_FAR");
-    let tmp = TempDir::new().unwrap();
-    let outdir = Utf8Path::from_path(tmp.path()).unwrap();
+    let blob_tmp = TempDir::new().unwrap();
+    let blob_outdir = Utf8Path::from_path(blob_tmp.path()).unwrap();
 
-    let manifest =
-        PackageManifest::from_archive(Path::new(&archive_path), outdir.as_std_path()).unwrap();
+    let manifest_tmp = TempDir::new().unwrap();
+    let manifest_outdir = Utf8Path::from_path(manifest_tmp.path()).unwrap();
 
-    (manifest, tmp)
+    let manifest = PackageManifest::from_archive(
+        Path::new(&archive_path),
+        blob_outdir.as_std_path(),
+        manifest_outdir.as_std_path(),
+    )
+    .unwrap();
+
+    (manifest, blob_tmp)
 }
 
 fn test_meta_far() -> (Utf8Reader<Cursor<Vec<u8>>>, TempDir) {

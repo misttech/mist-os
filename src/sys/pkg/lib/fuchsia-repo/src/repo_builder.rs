@@ -227,16 +227,21 @@ where
             return Ok(self);
         }
 
-        let archive_out = TempDir::new().unwrap();
-        let manifest = PackageManifest::from_archive(path.as_std_path(), archive_out.path())
-            .with_context(|| format!("reading package archive {path}"))
-            .expect("archive to manifest");
+        let blobs_out = TempDir::new().unwrap();
+        let manifest_out = TempDir::new().unwrap();
+        let manifest = PackageManifest::from_archive(
+            path.as_std_path(),
+            blobs_out.path(),
+            manifest_out.path(),
+        )
+        .with_context(|| format!("reading package archive {path}"))
+        .expect("archive to manifest");
 
         self.stage_named_package(
             manifest.package_path(),
             ToBeStagedPackage {
                 manifest_path: Some(path),
-                kind: ToBeStagedPackageKind::Archive { _archive_out: archive_out, manifest },
+                kind: ToBeStagedPackageKind::Archive { _archive_out: blobs_out, manifest },
             },
         )
         .await

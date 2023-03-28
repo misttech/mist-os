@@ -6,6 +6,7 @@ use {
     fuchsia_merkle::Hash,
     fuchsia_url::errors::{PackagePathSegmentError, ResourcePathError},
     std::{io, path::PathBuf},
+    tempfile::PersistError,
     thiserror::Error,
 };
 
@@ -77,6 +78,12 @@ pub enum PackageManifestError {
 
     #[error("archive: {}", _0)]
     Archive(#[from] fuchsia_archive::Error),
+
+    #[error("writing to relative path failed: {}", _0)]
+    RelativeWrite(#[from] anyhow::Error),
+
+    #[error("persisting to file failed: {}", _0)]
+    Persist(#[from] PersistError),
 }
 
 #[derive(Debug, Error)]

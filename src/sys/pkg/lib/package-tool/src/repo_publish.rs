@@ -148,6 +148,7 @@ pub async fn repo_merge(
 ) -> Result<()> {
     // Create repository based on src repository path
     let blobs_dir = src_repo_path.join("blobs");
+    let manifests_dir = src_repo_path.join("manifests");
     let src_repos = get_repositories(src_repo_path)?;
     let mut package_manifests = Vec::new();
     for src_repo in src_repos {
@@ -169,6 +170,7 @@ pub async fn repo_merge(
                     Hash::from_str(
                         &package.hash.clone().expect("package should have hash for meta.far"),
                     )?,
+                    manifests_dir.as_std_path(),
                 )?,
             ))
         }
