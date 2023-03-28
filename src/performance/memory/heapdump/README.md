@@ -7,7 +7,30 @@ point in time and export them in a pprof-compatible protobuf format.
 
 ## How to use
 
-TODO(fxbug.dev/122224): Document how to generate memory profiles.
+* Pass `--with src/performance/memory/heapdump/collector` to the `fx set`
+  invocation.
+* Add `//src/performance/memory/heapdump/instrumentation` to the `deps` of the
+  `executable` target that you want to profile.
+* Route the `fuchsia.memory.heapdump.process.Registry` capability from collector
+  to your component.
+* Add `#include <heapdump/bind_with_fdio.h>` and call
+  `heapdump_bind_with_fdio()` at the beginning of `main` in your program.
+* Run your program as usual.
+* Use `ffx profile heapdump snapshot` while your program is running to take a
+  snapshot of all the current live allocations. For instance, assuming that your
+  program is called `example.cm`:
+
+```
+ffx profile heapdump snapshot --by-name example.cm --output-file my_snapshot.pb
+```
+
+* Use [pprof](https://github.com/google/pprof) to analyze the memory profile you
+  acquired:
+
+```
+export PPROF_BINARY_PATH=~/fuchsia/out/default/.build-id:~/fuchsia/prebuilt/third_party/clang/linux-x64/lib/debug/.build-id:~/fuchsia/prebuilt/third_party/rust/linux-x64/lib/debug/.build-id
+pprof -http=":" my_snapshot.pb
+```
 
 ## Design
 
