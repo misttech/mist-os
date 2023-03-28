@@ -232,9 +232,8 @@ mod tests {
     async fn setup_test_util(
         launcher: &fproc::LauncherProxy,
     ) -> Result<(fproc::LaunchInfo, UtilProxy), Error> {
-        const TEST_UTIL_BIN: &'static str = "/pkg/bin/process_builder_test_util";
         let file_proxy = fuchsia_fs::file::open_in_namespace(
-            TEST_UTIL_BIN,
+            "/pkg/bin/process_builder_test_util",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
         )?;
         let vmo = file_proxy
@@ -259,7 +258,7 @@ mod tests {
         launcher.add_handles(&mut handles.iter_mut())?;
 
         let launch_info = fproc::LaunchInfo {
-            name: TEST_UTIL_BIN.to_owned(),
+            name: "process_builder_test_util".to_owned(),
             executable: vmo,
             job: job.duplicate(zx::Rights::SAME_RIGHTS)?,
         };

@@ -360,7 +360,22 @@ async fn create_launch_info(
     let job_dup =
         job.duplicate_handle(zx::Rights::SAME_RIGHTS).map_err(|_| LauncherError::Internal)?;
 
-    Ok(fproc::LaunchInfo { name: process_name, job: job_dup, executable })
+    let name = truncate_str(&process_name, zx::sys::ZX_MAX_NAME_LEN).to_owned();
+
+    Ok(fproc::LaunchInfo { name, job: job_dup, executable })
+}
+
+/// Truncates `s` to be at most `max_len` bytes.
+fn truncate_str(s: &str, max_len: usize) -> &str {
+    if s.len() <= max_len {
+        return s;
+    }
+    // TODO(https://github.com/rust-lang/rust/issues/93743): Use floor_char_boundary when stable.
+    let mut index = max_len;
+    while index > 0 && !s.is_char_boundary(index) {
+        index -= 1;
+    }
+    &s[..index]
 }
 
 #[cfg(test)]

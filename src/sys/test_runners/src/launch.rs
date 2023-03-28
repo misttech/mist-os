@@ -54,9 +54,10 @@ pub enum LaunchError {
 pub struct LaunchProcessArgs<'a> {
     /// Relative binary path to /pkg.
     pub bin_path: &'a str,
-    /// Name of the binary to add to process.
+    /// Name of the binary to add to process. This will be truncated to
+    /// `zx::sys::ZX_MAX_NAME_LEN` bytes.
     pub process_name: &'a str,
-    ///Job used launch process, if None, a new child of default_job() is used.
+    /// Job used launch process, if None, a new child of default_job() is used.
     pub job: Option<zx::Job>,
     /// Namespace for binary process to be launched.
     pub ns: ComponentNamespace,

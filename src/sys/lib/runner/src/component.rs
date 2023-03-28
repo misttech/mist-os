@@ -319,7 +319,8 @@ pub struct LauncherConfigArgs<'a> {
     /// relative binary path to /pkg in `ns`.
     pub bin_path: &'a str,
 
-    /// Name of the binary to add to `LaunchInfo`.
+    /// Name of the binary to add to `LaunchInfo`. This will be truncated to
+    /// `zx::sys::ZX_MAX_NAME_LEN` bytes.
     pub name: &'a str,
 
     /// The options used to create the process.
@@ -475,11 +476,22 @@ pub async fn configure_launcher(
         .add_names(&mut name_infos.iter_mut())
         .map_err(|e| LaunchError::AddNames(e.to_string()))?;
 
-    Ok(fproc::LaunchInfo {
-        executable: executable_vmo,
-        job: job,
-        name: config_args.name.to_owned(),
-    })
+    let name = truncate_str(config_args.name, zx::sys::ZX_MAX_NAME_LEN).to_owned();
+
+    Ok(fproc::LaunchInfo { executable: executable_vmo, job, name })
+}
+
+/// Truncates `s` to be at most `max_len` bytes.
+fn truncate_str(s: &str, max_len: usize) -> &str {
+    if s.len() <= max_len {
+        return s;
+    }
+    // TODO(https://github.com/rust-lang/rust/issues/93743): Use floor_char_boundary when stable.
+    let mut index = max_len;
+    while index > 0 && !s.is_char_boundary(index) {
+        index -= 1;
+    }
+    &s[..index]
 }
 
 static CONNECT_ERROR_HELP: &'static str = "To learn more, see \
@@ -501,8 +513,8 @@ pub fn report_start_error(
 mod tests {
     use {
         super::{
-            configure_launcher, ChannelEpitaph, ComponentNamespace, ComponentNamespaceError,
-            Controllable, Controller, LaunchError, LauncherConfigArgs,
+            configure_launcher, truncate_str, ChannelEpitaph, ComponentNamespace,
+            ComponentNamespaceError, Controllable, Controller, LaunchError, LauncherConfigArgs,
         },
         anyhow::{Context, Error},
         assert_matches::assert_matches,
@@ -520,6 +532,20 @@ mod tests {
             task::Poll,
         },
     };
+
+    #[test]
+    fn test_truncate_str() {
+        assert_eq!(truncate_str("", 0), "");
+        assert_eq!(truncate_str("", 1), "");
+
+        assert_eq!(truncate_str("été", 0), "");
+        assert_eq!(truncate_str("été", 1), "");
+        assert_eq!(truncate_str("été", 2), "é");
+        assert_eq!(truncate_str("été", 3), "ét");
+        assert_eq!(truncate_str("été", 4), "ét");
+        assert_eq!(truncate_str("été", 5), "été");
+        assert_eq!(truncate_str("été", 6), "été");
+    }
 
     struct FakeComponent<K, J>
     where
