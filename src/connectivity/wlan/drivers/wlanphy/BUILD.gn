@@ -51,18 +51,6 @@ fuchsia_driver("wlanphy_driver-driver") {
   configs += [ "//build/config:Wno-conversion" ]
 }
 
-# TODO(https://fxbug.dev/100036): Remove it when all the drivers that wlanphy driver binds to gets
-# migrated to DFv2.
-fuchsia_driver("wlanphy_driver_dfv2-driver") {
-  output_name = "wlanphy_dfv2"
-  sources = wlanphy_sources
-
-  deps = wlanphy_deps
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
-}
-
 fuchsia_driver_component("wlanphy_driver") {
   component_name = "wlanphy"
   deps = [ ":wlanphy_driver-driver" ]
@@ -70,19 +58,8 @@ fuchsia_driver_component("wlanphy_driver") {
   manifest = "meta/wlanphy.cml"
 }
 
-fuchsia_driver_component("wlanphy_driver_dfv2") {
-  component_name = "wlanphy_dfv2"
-  manifest = "meta/wlanphy_dfv2.cml"
-  deps = [ ":wlanphy_driver_dfv2-driver" ]
-  info = "wlanphy_driver-info.json"
-}
-
 fuchsia_driver_package("wlanphy") {
   driver_components = [ ":wlanphy_driver" ]
-}
-
-fuchsia_driver_package("wlanphy_dfv2") {
-  driver_components = [ ":wlanphy_driver_dfv2" ]
 }
 
 # unit tests start here

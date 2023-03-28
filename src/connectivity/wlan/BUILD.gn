@@ -17,7 +17,6 @@ group("drivers") {
     "drivers/third_party/nxp/nxpfmac:nxpfmac_sdio",
     "drivers/wlanif:wlanif_driver",
     "drivers/wlanphy:wlanphy_driver",
-    "drivers/wlanphy:wlanphy_driver_dfv2",
     "drivers/wlansoftmac:wlansoftmac_driver",
     "testing/wlantap-driver:wlantap_driver",
   ]
