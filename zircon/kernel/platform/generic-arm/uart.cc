@@ -12,7 +12,7 @@
 #include <arch/defines.h>
 #include <platform/uart.h>
 
-uint32_t PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
+ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
 
 volatile void* PlatformUartMapMmio(paddr_t paddr) {
   return reinterpret_cast<volatile void*>(periph_paddr_to_vaddr(paddr));

@@ -10,6 +10,7 @@
 
 #include <arch/defines.h>
 #include <arch/x86/apic.h>
+#include <ktl/optional.h>
 #include <platform/uart.h>
 #include <vm/physmap.h>
 
@@ -28,6 +29,9 @@ PlatformUartIoProvider<zbi_dcfg_simple_pio_t>::PlatformUartIoProvider(
   mark_pio_region_to_reserve(config.base, 8);
 }
 
-uint32_t PlatformUartGetIrqNumber(uint32_t irq_num) {
+ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) {
+  if (irq_num == 0) {
+    return ktl::nullopt;
+  }
   return apic_io_isa_to_global(static_cast<uint8_t>(irq_num));
 }

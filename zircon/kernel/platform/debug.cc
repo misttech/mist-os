@@ -13,9 +13,11 @@
 #include <lib/uart/uart.h>
 #include <lib/zircon-internal/macros.h>
 #include <lib/zircon-internal/thread_annotations.h>
+#include <lib/zx/time.h>
 #include <stdint.h>
 #include <zircon/boot/driver-config.h>
 #include <zircon/errors.h>
+#include <zircon/time.h>
 
 #include <cassert>
 #include <type_traits>
@@ -23,7 +25,9 @@
 #include <arch/arch_interrupt.h>
 #include <dev/init.h>
 #include <dev/interrupt.h>
+#include <kernel/deadline.h>
 #include <kernel/spinlock.h>
+#include <kernel/timer.h>
 #include <ktl/optional.h>
 #include <ktl/type_traits.h>
 #include <ktl/variant.h>
@@ -108,6 +112,28 @@ Cbuf rx_queue;
 // the reader to catch up. Useful when the incoming data is bursty.
 constexpr size_t kRxQueueSize = 1024;
 
+// When Polling is enabled, this will fire the polling callback for draining UART's RX Queue.
+Timer gUartPollTimer;
+
+constexpr zx_duration_t kPollingPeriod = ZX_MSEC(10);
+constexpr TimerSlack kPollingSlack = {ZX_MSEC(10), TIMER_SLACK_CENTER};
+
+// Callback used by |gUartPollTimer| when deadline is met. See |Timer| interface for more
+// information.
+template <bool DrainUart>
+void UartPoll(Timer* uart_timer, zx_time_t now, void* arg) {
+  uart_timer->Set(Deadline(zx_time_add_duration(now, kPollingPeriod), kPollingSlack),
+                  &UartPoll<true>, nullptr);
+  if constexpr (DrainUart) {
+    gUart.Visit([&](auto& driver) {
+      // Drain until there is nothing else in the RX Queue of the device.
+      while (auto c = driver.Read()) {
+        rx_queue.WriteChar(*c);
+      }
+    });
+  }
+}
+
 }  // namespace
 
 bool platform_serial_enabled(void) { return is_serial_enabled; }
@@ -121,8 +147,8 @@ void UartDriverHandoffEarly(const uart::all::Driver& serial) {
 
   use_new_serial = gBootOptions->experimental_serial_migration;
   if (use_new_serial) {
+    // Serial driver has been initialized by physboot.
     gUart = serial;
-    gUart.Visit([](auto& driver) { driver.Init(); });
   }
 
   PlatformUartDriverHandoffEarly(serial);
@@ -139,7 +165,8 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
     }
 
     // Check for interrupt support or explicitly polling uart.
-    uint32_t uart_irq = 0;
+    ktl::optional<uint32_t> uart_irq;
+    bool polling_mode = false;
     gUart.Visit([&](auto& driver) {
       using cfg_type = ktl::decay_t<decltype(driver.uart().config())>;
       if constexpr (ktl::is_same_v<cfg_type, zbi_dcfg_simple_pio_t> ||
@@ -149,6 +176,17 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
         using driver_type = ktl::decay_t<decltype(driver.uart())>;
         constexpr auto kIsNullDriver = ktl::is_same_v<driver_type, uart::null::Driver>;
         ZX_ASSERT_MSG(kIsNullDriver, "Unexpected UART Configuration.");
+        // No IRQ Handler for null driver.
+        return;
+      }
+
+      // Check for polling mode.
+      if (!uart_irq || gBootOptions->debug_uart_poll) {
+        // Start the polling without performing any drain.
+        UartPoll</*DrainUart=*/false>(&gUartPollTimer, current_time(), nullptr);
+        printf("UART: POLLING mode enabled.\n");
+        polling_mode = true;
+        return;
       }
 
       static constexpr auto rx_irq_handler = [](auto& spinlock, auto&& read_char,
@@ -198,17 +236,19 @@ void UartDriverHandoffLate(const uart::all::Driver& serial) {
 
       // Register IRQ Handler.
       zx_status_t irq_register_result =
-          register_permanent_int_handler(uart_irq, irq_handler, &driver);
+          register_permanent_int_handler(*uart_irq, irq_handler, &driver);
       DEBUG_ASSERT(irq_register_result == ZX_OK);
-      unmask_interrupt(uart_irq);
+      unmask_interrupt(*uart_irq);
       // Init Rx Interrupt.
       driver.InitInterrupt();
     });
 
-    printf("UART: IRQ driven RX: enabled\n");
+    if (!polling_mode) {
+      printf("UART: IRQ driven RX: enabled\n");
 
-    is_tx_irq_enabled = !dlog_bypass();
-    printf("UART: IRQ driven TX: %s\n", is_tx_irq_enabled ? "enabled" : "disabled");
+      is_tx_irq_enabled = !dlog_bypass();
+      printf("UART: IRQ driven TX: %s\n", is_tx_irq_enabled ? "enabled" : "disabled");
+    }
   }
   PlatformUartDriverHandoffLate(serial);
 }

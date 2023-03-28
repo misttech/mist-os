@@ -70,6 +70,9 @@ zx_library("pc") {
   public_deps = [
     # <platform/pc/smbios.h> has #include <lib/smbios/smbios.h>.
     "//zircon/system/ulib/smbios:headers",
+
+    # <ktl/optional.h> in uart.h.
+    "//zircon/kernel/lib/ktl:headers",
   ]
 
   if (toolchain_environment == "kernel") {
