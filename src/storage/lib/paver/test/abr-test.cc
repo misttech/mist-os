@@ -179,11 +179,11 @@ class ChromebookX64AbrTests : public zxtest::Test {
     ASSERT_OK(gpt->Sync());
 
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    auto result2 = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                      disk_->block_interface().channel()))
-                       ->Rebind(fidl::StringView("gpt.cm"));
-    ASSERT_TRUE(result2.ok());
-    ASSERT_FALSE(result2->is_error());
+    fidl::WireResult result2 = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
+                                                  disk_->block_interface().channel()))
+                                   ->Rebind(fidl::StringView("gpt.cm"));
+    ASSERT_TRUE(result2.ok(), "%s", result2.FormatDescription().c_str());
+    ASSERT_TRUE(result2->is_ok(), "%s", zx_status_get_string(result2->error_value()));
   }
 
   zx::result<std::unique_ptr<abr::Client>> GetAbrClient() {
@@ -305,11 +305,11 @@ class CurrentSlotUuidTest : public zxtest::Test {
     ASSERT_OK(gpt_->Sync());
 
     // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
-                                     disk_->block_interface().channel()))
-                      ->Rebind(fidl::StringView("gpt.cm"));
-    ASSERT_TRUE(result.ok());
-    ASSERT_FALSE(result->is_error());
+    fidl::WireResult result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
+                                                 disk_->block_interface().channel()))
+                                  ->Rebind(fidl::StringView("gpt.cm"));
+    ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+    ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.fshost_svc_dir(); }

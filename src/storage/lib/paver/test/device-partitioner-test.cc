@@ -437,8 +437,8 @@ class GptDevicePartitionerTests : public zxtest::Test {
     auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
                                      gpt_dev->block_interface().channel()))
                       ->Rebind(fidl::StringView("gpt.cm"));
-    ASSERT_TRUE(result.ok());
-    ASSERT_FALSE(result->is_error());
+    ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+    ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
   }
 
   void ReadBlocks(const BlockDevice* blk_dev, size_t offset_in_blocks, size_t size_in_blocks,
@@ -754,8 +754,8 @@ TEST_F(EfiDevicePartitionerTests, FindOldBootloaderPartitionName) {
   fidl::UnownedClientEnd<fuchsia_device::Controller> channel(
       gpt_dev->block_interface().channel()->get());
   auto result = fidl::WireCall(channel)->Rebind(fidl::StringView("gpt.cm"));
-  ASSERT_TRUE(result.ok());
-  ASSERT_FALSE(result->is_error());
+  ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+  ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
 
   zx::result gpt_fd = fd(*gpt_dev);
   ASSERT_OK(gpt_fd.status_value());
@@ -1319,8 +1319,8 @@ TEST_F(SherlockPartitionerTests, InitializePartitionTable) {
   auto result = fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(
                                    gpt_dev->block_interface().channel()))
                     ->Rebind(fidl::StringView("gpt.cm"));
-  ASSERT_TRUE(result.ok());
-  ASSERT_FALSE(result->is_error());
+  ASSERT_TRUE(result.ok(), "%s", result.FormatDescription().c_str());
+  ASSERT_TRUE(result->is_ok(), "%s", zx_status_get_string(result->error_value()));
 
   zx::result gpt_fd = fd(*gpt_dev);
   ASSERT_OK(gpt_fd.status_value());
