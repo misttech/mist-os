@@ -153,10 +153,8 @@ fn snapshot_and_select_bench(b: &mut criterion::Bencher, size: usize) {
     let hierarchy_matcher = parse_selectors(&*SELECTOR_TILL_LEVEL_30);
 
     b.iter_with_large_drop(|| {
-        criterion::black_box({
-            let hierarchy = hierarchy_generator.get_diagnostics_hierarchy().into_owned();
-            let _res = filter_hierarchy(hierarchy, &hierarchy_matcher);
-        });
+        let hierarchy = hierarchy_generator.get_diagnostics_hierarchy().into_owned();
+        filter_hierarchy(hierarchy, &hierarchy_matcher)
     });
 }
 

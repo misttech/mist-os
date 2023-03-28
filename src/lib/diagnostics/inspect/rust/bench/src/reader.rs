@@ -75,14 +75,10 @@ fn snapshot_bench(b: &mut criterion::Bencher, size: usize, frequency: usize) {
     let vmo = inspector.duplicate_vmo().expect("failed to duplicate vmo");
     let done_fn = start_inspector_update_thread(inspector, frequency);
 
-    b.iter_with_large_drop(move || {
-        criterion::black_box({
-            loop {
-                if let Ok(snapshot) = Snapshot::try_once_from_vmo(&vmo) {
-                    break snapshot;
-                }
-            }
-        })
+    b.iter_with_large_drop(move || loop {
+        if let Ok(snapshot) = Snapshot::try_once_from_vmo(&vmo) {
+            break snapshot;
+        }
     });
 
     done_fn();
@@ -101,14 +97,10 @@ fn snapshot_tree_bench(b: &mut criterion::Bencher, size: usize, frequency: usize
     let done_fn = start_inspector_update_thread(inspector.clone(), frequency);
     add_lazies(inspector, 4);
 
-    b.iter_with_large_drop(|| {
-        criterion::black_box({
-            loop {
-                if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
-                    break snapshot;
-                }
-            }
-        })
+    b.iter_with_large_drop(|| loop {
+        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
+            break snapshot;
+        }
     });
 
     done_fn();
@@ -126,14 +118,10 @@ fn uncontended_snapshot_tree_bench(b: &mut criterion::Bencher, size: usize) {
     let (proxy, tree_server_fut) = utils::spawn_server(inspector.clone()).unwrap();
     let task = fasync::Task::local(tree_server_fut);
 
-    b.iter_with_large_drop(|| {
-        criterion::black_box({
-            loop {
-                if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
-                    break snapshot;
-                }
-            }
-        })
+    b.iter_with_large_drop(|| loop {
+        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
+            break snapshot;
+        }
     });
 
     drop(proxy);
@@ -157,14 +145,10 @@ fn reader_snapshot_tree_vmo_bench(b: &mut criterion::Bencher, size: usize, fille
         }
     }
 
-    b.iter_with_large_drop(|| {
-        criterion::black_box({
-            loop {
-                if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
-                    break snapshot;
-                }
-            }
-        })
+    b.iter_with_large_drop(|| loop {
+        if let Ok(snapshot) = executor.run_singlethreaded(SnapshotTree::try_from(&proxy)) {
+            break snapshot;
+        }
     });
 
     drop(proxy);
