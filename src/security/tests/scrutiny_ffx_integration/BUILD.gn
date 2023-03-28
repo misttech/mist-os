@@ -75,8 +75,8 @@ if (is_host) {
 
   # Required for the test to be able to call ffx.
   host_test_data("copy_host_tools") {
-    sources = [ "${host_tools_dir}/ffx" ]
-    deps = [ "//src/developer/ffx:host($host_toolchain)" ]
+    sources = [ "${host_tools_dir}/ffx-scrutiny" ]
+    deps = [ "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_host_tool($host_toolchain)" ]
     outputs = [ "$target_out_dir/host_tools/{{source_file_part}}" ]
   }
 
@@ -85,7 +85,7 @@ if (is_host) {
         get_label_info(":testdata($host_toolchain)", "target_out_dir")
     host_tools_out_dir =
         get_label_info(":copy_host_tools($host_toolchain)", "target_out_dir")
-    ffx_path = "$host_tools_out_dir/host_tools/ffx"
+    ffx_path = "$host_tools_out_dir/host_tools/ffx-scrutiny"
     blobfs_path = "$testdata_out_dir/testdata/blob.blk"
     zbi_path = "$testdata_out_dir/testdata/${_assemble_system_target_name}.zbi"
     recovery_zbi_path = "$testdata_out_dir/testdata/${_assemble_system_recovery_target_name}.zbi"
@@ -98,7 +98,7 @@ if (is_host) {
     ]
   }
 
-  rustc_test("test") {
+  rustc_test("scrutiny_ffx_integration_test") {
     source_root = "src/lib.rs"
     edition = "2021"
     deps = [
@@ -118,5 +118,5 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  deps = [ ":test($host_toolchain)" ]
+  deps = [ ":scrutiny_ffx_integration_test($host_toolchain)" ]
 }

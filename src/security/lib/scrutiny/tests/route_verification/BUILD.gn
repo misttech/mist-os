@@ -12,6 +12,7 @@ import("//build/product.gni")
 import("//build/python/python_binary.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/testing/host_test.gni")
+import("//src/developer/ffx/config.gni")
 import("//src/sys/core/build/core.gni")
 import("//src/sys/core/build/core_shard.gni")
 
@@ -169,7 +170,7 @@ if (is_host) {
   }
 
   files = {
-    ffx = "$root_build_dir/host-tools/ffx"
+    ffx = "$ffx_test_host_tools_out_dir/ffx-scrutiny"
 
     product_bundle_target_out_dir =
         get_label_info(labels.product_bundle, "target_out_dir")
@@ -185,13 +186,9 @@ if (is_host) {
 
   host_test_data("failed_route_verify_test_data") {
     sources = get_target_outputs(":test_route_verification_bin")
-    sources += [
-      files.ffx,
-      files.product_bundle_dir,
-    ]
+    sources += [ files.product_bundle_dir ]
     deps = [
       ":test_route_verification_bin",
-      "//src/developer/ffx:host",
       labels.product_bundle,
     ]
   }
@@ -224,6 +221,7 @@ if (is_host) {
     deps = [
       ":failed_route_verify_test_data",
       "//build/python:interpreter",
+      "//src/developer/ffx/plugins/scrutiny:ffx_scrutiny_tool_test_data",
     ]
   }
 }
