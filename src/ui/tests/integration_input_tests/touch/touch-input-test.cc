@@ -737,8 +737,10 @@ class WebEngineTestIp : public TouchInputBase<> {
         {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
          .source = ChildRef{kFontsProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_},
-                          Directory{.name = "config-data", .as = "config-data", .subdir = "fonts"}},
+        {.capabilities =
+             {
+                 Protocol{fuchsia::tracing::provider::Registry::Name_},
+             },
          .source = ParentRef(),
          .targets = {target, ChildRef{kFontsProvider}}},
         {.capabilities = {Protocol{fuchsia::ui::input::ImeService::Name_}},
@@ -804,7 +806,7 @@ class WebEngineTestIp : public TouchInputBase<> {
 
  private:
   static constexpr auto kFontsProvider = "fonts_provider";
-  static constexpr auto kFontsProviderUrl = "#meta/fonts.cm";
+  static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
 
   static constexpr auto kTextManager = "text_manager";
   static constexpr auto kTextManagerUrl = "#meta/text_manager.cm";

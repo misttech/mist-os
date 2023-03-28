@@ -523,7 +523,7 @@ class WebEngineTest : public VirtualKeyboardBase {
   static constexpr auto kWebVirtualKeyboardUrl = "#meta/web-virtual-keyboard-client.cm";
 
   static constexpr auto kFontsProvider = "fonts_provider";
-  static constexpr auto kFontsProviderUrl = "#meta/fonts.cm";
+  static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
 
   static constexpr auto kIntl = "intl";
   static constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";

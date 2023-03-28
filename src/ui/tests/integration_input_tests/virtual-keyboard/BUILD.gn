@@ -4,21 +4,12 @@
 
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
-import("//src/fonts/build/fonts.gni")
 
 fidl("test.virtualkeyboard") {
   sdk_category = "internal"
   sources = [ "input_position_listener.test.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
   enable_hlcpp = true
-}
-
-font_collection("single-font-collection") {
-  testonly = true
-  product_config_path =
-      "//src/ui/testing/data/single-font-collection.fontcfg.json5"
-  local_asset_names = [ "Roboto-Regular.ttf" ]
-  font_service_pkg = "virtual-keyboard-test"
 }
 
 executable("virtual-keyboard-test-bin") {
@@ -74,12 +65,11 @@ fuchsia_component("virtual-keyboard-test-component") {
 fuchsia_test_package("virtual-keyboard-test") {
   test_components = [ ":virtual-keyboard-test-component" ]
   deps = [
-    ":single-font-collection",
     "//src/cobalt/bin/testing/mock_cobalt",
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
-    "//src/fonts:font_provider_cm",
+    "//src/fonts:font_provider_hermetic_for_test",
     "//src/testing/fidl/intl_property_manager:intl_property_manager_component",
     "//src/ui/tests/integration_input_tests/virtual-keyboard/web-virtual-keyboard-client:component",
   ]

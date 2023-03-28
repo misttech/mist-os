@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/config.gni")
-import("//src/fonts/build/fonts.gni")
 
 group("tests") {
   testonly = true
@@ -20,14 +19,6 @@ group("tests") {
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
   ]
-}
-
-font_collection("single-font-collection") {
-  testonly = true
-  product_config_path =
-      "//src/ui/testing/data/single-font-collection.fontcfg.json5"
-  local_asset_names = [ "Roboto-Regular.ttf" ]
-  font_service_pkg = "mouse-input-test"
 }
 
 executable("mouse-input-test-bin") {
@@ -78,9 +69,6 @@ fuchsia_component("mouse-input-test-component") {
 fuchsia_test_package("mouse-input-test") {
   test_components = [ ":mouse-input-test-component" ]
   deps = [
-    # Needed by font_provider.
-    ":single-font-collection",
-
     # The test realms.
     "mouse-input-chromium:mouse-input-chromium-component",
 
@@ -96,7 +84,7 @@ fuchsia_test_package("mouse-input-test") {
     "//src/connectivity/network/netstack:component",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
-    "//src/fonts:font_provider_cm",
+    "//src/fonts:font_provider_hermetic_for_test",
 
     # Include some default config (it doesn't matter which, since we're going to override it).
     "//src/ui/testing/test_ui_stack:flatland_scene_manager_config",

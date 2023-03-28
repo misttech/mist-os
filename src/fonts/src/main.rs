@@ -10,7 +10,7 @@ mod font_service;
 
 use {
     self::font_service::{FontServiceBuilder, ProviderRequestStream},
-    anyhow::{format_err, Error},
+    anyhow::{format_err, Context, Error},
     argh::FromArgs,
     fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
@@ -58,13 +58,15 @@ async fn main() -> Result<(), Error> {
     let arg_strs: Vec<&str> = arg_strings.iter().map(|s| s.as_str()).collect();
 
     let args: Args = Args::from_args(&[arg_strs[0]], &arg_strs[1..])
-        .map_err(|early_exit| format_err!("{}", early_exit.output))?;
+        .map_err(|early_exit| format_err!("{}", early_exit.output))
+        .context("malformed args, this is a fatal error")?;
 
     if args.no_default_fonts {
         fx_log_warn!("--no-default-fonts is deprecated and is treated as a no-op")
     }
 
-    let font_manifest_paths = select_manifests(&args)?;
+    let font_manifest_paths =
+        select_manifests(&args).context("no usable font manifests, this is a fatal error")?;
 
     let mut service_builder = FontServiceBuilder::with_default_asset_loader(
         DEFAULT_CACHE_CAPACITY_BYTES,
@@ -89,9 +91,11 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc")
         .add_fidl_service(ProviderRequestStream::Stable)
         .add_fidl_service(ProviderRequestStream::Experimental);
-    fs.take_and_serve_directory_handle()?;
+    fs.take_and_serve_directory_handle()
+        .context("could not serve directory handle, this is a fatal error")?;
 
-    inspect_runtime::serve(inspector(), &mut fs)?;
+    inspect_runtime::serve(inspector(), &mut fs)
+        .context("could not serve inspect, this is a fatal error")?;
 
     let fs = fs;
     service.run(fs).await;

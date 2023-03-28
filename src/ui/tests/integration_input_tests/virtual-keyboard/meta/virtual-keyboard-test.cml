@@ -17,6 +17,7 @@
             // Keep it minimal, describe only what's actually needed.
             // TODO(fxbug.dev/81446): Remove this list.
             protocol: [
+                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
 
