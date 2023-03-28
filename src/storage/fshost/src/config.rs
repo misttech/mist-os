@@ -8,7 +8,6 @@ use crate::boot_args::BootArgs;
 pub fn default_config() -> fshost_config::Config {
     fshost_config::Config {
         allow_legacy_data_partition_names: false,
-        apply_limits_to_ramdisk: false,
         blobfs: true,
         blobfs_initial_inodes: 0,
         blobfs_max_bytes: 0,

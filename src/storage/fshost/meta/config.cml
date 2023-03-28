@@ -14,12 +14,6 @@
         // Enables all GPT devices.
         gpt_all: { type: "bool" },
 
-        // Normally the partition limits (minfs-max-bytes and blofs-max-bytes) apply only to
-        // non-ramdisk devices. This is to prevent device hardware configuration from leaking into
-        // ramdisk uses. When present, this flag makes them apply to all partitions of the
-        // corresponding type (this use used for tests).
-        apply_limits_to_ramdisk: { type: "bool" },
-
         // Enables checking filesystems before mounting (if supported).
         check_filesystems: { type: "bool" },
 

@@ -78,7 +78,6 @@ template("generated_fshost_config") {
     values = {
       # Defaults
       # LINT.IfChange
-      apply_limits_to_ramdisk = false
       blobfs = true
       blobfs_max_bytes = 0
       bootpart = true

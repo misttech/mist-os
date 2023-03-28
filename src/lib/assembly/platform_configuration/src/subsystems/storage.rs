@@ -24,7 +24,6 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             let mut fshost_config_builder = builder.bootfs().component("meta/fshost.cm")?;
             fshost_config_builder
                 // LINT.IfChange
-                .field("apply_limits_to_ramdisk", false)?
                 .field("blobfs", true)?
                 .field("blobfs_max_bytes", 0)?
                 .field("bootpart", true)?
