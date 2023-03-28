@@ -285,8 +285,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   // Invoked when the node has been fully removed.
   fit::callback<void()> remove_complete_callback_;
   std::optional<DriverComponent> driver_component_;
-  std::optional<fidl::ServerBindingRef<fuchsia_driver_framework::Node>> node_ref_;
-  std::optional<fidl::ServerBindingRef<fuchsia_driver_framework::NodeController>> controller_ref_;
+  std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
+  std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;
 
   // This represents the node's presence in devfs, both it's topological path and it's class path.
   DevfsDevice devfs_device_;

@@ -126,10 +126,9 @@ bool IsDefaultOffer(std::string_view target_name) {
 }
 
 template <typename T>
-void UnbindAndReset(std::optional<fidl::ServerBindingRef<T>>& ref) {
+void CloseIfExists(std::optional<fidl::ServerBinding<T>>& ref) {
   if (ref) {
-    ref->Unbind();
-    ref.reset();
+    ref->Close(ZX_OK);
   }
 }
 
@@ -388,7 +387,7 @@ zx::result<std::shared_ptr<Node>> Node::CreateCompositeNode(
   return zx::ok(std::move(composite));
 }
 
-Node::~Node() { UnbindAndReset(controller_ref_); }
+Node::~Node() { CloseIfExists(controller_ref_); }
 
 const std::string& Node::driver_url() const {
   if (driver_component_) {
@@ -522,7 +521,7 @@ void Node::FinishRemoval() {
   }
 
   // Get an extra shared_ptr to ourselves so we are not freed halfway through this function.
-  auto this_node = shared_from_this();
+  std::shared_ptr this_node = shared_from_this();
   node_state_ = NodeState::kStopping;
   driver_component_.reset();
   for (auto& parent : parents()) {
@@ -531,8 +530,8 @@ void Node::FinishRemoval() {
   parents_.clear();
 
   LOGF(DEBUG, "Node: %s unbinding and resetting", name().c_str());
-  UnbindAndReset(controller_ref_);
-  UnbindAndReset(node_ref_);
+  CloseIfExists(controller_ref_);
+  CloseIfExists(node_ref_);
   devfs_device_.unpublish();
   if (removal_tracker_ && removal_id_.has_value()) {
     removal_tracker_->Notify(removal_id_.value(), node_state_);
@@ -636,6 +635,9 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   if (removal_tracker_ && removal_id_.has_value()) {
     removal_tracker_->Notify(removal_id_.value(), node_state_);
   }
+
+  // Get an extra shared_ptr to ourselves so we are not freed as we remove children.
+  std::shared_ptr this_node = shared_from_this();
 
   // Ask each of our children to remove themselves.
   for (auto it = children_.begin(); it != children_.end();) {
@@ -755,14 +757,15 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
   child->devfs_device_.publish();
 
   if (controller.is_valid()) {
-    child->controller_ref_ = fidl::BindServer(dispatcher_, std::move(controller), child.get());
+    child->controller_ref_.emplace(dispatcher_, std::move(controller), child.get(),
+                                   fidl::kIgnoreBindingClosure);
   }
   if (node.is_valid()) {
-    child->node_ref_ =
-        fidl::BindServer(dispatcher_, std::move(node), child, [](Node* node, auto, auto) {
-          LOGF(WARNING, "Removing node %s because of binding closed", node->name().c_str());
-          node->Remove(RemovalSet::kAll, nullptr);
-        });
+    child->node_ref_.emplace(dispatcher_, std::move(node), child.get(), [](Node* node, auto) {
+      node->node_ref_.reset();
+      LOGF(WARNING, "Removing node %s because of binding closed", node->name().c_str());
+      node->Remove(RemovalSet::kAll, nullptr);
+    });
   } else {
     // We don't care about tracking binds here, sending nullptr is fine.
     (*node_manager_)->Bind(*child, nullptr);
@@ -902,13 +905,13 @@ zx::result<> Node::StartDriver(
   if (endpoints.is_error()) {
     return zx::error(endpoints.error_value());
   }
-  node_ref_ =
-      fidl::BindServer(dispatcher_, std::move(endpoints->server), shared_from_this(),
-                       [](Node* node, fidl::UnbindInfo info, auto) {
-                         LOGF(WARNING, "Removing node %s because of fdf::Node binding closed: %s",
-                              node->name().c_str(), info.FormatDescription().c_str());
-                         node->Remove(RemovalSet::kAll, nullptr);
-                       });
+  node_ref_.emplace(dispatcher_, std::move(endpoints->server), this,
+                    [](Node* node, fidl::UnbindInfo info) {
+                      node->node_ref_.reset();
+                      LOGF(WARNING, "Removing node %s because of fdf::Node binding closed: %s",
+                           node->name().c_str(), info.FormatDescription().c_str());
+                      node->Remove(RemovalSet::kAll, nullptr);
+                    });
 
   LOGF(INFO, "Binding %.*s to  %s", static_cast<int>(url.size()), url.data(), name().c_str());
   // Start the driver within the driver host.
