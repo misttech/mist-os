@@ -18,8 +18,8 @@
                 "address_deprecation_ns3",
 
                 // TODO(https://fxbug.dev/76987): Should pass against Netstack3 once
-                // get/set forwarding is supported.
-                "get_set_forwarding_ns3",
+                // multicast forwarding is supported.
+                "get_set_forwarding_ns3*multicast*",
 
                 // TODO(https://fxbug.dev/106959): Should pass against Netstack3 once
                 // updating adddress lifetimes is supported.

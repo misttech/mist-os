@@ -621,19 +621,10 @@ async fn dispatch_control_request(
         }
         fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
-            // Lie in the response if forwarding is disabled to allow testing
-            // with netstack3.
-            if config.ipv4.map_or(false, |c| c.forwarding == Some(false))
-                && config.ipv6.map_or(false, |c| c.forwarding == Some(false))
-            {
-                log::warn!("TODO(https://fxbug.dev/76987) support enable/disable forwarding");
-                responder.send(&mut Ok(fnet_interfaces_admin::Configuration::EMPTY))
-            } else {
-                todo!("https://fxbug.dev/76987 support enable/disable forwarding")
-            }
+            responder.send(&mut Ok(set_configuration(ctx, id, config).await))
         }
-        fnet_interfaces_admin::ControlRequest::GetConfiguration { responder: _ } => {
-            todo!("https://fxbug.dev/76987 support enable/disable forwarding")
+        fnet_interfaces_admin::ControlRequest::GetConfiguration { responder } => {
+            responder.send(&mut Ok(get_configuration(ctx, id).await))
         }
         fnet_interfaces_admin::ControlRequest::Enable { responder } => {
             responder.send(&mut Ok(set_interface_enabled(ctx, true, id).await))
@@ -795,6 +786,133 @@ async fn remove_address(ctx: &NetstackContext, id: BindingId, address: fnet::Sub
     // Because the worker removes the address on teardown, `did_cancel_worker`
     // is a suitable proxy for `did_remove_addr`.
     return did_cancel_worker;
+}
+
+/// Sets the provided `config` on the interface with the given `id`.
+///
+/// Returns the previously set configuration on the interface.
+async fn set_configuration(
+    ctx: &NetstackContext,
+    id: BindingId,
+    config: fnet_interfaces_admin::Configuration,
+) -> fnet_interfaces_admin::Configuration {
+    let mut ctx = ctx.lock().await;
+    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+    let core_id = non_sync_ctx
+        .devices
+        .get_core_id(id)
+        .expect("device lifetime should be tied to channel lifetime");
+    let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
+    let ipv4 = ipv4.map(|ipv4_config| {
+        let fnet_interfaces_admin::Ipv4Configuration {
+            igmp, multicast_forwarding, forwarding, ..
+        } = ipv4_config;
+        if let Some(_) = igmp {
+            todo!("https://fxbug.dev/120293 support enable/disable igmp")
+        }
+        if let Some(_) = multicast_forwarding {
+            log::warn!(
+                "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
+            )
+        }
+
+        fnet_interfaces_admin::Ipv4Configuration {
+            forwarding: forwarding.map(|enable| {
+                let was_enabled = netstack3_core::device::is_routing_enabled::<
+                    _,
+                    net_types::ip::Ipv4,
+                >(&sync_ctx, &core_id);
+                netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv4>(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &core_id,
+                    enable,
+                )
+                .unwrap_or_else(|e| {
+                    // TODO(https://fxbug.dev/124447): Return error when forwarding not
+                    // supported on device.
+                    log::error!(
+                        "ip forwarding not supported on interface {} with error {}",
+                        core_id,
+                        e
+                    );
+                });
+                was_enabled
+            }),
+            ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+        }
+    });
+    let ipv6 = ipv6.map(|ipv6_config| {
+        let fnet_interfaces_admin::Ipv6Configuration {
+            mld, multicast_forwarding, forwarding, ..
+        } = ipv6_config;
+        if let Some(_) = mld {
+            todo!("https://fxbug.dev/120293 support enable/disable mld")
+        }
+        if let Some(_) = multicast_forwarding {
+            log::warn!(
+                "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
+            )
+        }
+        fnet_interfaces_admin::Ipv6Configuration {
+            forwarding: forwarding.map(|enable| {
+                let was_enabled = netstack3_core::device::is_routing_enabled::<
+                    _,
+                    net_types::ip::Ipv6,
+                >(&sync_ctx, &core_id);
+                netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv6>(
+                    sync_ctx,
+                    non_sync_ctx,
+                    &core_id,
+                    enable,
+                )
+                .unwrap_or_else(|e| {
+                    // TODO(https://fxbug.dev/124447): Return error when forwarding not
+                    // supported on device.
+                    log::error!(
+                        "ip forwarding not supported on interface {} with error {}",
+                        core_id,
+                        e
+                    );
+                });
+                was_enabled
+            }),
+            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+        }
+    });
+    fnet_interfaces_admin::Configuration {
+        ipv4,
+        ipv6,
+        ..fnet_interfaces_admin::Configuration::EMPTY
+    }
+}
+
+/// Returns the configuration used for the interface with the given `id`.
+async fn get_configuration(
+    ctx: &NetstackContext,
+    id: BindingId,
+) -> fnet_interfaces_admin::Configuration {
+    let mut ctx = ctx.lock().await;
+    let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+    let core_id = non_sync_ctx
+        .devices
+        .get_core_id(id)
+        .expect("device lifetime should be tied to channel lifetime");
+    fnet_interfaces_admin::Configuration {
+        ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+            forwarding: Some(netstack3_core::device::is_routing_enabled::<_, net_types::ip::Ipv4>(
+                &sync_ctx, &core_id,
+            )),
+            ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+        }),
+        ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+            forwarding: Some(netstack3_core::device::is_routing_enabled::<_, net_types::ip::Ipv6>(
+                &sync_ctx, &core_id,
+            )),
+            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+        }),
+        ..fnet_interfaces_admin::Configuration::EMPTY
+    }
 }
 
 /// Adds the given `address` to the interface with the given `id`.

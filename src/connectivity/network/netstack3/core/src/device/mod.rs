@@ -29,7 +29,8 @@ use log::{debug, trace};
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
+        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr, Mtu,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
@@ -1758,6 +1759,31 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
             Ok(self::ethernet::set_promiscuous_mode(&mut sync_ctx, ctx, id, enabled))
         }
         DeviceId::Loopback(LoopbackDeviceId(_)) => Err(NotSupportedError),
+    }
+}
+
+/// Enables or disables IP packet routing on `device`.
+pub fn set_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
+    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    ctx: &mut NonSyncCtx,
+    device: &DeviceId<NonSyncCtx>,
+    enabled: bool,
+) -> Result<(), NotSupportedError> {
+    crate::ip::device::set_routing_enabled::<_, _, I>(&mut sync_ctx, ctx, device, enabled)
+}
+
+/// Returns whether IP packet routing is enabled on `device`.
+pub fn is_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
+    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    device: &DeviceId<NonSyncCtx>,
+) -> bool {
+    match I::VERSION {
+        IpVersion::V4 => {
+            crate::ip::device::is_ip_routing_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
+        }
+        IpVersion::V6 => {
+            crate::ip::device::is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, device)
+        }
     }
 }
 

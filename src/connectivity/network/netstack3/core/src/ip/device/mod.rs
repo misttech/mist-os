@@ -15,7 +15,6 @@ pub mod state;
 use alloc::{boxed::Box, vec::Vec};
 use core::num::NonZeroU8;
 
-#[cfg(test)]
 use net_types::ip::IpVersion;
 use net_types::{
     ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
@@ -28,7 +27,7 @@ use crate::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TimerHandler,
     },
-    error::{ExistsError, NotFoundError},
+    error::{ExistsError, NotFoundError, NotSupportedError},
     ip::{
         device::{
             dad::{DadHandler, DadTimerId},
@@ -46,12 +45,10 @@ use crate::{
             igmp::IgmpTimerId, mld::MldDelayedReportTimerId, GmpHandler, GroupJoinResult,
             GroupLeaveResult,
         },
-        DualStackDeviceIdContext, IpDeviceIdContext,
+        DualStackDeviceIdContext, IpDeviceId as _, IpDeviceIdContext,
     },
     Instant,
 };
-#[cfg(test)]
-use crate::{error::NotSupportedError, ip::IpDeviceId as _};
 
 /// A timer ID for IPv4 devices.
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
@@ -844,7 +841,6 @@ pub(crate) fn is_ip_routing_enabled<
 }
 
 /// Enables or disables IP packet routing on `device`.
-#[cfg(test)]
 pub(crate) fn set_routing_enabled<
     C: IpDeviceNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>
         + IpDeviceNonSyncContext<Ipv6, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>,
@@ -866,7 +862,6 @@ where
 }
 
 /// Enables or disables IPv4 packet routing on `device_id`.
-#[cfg(test)]
 fn set_ipv4_routing_enabled<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
     SC: IpDeviceContext<Ipv4, C>,
@@ -891,7 +886,6 @@ fn set_ipv4_routing_enabled<
 ///
 /// Does nothing if the routing status does not change as a consequence of this
 /// call.
-#[cfg(test)]
 pub(crate) fn set_ipv6_routing_enabled<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + RsHandler<C>,
