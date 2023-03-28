@@ -289,6 +289,7 @@ assembly_input_bundle("core_realm_eng") {
         # config.
         core = rebase_path(
                 [
+                  "//src/sys/core/meta/core-env-full-resolver.core_shard.cml",
                   "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
                   "//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
                 ],
@@ -310,7 +311,13 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
       component_shards = {
         # All paths must be rebased since this is passed directly to the AIB
         # config.
-        core = rebase_path([], root_build_dir)
+        core = rebase_path(
+                [
+                  # user and userdebug only have the base resolver, not the full
+                  # resolver.
+                  "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
+                ],
+                root_build_dir)
       }
     },
   ]

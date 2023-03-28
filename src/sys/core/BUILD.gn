@@ -31,14 +31,16 @@ core_shard("core-storage-unrestricted") {
   shard_file = "meta/unrestricted-storage.core_shard.cml"
 }
 
+# Enabling a soft-transition, replace with actual target when complete
+# TODO(122864) Remove transitional labels
 # This shard gives components access to the PackageResolver.
-core_shard("core-env-full-resolver") {
-  shard_file = "meta/core-env-full-resolver.core_shard.cml"
+group("core-env-full-resolver") {
 }
 
+# Enabling a soft-transition, replace with actual target when complete
+# TODO(122864) Remove transitional labels
 # This shard gives components access to the base resolver.
-core_shard("core-env-base-resolver") {
-  shard_file = "meta/core-env-base-resolver.core_shard.cml"
+group("core-env-base-resolver") {
 }
 
 # This index contains component ID entries for components whose source-code
