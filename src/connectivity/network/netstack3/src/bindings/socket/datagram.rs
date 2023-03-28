@@ -1353,15 +1353,32 @@ struct BindingData<I: Ip, T: Transport<I>> {
     messages: Arc<Mutex<MessageQueue<I, T>>>,
 }
 
-impl<I: Ip, T: Transport<I>> BindingData<I, T> {
-    /// Creates a new `BindingData` with the provided event pair and
-    /// `properties`.
+impl<I, T> BindingData<I, T>
+where
+    I: SocketCollectionIpExt<T> + IpExt + IpSockAddrExt,
+    T: Transport<Ipv4>,
+    T: Transport<Ipv6>,
+    T: TransportState<I>,
+    BindingsNonSyncCtxImpl: RequestHandlerDispatcher<I, T>,
+{
+    /// Creates a new `BindingData`.
     fn new(
-        unbound_id: T::UnboundId,
-        local_event: zx::EventPair,
-        peer_event: zx::EventPair,
+        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         properties: SocketWorkerProperties,
     ) -> Self {
+        let (local_event, peer_event) = zx::EventPair::create();
+        // signal peer that OUTGOING is available.
+        // TODO(brunodalbo): We're currently not enforcing any sort of
+        // flow-control for outgoing datagrams. That'll get fixed once we
+        // limit the number of in flight datagrams per socket (i.e. application
+        // buffers).
+        if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
+            error!("socket failed to signal peer: {:?}", e);
+        }
+        let unbound_id = T::create_unbound(sync_ctx);
+        let SocketCollection { conns: _, listeners: _ } = I::get_collection_mut(non_sync_ctx);
+
         Self {
             peer_event,
             info: SocketControlInfo {
@@ -1432,23 +1449,35 @@ pub(super) fn spawn_worker(
 ) -> Result<(), fposix::Errno> {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
-            fasync::Task::spawn(SocketWorker::<BindingData<Ipv4, Udp>>::serve_stream(
-                ctx, properties, events,
+            fasync::Task::spawn(SocketWorker::serve_stream_with(
+                ctx,
+                BindingData::<Ipv4, Udp>::new,
+                properties,
+                events,
             ))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
-            fasync::Task::spawn(SocketWorker::<BindingData<Ipv6, Udp>>::serve_stream(
-                ctx, properties, events,
+            fasync::Task::spawn(SocketWorker::serve_stream_with(
+                ctx,
+                BindingData::<Ipv6, Udp>::new,
+                properties,
+                events,
             ))
         }
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            fasync::Task::spawn(SocketWorker::<BindingData<Ipv4, IcmpEcho>>::serve_stream(
-                ctx, properties, events,
+            fasync::Task::spawn(SocketWorker::serve_stream_with(
+                ctx,
+                BindingData::<Ipv4, IcmpEcho>::new,
+                properties,
+                events,
             ))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
-            fasync::Task::spawn(SocketWorker::<BindingData<Ipv6, IcmpEcho>>::serve_stream(
-                ctx, properties, events,
+            fasync::Task::spawn(SocketWorker::serve_stream_with(
+                ctx,
+                BindingData::<Ipv6, IcmpEcho>::new,
+                properties,
+                events,
             ))
         }
     }
@@ -1479,25 +1508,6 @@ where
     type Request = fposix_socket::SynchronousDatagramSocketRequest;
     type RequestStream = fposix_socket::SynchronousDatagramSocketRequestStream;
     type CloseResponder = fposix_socket::SynchronousDatagramSocketCloseResponder;
-
-    fn new(
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
-        properties: SocketWorkerProperties,
-    ) -> Self {
-        let (local_event, peer_event) = zx::EventPair::create();
-        // signal peer that OUTGOING is available.
-        // TODO(brunodalbo): We're currently not enforcing any sort of
-        // flow-control for outgoing datagrams. That'll get fixed once we
-        // limit the number of in flight datagrams per socket (i.e. application
-        // buffers).
-        if let Err(e) = local_event.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_OUTGOING) {
-            error!("socket failed to signal peer: {:?}", e);
-        }
-        let unbound_id = T::create_unbound(sync_ctx);
-        let SocketCollection { conns: _, listeners: _ } = I::get_collection_mut(non_sync_ctx);
-        Self::new(unbound_id, local_event, peer_event, properties)
-    }
 
     async fn handle_request(
         &mut self,

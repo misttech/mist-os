@@ -42,8 +42,11 @@ pub(crate) async fn serve(
                         .unwrap_or_else(|e: fidl::Error| {
                             panic!("failed to create a new request stream: {e}")
                         });
-                    fasync::Task::spawn(SocketWorker::<BindingData>::serve_stream(
+                    fasync::Task::spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
+                        |sync_ctx, _: &mut BindingsNonSyncCtxImpl, properties| {
+                            BindingData::new(sync_ctx, properties)
+                        },
                         SocketWorkerProperties {},
                         request_stream,
                     ))
@@ -64,23 +67,9 @@ struct BindingData {
     state: State,
 }
 
-#[derive(Debug)]
-struct State(SocketId);
-
-impl CloseResponder for fppacket::SocketCloseResponder {
-    fn send(self, arg: &mut fidl_fuchsia_unknown::CloseableCloseResult) -> Result<(), fidl::Error> {
-        fppacket::SocketCloseResponder::send(self, arg)
-    }
-}
-
-impl worker::SocketWorkerHandler for BindingData {
-    type Request = fppacket::SocketRequest;
-    type RequestStream = fppacket::SocketRequestStream;
-    type CloseResponder = fppacket::SocketCloseResponder;
-
+impl BindingData {
     fn new(
         sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
@@ -95,6 +84,21 @@ impl worker::SocketWorkerHandler for BindingData {
             state: State(netstack3_core::device::socket::create(sync_ctx)),
         }
     }
+}
+
+#[derive(Debug)]
+struct State(SocketId);
+
+impl CloseResponder for fppacket::SocketCloseResponder {
+    fn send(self, arg: &mut fidl_fuchsia_unknown::CloseableCloseResult) -> Result<(), fidl::Error> {
+        fppacket::SocketCloseResponder::send(self, arg)
+    }
+}
+
+impl worker::SocketWorkerHandler for BindingData {
+    type Request = fppacket::SocketRequest;
+    type RequestStream = fppacket::SocketRequestStream;
+    type CloseResponder = fppacket::SocketCloseResponder;
 
     async fn handle_request(
         &mut self,

@@ -512,6 +512,23 @@ struct BindingData<I: IpExt> {
     peer: zx::Socket,
 }
 
+impl<I: IpExt> BindingData<I> {
+    fn new(
+        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        properties: SocketWorkerProperties,
+    ) -> Self {
+        let (local, peer) = zx::Socket::create_stream();
+        let socket = Arc::new(local);
+        let SocketWorkerProperties {} = properties;
+        let id = SocketId::Unbound(
+            create_socket::<I, _>(sync_ctx, non_sync_ctx),
+            LocalZirconSocketAndNotifier(socket, NeedsDataNotifier::default()),
+        );
+        Self { id, peer }
+    }
+}
+
 impl CloseResponder for fposix_socket::StreamSocketCloseResponder {
     fn send(self, arg: &mut fidl_fuchsia_unknown::CloseableCloseResult) -> Result<(), fidl::Error> {
         fposix_socket::StreamSocketCloseResponder::send(self, arg)
@@ -528,21 +545,6 @@ where
     type Request = fposix_socket::StreamSocketRequest;
     type RequestStream = fposix_socket::StreamSocketRequestStream;
     type CloseResponder = fposix_socket::StreamSocketCloseResponder;
-
-    fn new(
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
-        properties: SocketWorkerProperties,
-    ) -> Self {
-        let (local, peer) = zx::Socket::create_stream();
-        let socket = Arc::new(local);
-        let SocketWorkerProperties {} = properties;
-        let id = SocketId::Unbound(
-            create_socket::<I, _>(sync_ctx, non_sync_ctx),
-            LocalZirconSocketAndNotifier(Arc::clone(&socket), NeedsDataNotifier::default()),
-        );
-        Self { id, peer }
-    }
 
     async fn handle_request(
         &mut self,
@@ -582,15 +584,17 @@ pub(super) async fn spawn_worker(
 {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::StreamSocketProtocol::Tcp) => {
-            fasync::Task::spawn(SocketWorker::<BindingData<Ipv4>>::serve_stream(
+            fasync::Task::spawn(SocketWorker::serve_stream_with(
                 ctx,
+                BindingData::<Ipv4>::new,
                 SocketWorkerProperties {},
                 request_stream,
             ))
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::StreamSocketProtocol::Tcp) => {
-            fasync::Task::spawn(SocketWorker::<BindingData<Ipv6>>::serve_stream(
+            fasync::Task::spawn(SocketWorker::serve_stream_with(
                 ctx,
+                BindingData::<Ipv6>::new,
                 SocketWorkerProperties {},
                 request_stream,
             ))

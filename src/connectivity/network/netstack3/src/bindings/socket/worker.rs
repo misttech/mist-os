@@ -42,16 +42,6 @@ pub(crate) trait SocketWorkerHandler: Send + 'static {
     /// A responder for a "close" request.
     type CloseResponder: CloseResponder;
 
-    /// Creates a new handler with the given context and properties.
-    ///
-    /// Implementations should use this to do any necessary initialization,
-    /// including creation of unbound sockets.
-    fn new(
-        sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
-        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
-        properties: SocketWorkerProperties,
-    ) -> Self;
-
     /// Handles a single request.
     ///
     /// Implementations should handle the incoming request in the appropriate
@@ -89,21 +79,6 @@ pub(crate) trait CloseResponder: Send {
 }
 
 impl<H: SocketWorkerHandler> SocketWorker<H> {
-    /// Starts servicing events from the provided event stream.
-    pub(crate) async fn serve_stream(
-        ctx: NetstackContext,
-        properties: SocketWorkerProperties,
-        events: H::RequestStream,
-    ) {
-        Self::serve_stream_with(
-            ctx,
-            |sync_ctx, non_sync_ctx, properties| H::new(sync_ctx, non_sync_ctx, properties),
-            properties,
-            events,
-        )
-        .await
-    }
-
     /// Starts servicing events from the provided state and event stream.
     pub(crate) async fn serve_stream_with<
         F: FnOnce(
