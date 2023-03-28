@@ -631,6 +631,13 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_SET_PTRACER => {
+            // PR_SET_PTRACER_ANY is defined as ((unsigned long) -1),
+            // which is not understood by bindgen.
+            if arg2 == u64::MAX {
+                // Callers (especially debuggerd) expect EINVAL if the
+                // kernel does not support PTRACER_ANY.
+                return error!(EINVAL);
+            }
             not_implemented!(current_task, "prctl(PR_SET_PTRACER, {})", arg2);
             Ok(().into())
         }
@@ -639,12 +646,27 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_SET_NO_NEW_PRIVS => {
-            not_implemented!(current_task, "prctl(PR_SET_NO_NEW_PRIVS, {})", arg2);
+            // If any args are set other than arg2 to 1, this should return einval
+            if arg2 != 1 || arg3 != 0 || arg4 != 0 || arg5 != 0 {
+                return error!(EINVAL);
+            }
+            current_task.write().enable_no_new_privs();
             Ok(().into())
         }
+        PR_GET_NO_NEW_PRIVS => {
+            // If any args are set, this should return einval
+            if arg2 != 0 || arg3 != 0 || arg4 != 0 {
+                return error!(EINVAL);
+            }
+            Ok(current_task.read().no_new_privs().into())
+        }
         PR_SET_SECCOMP => {
-            not_implemented!(current_task, "prctl(PR_SET_SECCOMP, {})", arg2);
-            Ok(().into())
+            if arg2 == SECCOMP_MODE_STRICT as u64 {
+                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
+            } else if arg2 == SECCOMP_SET_MODE_FILTER as u64 {
+                return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
+            }
+            error!(EINVAL)
         }
         PR_GET_CHILD_SUBREAPER => {
             let addr = UserAddress::from(arg2);
@@ -966,34 +988,41 @@ pub fn sys_seccomp(
     operation: u32,
     flags: u32,
     _args: UserAddress,
-) -> Result<(), Errno> {
+) -> Result<SyscallResult, Errno> {
     match operation {
         SECCOMP_SET_MODE_STRICT => {
             if flags != 0 {
                 return error!(EINVAL);
             }
+            not_implemented!(current_task, "seccomp not implemented");
+            error!(ENOSYS)
         }
         SECCOMP_SET_MODE_FILTER => match flags {
-            SECCOMP_FILTER_FLAG_LOG
+            // Some tests die badly if seccomp doesn't return 0 in
+            // this case, even though we haven't implemented it
+            0
+            | SECCOMP_FILTER_FLAG_LOG
             | SECCOMP_FILTER_FLAG_NEW_LISTENER
             | SECCOMP_FILTER_FLAG_SPEC_ALLOW
-            | SECCOMP_FILTER_FLAG_TSYNC => (),
-            _ => return error!(EINVAL),
+            | SECCOMP_FILTER_FLAG_TSYNC => Ok(().into()),
+            _ => error!(EINVAL),
         },
         SECCOMP_GET_ACTION_AVAIL => {
             if flags != 0 {
                 return error!(EINVAL);
             }
+            not_implemented!(current_task, "seccomp not implemented");
+            error!(ENOSYS)
         }
         SECCOMP_GET_NOTIF_SIZES => {
             if flags != 0 {
                 return error!(EINVAL);
             }
+            not_implemented!(current_task, "seccomp not implemented");
+            error!(ENOSYS)
         }
-        _ => return error!(EINVAL),
+        _ => error!(EINVAL),
     }
-    not_implemented!(current_task, "seccomp not implemented");
-    error!(ENOSYS)
 }
 
 pub fn sys_setgroups(

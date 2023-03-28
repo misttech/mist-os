@@ -220,6 +220,29 @@ pub struct TaskMutableState {
 
     /// The address and size of the mapped restricted state VMO.
     pub restricted_state_addr_and_size: Option<(usize, usize)>,
+
+    /// Bit that determines whether a newly started program can have privileges its parent does
+    /// not have.  See Documentation/prctl/no_new_privs.txt in the Linux kernel for details.
+    /// Note that Starnix does not currently implement the relevant privileges (e.g.,
+    /// setuid/setgid binaries).  So, you can set this, but it does nothing other than get
+    /// propagated to children.
+    ///
+    /// The documentation indicates that this can only ever be set to
+    /// true, and it cannot be reverted to false.  Accessor methods
+    /// for this field ensure this property.
+    no_new_privs: bool,
+}
+
+impl TaskMutableState {
+    pub fn no_new_privs(&self) -> bool {
+        self.no_new_privs
+    }
+
+    /// Sets the value of no_new_privs to true.  It is an error to set
+    /// it to anything else.
+    pub fn enable_no_new_privs(&mut self) {
+        self.no_new_privs = true;
+    }
 }
 
 pub enum ExceptionResult {
@@ -315,6 +338,7 @@ impl Task {
         vfork_event: Option<zx::Event>,
         priority: u8,
         uts_ns: UtsNamespaceHandle,
+        no_new_privs: bool,
     ) -> Self {
         let fs = {
             let result = OnceCell::new();
@@ -345,6 +369,7 @@ impl Task {
                 scheduler_policy: Default::default(),
                 uts_ns,
                 restricted_state_addr_and_size: None,
+                no_new_privs,
             }),
         };
         #[cfg(any(test, debug_assertions))]
@@ -444,6 +469,7 @@ impl Task {
             None,
             DEFAULT_TASK_PRIORITY,
             kernel.root_uts_ns.clone(),
+            false,
         ));
         current_task.thread_group.add(&current_task.task)?;
 
@@ -534,6 +560,7 @@ impl Task {
         let creds;
         let priority;
         let uts_ns;
+        let no_new_privs = self.read().no_new_privs;
         let TaskInfo { thread, thread_group, memory_manager } = {
             // Make sure to drop these locks ASAP to avoid inversion
             let thread_group_state = self.thread_group.write();
@@ -600,6 +627,7 @@ impl Task {
             vfork_event,
             priority,
             uts_ns,
+            no_new_privs,
         ));
 
         // Drop the pids lock as soon as possible after creating the child. Destroying the child

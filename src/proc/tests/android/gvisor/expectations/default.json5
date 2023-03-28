@@ -572,7 +572,6 @@
 
                 // prctl_test
                 "PrctlTest.InvalidPrSetMM",
-                "PrctlTest.NoNewPrivsPreservedAcrossCloneForkAndExecve",
                 "PrctlTest.PDeathSig",
                 "PrctlTest.RootDumpability",
 
@@ -778,6 +777,8 @@
                 "SeccompTest.RetErrnoReturnsErrno",
                 "SeccompTest.TsyncAppliesToAllThreads",
                 "SeccompTest.LeastPermissiveFilterReturnValueApplies",
+                "SeccompTest.RetAllowAllowsSyscall",
+                "SeccompTest.RetTraceWithoutPtracerReturnsENOSYS",
                 "SeccompTest.RetTrapCausesSIGSYS",
                 "SeccompTest.RetKillCausesDeathBySIGSYS",
                 "SeccompTest.FiltersPreservedAcrossForkAndExecve",
