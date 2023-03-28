@@ -7,7 +7,7 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fdio/directory.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/interface_request.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
@@ -34,66 +34,77 @@ int main(int argc, char** argv) {
   const fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   fxl::SetLogSettingsFromCommandLine(command_line, {"early-boot-instrumentation"});
 
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-
-  // Add prof_data dir.
   early_boot_instrumentation::SinkDirMap sink_map;
-
-  // All but llvm-profile data until its unified.
-  vfs::PseudoDir* debug_data = context->outgoing()->GetOrCreateDirectory("debugdata");
-
-  // Get the SvcStash server end.
-  zx::channel provider_client, provider_server;
-  if (zx_status_t res = zx::channel::create(0, &provider_client, &provider_server); res != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not create channel for fuchsia.boot.SvcStashProvider. "
-                   << zx_status_get_string(res);
-  } else if (zx_status_t res = fdio_service_connect(
-                 fidl::DiscoverableProtocolDefaultPath<fuchsia_boot::SvcStashProvider>,
-                 provider_server.release());
-             res != ZX_OK) {
-    FX_LOGS(ERROR) << "Could not obtain handle to fuchsia.boot.SvcStashProvider. "
-                   << zx_status_get_string(res);
-  } else {  // Successfully connected to the service.
-    fidl::WireSyncClient<fuchsia_boot::SvcStashProvider> provider_fidl_client;
-    fidl::ClientEnd<fuchsia_boot::SvcStashProvider> provider_client_end(std::move(provider_client));
-    provider_fidl_client.Bind(std::move(provider_client_end));
-
-    auto get_response = provider_fidl_client->Get();
-
-    if (get_response.ok() && get_response->is_ok()) {
-      auto& stash_svc = get_response->value()->resource;
-      sink_map = early_boot_instrumentation::ExtractDebugData(std::move(stash_svc));
+  [&sink_map]() {
+    zx::result client_end = component::Connect<fuchsia_boot::SvcStashProvider>();
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.status_value())
+          << "Failed to connect to "
+          << fidl::DiscoverableProtocolDefaultPath<fuchsia_boot::SvcStashProvider>;
+      return;
     }
-  }
+    fidl::WireSyncClient client(std::move(client_end.value()));
+    const fidl::WireResult result = client->Get();
+    if (!result.ok()) {
+      // TODO(https://fxbug.dev/124407): s/WARNING/ERROR/.
+      FX_PLOGS(WARNING, result.status()) << "Failed to call fuchsia.boot/SvcStashProvider.Get";
+      return;
+    }
+    const fit::result response = result.value();
+    if (response.is_error()) {
+      FX_PLOGS(ERROR, response.error_value())
+          << "Error response from fuchsia.boot/SvcStashProvider.Get";
+      return;
+    }
+    sink_map = early_boot_instrumentation::ExtractDebugData(std::move(response->resource));
+  }();
 
   // TODO(fxbug.dev/124317): This code does not create any directories when
   // profraw files are not available. Fix it as per contract.
-  fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
-  if (!kernel_data_dir) {
-    const char* err = strerror(errno);
-    FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data'. " << err;
-  } else if (zx::result res =
-                 early_boot_instrumentation::ExposeKernelProfileData(kernel_data_dir, sink_map);
-             res.is_error()) {
-    FX_PLOGS(ERROR, res.status_value()) << "Could not expose kernel profile data. ";
-  }
+  [&sink_map]() {
+    fbl::unique_fd kernel_data_dir(open("/boot/kernel/data", O_RDONLY));
+    if (!kernel_data_dir) {
+      const char* err = strerror(errno);
+      FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data': " << err;
+      return;
+    }
 
-  fbl::unique_fd phys_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
-  if (!phys_data_dir) {
-    const char* err = strerror(errno);
-    FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data/phys'. " << err;
-  } else if (zx::result res =
-                 early_boot_instrumentation::ExposePhysbootProfileData(phys_data_dir, sink_map);
-             res.is_error()) {
-    FX_PLOGS(ERROR, res.status_value()) << "Could not expose physboot profile data. ";
-  }
+    if (zx::result<> result =
+            early_boot_instrumentation::ExposeKernelProfileData(kernel_data_dir, sink_map);
+        result.is_error()) {
+      FX_PLOGS(ERROR, result.status_value()) << "Could not expose kernel profile data";
+    }
+  }();
 
+  [&sink_map]() {
+    fbl::unique_fd phys_data_dir(open("/boot/kernel/data/phys", O_RDONLY));
+    if (!phys_data_dir) {
+      const char* err = strerror(errno);
+      FX_LOGS(ERROR) << "Could not obtain handle to '/boot/kernel/data/phys': " << err;
+      return;
+    }
+
+    if (zx::result<> result =
+            early_boot_instrumentation::ExposePhysbootProfileData(phys_data_dir, sink_map);
+        result.is_error()) {
+      FX_PLOGS(ERROR, result.status_value()) << "Could not expose physboot profile data";
+    }
+  }();
+
+  std::unique_ptr context = sys::ComponentContext::Create();
+  vfs::PseudoDir* debug_data = context->outgoing()->GetOrCreateDirectory("debugdata");
   for (auto& [sink, root] : sink_map) {
     debug_data->AddEntry(sink, std::move(root));
   }
   sink_map.clear();
 
-  loop.Run();
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  if (zx_status_t status = context->outgoing()->ServeFromStartupInfo(loop.dispatcher());
+      status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "Could not serve outgoing directory";
+  }
+  if (zx_status_t status = loop.Run(); status != ZX_OK) {
+    FX_PLOGS(FATAL, status) << "Could not run async loop";
+  };
   return 0;
 }

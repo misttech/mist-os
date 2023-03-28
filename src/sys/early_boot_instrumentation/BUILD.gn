@@ -36,6 +36,7 @@ executable("app") {
   deps = [
     ":coverage-source",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
