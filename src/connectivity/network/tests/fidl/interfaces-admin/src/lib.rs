@@ -7,18 +7,24 @@
 use assert_matches::assert_matches;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fnet_debug;
+use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
-use fuchsia_async::{self as fasync, TimeoutExt as _};
+use fidl_fuchsia_posix_socket as fposix_socket;
+use fuchsia_async::{
+    self as fasync,
+    net::{DatagramSocket, UdpSocket},
+    TimeoutExt as _,
+};
 use fuchsia_zircon as zx;
 use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip_v6, std_socket_addr};
-use net_types::ip::IpAddress as _;
+use net_types::ip::{IpAddress as _, IpVersion};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     devices::create_tun_device,
     interfaces,
-    realms::{Netstack, TestRealmExt as _, TestSandboxExt as _},
+    realms::{Netstack, Netstack2, TestRealmExt as _, TestSandboxExt as _},
     ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
@@ -1585,6 +1591,136 @@ async fn link_state_interface_state_interaction<N: Netstack>(name: &str) {
     interface.set_link_up(false).await.expect("bring device down");
     let online = watcher.next().await.expect("stream unexpectedly ended");
     assert!(!online);
+}
+
+enum SetupOrder {
+    PreferredInterfaceFirst,
+    PreferredInterfaceLast,
+}
+
+#[netstack_test]
+#[test_case(SetupOrder::PreferredInterfaceFirst; "setup_preferred_interface_first")]
+#[test_case(SetupOrder::PreferredInterfaceLast; "setup_preferred_interface_last")]
+// Verify that interfaces with lower routing metrics are preferred.
+//
+// Setup two test realms (Netstacks) connected by an underlying network. On the
+// send side, install two interfaces with differing metrics. On the receive side
+// install a single interface. Configure all interfaces with differing IPs
+// within the same subnet (and add subnet routes). Finally, verify (by checking
+// the source addr) that sending from the send side to the receive side uses the
+// preferred send interface.
+// TODO(https://fxbug.dev/122489): Test against NS3 once it supports interface
+// metrics.
+async fn interface_routing_metric<I: net_types::ip::Ip>(name: &str, order: SetupOrder) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let send_realm = sandbox
+        .create_netstack_realm::<Netstack2, _>(format!("{name}_send"))
+        .expect("create realm");
+    let recv_realm = sandbox
+        .create_netstack_realm::<Netstack2, _>(format!("{name}_recv"))
+        .expect("create realm");
+    let network = sandbox.create_network(name).await.expect("create network");
+
+    async fn setup_interface_in_realm<'a>(
+        metric: Option<u32>,
+        addr_subnet: fnet::Subnet,
+        name: &'static str,
+        realm: &netemul::TestRealm<'a>,
+        network: &netemul::TestNetwork<'a>,
+    ) -> netemul::TestInterface<'a> {
+        let interface = realm
+            .join_network_with_if_config(
+                network,
+                name,
+                netemul::InterfaceConfig { name: None, metric },
+            )
+            .await
+            .expect("install interface");
+        interface.add_address_and_subnet_route(addr_subnet).await.expect("configure address");
+
+        interface
+    }
+
+    const LESS_PREFERRED_METRIC: Option<u32> = Some(100);
+    const MORE_PREFERRED_METRIC: Option<u32> = Some(50);
+    let (send_addr_sub1, send_addr_sub2, recv_addr_sub) = match I::VERSION {
+        IpVersion::V4 => (
+            fidl_subnet!("192.168.0.1/24"),
+            fidl_subnet!("192.168.0.2/24"),
+            fidl_subnet!("192.168.0.3/24"),
+        ),
+        IpVersion::V6 => {
+            (fidl_subnet!("ff::1/64"), fidl_subnet!("ff::2/64"), fidl_subnet!("ff::3/64"))
+        }
+    };
+    let (metric1, metric2, expected_src_addr) = match order {
+        SetupOrder::PreferredInterfaceFirst => {
+            (MORE_PREFERRED_METRIC, LESS_PREFERRED_METRIC, send_addr_sub1.addr)
+        }
+        SetupOrder::PreferredInterfaceLast => {
+            (LESS_PREFERRED_METRIC, MORE_PREFERRED_METRIC, send_addr_sub2.addr)
+        }
+    };
+
+    let _send_interface1: netemul::TestInterface<'_> =
+        setup_interface_in_realm(metric1, send_addr_sub1, "send-interface1", &send_realm, &network)
+            .await;
+    let _send_interface2: netemul::TestInterface<'_> =
+        setup_interface_in_realm(metric2, send_addr_sub2, "send-interface2", &send_realm, &network)
+            .await;
+    let _recv_interface: netemul::TestInterface<'_> = setup_interface_in_realm(
+        None,
+        recv_addr_sub.clone(),
+        "recv-interface",
+        &recv_realm,
+        &network,
+    )
+    .await;
+
+    async fn create_socket_in_realm<I: net_types::ip::Ip>(
+        realm: &netemul::TestRealm<'_>,
+        port: u16,
+    ) -> UdpSocket {
+        let (domain, addr) = match I::VERSION {
+            IpVersion::V4 => (
+                fposix_socket::Domain::Ipv4,
+                std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, port)),
+            ),
+            IpVersion::V6 => (
+                fposix_socket::Domain::Ipv6,
+                std::net::SocketAddr::from((std::net::Ipv6Addr::UNSPECIFIED, port)),
+            ),
+        };
+        let socket = realm
+            .datagram_socket(domain, fposix_socket::DatagramSocketProtocol::Udp)
+            .await
+            .expect("failed to create socket");
+        socket.bind(&addr.into()).expect("failed to bind socket");
+        UdpSocket::from_datagram(DatagramSocket::new_from_socket(socket).unwrap()).unwrap()
+    }
+    const PORT: u16 = 999;
+    let send_socket = create_socket_in_realm::<I>(&send_realm, PORT).await;
+    let recv_socket = create_socket_in_realm::<I>(&recv_realm, PORT).await;
+
+    let to_socket_addr = |addr: fnet::IpAddress| -> std::net::SocketAddr {
+        let fnet_ext::IpAddress(addr) = addr.into();
+        std::net::SocketAddr::from((addr, PORT))
+    };
+
+    const BUF: &str = "HELLO WORLD";
+    assert_eq!(
+        send_socket
+            .send_to(BUF.as_bytes(), to_socket_addr(recv_addr_sub.addr))
+            .await
+            .expect("send failed"),
+        BUF.len()
+    );
+
+    let mut buffer = [0u8; BUF.len() + 1];
+    let (len, source_addr) = recv_socket.recv_from(&mut buffer).await.expect("receive failed");
+    assert_eq!(source_addr, to_socket_addr(expected_src_addr));
+    assert_eq!(len, BUF.len());
+    assert_eq!(&buffer[..BUF.len()], BUF.as_bytes());
 }
 
 #[netstack_test]
