@@ -156,16 +156,16 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Debug \
   -DCMAKE_INSTALL_PREFIX= \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia-stage2.cmake \
   ${LLVM_SRCDIR}/llvm
-ninja distribution  -j1000  # Build the distribution
+ninja toolchain-distribution  -j1000  # Build the distribution
 ```
 
 If the above fails with an error related to Ninja, then you may need to add
 `ninja` to your PATH. You can find the prebuilt executable at
 `${FUCHSIA_DIR}//prebuilt/third_party/ninja/${platform}/bin`.
 
-`ninja distribution` should be enough for building all binaries, but the Fuchsia
-build assumes some libraries are stripped so `ninja
-install-distribution-stripped` is necessary.
+`ninja toolchain-distribution` should be enough for building all binaries, but
+the Fuchsia build assumes some libraries are stripped so `ninja
+install-toolchain-distribution-stripped` is necessary.
 
 Caution: Due to a [bug in Clang](https://bugs.llvm.org/show_bug.cgi?id=44097),
 builds with assertions enabled might crash while building Fuchsia. As a
@@ -188,8 +188,8 @@ cmake -GNinja \
   -DSTAGE2_FUCHSIA_SDK=${IDK_DIR} \
   -C ${LLVM_SRCDIR}/clang/cmake/caches/Fuchsia.cmake \
   ${LLVM_SRCDIR}/llvm
-ninja stage2-distribution -j1000
-DESTDIR=${INSTALL_DIR} ninja stage2-install-distribution-stripped -j1000
+ninja stage2-toolchain-distribution -j1000
+DESTDIR=${INSTALL_DIR} ninja stage2-install-toolchain-distribution-stripped -j1000
 ```
 
 Note: The second stage build uses LTO (Link Time Optimization) to
@@ -243,8 +243,8 @@ cmake -G Ninja -DCMAKE_BUILD_TYPE=Release \
   ${LLVM_SRCDIR}/llvm
 
 # Build and strip binaries and place them in the install directory
-ninja distribution -j1000
-DESTDIR=${INSTALL_DIR} ninja install-distribution-stripped -j1000
+ninja toolchain-distribution -j1000
+DESTDIR=${INSTALL_DIR} ninja install-toolchain-distribution-stripped -j1000
 
 # Generate runtime.json
 
@@ -331,7 +331,7 @@ CLANG_TOOLCHAIN_PREFIX=${FUCHSIA_DIR}/prebuilt/third_party/clang/linux-x64/bin/
 ```
 
 Note: To build Fuchsia, you need a stripped version of the toolchain runtime
-binaries. Use `DESTDIR=${INSTALL_DIR} ninja install-distribution-stripped`
+binaries. Use `DESTDIR=${INSTALL_DIR} ninja install-toolchain-distribution-stripped`
 to get a stripped install and then point your build configuration to
 `${INSTALL_DIR}/bin` as your toolchain.
 
