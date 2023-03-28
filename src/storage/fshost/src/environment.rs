@@ -588,7 +588,7 @@ impl FilesystemLauncher {
         let fvm_volume_manager_proxy =
             connect_to_protocol_at_path::<VolumeManagerMarker>(fvm_topo_path)
                 .context("Failed to connect to the fvm VolumeManagerProxy")?;
-        let device_path = fvm_allocate_partition(
+        let data_partition_controller = fvm_allocate_partition(
             &fvm_volume_manager_proxy,
             DATA_TYPE_GUID,
             *Uuid::new_v4().as_bytes(),
@@ -599,7 +599,12 @@ impl FilesystemLauncher {
         .await
         .context("Failed to allocate fvm data partition")?;
 
-        let mut device = BlockDevice::new(device_path).await?;
+        let device_path = data_partition_controller
+            .get_topological_path()
+            .await?
+            .map_err(zx::Status::from_raw)?;
+
+        let mut device = BlockDevice::from_proxy(data_partition_controller, device_path).await?;
         if inside_zxcrypt {
             if !self.config.fvm_ramdisk {
                 self.attach_driver(&mut device, ZXCRYPT_DRIVER_PATH).await?;

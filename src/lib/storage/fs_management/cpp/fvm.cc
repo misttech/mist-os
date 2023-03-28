@@ -185,8 +185,7 @@ zx::result<fbl::unique_fd> OpenPartitionImpl(DIR* dir, std::string_view out_path
     }
     auto& info = *static_cast<AllocHelperInfo*>(cookie);
     fdio_cpp::UnownedFdioCaller caller(dirfd);
-    zx::result channel = component::ConnectAt<fuchsia_hardware_block_partition::PartitionAndDevice>(
-        caller.directory(), fn);
+    zx::result channel = component::ConnectAt<fuchsia_device::Controller>(caller.directory(), fn);
     if (channel.is_error()) {
       return channel.status_value();
     }
@@ -224,15 +223,26 @@ zx_status_t DestroyPartitionImpl(
 }  // namespace
 
 __EXPORT
-bool PartitionMatches(
-    fidl::UnownedClientEnd<fuchsia_hardware_block_partition::PartitionAndDevice> channel,
-    const PartitionMatcher& matcher) {
+bool PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Controller> channel,
+                      const PartitionMatcher& matcher) {
   ZX_ASSERT(!matcher.type_guids.empty() || !matcher.instance_guids.empty() ||
             !matcher.detected_formats.empty() || !matcher.labels.empty() ||
             !matcher.parent_device.empty());
 
+  zx::result partition_endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_block_partition::Partition>();
+  if (partition_endpoints.is_error()) {
+    return false;
+  }
+  auto& [partition_client_end, partition_server_end] = partition_endpoints.value();
+  if (fidl::OneWayStatus response =
+          fidl::WireCall(channel)->ConnectToDeviceFidl(partition_server_end.TakeChannel());
+      !response.ok()) {
+    return false;
+  }
+
   if (!matcher.type_guids.empty()) {
-    const fidl::WireResult result = fidl::WireCall(channel)->GetTypeGuid();
+    const fidl::WireResult result = fidl::WireCall(partition_client_end)->GetTypeGuid();
     if (!result.ok()) {
       return false;
     }
@@ -248,7 +258,7 @@ bool PartitionMatches(
     }
   }
   if (!matcher.instance_guids.empty()) {
-    const fidl::WireResult result = fidl::WireCall(channel)->GetInstanceGuid();
+    const fidl::WireResult result = fidl::WireCall(partition_client_end)->GetInstanceGuid();
     if (!result.ok()) {
       return false;
     }
@@ -265,7 +275,7 @@ bool PartitionMatches(
     }
   }
   if (!matcher.labels.empty()) {
-    const fidl::WireResult result = fidl::WireCall(channel)->GetName();
+    const fidl::WireResult result = fidl::WireCall(partition_client_end)->GetName();
     if (!result.ok()) {
       return false;
     }
@@ -285,10 +295,7 @@ bool PartitionMatches(
   std::string topological_path;
   if (!matcher.parent_device.empty() || !matcher.ignore_prefix.empty() ||
       !matcher.ignore_if_path_contains.empty()) {
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
-    const auto resp =
-        fidl::WireCall(fidl::UnownedClientEnd<fuchsia_device::Controller>(channel.channel()))
-            ->GetTopologicalPath();
+    const auto resp = fidl::WireCall(channel)->GetTopologicalPath();
     if (!resp.ok() || resp->is_error()) {
       return false;
     }
@@ -307,9 +314,10 @@ bool PartitionMatches(
     return false;
   }
   if (!matcher.detected_formats.empty()) {
-    // TODO(https://fxbug.dev/112484): this relies on multiplexing.
+    // TODO(https://fxbug.dev/122007): avoid this cast
     const DiskFormat part_format =
-        DetectDiskFormat(fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(channel.channel()));
+        DetectDiskFormat(fidl::UnownedClientEnd<fuchsia_hardware_block::Block>(
+            partition_client_end.borrow().channel()));
     if (!std::any_of(
             matcher.detected_formats.cbegin(), matcher.detected_formats.cend(),
             [part_format](const DiskFormat match_format) { return part_format == match_format; })) {

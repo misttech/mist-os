@@ -13,7 +13,7 @@ use {
     },
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::{Proxy, RequestStream, ServerEnd},
-    fidl_fuchsia_device::ControllerMarker,
+    fidl_fuchsia_device::ControllerProxy,
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy},
     fidl_fuchsia_hardware_block_volume::VolumeManagerMarker,
@@ -26,7 +26,6 @@ use {
         Blobfs, F2fs, Fxfs, Minfs,
     },
     fuchsia_async as fasync,
-    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::{
         directory::{clone_onto_no_describe, create_directory_recursive, open_file},
         file::write,
@@ -63,15 +62,21 @@ fn data_partition_names() -> Vec<String> {
     vec![DATA_PARTITION_LABEL.to_string(), LEGACY_DATA_PARTITION_LABEL.to_string()]
 }
 
-async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<String, Error> {
+async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<ControllerProxy, Error> {
     let fvm_matcher = PartitionMatcher {
         detected_disk_formats: Some(vec![DiskFormat::Fvm]),
         ignore_prefix: ramdisk_prefix,
         ..Default::default()
     };
 
-    let fvm_path =
+    let fvm_controller =
         find_partition(fvm_matcher, FIND_PARTITION_DURATION).await.context("Failed to find FVM")?;
+    let fvm_path = fvm_controller
+        .get_topological_path()
+        .await
+        .context("fvm get_topo_path transport error")?
+        .map_err(zx::Status::from_raw)
+        .context("fvm get_topo_path returned error")?;
 
     let data_matcher = PartitionMatcher {
         type_guids: Some(vec![constants::DATA_TYPE_GUID]),
@@ -81,11 +86,7 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<String, E
         ..Default::default()
     };
 
-    let data_partition_path = find_partition(data_matcher, FIND_PARTITION_DURATION)
-        .await
-        .context("Failed to open partition")?;
-    tracing::info!(%data_partition_path, "Found data partition");
-    Ok(data_partition_path)
+    find_partition(data_matcher, FIND_PARTITION_DURATION).await
 }
 
 #[link(name = "fvm")]
@@ -118,8 +119,14 @@ async fn wipe_storage(
         ..Default::default()
     };
 
-    let fvm_path =
+    let fvm_controller =
         find_partition(fvm_matcher, FIND_PARTITION_DURATION).await.context("Failed to find FVM")?;
+    let fvm_path = fvm_controller
+        .get_topological_path()
+        .await
+        .context("fvm get_topo_path transport error")?
+        .map_err(zx::Status::from_raw)
+        .context("fvm get_topo_path returned error")?;
 
     // We need to pause the block watcher to make sure fshost doesn't try to mount or format any of
     // the newly provisioned volumes in the FVM.
@@ -131,21 +138,20 @@ async fn wipe_storage(
         tracing::info!("Block watcher already paused in WipeStorage");
     }
 
-    let fvm_proxy = connect_to_protocol_at_path::<ControllerMarker>(&fvm_path)
-        .context("Failed to create a fvm Controller proxy")?;
-
     tracing::info!(device_path = ?fvm_path, "Wiping storage");
     tracing::info!("Unbinding child drivers (FVM/zxcrypt).");
 
-    fvm_proxy.unbind_children().await?.map_err(zx::Status::from_raw)?;
+    fvm_controller.unbind_children().await?.map_err(zx::Status::from_raw)?;
 
     tracing::info!(slice_size = config.fvm_slice_size, "Initializing FVM");
-    let device = connect_to_protocol_at_path::<BlockMarker>(&fvm_path)
-        .context("Failed to create fvm Block proxy")?;
-    initialize_fvm(config.fvm_slice_size, &device)?;
+    let (block_proxy, server_end) = fidl::endpoints::create_proxy::<BlockMarker>()?;
+    fvm_controller
+        .connect_to_device_fidl(server_end.into_channel())
+        .context("connecting to block protocol")?;
+    initialize_fvm(config.fvm_slice_size, &block_proxy)?;
 
     tracing::info!("Binding and waiting for FVM driver.");
-    fvm_proxy.bind(constants::FVM_DRIVER_PATH).await?.map_err(zx::Status::from_raw)?;
+    fvm_controller.bind(constants::FVM_DRIVER_PATH).await?.map_err(zx::Status::from_raw)?;
 
     let fvm_dir = fuchsia_fs::directory::open_in_namespace(&fvm_path, OpenFlags::empty())
         .context("Failed to open the fvm directory")?;
@@ -160,7 +166,7 @@ async fn wipe_storage(
     const INITIAL_SLICE_COUNT: u64 = 1;
 
     // Generate FVM layouts and new GUIDs for the blob/data volumes.
-    let blobfs_path = fvm_allocate_partition(
+    let blobfs_controller = fvm_allocate_partition(
         &fvm_volume_manager_proxy,
         constants::BLOBFS_TYPE_GUID,
         *Uuid::new_v4().as_bytes(),
@@ -191,9 +197,7 @@ async fn wipe_storage(
         blobfs_config.num_inodes = config.blobfs_initial_inodes;
     }
 
-    let controller =
-        connect_to_protocol_at_path::<fidl_fuchsia_device::ControllerMarker>(&blobfs_path)?;
-    let mut blobfs = filesystem::Filesystem::new(controller, blobfs_config);
+    let mut blobfs = filesystem::Filesystem::new(blobfs_controller, blobfs_config);
     blobfs.format().await.context("Failed to format blobfs")?;
     let started_blobfs = blobfs.serve().await.context("serving blobfs")?;
     clone_onto_no_describe(started_blobfs.root(), None, blobfs_root)?;
@@ -232,7 +236,7 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    let partition_path = find_data_partition(ramdisk_prefix).await?;
+    let partition_controller = find_data_partition(ramdisk_prefix).await?;
 
     let format = match config.data_filesystem_format.as_ref() {
         "fxfs" => DiskFormat::Fxfs,
@@ -241,8 +245,18 @@ async fn write_data_file(
         _ => panic!("unsupported data filesystem format type"),
     };
 
-    let mut device =
-        Box::new(BlockDevice::new(partition_path).await.context("failed to make new device")?);
+    let partition_path = partition_controller
+        .get_topological_path()
+        .await
+        .context("get_topo_path transport error")?
+        .map_err(zx::Status::from_raw)
+        .context("get_topo_path returned error")?;
+    tracing::info!(%partition_path, "Found data partition");
+    let mut device = Box::new(
+        BlockDevice::from_proxy(partition_controller, &partition_path)
+            .await
+            .context("failed to make new device")?,
+    );
     let mut device: &mut dyn Device = device.as_mut();
     let mut zxcrypt_device;
     let mut inside_zxcrypt = false;
@@ -325,15 +339,16 @@ async fn shred_data_volume(
     } else {
         // Otherwise we need to find the Fxfs partition and shred it.
         // TODO(https://fxbug.dev/122940) Add support for fxblob.
-        let partition_path =
+        let partition_controller =
             find_data_partition(ramdisk_prefix).await.map_err(|_| zx::Status::NOT_FOUND)?;
+        let (block_proxy, block_server_end) =
+            fidl::endpoints::create_proxy::<BlockMarker>().map_err(|_| zx::Status::INTERNAL)?;
+        partition_controller
+            .connect_to_device_fidl(block_server_end.into_channel())
+            .map_err(|_| zx::Status::INTERNAL)?;
 
-        let block_client = RemoteBlockClient::new(
-            connect_to_protocol_at_path::<BlockMarker>(&partition_path)
-                .map_err(|_| zx::Status::INTERNAL)?,
-        )
-        .await
-        .map_err(|_| zx::Status::INTERNAL)?;
+        let block_client =
+            RemoteBlockClient::new(block_proxy).await.map_err(|_| zx::Status::INTERNAL)?;
 
         // Overwrite both super blocks.  Deliberately use a non-zero value so that we can tell this
         // has happened if we're debugging.

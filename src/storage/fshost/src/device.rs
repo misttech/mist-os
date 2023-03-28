@@ -158,7 +158,12 @@ impl Device for NandDevice {
 /// A block device.
 #[derive(Clone, Debug)]
 pub struct BlockDevice {
-    // The path of the device in /dev/class/.
+    // The canonical path of the device in /dev. Most of the time it's from /dev/class/, but it
+    // just needs to be able to be opened as a fuchsia.device/Controller.
+    //
+    // Eventually we should consider moving towards opening the device as a directory, which will
+    // let us re-open the controller and protocol connections, and be generally more future proof
+    // with respect to devfs.
     path: String,
 
     // The topological path.
@@ -183,16 +188,15 @@ impl BlockDevice {
     pub async fn new(path: impl ToString) -> Result<Self, Error> {
         let path = path.to_string();
         let controller = connect_to_protocol_at_path::<ControllerMarker>(&path)?;
-        let topological_path =
-            controller.get_topological_path().await?.map_err(zx::Status::from_raw)?;
-        Self::from_proxy(controller, path, topological_path)
+        Self::from_proxy(controller, path).await
     }
 
-    pub fn from_proxy(
+    pub async fn from_proxy(
         controller_proxy: ControllerProxy,
         path: impl ToString,
-        topological_path: impl ToString,
     ) -> Result<Self, Error> {
+        let topological_path =
+            controller_proxy.get_topological_path().await?.map_err(zx::Status::from_raw)?;
         let (partition_proxy, server) = create_proxy::<PartitionMarker>()?;
         controller_proxy.connect_to_device_fidl(server.into_channel())?;
         Ok(Self {

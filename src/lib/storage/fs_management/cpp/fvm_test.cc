@@ -4,6 +4,7 @@
 
 #include "src/lib/storage/fs_management/cpp/fvm.h"
 
+#include <fidl/fuchsia.device/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire_test_base.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -33,15 +34,13 @@ constexpr std::string_view kParent = "/fake/block/device/1";
 constexpr std::string_view kNotParent = "/fake/block/device/2";
 
 class FakePartition
-    : public fidl::testing::WireTestBase<fuchsia_hardware_block_partition::PartitionAndDevice> {
+    : public fidl::testing::WireTestBase<fuchsia_hardware_block_partition::Partition> {
  public:
-  FakePartition(const uuid::Uuid& type, const uuid::Uuid& instance, std::string_view label,
-                std::string_view path)
-      : type_guid_(type), instance_guid_(instance), label_(label), path_(path) {}
+  FakePartition(const uuid::Uuid& type, const uuid::Uuid& instance, std::string_view label)
+      : type_guid_(type), instance_guid_(instance), label_(label) {}
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
-    printf("'%s' was called unexpectedly", name.c_str());
-    ASSERT_TRUE(false);
+    FAIL() << name << " was called unexpectedly";
   }
 
   void GetTypeGuid(GetTypeGuidCompleter::Sync& completer) override {
@@ -65,44 +64,67 @@ class FakePartition
     completer.Reply(ZX_OK, label_object);
   }
 
-  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
-    completer.ReplySuccess(fidl::StringView::FromExternal(path_));
-  }
-
-  zx::result<fidl::ClientEnd<fuchsia_hardware_block_partition::PartitionAndDevice>> GetClient(
-      async_dispatcher_t* dispatcher) {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_block_partition::PartitionAndDevice>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    fidl::BindServer(dispatcher, std::move(endpoints->server), this);
-    return zx::ok(std::move(endpoints->client));
-  }
-
  private:
   fidl::Arena<1024> allocator_;
   uuid::Uuid type_guid_;
   uuid::Uuid instance_guid_;
   std::string_view label_;
+};
+
+class FakePartitionDevice : public fidl::testing::WireTestBase<fuchsia_device::Controller> {
+ public:
+  FakePartitionDevice(async_dispatcher_t* dispatcher, const uuid::Uuid& type,
+                      const uuid::Uuid& instance, std::string_view label, std::string_view path)
+      : dispatcher_(dispatcher), partition_(type, instance, label), path_(path) {}
+
+  void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
+    FAIL() << name << " was called unexpectedly";
+  }
+
+  void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override {
+    completer.ReplySuccess(fidl::StringView::FromExternal(path_));
+  }
+
+  void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
+                           ConnectToDeviceFidlCompleter::Sync& completer) override {
+    fidl::BindServer(
+        dispatcher_,
+        fidl::ServerEnd<fuchsia_hardware_block_partition::Partition>(std::move(request->server)),
+        &partition_);
+  }
+
+  zx::result<fidl::ClientEnd<fuchsia_device::Controller>> GetClient() {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+    fidl::BindServer(dispatcher_, std::move(endpoints->server), this);
+    return zx::ok(std::move(endpoints->client));
+  }
+
+ private:
+  async_dispatcher_t* dispatcher_;
+  FakePartition partition_;
   std::string_view path_;
 };
 
 class PartitionMatchesTest : public testing::Test {
  public:
   PartitionMatchesTest()
-      : partition_(kValidTypeGUID, kValidInstanceGUID, kValidLabel, kDefaultPath),
-        loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+      : loop_(&kAsyncLoopConfigNeverAttachToThread),
+        partition_(loop_.dispatcher(), kValidTypeGUID, kValidInstanceGUID, kValidLabel,
+                   kDefaultPath) {}
   void SetUp() override {
     ASSERT_EQ(loop_.StartThread("test-fidl-loop"), ZX_OK);
-    auto client = partition_.GetClient(loop_.dispatcher());
+    auto client = partition_.GetClient();
     ASSERT_EQ(client.status_value(), ZX_OK);
     client_ = std::move(client.value());
   }
 
  protected:
-  FakePartition partition_;
   async::Loop loop_;
-  fidl::ClientEnd<fuchsia_hardware_block_partition::PartitionAndDevice> client_;
+  FakePartitionDevice partition_;
+  fidl::ClientEnd<fuchsia_device::Controller> client_;
 };
 
 TEST_F(PartitionMatchesTest, TestTypeMatch) {

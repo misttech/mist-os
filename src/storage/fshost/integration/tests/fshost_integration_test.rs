@@ -7,8 +7,7 @@ use {
     fidl::endpoints::create_proxy,
     fidl_fuchsia_fshost as fshost,
     fidl_fuchsia_fshost::AdminMarker,
-    fidl_fuchsia_hardware_block_partition::Guid,
-    fidl_fuchsia_hardware_block_volume::{VolumeAndNodeMarker, VolumeManagerMarker, VolumeMarker},
+    fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker},
     fidl_fuchsia_io as fio,
     fs_management::{
         format::constants::DATA_PARTITION_LABEL,
@@ -304,15 +303,6 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     fixture.tear_down().await;
 }
 
-async fn get_instance_guid_from_path(dir_proxy: &fio::DirectoryProxy, path: &str) -> Box<Guid> {
-    let volume_proxy_data =
-        connect_to_named_protocol_at_dir_root::<VolumeAndNodeMarker>(dir_proxy, path).unwrap();
-
-    let (status, data_instance_guid) = volume_proxy_data.get_instance_guid().await.unwrap();
-    assert!(zx::Status::ok(status).is_ok());
-    data_instance_guid.unwrap()
-}
-
 #[fuchsia::test]
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn partition_max_size_set() {
@@ -327,12 +317,16 @@ async fn partition_max_size_set() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    // get blobfs instance guid
-    let mut blobfs_instance_guid = get_instance_guid_from_path(
+    // Get the blobfs instance guid.
+    // TODO(https://fxbug.dev/121274): Remove hardcoded paths
+    let volume_proxy_data = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
         &fixture.dir("dev-topological"),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
     )
-    .await;
+    .unwrap();
+    let (status, data_instance_guid) = volume_proxy_data.get_instance_guid().await.unwrap();
+    zx::Status::ok(status).unwrap();
+    let mut blobfs_instance_guid = data_instance_guid.unwrap();
 
     let data_matcher = PartitionMatcher {
         type_guids: Some(vec![DATA_TYPE_GUID]),
@@ -342,18 +336,21 @@ async fn partition_max_size_set() {
     };
 
     let dev = fixture.dir("dev-topological/class/block");
-    let data_partition_path = find_partition_in(&dev, data_matcher, zx::Duration::from_seconds(10))
-        .await
-        .expect("failed to find data partition");
+    let data_partition_controller =
+        find_partition_in(&dev, data_matcher, zx::Duration::from_seconds(10))
+            .await
+            .expect("failed to find data partition");
 
-    let data_path = data_partition_path
-        .strip_prefix("/dev/")
-        .expect("data partition topo path should start with /dev/");
+    // Get the data instance guid.
+    let (volume_proxy, volume_server_end) =
+        fidl::endpoints::create_proxy::<VolumeMarker>().unwrap();
+    data_partition_controller.connect_to_device_fidl(volume_server_end.into_channel()).unwrap();
 
-    // get data instance guid
-    let mut data_instance_guid =
-        get_instance_guid_from_path(&fixture.dir("dev-topological"), &data_path).await;
+    let (status, data_instance_guid) = volume_proxy.get_instance_guid().await.unwrap();
+    zx::Status::ok(status).unwrap();
+    let mut data_instance_guid = data_instance_guid.unwrap();
 
+    // TODO(https://fxbug.dev/121274): Remove hardcoded paths
     let fvm_proxy = connect_to_named_protocol_at_dir_root::<VolumeManagerMarker>(
         &fixture.dir("dev-topological"),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
@@ -363,13 +360,13 @@ async fn partition_max_size_set() {
     // blobfs max size check
     let (status, blobfs_slice_count) =
         fvm_proxy.get_partition_limit(blobfs_instance_guid.as_mut()).await.unwrap();
-    assert!(zx::Status::ok(status).is_ok());
+    zx::Status::ok(status).unwrap();
     assert_eq!(blobfs_slice_count, BLOBFS_MAX_BYTES / FVM_SLICE_SIZE);
 
     // data max size check
     let (status, data_slice_count) =
         fvm_proxy.get_partition_limit(data_instance_guid.as_mut()).await.unwrap();
-    assert!(zx::Status::ok(status).is_ok());
+    zx::Status::ok(status).unwrap();
     assert_eq!(data_slice_count, DATA_MAX_BYTES / FVM_SLICE_SIZE);
 
     fixture.tear_down().await;

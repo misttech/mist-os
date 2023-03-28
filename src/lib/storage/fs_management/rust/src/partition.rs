@@ -5,11 +5,10 @@
 use {
     crate::format::{detect_disk_format, DiskFormat},
     anyhow::{anyhow, Context, Error},
-    fidl::endpoints::Proxy,
+    fidl::endpoints::Proxy as _,
+    fidl_fuchsia_device::{ControllerMarker, ControllerProxy},
     fidl_fuchsia_hardware_block::BlockProxy,
-    fidl_fuchsia_hardware_block_partition::{
-        Guid, PartitionAndDeviceMarker, PartitionAndDeviceProxy,
-    },
+    fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker},
     fidl_fuchsia_hardware_block_volume::VolumeManagerProxy,
     fidl_fuchsia_io as fio,
     fuchsia_async::TimeoutExt,
@@ -45,7 +44,13 @@ const BLOCK_DEV_PATH: &str = "/dev/class/block/";
 
 /// Waits for a partition to appear on BLOCK_DEV_PATH that matches the fields in the
 /// PartitionMatcher. Returns the path of the partition if found. Errors after timeout duration.
-pub async fn find_partition(matcher: PartitionMatcher, timeout: Duration) -> Result<String, Error> {
+// TODO(fxbug.dev/122007): Most users end up wanting the things we open for checking the partition,
+// like the partition proxy and the topological path. We should consider returning all those
+// resources instead of forcing them to retrieve them again.
+pub async fn find_partition(
+    matcher: PartitionMatcher,
+    timeout: Duration,
+) -> Result<ControllerProxy, Error> {
     let dir =
         fuchsia_fs::directory::open_in_namespace(BLOCK_DEV_PATH, fuchsia_fs::OpenFlags::empty())?;
     find_partition_in(&dir, matcher, timeout).await
@@ -58,7 +63,7 @@ pub async fn find_partition_in(
     dir: &fio::DirectoryProxy,
     matcher: PartitionMatcher,
     timeout: Duration,
-) -> Result<String, Error> {
+) -> Result<ControllerProxy, Error> {
     async {
         let mut watcher = Watcher::new(dir).await.context("making watcher")?;
         while let Some(message) = watcher.next().await {
@@ -69,11 +74,14 @@ pub async fn find_partition_in(
                     if filename == "." {
                         continue;
                     }
-                    match partition_matches(&dir, filename, &matcher).await {
-                        Ok(Some(topological_path)) => {
-                            return Ok(topological_path);
+                    let proxy =
+                        connect_to_named_protocol_at_dir_root::<ControllerMarker>(&dir, filename)
+                            .context("opening partition path")?;
+                    match partition_matches_with_proxy(&proxy, &matcher).await {
+                        Ok(true) => {
+                            return Ok(proxy);
                         }
-                        Ok(None) => {}
+                        Ok(false) => {}
                         Err(error) => {
                             tracing::info!(?error, "Failure in partition match. Transient device?");
                         }
@@ -89,24 +97,13 @@ pub async fn find_partition_in(
 }
 
 /// Checks if the partition associated with proxy matches the matcher.
-/// On success, returns the topological path.
 /// An error isn't necessarily an issue - we might be using a matcher that wants a type guid,
 /// but the device we are currently checking doesn't implement get_type_guid. The error message may
 /// help debugging why no partition was matched but should generally be considered recoverable.
-async fn partition_matches(
-    dir: &fio::DirectoryProxy,
-    filename: &str,
-    matcher: &PartitionMatcher,
-) -> Result<Option<String>, Error> {
-    let proxy = connect_to_named_protocol_at_dir_root::<PartitionAndDeviceMarker>(&dir, filename)
-        .context("opening partition path")?;
-    partition_matches_with_proxy(proxy, matcher).await
-}
-
 async fn partition_matches_with_proxy(
-    proxy: PartitionAndDeviceProxy,
+    controller_proxy: &ControllerProxy,
     matcher: &PartitionMatcher,
-) -> Result<Option<String>, Error> {
+) -> Result<bool, Error> {
     assert!(
         matcher.type_guids.is_some()
             || matcher.instance_guids.is_some()
@@ -115,32 +112,41 @@ async fn partition_matches_with_proxy(
             || matcher.labels.is_some()
     );
 
+    let (partition_proxy, partition_server_end) =
+        fidl::endpoints::create_proxy::<PartitionMarker>().context("making partition endpoints")?;
+    controller_proxy
+        .connect_to_device_fidl(partition_server_end.into_channel())
+        .context("connecting to partition protocol")?;
+
     if let Some(matcher_type_guids) = &matcher.type_guids {
         let (status, guid_option) =
-            proxy.get_type_guid().await.context("transport error on get_type_guid")?;
+            partition_proxy.get_type_guid().await.context("transport error on get_type_guid")?;
         zx::Status::ok(status).context("get_type_guid failed")?;
         let guid = guid_option.ok_or(anyhow!("Expected type guid"))?;
         if !matcher_type_guids.into_iter().any(|x| x == &guid.value) {
-            return Ok(None);
+            return Ok(false);
         }
     }
 
     if let Some(matcher_instance_guids) = &matcher.instance_guids {
-        let (status, guid_option) =
-            proxy.get_instance_guid().await.context("transport error on get_instance_guid")?;
+        let (status, guid_option) = partition_proxy
+            .get_instance_guid()
+            .await
+            .context("transport error on get_instance_guid")?;
         zx::Status::ok(status).context("get_instance_guid failed")?;
         let guid = guid_option.ok_or(anyhow!("Expected instance guid"))?;
         if !matcher_instance_guids.into_iter().any(|x| x == &guid.value) {
-            return Ok(None);
+            return Ok(false);
         }
     }
 
     if let Some(matcher_labels) = &matcher.labels {
-        let (status, name) = proxy.get_name().await.context("transport error on get_name")?;
+        let (status, name) =
+            partition_proxy.get_name().await.context("transport error on get_name")?;
         zx::Status::ok(status).context("get_name failed")?;
         let name = name.ok_or(anyhow!("Expected name"))?;
         if name.is_empty() {
-            return Ok(None);
+            return Ok(false);
         }
         let mut matches_label = false;
         for label in matcher_labels {
@@ -150,11 +156,11 @@ async fn partition_matches_with_proxy(
             }
         }
         if !matches_label {
-            return Ok(None);
+            return Ok(false);
         }
     }
 
-    let topological_path = proxy
+    let topological_path = controller_proxy
         .get_topological_path()
         .await
         .context("get_topological_path failed")?
@@ -162,30 +168,31 @@ async fn partition_matches_with_proxy(
 
     if let Some(matcher_parent_device) = &matcher.parent_device {
         if !topological_path.starts_with(matcher_parent_device) {
-            return Ok(None);
+            return Ok(false);
         }
     }
 
     if let Some(matcher_ignore_prefix) = &matcher.ignore_prefix {
         if topological_path.starts_with(matcher_ignore_prefix) {
-            return Ok(None);
+            return Ok(false);
         }
     }
 
     if let Some(matcher_ignore_if_path_contains) = &matcher.ignore_if_path_contains {
         if topological_path.find(matcher_ignore_if_path_contains) != None {
-            return Ok(None);
+            return Ok(false);
         }
     }
 
     if let Some(matcher_detected_disk_formats) = &matcher.detected_disk_formats {
-        let block_proxy = BlockProxy::new(proxy.into_channel().unwrap());
+        // TODO(https://fxbug.dev/122007): avoid this cast
+        let block_proxy = BlockProxy::from_channel(partition_proxy.into_channel().unwrap());
         let detected_format = detect_disk_format(&block_proxy).await;
         if !matcher_detected_disk_formats.into_iter().any(|x| x == &detected_format) {
-            return Ok(None);
+            return Ok(false);
         }
     }
-    Ok(Some(topological_path))
+    Ok(true)
 }
 
 pub async fn fvm_allocate_partition(
@@ -195,7 +202,7 @@ pub async fn fvm_allocate_partition(
     name: &str,
     flags: u32,
     slice_count: u64,
-) -> Result<String, Error> {
+) -> Result<ControllerProxy, Error> {
     let status = fvm_proxy
         .allocate_partition(
             slice_count,
@@ -221,12 +228,11 @@ mod tests {
     use {
         super::{partition_matches_with_proxy, PartitionMatcher},
         crate::format::{constants, DiskFormat},
-        fidl::endpoints::create_proxy_and_stream,
+        fidl::endpoints::{create_proxy_and_stream, RequestStream as _},
+        fidl_fuchsia_device::{ControllerMarker, ControllerRequest},
         fidl_fuchsia_hardware_block::{BlockInfo, Flag},
-        fidl_fuchsia_hardware_block_partition::{
-            Guid, PartitionAndDeviceMarker, PartitionAndDeviceRequest,
-        },
-        fuchsia_zircon as zx,
+        fidl_fuchsia_hardware_block_partition::{Guid, PartitionRequest, PartitionRequestStream},
+        fuchsia_async as fasync, fuchsia_zircon as zx,
         futures::{pin_mut, select, FutureExt, StreamExt},
     };
 
@@ -258,28 +264,25 @@ mod tests {
     const DEFAULT_PATH: &str = "/fake/block/device/1/partition/001";
 
     async fn check_partition_matches(matcher: &PartitionMatcher) -> bool {
-        let (proxy, mut stream) = create_proxy_and_stream::<PartitionAndDeviceMarker>().unwrap();
+        let (proxy, mut stream) = create_proxy_and_stream::<ControllerMarker>().unwrap();
 
-        let mock_device = async {
+        let mock_partition = |mut stream: PartitionRequestStream| async move {
             while let Some(request) = stream.next().await {
                 match request {
-                    Ok(PartitionAndDeviceRequest::GetTypeGuid { responder }) => {
+                    Ok(PartitionRequest::GetTypeGuid { responder }) => {
                         responder
                             .send(zx::sys::ZX_OK, Some(&mut Guid { value: VALID_TYPE_GUID }))
                             .unwrap();
                     }
-                    Ok(PartitionAndDeviceRequest::GetInstanceGuid { responder }) => {
+                    Ok(PartitionRequest::GetInstanceGuid { responder }) => {
                         responder
                             .send(zx::sys::ZX_OK, Some(&mut Guid { value: VALID_INSTANCE_GUID }))
                             .unwrap();
                     }
-                    Ok(PartitionAndDeviceRequest::GetName { responder }) => {
+                    Ok(PartitionRequest::GetName { responder }) => {
                         responder.send(zx::sys::ZX_OK, Some(VALID_LABEL)).unwrap();
                     }
-                    Ok(PartitionAndDeviceRequest::GetTopologicalPath { responder }) => {
-                        responder.send(&mut Ok(DEFAULT_PATH.to_string())).unwrap();
-                    }
-                    Ok(PartitionAndDeviceRequest::GetInfo { responder }) => {
+                    Ok(PartitionRequest::GetInfo { responder }) => {
                         responder
                             .send(&mut Ok(BlockInfo {
                                 block_count: 1000,
@@ -289,7 +292,7 @@ mod tests {
                             }))
                             .unwrap();
                     }
-                    Ok(PartitionAndDeviceRequest::ReadBlocks {
+                    Ok(PartitionRequest::ReadBlocks {
                         responder,
                         vmo_offset,
                         vmo,
@@ -307,16 +310,35 @@ mod tests {
                     }
                 }
             }
+        };
+
+        let mock_controller = async {
+            while let Some(request) = stream.next().await {
+                match request {
+                    Ok(ControllerRequest::GetTopologicalPath { responder }) => {
+                        responder.send(&mut Ok(DEFAULT_PATH.to_string())).unwrap();
+                    }
+                    Ok(ControllerRequest::ConnectToDeviceFidl { server, .. }) => {
+                        fasync::Task::spawn(mock_partition(PartitionRequestStream::from_channel(
+                            fasync::Channel::from_channel(server).unwrap(),
+                        )))
+                        .detach();
+                    }
+                    _ => {
+                        println!("Unexpected request: {:?}", request);
+                        unreachable!()
+                    }
+                }
+            }
         }
         .fuse();
 
-        pin_mut!(mock_device);
+        pin_mut!(mock_controller);
 
         select! {
-            _ = mock_device => unreachable!(),
-            matches = partition_matches_with_proxy(proxy, &matcher).fuse() => matches,
+            _ = mock_controller => unreachable!(),
+            matches = partition_matches_with_proxy(&proxy, &matcher).fuse() => matches,
         }
-        .map(|v| v.is_some())
         .unwrap_or(false)
     }
 

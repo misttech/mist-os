@@ -21,7 +21,6 @@ use {
         Blobfs,
     },
     fshost_test_fixture::TestFixture,
-    fuchsia_component::client::connect_to_named_protocol_at_dir_root,
     fuchsia_zircon as zx,
     remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient},
 };
@@ -160,19 +159,13 @@ async fn blobfs_formatted() {
             labels: Some(vec!["blobfs".to_string()]),
             ..Default::default()
         };
-        let blobfs_path = find_partition_in(
+        let controller = find_partition_in(
             &fixture.dir("dev-topological/class/block"),
             matcher,
             zx::Duration::INFINITE,
         )
         .await
         .unwrap();
-        let controller =
-            connect_to_named_protocol_at_dir_root::<fidl_fuchsia_device::ControllerMarker>(
-                &fixture.dir("dev-topological"),
-                &blobfs_path.strip_prefix("/dev").unwrap(),
-            )
-            .unwrap();
         let blobfs = Blobfs::new(controller).serve().await.unwrap();
 
         let blobfs_root = blobfs.root();
@@ -221,7 +214,6 @@ async fn data_unformatted() {
         .await
         .expect("get topo path fidl failed")
         .expect("get topo path returned error");
-    let dev = fixture.dir("dev-topological");
     let dev_class = fixture.dir("dev-topological/class/block");
     let matcher = PartitionMatcher {
         parent_device: Some(test_disk_path),
@@ -231,13 +223,11 @@ async fn data_unformatted() {
 
     let orig_instance_guid;
     {
-        let data_path =
+        let data_controller =
             find_partition_in(&dev_class, matcher.clone(), zx::Duration::INFINITE).await.unwrap();
-        let data_partition = connect_to_named_protocol_at_dir_root::<PartitionMarker>(
-            &dev,
-            &data_path.strip_prefix("/dev").unwrap(),
-        )
-        .unwrap();
+        let (data_partition, partition_server_end) =
+            fidl::endpoints::create_proxy::<PartitionMarker>().unwrap();
+        data_controller.connect_to_device_fidl(partition_server_end.into_channel()).unwrap();
 
         let (status, guid) = data_partition.get_instance_guid().await.unwrap();
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
@@ -261,12 +251,11 @@ async fn data_unformatted() {
     admin.wipe_storage(blobfs_server).await.unwrap().expect("WipeStorage unexpectedly failed");
 
     // Ensure the data partition was assigned a new instance GUID.
-    let data_path = find_partition_in(&dev_class, matcher, zx::Duration::INFINITE).await.unwrap();
-    let data_partition = connect_to_named_protocol_at_dir_root::<PartitionMarker>(
-        &dev,
-        &data_path.strip_prefix("/dev").unwrap(),
-    )
-    .unwrap();
+    let data_controller =
+        find_partition_in(&dev_class, matcher, zx::Duration::INFINITE).await.unwrap();
+    let (data_partition, partition_server_end) =
+        fidl::endpoints::create_proxy::<PartitionMarker>().unwrap();
+    data_controller.connect_to_device_fidl(partition_server_end.into_channel()).unwrap();
     let (status, guid) = data_partition.get_instance_guid().await.unwrap();
     assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
     assert_ne!(guid.unwrap(), orig_instance_guid);
