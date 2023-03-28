@@ -69,17 +69,14 @@ pub async fn find_partition_in(
                     if filename == "." {
                         continue;
                     }
-                    let device_proxy = connect_to_named_protocol_at_dir_root::<
-                        PartitionAndDeviceMarker,
-                    >(&dir, filename)
-                    .context("opening partition path")?;
-                    let topological_path = device_proxy
-                        .get_topological_path()
-                        .await
-                        .context("Failed to get topological path in open partition")?
-                        .map_err(zx::Status::from_raw)?;
-                    if partition_matches(device_proxy, &matcher).await {
-                        return Ok(topological_path);
+                    match partition_matches(&dir, filename, &matcher).await {
+                        Ok(Some(topological_path)) => {
+                            return Ok(topological_path);
+                        }
+                        Ok(None) => {}
+                        Err(error) => {
+                            tracing::info!(?error, "Failure in partition match. Transient device?");
+                        }
                     }
                 }
                 _ => (),
@@ -91,25 +88,25 @@ pub async fn find_partition_in(
     .await
 }
 
-/// Checks if the partition associated with proxy matches the matcher. If an error is encountered,
-/// it prints it out as a warning and returns false. An error isn't necessarily an issue - we might
-/// be using a matcher that wants a type guid, but the device we are currently checking doesn't
-/// implement get_type_guid. The error message may help debugging why no partition was matched
-/// though.
-pub async fn partition_matches(proxy: PartitionAndDeviceProxy, matcher: &PartitionMatcher) -> bool {
-    match partition_matches_res(proxy, matcher).await {
-        Ok(matched) => matched,
-        Err(e) => {
-            tracing::warn!(?e, "partition_matches failed");
-            return false;
-        }
-    }
+/// Checks if the partition associated with proxy matches the matcher.
+/// On success, returns the topological path.
+/// An error isn't necessarily an issue - we might be using a matcher that wants a type guid,
+/// but the device we are currently checking doesn't implement get_type_guid. The error message may
+/// help debugging why no partition was matched but should generally be considered recoverable.
+async fn partition_matches(
+    dir: &fio::DirectoryProxy,
+    filename: &str,
+    matcher: &PartitionMatcher,
+) -> Result<Option<String>, Error> {
+    let proxy = connect_to_named_protocol_at_dir_root::<PartitionAndDeviceMarker>(&dir, filename)
+        .context("opening partition path")?;
+    partition_matches_with_proxy(proxy, matcher).await
 }
 
-async fn partition_matches_res(
+async fn partition_matches_with_proxy(
     proxy: PartitionAndDeviceProxy,
     matcher: &PartitionMatcher,
-) -> Result<bool, Error> {
+) -> Result<Option<String>, Error> {
     assert!(
         matcher.type_guids.is_some()
             || matcher.instance_guids.is_some()
@@ -124,7 +121,7 @@ async fn partition_matches_res(
         zx::Status::ok(status).context("get_type_guid failed")?;
         let guid = guid_option.ok_or(anyhow!("Expected type guid"))?;
         if !matcher_type_guids.into_iter().any(|x| x == &guid.value) {
-            return Ok(false);
+            return Ok(None);
         }
     }
 
@@ -134,7 +131,7 @@ async fn partition_matches_res(
         zx::Status::ok(status).context("get_instance_guid failed")?;
         let guid = guid_option.ok_or(anyhow!("Expected instance guid"))?;
         if !matcher_instance_guids.into_iter().any(|x| x == &guid.value) {
-            return Ok(false);
+            return Ok(None);
         }
     }
 
@@ -143,7 +140,7 @@ async fn partition_matches_res(
         zx::Status::ok(status).context("get_name failed")?;
         let name = name.ok_or(anyhow!("Expected name"))?;
         if name.is_empty() {
-            return Ok(false);
+            return Ok(None);
         }
         let mut matches_label = false;
         for label in matcher_labels {
@@ -153,7 +150,7 @@ async fn partition_matches_res(
             }
         }
         if !matches_label {
-            return Ok(false);
+            return Ok(None);
         }
     }
 
@@ -165,19 +162,19 @@ async fn partition_matches_res(
 
     if let Some(matcher_parent_device) = &matcher.parent_device {
         if !topological_path.starts_with(matcher_parent_device) {
-            return Ok(false);
+            return Ok(None);
         }
     }
 
     if let Some(matcher_ignore_prefix) = &matcher.ignore_prefix {
         if topological_path.starts_with(matcher_ignore_prefix) {
-            return Ok(false);
+            return Ok(None);
         }
     }
 
     if let Some(matcher_ignore_if_path_contains) = &matcher.ignore_if_path_contains {
         if topological_path.find(matcher_ignore_if_path_contains) != None {
-            return Ok(false);
+            return Ok(None);
         }
     }
 
@@ -185,10 +182,10 @@ async fn partition_matches_res(
         let block_proxy = BlockProxy::new(proxy.into_channel().unwrap());
         let detected_format = detect_disk_format(&block_proxy).await;
         if !matcher_detected_disk_formats.into_iter().any(|x| x == &detected_format) {
-            return Ok(false);
+            return Ok(None);
         }
     }
-    return Ok(true);
+    Ok(Some(topological_path))
 }
 
 pub async fn fvm_allocate_partition(
@@ -222,7 +219,7 @@ pub async fn fvm_allocate_partition(
 #[cfg(test)]
 mod tests {
     use {
-        super::{partition_matches, PartitionMatcher},
+        super::{partition_matches_with_proxy, PartitionMatcher},
         crate::format::{constants, DiskFormat},
         fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_hardware_block::{BlockInfo, Flag},
@@ -317,8 +314,10 @@ mod tests {
 
         select! {
             _ = mock_device => unreachable!(),
-            matches = partition_matches(proxy, &matcher).fuse() => matches,
+            matches = partition_matches_with_proxy(proxy, &matcher).fuse() => matches,
         }
+        .map(|v| v.is_some())
+        .unwrap_or(false)
     }
 
     #[fuchsia::test]
