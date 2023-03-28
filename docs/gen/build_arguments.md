@@ -7760,6 +7760,14 @@ Whether or not logging is disabled globally.
 
 From //src/proc/bin/starnix/BUILD.gn:20
 
+### starnix_disable_tracing
+
+Whether or not tracing is disabled globally.
+
+**Current value (from the default):** `true`
+
+From //src/proc/bin/starnix/BUILD.gn:23
+
 ### starnix_restricted_mode
 
 **Current value (from the default):** `false`
