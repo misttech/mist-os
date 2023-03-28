@@ -13,7 +13,7 @@
         binary: "bin/font_provider",
         args: [
             "--font-manifest",
-            "/pkg/data/assets/downstream_test_font_collection_all.hermetic_assets.font_manifest.json",
+            "/pkg/data/assets/downstream-test-font-collection_all.hermetic_assets.font_manifest.json",
         ],
     },
     capabilities: [
