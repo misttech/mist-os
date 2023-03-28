@@ -1,9 +1,3 @@
-abarth@google.com
-brettw@google.com
-jamesr@google.com
-lindkvist@google.com
-qsr@google.com
-tbodt@google.com
-vickiecheng@google.com
+include /src/starnix/OWNERS
 
 # COMPONENT: Starnix
