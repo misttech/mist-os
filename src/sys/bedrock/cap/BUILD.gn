@@ -36,6 +36,7 @@ rustc_library("cap") {
     "src/dict.rs",
     "src/handle.rs",
     "src/lib.rs",
+    "src/multishot.rs",
     "src/null.rs",
     "src/oneshot.rs",
   ]

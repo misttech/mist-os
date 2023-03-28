@@ -25,7 +25,6 @@ use {
     fidl::endpoints::{spawn_stream_handler, Proxy},
     fidl::HandleBased,
     fidl_fuchsia_examples as fexamples, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::future::BoxFuture,
     futures::try_join,
     tracing::info,
 };
@@ -33,16 +32,8 @@ use {
 /// The name of the echo capability in incoming/outgoing dicts.
 const ECHO_CAP_NAME: &str = "echo";
 
-/// A capability that serves a single Echo protocol connection.
-#[derive(Debug)]
 struct Echo {
     proxy: fexamples::EchoProxy,
-}
-impl cap::Capability for Echo {}
-impl cap::Remote for Echo {
-    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        unimplemented!()
-    }
 }
 
 impl Echo {

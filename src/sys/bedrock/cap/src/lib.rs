@@ -7,11 +7,13 @@
 mod cap;
 pub mod dict;
 pub mod handle;
+pub mod multishot;
 pub mod null;
 pub mod oneshot;
 
 pub use self::cap::{AnyCapability, Capability, Remote};
 pub use self::dict::Dict;
 pub use self::handle::Handle;
+pub use self::multishot::multishot;
 pub use self::null::Null;
 pub use self::oneshot::oneshot;

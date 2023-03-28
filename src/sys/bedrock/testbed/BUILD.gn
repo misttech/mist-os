@@ -43,6 +43,7 @@ rustc_test("bin") {
   ]
 
   sources = [
+    "src/echo_multishot.rs",
     "src/echo_oneshot.rs",
     "src/echo_oneshot_channel.rs",
     "src/echo_oneshot_remote.rs",
