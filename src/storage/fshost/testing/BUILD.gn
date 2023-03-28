@@ -6,19 +6,15 @@ import("//src/storage/fshost/fshost.gni")
 
 fshost_component_and_config("test-fshost") {
   testonly = true
-  options = default_integration_test_options
-  options.data_filesystem_format = "minfs"
-}
-
-fshost_component_and_config("test-fshost-fxfs") {
-  testonly = true
-  options = default_integration_test_options
-  options.data_filesystem_format = "fxfs"
+  options = {
+    data_filesystem_format = "minfs"
+  }
 }
 
 fshost_component_and_config("test-fshost-no-watcher") {
   testonly = true
-  options = default_integration_test_options
-  options.data_filesystem_format = "minfs"
-  options.disable_block_watcher = true
+  options = {
+    data_filesystem_format = "minfs"
+    disable_block_watcher = true
+  }
 }

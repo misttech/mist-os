@@ -646,6 +646,7 @@ async fn disable_block_watcher() {
 #[cfg_attr(feature = "fxblob", ignore)]
 async fn reset_fvm_partitions() {
     let mut builder = new_builder();
+    builder.fshost().set_config_value("data_max_bytes", DEFAULT_DATA_VOLUME_SIZE);
     builder
         .with_disk()
         .format_volumes(volumes_spec())
@@ -700,6 +701,6 @@ async fn reset_fvm_partitions() {
         let volume_info = volume_info.expect("get_volume_info returned no volume info");
         let slice_size = manager_info.slice_size;
         let slice_count = volume_info.partition_slice_count;
-        assert!(slice_size * slice_count > (DEFAULT_DATA_VOLUME_SIZE / 2));
+        assert_eq!(slice_size * slice_count, DEFAULT_DATA_VOLUME_SIZE);
     }
 }

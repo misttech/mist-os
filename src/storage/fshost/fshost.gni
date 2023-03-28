@@ -169,24 +169,3 @@ template("fshost_component_and_config") {
     }
   }
 }
-
-default_integration_test_options = {
-  # Some of the tests require us to be able to match against multiple GPT devices.
-  gpt_all = true
-
-  # The test BlockDeviceManagerIntegration.MaxSize verifies that the minfs "max runtime bytes" gets
-  # applied correctly. It checks that the max size in FVM is set to this value. The
-  # "apply_limits_to_ramdisk" flag is required to apply the minfs limit even to a ramdisk which is
-  # used in tests (normally the limits apply only to physical devices).  This number applies to all
-  # tests in the fshost integration test, so all minfs partitions created must be smaller than this
-  # value, but all disks should be larger than this value.
-  data_max_bytes = 117440512
-
-  apply_limits_to_ramdisk = true
-  check_filesystems = true
-
-  # The BlockDeviceManagerIntegration.SetPartitionName test needs this.
-  allow_legacy_data_partition_names = true
-
-  blobfs_use_deprecated_padded_format = false
-}

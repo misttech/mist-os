@@ -63,18 +63,19 @@ rustc_library("fshost_test_fixture") {
 # Generates an fshost integration test component. Includes the fshost component on which the test
 # is exectuted.
 #
-#   data_filesystem_format (required)
+#   options.data_filesystem_format (required)
 #     [string] The format of the data partition fshost exports. One of "fxfs", "minfs", or "f2fs".
+#              The options scope can also contain additional fshost options if required.
 #
 #   data_filesystem_variant (optional)
 #     [string] A variant string passed to the integration test harness. Defaults to the
 #              data_filesystem_format.
 #
 template("fshost_integration_test") {
-  assert(defined(invoker.data_filesystem_format),
-         "data filesystem format not specified")
+  assert(defined(invoker.options), "fshost options not specified")
+  fshost_options = invoker.options
   if (!defined(invoker.data_filesystem_variant)) {
-    invoker.data_filesystem_variant = invoker.data_filesystem_format
+    invoker.data_filesystem_variant = fshost_options.data_filesystem_format
   }
 
   _fshost_target = "test-fshost-${target_name}"
@@ -97,11 +98,11 @@ template("fshost_integration_test") {
     ]
     rustenv = [
       "FSHOST_COMPONENT_NAME=${_fshost_component_name}",
-      "DATA_FILESYSTEM_FORMAT=${invoker.data_filesystem_format}",
+      "DATA_FILESYSTEM_FORMAT=${fshost_options.data_filesystem_format}",
       "DATA_FILESYSTEM_VARIANT=${invoker.data_filesystem_variant}",
     ]
     features = [
-      invoker.data_filesystem_format,
+      fshost_options.data_filesystem_format,
       invoker.data_filesystem_variant,
     ]
     deps = [
@@ -164,45 +165,45 @@ template("fshost_integration_test") {
 }
 
 fshost_integration_test("fshost_integration_tests_fxfs") {
-  data_filesystem_format = "fxfs"
-  options = default_integration_test_options
-  options.data_filesystem_format = "fxfs"
+  options = {
+    data_filesystem_format = "fxfs"
+  }
 }
 
 fshost_integration_test("fshost_integration_tests_f2fs") {
-  data_filesystem_format = "f2fs"
-  options = default_integration_test_options
-  options.data_filesystem_format = "f2fs"
+  options = {
+    data_filesystem_format = "f2fs"
+  }
 }
 
 fshost_integration_test("fshost_integration_tests_minfs") {
-  data_filesystem_format = "minfs"
-  options = default_integration_test_options
-  options.data_filesystem_format = "minfs"
+  options = {
+    data_filesystem_format = "minfs"
+  }
 }
 
 fshost_integration_test("fshost_integration_tests_fxfs_fxblob") {
-  data_filesystem_format = "fxfs"
   data_filesystem_variant = "fxblob"
-  options = default_integration_test_options
-  options.fxfs_blob = true
-  options.data_filesystem_format = "fxfs"
+  options = {
+    fxfs_blob = true
+    data_filesystem_format = "fxfs"
+  }
 }
 
 fshost_integration_test("fshost_integration_tests_f2fs_no_zxcrypt") {
-  data_filesystem_format = "f2fs"
   data_filesystem_variant = "f2fs-no-zxcrypt"
-  options = default_integration_test_options
-  options.no_zxcrypt = true
-  options.data_filesystem_format = "f2fs"
+  options = {
+    no_zxcrypt = true
+    data_filesystem_format = "f2fs"
+  }
 }
 
 fshost_integration_test("fshost_integration_tests_minfs_no_zxcrypt") {
-  data_filesystem_format = "minfs"
   data_filesystem_variant = "minfs-no-zxcrypt"
-  options = default_integration_test_options
-  options.no_zxcrypt = true
-  options.data_filesystem_format = "minfs"
+  options = {
+    no_zxcrypt = true
+    data_filesystem_format = "minfs"
+  }
 }
 
 fuchsia_test_package("fshost_integration_tests") {
