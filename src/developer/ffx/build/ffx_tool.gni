@@ -131,9 +131,9 @@ template("ffx_tool") {
 
   if (defined(invoker.sdk_target_name)) {
     # Add to the sdk
-    file_base_root = "ffx_tools"
+    file_base_root = "tools/ffx_tools"
     if (host_os == "linux" || host_os == "mac") {
-      file_base_root = "ffx_tools/$current_cpu"
+      file_base_root = "tools/$current_cpu/ffx_tools"
     }
 
     file_base = "$file_base_root/$output_name"
@@ -157,7 +157,7 @@ template("ffx_tool") {
         value = {
           type = "ffx_tool"
           name = output_name
-          root = file_base_root
+          root = "tools"
           files = [
             file_base,
             file_base_metadata,
