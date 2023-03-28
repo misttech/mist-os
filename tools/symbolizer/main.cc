@@ -36,38 +36,21 @@ int AuthMode() {
     // Clear the callback.
     server->set_state_change_callback({});
   }
+  loop.Cleanup();
 
   if (server->state() == zxdb::SymbolServer::State::kReady) {
     std::cout << "You have already authenticated. To use another credential, please remove "
               << "~/.fuchsia/debug/googleapi_auth and sign out gcloud using "
               << "`gcloud auth application-default revoke`\n";
-    loop.Cleanup();
     return EXIT_SUCCESS;
   }
 
-  std::string key;
-  std::cout << "To authenticate, please supply an authentication token. "
-            << "You can retrieve a token from:\n"
-            << server->AuthInfo() << '\n'
-            << "Enter the server authentication key: ";
-  std::cin >> key;
-
-  int exit_code;
-  server->Authenticate(key, [&loop, &exit_code](const zxdb::Err& err) {
-    if (err.has_error()) {
-      std::cout << "Server authentication failed: " << err.msg() << ".\n";
-      exit_code = EXIT_FAILURE;
-    } else {
-      std::cout << "Authentication successful.\n";
-      exit_code = EXIT_SUCCESS;
-    }
-    loop.QuitNow();
-  });
-
-  loop.Run();
-  loop.Cleanup();
-
-  return exit_code;
+  std::cout
+      << "OOB auth workflow is deprecated (go/oauth-oob-deprecation). "
+      << "To authenticate, please run the following command\n\n"
+      << "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
+      << "For more information, please see fxbug.dev/119250.\n";
+  return EXIT_FAILURE;
 }
 
 }  // namespace

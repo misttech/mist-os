@@ -42,27 +42,11 @@ void RunVerbAuth(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
     return cmd_context->ReportError(Err("Server is not requesting authentication."));
   }
 
-  if (cmd.args().size() == 0) {
-    if (cmd.sym_server()->auth_type() != SymbolServer::AuthType::kOAuth) {
-      return cmd_context->ReportError(Err("Unknown authentication type."));
-    }
-
-    cmd_context->Output(std::string("To authenticate, please supply an authentication "
-                                    "token. You can retrieve a token from:\n\n") +
-                        cmd.sym_server()->AuthInfo() +
-                        "\n\nOnce you've retrieved a token, run 'auth <token>'");
-    return;
-  }
-
-  cmd.sym_server()->Authenticate(
-      cmd.args()[0], [name = cmd.sym_server()->name(), cmd_context](const Err& err) {
-        if (!err.has_error()) {
-          cmd_context->Output(std::string("Successfully authenticated with ") + name);
-        } else {
-          cmd_context->ReportError(
-              Err(std::string("Authentication with ") + name + " failed: " + err.msg()));
-        }
-      });
+  cmd_context->Output(
+      "OOB auth workflow is deprecated (go/oauth-oob-deprecation). "
+      "To authenticate, please run the following command and restart zxdb\n\n"
+      "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
+      "For more information, please see fxbug.dev/119250.");
 }
 
 }  // namespace
