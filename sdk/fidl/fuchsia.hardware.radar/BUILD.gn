@@ -8,6 +8,4 @@ fidl("fuchsia.hardware.radar") {
   sdk_category = "partner"
   sources = [ "radar.fidl" ]
   public_deps = [ "//zircon/vdso/zx" ]
-
-  enable_hlcpp = true
 }
