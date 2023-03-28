@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/test.gni")
 
-rustc_library("vmo_types") {
+rustc_library("heapdump_vmo") {
   edition = "2021"
   with_unit_tests = true
 
@@ -34,6 +34,6 @@ rustc_library("vmo_types") {
 }
 
 fuchsia_unittest_package("tests") {
-  package_name = "heapdump-vmo-types-tests"
-  deps = [ ":vmo_types_test" ]
+  package_name = "heapdump-vmo-tests"
+  deps = [ ":heapdump_vmo_test" ]
 }

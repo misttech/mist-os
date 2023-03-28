@@ -55,19 +55,20 @@ be able to correctly parse this data. It is therefore important that they agree
 on the data structures' layout.
 
 Because of the atomicity requirement, it is not possible to simply use FIDL to
-serialize data into the VMO. Instead, heapdump's `vmo_types` crate contains
+serialize data into the VMO. Instead, heapdump's `heapdump_vmo` crate contains
 ad hoc functions to manipulate the VMOs, that are used by both the
 instrumentation and the collector.
 
-However, while the usage of the shared `vmo_types` crate makes it easy to agree
-on a common format, it does not solve the issue of forward-compatibility: we
-want to support an older instrumentation library connecting to a newer
+However, while the usage of the shared `heapdump_vmo` crate makes it easy to
+agree on a common format, it does not solve the issue of forward-compatibility:
+we want to support an older instrumentation library connecting to a newer
 collector, while retaining the possibility to change the VMO format in a
-breaking way. This is the reason why all data structures defined in `vmo_types`
-have a version suffix (e.g. `_v1`): the current instrumentation library always
-uses the latest version to operate its VMOs but, by making it possible for
-different data structure versions to coexist in the code base, the collector can
-keep supporting processes linked against older instrumentation libraries.
+breaking way. This is the reason why all data structures defined in
+`heapdump_vmo` have a version suffix (e.g. `_v1`): the current instrumentation
+library always uses the latest version to operate its VMOs but, by making it
+possible for different data structure versions to coexist in the code base, the
+collector can keep supporting processes linked against older instrumentation
+libraries.
 
 The instrumentation library implicitly communicates the version of its data
 structures when it registers to the collector over the

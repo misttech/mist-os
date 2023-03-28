@@ -8,11 +8,11 @@ use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon::{self as zx, AsHandleRef, Koid};
 use futures::{lock::Mutex, StreamExt};
-use std::{collections::HashSet, sync::Arc};
-use vmo_types::{
+use heapdump_vmo::{
     allocations_table_v1::AllocationsTableReader, resources_table_v1::ResourcesTableReader,
     stack_trace_compression,
 };
+use std::{collections::HashSet, sync::Arc};
 
 use crate::process::{Process, Snapshot};
 use crate::utils::find_executable_regions;
@@ -167,12 +167,12 @@ mod tests {
     use fidl::endpoints::{create_proxy, create_proxy_and_stream};
     use fuchsia_async as fasync;
     use futures::pin_mut;
-    use itertools::{assert_equal, Itertools};
-    use std::collections::HashMap;
-    use vmo_types::{
+    use heapdump_vmo::{
         allocations_table_v1::AllocationsTableWriter, resources_table_v1::ResourcesTableWriter,
         stack_trace_compression,
     };
+    use itertools::{assert_equal, Itertools};
+    use std::collections::HashMap;
 
     use crate::registry::Registry;
 

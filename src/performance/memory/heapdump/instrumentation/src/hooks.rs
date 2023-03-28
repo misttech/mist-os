@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use heapdump_vmo::stack_trace_compression;
 use std::ffi::c_void;
-use vmo_types::stack_trace_compression;
 
 use crate::recursion_guard::with_recursion_guard;
 use crate::{PROFILER, THREAD_DATA};

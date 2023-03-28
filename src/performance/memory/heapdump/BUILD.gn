@@ -17,7 +17,7 @@ group("tests") {
   deps = [
     "collector:tests",
     "lib/heapdump_snapshot:tests",
-    "vmo_types:tests",
+    "lib/heapdump_vmo:tests",
   ]
 
   # TODO(fxbug.dev/122141): ASAN builds use a different allocator that

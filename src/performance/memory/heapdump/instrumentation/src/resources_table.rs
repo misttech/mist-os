@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use heapdump_vmo::resources_table_v1::{ResourceKey, ResourcesTableWriter};
 use std::sync::atomic::{fence, Ordering::Release};
-use vmo_types::resources_table_v1::{ResourceKey, ResourcesTableWriter};
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
 /// Actual memory for each page will only be committed when we first write to that page.

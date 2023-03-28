@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
-use vmo_types::allocations_table_v1::{AllocationsTableWriter, ResourceKey};
+use heapdump_vmo::allocations_table_v1::{AllocationsTableWriter, ResourceKey};
 
 /// We cap the size of our backing VMO at 2 GiB, then preallocate it and map it entirely.
 /// Actual memory for each page will only be committed when we first write to that page.
