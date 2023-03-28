@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/unwinder/dwarf_cfi_parser.h"
+#include "src/developer/debug/unwinder/cfi_parser.h"
 
 #include <cinttypes>
 #include <cstdint>
@@ -36,8 +36,8 @@ Error ReadRegisterID(Memory* elf, uint64_t& addr, RegisterID& reg) {
 
 }  // namespace
 
-DwarfCfiParser::DwarfCfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
-                               int64_t data_alignment_factor)
+CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
+                     int64_t data_alignment_factor)
     : code_alignment_factor_(code_alignment_factor), data_alignment_factor_(data_alignment_factor) {
   // Initialize those callee-preserved registers as kSameValue.
   static RegisterID kX64Preserved[] = {
@@ -106,8 +106,8 @@ DwarfCfiParser::DwarfCfiParser(Registers::Arch arch, uint64_t code_alignment_fac
 // DW_CFA_val_expression      0            0x16        ULEB128 register  BLOCK
 // DW_CFA_lo_user             0            0x1c
 // DW_CFA_hi_user             0            0x3f
-Error DwarfCfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
-                                        uint64_t instructions_end, uint64_t pc_limit) {
+Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
+                                   uint64_t instructions_end, uint64_t pc_limit) {
   // Boundary is tricky here! Consider the following program
   //
   //         .cfi_startproc
@@ -349,8 +349,8 @@ Error DwarfCfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin
   return Success();
 }
 
-Error DwarfCfiParser::Step(Memory* stack, RegisterID return_address_register,
-                           const Registers& current, Registers& next) {
+Error CfiParser::Step(Memory* stack, RegisterID return_address_register, const Registers& current,
+                      Registers& next) {
   if (cfa_location_.reg == RegisterID::kInvalid ||
       cfa_location_.offset == static_cast<uint64_t>(-1)) {
     return Error("undefined CFA");

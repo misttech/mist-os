@@ -12,7 +12,7 @@
 #include <utility>
 #include <vector>
 
-#include "src/developer/debug/unwinder/dwarf_unwinder.h"
+#include "src/developer/debug/unwinder/cfi_unwinder.h"
 #include "src/developer/debug/unwinder/error.h"
 #include "src/developer/debug/unwinder/memory.h"
 #include "src/developer/debug/unwinder/module.h"
@@ -46,7 +46,7 @@ std::string Frame::Describe() const {
   return res;
 }
 
-Unwinder::Unwinder(const std::vector<Module>& modules) : dwarf_unwinder_(modules) {}
+Unwinder::Unwinder(const std::vector<Module>& modules) : cfi_unwinder_(modules) {}
 
 std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, size_t max_depth) {
   UnavailableMemory unavailable_memory;
@@ -64,7 +64,7 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
     Frame& current = res.back();
     trust = Frame::Trust::kCFI;
     current.error =
-        dwarf_unwinder_.Step(stack, current.regs, next, current.trust != Frame::Trust::kContext);
+        cfi_unwinder_.Step(stack, current.regs, next, current.trust != Frame::Trust::kContext);
 
     if (current.error.has_err() && scs_unwinder.Step(current.regs, next).ok()) {
       trust = Frame::Trust::kSCS;

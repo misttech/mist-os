@@ -14,7 +14,7 @@
 namespace unwinder {
 
 // This is a simple implementation of a dwarf expression evaluator, only intended to be used
-// by the unwinder. A more sophisticated one can be found in zxdb::DwarfExprEval.
+// by the CFI unwinder. A more sophisticated one can be found in zxdb::DwarfExprEval.
 class DwarfExpr {
  public:
   DwarfExpr() = default;

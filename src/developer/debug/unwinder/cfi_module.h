@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_DEVELOPER_DEBUG_UNWINDER_DWARF_CFI_H_
-#define SRC_DEVELOPER_DEBUG_UNWINDER_DWARF_CFI_H_
+#ifndef SRC_DEVELOPER_DEBUG_UNWINDER_CFI_MODULE_H_
+#define SRC_DEVELOPER_DEBUG_UNWINDER_CFI_MODULE_H_
 
 #include <cstdint>
 #include <map>
@@ -15,15 +15,15 @@
 
 namespace unwinder {
 
-// Represents the DWARF CFI (Call Frame Information) from the .eh_frame and/or .debug_frame section
-// of one ELF file.
+// Represents the Call Frame Information (CFI) from the .eh_frame and/or the .debug_frame section
+// of one ELF module.
 //
 // This class doesn't cache the memory so if repeated lookups are required, it's recommended to use
 // a cached Memory implementation.
-class DwarfCfi {
+class CfiModule {
  public:
   // Caller must ensure elf to outlive us.
-  DwarfCfi(Memory* elf, uint64_t elf_ptr, Module::AddressMode address_mode)
+  CfiModule(Memory* elf, uint64_t elf_ptr, Module::AddressMode address_mode)
       : elf_(elf), elf_ptr_(elf_ptr), address_mode_(address_mode) {}
 
   // Load the CFI from the ELF file.
@@ -96,4 +96,4 @@ class DwarfCfi {
 
 }  // namespace unwinder
 
-#endif  // SRC_DEVELOPER_DEBUG_UNWINDER_DWARF_CFI_H_
+#endif  // SRC_DEVELOPER_DEBUG_UNWINDER_CFI_MODULE_H_

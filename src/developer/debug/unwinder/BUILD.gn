@@ -9,8 +9,8 @@ sdk_source_set("unwinder") {
   build_as_static = true
 
   public = [
-    "dwarf_cfi.h",
-    "dwarf_cfi_parser.h",
+    "cfi_module.h",
+    "cfi_parser.h",
     "dwarf_expr.h",
     "error.h",
     "memory.h",
@@ -19,17 +19,17 @@ sdk_source_set("unwinder") {
     "unwind.h",
   ]
   sdk_headers_for_internal_use = [
-    "dwarf_cfi.h",
-    "dwarf_cfi_parser.h",
+    "cfi_module.h",
+    "cfi_parser.h",
     "dwarf_expr.h",
-    "dwarf_unwinder.h",
+    "cfi_unwinder.h",
     "scs_unwinder.h",
   ]
   sources = [
-    "dwarf_cfi.cc",
-    "dwarf_cfi_parser.cc",
+    "cfi_module.cc",
+    "cfi_parser.cc",
+    "cfi_unwinder.cc",
     "dwarf_expr.cc",
-    "dwarf_unwinder.cc",
     "memory.cc",
     "registers.cc",
     "scs_unwinder.cc",

@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// This file exists merely to offload logics from dwarf_cfi.h to avoid the file being too large.
+// This file exists merely to offload logics from cfi_module.h to avoid the file being too large.
 
-#ifndef SRC_DEVELOPER_DEBUG_UNWINDER_DWARF_CFI_PARSER_H_
-#define SRC_DEVELOPER_DEBUG_UNWINDER_DWARF_CFI_PARSER_H_
+#ifndef SRC_DEVELOPER_DEBUG_UNWINDER_CFI_PARSER_H_
+#define SRC_DEVELOPER_DEBUG_UNWINDER_CFI_PARSER_H_
 
 #include <cstdint>
 #include <vector>
@@ -17,11 +17,10 @@
 namespace unwinder {
 
 // Parse the call frame instructions to get the locations of CFA and registers.
-class DwarfCfiParser {
+class CfiParser {
  public:
   // arch is needed to default initialize register_locations_.
-  DwarfCfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
-                 int64_t data_alignment_factor);
+  CfiParser(Registers::Arch arch, uint64_t code_alignment_factor, int64_t data_alignment_factor);
 
   // Parse the CFA instructions until the (relative) pc reaches pc_limit.
   [[nodiscard]] Error ParseInstructions(Memory* elf, uint64_t instructions_begin,
@@ -77,4 +76,4 @@ class DwarfCfiParser {
 
 }  // namespace unwinder
 
-#endif  // SRC_DEVELOPER_DEBUG_UNWINDER_DWARF_CFI_PARSER_H_
+#endif  // SRC_DEVELOPER_DEBUG_UNWINDER_CFI_PARSER_H_

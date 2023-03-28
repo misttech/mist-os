@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/developer/debug/unwinder/dwarf_cfi.h"
+#include "src/developer/debug/unwinder/cfi_module.h"
 
 #include <elf.h>
 
@@ -13,7 +13,7 @@
 #include <map>
 #include <string>
 
-#include "src/developer/debug/unwinder/dwarf_cfi_parser.h"
+#include "src/developer/debug/unwinder/cfi_parser.h"
 #include "src/developer/debug/unwinder/error.h"
 #include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/unwinder/registers.h"
@@ -104,7 +104,7 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
 // and a reference implementation in LLVM
 // https://github.com/llvm/llvm-project/blob/main/libunwind/src/DwarfParser.hpp
 // https://github.com/llvm/llvm-project/blob/main/libunwind/src/EHHeaderParser.hpp
-Error DwarfCfi::Load() {
+Error CfiModule::Load() {
   if (!elf_) {
     return Error("no elf memory");
   }
@@ -226,7 +226,7 @@ Error DwarfCfi::Load() {
   return Success();
 }
 
-Error DwarfCfi::Step(Memory* stack, const Registers& current, Registers& next) {
+Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) {
   uint64_t pc;
   if (auto err = current.GetPC(pc); err.has_err()) {
     return err;
@@ -249,7 +249,7 @@ Error DwarfCfi::Step(Memory* stack, const Registers& current, Registers& next) {
     }
   }
 
-  DwarfCfiParser cfi_parser(current.arch(), cie.code_alignment_factor, cie.data_alignment_factor);
+  CfiParser cfi_parser(current.arch(), cie.code_alignment_factor, cie.data_alignment_factor);
 
   // Parse instructions in CIE first.
   if (auto err =
@@ -275,7 +275,7 @@ Error DwarfCfi::Step(Memory* stack, const Registers& current, Registers& next) {
   return Success();
 }
 
-Error DwarfCfi::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
+Error CfiModule::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   // Binary search for fde_ptr in the range [low, high).
   uint64_t low = 0;
   uint64_t high = fde_count_;
@@ -307,7 +307,7 @@ Error DwarfCfi::SearchEhFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   return Success();
 }
 
-Error DwarfCfi::SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
+Error CfiModule::SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   if (!debug_frame_ptr_) {
     return Error("no .debug_frame section");
   }
@@ -335,7 +335,7 @@ Error DwarfCfi::SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
 
 // In order to read less memory, this function assumes the address_size of all CIEs is the same,
 // so that it only needs to decode the first CIE.
-Error DwarfCfi::BuildDebugFrameMap() {
+Error CfiModule::BuildDebugFrameMap() {
   debug_frame_map_.clear();
   uint8_t fde_address_encoding = 0;
   for (uint64_t p = debug_frame_ptr_, next_p; p < debug_frame_end_; p = next_p) {
@@ -372,7 +372,7 @@ Error DwarfCfi::BuildDebugFrameMap() {
 // When version == 1, check the spec at
 // https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/ehframechpt.html
 // When version == 4, check the spec at http://www.dwarfstd.org/doc/DWARF5.pdf
-Error DwarfCfi::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
+Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   uint64_t cie_id;
   if (auto err = DecodeCieFdeHdr(elf_, version, cie_ptr, cie.instructions_end, cie_id);
       err.has_err()) {
@@ -502,7 +502,7 @@ Error DwarfCfi::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   return Success();
 }
 
-Error DwarfCfi::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde) {
+Error CfiModule::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde) {
   uint64_t cie_offset;
   if (auto err = DecodeCieFdeHdr(elf_, version, fde_ptr, fde.instructions_end, cie_offset);
       err.has_err()) {
@@ -542,7 +542,7 @@ Error DwarfCfi::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, Dwar
   return Success();
 }
 
-Error DwarfCfi::StepPLT(Memory* stack, const Registers& current, Registers& next) {
+Error CfiModule::StepPLT(Memory* stack, const Registers& current, Registers& next) {
   if (current.arch() == Registers::Arch::kX64) {
     uint64_t sp;
     if (auto err = current.GetSP(sp); err.has_err()) {

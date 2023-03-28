@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "src/developer/debug/unwinder/dwarf_unwinder.h"
+#include "src/developer/debug/unwinder/cfi_unwinder.h"
 #include "src/developer/debug/unwinder/memory.h"
 #include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/unwinder/registers.h"
@@ -60,7 +60,7 @@ class Unwinder {
   std::vector<Frame> Unwind(Memory* stack, const Registers& registers, size_t max_depth = 50);
 
  private:
-  DwarfUnwinder dwarf_unwinder_;
+  CfiUnwinder cfi_unwinder_;
 };
 
 // Unwind with given memory, modules, and registers.
