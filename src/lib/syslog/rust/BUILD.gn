@@ -74,8 +74,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/power/power-manager:*",
   "//src/recovery/factory-reset-trigger:*",
   "//src/security/bin/tee_manager:*",
-  "//src/settings/service:*",
-  "//src/settings/storage:*",
   "//src/sys/pkg/bin/pkg-local-mirror:*",
   "//src/sys/pkg/bin/system-updater:*",
   "//src/sys/pkg/lib/forced-fdr:*",
