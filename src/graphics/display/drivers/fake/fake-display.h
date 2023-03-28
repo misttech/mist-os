@@ -65,10 +65,9 @@ class FakeDisplay : public DeviceType,
   zx_status_t DisplayControllerImplImportImage(image_t* image, uint64_t collection_id,
                                                uint32_t index);
   void DisplayControllerImplReleaseImage(image_t* image);
-  uint32_t DisplayControllerImplCheckConfiguration(const display_config_t** display_configs,
-                                                   size_t display_count,
-                                                   uint32_t** layer_cfg_results,
-                                                   size_t* layer_cfg_result_count);
+  config_check_result_t DisplayControllerImplCheckConfiguration(
+      const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
+      size_t* layer_cfg_result_count);
   void DisplayControllerImplApplyConfiguration(const display_config_t** display_config,
                                                size_t display_count,
                                                const config_stamp_t* config_stamp);

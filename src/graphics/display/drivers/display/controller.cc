@@ -118,7 +118,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
     uint32_t* display_layer_results[] = {&layer_result};
     display_cfg_result = dc_.CheckConfiguration(test_configs, 1, display_layer_results,
                                                 &display_layer_results_count);
-    if (display_cfg_result == CONFIG_DISPLAY_OK) {
+    if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(*timing, &ac);
       if (!ac.check()) {

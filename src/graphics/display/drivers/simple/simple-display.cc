@@ -212,12 +212,12 @@ void SimpleDisplay::DisplayControllerImplReleaseImage(image_t* image) {
   // noop
 }
 
-uint32_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
+config_check_result_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
     size_t* layer_cfg_result_count) {
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
-    return CONFIG_DISPLAY_OK;
+    return CONFIG_CHECK_RESULT_OK;
   }
   ZX_DEBUG_ASSERT(display_configs[0]->display_id == kDisplayId);
   bool success;
@@ -245,7 +245,7 @@ uint32_t SimpleDisplay::DisplayControllerImplCheckConfiguration(
     }
     layer_cfg_result_count[0] = display_configs[0]->layer_count;
   }
-  return CONFIG_DISPLAY_OK;
+  return CONFIG_CHECK_RESULT_OK;
 }
 
 void SimpleDisplay::DisplayControllerImplApplyConfiguration(const display_config_t** display_config,

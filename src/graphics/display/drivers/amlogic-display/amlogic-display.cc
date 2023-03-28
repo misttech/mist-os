@@ -318,23 +318,23 @@ void AmlogicDisplay::DisplayControllerImplReleaseImage(image_t* image) {
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
-uint32_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
+config_check_result_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
     size_t* layer_cfg_result_count) {
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
-    return CONFIG_DISPLAY_OK;
+    return CONFIG_CHECK_RESULT_OK;
   }
 
   fbl::AutoLock lock(&display_lock_);
 
   // no-op, just wait for the client to try a new config
   if (!display_attached_ || display_configs[0]->display_id != display_id_) {
-    return CONFIG_DISPLAY_OK;
+    return CONFIG_CHECK_RESULT_OK;
   }
 
   if (vout_->CheckMode(&display_configs[0]->mode)) {
-    return CONFIG_DISPLAY_UNSUPPORTED_MODES;
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
   bool success = true;
@@ -397,7 +397,7 @@ uint32_t AmlogicDisplay::DisplayControllerImplCheckConfiguration(
       layer_cfg_results[0][i] = CLIENT_MERGE_SRC;
     }
   }
-  return CONFIG_DISPLAY_OK;
+  return CONFIG_CHECK_RESULT_OK;
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops

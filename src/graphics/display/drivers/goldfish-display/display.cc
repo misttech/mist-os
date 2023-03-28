@@ -32,6 +32,7 @@
 #include "fidl/fuchsia.sysmem/cpp/common_types.h"
 #include "fidl/fuchsia.sysmem/cpp/markers.h"
 #include "fidl/fuchsia.sysmem/cpp/natural_types.h"
+#include "fuchsia/hardware/display/controller/c/banjo.h"
 #include "lib/fidl/cpp/channel.h"
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "lib/fidl/cpp/wire/traits.h"
@@ -445,12 +446,11 @@ void Display::DisplayControllerImplReleaseImage(image_t* image) {
   });
 }
 
-uint32_t Display::DisplayControllerImplCheckConfiguration(const display_config_t** display_configs,
-                                                          size_t display_count,
-                                                          uint32_t** layer_cfg_results,
-                                                          size_t* layer_cfg_result_count) {
+config_check_result_t Display::DisplayControllerImplCheckConfiguration(
+    const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
+    size_t* layer_cfg_result_count) {
   if (display_count == 0) {
-    return CONFIG_DISPLAY_OK;
+    return CONFIG_CHECK_RESULT_OK;
   }
   for (unsigned i = 0; i < display_count; i++) {
     const size_t layer_count = display_configs[i]->layer_count;
@@ -521,7 +521,7 @@ uint32_t Display::DisplayControllerImplCheckConfiguration(const display_config_t
       }
     }
   }
-  return CONFIG_DISPLAY_OK;
+  return CONFIG_CHECK_RESULT_OK;
 }
 
 zx_status_t Display::PresentDisplayConfig(RenderControl::DisplayId display_id,

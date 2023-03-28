@@ -313,7 +313,7 @@ type DisplayConfig = struct {
 
     mode DisplayMode;
 
-    /// Bitmask of COLOR_CONVERSION_* flags
+    /// Bitmask of flags defined in the ColorConversion enum.
     cc_flags uint32;
     /// Color conversion is applied to each pixel according to the formula:
     ///
@@ -341,7 +341,7 @@ type DisplayConfig = struct {
     gamma_blue vector<float32>:MAX;
 };
 
-type ConfigDisplay = strict enum : uint32 {
+type ConfigCheckResult = strict enum : uint32 {
     /// The display mode configuration is valid. Note that this is distinct from
     /// whether or not the layer configuration is valid.
     OK = 0;
@@ -492,7 +492,7 @@ protocol DisplayControllerImpl {
     ///
     /// layer_cfg_result points to an array of arrays. The primary length is display_count, the
     /// secondary lengths are the corresponding display_cfg's layer_count. If display_cfg_result
-    /// is CONFIG_DISPLAY_OK, any errors in layer configuration should be returned as a CLIENT*
+    /// is CONFIG_CHECK_RESULT_OK, any errors in layer configuration should be returned as a CLIENT*
     /// flag in the corresponding layer_cfg_result entry.
     ///
     /// The driver must not retain references to the configuration after this function returns.
@@ -501,7 +501,7 @@ protocol DisplayControllerImpl {
         @inner_pointer
         display_config vector<DisplayConfig>:MAX;
     }) -> (struct {
-        display_cfg_result uint32;
+        display_cfg_result ConfigCheckResult;
         @callee_allocated
         layer_cfg_result vector<uint32>:MAX;
     });

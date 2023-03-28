@@ -1521,7 +1521,7 @@ bool Controller::CheckDisplayLimits(cpp20::span<const display_config_t*> display
   return true;
 }
 
-uint32_t Controller::DisplayControllerImplCheckConfiguration(
+config_check_result_t Controller::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_config, size_t display_config_count,
     uint32_t** layer_cfg_result, size_t* layer_cfg_result_count) {
   fbl::AutoLock lock(&display_lock_);
@@ -1529,16 +1529,16 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
   cpp20::span display_configs(display_config, display_config_count);
   if (display_configs.empty()) {
     // All displays off is supported
-    return CONFIG_DISPLAY_OK;
+    return CONFIG_CHECK_RESULT_OK;
   }
 
   uint64_t pipe_alloc[PipeIds<registers::Platform::kKabyLake>().size()];
   if (!CalculatePipeAllocation(display_configs, pipe_alloc)) {
-    return CONFIG_DISPLAY_TOO_MANY;
+    return CONFIG_CHECK_RESULT_TOO_MANY;
   }
 
   if (!CheckDisplayLimits(display_configs, layer_cfg_result)) {
-    return CONFIG_DISPLAY_UNSUPPORTED_MODES;
+    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
   }
 
   for (unsigned i = 0; i < display_configs.size(); i++) {
@@ -1710,7 +1710,7 @@ uint32_t Controller::DisplayControllerImplCheckConfiguration(
     }
   }
 
-  return CONFIG_DISPLAY_OK;
+  return CONFIG_CHECK_RESULT_OK;
 }
 
 bool Controller::CalculatePipeAllocation(

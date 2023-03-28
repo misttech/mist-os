@@ -950,9 +950,9 @@ bool Client::CheckConfig(fhd::wire::ConfigResult* res,
   uint32_t display_cfg_result = controller_->dc()->CheckConfiguration(
       configs, config_idx, display_layer_cfg_results, &layer_cfg_results_count);
 
-  if (display_cfg_result != CONFIG_DISPLAY_OK) {
+  if (display_cfg_result != CONFIG_CHECK_RESULT_OK) {
     if (res) {
-      *res = display_cfg_result == CONFIG_DISPLAY_TOO_MANY
+      *res = display_cfg_result == CONFIG_CHECK_RESULT_TOO_MANY
                  ? fhd::wire::ConfigResult::kTooManyDisplays
                  : fhd::wire::ConfigResult::kUnsupportedDisplayModes;
     }

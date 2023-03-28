@@ -89,7 +89,7 @@ void GoldfishDisplayTest::TearDown() {
 
 TEST_F(GoldfishDisplayTest, CheckConfigNoDisplay) {
   // Test No display
-  uint32_t res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), 0, results_ptrs_.data(),
       result_count_.data());
   EXPECT_OK(res);
@@ -101,7 +101,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigMultiLayer) {
     configs_[i].layer_count = kMaxLayerCount;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -120,7 +120,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColor) {
     configs_[i].layer_list[0]->type = LAYER_TYPE_COLOR;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -136,7 +136,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerCursor) {
     configs_[i].layer_list[0]->type = LAYER_TYPE_CURSOR;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -169,7 +169,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerPrimary) {
     configs_[i].layer_list[0]->cfg.primary.transform_mode = 0;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -202,7 +202,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerDestFrame) {
     configs_[i].layer_list[0]->cfg.primary.image.height = 768;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -233,7 +233,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerSrcFrame) {
     configs_[i].layer_list[0]->cfg.primary.image.height = 768;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -265,7 +265,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerAlpha) {
     configs_[i].layer_list[0]->cfg.primary.alpha_mode = ALPHA_HW_MULTIPLY;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -297,7 +297,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerTransform) {
     configs_[i].layer_list[0]->cfg.primary.transform_mode = FRAME_TRANSFORM_REFLECT_X;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -329,7 +329,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigLayerColorCoversion) {
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);
@@ -365,7 +365,7 @@ TEST_F(GoldfishDisplayTest, CheckConfigAllFeatures) {
     configs_[i].cc_flags = COLOR_CONVERSION_POSTOFFSET;
   }
 
-  auto res = display_->DisplayControllerImplCheckConfiguration(
+  config_check_result_t res = display_->DisplayControllerImplCheckConfiguration(
       const_cast<const display_config_t**>(configs_ptrs_.data()), kNumDisplays,
       results_ptrs_.data(), result_count_.data());
   EXPECT_OK(res);

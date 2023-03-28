@@ -257,12 +257,12 @@ void FakeDisplay::DisplayControllerImplReleaseImage(image_t* image) {
   imported_images_.erase(*info);
 }
 
-uint32_t FakeDisplay::DisplayControllerImplCheckConfiguration(
+config_check_result_t FakeDisplay::DisplayControllerImplCheckConfiguration(
     const display_config_t** display_configs, size_t display_count, uint32_t** layer_cfg_results,
     size_t* layer_cfg_result_count) {
   if (display_count != 1) {
     ZX_DEBUG_ASSERT(display_count == 0);
-    return CONFIG_DISPLAY_OK;
+    return CONFIG_CHECK_RESULT_OK;
   }
   ZX_DEBUG_ASSERT(display_configs[0]->display_id == kDisplayId);
 
@@ -292,7 +292,7 @@ uint32_t FakeDisplay::DisplayControllerImplCheckConfiguration(
     }
     layer_cfg_result_count[0] = display_configs[0]->layer_count;
   }
-  return CONFIG_DISPLAY_OK;
+  return CONFIG_CHECK_RESULT_OK;
 }
 
 void FakeDisplay::DisplayControllerImplApplyConfiguration(const display_config_t** display_configs,

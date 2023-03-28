@@ -183,7 +183,7 @@ class Device : public DeviceType {
 
   void DisplayControllerImplReleaseImage(image_t* image) {}
 
-  uint32_t DisplayControllerImplCheckConfiguration(
+  config_check_result_t DisplayControllerImplCheckConfiguration(
       const display_config_t** display_config, size_t display_count,
       uint32_t** layer_cfg_result, size_t* layer_cfg_result_count) {}
 
