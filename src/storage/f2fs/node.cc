@@ -483,7 +483,7 @@ zx::result<std::vector<block_t>> NodeManager::GetDataBlockAddresses(
       ofs_in_dnode = result.value();
     }
 
-    block_t data_blkaddr = DatablockAddr(&dnode_page.GetPage<NodePage>(), ofs_in_dnode);
+    block_t data_blkaddr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
 
     if (!read_only && data_blkaddr == kNullAddr) {
       if (zx_status_t err = vnode.ReserveNewBlock(dnode_page.GetPage<NodePage>(), ofs_in_dnode);
@@ -518,7 +518,8 @@ zx_status_t NodeManager::FindLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Lo
     }
 
     if (i < level) {
-      nid = node_page.GetPage<NodePage>().GetNid(offset[i], IsInode(*node_page));
+      NodePage &node = node_page.GetPage<NodePage>();
+      nid = node.GetNid(offset[i]);
     } else {
       *out = std::move(node_page);
     }
@@ -552,7 +553,7 @@ zx_status_t NodeManager::GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Loc
         return err;
       }
 
-      parent.GetPage<NodePage>().SetNid(offset[i - 1], nid, IsInode(*parent));
+      parent.GetPage<NodePage>().SetNid(offset[i - 1], nid);
       parent.SetDirty();
     } else {
       if (zx_status_t err = GetNodePage(nid, &node_page); err != ZX_OK) {
@@ -561,7 +562,8 @@ zx_status_t NodeManager::GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Loc
     }
 
     if (i < level) {
-      nid = node_page.GetPage<NodePage>().GetNid(offset[i], IsInode(*node_page));
+      NodePage &node = node_page.GetPage<NodePage>();
+      nid = node.GetNid(offset[i]);
       parent = std::move(node_page);
     } else {
       *out = std::move(node_page);
@@ -663,7 +665,8 @@ zx::result<uint32_t> NodeManager::TruncateNodes(VnodeF2fs &vnode, nid_t start_ni
       if (auto ret = TruncateDnode(vnode, child_nid); ret.is_error()) {
         return ret;
       }
-      page.GetPage<NodePage>().SetNid(i, 0, false);
+      ZX_ASSERT(!page.GetPage<NodePage>().IsInode());
+      page.GetPage<NodePage>().SetNid(i, 0);
       page.SetDirty();
     }
   } else {
@@ -675,7 +678,8 @@ zx::result<uint32_t> NodeManager::TruncateNodes(VnodeF2fs &vnode, nid_t start_ni
         return freed_or.take_error();
       } else {
         ZX_DEBUG_ASSERT(*freed_or == kInvalidatedNids);
-        page.GetPage<NodePage>().SetNid(i, 0, false);
+        ZX_ASSERT(!page.GetPage<NodePage>().IsInode());
+        page.GetPage<NodePage>().SetNid(i, 0);
         page.SetDirty();
       }
       child_nofs += kInvalidatedNids;
@@ -705,18 +709,20 @@ zx_status_t NodeManager::TruncatePartialNodes(VnodeF2fs &vnode, const Inode &ri,
     if (auto ret = fs_->GetNodeManager().GetNodePage(nid[i], &pages[i]); ret != ZX_OK) {
       return ret;
     }
-    nid[i + 1] = pages[i].GetPage<NodePage>().GetNid(offset[i + 1], false);
+    nid[i + 1] = pages[i].GetPage<NodePage>().GetNid(offset[i + 1]);
   }
 
   // free direct nodes linked to a partial indirect node
   for (auto i = offset[idx + 1]; i < kNidsPerBlock; ++i) {
-    nid_t child_nid = pages[idx].GetPage<NodePage>().GetNid(i, false);
-    if (!child_nid)
+    nid_t child_nid = pages[idx].GetPage<NodePage>().GetNid(i);
+    if (!child_nid) {
       continue;
+    }
     if (auto ret = TruncateDnode(vnode, child_nid); ret.is_error()) {
       return ret.error_value();
     }
-    pages[idx].GetPage<NodePage>().SetNid(i, 0, false);
+    ZX_ASSERT(!pages[idx].GetPage<NodePage>().IsInode());
+    pages[idx].GetPage<NodePage>().SetNid(i, 0);
     pages[idx].SetDirty();
   }
 
@@ -886,7 +892,7 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
   vnode.MarkInodeDirty();
 
   page.SetDirty();
-  page.GetPage<NodePage>().SetColdNode(vnode);
+  page.GetPage<NodePage>().SetColdNode(vnode.IsDir());
   if (ofs == 0)
     fs_->IncValidInodeCount();
 
@@ -986,7 +992,7 @@ pgoff_t NodeManager::FsyncNodePages(VnodeF2fs &vnode) {
   op.node_page_cb = [ino, this](fbl::RefPtr<Page> page, bool is_last_dnode) {
     auto node_page = fbl::RefPtr<NodePage>::Downcast(std::move(page));
     node_page->SetFsyncMark(false);
-    if (IsInode(*node_page)) {
+    if (node_page->IsInode()) {
       node_page->SetDentryMark(!IsCheckpointedNode(ino));
     }
     if (is_last_dnode) {

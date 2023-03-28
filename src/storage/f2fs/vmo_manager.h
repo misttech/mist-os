@@ -106,9 +106,8 @@ class VmoManager {
   VmoManager &operator=(const VmoManager &&) = delete;
   ~VmoManager() { Reset(true); }
 
-  zx::result<bool> CreateAndLockVmo(pgoff_t index) __TA_EXCLUDES(mutex_);
+  zx::result<bool> CreateAndLockVmo(pgoff_t index, void **out = nullptr) __TA_EXCLUDES(mutex_);
   zx_status_t UnlockVmo(pgoff_t index, bool evict) __TA_EXCLUDES(mutex_);
-  zx::result<zx_vaddr_t> GetAddress(pgoff_t index) __TA_EXCLUDES(mutex_);
   void ZeroBlocks(fs::PagedVfs &vfs, pgoff_t start, pgoff_t end) __TA_EXCLUDES(mutex_);
   zx::result<> WritebackBegin(fs::PagedVfs &vfs, const size_t start = 0,
                                     const size_t end = kMaxVmoSize) __TA_EXCLUDES(mutex_);

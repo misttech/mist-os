@@ -95,10 +95,7 @@ class Page : public PageRefCounted<Page>,
 
   template <typename U = void>
   U *GetAddress() const {
-    if (auto address_or = GetVmoManager().GetAddress(index_); address_or.is_ok()) {
-      return reinterpret_cast<U *>(*address_or);
-    }
-    return nullptr;
+    return static_cast<U *>(addr_);
   }
 
   bool IsUptodate() const { return TestFlag(PageFlag::kPageUptodate); }
@@ -202,6 +199,7 @@ class Page : public PageRefCounted<Page>,
       ATOMIC_FLAG_INIT};
   // It indicates FileCache to which |this| belongs.
   FileCache *file_cache_ = nullptr;
+  void *addr_ = nullptr;
   // It is used as the key of |this| in a lookup table (i.e., FileCache::page_tree_).
   // It indicates different information according to the type of FileCache::vnode_ such as file,
   // node, and meta vnodes. For file vnodes, it has file offset. For node vnodes, it indicates the

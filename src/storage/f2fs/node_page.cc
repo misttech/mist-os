@@ -6,34 +6,35 @@
 
 namespace f2fs {
 void NodePage::FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs) {
-  Node &node = GetRawNode();
-  node.footer.nid = CpuToLe(nid);
-  node.footer.ino = CpuToLe(ino);
-  node.footer.flag = CpuToLe(ofs << static_cast<int>(BitShift::kOffsetBitShift));
+  NodeFooter &raw_footer = node().footer;
+  raw_footer.nid = CpuToLe(nid);
+  raw_footer.ino = CpuToLe(ino);
+  raw_footer.flag = CpuToLe(ofs << static_cast<int>(BitShift::kOffsetBitShift));
 }
 
 void NodePage::CopyNodeFooterFrom(NodePage &src) {
-  memcpy(&GetRawNode().footer, &src.GetRawNode().footer, sizeof(NodeFooter));
+  memcpy(&node().footer, &src.node().footer, sizeof(NodeFooter));
 }
 
 void NodePage::FillNodeFooterBlkaddr(block_t blkaddr) {
   Checkpoint &ckpt = fs()->GetSuperblockInfo().GetCheckpoint();
-  GetRawNode().footer.cp_ver = ckpt.checkpoint_ver;
-  GetRawNode().footer.next_blkaddr = blkaddr;
+  NodeFooter &raw_footer = node().footer;
+  raw_footer.cp_ver = CpuToLe(ckpt.checkpoint_ver);
+  raw_footer.next_blkaddr = CpuToLe(blkaddr);
 }
 
-nid_t NodePage::InoOfNode() { return LeToCpu(GetRawNode().footer.ino); }
+nid_t NodePage::InoOfNode() const { return LeToCpu(node().footer.ino); }
 
-nid_t NodePage::NidOfNode() { return LeToCpu(GetRawNode().footer.nid); }
+nid_t NodePage::NidOfNode() const { return LeToCpu(node().footer.nid); }
 
-uint32_t NodePage::OfsOfNode() {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
+uint32_t NodePage::OfsOfNode() const {
+  uint32_t flag = LeToCpu(node().footer.flag);
   return flag >> static_cast<int>(BitShift::kOffsetBitShift);
 }
 
-uint64_t NodePage::CpverOfNode() { return LeToCpu(GetRawNode().footer.cp_ver); }
+uint64_t NodePage::CpverOfNode() const { return LeToCpu(node().footer.cp_ver); }
 
-block_t NodePage::NextBlkaddrOfNode() { return LeToCpu(GetRawNode().footer.next_blkaddr); }
+block_t NodePage::NextBlkaddrOfNode() const { return LeToCpu(node().footer.next_blkaddr); }
 
 // f2fs assigns the following node offsets described as (num).
 // N = kNidsPerBlock
@@ -48,82 +49,98 @@ block_t NodePage::NextBlkaddrOfNode() { return LeToCpu(GetRawNode().footer.next_
 //    `- double indirect node (5 + 2N)
 //                 `- indirect node (6 + 2N)
 //                       `- direct node (x(N + 1))
-bool NodePage::IsDnode() {
+bool NodePage::IsDnode() const {
   uint32_t ofs = OfsOfNode();
-  if (ofs == kOfsIndirectNode1 || ofs == kOfsIndirectNode2 || ofs == kOfsDoubleIndirectNode)
+  if (ofs == kOfsIndirectNode1 || ofs == kOfsIndirectNode2 || ofs == kOfsDoubleIndirectNode) {
     return false;
+  }
   if (ofs >= kOfsDoubleIndirectNode + 1) {
     ofs -= kOfsDoubleIndirectNode + 1;
-    if (static_cast<int64_t>(ofs) % (kNidsPerBlock + 1))
+    if (ofs % (kNidsPerBlock + 1)) {
       return false;
+    }
   }
   return true;
 }
 
-void NodePage::SetNid(size_t off, nid_t nid, bool is_inode) {
+void NodePage::SetNid(size_t off, nid_t nid) {
   WaitOnWriteback();
 
-  if (is_inode) {
-    GetRawNode().i.i_nid[off - kNodeDir1Block] = CpuToLe(nid);
+  if (IsInode()) {
+    node().i.i_nid[off - kNodeDir1Block] = CpuToLe(nid);
   } else {
-    GetRawNode().in.nid[off] = CpuToLe(nid);
+    node().in.nid[off] = CpuToLe(nid);
   }
 }
 
-nid_t NodePage::GetNid(size_t off, bool is_inode) {
-  if (is_inode) {
-    return LeToCpu(GetRawNode().i.i_nid[off - kNodeDir1Block]);
+nid_t NodePage::GetNid(size_t off) const {
+  if (IsInode()) {
+    return LeToCpu(node().i.i_nid[off - kNodeDir1Block]);
   }
-  return LeToCpu(GetRawNode().in.nid[off]);
+  return LeToCpu(node().in.nid[off]);
 }
 
-bool NodePage::IsColdNode() {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
-  return TestBit(static_cast<uint32_t>(BitShift::kColdBitShift), &flag);
+bool NodePage::IsColdNode() const {
+  uint32_t flag = LeToCpu(node().footer.flag);
+  uint32_t bit =
+      safemath::CheckLsh(1U, static_cast<uint32_t>(BitShift::kColdBitShift)).ValueOrDie();
+  return flag & bit;
 }
 
-bool NodePage::IsFsyncDnode() {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
-  return TestBit(static_cast<uint32_t>(BitShift::kFsyncBitShift), &flag);
+bool NodePage::IsFsyncDnode() const {
+  uint32_t flag = LeToCpu(node().footer.flag);
+  uint32_t bit =
+      safemath::CheckLsh(1U, static_cast<uint32_t>(BitShift::kFsyncBitShift)).ValueOrDie();
+  return flag & bit;
 }
 
-bool NodePage::IsDentDnode() {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
-  return TestBit(static_cast<uint32_t>(BitShift::kDentBitShift), &flag);
+bool NodePage::IsDentDnode() const {
+  uint32_t flag = LeToCpu(node().footer.flag);
+  uint32_t bit =
+      safemath::CheckLsh(1U, static_cast<uint32_t>(BitShift::kDentBitShift)).ValueOrDie();
+  return flag & bit;
 }
 
-void NodePage::SetColdNode(VnodeF2fs &vnode) {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
-
-  if (vnode.IsDir()) {
-    ClearBit(static_cast<uint32_t>(BitShift::kColdBitShift), &flag);
+void NodePage::SetColdNode(const bool is_dir) {
+  Node &raw_node = node();
+  uint32_t flag = LeToCpu(raw_node.footer.flag);
+  uint32_t bit =
+      safemath::CheckLsh(1U, static_cast<uint32_t>(BitShift::kColdBitShift)).ValueOrDie();
+  if (is_dir) {
+    flag &= ~bit;
   } else {
-    SetBit(static_cast<uint32_t>(BitShift::kColdBitShift), &flag);
+    flag |= bit;
   }
-  GetRawNode().footer.flag = CpuToLe(flag);
+  raw_node.footer.flag = CpuToLe(flag);
 }
 
 void NodePage::SetFsyncMark(bool mark) {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
+  Node &raw_node = node();
+  uint32_t flag = LeToCpu(raw_node.footer.flag);
+  uint32_t bit =
+      safemath::CheckLsh(1U, static_cast<uint32_t>(BitShift::kFsyncBitShift)).ValueOrDie();
   if (mark) {
-    SetBit(static_cast<uint32_t>(BitShift::kFsyncBitShift), &flag);
+    flag |= bit;
   } else {
-    ClearBit(static_cast<uint32_t>(BitShift::kFsyncBitShift), &flag);
+    flag &= ~bit;
   }
-  GetRawNode().footer.flag = CpuToLe(flag);
+  raw_node.footer.flag = CpuToLe(flag);
 }
 
 void NodePage::SetDentryMark(bool mark) {
-  uint32_t flag = LeToCpu(GetRawNode().footer.flag);
+  Node &raw_node = node();
+  uint32_t flag = LeToCpu(raw_node.footer.flag);
+  uint32_t bit =
+      safemath::CheckLsh(1U, static_cast<uint32_t>(BitShift::kDentBitShift)).ValueOrDie();
   if (mark) {
-    SetBit(static_cast<uint32_t>(BitShift::kDentBitShift), &flag);
+    flag |= bit;
   } else {
-    ClearBit(static_cast<uint32_t>(BitShift::kDentBitShift), &flag);
+    flag &= ~bit;
   }
-  GetRawNode().footer.flag = CpuToLe(flag);
+  raw_node.footer.flag = CpuToLe(flag);
 }
 
-block_t NodePage::StartBidxOfNode(const VnodeF2fs &vnode) {
+uint32_t NodePage::StartBidxOfNode(const uint32_t num_addrs) const {
   uint32_t node_ofs = OfsOfNode(), NumOfIndirectNodes = 0;
 
   if (node_ofs == kOfsInode) {
@@ -139,6 +156,30 @@ block_t NodePage::StartBidxOfNode(const VnodeF2fs &vnode) {
   }
 
   uint32_t bidx = node_ofs - NumOfIndirectNodes - 1;
-  return (vnode.GetAddrsPerInode() + safemath::CheckMul(bidx, kAddrsPerBlock)).ValueOrDie();
+  return (num_addrs + safemath::CheckMul(bidx, kAddrsPerBlock)).ValueOrDie();
 }
+
+bool NodePage::IsInode() const {
+  NodeFooter &raw_footer = node().footer;
+  return raw_footer.nid == raw_footer.ino;
+}
+
+block_t *NodePage::addrs_array() const {
+  Node &raw_node = node();
+  if (IsInode()) {
+    Inode &inode = raw_node.i;
+    if (inode.i_inline & kExtraAttr) {
+      return inode.i_addr + (inode.i_extra_isize / sizeof(uint32_t));
+    }
+    return inode.i_addr;
+  }
+  return raw_node.dn.addr;
+}
+
+block_t NodePage::GetBlockAddr(const size_t offset) const { return LeToCpu(addrs_array()[offset]); }
+
+void NodePage::SetBlockAddr(const size_t offset, const block_t new_addr) const {
+  addrs_array()[offset] = CpuToLe(new_addr);
+}
+
 }  // namespace f2fs

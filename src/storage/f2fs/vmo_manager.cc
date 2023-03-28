@@ -50,6 +50,7 @@ zx_status_t VmoDiscardable::Zero(pgoff_t start, pgoff_t len) {
 }
 
 zx::result<bool> VmoDiscardable::Lock(pgoff_t offset) {
+  ZX_ASSERT(offset < get_size());
   if (!active_pages()) {
     auto size = page_to_address(get_size());
     zx_status_t status = vmo().op_range(ZX_VMO_OP_TRY_LOCK, 0, size, nullptr, 0);
@@ -73,10 +74,9 @@ zx::result<bool> VmoDiscardable::Lock(pgoff_t offset) {
     ZX_DEBUG_ASSERT(status == ZX_OK);
   }
 
-  size_t offset_in_bitmap = offset % get_size();
-  bool committed = page_bitmap_[offset_in_bitmap];
+  bool committed = page_bitmap_[offset];
   if (!committed) {
-    page_bitmap_[offset_in_bitmap] = true;
+    page_bitmap_[offset] = true;
     increase_active_pages();
   }
   return zx::ok(committed);
@@ -115,7 +115,8 @@ VmoManager::VmoManager(VmoMode mode, size_t content_size, size_t node_size, zx::
   }
 }
 
-zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index) __TA_EXCLUDES(mutex_) {
+zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index, void **out)
+    __TA_EXCLUDES(mutex_) {
   if (mode_ == VmoMode::kPaged) {
     return zx::ok(false);
   }
@@ -125,7 +126,13 @@ zx::result<bool> VmoManager::CreateAndLockVmo(const pgoff_t index) __TA_EXCLUDES
   }
   auto vmo_node_or = GetVmoNodeUnsafe(GetVmoNodeKey(index));
   ZX_DEBUG_ASSERT(vmo_node_or.is_ok());
-  return vmo_node_or.value()->Lock(index);
+  if (out) {
+    auto addr_or = vmo_node_or.value()->GetAddress(GetOffsetInVmoNode(index));
+    if (addr_or.is_ok()) {
+      *out = reinterpret_cast<void *>(*addr_or);
+    }
+  }
+  return vmo_node_or.value()->Lock(GetOffsetInVmoNode(index));
 }
 
 zx_status_t VmoManager::UnlockVmo(const pgoff_t index, const bool evict) {
@@ -146,20 +153,6 @@ zx_status_t VmoManager::UnlockVmo(const pgoff_t index, const bool evict) {
     return vmo_node_or.status_value();
   }
   return ZX_OK;
-}
-
-zx::result<zx_vaddr_t> VmoManager::GetAddress(pgoff_t index) {
-  if (mode_ != VmoMode::kDiscardable) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  fs::SharedLock tree_lock(mutex_);
-  ZX_ASSERT(index < size_in_blocks_);
-  auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(index));
-  if (vmo_node_or.is_ok()) {
-    return vmo_node_or.value()->GetAddress(GetOffsetInVmoNode(index));
-  }
-  return zx::error(vmo_node_or.error_value());
 }
 
 void VmoManager::Reset(bool shutdown) {

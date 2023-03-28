@@ -384,7 +384,7 @@ void MapTester::CheckBlkaddrsInuse(F2fs *fs, std::unordered_set<block_t> &blkadd
 
 void MapTester::CheckDnodePage(NodePage &page, nid_t exp_nid) {
   ASSERT_EQ(page.NidOfNode(), exp_nid);
-  ASSERT_EQ(DatablockAddr(&page, uint64_t{1}), block_t{0});
+  ASSERT_EQ(page.GetBlockAddr(1U), 0U);
 }
 
 bool MapTester::IsCachedNat(NodeManager &node_manager, nid_t n) {

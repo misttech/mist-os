@@ -24,29 +24,35 @@ class NodePage : public Page, public fbl::Recyclable<NodePage> {
   void FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs);
   void CopyNodeFooterFrom(NodePage &src);
   void FillNodeFooterBlkaddr(block_t blkaddr);
-  nid_t InoOfNode();
-  nid_t NidOfNode();
-  uint32_t OfsOfNode();
-  uint64_t CpverOfNode();
-  block_t NextBlkaddrOfNode();
-  bool IsDnode();
-  bool IsColdNode();
-  bool IsFsyncDnode();
-  bool IsDentDnode();
-  void SetColdNode(VnodeF2fs &vnode);
-  void SetFsyncMark(bool mark);
-  void SetDentryMark(bool mark);
+  nid_t InoOfNode() const;
+  nid_t NidOfNode() const;
+  uint32_t OfsOfNode() const;
+  uint64_t CpverOfNode() const;
+  block_t NextBlkaddrOfNode() const;
+  bool IsDnode() const;
+  bool IsColdNode() const;
+  bool IsFsyncDnode() const;
+  bool IsDentDnode() const;
+  void SetColdNode(const bool is_dir);
+  void SetFsyncMark(const bool mark);
+  void SetDentryMark(const bool mark);
+
+  bool IsInode() const;
+  block_t GetBlockAddr(const size_t offset) const;
+  void SetBlockAddr(const size_t offset, const block_t addr) const;
 
   // It returns the starting file offset that |node_page| indicates.
   // The file offset can be calcuated by using the node offset that |node_page| has.
   // See NodePage::IsDnode().
-  block_t StartBidxOfNode(const VnodeF2fs &vnode);
+  uint32_t StartBidxOfNode(const uint32_t num_addrs) const;
 
-  void SetNid(size_t off, nid_t nid, bool is_inode);
-  nid_t GetNid(size_t off, bool is_inode);
+  void SetNid(size_t off, nid_t nid);
+  nid_t GetNid(size_t off) const;
 
  private:
-  Node &GetRawNode() { return *GetAddress<Node>(); }
+  Node &node() const { return *GetAddress<Node>(); }
+  block_t *addrs_array() const;
+
   static constexpr uint32_t kOfsInode = 0;
   static constexpr uint32_t kOfsDirectNode1 = 1;
   static constexpr uint32_t kOfsDirectNode2 = 2;

@@ -299,7 +299,7 @@ zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno
 
 zx::result<std::pair<nid_t, block_t>> GcManager::CheckDnode(const Summary &sum, block_t blkaddr) {
   nid_t nid = LeToCpu(sum.nid);
-  uint64_t ofs_in_node = LeToCpu(sum.ofs_in_node);
+  uint16_t ofs_in_node = LeToCpu(sum.ofs_in_node);
 
   LockedPage node_page;
   if (auto err = fs_->GetNodeManager().GetNodePage(nid, &node_page); err != ZX_OK) {
@@ -320,8 +320,8 @@ zx::result<std::pair<nid_t, block_t>> GcManager::CheckDnode(const Summary &sum, 
     return zx::error(err);
   }
 
-  auto start_bidx = node_page.GetPage<NodePage>().StartBidxOfNode(*vnode);
-  block_t source_blkaddr = DatablockAddr(&node_page.GetPage<NodePage>(), ofs_in_node);
+  auto start_bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode->GetAddrsPerInode());
+  block_t source_blkaddr = node_page.GetPage<NodePage>().GetBlockAddr(ofs_in_node);
 
   if (source_blkaddr != blkaddr) {
     return zx::error(ZX_ERR_BAD_STATE);

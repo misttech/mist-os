@@ -54,29 +54,29 @@ zx::result<> Reader::ReadBlocks(std::vector<LockedPage> &pages, std::vector<bloc
   } else {
     // If every addr is set to either kNullAddr or kNewAddr, the size of
     // |*operations_or| is zero.
-    if (auto status =
-            RunIO(*operation_or,
-                  [&](const StorageOperations &operation, zx_status_t io_status) {
-                    if (io_status == ZX_OK) {
-                      auto &keys = operation.VmoKeys();
-                      auto key = keys.begin();
-                      uint32_t allocate_index = 0;
-                      for (size_t i = 0; i < addrs.size(); ++i) {
-                        if (addrs[i] != kNullAddr && !pages[i]->IsUptodate()) {
-                          if (addrs[i] != kNewAddr) {
-                            pages[i]->Write(buffer_->Data(key->GetKey() + allocate_index));
-                            if ((++allocate_index) == kDefaultAllocationUnit_) {
-                              allocate_index = 0;
-                              ++key;
-                            }
-                          } else {
-                            pages[i].Zero();
-                          }
-                          pages[i]->SetUptodate();
-                        }
-                      }
-                    }
-                  });
+    if (auto status = RunIO(*operation_or,
+                            [&](const StorageOperations &operation, zx_status_t io_status) {
+                              if (io_status == ZX_OK) {
+                                auto &keys = operation.VmoKeys();
+                                auto key = keys.begin();
+                                uint32_t allocate_index = 0;
+                                for (size_t i = 0; i < addrs.size(); ++i) {
+                                  if (addrs[i] == kNullAddr || pages[i]->IsUptodate()) {
+                                    continue;
+                                  }
+                                  if (addrs[i] == kNewAddr) {
+                                    pages[i].Zero();
+                                  } else {
+                                    pages[i]->Write(buffer_->Data(key->GetKey() + allocate_index));
+                                    if ((++allocate_index) == kDefaultAllocationUnit_) {
+                                      allocate_index = 0;
+                                      ++key;
+                                    }
+                                  }
+                                  pages[i]->SetUptodate();
+                                }
+                              }
+                            });
         status != ZX_OK) {
       return zx::error(status);
     }

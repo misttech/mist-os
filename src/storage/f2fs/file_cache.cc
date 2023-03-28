@@ -141,14 +141,12 @@ bool Page::ClearDirtyForIo() {
 zx_status_t Page::GetPage() {
   ZX_DEBUG_ASSERT(IsLocked());
   auto committed_or = VmoOpLock();
-  if (committed_or.is_ok()) {
-    if (!committed_or.value()) {
-      ZX_DEBUG_ASSERT(!IsDirty());
-      ZX_DEBUG_ASSERT(!IsWriteback());
-      ClearUptodate();
-    }
-  }
   ZX_ASSERT(committed_or.is_ok());
+  if (!committed_or.value()) {
+    ZX_DEBUG_ASSERT(!IsDirty());
+    ZX_DEBUG_ASSERT(!IsWriteback());
+    ClearUptodate();
+  }
   return committed_or.status_value();
 }
 
@@ -230,7 +228,7 @@ zx::result<bool> Page::VmoOpLock() {
   ZX_DEBUG_ASSERT(InTreeContainer());
   ZX_DEBUG_ASSERT(IsLocked());
   if (!SetFlag(PageFlag::kPageVmoLocked)) {
-    return GetVmoManager().CreateAndLockVmo(index_);
+    return GetVmoManager().CreateAndLockVmo(index_, addr_ ? nullptr : &addr_);
   }
   return zx::ok(true);
 }

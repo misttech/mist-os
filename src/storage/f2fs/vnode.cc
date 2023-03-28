@@ -620,15 +620,13 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
 
 int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node, uint32_t count) {
   int nr_free = 0;
-  Node &node = *node_page.GetAddress<Node>();
-
   for (; count > 0; --count, ++ofs_in_node) {
-    uint32_t *addr = BlkaddrInNode(node) + ofs_in_node;
-    block_t blkaddr = LeToCpu(*addr);
-    if (blkaddr == kNullAddr)
+    block_t blkaddr = node_page.GetBlockAddr(ofs_in_node);
+    if (blkaddr == kNullAddr) {
       continue;
+    }
     SetDataBlkaddr(node_page, ofs_in_node, kNullAddr);
-    UpdateExtentCache(kNullAddr, node_page.StartBidxOfNode(*this) + ofs_in_node);
+    UpdateExtentCache(kNullAddr, node_page.StartBidxOfNode(GetAddrsPerInode()) + ofs_in_node);
     fs()->GetSegmentManager().InvalidateBlocks(blkaddr);
     fs()->DecValidBlockCount(this, 1);
     ++nr_free;
@@ -649,7 +647,6 @@ void VnodeF2fs::TruncateDataBlocks(NodePage &node_page) {
 zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
   uint32_t blocksize = superblock_info.GetBlocksize();
-  uint32_t count = 0;
 
   if (from > GetSize()) {
     return ZX_OK;
@@ -662,32 +659,36 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   // Invalidate data pages starting from |free_from|. It safely removes any pages updating their
   // block addrs before purging the addrs in nodes.
   InvalidatePages(free_from);
-  LockedPage node_page;
-  if (zx_status_t err = fs()->GetNodeManager().FindLockedDnodePage(*this, free_from, &node_page);
-      err == ZX_OK) {
-    uint32_t ofs_in_node;
-    if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, free_from); result.is_error()) {
-      return result.error_value();
-    } else {
-      ofs_in_node = result.value();
-    }
-
-    // If |from| starts from inode or the middle of dnode, purge the addrs in the start dnode.
-    if (ofs_in_node || IsInode(*node_page)) {
-      if (IsInode(*node_page)) {
-        count = safemath::CheckSub(GetAddrsPerInode(), ofs_in_node).ValueOrDie();
+  {
+    LockedPage node_page;
+    if (zx_status_t err = fs()->GetNodeManager().FindLockedDnodePage(*this, free_from, &node_page);
+        err == ZX_OK) {
+      uint32_t ofs_in_node;
+      if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, free_from); result.is_error()) {
+        return result.error_value();
       } else {
-        count = safemath::CheckSub(kAddrsPerBlock, ofs_in_node).ValueOrDie();
+        ofs_in_node = result.value();
       }
-      TruncateDataBlocksRange(node_page.GetPage<NodePage>(), ofs_in_node, count);
+
+      // If |from| starts from inode or the middle of dnode, purge the addrs in the start dnode.
+      NodePage &node = node_page.GetPage<NodePage>();
+      if (ofs_in_node || node.IsInode()) {
+        uint32_t count = 0;
+        if (node.IsInode()) {
+          count = safemath::CheckSub(GetAddrsPerInode(), ofs_in_node).ValueOrDie();
+        } else {
+          count = safemath::CheckSub(kAddrsPerBlock, ofs_in_node).ValueOrDie();
+        }
+        TruncateDataBlocksRange(node, ofs_in_node, count);
+        free_from += count;
+      }
+    } else if (err != ZX_ERR_NOT_FOUND) {
+      return err;
     }
-    node_page.reset();
-  } else if (err != ZX_ERR_NOT_FOUND) {
-    return err;
   }
 
   // Invalidate the rest nodes.
-  if (zx_status_t err = fs()->GetNodeManager().TruncateInodeBlocks(*this, free_from + count);
+  if (zx_status_t err = fs()->GetNodeManager().TruncateInodeBlocks(*this, free_from);
       err != ZX_OK) {
     return err;
   }
@@ -717,7 +718,7 @@ zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end) {
       ofs_in_dnode = result.value();
     }
 
-    if (DatablockAddr(&dnode_page.GetPage<NodePage>(), ofs_in_dnode) != kNullAddr) {
+    if (dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode) != kNullAddr) {
       TruncateDataBlocksRange(dnode_page.GetPage<NodePage>(), ofs_in_dnode, 1);
     }
   }

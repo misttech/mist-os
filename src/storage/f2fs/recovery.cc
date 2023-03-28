@@ -75,8 +75,9 @@ zx_status_t F2fs::FindFsyncDnodes(FsyncInodeList &inode_list) {
     }
 
     // Reserve inode page
-    if (IsInode(*page)) {
-      inode_page = fbl::RefPtr<NodePage>::Downcast(page.CopyRefPtr());
+    auto node_page = fbl::RefPtr<NodePage>::Downcast(page.CopyRefPtr());
+    if (node_page->IsInode()) {
+      inode_page = std::move(node_page);
     }
 
     if (!page.GetPage<NodePage>().IsFsyncDnode()) {
@@ -178,7 +179,8 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
     }
     ino = node_page.GetPage<NodePage>().InoOfNode();
     ZX_ASSERT(VnodeF2fs::Vget(this, ino, &vnode_refptr) == ZX_OK);
-    bidx = node_page.GetPage<NodePage>().StartBidxOfNode(*vnode_refptr) + LeToCpu(sum.ofs_in_node);
+    bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode_refptr->GetAddrsPerInode()) +
+           LeToCpu(sum.ofs_in_node);
   }
 
   // Deallocate previous index in the node page
@@ -195,8 +197,8 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
     return;
   }
 
-  start = page.StartBidxOfNode(vnode);
-  if (IsInode(page)) {
+  start = page.StartBidxOfNode(vnode.GetAddrsPerInode());
+  if (page.IsInode()) {
     end = start + vnode.GetAddrsPerInode();
   } else {
     end = start + kAddrsPerBlock;
@@ -222,8 +224,8 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   for (; start < end; ++start) {
     block_t src, dest;
 
-    src = DatablockAddr(&dnode_page.GetPage<NodePage>(), offset_in_dnode);
-    dest = DatablockAddr(&page, offset_in_dnode);
+    src = dnode_page.GetPage<NodePage>().GetBlockAddr(offset_in_dnode);
+    dest = page.GetBlockAddr(offset_in_dnode);
 
     if (src != dest && dest != kNewAddr && dest != kNullAddr) {
       if (src == kNullAddr) {
@@ -239,14 +241,14 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
       // Write dummy data page
       GetSegmentManager().RecoverDataPage(sum, src, dest);
       vnode.SetDataBlkaddr(dnode_page.GetPage<NodePage>(), offset_in_dnode, dest);
-      vnode.UpdateExtentCache(dest, page.StartBidxOfNode(vnode));
+      vnode.UpdateExtentCache(dest, page.StartBidxOfNode(vnode.GetAddrsPerInode()));
     }
     ++offset_in_dnode;
   }
 
   // Write node page in place
   GetSegmentManager().SetSummary(&sum, dnode_page.GetPage<NodePage>().NidOfNode(), 0, 0);
-  if (IsInode(*dnode_page)) {
+  if (dnode_page.GetPage<NodePage>().IsInode()) {
     vnode.MarkInodeDirty();
   }
 

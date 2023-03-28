@@ -54,9 +54,9 @@ block_t StartBidxOfNodeWithoutVnode(NodePage &node_page) {
 }
 
 zx::result<pgoff_t> CheckNodePage(F2fs *fs, NodePage &node_page) {
-  pgoff_t block_count = 0, start_index = 0, checked = 0;
+  uint32_t block_count = 0, start_index = 0, checked = 0;
 
-  if (IsInode(node_page)) {
+  if (node_page.IsInode()) {
     block_count = kAddrsPerInode;
   } else {
     block_count = kAddrsPerBlock;
@@ -64,8 +64,8 @@ zx::result<pgoff_t> CheckNodePage(F2fs *fs, NodePage &node_page) {
 
   start_index = StartBidxOfNodeWithoutVnode(node_page);
 
-  for (pgoff_t index = 0; index < block_count; ++index) {
-    block_t data_blkaddr = DatablockAddr(&node_page, index);
+  for (uint32_t index = 0; index < block_count; ++index) {
+    block_t data_blkaddr = node_page.GetBlockAddr(index);
     if (data_blkaddr == kNullAddr) {
       break;
     }
@@ -115,7 +115,7 @@ void CheckFsyncedFile(F2fs *fs, ino_t ino, pgoff_t data_page_count, pgoff_t node
       break;
     }
 
-    if (IsInode(*page)) {
+    if (node_page->IsInode()) {
       ASSERT_EQ(node_page->NidOfNode(), node_page->InoOfNode());
       ASSERT_TRUE(node_page->IsDentDnode());
     } else {

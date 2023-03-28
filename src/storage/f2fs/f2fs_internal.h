@@ -493,26 +493,6 @@ class SuperblockInfo {
   std::mutex stat_lock_;  // lock for stat operations
 };
 
-inline bool RawIsInode(Node &node) { return node.footer.nid == node.footer.ino; }
-
-inline bool IsInode(Page &page) { return RawIsInode(*page.GetAddress<Node>()); }
-
-inline uint32_t *BlkaddrInNode(Node &node) {
-  if (RawIsInode(node)) {
-    if (node.i.i_inline & kExtraAttr) {
-      return node.i.i_addr + (node.i.i_extra_isize / sizeof(uint32_t));
-    }
-    return node.i.i_addr;
-  }
-  return node.dn.addr;
-}
-
-inline block_t DatablockAddr(NodePage *node_page, uint64_t offset) {
-  Node &raw_node = *node_page->GetAddress<Node>();
-  uint32_t *addr_array = BlkaddrInNode(raw_node);
-  return LeToCpu(addr_array[offset]);
-}
-
 inline int TestValidBitmap(uint64_t nr, const uint8_t *addr) {
   int mask;
 

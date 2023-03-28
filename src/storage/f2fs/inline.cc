@@ -155,7 +155,7 @@ zx_status_t Dir::ConvertInlineDir() {
   }
 
   NodePage *ipage = &dnode_page.GetPage<NodePage>();
-  block_t data_blkaddr = DatablockAddr(ipage, ofs_in_dnode);
+  block_t data_blkaddr = ipage->GetBlockAddr(ofs_in_dnode);
   ZX_DEBUG_ASSERT(data_blkaddr == kNullAddr);
 
   if (zx_status_t err = ReserveNewBlock(*ipage, ofs_in_dnode); err != ZX_OK) {
@@ -396,7 +396,7 @@ zx_status_t File::ConvertInlineData() {
   }
 
   NodePage *ipage = &dnode_page.GetPage<NodePage>();
-  block_t data_blkaddr = DatablockAddr(ipage, ofs_in_dnode);
+  block_t data_blkaddr = ipage->GetBlockAddr(ofs_in_dnode);
   ZX_DEBUG_ASSERT(data_blkaddr == kNullAddr);
 
   if (zx_status_t err = ReserveNewBlock(*ipage, ofs_in_dnode); err != ZX_OK) {
@@ -482,7 +482,7 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
   //    x       x  -> recover data blocks
   // ([prev.] is checkpointed data. And [next] is data written and fsynced after checkpoint.)
 
-  if (IsInode(page)) {
+  if (page.IsInode()) {
     Inode &inode = page.GetAddress<Node>()->i;
 
     // [next] have inline data.

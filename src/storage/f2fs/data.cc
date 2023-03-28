@@ -12,16 +12,13 @@ namespace f2fs {
 //    update block addresses in the node page
 void VnodeF2fs::SetDataBlkaddr(NodePage &node_page, uint32_t ofs_in_node, block_t new_addr) {
   node_page.WaitOnWriteback();
-  // Get physical address of data block
-  uint32_t *addr_array = BlkaddrInNode(*node_page.GetAddress<Node>());
-
   if (new_addr == kNewAddr) {
-    ZX_DEBUG_ASSERT(addr_array[ofs_in_node] == kNullAddr);
+    ZX_DEBUG_ASSERT(node_page.GetBlockAddr(ofs_in_node) == kNullAddr);
   } else {
-    ZX_DEBUG_ASSERT(addr_array[ofs_in_node] != kNullAddr);
+    ZX_DEBUG_ASSERT(node_page.GetBlockAddr(ofs_in_node) != kNullAddr);
   }
 
-  addr_array[ofs_in_node] = CpuToLe(new_addr);
+  node_page.SetBlockAddr(ofs_in_node, new_addr);
   LockedPage lock_page(fbl::RefPtr<Page>(&node_page), false);
   lock_page.SetDirty();
   [[maybe_unused]] auto unused = lock_page.release(false);
@@ -156,7 +153,7 @@ zx::result<block_t> VnodeF2fs::FindDataBlkAddr(pgoff_t index) {
     return zx::error(err);
   }
 
-  return zx::ok(DatablockAddr(&dnode_page.GetPage<NodePage>(), ofs_in_dnode));
+  return zx::ok(dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode));
 }
 
 zx::result<LockedPage> VnodeF2fs::FindDataPage(pgoff_t index, bool do_read) {
@@ -314,7 +311,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
       ofs_in_dnode = result.value();
     }
 
-    data_blkaddr = DatablockAddr(&dnode_page.GetPage<NodePage>(), ofs_in_dnode);
+    data_blkaddr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
     if (data_blkaddr == kNullAddr) {
       if (zx_status_t ret = ReserveNewBlock(dnode_page.GetPage<NodePage>(), ofs_in_dnode);
           ret != ZX_OK) {
@@ -425,7 +422,7 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
     ofs_in_dnode = result.value();
   }
 
-  block_t old_blk_addr = DatablockAddr(&dnode_page.GetPage<NodePage>(), ofs_in_dnode);
+  block_t old_blk_addr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
   // This page is already truncated
   if (old_blk_addr == kNullAddr) {
     return zx::error(ZX_ERR_NOT_FOUND);
