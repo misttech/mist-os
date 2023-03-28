@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use errors::{ffx_error, IntoExitCode};
+use ffx_config::environment::ExecutableKind;
 use fuchsia_async::TimeoutExt;
 use std::{fs::File, io::Write, process::ExitStatus, str::FromStr, time::Duration};
 
@@ -49,11 +50,11 @@ pub async fn report_bug(err: &impl std::fmt::Display) {
 }
 
 #[tracing::instrument]
-pub async fn run<T: ToolSuite>() -> Result<ExitStatus> {
+pub async fn run<T: ToolSuite>(exe_kind: ExecutableKind) -> Result<ExitStatus> {
     let cmd = ffx::FfxCommandLine::from_env().map_err(T::add_globals_to_help)?;
     let app = &cmd.global;
 
-    let context = app.load_context()?;
+    let context = app.load_context(exe_kind)?;
 
     ffx_config::init(&context).await?;
 

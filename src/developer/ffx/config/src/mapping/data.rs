@@ -20,11 +20,12 @@ pub(crate) fn data(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigMap;
+    use crate::{environment::ExecutableKind, ConfigMap};
 
     #[test]
     fn test_mapper() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -39,6 +40,7 @@ mod test {
     #[test]
     fn test_mapper_multiple() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -53,6 +55,7 @@ mod test {
     #[test]
     fn test_mapper_returns_pass_through() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),

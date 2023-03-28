@@ -232,7 +232,7 @@ mod test {
     use super::*;
     // This is to get the FfxConfigBacked derive to compile, as it
     // creates a token stream referencing `ffx_config` on the inside.
-    use crate as ffx_config;
+    use crate::{self as ffx_config, environment::ExecutableKind};
     use serde_json::{json, Value};
     use std::{
         collections::{HashMap, HashSet},
@@ -264,6 +264,7 @@ mod test {
     #[test]
     fn test_validating_types() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             HashMap::default(),
             ConfigMap::default(),

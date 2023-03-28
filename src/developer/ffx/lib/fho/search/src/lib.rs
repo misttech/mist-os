@@ -362,6 +362,8 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn scan_workspace_subtool_directory() {
+        let test_env = ffx_config::test_init().await.expect("test init");
+
         let tempdir = tempfile::tempdir().expect("tempdir");
         create_mock_subtool(
             tempdir.path(),
@@ -385,7 +387,7 @@ mod tests {
         );
 
         let suite =
-            ExternalSubToolSuite::with_tools_from(EnvironmentContext::default(), &[tempdir.path()])
+            ExternalSubToolSuite::with_tools_from(test_env.context.clone(), &[tempdir.path()])
                 .expect("subtool suite scanning should succeed");
 
         assert!(

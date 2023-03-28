@@ -8,7 +8,7 @@ use ffx_command::{
     DaemonVersionCheck, Error, FfxCommandLine, FfxContext, FfxToolInfo, MetricsSession, Result,
     ToolRunner, ToolSuite,
 };
-use ffx_config::EnvironmentContext;
+use ffx_config::{environment::ExecutableKind, EnvironmentContext};
 use ffx_lib_args::FfxBuiltIn;
 use ffx_lib_sub_command::SubCommand;
 use fho_search::ExternalSubToolSuite;
@@ -132,6 +132,6 @@ fn is_daemon(subcommand: &FfxBuiltIn) -> bool {
 
 #[fuchsia_async::run_singlethreaded]
 async fn main() {
-    let result = ffx_command::run::<FfxSuite>().await;
+    let result = ffx_command::run::<FfxSuite>(ExecutableKind::MainFfx).await;
     ffx_command::exit(result).await
 }

@@ -39,11 +39,14 @@ pub(crate) fn build(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 // tests
 #[cfg(test)]
 mod test {
+    use crate::environment::ExecutableKind;
+
     use super::*;
 
     #[test]
     fn test_mapper() {
         let ctx = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
             "/tmp".into(),
             Some("/tmp/build".into()),
             Default::default(),
@@ -57,6 +60,7 @@ mod test {
     #[test]
     fn test_mapper_multiple() {
         let ctx = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
             "/tmp".into(),
             Some("/tmp/build".into()),
             Default::default(),
@@ -70,6 +74,7 @@ mod test {
     #[test]
     fn test_no_build_dir() {
         let ctx = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
             "/tmp".into(),
             None,
             Default::default(),
@@ -82,6 +87,7 @@ mod test {
     #[test]
     fn test_mapper_returns_pass_through() {
         let ctx = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
             "/tmp".into(),
             Some("/tmp/build".into()),
             Default::default(),

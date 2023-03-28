@@ -51,11 +51,12 @@ pub(crate) fn env_var(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigMap;
+    use crate::{environment::ExecutableKind, ConfigMap};
 
     #[test]
     fn test_env_var_mapper() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             [("FFX_TEST_ENV_VAR_MAPPER".to_owned(), "test".to_owned())].into(),
             ConfigMap::default(),
@@ -68,6 +69,7 @@ mod test {
     #[test]
     fn test_env_var_mapper_multiple() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             [("FFX_TEST_ENV_VAR_MAPPER_MULTIPLE".to_owned(), "test".to_owned())].into(),
             ConfigMap::default(),
@@ -82,6 +84,7 @@ mod test {
     #[test]
     fn test_env_var_mapper_returns_none() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -94,6 +97,7 @@ mod test {
     #[test]
     fn test_env_var_mapper_multiple_returns_none_if_one_does_not_exist() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -106,6 +110,7 @@ mod test {
     #[test]
     fn test_env_var_mapper_escapes_dollar_sign() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -118,6 +123,7 @@ mod test {
     #[test]
     fn test_env_var_returns_value_if_not_string() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),

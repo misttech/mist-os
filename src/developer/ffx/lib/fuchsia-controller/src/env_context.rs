@@ -5,6 +5,7 @@
 use crate::LibContext;
 use anyhow::Result;
 use errors::ffx_error;
+use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
@@ -41,8 +42,13 @@ impl EnvContext {
     pub async fn new(lib_ctx: Weak<LibContext>) -> Result<Self> {
         let runtime_args = ffx_config::runtime::populate_runtime(&[], None)?;
         let env_path = None;
-        let context = EnvironmentContext::detect(runtime_args, &std::env::current_dir()?, env_path)
-            .map_err(fxe)?;
+        let context = EnvironmentContext::detect(
+            ExecutableKind::Test,
+            runtime_args,
+            &std::env::current_dir()?,
+            env_path,
+        )
+        .map_err(fxe)?;
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
         let _hoist_cache_dir = tempfile::tempdir_in(&cache_path)?;

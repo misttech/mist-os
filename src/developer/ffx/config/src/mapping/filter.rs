@@ -20,12 +20,13 @@ pub(crate) fn filter(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigMap;
+    use crate::{environment::ExecutableKind, ConfigMap};
     use serde_json::json;
 
     #[test]
     fn test_returns_all() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -39,6 +40,7 @@ mod test {
     #[test]
     fn test_returns_value_if_not_array() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),

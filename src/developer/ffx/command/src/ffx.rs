@@ -6,7 +6,7 @@ use crate::{Error, FfxContext, MetricsSession, Result};
 use anyhow::Context;
 use argh::FromArgs;
 use errors::ffx_error;
-use ffx_config::{EnvironmentContext, FfxConfigBacked};
+use ffx_config::{environment::ExecutableKind, EnvironmentContext, FfxConfigBacked};
 use ffx_daemon_proxy::Injection;
 use ffx_target::TargetKind;
 use ffx_writer::Format;
@@ -212,7 +212,10 @@ pub struct Ffx {
 }
 
 impl Ffx {
-    pub fn load_context(&self) -> Result<EnvironmentContext, anyhow::Error> {
+    pub fn load_context(
+        &self,
+        exe_kind: ExecutableKind,
+    ) -> Result<EnvironmentContext, anyhow::Error> {
         // Configuration initialization must happen before ANY calls to the config (or the cache won't
         // properly have the runtime parameters.
         let overrides = self.runtime_config_overrides();
@@ -222,19 +225,26 @@ impl Ffx {
         // If we're given an isolation setting, use that. Otherwise do a normal detection of the environment.
         match (self, std::env::var_os("FFX_ISOLATE_DIR")) {
             (Ffx { isolate_dir: Some(path), .. }, _) => Ok(EnvironmentContext::isolated(
+                exe_kind,
                 path.to_path_buf(),
                 HashMap::from_iter(std::env::vars()),
                 runtime_args,
                 env_path,
             )),
             (_, Some(path_str)) => Ok(EnvironmentContext::isolated(
+                exe_kind,
                 PathBuf::from(path_str),
                 HashMap::from_iter(std::env::vars()),
                 runtime_args,
                 env_path,
             )),
-            _ => EnvironmentContext::detect(runtime_args, &std::env::current_dir()?, env_path)
-                .map_err(|e| ffx_error!(e).into()),
+            _ => EnvironmentContext::detect(
+                exe_kind,
+                runtime_args,
+                &std::env::current_dir()?,
+                env_path,
+            )
+            .map_err(|e| ffx_error!(e).into()),
         }
     }
 

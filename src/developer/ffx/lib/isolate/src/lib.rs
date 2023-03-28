@@ -198,6 +198,7 @@ impl Isolate {
             env_vars.insert("FUCHSIA_SSH_KEY".to_owned(), ssh_key.to_string_lossy().to_string());
 
         let env_ctx = ffx_config::EnvironmentContext::isolated(
+            env_context.exe_kind(),
             tmpdir.path().to_owned(),
             env_vars,
             ffx_config::ConfigMap::new(),

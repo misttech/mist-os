@@ -19,11 +19,12 @@ pub(crate) fn flatten(_ctx: &EnvironmentContext, value: Value) -> Option<Value> 
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigMap;
+    use crate::{environment::ExecutableKind, ConfigMap};
 
     #[test]
     fn test_returns_first() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -40,6 +41,7 @@ mod test {
     #[test]
     fn test_returns_value_if_not_string() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),

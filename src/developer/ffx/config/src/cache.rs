@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    environment::{Environment, EnvironmentContext},
+    environment::{Environment, EnvironmentContext, ExecutableKind},
     storage::{Config, ConfigMap},
     BuildOverride,
 };
@@ -72,6 +72,7 @@ impl TestEnv {
         // Point the user config at a temporary file.
         let user_file_path = user_file.path().to_owned();
         let context = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             isolate_root.path().to_owned(),
             HashMap::from_iter(std::env::vars()),
             ConfigMap::default(),

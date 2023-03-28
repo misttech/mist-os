@@ -78,15 +78,22 @@ impl std::fmt::Display for EnvironmentKind {
     }
 }
 
-impl Default for EnvironmentKind {
-    fn default() -> Self {
-        Self::NoContext
-    }
+/// What kind of executable target this environment was created in
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ExecutableKind {
+    /// A main "launcher" ffx that can be used to run other ffx commands.
+    MainFfx,
+    /// A subtool ffx that only knows its own command.
+    Subtool,
+    /// In a unit or integration test
+    Test,
 }
+
 /// Contextual information about where this instance of ffx is running
-#[derive(Clone, Default, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct EnvironmentContext {
     kind: EnvironmentKind,
+    exe_kind: ExecutableKind,
     env_vars: Option<EnvVars>,
     runtime_args: ConfigMap,
     env_file_path: Option<PathBuf>,
@@ -102,16 +109,18 @@ impl EnvironmentContext {
     /// Initializes a new environment type with the given kind and runtime arguments.
     pub(crate) fn new(
         kind: EnvironmentKind,
+        exe_kind: ExecutableKind,
         env_vars: Option<EnvVars>,
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
     ) -> Self {
-        Self { kind, env_vars, runtime_args, env_file_path }
+        Self { kind, exe_kind, env_vars, runtime_args, env_file_path }
     }
 
     /// Initialize an environment type for an in tree context, rooted at `tree_root` and if
     /// a build directory is currently set at `build_dir`.
     pub fn in_tree(
+        exe_kind: ExecutableKind,
         tree_root: PathBuf,
         build_dir: Option<PathBuf>,
         runtime_args: ConfigMap,
@@ -119,6 +128,7 @@ impl EnvironmentContext {
     ) -> Self {
         Self::new(
             EnvironmentKind::InTree { tree_root, build_dir },
+            exe_kind,
             None,
             runtime_args,
             env_file_path,
@@ -127,6 +137,7 @@ impl EnvironmentContext {
 
     /// Initialize an environment with an isolated root under which things should be stored/used/run.
     pub fn isolated(
+        exe_kind: ExecutableKind,
         isolate_root: PathBuf,
         env_vars: EnvVars,
         runtime_args: ConfigMap,
@@ -134,6 +145,7 @@ impl EnvironmentContext {
     ) -> Self {
         Self::new(
             EnvironmentKind::Isolated { isolate_root },
+            exe_kind,
             Some(env_vars),
             runtime_args,
             env_file_path,
@@ -142,8 +154,12 @@ impl EnvironmentContext {
 
     /// Initialize an environment type that has no meaningful context, using only global and
     /// user level configuration.
-    pub fn no_context(runtime_args: ConfigMap, env_file_path: Option<PathBuf>) -> Self {
-        Self::new(EnvironmentKind::NoContext, None, runtime_args, env_file_path)
+    pub fn no_context(
+        exe_kind: ExecutableKind,
+        runtime_args: ConfigMap,
+        env_file_path: Option<PathBuf>,
+    ) -> Self {
+        Self::new(EnvironmentKind::NoContext, exe_kind, None, runtime_args, env_file_path)
     }
 
     /// Detects what kind of environment we're in, based on the provided arguments,
@@ -151,6 +167,7 @@ impl EnvironmentContext {
     /// the kind of environment will be used. Note that this will never automatically detect
     /// an isolated environment, that has to be chosen explicitly.
     pub fn detect(
+        exe_kind: ExecutableKind,
         runtime_args: ConfigMap,
         current_dir: &Path,
         env_file_path: Option<PathBuf>,
@@ -161,11 +178,15 @@ impl EnvironmentContext {
             // look for a .fx-build-dir file and use that instead.
             let build_dir = Self::load_fx_build_dir(&tree_root)?;
 
-            Ok(Self::in_tree(tree_root, build_dir, runtime_args, env_file_path))
+            Ok(Self::in_tree(exe_kind, tree_root, build_dir, runtime_args, env_file_path))
         } else {
             // - no particular context: any other situation
-            Ok(Self::no_context(runtime_args, env_file_path))
+            Ok(Self::no_context(exe_kind, runtime_args, env_file_path))
         }
+    }
+
+    pub fn exe_kind(&self) -> ExecutableKind {
+        self.exe_kind
     }
 
     pub async fn analytics_enabled(&self) -> bool {
@@ -299,25 +320,26 @@ impl EnvironmentContext {
     pub const FFX_BIN_ENV: &str = "FFX_BIN";
     /// Gets the path to the top level binary for use when re-running ffx.
     ///
-    /// - This will first check the environment variable in [`Self::FFX_BIN_ENV`], which should be set by a
-    /// top level ffx invocation if we were run by one.
-    /// - If that isn't set, it will look at the 'name' of the currently running executable, and
-    /// if that doesn't appear to be a subtool (ie. has no hyphens in the filename), it will use that.
-    /// - If neither of those are found, and an sdk is configured, search the sdk manifest for the
-    /// ffx host-tool entry and use that.
+    /// - This will first check the environment variable in [`Self::FFX_BIN_ENV`],
+    /// which should be set by a top level ffx invocation if we were run by one.
+    /// - If that isn't set, it will use the current executable if this
+    /// context's `ExecutableType` is MainFfx.
+    /// - If neither of those are found, and an sdk is configured, search the
+    /// sdk manifest for the ffx host-tool entry and use that.
     pub async fn rerun_bin(&self) -> Result<PathBuf, anyhow::Error> {
         if let Some(bin_from_env) = self.env_var(Self::FFX_BIN_ENV).ok() {
             return Ok(bin_from_env.into());
         }
 
-        let current_exe = std::env::current_exe()?;
-        let current_exe_name = current_exe.file_name().and_then(|name| name.to_str());
-        if current_exe_name.map_or(false, |name| !name.contains("-")) {
-            return Ok(current_exe);
+        if let ExecutableKind::MainFfx = self.exe_kind {
+            return Ok(std::env::current_exe()?);
         }
 
-        let sdk = self.get_sdk_root().await?.get_sdk()?;
+        let sdk = self.get_sdk().await.with_context(|| {
+            ffx_error!("Unable to load SDK while searching for the 'main' ffx binary")
+        })?;
         sdk.get_host_tool("ffx")
+            .with_context(|| ffx_error!("Unable to find the 'main' ffx binary in the loaded SDK"))
     }
 
     /// Creates a command builder that starts with everything necessary to re-run ffx within the same context,
@@ -746,6 +768,18 @@ mod test {
             "global": "/tmp/global.json"
         }"#;
 
+    impl Default for EnvironmentContext {
+        fn default() -> Self {
+            Self {
+                kind: EnvironmentKind::NoContext,
+                exe_kind: ExecutableKind::Test,
+                env_vars: Default::default(),
+                runtime_args: Default::default(),
+                env_file_path: Default::default(),
+            }
+        }
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_loading_and_saving_environment() {
         let mut test_env = test_init().await.expect("initializing test environment");
@@ -782,6 +816,7 @@ mod test {
         let build_dir_config = temp_dir.join("build.json");
         let env_file_path = temp_dir.join("env.json");
         let context = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
             temp_dir.clone(),
             Some(build_dir_path.clone()),
             ConfigMap::default(),
@@ -822,6 +857,7 @@ mod test {
         let build_dir_config = temp_dir.join("build-manual.json");
         let env_file_path = temp_dir.join("env.json");
         let context = EnvironmentContext::in_tree(
+            ExecutableKind::Test,
             temp_dir.clone(),
             Some(build_dir_path.clone()),
             ConfigMap::default(),

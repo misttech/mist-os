@@ -33,7 +33,7 @@ pub(crate) fn home(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigMap;
+    use crate::{environment::ExecutableKind, ConfigMap};
 
     fn home_dir(default: &str) -> String {
         home::home_dir().map_or(default.to_string(), |home_path| {
@@ -44,6 +44,7 @@ mod test {
     #[test]
     fn test_mapper() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -57,6 +58,7 @@ mod test {
     #[test]
     fn test_mapper_multiple() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -70,6 +72,7 @@ mod test {
     #[test]
     fn test_mapper_returns_pass_through() {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),

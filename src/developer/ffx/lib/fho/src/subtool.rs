@@ -8,6 +8,7 @@ use ffx_command::{
     DaemonVersionCheck, Error, FfxCommandLine, FfxContext, MetricsSession, Result, ToolRunner,
     ToolSuite,
 };
+use ffx_config::environment::ExecutableKind;
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_writer::ToolIO;
@@ -30,7 +31,7 @@ pub trait FfxTool: Sized {
 
     /// Executes the tool. This is intended to be invoked by the user in main.
     async fn execute_tool() {
-        let result = ffx_command::run::<FhoSuite<Self>>().await;
+        let result = ffx_command::run::<FhoSuite<Self>>(ExecutableKind::Subtool).await;
         ffx_command::exit(result).await;
     }
 }

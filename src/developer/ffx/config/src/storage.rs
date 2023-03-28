@@ -351,7 +351,7 @@ impl fmt::Display for Config {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{nested::RecursiveMap, EnvironmentContext};
+    use crate::{environment::ExecutableKind, nested::RecursiveMap, EnvironmentContext};
     use regex::Regex;
     use serde_json::json;
     use std::{
@@ -756,6 +756,7 @@ mod test {
     #[test]
     fn test_mapping() -> Result<()> {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             HashMap::default(),
             ConfigMap::default(),
@@ -823,6 +824,7 @@ mod test {
     #[test]
     fn test_nested_get_should_map_values_in_sub_tree() -> Result<()> {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             HashMap::default(),
             ConfigMap::default(),

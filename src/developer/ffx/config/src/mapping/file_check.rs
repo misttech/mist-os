@@ -22,7 +22,7 @@ pub(crate) fn file_check(_ctx: &EnvironmentContext, value: Value) -> Option<Valu
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ConfigMap;
+    use crate::{environment::ExecutableKind, ConfigMap};
     use anyhow::{bail, Result};
     use serde_json::json;
     use tempfile::NamedTempFile;
@@ -30,6 +30,7 @@ mod test {
     #[test]
     fn test_file_mapper() -> Result<()> {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
@@ -48,6 +49,7 @@ mod test {
     #[test]
     fn test_file_mapper_returns_none() -> Result<()> {
         let ctx = EnvironmentContext::isolated(
+            ExecutableKind::Test,
             "/tmp".into(),
             Default::default(),
             ConfigMap::default(),
