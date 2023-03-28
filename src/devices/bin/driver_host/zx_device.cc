@@ -408,13 +408,18 @@ zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* tx
 zx_status_t zx_device::Rebind() {
   DriverHostContext& context = *driver_host_context();
   fbl::AutoLock lock(&context.api_lock());
-  if (!children().is_empty() || has_composite()) {
-    // note that we want to be rebound when our children are all gone
+  zx::result scheduled_unbind = context.ScheduleUnbindChildren(fbl::RefPtr(this));
+  if (scheduled_unbind.is_error()) {
+    return scheduled_unbind.error_value();
+  }
+  // This will be true if we had children, we will want to wait to rebind until our children are
+  // gone.
+  if (scheduled_unbind.value()) {
     set_flag(DEV_FLAG_WANTS_REBIND);
-    // request that any existing children go away
-    std::ignore = context.ScheduleUnbindChildren(fbl::RefPtr(this));
     return ZX_OK;
   }
+
+  // We don't have any children, so try to rebind right now.
   zx_status_t status = context.DeviceBind(fbl::RefPtr(this), get_rebind_drv_name().c_str());
   if (status != ZX_OK) {
     // Since device binding didn't work, we should reply to an outstanding rebind if it exists;

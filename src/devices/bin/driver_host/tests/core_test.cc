@@ -69,7 +69,7 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void ScheduleUnbindChildren(ScheduleUnbindChildrenCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+    completer.ReplySuccess(unbind_children_value_);
   }
   void ConnectFidlProtocol(ConnectFidlProtocolRequestView request,
                            ConnectFidlProtocolCompleter::Sync& completer) override {
@@ -77,6 +77,9 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
   }
 
   uint32_t bind_count() { return bind_count_; }
+  void set_unbind_children_value(bool unbind_children_value) {
+    unbind_children_value_ = unbind_children_value;
+  }
 
   zx_status_t set_spec_callback(TestAddCompositeNodeSpecCallback callback) {
     spec_callback_ = std::move(callback);
@@ -85,6 +88,7 @@ class FakeCoordinator : public fidl::WireServer<fuchsia_device_manager::Coordina
 
  private:
   uint32_t bind_count_ = 0;
+  bool unbind_children_value_ = false;
   TestAddCompositeNodeSpecCallback spec_callback_;
   fidl::ServerBindingGroup<fuchsia_device_manager::Coordinator> bindings_;
 };
@@ -286,6 +290,7 @@ TEST_F(CoreTest, SystemPowerStateMapping) {
 
 TEST_F(CoreTest, RebindHasOneChild) {
   uint32_t unbind_count = 0;
+  coordinator_.SyncCall(&FakeCoordinator::set_unbind_children_value, true);
 
   zx_protocol_device_t ops = {};
   ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
@@ -319,6 +324,7 @@ TEST_F(CoreTest, RebindHasOneChild) {
 
 TEST_F(CoreTest, RebindHasMultipleChildren) {
   uint32_t unbind_count = 0;
+  coordinator_.SyncCall(&FakeCoordinator::set_unbind_children_value, true);
 
   zx_protocol_device_t ops = {};
   ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
