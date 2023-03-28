@@ -107,9 +107,8 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
     let image_assembly_file = std::fs::File::create(&image_assembly_path).with_context(|| {
         format!("Failed to create image assembly config file: {image_assembly_path}")
     })?;
-    serde_json::to_writer_pretty(image_assembly_file, &image_assembly).with_context(|| {
-        format!("Writing image assembly config file: {builder_forensics_file_path}")
-    })?;
+    serde_json::to_writer_pretty(image_assembly_file, &image_assembly)
+        .with_context(|| format!("Writing image assembly config file: {image_assembly_path}"))?;
 
     Ok(())
 }
