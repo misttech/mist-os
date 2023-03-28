@@ -1,4 +1,4 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -21,7 +21,7 @@ use {
 /// Read in the provided JSON file and add includes.
 /// If the JSON file is an object with a key "include" that references an array of strings then
 /// the strings are treated as paths to JSON files to be merged with the input file.
-/// Returns any includes encountered.
+///
 /// If a depfile is provided, also writes includes encountered to the depfile.
 pub fn merge_includes(
     file: &PathBuf,
@@ -30,21 +30,40 @@ pub fn merge_includes(
     includepath: &Vec<PathBuf>,
     includeroot: &PathBuf,
 ) -> Result<(), Error> {
-    let includes = transitive_includes(&file, includepath, &includeroot)?;
-    let mut v: Value = json_or_json5_from_file(&file)?;
-    v.as_object_mut().and_then(|v| v.remove("include"));
+    let includes = transitive_includes(&file, &includepath, &includeroot)?;
+    let json_str = if file.as_path().to_str().unwrap().ends_with(".cml") {
+        let mut document = util::read_cml(&file)?;
+        for include in &includes {
+            let mut include_document = util::read_cml(&include)?;
+            document.merge_from(&mut include_document, &include)?;
+        }
+        document.include = None;
+        serde_json::to_string_pretty(&document)?
+    } else {
+        // Perform a simple JSON merge algorithm.
+        let mut v: Value = json_or_json5_from_file(&file)?;
+        v.as_object_mut().and_then(|v| v.remove("include"));
 
-    for include in &includes {
-        let mut includev: Value = json_or_json5_from_file(&include).map_err(|e| {
-            Error::parse(format!("Couldn't read include {:?}: {}", &include, e), None, Some(&file))
-        })?;
-        includev.as_object_mut().and_then(|v| v.remove("include"));
-        merge_json(&mut v, &includev).map_err(|e| {
-            Error::parse(format!("Failed to merge with {:?}: {}", include, e), None, Some(&file))
-        })?;
-    }
+        for include in &includes {
+            let mut includev: Value = json_or_json5_from_file(&include).map_err(|e| {
+                Error::parse(
+                    format!("Couldn't read include {:?}: {}", &include, e),
+                    None,
+                    Some(&file),
+                )
+            })?;
+            includev.as_object_mut().and_then(|v| v.remove("include"));
+            merge_json(&mut v, &includev).map_err(|e| {
+                Error::parse(
+                    format!("Failed to merge with {:?}: {}", include, e),
+                    None,
+                    Some(&file),
+                )
+            })?;
+        }
+        serde_json::to_string_pretty(&v)?
+    };
 
-    // Write postprocessed JSON
     if let Some(output_path) = output.as_ref() {
         util::ensure_directory_exists(&output_path)?;
         fs::OpenOptions::new()
@@ -52,9 +71,9 @@ pub fn merge_includes(
             .truncate(true)
             .write(true)
             .open(output_path)?
-            .write_all(format!("{:#}", v).as_bytes())?;
+            .write_all(json_str.as_bytes())?;
     } else {
-        println!("{:#}", v);
+        println!("{:#}", json_str);
     }
 
     // Write includes to depfile
@@ -299,15 +318,12 @@ mod tests {
             )
         }
 
-        fn assert_output_eq(&self, contents: impl Display) {
+        #[track_caller]
+        fn assert_output_eq(&self, expected: Value) {
             let mut actual = String::new();
             File::open(&self.output).unwrap().read_to_string(&mut actual).unwrap();
-            assert_eq!(
-                actual,
-                format!("{:#}", contents),
-                "Unexpected contents of {:?}",
-                &self.output
-            );
+            let actual_json: Value = serde_json::from_str(actual.as_str()).unwrap();
+            assert_eq!(actual_json, expected, "Unexpected contents of {:?}", &self.output);
         }
 
         fn assert_depfile_eq(&self, out: &PathBuf, ins: &[&PathBuf]) {
@@ -375,41 +391,93 @@ mod tests {
                 "binary": "bin/hello_world"
             },
             "use": [{
-                "protocol": ["fuchsia.foo.Bar"]
+                "protocol": "fuchsia.foo.Bar"
             }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
     }
 
     #[test]
-    fn test_include_not_from_first_path() {
+    fn test_include_cml_dup_protocol() {
         let ctx = TestContext::new();
-        let cmx_path = ctx.new_file(
-            "some.cmx",
-            json!({
-                "include": ["shard.cmx"],
-                "program": {
-                    "binary": "bin/hello_world"
-                }
-            }),
-        );
-        let shard_path = ctx.new_include_secondary(
-            "shard.cmx",
-            json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Bar"]
-                }
-            }),
-        );
-        ctx.merge_includes(&cmx_path).unwrap();
+        let cml_path =
+            ctx.new_file("some.cml", "{include: [\"shard.cml\"], use: [{ protocol: [\"bar\"]}]}");
+        let shard_path = ctx.new_include("shard.cml", "{use: [{ protocol: [\"foo\", \"bar\"]}]}");
+        ctx.merge_includes(&cml_path).unwrap();
 
         ctx.assert_output_eq(json!({
-            "program": {
-                "binary": "bin/hello_world"
-            },
-            "sandbox": {
-                "services": ["fuchsia.foo.Bar"]
-            }
+            "use": [
+            {
+                "protocol": "bar"
+            },{
+                "protocol": "foo"
+            }]
+        }));
+        ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
+    }
+
+    #[test]
+    fn test_include_cml_dup_protocol_string_variant() {
+        let ctx = TestContext::new();
+        let cml_path = ctx.new_file(
+            "some.cml",
+            json!({
+                "include": ["shard.cml"],
+                "use": [
+                    {"protocol": "bar"}
+                ]
+            }),
+        );
+        let shard_path = ctx.new_include(
+            "shard.cml",
+            json!({
+                "use": [{
+                    "protocol": ["bar"]
+                }]
+            }),
+        );
+        ctx.merge_includes(&cml_path).unwrap();
+
+        ctx.assert_output_eq(json!({
+            "use": [{
+                "protocol": "bar"
+            }]
+        }));
+        ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
+    }
+
+    #[test]
+    fn test_include_cml_dup_protocol_complex_string_variant() {
+        let ctx = TestContext::new();
+        let cml_path = ctx.new_file(
+            "some.cml",
+            json!({
+                "include": ["shard.cml"],
+                "use": [
+                    {"protocol": "bar", "path": "/foo"}
+                ]
+            }),
+        );
+        let shard_path = ctx.new_include(
+            "shard.cml",
+            json!({
+                "use": [{
+                    "protocol": ["bar"]
+                }]
+            }),
+        );
+        ctx.merge_includes(&cml_path).unwrap();
+
+        ctx.assert_output_eq(json!({
+            "use": [
+                {
+                    "path": "/foo",
+                    "protocol": "bar",
+                },
+                {
+                    "protocol": "bar"
+                }
+            ]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
     }
@@ -418,29 +486,29 @@ mod tests {
     fn test_include_paths_take_priority_by_order() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_file(
-            "some.cmx",
+            "some.cml",
             json!({
-                "include": ["shard.cmx"],
+                "include": ["shard.cml"],
                 "program": {
                     "binary": "bin/hello_world"
                 }
             }),
         );
         let shard_path = ctx.new_include(
-            "shard.cmx",
+            "shard.cml",
             json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Bar"]
-                }
+                "use": [{
+                    "protocol": "bar"
+                }]
             }),
         );
         // This shard won't be included because the one above will match first
         ctx.new_include_secondary(
-            "shard.cmx",
+            "shard.cml",
             json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Qux"]
-                }
+                "use": [{
+                    "protocol": "qux"
+                }]
             }),
         );
         ctx.merge_includes(&cmx_path).unwrap();
@@ -449,9 +517,9 @@ mod tests {
             "program": {
                 "binary": "bin/hello_world"
             },
-            "sandbox": {
-                "services": ["fuchsia.foo.Bar"]
-            }
+            "use": [{
+                "protocol": "bar"
+            }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
     }
@@ -461,20 +529,20 @@ mod tests {
         let ctx = TestContext::new();
         ctx.new_dir("path/to");
         let cmx_path = ctx.new_include(
-            "some.cmx",
+            "some.cml",
             json!({
-                "include": ["//path/to/shard.cmx"],
+                "include": ["//path/to/shard.cml"],
                 "program": {
                     "binary": "bin/hello_world"
                 }
             }),
         );
         let shard_path = ctx.new_file(
-            "path/to/shard.cmx",
+            "path/to/shard.cml",
             json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Bar"]
-                }
+                "use": [{
+                    "protocol": "bar"
+                }]
             }),
         );
         ctx.merge_includes(&cmx_path).unwrap();
@@ -483,9 +551,9 @@ mod tests {
             "program": {
                 "binary": "bin/hello_world"
             },
-            "sandbox": {
-                "services": ["fuchsia.foo.Bar"]
-            }
+            "use": [{
+                "protocol": "bar"
+            }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard_path]);
     }
@@ -494,28 +562,28 @@ mod tests {
     fn test_include_multiple_shards() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_include(
-            "some.cmx",
+            "some.cml",
             json!({
-                "include": ["shard1.cmx", "shard2.cmx"],
+                "include": ["shard1.cml", "shard2.cml"],
                 "program": {
                     "binary": "bin/hello_world"
                 }
             }),
         );
         let shard1_path = ctx.new_include(
-            "shard1.cmx",
+            "shard1.cml",
             json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Bar"]
-                }
+                "use": [{
+                    "protocol": "bar"
+                }]
             }),
         );
         let shard2_path = ctx.new_include(
-            "shard2.cmx",
+            "shard2.cml",
             json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Qux"]
-                }
+                "use": [{
+                    "protocol": "qux"
+                }]
             }),
         );
         ctx.merge_includes(&cmx_path).unwrap();
@@ -524,9 +592,11 @@ mod tests {
             "program": {
                 "binary": "bin/hello_world"
             },
-            "sandbox": {
-                "services": ["fuchsia.foo.Bar", "fuchsia.foo.Qux"]
-            }
+            "use": [{
+                "protocol": "bar"
+            },{
+                "protocol": "qux"
+            }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard1_path, &shard2_path]);
     }
@@ -535,29 +605,29 @@ mod tests {
     fn test_include_recursively() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_include(
-            "some.cmx",
+            "some.cml",
             json!({
-                "include": ["shard1.cmx"],
+                "include": ["shard1.cml"],
                 "program": {
                     "binary": "bin/hello_world"
                 }
             }),
         );
         let shard1_path = ctx.new_include(
-            "shard1.cmx",
+            "shard1.cml",
             json!({
-                "include": ["shard2.cmx"],
-                "sandbox": {
-                    "services": ["fuchsia.foo.Bar"]
-                }
+                "include": ["shard2.cml"],
+                "use": [{
+                    "protocol": "bar"
+                }]
             }),
         );
         let shard2_path = ctx.new_include(
-            "shard2.cmx",
+            "shard2.cml",
             json!({
-                "sandbox": {
-                    "services": ["fuchsia.foo.Qux"]
-                }
+                "use": [{
+                    "protocol": "qux"
+                }]
             }),
         );
         ctx.merge_includes(&cmx_path).unwrap();
@@ -566,9 +636,11 @@ mod tests {
             "program": {
                 "binary": "bin/hello_world"
             },
-            "sandbox": {
-                "services": ["fuchsia.foo.Bar", "fuchsia.foo.Qux"]
-            }
+            "use": [{
+                "protocol": "bar"
+            },{
+                "protocol": "qux"
+            }]
         }));
         ctx.assert_depfile_eq(&ctx.output, &[&shard1_path, &shard2_path]);
     }
@@ -577,7 +649,7 @@ mod tests {
     fn test_include_nothing() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_include(
-            "some.cmx",
+            "some.cml",
             json!({
                 "include": [],
                 "program": {
@@ -599,7 +671,7 @@ mod tests {
     fn test_no_includes() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_include(
-            "some.cmx",
+            "some.cml",
             json!({
                 "program": {
                     "binary": "bin/hello_world"
@@ -620,9 +692,9 @@ mod tests {
     fn test_invalid_include() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_include(
-            "some.cmx",
+            "some.cml",
             json!({
-                "include": ["doesnt_exist.cmx"],
+                "include": ["doesnt_exist.cml"],
                 "program": {
                     "binary": "bin/hello_world"
                 }
@@ -631,22 +703,22 @@ mod tests {
         let result = ctx.merge_includes(&cmx_path);
 
         assert_matches!(result, Err(Error::Parse { err, .. })
-                        if err.starts_with("Couldn't read include ") && err.contains("doesnt_exist.cmx"));
+                        if err.starts_with("Couldn't read include ") && err.contains("doesnt_exist.cml"));
     }
 
     #[test]
     fn test_include_detect_cycle() {
         let ctx = TestContext::new();
         let cmx_path = ctx.new_include(
-            "some1.cmx",
+            "some1.cml",
             json!({
-                "include": ["some2.cmx"],
+                "include": ["some2.cml"],
             }),
         );
         ctx.new_include(
-            "some2.cmx",
+            "some2.cml",
             json!({
-                "include": ["some1.cmx"],
+                "include": ["some1.cml"],
             }),
         );
         let result = ctx.merge_includes(&cmx_path);
@@ -664,24 +736,24 @@ mod tests {
         //   D
         let ctx = TestContext::new();
         let a_path = ctx.new_include(
-            "a.cmx",
+            "a.cml",
             json!({
-                "include": ["b.cmx", "c.cmx"],
+                "include": ["b.cml", "c.cml"],
             }),
         );
         ctx.new_include(
-            "b.cmx",
+            "b.cml",
             json!({
-                "include": ["d.cmx"],
+                "include": ["d.cml"],
             }),
         );
         ctx.new_include(
-            "c.cmx",
+            "c.cml",
             json!({
-                "include": ["d.cmx"],
+                "include": ["d.cml"],
             }),
         );
-        ctx.new_include("d.cmx", json!({}));
+        ctx.new_include("d.cml", json!({}));
         let result = ctx.merge_includes(&a_path);
         assert_matches!(result, Ok(()));
     }
@@ -715,7 +787,7 @@ mod tests {
         let cmx3_path = ctx.new_include(
             "some3.cml",
             json!({
-                "include": [ "foo.cmx" ],
+                "include": [ "foo.cml" ],
                 "program": {
                     "binary": "bin/hello_world"
                 }
@@ -740,7 +812,7 @@ mod tests {
         let bar_path = ctx.new_include("bar.cml", json!({}));
         assert_matches!(ctx.check_includes(&cml_path, vec!["bar.cml".into()]), Ok(()));
         // Note that inputs are sorted to keep depfile contents stable,
-        // so bar.cmx comes before foo.cmx.
+        // so bar.cml comes before foo.cml.
         ctx.assert_depfile_eq(&ctx.stamp, &[&bar_path, &foo_path, &cml_path]);
     }
 
