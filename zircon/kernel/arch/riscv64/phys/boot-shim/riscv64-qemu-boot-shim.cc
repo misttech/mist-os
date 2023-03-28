@@ -95,7 +95,7 @@ ktl::optional<uintptr_t> UintptrFromProperty(devicetree::PropertyValue value) {
 Shim::ByteView ParseDevicetree(Shim& shim, const devicetree::Devicetree& dt) {
   Shim::ByteView zbi;
 
-  dt.Walk([&shim, &zbi](const auto& path, const auto& props) -> bool {
+  dt.Walk([&shim, &zbi](const auto& path, const auto& prop_decoder) -> bool {
     // The root node / is represented by the sequence {""}, not the empty path.
     ZX_DEBUG_ASSERT(!path.is_empty());
     auto it = ++path.begin();
@@ -104,7 +104,7 @@ Shim::ByteView ParseDevicetree(Shim& shim, const devicetree::Devicetree& dt) {
     }
     ktl::optional<ktl::string_view> cmdline;
     ktl::optional<uintptr_t> initrd_start, initrd_end;
-    for (auto [name, value] : props) {
+    for (auto [name, value] : prop_decoder.properties()) {
       if (name == "bootargs") {
         cmdline = value.AsString();
       } else if (name == "linux,initrd-start") {
