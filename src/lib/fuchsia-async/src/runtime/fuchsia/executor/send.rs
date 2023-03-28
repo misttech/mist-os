@@ -45,7 +45,7 @@ pub struct SendExecutor {
 
 impl fmt::Debug for SendExecutor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("LocalExecutor").field("port", &self.inner.port).finish()
+        f.debug_struct("SendExecutor").field("port", &self.inner.port).finish()
     }
 }
 
