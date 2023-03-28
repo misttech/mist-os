@@ -8,7 +8,6 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use once_cell::sync::Lazy;
 use std::collections::{hash_map::Entry, HashMap};
 use std::convert::TryInto;
-use std::ffi::{CStr, CString};
 use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes};
 
@@ -42,6 +41,21 @@ bitflags! {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
+pub enum MappingName {
+    // No name.
+    None,
+
+    /// The file backing this mapping.
+    File(NamespaceNode),
+
+    /// The name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
+    /// An empty name is distinct from an unnamed mapping. Mappings are initially created with no
+    /// name and can be reset to the unnamed state by passing NULL to
+    /// prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
+    Vma(FsString),
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
 struct Mapping {
     /// The base address of this mapping.
     ///
@@ -62,21 +76,15 @@ struct Mapping {
     /// The flags for this mapping.
     options: MappingOptions,
 
-    /// The name of the file used for the mapping.
-    /// This is usually set to none if the mapping is anonymous.
+    /// The name for this mapping.
     ///
-    /// The only exception is when mapping `/dev/zero` which is equivalent to an
-    /// anonymous mapping despite having this field set.
+    /// This may be a reference to the filesystem node backing this mapping or a userspace-assigned name.
+    /// The existence of this field is orthogonal to whether this mapping is anonymous - mappings of the
+    /// file '/dev/zero' are treated as anonymous mappings and anonymous mappings may have a name assigned.
     ///
     /// Because of this exception, avoid using this field to check if a mapping is anonymous.
     /// Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
-    filename: Option<NamespaceNode>,
-
-    /// A name associated with the mapping. Set by prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
-    /// TODO(tbodt): RangeMap automatically merges adjacent mappings based on this struct's
-    /// PartialEq impl. The auto derive checks this field too, so adjacent mappings with different
-    /// names aren't merged. Investigate whether this is correct.
-    name: CString,
+    name: MappingName,
 }
 
 impl Mapping {
@@ -96,8 +104,7 @@ impl Mapping {
                     | zx::VmarFlags::PERM_WRITE
                     | zx::VmarFlags::PERM_EXECUTE),
             options,
-            filename: None,
-            name: CString::default(),
+            name: MappingName::None,
         }
     }
 
@@ -199,7 +206,7 @@ impl MemoryManagerState {
         length: usize,
         flags: zx::VmarFlags,
         options: MappingOptions,
-        filename: Option<NamespaceNode>,
+        name: MappingName,
     ) -> Result<UserAddress, Errno> {
         let addr = UserAddress::from_ptr(
             self.user_vmar
@@ -211,13 +218,13 @@ impl MemoryManagerState {
         {
             // Take the lock on directory entry while holding the one on the mm state to ensure any
             // wrong ordering will trigger the tracing-mutex at the right call site.
-            if let Some(name) = &filename {
+            if let MappingName::File(name) = &name {
                 let _l1 = name.entry.parent();
             }
         }
 
         let mut mapping = Mapping::new(addr, vmo, vmo_offset, flags, options);
-        mapping.filename = filename;
+        mapping.name = name;
         let end = (addr + length).round_up(*PAGE_SIZE)?;
         self.mappings.insert(addr..end, mapping);
 
@@ -368,7 +375,7 @@ impl MemoryManagerState {
             final_length,
             vmar_flags,
             original_mapping.options,
-            original_mapping.filename,
+            original_mapping.name,
         )?))
     }
 
@@ -465,7 +472,7 @@ impl MemoryManagerState {
                 dst_length,
                 vmar_flags,
                 src_mapping.options,
-                src_mapping.filename,
+                src_mapping.name,
             )?
         } else {
             // This mapping is backed by an FD, just map the range of the VMO covering the moved
@@ -477,7 +484,7 @@ impl MemoryManagerState {
                 dst_length,
                 vmar_flags,
                 src_mapping.options,
-                src_mapping.filename,
+                src_mapping.name,
             )?
         };
 
@@ -582,7 +589,7 @@ impl MemoryManagerState {
                 child_length,
                 mapping.permissions | zx::VmarFlags::SPECIFIC,
                 mapping.options,
-                mapping.filename,
+                mapping.name,
             )?;
         }
 
@@ -1109,8 +1116,7 @@ impl MemoryManager {
         let mut brk = match state.brk {
             None => {
                 let vmo = zx::Vmo::create(PROGRAM_BREAK_LIMIT).map_err(|_| errno!(ENOMEM))?;
-                vmo.set_name(CStr::from_bytes_with_nul(b"starnix-brk\0").unwrap())
-                    .map_err(impossible_error)?;
+                set_zx_name(&vmo, b"starnix-brk");
                 let length = *PAGE_SIZE as usize;
                 let addr = state.map(
                     0,
@@ -1119,7 +1125,7 @@ impl MemoryManager {
                     length,
                     zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
                     MappingOptions::empty(),
-                    None,
+                    MappingName::None,
                 )?;
                 let brk = ProgramBreak { base: addr, current: addr };
                 state.brk = Some(brk);
@@ -1258,7 +1264,7 @@ impl MemoryManager {
                 length,
                 mapping.permissions | zx::VmarFlags::SPECIFIC,
                 mapping.options,
-                mapping.filename.clone(),
+                mapping.name.clone(),
             )?;
         }
 
@@ -1312,7 +1318,7 @@ impl MemoryManager {
         length: usize,
         mut flags: zx::VmarFlags,
         options: MappingOptions,
-        filename: Option<NamespaceNode>,
+        name: MappingName,
     ) -> Result<UserAddress, Errno> {
         let vmar_offset = match addr.address() {
             a if a.is_null() => {
@@ -1337,7 +1343,7 @@ impl MemoryManager {
                 length,
                 flags,
                 options,
-                filename.clone(),
+                name.clone(),
             )
         };
         let addr = match try_map(vmar_offset, flags) {
@@ -1399,20 +1405,99 @@ impl MemoryManager {
         &self,
         addr: UserAddress,
         length: usize,
-        name: CString,
+        name: Option<FsString>,
     ) -> Result<(), Errno> {
-        let mut state = self.state.write();
-        let (range, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EINVAL))?;
-        if range.end - addr < length {
+        if addr.ptr() % *PAGE_SIZE as usize != 0 {
             return error!(EINVAL);
         }
+        let end = match addr.checked_add(length) {
+            Some(addr) => addr.round_up(*PAGE_SIZE).map_err(|_| errno!(ENOMEM))?,
+            None => return error!(EINVAL),
+        };
+        let mut state = self.state.write();
+
+        let mappings_in_range = state
+            .mappings
+            .intersection(addr..end)
+            .map(|(r, m)| (r.clone(), m.clone()))
+            .collect::<Vec<_>>();
+
+        if mappings_in_range.is_empty() {
+            return error!(EINVAL);
+        }
+        if !mappings_in_range.first().unwrap().0.contains(&addr) {
+            return error!(ENOMEM);
+        }
+
+        let mut last_range_end = None;
         // There's no get_mut on RangeMap, because it would be hard to implement correctly in
         // combination with merging of adjacent mappings. Instead, make a copy, change the copy,
         // and insert the copy.
-        let (mut mapping, range) = (mapping.clone(), range.clone());
-        let _result = mapping.vmo.set_name(&name);
-        mapping.name = name;
-        state.mappings.insert(range, mapping);
+        for (mut range, mut mapping) in mappings_in_range {
+            if let MappingName::File(_) = mapping.name {
+                // It's invalid to assign a name to a file-backed mapping.
+                return error!(EBADF);
+            }
+            if range.start < addr {
+                // This mapping starts before the named region. Split the mapping so we can apply the name only to
+                // the specified region.
+                let start_split_range = range.start..addr;
+                let start_split_length = addr - range.start;
+                let start_split_mapping = Mapping::new(
+                    range.start,
+                    mapping.vmo.clone(),
+                    mapping.vmo_offset,
+                    mapping.permissions,
+                    mapping.options,
+                );
+                state.mappings.insert(start_split_range, start_split_mapping);
+
+                // Shrink the range of the named mapping to only the named area.
+                mapping.vmo_offset = start_split_length as u64;
+                range = addr..range.end;
+            }
+            if let Some(last_range_end) = last_range_end {
+                if last_range_end != range.start {
+                    // The name must apply to a contiguous range of mapped pages.
+                    return error!(ENOMEM);
+                }
+            }
+            last_range_end = Some(range.end.round_up(*PAGE_SIZE)?);
+            match &name {
+                Some(vmo_name) => {
+                    set_zx_name(&*mapping.vmo, vmo_name);
+                }
+                None => {
+                    set_zx_name(&*mapping.vmo, b"");
+                }
+            };
+            if range.end > end {
+                // The named region ends before the last mapping ends. Split the tail off of the
+                // last mapping to have an unnamed mapping after the named region.
+                let tail_range = end..range.end;
+                let tail_offset = range.end - end;
+                let tail_mapping = Mapping::new(
+                    end,
+                    mapping.vmo.clone(),
+                    mapping.vmo_offset + tail_offset as u64,
+                    mapping.permissions,
+                    mapping.options,
+                );
+                state.mappings.insert(tail_range, tail_mapping);
+                range.end = end;
+            }
+            mapping.name = match &name {
+                Some(name) => MappingName::Vma(name.clone()),
+                None => MappingName::None,
+            };
+            state.mappings.insert(range, mapping);
+        }
+        if let Some(last_range_end) = last_range_end {
+            if last_range_end < end {
+                // The name must apply to a contiguous range of mapped pages.
+                return error!(ENOMEM);
+            }
+        }
         Ok(())
     }
 
@@ -1488,10 +1573,14 @@ impl MemoryManager {
     }
 
     #[cfg(test)]
-    pub fn get_mapping_name(&self, addr: UserAddress) -> Result<CString, Errno> {
+    pub fn get_mapping_name(&self, addr: UserAddress) -> Result<Option<FsString>, Errno> {
         let state = self.state.read();
         let (_, mapping) = state.mappings.get(&addr).ok_or_else(|| errno!(EFAULT))?;
-        Ok(mapping.name.clone())
+        if let MappingName::Vma(name) = &mapping.name {
+            Ok(Some(name.clone()))
+        } else {
+            Ok(None)
+        }
     }
 
     #[cfg(test)]
@@ -1624,13 +1713,13 @@ impl FileOps for ProcMapsFile {
                     if map.permissions.contains(zx::VmarFlags::PERM_EXECUTE) { 'x' } else { '-' },
                     if map.options.contains(MappingOptions::SHARED) { 's' } else { 'p' },
                     map.vmo_offset,
-                    if let Some(filename) = &map.filename {
+                    if let MappingName::File(filename) = &map.name {
                         filename.entry.node.inode_num
                     } else {
                         0
                     }
                 )?;
-                if let Some(filename) = &map.filename {
+                if let MappingName::File(filename) = &map.name {
                     // The filename goes at >= the 74th column (73rd when zero indexed)
                     for _ in line_length..73 {
                         sink.write(b" ");
@@ -1652,6 +1741,15 @@ impl FileOps for ProcMapsFile {
                             )
                             .copied(),
                     );
+                }
+                if let MappingName::Vma(name) = &map.name {
+                    // The filename goes at >= the 74th column (73rd when zero indexed)
+                    for _ in line_length..73 {
+                        sink.write(b" ");
+                    }
+                    sink.write(b"[anon:");
+                    sink.write(name.as_bytes());
+                    sink.write(b"]");
                 }
                 sink.write(b"\n");
                 return Ok(Some(range.end));
@@ -1789,8 +1887,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
             zx::Status::OUT_OF_RANGE => errno!(ENOMEM),
             _ => impossible_error(s),
         })?;
-    vmo.set_name(CStr::from_bytes_with_nul(b"starnix-anon\0").unwrap())
-        .map_err(impossible_error)?;
+    set_zx_name(&vmo, b"starnix-anon");
     // TODO(fxbug.dev/105639): Audit replace_as_executable usage
     vmo = vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
     Ok(Arc::new(vmo))
@@ -1800,9 +1897,11 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 mod tests {
     use super::*;
     use crate::mm::syscalls::sys_mmap;
+    use crate::task::syscalls::sys_prctl;
     use crate::testing::*;
     use assert_matches::assert_matches;
     use itertools::assert_equal;
+    use std::ffi::CString;
 
     #[::fuchsia::test]
     fn test_brk() {
@@ -2479,7 +2578,7 @@ mod tests {
                 VMO_SIZE as usize,
                 vmar_flags,
                 MappingOptions::empty(),
-                None,
+                MappingName::None,
             )
             .expect("map failed");
 
@@ -2509,5 +2608,211 @@ mod tests {
         port.queue(&zx::Packet::from_user_packet(0, 0, zx::UserPacket::from_u8_array([0; 32])))
             .unwrap();
         thread.join().unwrap();
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let vma_name = b"vma name".to_vec();
+        mm.write_memory(name_addr, vma_name.as_bytes()).unwrap();
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        sys_prctl(
+            &current_task,
+            PR_SET_VMA,
+            PR_SET_VMA_ANON_NAME as u64,
+            mapping_addr.ptr() as u64,
+            *PAGE_SIZE,
+            name_addr.ptr() as u64,
+        )
+        .unwrap();
+
+        assert_eq!(mm.get_mapping_name(mapping_addr).unwrap(), Some(vma_name));
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_adjacent_mappings() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+
+        let first_mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        let second_mapping_addr = map_memory_with_flags(
+            &current_task,
+            first_mapping_addr + *PAGE_SIZE,
+            *PAGE_SIZE,
+            MAP_FIXED | MAP_PRIVATE | MAP_ANONYMOUS,
+        );
+
+        assert_eq!(first_mapping_addr + *PAGE_SIZE, second_mapping_addr);
+
+        sys_prctl(
+            &current_task,
+            PR_SET_VMA,
+            PR_SET_VMA_ANON_NAME as u64,
+            first_mapping_addr.ptr() as u64,
+            2 * *PAGE_SIZE,
+            name_addr.ptr() as u64,
+        )
+        .unwrap();
+
+        {
+            let state = mm.state.read();
+
+            // The name should apply to both mappings.
+            let (_, mapping) = state.mappings.get(&first_mapping_addr).unwrap();
+            assert_eq!(mapping.name, MappingName::Vma("foo".into()));
+
+            let (_, mapping) = state.mappings.get(&second_mapping_addr).unwrap();
+            assert_eq!(mapping.name, MappingName::Vma("foo".into()));
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_beyond_end() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
+
+        let second_page = mapping_addr + *PAGE_SIZE;
+        mm.unmap(second_page, *PAGE_SIZE as usize).unwrap();
+
+        // This should fail with ENOMEM since it extends past the end of the mapping into unmapped memory.
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                2 * *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            ),
+            Err(errno!(ENOMEM))
+        );
+
+        // Despite returning an error, the prctl should still assign a name to the region at the start of the region.
+        {
+            let state = mm.state.read();
+
+            let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
+            assert_eq!(mapping.name, MappingName::Vma("foo".into()));
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_before_start() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
+
+        let second_page = mapping_addr + *PAGE_SIZE;
+        mm.unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
+
+        // This should fail with ENOMEM since the start of the range is in unmapped memory.
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                2 * *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            ),
+            Err(errno!(ENOMEM))
+        );
+
+        // Unlike a range which starts within a mapping and extends past the end, this should not assign
+        // a name to any mappings.
+        {
+            let state = mm.state.read();
+
+            let (_, mapping) = state.mappings.get(&second_page).unwrap();
+            assert_eq!(mapping.name, MappingName::None);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_partial() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), 3 * *PAGE_SIZE);
+
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                (mapping_addr + *PAGE_SIZE).ptr() as u64,
+                *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            ),
+            Ok(crate::syscalls::SUCCESS)
+        );
+
+        // This should split the mapping into 3 pieces with the second piece having the name "foo"
+        {
+            let state = mm.state.read();
+
+            let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
+            assert_eq!(mapping.name, MappingName::None);
+
+            let (_, mapping) = state.mappings.get(&(mapping_addr + *PAGE_SIZE)).unwrap();
+            assert_eq!(mapping.name, MappingName::Vma("foo".into()));
+
+            let (_, mapping) = state.mappings.get(&(mapping_addr + 2 * *PAGE_SIZE)).unwrap();
+            assert_eq!(mapping.name, MappingName::None);
+        }
+    }
+
+    #[test]
+    fn test_preserve_name_snapshot() {
+        let (kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+        mm.write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul()).unwrap();
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            ),
+            Ok(crate::syscalls::SUCCESS)
+        );
+
+        let target = create_task(&kernel, "another-task");
+        mm.snapshot_to(&target.mm).expect("snapshot_to failed");
+
+        {
+            let state = target.mm.state.read();
+
+            let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
+            assert_eq!(mapping.name, MappingName::Vma("foo".into()));
+        }
     }
 }

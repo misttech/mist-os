@@ -22,7 +22,7 @@ use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, Syslog
 use crate::fs::*;
 use crate::logging::log_trace;
 use crate::mm::{DesiredAddress, MappingOptions, PAGE_SIZE};
-use crate::mm::{MemoryAccessorExt, MemoryManager};
+use crate::mm::{MappingName, MemoryAccessorExt, MemoryManager};
 use crate::signals::dequeue_signal;
 use crate::syscalls::{
     decls::{Syscall, SyscallDecl},
@@ -239,7 +239,7 @@ pub fn notify_debugger_of_module_list(current_task: &mut CurrentTask) -> Result<
         instructions.len(),
         zx::VmarFlags::PERM_EXECUTE | zx::VmarFlags::PERM_READ,
         MappingOptions::empty(),
-        None,
+        MappingName::None,
     )?;
 
     // Set the break on load value to point to the software breakpoint. This is how the debugger

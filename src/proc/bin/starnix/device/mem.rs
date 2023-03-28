@@ -112,7 +112,7 @@ impl FileOps for DevZero {
             // functionally equivalent to an anonymous mapping. Doing so affects
             // the output of `/proc/self/maps` and identifies this mapping as
             // file-based.
-            Some(filename),
+            MappingName::File(filename),
         )?;
         Ok(MappedVmo::new(vmo, addr))
     }

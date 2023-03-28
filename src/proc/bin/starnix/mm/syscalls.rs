@@ -117,8 +117,15 @@ pub fn sys_mmap(
 
     let MappedVmo { vmo, user_address } = if flags & MAP_ANONYMOUS != 0 {
         let vmo = create_anonymous_mapping_vmo(length as u64)?;
-        let user_address =
-            current_task.mm.map(addr, vmo.clone(), vmo_offset, length, zx_flags, options, None)?;
+        let user_address = current_task.mm.map(
+            addr,
+            vmo.clone(),
+            vmo_offset,
+            length,
+            zx_flags,
+            options,
+            MappingName::None,
+        )?;
         MappedVmo::new(vmo, user_address)
     } else {
         // TODO(tbodt): maximize protection flags so that mprotect works

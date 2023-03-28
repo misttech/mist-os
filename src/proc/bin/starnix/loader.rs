@@ -144,7 +144,7 @@ impl elf_load::Mapper for Mapper<'_> {
                 length,
                 flags,
                 MappingOptions::empty(),
-                Some(self.file.name.clone()),
+                MappingName::File(self.file.name.clone()),
             )
             .map_err(|e| {
                 // TODO: Find a way to propagate this errno to the caller.
@@ -410,7 +410,7 @@ pub fn load_executable(
         stack_size,
         zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
         MappingOptions::empty(),
-        None,
+        MappingName::None,
     )?;
     let stack = stack_base + (stack_size - 8);
 
@@ -427,7 +427,7 @@ pub fn load_executable(
             vmo_size as usize,
             zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_EXECUTE,
             MappingOptions::empty(),
-            None,
+            MappingName::None,
         )?;
         map_result.ptr() as u64
     } else {

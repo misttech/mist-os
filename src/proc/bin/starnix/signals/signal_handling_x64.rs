@@ -266,7 +266,7 @@ mod tests {
     use std::sync::Arc;
 
     use super::*;
-    use crate::mm::{DesiredAddress, MappingOptions};
+    use crate::mm::{DesiredAddress, MappingName, MappingOptions};
     use crate::testing::*;
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::from(100);
@@ -538,7 +538,7 @@ mod tests {
                 STACK_SIZE,
                 zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE,
                 MappingOptions::empty(),
-                None,
+                MappingName::None,
             )
             .expect("failed to map stack VMO");
         current_task.registers.rsp = (stack_base + (STACK_SIZE - 8)).ptr() as u64;

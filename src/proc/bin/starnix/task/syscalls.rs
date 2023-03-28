@@ -585,10 +585,32 @@ pub fn sys_prctl(
             }
             let addr = UserAddress::from(arg3);
             let length = arg4 as usize;
-            let name = UserCString::new(UserAddress::from(arg5));
-            let mut buf = [0u8; PATH_MAX as usize]; // TODO: How large can these names be?
-            let name = current_task.mm.read_c_string(name, &mut buf)?;
-            let name = CString::new(name).map_err(|_| errno!(EINVAL))?;
+            let name_addr = UserAddress::from(arg5);
+            let name = if name_addr.is_null() {
+                None
+            } else {
+                let name = UserCString::new(UserAddress::from(arg5));
+                let mut buf = [0u8; 256];
+                // An overly long name produces EINVAL and not ENAMETOOLONG in Linux 5.15.
+                let name = current_task.mm.read_c_string(name, &mut buf).map_err(|e| {
+                    if e == errno!(ENAMETOOLONG) {
+                        errno!(EINVAL)
+                    } else {
+                        e
+                    }
+                })?;
+                // Some characters are forbidden in VMA names.
+                if name.iter().any(|b| {
+                    matches!(b,
+                        0..=0x1f |
+                        0x7f..=0xff |
+                        b'\\' | b'`' | b'$' | b'[' | b']'
+                    )
+                }) {
+                    return error!(EINVAL);
+                }
+                Some(name.to_vec())
+            };
             current_task.mm.set_mapping_name(addr, length, name)?;
             Ok(().into())
         }
@@ -1154,7 +1176,7 @@ mod tests {
         )
         .expect("failed to set name");
         assert_eq!(
-            CString::new("test-name").unwrap(),
+            Some("test-name".into()),
             current_task
                 .mm
                 .get_mapping_name(mapped_address + 24u64)
@@ -1164,6 +1186,124 @@ mod tests {
         sys_munmap(&current_task, mapped_address, *PAGE_SIZE as usize)
             .expect("failed to unmap memory");
         assert_eq!(error!(EFAULT), current_task.mm.get_mapping_name(mapped_address + 24u64));
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_special_chars() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        for c in 1..255 {
+            let vma_name = CString::new([c]).unwrap();
+            mm.write_memory(name_addr, vma_name.as_bytes_with_nul()).unwrap();
+
+            let result = sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            );
+
+            if c > 0x1f
+                && c < 0x7f
+                && c != b'\\'
+                && c != b'`'
+                && c != b'$'
+                && c != b'['
+                && c != b']'
+            {
+                assert_eq!(result, Ok(SUCCESS));
+            } else {
+                assert_eq!(result, Err(errno!(EINVAL)));
+            }
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_long() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let name_too_long = CString::new(vec![b'a'; 256]).unwrap();
+
+        mm.write_memory(name_addr, name_too_long.as_bytes_with_nul()).unwrap();
+
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            ),
+            Err(errno!(EINVAL))
+        );
+
+        let name_just_long_enough = CString::new(vec![b'a'; 255]).unwrap();
+
+        mm.write_memory(name_addr, name_just_long_enough.as_bytes_with_nul()).unwrap();
+
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                *PAGE_SIZE,
+                name_addr.ptr() as u64,
+            ),
+            Ok(SUCCESS)
+        );
+    }
+
+    #[::fuchsia::test]
+    fn test_set_vma_name_misaligned() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let mm = &current_task.mm;
+
+        let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let mapping_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
+
+        let name = CString::new("name").unwrap();
+        mm.write_memory(name_addr, name.as_bytes_with_nul()).unwrap();
+
+        // Passing a misaligned pointer to the start of the named region fails.
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                1 + mapping_addr.ptr() as u64,
+                *PAGE_SIZE - 1,
+                name_addr.ptr() as u64,
+            ),
+            Err(errno!(EINVAL))
+        );
+
+        // Passing an unaligned length does work, however.
+        assert_eq!(
+            sys_prctl(
+                &current_task,
+                PR_SET_VMA,
+                PR_SET_VMA_ANON_NAME as u64,
+                mapping_addr.ptr() as u64,
+                *PAGE_SIZE - 1,
+                name_addr.ptr() as u64,
+            ),
+            Ok(SUCCESS)
+        );
     }
 
     #[::fuchsia::test]

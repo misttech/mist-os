@@ -11,7 +11,7 @@ use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;
 use crate::lock::Mutex;
 use crate::logging::{impossible_error, not_implemented};
-use crate::mm::{DesiredAddress, MappedVmo, MappingOptions, MemoryAccessorExt};
+use crate::mm::{DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessorExt};
 use crate::syscalls::*;
 use crate::task::*;
 use crate::types::as_any::*;
@@ -166,7 +166,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             length,
             flags,
             options,
-            Some(filename),
+            MappingName::File(filename),
         )?;
         Ok(MappedVmo::new(vmo, addr))
     }

@@ -19,7 +19,8 @@ use crate::lock::{Mutex, MutexGuard, RwLock};
 use crate::logging::*;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{
-    DesiredAddress, MappedVmo, MappingOptions, MemoryAccessor, MemoryAccessorExt, UserMemoryCursor,
+    DesiredAddress, MappedVmo, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
+    UserMemoryCursor,
 };
 use crate::mutable_state::Guard;
 use crate::syscalls::{SyscallResult, SUCCESS};
@@ -3292,7 +3293,7 @@ impl BinderDriver {
             length,
             flags,
             mapping_options,
-            Some(filename),
+            MappingName::File(filename),
         )?;
 
         // Map the VMO into the driver's address space.

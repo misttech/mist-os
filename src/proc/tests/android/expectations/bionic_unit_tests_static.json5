@@ -24,7 +24,6 @@
             matchers: [
                 "sys_msg.smoke",
                 "sys_personality.current_persona",
-                "sys_prctl.bug_20017123",
                 "sys_prctl.pr_cap_ambient",
                 "sys_ptrace.watchpoint_imprecise",
                 "sys_ptrace.hardware_breakpoint",
