@@ -38,13 +38,17 @@ const GPT_DRIVER_PATH: &str = "gpt.cm";
 const RAMDISK_BLOCK_SIZE: u64 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
 
-// We set the default disk size to be twice the value of
-// DEFAULT_F2FS_MIN_BYTES (defined in device/constants.rs)
-// to ensure that when f2fs is the data filesystem format,
-// we don't run out of space. Similarly, the size of the data
-// volume should be > DEFAULT_F2FS_MIN_BYTES but < disk size
-pub const DEFAULT_DISK_SIZE: u64 = 200 * 1024 * 1024;
+// The default disk size is about 110MiB, with about 106MiB dedicated to the data volume. This size
+// is chosen because the data volume has to be big enough to support f2fs, which has a relatively
+// large minimum size requirement to be formatted.
+//
+// Only the data volume is actually created with a specific size, the other volumes aren't passed
+// any sizes. Blobfs can resize itself on the fvm, and the other two potential volumes are only
+// used in specific circumstances and are never formatted. The remaining volume size is just used
+// for calculation.
 pub const DEFAULT_DATA_VOLUME_SIZE: u64 = 101 * 1024 * 1024;
+pub const DEFAULT_REMAINING_VOLUME_SIZE: u64 = 4 * 1024 * 1024;
+pub const DEFAULT_DISK_SIZE: u64 = DEFAULT_DATA_VOLUME_SIZE + DEFAULT_REMAINING_VOLUME_SIZE;
 
 // We use a static key-bag so that the crypt instance can be shared across test executions safely.
 // These keys match the DATA_KEY and METADATA_KEY respectively, when wrapped with the "zxcrypt"
@@ -261,6 +265,10 @@ impl DiskBuilder {
 
     pub fn data_volume_size(&mut self, data_volume_size: u64) -> &mut Self {
         self.data_volume_size = data_volume_size;
+        // Increase the size of the disk if required. NB: We don't decrease the size of the disk
+        // because some tests set a lower initial size and expect to be able to resize to a larger
+        // one.
+        self.size = self.size.max(self.data_volume_size + DEFAULT_REMAINING_VOLUME_SIZE);
         self
     }
 
