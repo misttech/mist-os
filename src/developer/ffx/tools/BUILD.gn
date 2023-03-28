@@ -11,12 +11,8 @@ group("tools") {
 
   # Any plugins that can be built in dual mode should be listed here, and that
   # will cause them to be built as host tools that ffx can invoke.
-  #
-  # Keep this set in sync with ../BUILD.gn's opposite listing.
   if (ffx_build_dual_mode_plugins_as_subtools) {
-    # LINT.IfChange
     public_deps += dual_mode_subtools  # from config.gni
-    # LINT.ThenChange(../BUILD.gn)
   }
 }
 
@@ -24,8 +20,6 @@ group("tests") {
   testonly = true
   deps = [ "echo:tests" ]
   if (ffx_build_dual_mode_plugins_as_subtools) {
-    # LINT.IfChange
     deps += dual_mode_subtool_tests  # from config.gni
-    # LINT.ThenChange(../BUILD.gn)
   }
 }

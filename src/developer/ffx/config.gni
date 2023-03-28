@@ -21,6 +21,27 @@ declare_args() {
 ffx_test_host_tools_out_dir =
     "${root_out_dir}/src/developer/ffx/test-host-tools"
 
+# The list of ffx plugins that we'd expect to be included directly in the binary
+# for architectural reasons.
+required_ffx_plugins = [
+  "//src/developer/ffx/plugins/config:ffx_config_plugin",
+  "//src/developer/ffx/plugins/daemon:ffx_daemon_plugin",
+  "//src/developer/ffx/plugins/schema:ffx_schema",
+  "//src/developer/ffx/plugins/target:ffx_target",
+  "//src/developer/ffx/plugins/version:ffx_version",
+]
+
+# The list of ffx plugins that we currently build as part of the 'main' ffx
+# binary but that don't really have to be there. These should all be migrated
+# to being "dual mode" subtools.
+included_ffx_plugins = [
+  "//src/connectivity/network/net-cli/ffx:ffx_net",
+  "//src/developer/ffx/plugins/cts:ffx_cts",
+  "//src/developer/ffx/plugins/doctor:ffx_doctor",
+  "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
+  "//src/developer/ffx/plugins/test:ffx_test",
+]
+
 # The list of plugins that can be built either as plugins or subtools,
 # used in the main ffx target if `ffx_build_dual_mode_plugns_as_subtools`
 # is false, and in tools/BUILD.gn if it's true (with the suffix of
@@ -62,6 +83,9 @@ dual_mode_plugins = [
   "//src/storage/ffx:ffx_storage",
   "//src/virtualization/ffx:ffx_guest",
 ]
+
+# The full set of plugins you'd expect in a 'large', fully integrated ffx
+all_ffx_plugins = required_ffx_plugins + dual_mode_plugins
 
 # Config default files from tools listed above so they can be included in
 # the build.

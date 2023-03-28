@@ -30,40 +30,17 @@ if (is_host) {
     edition = "2021"
     with_unit_tests = true
 
-    # Essential plugins you can't really use ffx without, don't remove these
-    # when trying to build a cut-down ffx
-    plugin_deps = [
-      "//src/developer/ffx/plugins/config:ffx_config_plugin",
-      "//src/developer/ffx/plugins/daemon:ffx_daemon_plugin",
-      "//src/developer/ffx/plugins/schema:ffx_schema",
-      "//src/developer/ffx/plugins/target:ffx_target",
-      "//src/developer/ffx/plugins/version:ffx_version",
-    ]
+    plugin_deps = required_ffx_plugins + included_ffx_plugins  # from config.gni
 
-    # Plugins that can be disabled without breaking ffx as a whole. You
-    # can do so in local development to reduce compile times while iterating on
-    # a specific plugin.
+    # If `ffx_build_dual_mode_plugins_as_subtools` config is set, we won't
+    # include any plugin that doesn't have to be included, and they will be
+    # built as independent subtools instead.
     #
-    # Moving any of these plugins to be built externally will allow them to be
-    # used with the `ffx_build_dual_mode_plugins_as_subtools`. See the next
-    # section for this.
-    plugin_deps += [
-      "//src/connectivity/network/net-cli/ffx:ffx_net",
-      "//src/developer/ffx/plugins/cts:ffx_cts",
-      "//src/developer/ffx/plugins/doctor:ffx_doctor",
-      "//src/developer/ffx/plugins/product_bundle:ffx_product_bundle",
-      "//src/developer/ffx/plugins/test:ffx_test",
-    ]
-
-    # Any plugins that can be built in dual mode should be listed here, and that
-    # will cause them to be not included in the main ffx build if the
-    # `ffx_build_dual_mode_plugins_as_subtools` config is set.
-    #
-    # Keep this set in sync with tools/BUILD.gn's opposite listing.
+    # If you're looking to reduce build times, set the above flag and it will
+    # make it so you won't have to re-link all of ffx to build a single plugin's
+    # code.
     if (!ffx_build_dual_mode_plugins_as_subtools) {
-      # LINT.IfChange
       plugin_deps += dual_mode_plugins  # from config.gni
-      # LINT.ThenChange(tools/BUILD.gn)
     }
 
     deps = [ "//third_party/rust_crates:anyhow" ]
