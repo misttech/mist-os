@@ -33,7 +33,6 @@
             type: "expect_failure",
             matchers: [
                 // Otherwise, expect failure.
-                "AllInetTests/TcpSocketTest.ConnectOnEstablishedConnection/*",
                 "AllInetTests/TcpSocketTest.ShutdownWriteInTimeWait/*",
                 "AllInetTests/TcpSocketTest.ClosedWriteBlockingSocket/*",
                 "AllInetTests/TcpSocketTest.MsgTrunc/*",
@@ -64,7 +63,6 @@
                 "AllInetTests/SimpleTcpSocketTest.SetCongestionControlFailsForUnsupported/*",
                 "AllInetTests/SimpleTcpSocketTest.SelfConnectSend/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectRetry/*",
-                "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectRefused/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerRead/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListenerPeek/*",
                 "AllInetTests/SimpleTcpSocketTest.NonBlockingConnectNoListener/*",
