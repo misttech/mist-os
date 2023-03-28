@@ -40,20 +40,25 @@ int main(int argc, char** argv) {
   perfetto::ipc::Host* producer_host_ptr = nullptr;
   std::unique_ptr<perfetto::ServiceIPCHost> ipc_host =
       perfetto::ServiceIPCHost::CreateInstance(perfetto_task_runner.get());
-  std::condition_variable cv;
-  perfetto_task_runner->PostTask(
-      [&cv, &producer_host_ptr, &ipc_host, perfetto_task_runner = perfetto_task_runner.get()]() {
-        auto producer_host = perfetto::ipc::Host::CreateInstance_Fuchsia(perfetto_task_runner);
-        producer_host_ptr = producer_host.get();
-
-        auto consumer_host = perfetto::ipc::Host::CreateInstance_Fuchsia(perfetto_task_runner);
-        FX_CHECK(ipc_host->Start(std::move(producer_host), std::move(consumer_host)))
-            << "Perfetto IPC host failed to start.";
-        cv.notify_one();
-      });
   std::mutex mutex;
+  std::condition_variable cv;
+  bool initialized = false;
+  perfetto_task_runner->PostTask([&initialized, &mutex, &cv, &producer_host_ptr, &ipc_host,
+                                  perfetto_task_runner = perfetto_task_runner.get()]() {
+    std::lock_guard<std::mutex> l(mutex);
+    auto producer_host = perfetto::ipc::Host::CreateInstance_Fuchsia(perfetto_task_runner);
+    producer_host_ptr = producer_host.get();
+
+    auto consumer_host = perfetto::ipc::Host::CreateInstance_Fuchsia(perfetto_task_runner);
+    FX_CHECK(ipc_host->Start(std::move(producer_host), std::move(consumer_host)))
+        << "Perfetto IPC host failed to start.";
+
+    initialized = true;
+    cv.notify_one();
+  });
+
   std::unique_lock<std::mutex> lock(mutex);
-  cv.wait(lock);
+  cv.wait(lock, [&initialized]() { return initialized; });
 
   // Create a single instance of ProducerConnectorImpl, to be shared across all clients.
   ProducerConnectorImpl producer_connector_service(loop.dispatcher(), perfetto_task_runner.get(),
