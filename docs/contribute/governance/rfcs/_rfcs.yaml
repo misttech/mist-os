@@ -2775,3 +2775,16 @@
   reviewers: ['aaronwood@google.com', 'aminuttam@google.com', 'markdittmer@google.com', 'marvinpaul@google.com', 'sethladd@google.com', 'wittrock@google.com']
   submitted: '2022-11-17'
   reviewed: '2023-03-07'
+
+- name: 'RFC-0213'
+  title: 'Removing devfs FIDL multiplexing'
+  short_description: 'Outline reasoning and plan for removing FIDL multiplexing in devfs'
+  authors: ['dgilhooley@google.com']
+  file: '0213_removing_devfs_fidl_multiplexing.md'
+  area: ['Drivers']
+  issue: ['121802']
+  gerrit_change_id: ['802807']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'cja@google.com', 'csuter@google.com', 'jfsulliv@google.com', 'surajmalhotra@google.com', 'tamird@google.com', 'yifeit@google.com',  ]
+  submitted: '2023-03-28'
+  reviewed: '2023-03-17'
