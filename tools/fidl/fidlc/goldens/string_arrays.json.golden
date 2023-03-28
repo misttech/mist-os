@@ -457,6 +457,7 @@
       }
     }
   ],
+  "overlay_declarations": [],
   "alias_declarations": [],
   "new_type_declarations": [],
   "declaration_order": [

@@ -291,6 +291,11 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
           auto coded_union_type = static_cast<coded::UnionType*>(coded_type);
           return coded_union_type->maybe_reference_type;
         }
+        case coded::Type::Kind::kOverlay: {
+          // Overlays cannot be nullable.
+          ZX_ASSERT(identifier_type->nullability != types::Nullability::kNullable);
+          return coded_type;
+        }
         case coded::Type::Kind::kProtocol: {
           auto iter = protocol_type_map_.find(identifier_type);
           if (iter != protocol_type_map_.end())
@@ -626,6 +631,14 @@ void CodedTypesGenerator::CompileDecl(const flat::Decl* decl) {
                                        types::Nullability::kNonnullable, nullable_union_ptr));
       break;
     }
+    case flat::Decl::Kind::kOverlay: {
+      auto overlay_decl = static_cast<const flat::Overlay*>(decl);
+      named_coded_types_.emplace(decl->name,
+                                 CompileOverlayDecl(overlay_decl, NameCodedName(overlay_decl->name),
+                                                    NameFlatName(overlay_decl->name)));
+
+      break;
+    }
     case flat::Decl::Kind::kNewType: {
       auto* new_type = static_cast<const flat::NewType*>(decl);
       ZX_ASSERT(new_type->compiled);
@@ -644,9 +657,7 @@ void CodedTypesGenerator::CompileDecl(const flat::Decl* decl) {
 
 std::unique_ptr<coded::StructType> CodedTypesGenerator::CompileStructDecl(
     const flat::Struct* struct_decl, std::string name, std::string qname) {
-  auto typeshape_v2 = TypeShape::ForEmptyPayload();
-
-  typeshape_v2 = struct_decl->typeshape(WireFormat::kV2);
+  auto typeshape_v2 = struct_decl->typeshape(WireFormat::kV2);
 
   return std::make_unique<coded::StructType>(std::move(name), std::vector<coded::StructElement>(),
                                              typeshape_v2.inline_size, typeshape_v2.has_envelope,
@@ -663,6 +674,13 @@ std::unique_ptr<coded::UnionType> CodedTypesGenerator::CompileUnionDecl(
     union_type->maybe_reference_type = reference_type;
   }
   return union_type;
+}
+
+std::unique_ptr<coded::OverlayType> CodedTypesGenerator::CompileOverlayDecl(
+    const flat::Overlay* overlay_decl, std::string name, std::string qname) {
+  auto typeshape = overlay_decl->typeshape(WireFormat::kV2);
+  return std::make_unique<coded::OverlayType>(std::move(name), std::vector<coded::OverlayField>(),
+                                              typeshape.inline_size);
 }
 
 void CodedTypesGenerator::CompileCodedTypes() {

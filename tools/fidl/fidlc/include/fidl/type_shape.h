@@ -16,6 +16,7 @@ struct Object;
 struct StructMember;
 struct TableMemberUsed;
 struct UnionMemberUsed;
+struct OverlayMemberUsed;
 
 }  // namespace flat
 
@@ -86,6 +87,7 @@ struct FieldShape {
   explicit FieldShape(const flat::StructMember&, WireFormat wire_format);
   explicit FieldShape(const flat::TableMemberUsed&, WireFormat wire_format);
   explicit FieldShape(const flat::UnionMemberUsed&, WireFormat wire_format);
+  explicit FieldShape(const flat::OverlayMemberUsed&, WireFormat wire_format);
 
   uint32_t offset = 0;
   uint32_t padding = 0;

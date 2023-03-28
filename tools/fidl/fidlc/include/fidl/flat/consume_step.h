@@ -31,7 +31,7 @@ class ConsumeStep : public Compiler::Step {
   void ConsumeUsing(std::unique_ptr<raw::Using> using_directive);
 
   // Layouts
-  template <typename T>  // T should be Table or Union
+  template <typename T>  // T should be Table, Union or Overlay
   bool ConsumeOrdinaledLayout(std::unique_ptr<raw::Layout> layout,
                               const std::shared_ptr<NamingContext>& context,
                               std::unique_ptr<raw::AttributeList> raw_attribute_list,

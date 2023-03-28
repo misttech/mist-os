@@ -203,6 +203,9 @@ void CompileStep::CompileDecl(Decl* decl) {
     case Decl::Kind::kUnion:
       CompileUnion(static_cast<Union*>(decl));
       break;
+    case Decl::Kind::kOverlay:
+      CompileOverlay(static_cast<Overlay*>(decl));
+      break;
     case Decl::Kind::kAlias:
       CompileAlias(static_cast<Alias*>(decl));
       break;
@@ -1400,6 +1403,57 @@ void CompileStep::CompileUnion(Union* union_declaration) {
   if (union_declaration->strictness == types::Strictness::kStrict &&
       !contains_non_reserved_member) {
     Fail(ErrStrictUnionMustHaveNonReservedMember, union_declaration->name.span().value());
+  }
+
+  if (auto ordinal_and_loc = FindFirstNonDenseOrdinal(ordinal_scope)) {
+    auto [ordinal, span] = *ordinal_and_loc;
+    Fail(ErrNonDenseOrdinal, span, ordinal);
+  }
+}
+
+void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
+  if (overlay_declaration->strictness != types::Strictness::kStrict) {
+    Fail(ErrOverlayMustBeStrict, overlay_declaration->name.span().value());
+  }
+  if (overlay_declaration->resourceness == types::Resourceness::kResource) {
+    Fail(ErrOverlayMustBeValue, overlay_declaration->name.span().value());
+  }
+  Scope<std::string> scope;
+  Ordinal64Scope ordinal_scope;
+
+  CompileAttributeList(overlay_declaration->attributes.get());
+  for (const auto& member : overlay_declaration->members) {
+    CompileAttributeList(member.attributes.get());
+    const auto ordinal_result = ordinal_scope.Insert(member.ordinal->value, member.ordinal->span());
+    if (!ordinal_result.ok()) {
+      // TODO(fxbug.dev/123989): Consolidate errors for duplicate member ordinals.
+      Fail(ErrDuplicateUnionMemberOrdinal, member.ordinal->span(),
+           ordinal_result.previous_occurrence());
+    }
+    if (!member.maybe_used) {
+      Fail(ErrOverlayMustNotContainReserved, member.span.value());
+      continue;
+    }
+
+    const auto& member_used = *member.maybe_used;
+    const auto original_name = member_used.name.data();
+    const auto canonical_name = utils::canonicalize(original_name);
+    const auto name_result = scope.Insert(canonical_name, member_used.name);
+    if (!name_result.ok()) {
+      const auto previous_span = name_result.previous_occurrence();
+      // TODO(fxbug.dev/123989): Consolidate errors for duplicate member ordinals.
+      if (original_name == previous_span.data()) {
+        Fail(ErrDuplicateUnionMemberName, member_used.name, original_name, previous_span);
+      } else {
+        Fail(ErrDuplicateUnionMemberNameCanonical, member_used.name, original_name,
+             previous_span.data(), previous_span, canonical_name);
+      }
+    }
+
+    CompileTypeConstructor(member_used.type_ctor.get());
+    if (!member_used.type_ctor->type) {
+      continue;
+    }
   }
 
   if (auto ordinal_and_loc = FindFirstNonDenseOrdinal(ordinal_scope)) {

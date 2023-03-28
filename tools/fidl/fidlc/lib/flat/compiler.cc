@@ -374,6 +374,14 @@ class CalcDependencies {
         }
         break;
       }
+      case Decl::Kind::kOverlay: {
+        auto overlay_decl = static_cast<const Overlay*>(decl);
+        for (auto& member : overlay_decl->members) {
+          if (auto& used = member.maybe_used) {
+            VisitTypeConstructor(used->type_ctor.get());
+          }
+        }
+      }
     }
   }
 
@@ -464,6 +472,7 @@ std::unique_ptr<Compilation> Libraries::Filter(const VersionSelection* version_s
     filter(&dst->tables, src.tables);
     filter(&dst->aliases, src.aliases);
     filter(&dst->unions, src.unions);
+    filter(&dst->overlays, src.overlays);
   };
 
   ZX_ASSERT(!libraries_.empty());

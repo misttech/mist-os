@@ -174,6 +174,7 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kResource:
           case flat::Decl::Kind::kTable:
           case flat::Decl::Kind::kAlias:
+          case flat::Decl::Kind::kOverlay:
             ZX_PANIC("UnalignedSize(flat::IdentifierType&) called on invalid nullable kind");
         }
       case types::Nullability::kNonnullable: {
@@ -245,6 +246,25 @@ class UnalignedSizeVisitor final : public TypeShapeVisitor<DataSize> {
     return UnalignedSize(object.type_ctor->type);
   }
 
+  std::any Visit(const flat::Overlay& object) override {
+    DataSize max_member_size = 0;
+    for (const auto& member : object.members) {
+      if (member.maybe_used) {
+        max_member_size =
+            std::max(max_member_size, UnalignedSize(member.maybe_used->type_ctor->type));
+      }
+    }
+    return max_member_size + DataSize(8);
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? UnalignedSize(*object.maybe_used) : DataSize(0);
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
+    return UnalignedSize(object.type_ctor->type);
+  }
+
   std::any Visit(const flat::Protocol& object) override { return DataSize(kHandleSize); }
 
   std::any Visit(const flat::ZxExperimentalPointerType& object) override { return DataSize(8); }
@@ -298,6 +318,7 @@ class AlignmentVisitor final : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kResource:
           case flat::Decl::Kind::kTable:
           case flat::Decl::Kind::kAlias:
+          case flat::Decl::Kind::kOverlay:
             ZX_PANIC("Alignment(flat::IdentifierType&) called on invalid nullable kind");
         }
       case types::Nullability::kNonnullable:
@@ -340,6 +361,19 @@ class AlignmentVisitor final : public TypeShapeVisitor<DataSize> {
   }
 
   std::any Visit(const flat::Struct::Member& object) override {
+    return Alignment(object.type_ctor->type);
+  }
+
+  std::any Visit(const flat::Overlay& object) override {
+    // Ordinal always has alignment 8, so the overlay does too.
+    return DataSize(8);
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? Alignment(*object.maybe_used) : DataSize(0);
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
     return Alignment(object.type_ctor->type);
   }
 
@@ -422,6 +456,7 @@ class DepthVisitor : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kResource:
           case flat::Decl::Kind::kTable:
           case flat::Decl::Kind::kAlias:
+          case flat::Decl::Kind::kOverlay:
             ZX_PANIC("Depth(flat::IdentifierType&) called on invalid nullable kind");
         }
       case types::Nullability::kNonnullable:
@@ -438,6 +473,7 @@ class DepthVisitor : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kTable:
           case flat::Decl::Kind::kAlias:
           case flat::Decl::Kind::kUnion:
+          case flat::Decl::Kind::kOverlay:
             return Depth(object.type_decl);
           case flat::Decl::Kind::kBuiltin:
             ZX_PANIC("unexpected builtin");
@@ -477,6 +513,24 @@ class DepthVisitor : public TypeShapeVisitor<DataSize> {
   }
 
   std::any Visit(const flat::Struct::Member& object) override {
+    return Depth(object.type_ctor->type);
+  }
+
+  std::any Visit(const flat::Overlay& object) override {
+    DataSize max_depth = 0;
+
+    for (const auto& member : object.members) {
+      max_depth = std::max(max_depth, Depth(member));
+    }
+
+    return max_depth;
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? Depth(*object.maybe_used) : DataSize(0);
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
     return Depth(object.type_ctor->type);
   }
 
@@ -658,6 +712,14 @@ class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
     return MaxHandles(object.type_ctor->type);
   }
 
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? MaxHandles(*object.maybe_used) : DataSize(0);
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
+    return MaxHandles(object.type_ctor->type);
+  }
+
   std::any Visit(const flat::Table& object) override {
     DataSize max_handles = 0;
 
@@ -677,6 +739,16 @@ class MaxHandlesVisitor final : public flat::Object::Visitor<DataSize> {
   }
 
   std::any Visit(const flat::Union& object) override {
+    DataSize max_handles;
+
+    for (const auto& member : object.members) {
+      max_handles = std::max(max_handles, MaxHandles(member));
+    }
+
+    return max_handles;
+  }
+
+  std::any Visit(const flat::Overlay& object) override {
     DataSize max_handles;
 
     for (const auto& member : object.members) {
@@ -754,6 +826,7 @@ class MaxOutOfLineVisitor final : public TypeShapeVisitor<DataSize> {
           case flat::Decl::Kind::kResource:
           case flat::Decl::Kind::kTable:
           case flat::Decl::Kind::kAlias:
+          case flat::Decl::Kind::kOverlay:
             ZX_PANIC("MaxOutOfLine(flat::IdentifierType&) called on invalid nullable kind");
         }
       }
@@ -791,6 +864,24 @@ class MaxOutOfLineVisitor final : public TypeShapeVisitor<DataSize> {
   }
 
   std::any Visit(const flat::Struct::Member& object) override {
+    return MaxOutOfLine(object.type_ctor->type);
+  }
+
+  std::any Visit(const flat::Overlay& object) override {
+    DataSize max_out_of_line = 0;
+
+    for (const auto& member : object.members) {
+      max_out_of_line = std::max(max_out_of_line, MaxOutOfLine(member));
+    }
+
+    return max_out_of_line;
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? MaxOutOfLine(*object.maybe_used) : DataSize(0);
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
     return MaxOutOfLine(object.type_ctor->type);
   }
 
@@ -938,6 +1029,7 @@ class HasPaddingVisitor final : public TypeShapeVisitor<bool> {
           case flat::Decl::Kind::kResource:
           case flat::Decl::Kind::kTable:
           case flat::Decl::Kind::kAlias:
+          case flat::Decl::Kind::kOverlay:
             ZX_PANIC("HasPadding(flat::IdentifierType&) called on invalid nullable kind");
         }
       case types::Nullability::kNonnullable:
@@ -974,6 +1066,24 @@ class HasPaddingVisitor final : public TypeShapeVisitor<bool> {
   }
 
   std::any Visit(const flat::Struct::Member& object) override {
+    return object.fieldshape(wire_format()).padding > 0 || HasPadding(object.type_ctor->type);
+  }
+
+  std::any Visit(const flat::Overlay& object) override {
+    for (const auto& member : object.members) {
+      if (HasPadding(member)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? HasPadding(*object.maybe_used) : false;
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
     return object.fieldshape(wire_format()).padding > 0 || HasPadding(object.type_ctor->type);
   }
 
@@ -1088,6 +1198,23 @@ class HasEnvelopeVisitor final : public TypeShapeVisitor<bool> {
     return HasEnvelope(object.type_ctor->type, wire_format());
   }
 
+  std::any Visit(const flat::Overlay& object) override {
+    for (const auto& member : object.members) {
+      if (HasEnvelope(member, wire_format())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used ? HasEnvelope(*object.maybe_used, wire_format()) : false;
+  }
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
+    return HasEnvelope(object.type_ctor->type, wire_format());
+  }
+
   std::any Visit(const flat::Table& object) override { return true; }
 
   std::any Visit(const flat::Table::Member& object) override { return true; }
@@ -1172,6 +1299,26 @@ class HasFlexibleEnvelopeVisitor final : public TypeShapeVisitor<bool> {
   }
 
   std::any Visit(const flat::Struct::Member& object) override {
+    return HasFlexibleEnvelope(object.type_ctor->type, wire_format());
+  }
+
+  std::any Visit(const flat::Overlay& object) override {
+    for (const auto& member : object.members) {
+      if (HasFlexibleEnvelope(member, wire_format())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  std::any Visit(const flat::Overlay::Member& object) override {
+    return object.maybe_used
+               ? HasFlexibleEnvelope(object.maybe_used->type_ctor->type, wire_format())
+               : false;
+  }
+
+  std::any Visit(const flat::Overlay::Member::Used& object) override {
     return HasFlexibleEnvelope(object.type_ctor->type, wire_format());
   }
 
@@ -1357,5 +1504,30 @@ FieldShape::FieldShape(const flat::TableMemberUsed& member, WireFormat wire_form
 FieldShape::FieldShape(const flat::UnionMemberUsed& member, WireFormat wire_format)
     : padding(
           ::Padding(UnalignedSize(member, wire_format), Alignment(member.parent, wire_format))) {}
+
+FieldShape::FieldShape(const flat::OverlayMemberUsed& member, WireFormat wire_format) {
+  ZX_ASSERT(member.parent);
+  const flat::Overlay& parent = *member.parent;
+
+  // Our parent overlay must have at least one member if fieldshape() on a member is being
+  // called.
+  ZX_ASSERT(!parent.members.empty());
+  const std::vector<flat::OverlayMember>& members = parent.members;
+
+  // After the ordinal.
+  offset = 8;
+
+  // Alignment is dictated by the ordinal.
+  DataSize alignment = 8;
+
+  DataSize max_member_size = 0;
+  for (const auto& member : members) {
+    if (member.maybe_used) {
+      max_member_size =
+          std::max(max_member_size, UnalignedSize(member.maybe_used->type_ctor->type, wire_format));
+    }
+  }
+  padding = AlignTo(max_member_size, alignment) - UnalignedSize(member, wire_format);
+}
 
 }  // namespace fidl

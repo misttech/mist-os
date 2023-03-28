@@ -43,6 +43,7 @@ class CompileStep : public Compiler::Step {
   void CompileTable(Table* table_declaration);
   void CompileTypeConstructor(TypeConstructor* type_ctor);
   void CompileUnion(Union* union_declaration);
+  void CompileOverlay(Overlay* overlay_declaration);
 
   // Resolve methods
   bool ResolveHandleRightsConstant(Resource* resource, Constant* constant,

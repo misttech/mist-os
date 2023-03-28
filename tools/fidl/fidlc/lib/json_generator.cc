@@ -718,6 +718,37 @@ void JSONGenerator::Generate(const flat::Union::Member& value) {
   });
 }
 
+void JSONGenerator::Generate(const flat::Overlay& value) {
+  GenerateObject([&]() {
+    GenerateDeclName(value.name);
+    GenerateObjectMember("location", NameSpan(value.name));
+    if (!value.attributes->Empty())
+      GenerateObjectMember("maybe_attributes", value.attributes);
+    GenerateObjectMember("members", value.members);
+    ZX_ASSERT(value.strictness == types::Strictness::kStrict);
+    GenerateObjectMember("strict", value.strictness);
+    ZX_ASSERT(value.resourceness == types::Resourceness::kValue);
+    GenerateObjectMember("resource", value.resourceness == types::Resourceness::kResource);
+    GenerateTypeShapes(value);
+  });
+}
+
+void JSONGenerator::Generate(const flat::Overlay::Member& value) {
+  GenerateObject([&]() {
+    GenerateObjectMember("ordinal", value.ordinal, Position::kFirst);
+    ZX_ASSERT(value.maybe_used);
+    ZX_ASSERT(!value.span);
+    GenerateObjectMember("reserved", false);
+    GenerateObjectMember("name", value.maybe_used->name);
+    GenerateTypeAndFromAlias(value.maybe_used->type_ctor.get());
+    GenerateObjectMember("location", NameSpan(value.maybe_used->name));
+
+    if (!value.attributes->Empty()) {
+      GenerateObjectMember("maybe_attributes", value.attributes);
+    }
+  });
+}
+
 void JSONGenerator::Generate(const flat::LayoutInvocation& value) {
   GenerateObject([&]() {
     GenerateObjectMember("name", value.from_alias->name, Position::kFirst);
@@ -908,6 +939,9 @@ void JSONGenerator::GenerateDeclarationsMember(const flat::Compilation::Declarat
     for (const auto& decl : declarations.unions)
       GenerateDeclarationsEntry(count++, decl->name, "union");
 
+    for (const auto& decl : declarations.overlays)
+      GenerateDeclarationsEntry(count++, decl->name, "overlay");
+
     for (const auto& decl : declarations.aliases)
       GenerateDeclarationsEntry(count++, decl->name, "alias");
 
@@ -967,6 +1001,9 @@ void JSONGenerator::GenerateExternalDeclarationsMember(
     for (const auto& decl : declarations.unions)
       GenerateExternalDeclarationsEntry(count++, decl->name, "union", decl->resourceness);
 
+    for (const auto& decl : declarations.overlays)
+      GenerateExternalDeclarationsEntry(count++, decl->name, "overlays", decl->resourceness);
+
     for (const auto& decl : declarations.aliases)
       GenerateExternalDeclarationsEntry(count++, decl->name, "alias", std::nullopt);
 
@@ -1009,6 +1046,9 @@ std::ostringstream JSONGenerator::Produce() {
     GenerateObjectMember("external_struct_declarations", compilation_->external_structs);
     GenerateObjectMember("table_declarations", compilation_->declarations.tables);
     GenerateObjectMember("union_declarations", compilation_->declarations.unions);
+    if (experimental_flags_.IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes)) {
+      GenerateObjectMember("overlay_declarations", compilation_->declarations.overlays);
+    }
     GenerateObjectMember("alias_declarations", compilation_->declarations.aliases);
     GenerateObjectMember("new_type_declarations", compilation_->declarations.new_types);
 

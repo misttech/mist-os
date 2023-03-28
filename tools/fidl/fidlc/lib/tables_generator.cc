@@ -633,6 +633,7 @@ void TablesGenerator::Produce(CodedTypesGenerator* coded_types_generator) {
       case coded::Type::Kind::kTable:
       case coded::Type::Kind::kStructPointer:
       case coded::Type::Kind::kUnion:
+      case coded::Type::Kind::kOverlay:
         // These are generated in the next phase.
         break;
       case coded::Type::Kind::kProtocol:

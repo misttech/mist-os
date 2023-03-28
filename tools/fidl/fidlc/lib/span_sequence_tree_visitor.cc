@@ -624,6 +624,7 @@ void SpanSequenceTreeVisitor::OnLayout(const std::unique_ptr<raw::Layout>& eleme
       break;
     }
     case raw::Layout::kTable:
+    case raw::Layout::kOverlay:
     case raw::Layout::kUnion: {
       inner_kind = VisitorKind::kOrdinaledLayout;
       break;

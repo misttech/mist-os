@@ -521,6 +521,7 @@ test("fidlc-test") {
     "method_tests.cc",
     "new_type_tests.cc",
     "ordinals_tests.cc",
+    "overlay_tests.cc",
     "parsed_transformer_tests.cc",
     "parsing_tests.cc",
     "protocol_tests.cc",

@@ -47,6 +47,8 @@ class CodedTypesGenerator {
   static std::unique_ptr<coded::UnionType> CompileUnionDecl(
       const flat::Union* union_decl, std::string name, std::string qname,
       types::Nullability nullability, coded::UnionType* reference_type = nullptr);
+  std::unique_ptr<coded::OverlayType> CompileOverlayDecl(const flat::Overlay* overlay_decl,
+                                                         std::string name, std::string qname);
 
   void CompileXRef(const coded::Type* type);
 

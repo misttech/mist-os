@@ -675,6 +675,8 @@ class ParsedTransformer : public internal::Transformer {
   virtual void WhenTypeLayoutParameter(raw::TypeLayoutParameter*, TokenSlice&) {}
   virtual void WhenUnionDeclaration(raw::Layout*, TokenSlice&) {}
   virtual void WhenUnionMember(raw::OrdinaledLayoutMember*, TokenSlice&) {}
+  virtual void WhenOverlayDeclaration(raw::Layout*, TokenSlice&) {}
+  virtual void WhenOverlayMember(raw::OrdinaledLayoutMember*, TokenSlice&) {}
 
  private:
   // The visitation methods inherited from |DeclarationOrderTreeVisitor| are intentionally hidden,
@@ -822,6 +824,10 @@ class CompiledTransformer : public internal::Transformer {
   }
   virtual void WhenUnionMember(raw::OrdinaledLayoutMember*, TokenSlice&,
                                const VersionedEntry<flat::Union::Member>*) {}
+  virtual void WhenOverlayDeclaration(raw::Layout*, TokenSlice&,
+                                      const VersionedEntry<flat::Overlay>*) {}
+  virtual void WhenOverlayMember(raw::OrdinaledLayoutMember*, TokenSlice&,
+                                 const VersionedEntry<flat::Overlay::Member>*) {}
 
  private:
   // A helper function that takes an unordered list of |SourceFile|s and compiles a |flat::Library|

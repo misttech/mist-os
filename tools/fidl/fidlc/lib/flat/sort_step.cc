@@ -212,6 +212,17 @@ CalcDependencies::CalcDependencies(const Decl* decl) : library_(decl->name.libra
       }
       break;
     }
+    case Decl::Kind::kOverlay: {
+      auto overlay_decl = static_cast<const Overlay*>(decl);
+      for (const auto& member : overlay_decl->members) {
+        if (!member.maybe_used) {
+          continue;
+        }
+        VisitTypeConstructor(member.maybe_used->type_ctor.get());
+      }
+      break;
+    }
+
     case Decl::Kind::kAlias: {
       auto alias_decl = static_cast<const Alias*>(decl);
       VisitTypeConstructor(alias_decl->partial_type_ctor.get());

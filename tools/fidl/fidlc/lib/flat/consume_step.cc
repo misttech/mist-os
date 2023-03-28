@@ -806,6 +806,10 @@ bool ConsumeStep::ConsumeLayout(std::unique_ptr<raw::Layout> layout,
       return ConsumeOrdinaledLayout<Union>(std::move(layout), context,
                                            std::move(raw_attribute_list), out_decl);
     }
+    case raw::Layout::Kind::kOverlay: {
+      return ConsumeOrdinaledLayout<Overlay>(std::move(layout), context,
+                                             std::move(raw_attribute_list), out_decl);
+    }
   }
 }
 

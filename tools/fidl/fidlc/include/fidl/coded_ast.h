@@ -105,6 +105,12 @@ struct UnionField {
   const Type* type;
 };
 
+struct OverlayField {
+  explicit OverlayField(const Type* type) : type(type) {}
+
+  const Type* type;
+};
+
 struct Type {
   virtual ~Type() = default;
 
@@ -119,6 +125,7 @@ struct Type {
     kStruct,
     kTable,
     kUnion,
+    kOverlay,
     kStructPointer,
     kProtocol,
     kArray,
@@ -283,6 +290,13 @@ struct UnionType : public Type {
   types::Strictness strictness;
   UnionType* maybe_reference_type = nullptr;
   types::Resourceness resourceness;
+};
+
+struct OverlayType : public Type {
+  OverlayType(std::string name, std::vector<OverlayField> fields, uint32_t size)
+      : Type(Kind::kOverlay, std::move(name), size, true, false), fields(std::move(fields)) {}
+
+  std::vector<OverlayField> fields;
 };
 
 struct ProtocolType : public Type {

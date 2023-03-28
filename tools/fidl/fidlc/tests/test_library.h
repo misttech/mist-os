@@ -372,6 +372,14 @@ class TestLibrary final : public SharedInterface {
     }
     return nullptr;
   }
+  const fidl::flat::Overlay* LookupOverlay(std::string_view name) {
+    for (const auto& overlay_decl : compilation_->declarations.overlays) {
+      if (overlay_decl->GetName() == name) {
+        return overlay_decl;
+      }
+    }
+    return nullptr;
+  }
 
   const fidl::flat::Protocol* LookupProtocol(std::string_view name) {
     for (const auto& protocol_decl : compilation_->declarations.protocols) {

@@ -28,6 +28,7 @@ Name Reference::Target::name() const {
     case Element::Kind::kTable:
     case Element::Kind::kAlias:
     case Element::Kind::kUnion:
+    case Element::Kind::kOverlay:
       return target_->AsDecl()->name;
     case Element::Kind::kBitsMember:
       return maybe_parent_->name.WithMemberName(
@@ -35,7 +36,15 @@ Name Reference::Target::name() const {
     case Element::Kind::kEnumMember:
       return maybe_parent_->name.WithMemberName(
           std::string(static_cast<Enum::Member*>(target_)->name.data()));
-    default:
+    case Element::Kind::kLibrary:
+    case Element::Kind::kProtocolCompose:
+    case Element::Kind::kProtocolMethod:
+    case Element::Kind::kResourceProperty:
+    case Element::Kind::kServiceMember:
+    case Element::Kind::kStructMember:
+    case Element::Kind::kTableMember:
+    case Element::Kind::kUnionMember:
+    case Element::Kind::kOverlayMember:
       ZX_PANIC("invalid element kind");
   }
 }

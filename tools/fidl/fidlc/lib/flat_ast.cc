@@ -26,6 +26,7 @@ bool Element::IsDecl() const {
     case Kind::kAlias:
     case Kind::kUnion:
     case Kind::kNewType:
+    case Kind::kOverlay:
       return true;
     case Kind::kLibrary:
     case Kind::kBitsMember:
@@ -37,6 +38,7 @@ bool Element::IsDecl() const {
     case Kind::kStructMember:
     case Kind::kTableMember:
     case Kind::kUnionMember:
+    case Kind::kOverlayMember:
       return false;
   }
 }
@@ -53,6 +55,7 @@ bool Element::IsAnonymousLayout() const {
     case Element::Kind::kStruct:
     case Element::Kind::kTable:
     case Element::Kind::kUnion:
+    case Element::Kind::kOverlay:
       return static_cast<const Decl*>(this)->name.as_anonymous() != nullptr;
     default:
       return false;
@@ -104,6 +107,10 @@ FieldShape Table::Member::Used::fieldshape(WireFormat wire_format) const {
 }
 
 FieldShape Union::Member::Used::fieldshape(WireFormat wire_format) const {
+  return FieldShape(*this, wire_format);
+}
+
+FieldShape Overlay::Member::Used::fieldshape(WireFormat wire_format) const {
   return FieldShape(*this, wire_format);
 }
 
@@ -306,6 +313,11 @@ void Decl::ForEachMember(const fit::function<void(Element*)>& fn) {
         fn(&member);
       }
       break;
+    case Decl::Kind::kOverlay:
+      for (auto& member : static_cast<Overlay*>(this)->members) {
+        fn(&member);
+      }
+      break;
   }  // switch
 }
 
@@ -345,6 +357,8 @@ Decl* Library::Declarations::Insert(std::unique_ptr<Decl> decl) {
       return StoreDecl(std::move(decl), &all, &aliases);
     case Decl::Kind::kUnion:
       return StoreDecl(std::move(decl), &all, &unions);
+    case Decl::Kind::kOverlay:
+      return StoreDecl(std::move(decl), &all, &overlays);
     case Decl::Kind::kNewType:
       return StoreDecl(std::move(decl), &all, &new_types);
   }
@@ -515,6 +529,12 @@ std::unique_ptr<Decl> Union::SplitImpl(VersionRange range) const {
                                  FilterOrdinaledMembers(members, range), strictness, resourceness);
 }
 
+std::unique_ptr<Decl> Overlay::SplitImpl(VersionRange range) const {
+  return std::make_unique<Overlay>(source_signature(), attributes->Clone(), name,
+                                   FilterOrdinaledMembers(members, range), strictness,
+                                   resourceness);
+}
+
 std::unique_ptr<Decl> Protocol::SplitImpl(VersionRange range) const {
   return std::make_unique<Protocol>(source_signature(), attributes->Clone(), openness, name,
                                     FilterMembers(composed_protocols, range),
@@ -564,6 +584,11 @@ Union::Member Union::Member::Copy() const {
                      attributes->Clone());
 }
 
+Overlay::Member Overlay::Member::Copy() const {
+  return OverlayMember(source_signature(), ordinal, span,
+                       maybe_used ? maybe_used->Clone() : nullptr, attributes->Clone());
+}
+
 Protocol::Method Protocol::Method::Copy() const {
   return Method(source_signature(), attributes->Clone(), strictness, identifier, name, has_request,
                 maybe_request ? maybe_request->Clone() : nullptr, has_response,
@@ -591,5 +616,10 @@ std::any Table::Member::Used::AcceptAny(VisitorAny* visitor) const { return visi
 std::any Union::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
 std::any Union::Member::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
 std::any Union::Member::Used::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
+std::any Overlay::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
+std::any Overlay::Member::AcceptAny(VisitorAny* visitor) const { return visitor->Visit(*this); }
+std::any Overlay::Member::Used::AcceptAny(VisitorAny* visitor) const {
+  return visitor->Visit(*this);
+}
 
 }  // namespace fidl::flat

@@ -173,6 +173,7 @@ class SourceSpanVisitor : public fidl::raw::TreeVisitor {
         CheckSpanOfNodeKind(NodeKind::kStructLayout, *element);
         break;
       case fidl::raw::Layout::kTable:
+      case fidl::raw::Layout::kOverlay:
       case fidl::raw::Layout::kUnion:
         CheckSpanOfNodeKind(NodeKind::kOrdinaledLayout, *element);
         break;

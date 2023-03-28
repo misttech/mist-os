@@ -135,6 +135,10 @@ std::string Display(flat::Element::Kind k) {
       return "union";
     case flat::Element::Kind::kUnionMember:
       return "union member";
+    case flat::Element::Kind::kOverlay:
+      return "overlay";
+    case flat::Element::Kind::kOverlayMember:
+      return "overlay member";
   }
 }
 
@@ -179,6 +183,7 @@ std::string Display(const flat::Element* e) {
     case flat::Element::Kind::kTable:
     case flat::Element::Kind::kAlias:
     case flat::Element::Kind::kUnion:
+    case flat::Element::Kind::kOverlay:
       ss << static_cast<const flat::Decl*>(e)->name.decl_name();
       break;
     case flat::Element::Kind::kBitsMember:
@@ -216,6 +221,13 @@ std::string Display(const flat::Element* e) {
     case flat::Element::Kind::kUnionMember: {
       auto union_member = static_cast<const flat::Union::Member*>(e);
       if (auto& used = union_member->maybe_used) {
+        ss << used->name.data();
+      }
+      break;
+    }
+    case flat::Element::Kind::kOverlayMember: {
+      auto overlay_member = static_cast<const flat::Overlay::Member*>(e);
+      if (auto& used = overlay_member->maybe_used) {
         ss << used->name.data();
       }
       break;

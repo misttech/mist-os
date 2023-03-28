@@ -163,6 +163,7 @@ const Type* Typespace::Creator::Create() {
     case Decl::Kind::kStruct:
     case Decl::Kind::kTable:
     case Decl::Kind::kUnion:
+    case Decl::Kind::kOverlay:
       return CreateIdentifierType(static_cast<TypeDecl*>(target));
     case Decl::Kind::kResource:
       return CreateHandleType(static_cast<Resource*>(target));
@@ -171,7 +172,9 @@ const Type* Typespace::Creator::Create() {
     case Decl::Kind::kBuiltin:
       // Handled below.
       break;
-    default:
+    case Decl::Kind::kConst:
+    case Decl::Kind::kProtocol:
+    case Decl::Kind::kService:
       Fail(ErrExpectedType, layout_.span());
       return nullptr;
   }

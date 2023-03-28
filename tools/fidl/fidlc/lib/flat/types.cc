@@ -181,6 +181,7 @@ bool IdentifierType::ApplyConstraints(TypeResolver* resolver, const TypeConstrai
     case Decl::Kind::kBits:
     case Decl::Kind::kEnum:
     case Decl::Kind::kTable:
+    case Decl::Kind::kOverlay:
       if (c.HasConstraint<ConstraintKind::kNullability>()) {
         return resolver->Fail(ErrCannotBeOptional, constraints.span.value(), layout_name);
       }
@@ -370,6 +371,9 @@ types::Resourceness Type::Resourceness() const {
     case Decl::Kind::kUnion:
       ZX_ASSERT_MSG(decl->compiled, "accessing resourceness of not-yet-compiled union");
       return static_cast<const Union*>(decl)->resourceness.value();
+    case Decl::Kind::kOverlay:
+      ZX_ASSERT_MSG(decl->compiled, "accessing resourceness of not-yet-compiled overlay");
+      return static_cast<const Overlay*>(decl)->resourceness;
     case Decl::Kind::kNewType: {
       const auto* new_type = static_cast<const NewType*>(decl);
       const auto* underlying_type = new_type->type_ctor->type;

@@ -80,6 +80,8 @@ struct Element {
     kTableMember,
     kUnion,
     kUnionMember,
+    kOverlay,
+    kOverlayMember,
   };
 
   Element(const Element&) = delete;
@@ -118,6 +120,7 @@ struct Decl : public MaybeSourced, public Element {
     kStruct,
     kTable,
     kUnion,
+    kOverlay,
   };
 
   static Element::Kind ElementKind(Kind kind) {
@@ -146,6 +149,8 @@ struct Decl : public MaybeSourced, public Element {
         return Element::Kind::kAlias;
       case Kind::kUnion:
         return Element::Kind::kUnion;
+      case Kind::kOverlay:
+        return Element::Kind::kOverlay;
     }
   }
 
@@ -541,9 +546,10 @@ struct Service final : public TypeDecl {
 
 struct Struct;
 
-// Historically, StructMember was a nested class inside Struct named Struct::Member. However, this
-// was made a top-level class since it's not possible to forward-declare nested classes in C++. For
-// backward-compatibility, Struct::Member is now an alias for this top-level StructMember.
+// Historically, StructMember was a nested class inside Struct named Struct::Member. However,
+// this was made a top-level class since it's not possible to forward-declare nested classes in
+// C++. For backward-compatibility, Struct::Member is now an alias for this top-level
+// StructMember.
 // TODO(fxbug.dev/37535): Move this to a nested class inside Struct.
 struct StructMember : public Sourced, public Element, public Object, public HasCopy<StructMember> {
   StructMember(raw::SourceElement::Signature signature, std::unique_ptr<TypeConstructor> type_ctor,
@@ -762,6 +768,92 @@ struct Union final : public TypeDecl {
   std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
 };
 
+struct Overlay;
+
+struct OverlayMemberUsed : public Object, public HasClone<OverlayMemberUsed> {
+  OverlayMemberUsed(std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name)
+      : type_ctor(std::move(type_ctor)), name(name) {}
+  std::unique_ptr<TypeConstructor> type_ctor;
+  SourceSpan name;
+
+  std::any AcceptAny(VisitorAny* visitor) const override;
+
+  FieldShape fieldshape(WireFormat wire_format) const;
+
+  std::unique_ptr<OverlayMemberUsed> Clone() const override {
+    return std::make_unique<OverlayMemberUsed>(type_ctor->Clone(), name);
+  }
+
+  const Overlay* parent = nullptr;
+};
+
+struct OverlayMember final : public Sourced,
+                             public Element,
+                             public Object,
+                             public HasCopy<OverlayMember> {
+  using Used = OverlayMemberUsed;
+  OverlayMember(raw::SourceElement::Signature signature, const raw::Ordinal64* ordinal,
+                std::unique_ptr<TypeConstructor> type_ctor, SourceSpan name,
+                std::unique_ptr<AttributeList> attributes)
+      : Sourced(signature),
+        Element(Element::Kind::kOverlayMember, std::move(attributes)),
+        ordinal(ordinal),
+        maybe_used(std::make_unique<Used>(std::move(type_ctor), name)) {}
+
+  static OverlayMember Reserved(raw::SourceElement::Signature signature,
+                                const raw::Ordinal64* ordinal, SourceSpan span,
+                                std::unique_ptr<AttributeList> attributes) {
+    return OverlayMember(signature, ordinal, span, nullptr, std::move(attributes));
+  }
+
+  OverlayMember Copy() const override;
+  std::any AcceptAny(VisitorAny* visitor) const override;
+
+  // Owned by Library::raw_ordinals.
+  const raw::Ordinal64* ordinal;
+
+  // The span for reserved members.
+  std::optional<SourceSpan> span;
+  std::unique_ptr<Used> maybe_used;
+
+ private:
+  OverlayMember(raw::SourceElement::Signature signature, const raw::Ordinal64* ordinal,
+                std::optional<SourceSpan> span, std::unique_ptr<Used> maybe_used,
+                std::unique_ptr<AttributeList> attributes)
+      : Sourced(signature),
+        Element(Element::Kind::kOverlayMember, std::move(attributes)),
+        ordinal(ordinal),
+        span(span),
+        maybe_used(std::move(maybe_used)) {}
+};
+
+struct Overlay final : public TypeDecl {
+  using Member = OverlayMember;
+
+  Overlay(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
+          Name name, std::vector<Member> unparented_members, types::Strictness strictness,
+          types::Resourceness resourceness)
+      : TypeDecl(signature, Kind::kOverlay, std::move(attributes), std::move(name)),
+        members(std::move(unparented_members)),
+        strictness(strictness),
+        resourceness(resourceness) {
+    for (auto& member : members) {
+      if (member.maybe_used) {
+        member.maybe_used->parent = this;
+      }
+    }
+  }
+
+  std::vector<Member> members;
+  const types::Strictness strictness;
+  types::Resourceness resourceness;
+
+  std::any AcceptAny(VisitorAny* visitor) const override;
+
+ private:
+  std::unique_ptr<Decl> SplitImpl(VersionRange range) const override;
+};
+
 struct Protocol final : public TypeDecl {
   struct Method : public Sourced, public Element, public HasCopy<Method> {
     Method(raw::SourceElement::Signature signature, std::unique_ptr<AttributeList> attributes,
@@ -793,8 +885,8 @@ struct Protocol final : public TypeDecl {
     std::unique_ptr<TypeConstructor> maybe_response;
     bool has_error;
 
-    // Returns true if this method should use a result union. Result union is used if the method
-    // uses error syntax or if it is a flexible two-way method.
+    // Returns true if this method should use a result union. Result union is used if the
+    // method uses error syntax or if it is a flexible two-way method.
     bool HasResultUnion() const {
       return has_error ||
              (has_request && has_response && strictness == types::Strictness::kFlexible);
@@ -916,8 +1008,8 @@ struct NewType final : public TypeDecl {
         type_ctor(std::move(type_ctor)) {}
 
   // Note that unlike in Alias, we are not calling this partial type constructor. Whether or
-  // not all the constraints for this type are applied is irrelevant to us down the line - all we
-  // care is that we have a type constructor to define a type.
+  // not all the constraints for this type are applied is irrelevant to us down the line - all
+  // we care is that we have a type constructor to define a type.
   std::unique_ptr<TypeConstructor> type_ctor;
 
   std::any AcceptAny(VisitorAny* visitor) const override;
@@ -1026,6 +1118,7 @@ struct Library final : public Element {
     std::vector<std::unique_ptr<Struct>> structs;
     std::vector<std::unique_ptr<Table>> tables;
     std::vector<std::unique_ptr<Union>> unions;
+    std::vector<std::unique_ptr<Overlay>> overlays;
   };
 
   std::vector<std::string_view> name;

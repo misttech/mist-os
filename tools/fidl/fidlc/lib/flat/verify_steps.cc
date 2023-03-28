@@ -63,6 +63,20 @@ void VerifyResourcenessStep::VerifyDecl(const Decl* decl) {
       }
       break;
     }
+    case Decl::Kind::kOverlay: {
+      const auto* overlay_decl = static_cast<const Overlay*>(decl);
+      if (overlay_decl->resourceness == types::Resourceness::kValue) {
+        for (const auto& member : overlay_decl->members) {
+          if (member.maybe_used) {
+            const auto& used = *member.maybe_used;
+            if (EffectiveResourceness(used.type_ctor->type) == types::Resourceness::kResource) {
+              Fail(ErrOverlayMemberMustBeValue, overlay_decl->name.span().value());
+            }
+          }
+        }
+      }
+      break;
+    }
     default:
       break;
   }
@@ -125,6 +139,10 @@ types::Resourceness VerifyResourcenessStep::EffectiveResourceness(const Type* ty
         return types::Resourceness::kResource;
       }
       break;
+    case Decl::Kind::kOverlay:
+      // Overlays are always value types.
+      ZX_ASSERT(static_cast<const Overlay*>(decl)->resourceness == types::Resourceness::kValue);
+      return types::Resourceness::kValue;
     case Decl::Kind::kService:
       return types::Resourceness::kValue;
     case Decl::Kind::kBuiltin:
@@ -313,6 +331,16 @@ void VerifyHandleTransportCompatibilityStep::CheckHandleTransportUsages(
     case Decl::Kind::kUnion: {
       const Union* u = static_cast<const Union*>(decl);
       for (auto& member : u->members) {
+        if (member.maybe_used != nullptr) {
+          CheckHandleTransportUsages(member.maybe_used->type_ctor->type, transport, protocol,
+                                     member.maybe_used->name, seen);
+        }
+      }
+      return;
+    }
+    case Decl::Kind::kOverlay: {
+      const Overlay* o = static_cast<const Overlay*>(decl);
+      for (auto& member : o->members) {
         if (member.maybe_used != nullptr) {
           CheckHandleTransportUsages(member.maybe_used->type_ctor->type, transport, protocol,
                                      member.maybe_used->name, seen);

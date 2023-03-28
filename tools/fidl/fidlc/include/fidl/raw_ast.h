@@ -752,6 +752,7 @@ class Layout final : public SourceElement {
     kStruct,
     kTable,
     kUnion,
+    kOverlay,
   };
 
   Layout(const TokenChain& element, Kind kind, std::vector<std::unique_ptr<LayoutMember>> members,
@@ -773,6 +774,7 @@ class Layout final : public SourceElement {
         return SourceElement::NodeKind::kStructLayout;
       case Kind::kTable:
       case Kind::kUnion:
+      case Kind::kOverlay:
         return SourceElement::NodeKind::kOrdinaledLayout;
     }
   }
@@ -842,7 +844,8 @@ class OrdinaledLayoutMember final : public LayoutMember {
         ordinal(std::move(ordinal)),
         type_ctor(nullptr),
         reserved(true) {
-    ZX_ASSERT(layout_kind == Layout::Kind::kTable || layout_kind == Layout::Kind::kUnion);
+    ZX_ASSERT(layout_kind == Layout::Kind::kTable || layout_kind == Layout::Kind::kUnion ||
+              layout_kind == Layout::Kind::kOverlay);
   }
 
   void Accept(TreeVisitor* visitor) const;

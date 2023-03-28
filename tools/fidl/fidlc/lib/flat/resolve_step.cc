@@ -169,6 +169,13 @@ void ResolveStep::VisitElement(Element* element, Context context) {
       }
       break;
     }
+    case Element::Kind::kOverlayMember: {
+      auto overlay_member = static_cast<Overlay::Member*>(element);
+      if (auto& used = overlay_member->maybe_used) {
+        VisitTypeConstructor(used->type_ctor.get(), context);
+      }
+      break;
+    }
     case Element::Kind::kProtocolCompose: {
       auto composed_protocol = static_cast<Protocol::ComposedProtocol*>(element);
       VisitReference(composed_protocol->reference, context);
@@ -206,6 +213,7 @@ void ResolveStep::VisitElement(Element* element, Context context) {
     case Element::Kind::kStruct:
     case Element::Kind::kTable:
     case Element::Kind::kUnion:
+    case Element::Kind::kOverlay:
       break;
   }
 }

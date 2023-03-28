@@ -171,6 +171,7 @@ struct Compilation {
     std::vector<const Struct*> structs;
     std::vector<const Table*> tables;
     std::vector<const Union*> unions;
+    std::vector<const Overlay*> overlays;
   };
 
   // A library dependency together with its filtered declarations.

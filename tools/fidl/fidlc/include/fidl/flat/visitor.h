@@ -34,6 +34,9 @@ struct Object::VisitorAny {
   virtual std::any Visit(const Union&) = 0;
   virtual std::any Visit(const Union::Member&) = 0;
   virtual std::any Visit(const Union::Member::Used&) = 0;
+  virtual std::any Visit(const Overlay&) = 0;
+  virtual std::any Visit(const Overlay::Member&) = 0;
+  virtual std::any Visit(const Overlay::Member::Used&) = 0;
   virtual std::any Visit(const Protocol&) = 0;
   virtual std::any Visit(const ZxExperimentalPointerType&) = 0;
 };

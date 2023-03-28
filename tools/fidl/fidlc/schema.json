@@ -388,6 +388,7 @@
                         "enum",
                         "experimental_resource",
                         "new_type",
+                        "overlay",
                         "protocol",
                         "service",
                         "struct",
@@ -1945,6 +1946,115 @@
             ],
             "type": "object"
         },
+        "overlay": {
+            "additionalProperties": false,
+            "description": "Definition of an overlay",
+            "patternProperties": {
+                "^experimental_": {}
+            },
+            "properties": {
+                "location": {
+                    "$ref": "#/definitions/location",
+                    "description": "Source location of the declaration"
+                },
+                "max_handles": {
+                    "$ref": "#/definitions/count",
+                    "description": "Maximum number of handles present in the overlay"
+                },
+                "maybe_attributes": {
+                    "$ref": "#/definitions/attributes-list",
+                    "description": "Optional list of overlay attributes"
+                },
+                "members": {
+                    "description": "List of overlay members, sorted by ordinal",
+                    "items": {
+                        "$ref": "#/definitions/overlay-member"
+                    },
+                    "type": "array"
+                },
+                "name": {
+                    "$ref": "#/definitions/compound-identifier",
+                    "description": "Name of overlay"
+                },
+                "naming_context": {
+                    "$ref": "#/definitions/naming-context",
+                    "description": "Naming context of the overlay"
+                },
+                "resource": {
+                    "description": "True if the overlay is a resource type (may contain handles)",
+                    "type": "boolean"
+                },
+                "strict": {
+                    "description": "Strictness of overlay",
+                    "type": "boolean"
+                },
+                "type_shape_v1": {
+                    "$ref": "#/definitions/typeshape",
+                    "description": "Type shape of this declaration"
+                },
+                "type_shape_v2": {
+                    "$ref": "#/definitions/typeshape",
+                    "description": "Type shape of this declaration"
+                }
+            },
+            "required": [
+                "location",
+                "members",
+                "name",
+                "resource",
+                "strict",
+                "type_shape_v1",
+                "type_shape_v2"
+            ],
+            "type": "object"
+        },
+        "overlay-member": {
+            "additionalProperties": false,
+            "description": "Definition of an overlay member",
+            "patternProperties": {
+                "^experimental_": {}
+            },
+            "properties": {
+                "location": {
+                    "$ref": "#/definitions/location",
+                    "description": "Source location of the declaration"
+                },
+                "max_out_of_line": {
+                    "$ref": "#/definitions/count",
+                    "description": "Maximum size of the out-of-line payload"
+                },
+                "maybe_attributes": {
+                    "$ref": "#/definitions/attributes-list",
+                    "description": "Optional list of overlay member attributes"
+                },
+                "name": {
+                    "$ref": "#/definitions/identifier",
+                    "description": "Name of overlay member"
+                },
+                "offset": {
+                    "$ref": "#/definitions/count",
+                    "description": "Offset of overlay member"
+                },
+                "ordinal": {
+                    "$ref": "#/definitions/ordinal",
+                    "description": "Ordinal value of overlay member"
+                },
+                "reserved": {
+                    "description": "Flag indicating that the member is reserved",
+                    "type": "boolean"
+                },
+                "type": {
+                    "$ref": "#/definitions/type",
+                    "description": "Type of overlay member"
+                }
+            },
+            "required": [
+                "location",
+                "ordinal",
+                "reserved"
+            ],
+            "type": "object"
+        },
         "vector-type": {
             "additionalProperties": false,
             "description": "Definition of vector type",
@@ -2109,6 +2219,13 @@
             "description": "List of unions, sorted by fully qualified name",
             "items": {
                 "$ref": "#/definitions/union"
+            },
+            "type": "array"
+        },
+        "overlay_declarations": {
+            "description": "List of overlays, sorted by fully qualified name",
+            "items": {
+                "$ref": "#/definitions/overlay"
             },
             "type": "array"
         }

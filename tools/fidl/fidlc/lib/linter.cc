@@ -108,6 +108,9 @@ std::string name_layout_kind(const raw::Layout& layout) {
     case raw::Layout::kUnion: {
       return "union";
     }
+    case raw::Layout::kOverlay: {
+      return "overlay";
+    }
   }
 }
 

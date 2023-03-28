@@ -109,6 +109,8 @@ class JSONGenerator : public utils::JsonWriter<JSONGenerator> {
   void Generate(const flat::Table::Member& value);
   void Generate(const flat::Union& value);
   void Generate(const flat::Union::Member& value);
+  void Generate(const flat::Overlay& value);
+  void Generate(const flat::Overlay::Member& value);
   void Generate(const flat::LayoutInvocation& value);
   void Generate(const flat::TypeConstructor& value);
   void Generate(const flat::Alias& value);

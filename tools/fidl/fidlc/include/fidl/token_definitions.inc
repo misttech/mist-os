@@ -78,6 +78,7 @@ TOKEN_SUBKIND(Table, "table")
 TOKEN_SUBKIND(Flexible, "flexible")
 TOKEN_SUBKIND(Type, "type")
 TOKEN_SUBKIND(Union, "union")
+TOKEN_SUBKIND(Overlay, "overlay")
 
 TOKEN_SUBKIND(Error, "error")
 

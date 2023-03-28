@@ -462,6 +462,11 @@ constexpr ErrorDef<195> ErrExperimentalOverflowingAttributeMissingExperimentalFl
 constexpr ErrorDef<196> ErrExperimentalOverflowingIncorrectUsage(
     "the @experimental_overflowing attribute must have at least one of the `request` or `response`"
     "arguments set to true");
+constexpr ErrorDef<197> ErrOverlayMustBeStrict("overlays must be strict");
+constexpr ErrorDef<198> ErrOverlayMustBeValue("overlays must be value (not resource) types");
+constexpr ErrorDef<199> ErrOverlayMemberMustBeValue("overlays may not contain resource members");
+constexpr ErrorDef<200> ErrOverlayMustNotContainReserved(
+    "overlays may not contain reserved members");
 }  // namespace fidl
 
 // LINT.ThenChange(/tools/fidl/fidlc/tests/errcat_good_tests.cc)

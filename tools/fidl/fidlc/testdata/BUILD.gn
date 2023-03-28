@@ -31,6 +31,7 @@ standalone_libraries = [
   "new_type.test.fidl",
   "nullable.test.fidl",
   "large_messages.test.fidl",
+  "overlay.test.fidl",
   "padding.test.fidl",
   "protocol_request.test.fidl",
   "protocols.test.fidl",
@@ -79,6 +80,9 @@ foreach(filename, standalone_libraries) {
     }
 
     if (filename == "string_arrays.test.fidl") {
+      experimental_flags += [ "zx_c_types" ]
+    }
+    if (filename == "overlay.test.fidl") {
       experimental_flags += [ "zx_c_types" ]
     }
 

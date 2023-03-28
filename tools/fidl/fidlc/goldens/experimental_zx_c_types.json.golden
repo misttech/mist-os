@@ -557,6 +557,7 @@
   "external_struct_declarations": [],
   "table_declarations": [],
   "union_declarations": [],
+  "overlay_declarations": [],
   "alias_declarations": [
     {
       "name": "test.experimentalzxctypes/AliasOfUchar",

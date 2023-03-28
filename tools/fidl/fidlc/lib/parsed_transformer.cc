@@ -82,6 +82,10 @@ void ParsedTransformer::OnLayout(const std::unique_ptr<raw::Layout>& el) {
       VISIT_THEN_TRANSFORM_UNIQUE_PTR(Layout, UnionDeclaration);
       break;
     }
+    case raw::Layout::kOverlay: {
+      VISIT_THEN_TRANSFORM_UNIQUE_PTR(Layout, OverlayDeclaration);
+      break;
+    }
   }
 }
 

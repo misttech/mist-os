@@ -1224,6 +1224,12 @@ std::unique_ptr<raw::Layout> Parser::ParseLayout(
       ValidateModifiers<types::Strictness, types::Resourceness>(modifiers, identifier->start());
     layout_kind = raw::Layout::Kind::kUnion;
     member_kind = raw::LayoutMember::Kind::kOrdinaled;
+  } else if (experimental_flags_.IsFlagEnabled(ExperimentalFlags::Flag::kZxCTypes) &&
+             identifier->span().data() == "overlay") {
+    if (modifiers != nullptr)
+      ValidateModifiers<types::Strictness>(modifiers, identifier->start());
+    layout_kind = raw::Layout::Kind::kOverlay;
+    member_kind = raw::LayoutMember::Kind::kOrdinaled;
   } else {
     return Fail(ErrInvalidLayoutClass);
   }

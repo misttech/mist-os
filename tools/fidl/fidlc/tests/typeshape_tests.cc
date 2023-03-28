@@ -1312,6 +1312,75 @@ type ManyHandleUnion = strict resource union {
       CheckFieldShape(*many_handle_union->members[2].maybe_used, ExpectedField{}, ExpectedField{}));
 }
 
+TEST(TypeshapeTests, GoodOverlays) {
+  TestLibrary test_library(R"FIDL(library example;
+
+type BoolOrStringOrU64 = strict overlay {
+    1: b bool;
+    2: s string:255;
+    3: u uint64;
+};
+
+type BoolOverlay = strict overlay {
+    1: b bool;
+};
+
+type U64BoolStruct = struct {
+    u uint64;
+    b bool;
+};
+
+type BoolOverlayStruct = struct {
+    bo BoolOverlay;
+};
+
+)FIDL");
+  test_library.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
+
+  ASSERT_COMPILED(test_library);
+  auto bool_or_string_or_u64 = test_library.LookupOverlay("BoolOrStringOrU64");
+  EXPECT_NO_FAILURES(CheckTypeShape(bool_or_string_or_u64, Expected{
+                                                               .inline_size = 24,
+                                                               .alignment = 8,
+                                                               .max_out_of_line = 256,
+                                                               .depth = 1,
+                                                               .has_padding = true,
+                                                               .has_envelope = false,
+                                                           }));
+  EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[0].maybe_used,
+                                     ExpectedField{.offset = 8, .padding = 15}));
+  EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[1].maybe_used,
+                                     ExpectedField{.offset = 8, .padding = 0}));
+  EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[2].maybe_used,
+                                     ExpectedField{.offset = 8, .padding = 8}));
+
+  // BoolOverlay and U64BoolStruct should have basically the same typeshape.
+  auto bool_overlay = test_library.LookupOverlay("BoolOverlay");
+  auto u64_bool_struct = test_library.LookupStruct("U64BoolStruct");
+  EXPECT_NO_FAILURES(CheckTypeShape(bool_overlay, Expected{
+                                                      .inline_size = 16,
+                                                      .alignment = 8,
+                                                      .max_out_of_line = 0,
+                                                      .depth = 0,
+                                                      .has_padding = true,
+                                                      .has_envelope = false,
+                                                  }));
+  EXPECT_NO_FAILURES(CheckFieldShape(*bool_overlay->members[0].maybe_used,
+                                     ExpectedField{.offset = 8, .padding = 7}));
+  EXPECT_NO_FAILURES(CheckTypeShape(u64_bool_struct, Expected{
+                                                         .inline_size = 16,
+                                                         .alignment = 8,
+                                                         .max_out_of_line = 0,
+                                                         .depth = 0,
+                                                         .has_padding = true,
+                                                         .has_envelope = false,
+                                                     }));
+
+  auto bool_overlay_struct = test_library.LookupStruct("BoolOverlayStruct");
+  EXPECT_NO_FAILURES(
+      CheckFieldShape(bool_overlay_struct->members[0], ExpectedField{.offset = 0, .padding = 7}));
+}
+
 TEST(TypeshapeTests, GoodVectors) {
   TestLibrary test_library(R"FIDL(library example;
 

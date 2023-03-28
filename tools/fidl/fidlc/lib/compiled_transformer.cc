@@ -186,6 +186,10 @@ void CompiledTransformer::OnLayout(const std::unique_ptr<raw::Layout>& el) {
       TRANSFORM_UNIQUE_PTR_WITH_SOURCE_MAP(Layout, UnionDeclaration, Versioned, Union);
       break;
     }
+    case raw::Layout::kOverlay: {
+      TRANSFORM_UNIQUE_PTR_WITH_SOURCE_MAP(Layout, OverlayDeclaration, Versioned, Overlay);
+      break;
+    }
   }
 }
 
