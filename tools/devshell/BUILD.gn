@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//scripts/sdk/gn/test/build/host_script_test.gni")
+import("//tools/devshell/test_runner/host_script_test.gni")
 
 if (!is_host) {
   group("fx") {
@@ -133,9 +133,9 @@ host_script_test_data("fx_bash_tests") {
       }
     },
     {
-      source_base_dir = "//scripts/sdk/gn/bash_tests"
+      source_base_dir = "//tools/devshell/tests/lib"
       target_base_dir = "tools/devshell"
-      files = [ "//scripts/sdk/gn/bash_tests/script_runner.sh" ]
+      files = [ "//tools/devshell/tests/lib/script_runner.sh" ]
     },
     {
       source_base_dir = "//tools/devshell/tests/lib"
@@ -234,7 +234,7 @@ host_script_test_data("fx_bash_tests") {
 generated_file("run_fx_bash_tests_driver") {
   outputs = [ "${target_out_dir}/run_fx_bash_tests_driver.sh" ]
   contents =
-      read_file("//scripts/sdk/gn/bash_tests/script_header.sh", "list lines")
+      read_file("//tools/devshell/tests/lib/script_header.sh", "list lines")
   foreach(s, test_scripts) {
     contents += [ "tools/devshell/script_runner.sh $s" ]
   }
