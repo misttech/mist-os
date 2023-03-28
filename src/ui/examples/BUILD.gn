@@ -5,7 +5,10 @@
 import("//build/components.gni")
 
 group("examples") {
-  public_deps = [ ":flatland-examples" ]
+  public_deps = [
+    ":flatland-examples",
+    "escher",
+  ]
 }
 
 group("tests") {

@@ -19,67 +19,6 @@
 // Directory provided by the "isolated-cache-storage" feature of the component sandbox.
 static const char* kCacheDirectoryPath = "/cache";
 
-namespace {
-
-class DemoKeyDispatcher : public fuchsia::ui::input::InputDevice {
- public:
-  using Callback = fit::function<void(std::string)>;
-
-  DemoKeyDispatcher(Callback callback) : callback_(std::move(callback)) {}
-
- private:
-  // |fuchsia::ui::input::InputDevice|
-  void DispatchReport(fuchsia::ui::input::InputReport report) override {
-    if (report.keyboard) {
-      DispatchDelta(std::move(report.keyboard->pressed_keys));
-    }
-  }
-
-  // Dispatch only keys that are newly pressed.
-  void DispatchDelta(std::vector<uint32_t> pressed_keys) {
-    for (uint32_t key : pressed_keys) {
-      // Since this is a demo harness, we can assume a small number of pressed
-      // keys. However, if this assumption breaks, we can switch to std::bitset.
-      if (std::find(pressed_keys_.begin(), pressed_keys_.end(), key) == pressed_keys_.end()) {
-        DispatchKey(key);
-      }
-    }
-    pressed_keys_ = std::move(pressed_keys);
-  }
-
-  void DispatchKey(uint32_t hid) {
-    if (hid >= HID_USAGE_KEY_A && hid <= HID_USAGE_KEY_Z) {
-      callback_(std::string(1, 'A' + hid - HID_USAGE_KEY_A));
-    } else if (hid >= HID_USAGE_KEY_1 && hid <= HID_USAGE_KEY_9) {
-      callback_(std::string(1, '1' + hid - HID_USAGE_KEY_1));
-    } else {
-      switch (hid) {
-        // Unlike ASCII, HID_USAGE_KEY_0 comes after 9.
-        case HID_USAGE_KEY_0:
-          callback_("0");
-          break;
-        case HID_USAGE_KEY_ENTER:
-        case HID_USAGE_KEY_KP_ENTER:
-          callback_("RETURN");
-          break;
-        case HID_USAGE_KEY_ESC:
-          callback_("ESCAPE");
-          break;
-        case HID_USAGE_KEY_SPACE:
-          callback_("SPACE");
-          break;
-        default:
-          break;
-      }
-    }
-  }
-
-  Callback callback_;
-  std::vector<uint32_t> pressed_keys_;
-};
-
-}  // namespace
-
 // When running on Fuchsia, New() instantiates a DemoHarnessFuchsia.
 std::unique_ptr<DemoHarness> DemoHarness::New(DemoHarness::WindowParams window_params,
                                               DemoHarness::InstanceParams instance_params) {
