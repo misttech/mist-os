@@ -18,6 +18,7 @@ pub async fn flash(fastboot_proxy: FastbootProxy, cmd: FlashCommand) -> Result<(
     flash_plugin_impl(fastboot_proxy, cmd, &mut stdout()).await
 }
 
+#[tracing::instrument(skip(fastboot_proxy, writer))]
 pub async fn flash_plugin_impl<W: Write>(
     fastboot_proxy: FastbootProxy,
     mut cmd: FlashCommand,

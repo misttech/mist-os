@@ -109,6 +109,7 @@ pub async fn send_with_listener<T: AsyncRead + AsyncWrite + Unpin>(
     read(interface, listener).await
 }
 
+#[tracing::instrument(skip(interface))]
 #[allow(clippy::unused_io_amount)] // TODO(fxbug.dev/95074)
 pub async fn send<T: AsyncRead + AsyncWrite + Unpin>(
     cmd: Command,
@@ -130,6 +131,7 @@ pub async fn send_with_timeout<T: AsyncRead + AsyncWrite + Unpin>(
     read_with_timeout(interface, &LogInfoListener {}, timeout).await
 }
 
+#[tracing::instrument(skip(interface, listener, data))]
 pub async fn upload<T: AsyncRead + AsyncWrite + Unpin>(
     data: &[u8],
     interface: &mut T,

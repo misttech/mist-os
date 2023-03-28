@@ -55,7 +55,6 @@ rustc_library("lib") {
     "//third_party/rust_crates:socket2",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:zerocopy",
   ]
 

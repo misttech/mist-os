@@ -306,6 +306,7 @@ pub async fn find_devices() -> Vec<FastbootDevice> {
     products
 }
 
+#[tracing::instrument]
 pub fn open_interface_with_serial(serial: &String) -> Result<Interface> {
     tracing::trace!("opening interface with serial number: {}", serial);
     open_interface(|info: &InterfaceInfo| -> bool { extract_serial_number(info) == *serial })
@@ -354,6 +355,7 @@ pub async fn stage<T: AsyncRead + AsyncWrite + Unpin>(
     }
 }
 
+#[tracing::instrument(skip(interface, listener))]
 pub async fn flash<T: AsyncRead + AsyncWrite + Unpin>(
     interface: &mut T,
     file: &String,
@@ -375,10 +377,12 @@ pub async fn flash<T: AsyncRead + AsyncWrite + Unpin>(
     let mut timeout = megabytes / timeout_rate;
     timeout = std::cmp::max(timeout, min_timeout);
     tracing::debug!("Estimated timeout: {}s for {}MB", timeout, megabytes);
+    let span = tracing::span!(tracing::Level::INFO, "device_flash").entered();
     let send_reply =
         send_with_timeout(Command::Flash(name.to_string()), interface, Duration::seconds(timeout))
             .await
             .context("sending flash");
+    drop(span);
     match send_reply {
         Ok(Reply::Okay(_)) => Ok(()),
         Ok(Reply::Fail(s)) => bail!("Failed to flash \"{}\": {}", name, s),
