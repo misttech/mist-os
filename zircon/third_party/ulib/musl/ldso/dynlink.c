@@ -616,6 +616,7 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
         if (stride < 3)
           addend = reloc_addr[1];
         if (runtime && def.dso->tls_id >= static_tls_cnt) {
+#if !TLSDESC_DIRECT
           size_t* new = dl_alloc(2 * sizeof(size_t));
           if (!new) {
             error("Error relocating %s: cannot allocate TLSDESC for %s", dso->l_map.l_name, name);
@@ -623,8 +624,12 @@ LIBC_NO_SAFESTACK NO_ASAN static void do_relocs(struct dso* dso, size_t* rel, si
           }
           new[0] = def.dso->tls_id;
           new[1] = tls_val + addend;
-          reloc_addr[0] = (size_t)__tlsdesc_dynamic;
           reloc_addr[1] = (size_t) new;
+#else
+          reloc_addr[1] = tls_val + addend;
+          reloc_addr[2] = def.dso->tls_id;
+#endif
+          reloc_addr[0] = (size_t)__tlsdesc_dynamic;
         } else {
           reloc_addr[0] = (size_t)__tlsdesc_static;
 #ifdef TLS_ABOVE_TP
@@ -1531,11 +1536,11 @@ __asm__(
     ".size _dl_debug_state, . - _dl_debug_state\n"
     ".popsection");
 
-__attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t* v) {
+__attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t offset, size_t modid) {
   pthread_t self = __pthread_self();
 
-  if (v[0] <= (size_t)self->head.dtv[0]) {
-    return (char*)self->head.dtv[v[0]] + v[1] + DTP_OFFSET;
+  if (modid <= (size_t)self->head.dtv[0]) {
+    return (char*)self->head.dtv[modid] + offset + DTP_OFFSET;
   }
 
   /* This is safe without any locks held because, if the caller
@@ -1543,14 +1548,14 @@ __attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t* v) {
    * must be valid at least that far out and it was synchronized
    * at program startup or by an already-completed call to dlopen. */
   struct dso* p;
-  for (p = head; p->tls_id != v[0]; p = dso_next(p))
+  for (p = head; p->tls_id != modid; p = dso_next(p))
     ;
 
   /* Get new DTV space from new DSO if needed */
-  if (v[0] > (size_t)self->head.dtv[0]) {
-    void** newdtv = p->new_dtv + (v[0] + 1) * atomic_fetch_add(&p->new_dtv_idx, 1);
+  if (modid > (size_t)self->head.dtv[0]) {
+    void** newdtv = p->new_dtv + (modid + 1) * atomic_fetch_add(&p->new_dtv_idx, 1);
     memcpy(newdtv, self->head.dtv, ((size_t)self->head.dtv[0] + 1) * sizeof(void*));
-    newdtv[0] = (void*)v[0];
+    newdtv[0] = (void*)modid;
     self->head.dtv = newdtv;
   }
 
@@ -1563,10 +1568,10 @@ __attribute__((__visibility__("hidden"))) void* __tls_get_new(size_t* v) {
     mem += ((uintptr_t)p->tls.image - (uintptr_t)mem) & (p->tls.align - 1);
     self->head.dtv[p->tls_id] = mem;
     memcpy(mem, p->tls.image, p->tls.len);
-    if (p->tls_id == v[0])
+    if (p->tls_id == modid)
       break;
   }
-  return mem + v[1] + DTP_OFFSET;
+  return mem + offset + DTP_OFFSET;
 }
 
 LIBC_NO_SAFESTACK thrd_info_t __init_main_thread(zx_handle_t thread_self) {

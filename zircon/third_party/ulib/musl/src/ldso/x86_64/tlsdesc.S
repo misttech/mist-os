@@ -32,7 +32,8 @@ __tlsdesc_dynamic:
 	push %r9
 	push %r10
 	push %r11
-	mov %rax,%rdi
+	movq 0(%rax),%rsi  // Second argument: module ID.
+	movq 8(%rax),%rdi  // First argument: offset within PT_TLS.
 	call __tls_get_new
 	pop %r11
 	pop %r10

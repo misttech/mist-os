@@ -240,7 +240,7 @@ static inline bool pthread_mutex_is_state_contested(int state) {
 extern void* __pthread_tsd_main[];
 extern volatile size_t __pthread_tsd_size;
 
-void* __tls_get_new(size_t*) ATTR_LIBC_VISIBILITY;
+void* __tls_get_new(size_t offset, size_t modid) ATTR_LIBC_VISIBILITY;
 
 static inline struct pthread* __pthread_self(void) { return tp_to_pthread(zxr_tp_get()); }
 

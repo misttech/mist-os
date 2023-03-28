@@ -17,7 +17,7 @@ __tlsdesc_static:
 // 	size_t *dtv = *(size_t**)(tp + 16 - 8);
 // 	if (p->modidx <= dtv[0])
 // 		return dtv[p->modidx] + p->off - tp;
-// 	return __tls_get_new(p) - tp;
+// 	return __tls_get_new(p[1], p[0]) - tp;
 // }
 .global __tlsdesc_dynamic
 .hidden __tlsdesc_dynamic
@@ -43,7 +43,9 @@ __tlsdesc_dynamic:
 
 	// save all registers __tls_get_new may clobber
 	// update sp in two steps because offset must be in [-512,509]
-1:	stp x29,x30,[sp,#-160]!
+1:
+	ldp x1, x0, [x0] // Load arguments for __tls_get_new.
+	stp x29,x30,[sp,#-160]!
 	stp x5,x6,[sp,#16]
 	stp x7,x8,[sp,#32]
 	stp x9,x10,[sp,#48]
