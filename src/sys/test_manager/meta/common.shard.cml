@@ -107,6 +107,10 @@
             url: "#meta/debug_data_processor.cm",
         },
         {
+            name: "fxfs_data",
+            url: "#meta/fxfs_backed_data_for_tests.cm",
+        },
+        {
             name: "early_boot_instrumentation",
             url: "#meta/early-boot-instrumentation.cm",
         },
@@ -157,13 +161,17 @@
             storage_id: "static_instance_id_or_moniker",
         },
         {
-            directory: "fxfs_data",
-            rights: [ "rw*" ],
-            path: "/data_for_test",
+            storage: "fxfs_tests_data",
+            from: "#fxfs_data",
+            backing_dir: "fxfs_data",
+            storage_id: "static_instance_id_or_moniker",
         },
+
+        // TODO(fxbug.dev/124393): Adding dummy capability to make cmc tool
+        // happy. This capability is not routed to any component.
         {
             storage: "data",
-            from: "self",
+            from: "#fxfs_data",
             backing_dir: "fxfs_data",
             storage_id: "static_instance_id_or_moniker",
         },
@@ -205,13 +213,13 @@
             rights: [ "rw*" ],
             path: "/tmp",
         },
-        {
-            storage: "data",
-            rights: [ "rw*" ],
-            path: "/data",
-        },
     ],
     offer: [
+        {
+            storage: "data",
+            from: "parent",
+            to: "#fxfs_data",
+        },
         {
             // Tests are permitted to use /dev/null and /dev/zero.
             directory: "dev-builtin",
@@ -470,8 +478,9 @@
             ],
         },
         {
-            storage: "data",
+            storage: "fxfs_tests_data",
             from: "self",
+            as: "data",
             to: [
                 "#system-tests",
                 "#tests",

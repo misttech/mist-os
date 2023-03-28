@@ -129,19 +129,35 @@ rustc_binary("bin") {
   deps = [
     ":lib",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/diagnostics/inspect/runtime/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
   ]
 
   sources = [ "src/main.rs" ]
+}
+
+rustc_binary("fxfs_backed_data_for_tests_bin") {
+  testonly = true
+  name = "fxfs_backed_data_for_tests"
+  edition = "2021"
+  source_root = "src/fxfs_backed_data.rs"
+
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-fs",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+  ]
+
+  sources = [ source_root ]
 }
 
 fuchsia_component("test_manager_cmp") {
@@ -155,10 +171,18 @@ fuchsia_component("test_manager_cmp") {
   visibility = [ ":*" ]
 }
 
+fuchsia_component("fxfs_backed_data_for_tests_cmp") {
+  testonly = true
+  component_name = "fxfs_backed_data_for_tests"
+  deps = [ ":fxfs_backed_data_for_tests_bin" ]
+  manifest = "meta/fxfs_backed_data_for_tests.cml"
+}
+
 fuchsia_package("test_manager_pkg") {
   testonly = true
   package_name = "test_manager"
   deps = [
+    ":fxfs_backed_data_for_tests_cmp",
     ":test_manager_cmp",
     "debug_data_processor",
     "//src/diagnostics/archivist:archivist-for-embedding-v2",
