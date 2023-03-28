@@ -633,13 +633,16 @@ mod tests {
         .unwrap();
     }
 
-    async fn check_no_events_were_emitted(watcher: &mut PackageManifestWatcher) {
-        async {
-            let result = watcher.next().await;
-            panic!("should not have received: {result:?}");
-        }
-        .on_timeout(TEST_BATCH_WATCHER_TIMEOUT * 2, || ())
-        .await;
+    // TODO(https://github.com/rust-lang/rust/issues/87417): use #[track_caller] when stabilized.
+    macro_rules! check_no_events_were_emitted {
+        ($watcher:expr) => {{
+            async {
+                let result = $watcher.next().await;
+                panic!("should not have received: {result:?}");
+            }
+            .on_timeout(TEST_BATCH_WATCHER_TIMEOUT * 2, || ())
+            .await;
+        }};
     }
 
     /// Read changed paths from the watcher. It's possible events can be distributed across batches,
@@ -695,7 +698,7 @@ mod tests {
         );
 
         // Make sure we don't read any events from the stream.
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
     }
 
     #[fuchsia::test]
@@ -716,7 +719,7 @@ mod tests {
         create_package_manifest_with_content(&dir, 1, "1");
 
         // Make sure we don't read any events from the stream.
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
 
         // Overwrite the package with the same content. This should be observed.
         create_package_manifest_with_content(&dir, 1, "2");
@@ -838,7 +841,7 @@ mod tests {
         // Remove the manifest list, which we should not observe.
         std::fs::remove_file(&list_path1).unwrap();
 
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
 
         // Next, write to manifest file which is no longer watched.
         create_package_manifest_with_content(&dir, 1, "2");
@@ -848,7 +851,7 @@ mod tests {
 
         // Try to read from the stream. This should not return anything since there were no
         // updates to files watched.
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
     }
 
     #[fuchsia::test]
@@ -868,7 +871,7 @@ mod tests {
 
         // Delete the manifest list, which should not emit any events.
         std::fs::remove_file(&list_path).unwrap();
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
 
         // Next, recreate manifest list and make sure we observe an event.
         create_manifest_list(&list_path, [manifest_path2.as_path()]);
@@ -901,7 +904,7 @@ mod tests {
 
         // Delete first manifest list and make sure we observe an event.
         std::fs::remove_file(&list_path1).unwrap();
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
 
         // Next, write to shared file and make sure we observe an event.
         create_package_manifest_with_content(&dir, 1, "2");
@@ -909,10 +912,10 @@ mod tests {
 
         // Delete second manifest list and make sure we observe an event.
         std::fs::remove_file(&list_path2).unwrap();
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
 
         // Next, write to shared file, which should not be observed.
         create_package_manifest_with_content(&dir, 1, "3");
-        check_no_events_were_emitted(&mut watcher).await;
+        check_no_events_were_emitted!(&mut watcher);
     }
 }
