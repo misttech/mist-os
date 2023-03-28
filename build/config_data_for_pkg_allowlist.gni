@@ -98,7 +98,6 @@ config_data_for_pkg_allowlist = [
   "weavestack-adaptation-unittests",
   "weavestack-unittests",
   "web-semantics-test",
-  "web_runner_pixel_test",
   "web_engine",
   "wlancfg",
 ]

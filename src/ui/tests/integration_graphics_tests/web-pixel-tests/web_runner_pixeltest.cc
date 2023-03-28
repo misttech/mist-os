@@ -266,9 +266,6 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
                  {
                      Protocol{fuchsia::tracing::provider::Registry::Name_},
                      Protocol{fuchsia::logger::LogSink::Name_},
-                     Directory{.name = "config-data",
-                               .rights = fuchsia::io::R_STAR_DIR,
-                               .path = "/config/data"},
                  },
              .source = ParentRef(),
              .targets = {ChildRef{kFontsProvider}}}};
@@ -278,7 +275,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
   static constexpr auto kWebClientUrl = "#meta/chromium_pixel_client.cm";
 
   static constexpr auto kFontsProvider = "fonts_provider";
-  static constexpr auto kFontsProviderUrl = "#meta/fonts.cm";
+  static constexpr auto kFontsProviderUrl = "#meta/font_provider_hermetic_for_test.cm";
 
   static constexpr auto kTextManager = "text_manager";
   static constexpr auto kTextManagerUrl = "#meta/text_manager.cm";
