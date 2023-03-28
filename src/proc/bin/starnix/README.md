@@ -194,11 +194,12 @@ ffx inspect show core/starnix_manager/bionic:root:syscall_stats
 
 ## Tracing
 
-Starnix is integrated with Fuchsia's tracing system. To start a trace with an increased
-buffer size, run:
+Starnix is integrated with Fuchsia's tracing system but is disabled by default.
+Set the build argument `starnix_disable_tracing` to false to enable tracing. To
+start a trace with an increased buffer size, run:
 
 ```
-ffx trace start --categories "kernel:meta,starnix" --buffer-size 16
+ffx trace start --categories "kernel:meta,starnix" --buffer-size 64
 ```
 
 Trace files can be visualized and queried with Perfetto. For example, to see the average

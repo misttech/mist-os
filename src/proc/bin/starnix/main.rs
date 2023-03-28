@@ -48,7 +48,7 @@ mod testing;
 #[fuchsia::main(logging_tags = ["starnix"])]
 async fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
-    fuchsia_trace::instant!(
+    trace_instant!(
         trace_category_starnix!(),
         trace_name_start_kernel!(),
         fuchsia_trace::Scope::Thread

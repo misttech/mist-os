@@ -22,3 +22,37 @@ fuchsia_trace::string_name_macro!(trace_name_start_kernel, "StartKernel");
 
 // The argument used to track the name of a syscall.
 fuchsia_trace::string_name_macro!(trace_arg_name, "name");
+
+macro_rules! trace_instant {
+    ($category:expr, $name:expr, $scope:expr $(, $($key:expr => $val:expr)*)?) => {
+        if !cfg!(feature = "disable_tracing") {
+            fuchsia_trace::instant!($category, $name, $scope $(, $($key => $val)*)?);
+        }
+    };
+}
+
+macro_rules! trace_duration {
+    ($category:expr, $name:expr $(, $($key:expr => $val:expr)*)?) => {
+        if !cfg!(feature = "disable_tracing") {
+            fuchsia_trace::duration!($category, $name $(, $($key => $val)*)?);
+        }
+    };
+}
+
+#[cfg(target_arch = "x86_64")]
+macro_rules! trace_duration_begin {
+    ($category:expr, $name:expr $(, $($key:expr => $val:expr)*)?) => {
+        if !cfg!(feature = "disable_tracing") {
+            fuchsia_trace::duration_begin!($category, $name $(, $($key => $val)*)?);
+        }
+    };
+}
+
+#[cfg(target_arch = "x86_64")]
+macro_rules! trace_duration_end {
+    ($category:expr, $name:expr $(, $($key:expr => $val:expr)*)?) => {
+        if !cfg!(feature = "disable_tracing") {
+            fuchsia_trace::duration_end!($category, $name $(, $($key => $val)*)?);
+        }
+    };
+}

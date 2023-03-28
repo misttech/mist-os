@@ -18,6 +18,9 @@ declare_args() {
 
   # Whether or not logging is disabled globally.
   starnix_disable_logging = false
+
+  # Whether or not tracing is disabled globally.
+  starnix_disable_tracing = true
 }
 
 group("starnix") {
@@ -321,6 +324,9 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_disable_logging) {
     features = [ "disable_logging" ]
+  }
+  if (starnix_disable_tracing) {
+    features += [ "disable_tracing" ]
   }
 }
 

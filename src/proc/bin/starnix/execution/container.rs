@@ -170,7 +170,7 @@ enum ExposedServices {
 
 /// Creates a new container.
 pub async fn create_container() -> Result<Arc<Container>, Error> {
-    fuchsia_trace::duration!(trace_category_starnix!(), trace_name_create_container!());
+    trace_duration!(trace_category_starnix!(), trace_name_create_container!());
     const DEFAULT_INIT: &str = "/container/init";
     let mut config = get_config();
 

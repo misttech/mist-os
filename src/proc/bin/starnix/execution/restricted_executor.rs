@@ -134,9 +134,9 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         // Copy the register state into the mapped VMO.
         bound_state.copy_from_slice(restricted_state_as_bytes(&mut state));
 
-        fuchsia_trace::duration_begin!(trace_category_starnix!(), trace_name_user_space!());
+        trace_duration_begin!(trace_category_starnix!(), trace_name_user_space!());
         let status = unsafe { restricted_enter(0, restricted_return_ptr as usize) };
-        fuchsia_trace::duration_end!(trace_category_starnix!(), trace_name_user_space!());
+        trace_duration_end!(trace_category_starnix!(), trace_name_user_space!());
         match { status } {
             zx::sys::ZX_OK => {
                 // Successfully entered and exited restricted mode. At this point the task has
@@ -146,7 +146,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
             _ => return Err(format_err!("failed to restricted_enter: {:?}", state)),
         }
 
-        fuchsia_trace::duration_begin!(
+        trace_duration_begin!(
             trace_category_starnix!(),
             trace_name_run_task_loop!(),
             trace_arg_name!() => syscall_decl.name
@@ -211,7 +211,7 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         }
 
         if let Some(exit_status) = process_completed_syscall(current_task, &error_context)? {
-            fuchsia_trace::duration_end!(
+            trace_duration_end!(
                 trace_category_starnix!(),
                 trace_name_run_task_loop!(),
                 trace_arg_name!() => syscall_decl.name
