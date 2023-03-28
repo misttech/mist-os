@@ -9,4 +9,5 @@ fuchsia.BIND_IHDA_CODEC_VID == fuchsia.intelhda.BIND_IHDA_CODEC_VID.INTEL;
 
 accept fuchsia.BIND_IHDA_CODEC_DID {
   0x280b,  // Intel Display Audio
+  0x2812,  // Intel Tiger Lake
 }

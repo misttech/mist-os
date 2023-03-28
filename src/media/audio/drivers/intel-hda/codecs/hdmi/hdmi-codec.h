@@ -26,6 +26,7 @@ class HdmiCodec : public IntelHDACodecDriverBase {
 
  protected:
   zx_status_t Setup();
+  zx_status_t GetImplementationId();
   zx_status_t RunCommandList(const CommandListEntry* cmds, size_t cmd_count);
   zx_status_t CreateAndStartStreams(const StreamProperties* streams, size_t stream_cnt);
 
@@ -34,7 +35,9 @@ class HdmiCodec : public IntelHDACodecDriverBase {
   HdmiCodec() {}
   virtual ~HdmiCodec() {}
 
+  bool waiting_for_vendor_id_ = false;
   bool waiting_for_impl_id_ = false;
+  bool is_tgl_ = false;  // True on TigerLake hardware
 };
 
 }  // namespace codecs

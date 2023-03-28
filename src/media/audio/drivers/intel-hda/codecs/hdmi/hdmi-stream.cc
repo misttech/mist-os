@@ -225,6 +225,36 @@ zx_status_t HdmiStream::FinishChangeStreamFormatLocked(uint16_t encoded_fmt) {
     return res;
   }
 
+  if (props_.is_tgl) {
+    const Command TIGERLAKE_INIT[] = {
+        // This entire block attempts to configure HDMI stream details,
+        // and should be considered as experimental and unfinished.
+        {props_.conv_nid, SET_DIGITAL_CONV_CONTROL_1(0x80)},
+        {props_.conv_nid, SET_DIGITAL_CONV_CONTROL_2(0x02)},
+        {props_.conv_nid, SET_DIGITAL_CONV_CONTROL_3(0x80)},
+        {props_.pc_nid, SET_DIP_INDEX(0)},
+        {props_.pc_nid, SET_DIP_XMIT_CTRL(0)},
+        {props_.pc_nid, SET_DIP_INDEX(0)},
+        {props_.pc_nid, SET_DIP_DATA(0x84)},
+        {props_.pc_nid, SET_DIP_DATA(0x1B)},
+        {props_.pc_nid, SET_DIP_DATA(0x44)},
+        {props_.pc_nid, SET_DIP_DATA(0x01)},
+        {props_.pc_nid, SET_DIP_DATA(0x00)},
+        {props_.pc_nid, SET_DIP_DATA(0x00)},
+        {props_.pc_nid, SET_DIP_DATA(0x00)},
+        {props_.pc_nid, SET_DIP_DATA(0x00)},
+        {props_.pc_nid, SET_DIP_DATA(0x00)},
+        {props_.pc_nid, SET_DIP_INDEX(0)},
+        {props_.pc_nid, SET_DIP_XMIT_CTRL(0xC0)},
+        {props_.conv_nid, SET_DIGITAL_CONV_CONTROL_1(0x80)},
+    };
+
+    res = RunCmdListLocked(TIGERLAKE_INIT, std::size(TIGERLAKE_INIT));
+    if (res != ZX_OK) {
+      return res;
+    }
+  }
+
   res = SendGainUpdatesLocked();
   if (res != ZX_OK) {
     return res;

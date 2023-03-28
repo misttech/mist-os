@@ -27,6 +27,7 @@ struct StreamProperties {
   uint16_t pc_nid;    // NID of the pin converter used by this stream.
   float default_conv_gain;
   float default_pc_gain;
+  bool is_tgl;  // True if running on TigerLake hardware
 
   const char* mfr_name;                               // No need for storage, we get it from a LUT.
   char product_name[kMaxValidMonitorNameLength + 1];  // + 1 for null termination.
