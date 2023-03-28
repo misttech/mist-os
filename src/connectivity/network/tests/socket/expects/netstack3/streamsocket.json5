@@ -18,6 +18,7 @@
                 "LocalhostTest.AcceptAfterReset",
                 "LocalhostTest.RaceLocalPeerClose",
                 "LocalhostTest.GetAddrInfo",
+                "NetStreamTest.NonBlockingConnectRefused",
                 "NetStreamTest.GetTcpInfo",
                 "NetStreamTest.GetSocketAcceptConn",
                 "NetStreamTest.ConnectTwice",

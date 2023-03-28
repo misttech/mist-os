@@ -135,8 +135,6 @@ pub(crate) struct BindingsNonSyncCtxImpl {
     udp_sockets: UdpSockets,
     tcp_v4_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,
     tcp_v6_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,
-    tcp_v4_connections: IdMap<crate::bindings::socket::stream::ConnectionStatus>,
-    tcp_v6_connections: IdMap<crate::bindings::socket::stream::ConnectionStatus>,
     route_update_dispatcher: routes_fidl_worker::RouteUpdateDispatcher,
 }
 

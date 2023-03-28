@@ -115,6 +115,15 @@
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4Loopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedLoopback_ConnectV4MappedLoopback",
+                // Netstack3 does not interpret listener backlog exactly as Linux does.
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Loopback_ConnectV6Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4Any",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Any_ConnectV4Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Loopback_ConnectV6Loopback",
+                "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4Loopback",
             ],
         },
         {
