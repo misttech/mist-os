@@ -126,7 +126,26 @@ const (
 	neighborRemoved
 )
 
-const maxEntryIteratorItemsQueueLen = 2 * neighbor.MaxItemBatchSize
+// maxEntryIteratorItemsQueueLen returns the maximum number of events that the
+// fuchsia.net.neighbor implementation will queue on the behalf of clients.
+//
+// Ensure that it's larger than neighbor.MaxItemBatchSize so that we don't
+// artificially truncate event batches. Also ensure that it's larger than
+// stack.neighborCacheSize, which is the maximum number of events per interface.
+// Here we use 4 times the larger of the two, to ensure that we have some wiggle
+// room (e.g. supporting multiple interfaces with the maximum number of
+// neighbors).
+func maxEntryIteratorItemsQueueLen() uint64 {
+	const neighborEntryMultiplier = 4
+	// TODO(https://fxbug.dev/124470): export the stack.neighborCacheSize
+	// constant in gVisor so we can depend on it here.
+	const gVisorNeighborCacheSize = 512
+	if neighbor.MaxItemBatchSize > gVisorNeighborCacheSize {
+		return neighbor.MaxItemBatchSize * neighborEntryMultiplier
+	} else {
+		return gVisorNeighborCacheSize * neighborEntryMultiplier
+	}
+}
 
 type neighborEvent struct {
 	kind  neighborEventKind
@@ -227,12 +246,14 @@ func (n *neighborImpl) processEvent(event neighborEvent) {
 	if !valid {
 		return
 	}
+	maxSize := maxEntryIteratorItemsQueueLen()
 	for it := range n.mu.iterators {
 		it.mu.Lock()
-		if len(it.mu.items) < int(maxEntryIteratorItemsQueueLen) {
+		if uint64(len(it.mu.items)) < maxSize {
 			it.mu.items = append(it.mu.items, propagateEvent)
 		} else {
 			// Stop serving if client is not fetching events fast enough.
+			_ = syslog.WarnTf(neighbor.ViewName, "Exceeded maximum queue size of %d, disconnecting.", maxSize)
 			it.cancelServe()
 		}
 		hanging := it.mu.isHanging
