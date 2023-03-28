@@ -49,6 +49,7 @@ rustc_test("bin") {
     "src/echo_oneshot_remote.rs",
     "src/elf.rs",
     "src/lib.rs",
+    "src/task.rs",
   ]
 }
 

@@ -119,12 +119,20 @@ pub trait Stop {
     /// The type may transition to the stopped state implicitly, without a client calling `stop()`.
     /// This may also create terminal state (e.g. a return code). Hence, `stop()` does not return
     /// any terminal state, only the result the stop operation.
-    async fn stop(&self) -> Result<(), Self::Error>;
+    async fn stop(&mut self) -> Result<(), Self::Error>;
 }
 
-/// A trait for types that represent a program that exits with a return code.
+/// `Stop`s that exit with some information.
 #[async_trait]
-pub trait Program: Stop<Error = zx::Status> {
-    /// Waits for the program to exit and returns its exit code.
-    async fn on_exit(&self) -> Result<i64, zx::Status>;
+pub trait Lifecycle: Stop {
+    /// The information returned when the `Stop` exits.
+    type Exit;
+
+    /// Waits for the `Stop` to exit and returns its error if any.
+    async fn on_exit(&self) -> Result<Self::Exit, Self::Error>;
 }
+
+/// `Stop`s that exit with a return code and may fail to observe exit
+/// with a Zircon status code.
+#[async_trait]
+pub trait Program: Lifecycle<Exit = i64, Error = zx::Status> {}

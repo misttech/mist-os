@@ -100,7 +100,7 @@ impl Start for EchoServer {
 impl Stop for EchoServer {
     type Error = Error;
 
-    async fn stop(&self) -> Result<(), Self::Error> {
+    async fn stop(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }
@@ -158,7 +158,7 @@ impl Start for EchoClient {
 impl Stop for EchoClient {
     type Error = Error;
 
-    async fn stop(&self) -> Result<(), Self::Error> {
+    async fn stop(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }

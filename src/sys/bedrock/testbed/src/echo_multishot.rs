@@ -17,11 +17,12 @@
 //! The `Sender`/`Receiver` is multishot, so the client can reconnect by sending more server ends.
 
 use {
-    anyhow::{anyhow, Context, Error},
+    crate::task::{create_task, AlreadyStopped, ExitReason, RunningTask},
+    anyhow::{anyhow, Error},
     async_trait::async_trait,
-    exec::{Start, Stop},
+    exec::{Lifecycle, Start, Stop},
     fidl::{endpoints::ServerEnd, HandleBased},
-    fidl_fuchsia_examples as fexamples, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_examples as fexamples, fuchsia_zircon as zx,
     futures::{SinkExt, StreamExt},
     tracing::info,
 };
@@ -43,10 +44,12 @@ async fn run_server(item: cap::AnyCapability) -> anyhow::Result<()> {
     while let Some(Ok(echo_request)) = stream.next().await {
         match echo_request {
             fexamples::EchoRequest::EchoString { value, responder } => {
-                responder.send(&value).expect("error sending EchoString response");
+                responder.send(&value).expect("sending EchoString response should succeed");
             }
             fexamples::EchoRequest::SendString { value, control_handle } => {
-                control_handle.send_on_string(&value).expect("error sending SendString event");
+                control_handle
+                    .send_on_string(&value)
+                    .expect("sending SendString event should succeed");
             }
         }
     }
@@ -62,40 +65,33 @@ impl EchoServer {
 
 #[async_trait]
 impl Start for EchoServer {
-    type Error = Error;
-    type Stop = Self;
+    type Error = AlreadyStopped;
+    type Stop = RunningTask;
 
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
-        info!("started EchoServer");
+        create_task(async move {
+            info!("started EchoServer");
 
-        let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming
-            .entries
-            .lock()
-            .await
-            .remove(ECHO_CAP_NAME)
-            .context("no echo cap in incoming")?;
+            let incoming = self.incoming.downcast_mut::<cap::Dict>().expect("should get a Dict");
+            let echo_cap = incoming
+                .entries
+                .lock()
+                .await
+                .remove(ECHO_CAP_NAME)
+                .expect("incoming should have echo cap");
 
-        let echo_receiver = echo_cap
-            .downcast::<cap::multishot::Receiver>()
-            .map_err(|_| anyhow!("echo cap is not a Receiver"))?;
+            let echo_receiver = echo_cap
+                .downcast::<cap::multishot::Receiver>()
+                .expect("echo cap should be a Receiver");
 
-        echo_receiver
-            .for_each_concurrent(None, |item| async {
-                run_server(item).await.expect("server error")
-            })
-            .await;
-
-        Ok(self)
-    }
-}
-
-#[async_trait]
-impl Stop for EchoServer {
-    type Error = Error;
-
-    async fn stop(&self) -> Result<(), Self::Error> {
-        Ok(())
+            echo_receiver
+                .for_each_concurrent(None, |item| async {
+                    run_server(item).await.expect("server should not error")
+                })
+                .await;
+        })
+        .start()
+        .await
     }
 }
 
@@ -111,47 +107,41 @@ impl EchoClient {
 
 #[async_trait]
 impl Start for EchoClient {
-    type Error = Error;
-    type Stop = Self;
+    type Error = AlreadyStopped;
+    type Stop = RunningTask;
 
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
-        info!("started EchoClient");
+        create_task(async move {
+            info!("started EchoClient");
 
-        let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let mut entries = incoming.entries.lock().await;
-        let echo_cap = entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+            let incoming = self.incoming.downcast_mut::<cap::Dict>().expect("should get a Dict");
+            let mut entries = incoming.entries.lock().await;
+            let echo_cap = entries.get_mut(ECHO_CAP_NAME).expect("incoming should have echo cap");
 
-        let echo_sender = echo_cap
-            .downcast_mut::<cap::multishot::Sender>()
-            .context("echo cap is not a Sender")?;
-        info!("(client) echo sender: {:?}", echo_sender);
+            let echo_sender = echo_cap
+                .downcast_mut::<cap::multishot::Sender>()
+                .expect("echo cap should be a Sender");
+            info!("(client) echo sender: {:?}", echo_sender);
 
-        // Reconnect a few times.
-        for _ in 0..3 {
-            // Pipeline an echo server end using the sender.
-            let (echo_proxy, echo_server_end) =
-                fidl::endpoints::create_proxy::<fexamples::EchoMarker>()?;
-            echo_sender.send(Box::new(cap::Handle::from(echo_server_end.into_handle()))).await?;
+            // Reconnect a few times.
+            for _ in 0..3 {
+                // Pipeline an echo server end using the sender.
+                let (echo_proxy, echo_server_end) =
+                    fidl::endpoints::create_proxy::<fexamples::EchoMarker>().unwrap();
+                echo_sender
+                    .send(Box::new(cap::Handle::from(echo_server_end.into_handle())))
+                    .await
+                    .unwrap();
 
-            let message = "Hello, bedrock!";
-            let response =
-                echo_proxy.echo_string(message).await.context("failed to call EchoString")?;
-            assert_eq!(response, message.to_string());
-            info!("(client) got a response: {:?}", response);
-        }
-
-        drop(entries); // Release the lock.
-
-        Ok(self)
-    }
-}
-
-#[async_trait]
-impl Stop for EchoClient {
-    type Error = Error;
-
-    async fn stop(&self) -> Result<(), Self::Error> {
-        Ok(())
+                let message = "Hello, bedrock!";
+                let response =
+                    echo_proxy.echo_string(message).await.expect("EchoString should succeed");
+                assert_eq!(response, message.to_string());
+                info!("(client) got a response: {:?}", response);
+            }
+        })
+        .start()
+        .await
     }
 }
 
@@ -168,9 +158,13 @@ async fn test_echo_multishot() -> Result<(), Error> {
     let client = EchoClient::new(client_incoming);
 
     // Start the server in the background. Run the client to completion.
-    let server_task = fasync::Task::spawn(server.start());
-    client.start().await.expect("client failed").stop().await?;
-    server_task.await.expect("server failed").stop().await?;
+    let mut server_task = server.start().await.expect("should be able to start server");
+    let mut client_task = client.start().await.expect("should be able to start client");
+
+    assert_eq!(client_task.on_exit().await?, ExitReason::RanToCompletion);
+
+    client_task.stop().await.expect("should be able to stop client");
+    server_task.stop().await.expect("should be able to stop server");
 
     Ok(())
 }

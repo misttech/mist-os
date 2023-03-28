@@ -4,7 +4,7 @@
 
 use {
     anyhow::{Context as _, Error},
-    exec::{elf::Elf, Program, Start, Stop},
+    exec::{elf::Elf, Lifecycle, Start, Stop},
     fidl::HandleBased,
     fidl_fuchsia_examples as fexamples, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol_at_dir_svc,
@@ -190,7 +190,7 @@ async fn echo_server_use_protocol() -> Result<(), Error> {
         .context("failed to create Elf")?;
 
     // Start the program.
-    let program = elf.start().await.context("failed to start")?;
+    let mut program = elf.start().await.context("failed to start")?;
 
     // Use the Echo protocol served by the program.
     let echo = connect_to_protocol_at_dir_svc::<fexamples::EchoMarker>(&outgoing)
@@ -226,7 +226,7 @@ async fn echo_server_stop_return_code() -> Result<(), Error> {
         .context("failed to create Elf")?;
 
     // Start the program.
-    let program = elf.start().await.context("failed to start")?;
+    let mut program = elf.start().await.context("failed to start")?;
 
     // Stop the program.
     program.stop().await.context("failed to stop")?;

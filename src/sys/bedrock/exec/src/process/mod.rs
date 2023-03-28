@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::{Program, Start, Stop},
+    crate::{Lifecycle, Program, Start, Stop},
     async_trait::async_trait,
     fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, Task},
@@ -82,13 +82,15 @@ impl Stop for Process {
     /// for possible status values and their meaning.
     ///
     /// [zx_task_kill]: https://fuchsia.dev/fuchsia-src/reference/syscalls/task_kill
-    async fn stop(&self) -> Result<(), Self::Error> {
+    async fn stop(&mut self) -> Result<(), Self::Error> {
         self.0.kill()
     }
 }
 
 #[async_trait]
-impl Program for Process {
+impl Lifecycle for Process {
+    type Exit = i64;
+
     /// Returns the exit code once the process is terminated.
     ///
     /// This returns once the underlying Zircon process is terminated. This can happen either
@@ -110,3 +112,5 @@ impl Program for Process {
         wait_for_process_terminated(&self.0).await
     }
 }
+
+impl Program for Process {}

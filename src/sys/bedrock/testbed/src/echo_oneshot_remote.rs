@@ -20,7 +20,7 @@ use {
     crate::elf::create_packaged_elf,
     anyhow::{Context, Error},
     cap::Remote,
-    exec::{Program, Start, Stop},
+    exec::{Lifecycle, Start, Stop},
     fidl::endpoints::create_proxy,
     fidl_fuchsia_examples as fexamples, fuchsia_async as fasync,
     fuchsia_runtime::{HandleInfo, HandleType},
@@ -72,7 +72,7 @@ async fn test_echo_oneshot_remote() -> Result<(), Error> {
     let elf = create_echo_server_cap(processargs).await.context("failed to create Elf")?;
 
     // Start the program.
-    let program = elf.start().await.context("failed to start")?;
+    let mut program = elf.start().await.context("failed to start")?;
 
     // Use the Echo protocol served by the program.
     let message = "Hello, bedrock!";

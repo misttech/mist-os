@@ -7,3 +7,4 @@ mod echo_oneshot;
 mod echo_oneshot_channel;
 mod echo_oneshot_remote;
 mod elf;
+mod task;
