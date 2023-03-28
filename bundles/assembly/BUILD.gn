@@ -290,6 +290,7 @@ assembly_input_bundle("core_realm_eng") {
         core = rebase_path(
                 [
                   "//src/sys/core/meta/core-env-full-resolver.core_shard.cml",
+                  "//src/sys/core/meta/unrestricted-storage.core_shard.cml",
                   "//src/sys/tools/debug-dash-launcher/meta/debug_dash_launcher.core_shard.cml",
                   "//src/storage/fs_realm/meta/fs_realm.core_shard.cml",
                 ],
@@ -316,6 +317,10 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
                   # user and userdebug only have the base resolver, not the full
                   # resolver.
                   "//src/sys/core/meta/core-env-base-resolver.core_shard.cml",
+
+                  # user and userdebug restrict access to the Storage capability
+                  # to registered component ids.
+                  "//src/sys/core/meta/restricted-storage.core_shard.cml",
                 ],
                 root_build_dir)
       }

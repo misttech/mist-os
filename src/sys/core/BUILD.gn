@@ -20,15 +20,13 @@ group("tests") {
 #
 # The data (persistent) storage capability can only be used components listed
 # in the component ID index.
-core_shard("core-storage-restricted") {
-  shard_file = "meta/restricted-storage.core_shard.cml"
+group("core-storage-restricted") {
 }
 
 # This shard declares 3 storage capabilities: data (persistent), cache, and
 # temp. Any component may use these storage capabilities if they are routed to
 # them.
-core_shard("core-storage-unrestricted") {
-  shard_file = "meta/unrestricted-storage.core_shard.cml"
+group("core-storage-unrestricted") {
 }
 
 # Enabling a soft-transition, replace with actual target when complete
