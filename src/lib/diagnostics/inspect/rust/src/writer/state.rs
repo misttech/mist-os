@@ -272,7 +272,6 @@ impl State {
     pub fn begin_transaction(&self) {
         let mut inner_lock = self.inner.lock();
         if inner_lock.transaction_count == 0 {
-            debug_assert!(inner_lock.header.check_locked(false).is_ok());
             let res = inner_lock.header.lock_header();
             debug_assert!(res.is_ok());
         }
@@ -285,7 +284,6 @@ impl State {
         let mut inner_lock = self.inner.lock();
         inner_lock.transaction_count -= 1;
         if inner_lock.transaction_count == 0 {
-            debug_assert!(inner_lock.header.check_locked(true).is_ok());
             let res = inner_lock.header.unlock_header();
             debug_assert!(res.is_ok());
         }

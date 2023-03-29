@@ -250,7 +250,7 @@ impl<T: ReadBytes> Block<T> {
 
     /// Ensures the type of the array is the expected one.
     fn check_array_entry_type(&self, expected: BlockType) -> Result<(), Error> {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let actual = self.array_entry_type()?;
             if actual == expected {
                 return Ok(());
@@ -412,11 +412,12 @@ impl<T: ReadBytes> Block<T> {
     }
 
     /// Check if the HEADER block is locked (when generation count is odd).
-    /// NOTE: this should only be used for testing.
     pub fn check_locked(&self, value: bool) -> Result<(), Error> {
-        let payload = self.read_payload();
-        if (payload.header_generation_count() & 1 == 1) != value {
-            return Err(Error::ExpectedLockState(value));
+        if cfg!(any(debug_assertions, test)) {
+            let payload = self.read_payload();
+            if (payload.header_generation_count() & 1 == 1) != value {
+                return Err(Error::ExpectedLockState(value));
+            }
         }
         Ok(())
     }
