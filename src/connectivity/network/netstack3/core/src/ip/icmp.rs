@@ -744,13 +744,6 @@ pub(crate) trait InnerIcmpv4Context<C: IcmpNonSyncCtx<Ipv4>>:
     fn should_send_timestamp_reply(&self) -> bool;
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<C: NonSyncContext> InnerIcmpv4Context<C> for &'_ SyncCtx<C> {
-    fn should_send_timestamp_reply(&self) -> bool {
-        InnerIcmpv4Context::<C>::should_send_timestamp_reply(&Locked::new(*self))
-    }
-}
-
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>
     for SyncCtx<C>
 {
@@ -3030,7 +3023,7 @@ mod tests {
             },
             gmp::mld::MldPacketHandler,
             path_mtu::testutil::FakePmtuState,
-            receive_ipv4_packet, receive_ipv6_packet,
+            receive_ip_packet,
             socket::testutil::FakeIpSocketCtx,
             testutil::{FakeDeviceId, FakeIpDeviceIdCtx, FakeWeakDeviceId},
             SendIpPacketMeta,
@@ -3166,14 +3159,14 @@ mod tests {
         set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         match I::VERSION {
-            IpVersion::V4 => receive_ipv4_packet(
+            IpVersion::V4 => receive_ip_packet::<_, _, Ipv4>(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &device,
                 FrameDestination::Unicast,
                 buffer,
             ),
-            IpVersion::V6 => receive_ipv6_packet(
+            IpVersion::V6 => receive_ip_packet::<_, _, Ipv6>(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &device,

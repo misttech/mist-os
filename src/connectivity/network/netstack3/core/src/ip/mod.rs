@@ -1002,8 +1002,11 @@ impl<
 {
 }
 
-impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv4, C, B>
-    for &'_ SyncCtx<C>
+impl<
+        C: BufferNonSyncContext<B>,
+        B: BufferMut,
+        L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>,
+    > BufferTransportContext<Ipv4, C, B> for Locked<'_, SyncCtx<C>, L>
 {
     fn dispatch_receive_ip_packet(
         &mut self,
@@ -1024,7 +1027,7 @@ impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv4, C, B
                 _,
                 _,
             >>::receive_ip_packet(
-                &mut Locked::new(*self), ctx, device, src_ip, dst_ip, body
+                self, ctx, device, src_ip, dst_ip, body
             ),
             Ipv4Proto::Igmp => {
                 IgmpPacketHandler::receive_igmp_packet(self, ctx, device, src_ip, dst_ip, body);
@@ -1036,12 +1039,7 @@ impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv4, C, B
                 _,
                 _,
             >>::receive_ip_packet(
-                &mut Locked::new(*self),
-                ctx,
-                device,
-                src_ip,
-                dst_ip,
-                body,
+                self, ctx, device, src_ip, dst_ip, body
             ),
             Ipv4Proto::Proto(IpProto::Tcp) => <TcpIpTransportContext as BufferIpTransportContext<
                 Ipv4,
@@ -1049,12 +1047,7 @@ impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv4, C, B
                 _,
                 _,
             >>::receive_ip_packet(
-                &mut Locked::new(*self),
-                ctx,
-                device,
-                src_ip,
-                dst_ip,
-                body,
+                self, ctx, device, src_ip, dst_ip, body
             ),
             // TODO(joshlf): Once all IP protocol numbers are covered, remove
             // this default case.
@@ -1066,8 +1059,11 @@ impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv4, C, B
     }
 }
 
-impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv6, C, B>
-    for &'_ SyncCtx<C>
+impl<
+        C: BufferNonSyncContext<B>,
+        B: BufferMut,
+        L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv6>>,
+    > BufferTransportContext<Ipv6, C, B> for Locked<'_, SyncCtx<C>, L>
 {
     fn dispatch_receive_ip_packet(
         &mut self,
@@ -1100,12 +1096,7 @@ impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv6, C, B
                 _,
                 _,
             >>::receive_ip_packet(
-                &mut Locked::new(*self),
-                ctx,
-                device,
-                src_ip,
-                dst_ip,
-                body,
+                self, ctx, device, src_ip, dst_ip, body
             ),
             Ipv6Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as BufferIpTransportContext<
                 Ipv6,
@@ -1113,12 +1104,7 @@ impl<C: BufferNonSyncContext<B>, B: BufferMut> BufferTransportContext<Ipv6, C, B
                 _,
                 _,
             >>::receive_ip_packet(
-                &mut Locked::new(*self),
-                ctx,
-                device,
-                src_ip,
-                dst_ip,
-                body,
+                self, ctx, device, src_ip, dst_ip, body
             ),
             // TODO(joshlf): Once all IP Next Header numbers are covered, remove
             // this default case.
@@ -1718,12 +1704,13 @@ macro_rules! try_parse_ip_packet {
 /// `receive_ip_packet` calls [`receive_ipv4_packet`] or [`receive_ipv6_packet`]
 /// depending on the type parameter, `I`.
 pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>, I: Ip>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     frame_dst: FrameDestination,
     buffer: B,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     match I::VERSION {
         IpVersion::V4 => receive_ipv4_packet(&mut sync_ctx, ctx, device, frame_dst, buffer),
         IpVersion::V6 => receive_ipv6_packet(&mut sync_ctx, ctx, device, frame_dst, buffer),
@@ -2719,60 +2706,6 @@ pub(crate) fn send_ipv6_packet_from_device<
     }
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<C: NonSyncContext> InnerIcmpContext<Ipv4, C> for &'_ SyncCtx<C> {
-    fn receive_icmp_error(
-        &mut self,
-        ctx: &mut C,
-        device: &DeviceId<C>,
-        original_src_ip: Option<SpecifiedAddr<Ipv4Addr>>,
-        original_dst_ip: SpecifiedAddr<Ipv4Addr>,
-        original_proto: Ipv4Proto,
-        original_body: &[u8],
-        err: Icmpv4ErrorCode,
-    ) {
-        InnerIcmpContext::<Ipv4, _>::receive_icmp_error(
-            &mut Locked::new(*self),
-            ctx,
-            device,
-            original_src_ip,
-            original_dst_ip,
-            original_proto,
-            original_body,
-            err,
-        )
-    }
-
-    fn with_icmp_sockets<
-        O,
-        F: FnOnce(&IcmpSockets<Ipv4Addr, IpSock<Ipv4, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        InnerIcmpContext::<Ipv4, _>::with_icmp_sockets(&mut Locked::new(*self), cb)
-    }
-
-    fn with_icmp_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut IcmpSockets<Ipv4Addr, IpSock<Ipv4, Self::WeakDeviceId, DefaultSendOptions>>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        InnerIcmpContext::<Ipv4, _>::with_icmp_sockets_mut(&mut Locked::new(*self), cb)
-    }
-
-    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<C::Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        InnerIcmpContext::<Ipv4, _>::with_error_send_bucket_mut(&mut Locked::new(*self), cb)
-    }
-}
-
 impl<
         C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>
@@ -2868,60 +2801,6 @@ impl<
         cb: F,
     ) -> O {
         cb(&mut self.lock::<crate::lock_ordering::IcmpTokenBucket<Ipv4>>())
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<C: NonSyncContext> InnerIcmpContext<Ipv6, C> for &'_ SyncCtx<C> {
-    fn receive_icmp_error(
-        &mut self,
-        ctx: &mut C,
-        device: &DeviceId<C>,
-        original_src_ip: Option<SpecifiedAddr<Ipv6Addr>>,
-        original_dst_ip: SpecifiedAddr<Ipv6Addr>,
-        original_proto: Ipv6Proto,
-        original_body: &[u8],
-        err: Icmpv6ErrorCode,
-    ) {
-        InnerIcmpContext::<Ipv6, _>::receive_icmp_error(
-            &mut Locked::new(*self),
-            ctx,
-            device,
-            original_src_ip,
-            original_dst_ip,
-            original_proto,
-            original_body,
-            err,
-        )
-    }
-
-    fn with_icmp_sockets<
-        O,
-        F: FnOnce(&IcmpSockets<Ipv6Addr, IpSock<Ipv6, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        InnerIcmpContext::<Ipv6, _>::with_icmp_sockets(&mut Locked::new(*self), cb)
-    }
-
-    fn with_icmp_sockets_mut<
-        O,
-        F: FnOnce(
-            &mut IcmpSockets<Ipv6Addr, IpSock<Ipv6, Self::WeakDeviceId, DefaultSendOptions>>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        InnerIcmpContext::<Ipv6, _>::with_icmp_sockets_mut(&mut Locked::new(*self), cb)
-    }
-
-    fn with_error_send_bucket_mut<O, F: FnOnce(&mut TokenBucket<C::Instant>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        InnerIcmpContext::<Ipv6, _>::with_error_send_bucket_mut(&mut Locked::new(*self), cb)
     }
 }
 
@@ -3483,7 +3362,7 @@ mod tests {
         body.extend(fragment_offset * 8..fragment_offset * 8 + 8);
         let buffer =
             Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap().into_inner();
-        receive_ipv4_packet(sync_ctx, ctx, device, FrameDestination::Unicast, buffer);
+        receive_ip_packet::<_, _, Ipv4>(sync_ctx, ctx, device, FrameDestination::Unicast, buffer);
     }
 
     /// Generate and 'receive' an IPv6 fragment packet.
@@ -3517,7 +3396,7 @@ mod tests {
         let payload_len = u16::try_from(bytes.len() - 40).unwrap();
         bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
         let buffer = Buf::new(bytes, ..);
-        receive_ipv6_packet(sync_ctx, ctx, device, FrameDestination::Unicast, buffer);
+        receive_ip_packet::<_, _, Ipv6>(sync_ctx, ctx, device, FrameDestination::Unicast, buffer);
     }
 
     #[test]
@@ -3549,7 +3428,7 @@ mod tests {
         bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
         let buf = Buf::new(bytes, ..);
 
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -3600,7 +3479,7 @@ mod tests {
         bytes[8..24].copy_from_slice(FAKE_CONFIG_V6.remote_ip.bytes());
         bytes[24..40].copy_from_slice(FAKE_CONFIG_V6.local_ip.bytes());
         let buf = Buf::new(bytes, ..);
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -3636,7 +3515,7 @@ mod tests {
             ExtensionHeaderOptionAction::SkipAndContinue,
             false,
         );
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
@@ -3649,7 +3528,7 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacket,
             false,
         );
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
 
@@ -3662,7 +3541,7 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacketSendIcmp,
             false,
         );
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         expected_icmps += 1;
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
@@ -3682,7 +3561,7 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacketSendIcmp,
             true,
         );
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         expected_icmps += 1;
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
@@ -3702,7 +3581,7 @@ mod tests {
             ExtensionHeaderOptionAction::DiscardPacketSendIcmpNoMulticast,
             false,
         );
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         expected_icmps += 1;
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
@@ -3723,7 +3602,7 @@ mod tests {
             true,
         );
         // Do not expect an ICMP response for this packet
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, "send_icmpv6_parameter_problem"), expected_icmps);
         assert_eq!(non_sync_ctx.frames_sent().len(), expected_icmps);
 
@@ -4037,7 +3916,7 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
         // Receive the IP packet.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -4327,7 +4206,13 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ipv4_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
+        receive_ip_packet::<_, _, Ipv4>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            frame_dst,
+            packet_buf,
+        );
 
         // Should have dispatched the packet.
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 1);
@@ -4356,7 +4241,13 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ipv4_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
+        receive_ip_packet::<_, _, Ipv4>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            frame_dst,
+            packet_buf,
+        );
 
         // Should have dispatched the packet.
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 2);
@@ -4385,7 +4276,13 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ipv4_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
+        receive_ip_packet::<_, _, Ipv4>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            frame_dst,
+            packet_buf,
+        );
 
         // Should have dispatched the packet.
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 3);
@@ -4417,7 +4314,13 @@ mod tests {
         );
 
         // Receive the IP packet.
-        receive_ipv4_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, packet_buf);
+        receive_ip_packet::<_, _, Ipv4>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            frame_dst,
+            packet_buf,
+        );
 
         // Should have dispatched the packet.
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 4);
@@ -4465,7 +4368,7 @@ mod tests {
             .unwrap();
 
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
 
         // Should not have dispatched the packet.
         assert_eq!(get_counter_val(&non_sync_ctx, "receive_ipv6_packet"), 1);
@@ -4509,7 +4412,7 @@ mod tests {
             .serialize_vec_outer()
             .unwrap();
 
-        receive_ipv4_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv4>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
 
         // Should have dispatched the packet but resulted in an ICMP error.
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv4_packet"), 1);
@@ -4615,7 +4518,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::ip::device::update_ipv6_configuration(
+        crate::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -4638,7 +4541,13 @@ mod tests {
             .into_inner();
 
         // Received packet should not have been dispatched.
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, Ipv6>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            frame_dst,
+            buf.clone(),
+        );
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 0);
 
         // Wait until DAD is complete. Arbitrarily choose a year in the future
@@ -4655,7 +4564,7 @@ mod tests {
         );
 
         // Received packet should have been dispatched.
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
 
         // Set the new IP (this should trigger DAD).
@@ -4675,7 +4584,13 @@ mod tests {
             .into_inner();
 
         // Received packet should not have been dispatched.
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf.clone());
+        receive_ip_packet::<_, _, Ipv6>(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device,
+            frame_dst,
+            buf.clone(),
+        );
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 1);
 
         // Make sure all timers are done (DAD to complete on the interface due
@@ -4689,7 +4604,7 @@ mod tests {
         );
 
         // Received packet should have been dispatched.
-        receive_ipv6_packet(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
+        receive_ip_packet::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, frame_dst, buf);
         assert_eq!(get_counter_val(&non_sync_ctx, "dispatch_receive_ipv6_packet"), 2);
     }
 
@@ -4722,7 +4637,7 @@ mod tests {
             .unwrap()
             .into_inner();
 
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -4849,7 +4764,7 @@ mod tests {
                 DEFAULT_INTERFACE_METRIC,
             )
             .into();
-            crate::ip::device::update_ipv6_configuration(
+            crate::device::update_ipv6_configuration(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &device,

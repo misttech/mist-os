@@ -83,7 +83,7 @@ mod tests {
                 testutil::{get_global_ipv6_addrs, with_assigned_ipv6_addr_subnets},
                 Ipv6DeviceHandler, Ipv6DeviceTimerId,
             },
-            receive_ipv6_packet,
+            receive_ip_packet,
             testutil::is_in_ip_multicast,
             SendIpPacketMeta,
         },
@@ -942,7 +942,7 @@ mod tests {
             ))
             .serialize_vec_outer()
             .unwrap();
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -992,7 +992,7 @@ mod tests {
         // (should not receive).
 
         let icmpv6_packet_buf = router_advertisement_message(src_ip.into(), config.local_ip.get());
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -1006,7 +1006,7 @@ mod tests {
 
         let src_ip = Mac::new(src_mac).to_ipv6_link_local().addr().get();
         let icmpv6_packet_buf = router_advertisement_message(src_ip, config.local_ip.get());
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -1047,7 +1047,7 @@ mod tests {
                 .serialize_vec_outer()
                 .unwrap()
                 .unwrap_b();
-            receive_ipv6_packet(
+            receive_ip_packet::<_, _, Ipv6>(
                 sync_ctx,
                 ctx,
                 device_id,
@@ -1131,7 +1131,7 @@ mod tests {
 
         let icmpv6_packet_buf =
             packet_buf(src_ip.get(), Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(), 5781);
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -1149,7 +1149,7 @@ mod tests {
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
             u32::from(Ipv6::MINIMUM_LINK_MTU) - 1,
         );
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -1167,7 +1167,7 @@ mod tests {
             Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.get(),
             Ipv6::MINIMUM_LINK_MTU.into(),
         );
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -1662,7 +1662,7 @@ mod tests {
             100,
             0,
         );
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -1793,7 +1793,7 @@ mod tests {
             idgen_retries,
         );
 
-        crate::ip::device::update_ipv6_configuration(
+        crate::device::update_ipv6_configuration(
             &mut sync_ctx,
             non_sync_ctx,
             &device,
@@ -2119,7 +2119,7 @@ mod tests {
             9000,
             10000,
         );
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -2254,7 +2254,13 @@ mod tests {
             valid_lifetime,
             preferred_lifetime,
         );
-        receive_ipv6_packet(sync_ctx, ctx, &device, FrameDestination::Multicast, icmpv6_packet_buf);
+        receive_ip_packet::<_, _, Ipv6>(
+            sync_ctx,
+            ctx,
+            &device,
+            FrameDestination::Multicast,
+            icmpv6_packet_buf,
+        );
     }
 
     fn get_matching_slaac_address_entries<F: FnMut(&Ipv6AddressEntry<FakeInstant>) -> bool>(
@@ -2701,7 +2707,7 @@ mod tests {
         let override_flag = true;
 
         let src_ip = source_ip.get();
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             sync_ctx,
             ctx,
             &device,
@@ -3364,7 +3370,7 @@ mod tests {
             idgen_retries,
         );
 
-        crate::ip::device::update_ipv6_configuration(
+        crate::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
@@ -3453,7 +3459,7 @@ mod tests {
             VALID_LIFETIME_SECS,
             PREFERRED_LIFETIME_SECS,
         );
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,

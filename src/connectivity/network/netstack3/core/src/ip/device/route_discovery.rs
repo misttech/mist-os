@@ -241,7 +241,7 @@ mod tests {
         device::{FrameDestination, WeakDeviceId},
         ip::{
             device::Ipv6DeviceTimerId,
-            receive_ipv6_packet,
+            receive_ip_packet,
             testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
             IPV6_DEFAULT_SUBNET,
         },
@@ -608,7 +608,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::ip::device::update_ipv6_configuration(
+        crate::device::update_ipv6_configuration(
             &mut &*sync_ctx,
             non_sync_ctx,
             &device_id,
@@ -680,7 +680,7 @@ mod tests {
 
         // Do nothing as router with no valid lifetime has not been discovered
         // yet and prefix does not make on-link determination.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -692,7 +692,7 @@ mod tests {
 
         // Discover a default router only as on-link prefix has no valid
         // lifetime.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -717,7 +717,7 @@ mod tests {
 
         // Discover an on-link prefix and update valid lifetime for default
         // router.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -740,7 +740,7 @@ mod tests {
 
         // Invalidate default router and update valid lifetime for on-link
         // prefix.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -762,7 +762,7 @@ mod tests {
 
         // Do nothing as prefix does not make on-link determination and router
         // with valid lifetime is not discovered.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -776,7 +776,7 @@ mod tests {
         )]);
 
         // Invalidate on-link prefix.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -831,7 +831,7 @@ mod tests {
         // lifetime.
         let router_lifetime_secs = u16::MAX;
         let prefix_lifetime_secs = u32::MAX;
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -862,7 +862,7 @@ mod tests {
         // Router and prefix with finite lifetimes.
         let router_lifetime_secs = u16::MAX - 1;
         let prefix_lifetime_secs = u32::MAX - 1;
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -884,7 +884,7 @@ mod tests {
         // lifetime.
         let router_lifetime_secs = u16::MAX;
         let prefix_lifetime_secs = u32::MAX;
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -899,7 +899,7 @@ mod tests {
         // Router and prefix invalidated.
         let router_lifetime_secs = 0;
         let prefix_lifetime_secs = 0;
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -947,7 +947,7 @@ mod tests {
         let timer_id = |route| timer_id(route, device_id.clone());
 
         // Discover both an on-link prefix and default router.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -982,7 +982,7 @@ mod tests {
         ]);
 
         // Disable the interface.
-        crate::ip::device::update_ipv6_configuration(
+        crate::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,

@@ -1454,7 +1454,7 @@ mod tests {
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
     use crate::{
-        device::{ethernet, DeviceId},
+        device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
         ip::gmp::GmpDelayedReportTimerId,
         testutil::{
             assert_empty, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx, TestIpExt as _,

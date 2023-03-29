@@ -1582,7 +1582,7 @@ mod tests {
         ip::{
             device::testutil::with_assigned_ipv6_addr_subnets,
             icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            receive_ipv6_packet,
+            receive_ip_packet,
             testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
         },
         testutil::{
@@ -2672,7 +2672,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        crate::ip::device::update_ipv6_configuration(
+        crate::device::update_ipv6_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
@@ -2692,20 +2692,15 @@ mod tests {
         let set_ip_enabled = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                               non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                               enabled| {
-            crate::ip::device::update_ipv6_configuration(
-                sync_ctx,
-                non_sync_ctx,
-                &device_id,
-                |config| {
-                    config.ip_config.ip_enabled = enabled;
-                },
-            )
+            crate::device::update_ipv6_configuration(sync_ctx, non_sync_ctx, &device_id, |config| {
+                config.ip_config.ip_enabled = enabled;
+            })
         };
         set_ip_enabled(&mut sync_ctx, &mut non_sync_ctx, true /* enabled */);
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
         // Generate stable and temporary SLAAC addresses.
-        receive_ipv6_packet(
+        receive_ip_packet::<_, _, Ipv6>(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,

@@ -139,6 +139,14 @@ pub(crate) enum EthernetIpv4Arp {}
 pub(crate) enum EthernetIpv6Nud {}
 pub(crate) enum EthernetTxQueue {}
 pub(crate) enum EthernetTxDequeue {}
+// We do not actually have a dedicated RX queue for ethernet, but we want to have a
+// clear separation between the ethernet layer and above (IP/ARP) without specifying
+// any specific protocol. To do this, we introduce this lock-level to show the
+// "boundary" between ethernet-level RX path work and upper level RX path work.
+//
+// Note that if/when an RX queue is implemented for ethernet, this lock-level may be
+// trivially used.
+pub(crate) enum EthernetRxDequeue {}
 
 pub(crate) enum LoopbackRxQueue {}
 pub(crate) enum LoopbackRxDequeue {}
@@ -148,7 +156,8 @@ pub(crate) enum LoopbackTxDequeue {}
 impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
 impl_lock_after!(EthernetTxDequeue => LoopbackRxDequeue);
-impl_lock_after!(LoopbackRxDequeue => IcmpSockets<Ipv4>);
+impl_lock_after!(LoopbackRxDequeue => EthernetRxDequeue);
+impl_lock_after!(EthernetRxDequeue => IcmpSockets<Ipv4>);
 impl_lock_after!(IcmpSockets<Ipv4> => IcmpTokenBucket<Ipv4>);
 impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSockets<Ipv6>);
 impl_lock_after!(IcmpSockets<Ipv6> => IcmpTokenBucket<Ipv6>);

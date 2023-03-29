@@ -1282,7 +1282,7 @@ mod tests {
         let set_config = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                           non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                           TestConfig { ip_enabled, gmp_enabled }| {
-            crate::ip::device::update_ipv4_configuration(
+            crate::device::update_ipv4_configuration(
                 sync_ctx,
                 non_sync_ctx,
                 &device_id,
