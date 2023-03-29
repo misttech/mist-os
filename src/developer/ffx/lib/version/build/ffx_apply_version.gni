@@ -48,7 +48,15 @@ template("ffx_apply_version") {
       [ rsp_outputs[0] ] == rsp_outputs,
       "invariant assumption failed, expecting link_output_rspfile to only have a single output")
 
-  action(main_target) {
+  # When building with build variants, executable targets will redirect to the
+  # target with the proper toolchain variant applied. Because of this, adding
+  # version metadata to a binary requires knowledge of this redirection.
+  # Otherwise the binary will be present twice in tool_paths.json, one for the
+  # variant-less target, and one with the variant.
+  variant_target("action") {
+    target_name = main_target
+    _variant_shared = false
+
     forward_variables_from(invoker,
                            [
                              "output_name",
