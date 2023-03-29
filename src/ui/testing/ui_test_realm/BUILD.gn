@@ -125,7 +125,6 @@ fuchsia_component("scene_manager_scene_with_input") {
     "//src/ui/bin/hardware_display_controller_provider:fake-hardware-display-controller-provider-cmv2-component",
     "//src/ui/bin/root_presenter:virtual_keyboard_component_v2",
     "//src/ui/bin/scene_manager:scene_manager_component_for_test",
-    "//src/ui/bin/shortcut:shortcut_manager",
     "//src/ui/bin/text:text_manager_comp",
     "//src/ui/scenic:component_v2_with_supplied_display_provider",
     "//src/ui/testing/input_helper:input-helper-component",

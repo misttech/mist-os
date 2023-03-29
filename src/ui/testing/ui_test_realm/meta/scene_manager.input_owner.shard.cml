@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/ui/testing/ui_test_realm/meta/shortcut_manager.shard.cml",
         "//src/ui/testing/ui_test_realm/meta/text_manager.shard.cml",
         "//src/ui/testing/ui_test_realm/meta/virtual_keyboard_manager.shard.cml",
     ],

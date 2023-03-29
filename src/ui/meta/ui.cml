@@ -6,7 +6,6 @@
         "//src/ui/meta/a11y_routes.shard.cml",
         "//src/ui/meta/scene_manager_routes.shard.cml",
         "//src/ui/meta/scenic_routes.shard.cml",
-        "//src/ui/meta/shortcut_manager_routes.shard.cml",
         "//src/ui/meta/text_manager_routes.shard.cml",
         "//src/ui/meta/virtual_keyboard_manager_routes.shard.cml",
         "syslog/client.shard.cml",

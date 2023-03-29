@@ -15,10 +15,7 @@
     // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
     use: [
         {
-            protocol: [
-                "fuchsia.session.scene.Manager",
-                "fuchsia.ui.shortcut.Manager",
-            ],
+            protocol: [ "fuchsia.session.scene.Manager" ],
             from: "#ui",
             dependency: "weak_for_migration",
         },
@@ -29,8 +26,6 @@
             protocol: [
                 "fuchsia.session.scene.Manager",
                 "fuchsia.ui.pointer.augment.GlobalMouse",
-                "fuchsia.ui.shortcut.Manager",
-                "fuchsia.ui.shortcut2.Registry",
             ],
             from: "#ui",
             to: "#session-manager",

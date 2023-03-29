@@ -18,10 +18,6 @@
             //
             // dev-input-report: this should be turned off, but no such
             // test component exists yet.
-            //
-            // fuchsia.ui.shortcut.Manager: a warning is printed in the logs,
-            // but so long as we don't attempt to test shortcuts, the scene
-            // manager will otherwise work.
         },
     ],
     offer: [

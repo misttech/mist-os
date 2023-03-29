@@ -66,15 +66,6 @@
             to: [ "#scene_manager" ],
             source_availability: "unknown",
         },
-        {
-            protocol: [
-                // Used by the input pipeline library to distribute focus.
-                "fuchsia.ui.shortcut.Manager",
-            ],
-            from: "#shortcut_manager",
-            to: [ "#scene_manager" ],
-            source_availability: "unknown",
-        },
     ],
     expose: [
         {

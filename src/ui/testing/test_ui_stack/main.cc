@@ -12,8 +12,6 @@
 #include <fuchsia/ui/input3/cpp/fidl.h>
 #include <fuchsia/ui/pointerinjector/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <fuchsia/ui/shortcut/cpp/fidl.h>
-#include <fuchsia/ui/shortcut2/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
@@ -88,8 +86,6 @@ int run_test_ui_stack(int argc, const char** argv) {
   AddPublicService<fuchsia::ui::input3::Keyboard>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia::ui::input3::KeyEventInjector>(context.get(),
                                                           realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::shortcut::Manager>(context.get(), realm_exposed_services.get());
-  AddPublicService<fuchsia::ui::shortcut2::Registry>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia::ui::pointerinjector::Registry>(context.get(),
                                                            realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Screenshot>(context.get(),
