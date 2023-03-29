@@ -1014,16 +1014,7 @@
                 "FstatfsTest.BlocksFree",
 
                 // stat_times_test
-                "StatTimesTest.FileRenameOpenFD",
                 "StatTimesTest.FileUtimes",
-                "StatTimesTest.DirRemoveFile",
-                "StatTimesTest.FileChmod",
-                "StatTimesTest.FileTruncate",
-                "StatTimesTest.FileRename",
-                "StatTimesTest.FileWrite",
-                "StatTimesTest.DirCreateFile",
-                "StatTimesTest.DirList",
-                "StatTimesTest.DirCreateDir",
 
                 // sticky_test
                 "StickyTest.StickyBitPermDenied",

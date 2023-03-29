@@ -685,7 +685,12 @@ impl FileObject {
             return error!(EBADF);
         }
 
-        self.ops().read(self, current_task, data)
+        let bytes_read = self.ops().read(self, current_task, data)?;
+
+        // TODO(steveaustin) - omit updating time_access to allow info to be immutable
+        // and thus allow simultaneous reads.
+        self.node().update_atime();
+        Ok(bytes_read)
     }
 
     pub fn read_at(
@@ -708,13 +713,16 @@ impl FileObject {
         if !self.can_write() {
             return error!(EBADF);
         }
-        if self.flags().contains(OpenFlags::APPEND) {
+        let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
             let _guard = self.node().append_lock.write();
-            self.ops().write(self, current_task, data)
+            self.ops().write(self, current_task, data)?
         } else {
             let _guard = self.node().append_lock.read();
-            self.ops().write(self, current_task, data)
-        }
+            self.ops().write(self, current_task, data)?
+        };
+
+        self.node().update_ctime_mtime();
+        Ok(bytes_written)
     }
 
     pub fn write_at(
@@ -795,7 +803,10 @@ impl FileObject {
             Err(errno) if errno == ENOSPC && sink.actual() > 0 => Ok(()),
             Err(errno) if errno == ENOSPC => error!(EINVAL),
             result => result,
-        }
+        }?;
+
+        self.node().update_atime();
+        Ok(())
     }
 
     pub fn ioctl(

@@ -97,9 +97,6 @@ impl FsNodeOps for VmoFileNode {
         })?;
         info.size = length as usize;
         info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
-        let time = fuchsia_runtime::utc_time();
-        info.time_access = time;
-        info.time_modify = time;
         Ok(())
     }
 
@@ -128,9 +125,6 @@ impl FsNodeOps for VmoFileNode {
         })?;
         info.size = new_size as usize;
         info.storage_size = self.vmo.get_size().map_err(impossible_error)? as usize;
-        let time = fuchsia_runtime::utc_time();
-        info.time_access = time;
-        info.time_modify = time;
         Ok(())
     }
 }
@@ -176,9 +170,6 @@ impl VmoFileObject {
                 0
             }
         };
-        // TODO(steveaustin) - omit updating time_access to allow info to be immutable
-        // and thus allow simultaneous reads.
-        file.node().info_write().time_access = fuchsia_runtime::utc_time();
         Ok(actual)
     }
 
@@ -257,9 +248,6 @@ impl VmoFileObject {
         if update_content_size {
             info.size = write_end;
         }
-        let now = fuchsia_runtime::utc_time();
-        info.time_access = now;
-        info.time_modify = now;
         Ok(want_write)
     }
 

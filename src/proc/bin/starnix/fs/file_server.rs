@@ -270,7 +270,7 @@ impl StarnixNodeConnection {
             content_size: info.size as u64,
             storage_size: info.storage_size as u64,
             link_count,
-            creation_time: info.time_create.into_nanos() as u64,
+            creation_time: info.time_status_change.into_nanos() as u64,
             modification_time: info.time_modify.into_nanos() as u64,
         }
     }
@@ -284,7 +284,7 @@ impl StarnixNodeConnection {
     ) -> Result<(), Errno> {
         let mut info = self.file.node().info_write();
         if flags.contains(fio::NodeAttributeFlags::CREATION_TIME) {
-            info.time_create = zx::Time::from_nanos(attributes.creation_time as i64);
+            info.time_status_change = zx::Time::from_nanos(attributes.creation_time as i64);
         }
         if flags.contains(fio::NodeAttributeFlags::MODIFICATION_TIME) {
             info.time_modify = zx::Time::from_nanos(attributes.modification_time as i64);

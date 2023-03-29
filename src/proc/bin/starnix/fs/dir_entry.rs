@@ -212,12 +212,14 @@ impl DirEntry {
         let (entry, exists) = self.get_or_create_child(current_task, name, create_node_fn)?;
         if exists {
             match exists_option {
-                ExistsOption::ReturnExisting => return Ok(entry),
-                ExistsOption::DoNotReturnExisting => return error!(EEXIST),
+                ExistsOption::ReturnExisting => Ok(entry),
+                ExistsOption::DoNotReturnExisting => error!(EEXIST),
             }
+        } else {
+            // An entry was created. Update the ctime and mtime of this directory.
+            self.node.update_ctime_mtime();
+            Ok(entry)
         }
-        self.node.touch();
-        Ok(entry)
     }
 
     /// Magically creates a node without asking the filesystem. All the other node creation
@@ -477,7 +479,7 @@ impl DirEntry {
 
         // We need to hold these DirEntryHandles until after we drop all the
         // locks so that we do not deadlock when we drop them.
-        let (_renamed, maybe_replaced) = {
+        let (renamed, maybe_replaced) = {
             // The mount_eq check in sys_renameat ensures that the nodes we're
             // touching are part of the same file system. It doesn't matter
             // where we grab the FileSystem reference from.
@@ -604,6 +606,9 @@ impl DirEntry {
         if let Some(replaced) = maybe_replaced {
             replaced.node.fs().will_destroy_dir_entry(&replaced);
         }
+
+        // Renaming a file updates its ctime.
+        renamed.node.update_ctime();
 
         Ok(())
     }

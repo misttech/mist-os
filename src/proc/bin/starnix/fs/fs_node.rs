@@ -76,7 +76,7 @@ pub struct FsNodeInfo {
     pub uid: uid_t,
     pub gid: gid_t,
     pub link_count: nlink_t,
-    pub time_create: zx::Time,
+    pub time_status_change: zx::Time,
     pub time_access: zx::Time,
     pub time_modify: zx::Time,
     pub rdev: DeviceType,
@@ -459,7 +459,7 @@ impl FsNode {
             uid: owner.uid,
             gid: owner.gid,
             link_count: if mode.is_dir() { 2 } else { 1 },
-            time_create: now,
+            time_status_change: now,
             time_access: now,
             time_modify: now,
             ..Default::default()
@@ -692,8 +692,7 @@ impl FsNode {
 
     pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         // TODO(qsr): Is there a permission check here?
-        let now = fuchsia_runtime::utc_time();
-        self.info_write().time_access = now;
+        self.update_atime();
         self.ops().readlink(self, current_task)
     }
 
@@ -714,7 +713,9 @@ impl FsNode {
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().unlink(self, name, child)
+        self.ops().unlink(self, name, child)?;
+        self.update_ctime_mtime();
+        Ok(())
     }
 
     pub fn truncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
@@ -723,7 +724,9 @@ impl FsNode {
         }
 
         self.check_access(current_task, Access::WRITE)?;
-        self.ops().truncate(self, length)
+        self.ops().truncate(self, length)?;
+        self.update_ctime_mtime();
+        Ok(())
     }
 
     /// Avoid calling this method directly. You probably want to call `FileObject::ftruncate()`
@@ -751,13 +754,17 @@ impl FsNode {
         //
         // "With ftruncate(), the file must be open for writing; with truncate(),
         // the file must be writable."
-        self.ops().truncate(self, length)
+        self.ops().truncate(self, length)?;
+        self.update_ctime_mtime();
+        Ok(())
     }
 
     /// Avoid calling this method directly. You probably want to call `FileObject::fallocate()`
     /// which will also perform additional verifications.
     pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {
-        self.ops().allocate(self, offset, length)
+        self.ops().allocate(self, offset, length)?;
+        self.update_ctime_mtime();
+        Ok(())
     }
 
     /// Check whether the node can be accessed in the current context with the specified access
@@ -811,6 +818,7 @@ impl FsNode {
         // TODO(qsr, security): Check permissions.
         let mut info = self.info_write();
         info.mode = (info.mode & !FileMode::PERMISSIONS) | (mode & FileMode::PERMISSIONS);
+        info.time_status_change = fuchsia_runtime::utc_time();
     }
 
     /// Sets the owner and/or group on this FsNode.
@@ -850,14 +858,6 @@ impl FsNode {
         self.info().mode.is_lnk()
     }
 
-    /// Update the access and modify time for this node to now.
-    pub fn touch(&self) {
-        let now = fuchsia_runtime::utc_time();
-        let mut info = self.info_write();
-        info.time_access = now;
-        info.time_modify = now;
-    }
-
     pub fn stat(&self) -> Result<stat_t, Errno> {
         let info = self.ops().update_info(self)?;
 
@@ -873,7 +873,7 @@ impl FsNode {
             st_nlink: info.link_count,
             st_uid: info.uid,
             st_gid: info.gid,
-            st_ctim: timespec_from_time(info.time_create),
+            st_ctim: timespec_from_time(info.time_status_change),
             st_mtim: timespec_from_time(info.time_modify),
             st_atim: timespec_from_time(info.time_access),
             st_dev: self.fs().dev_id.bits(),
@@ -930,7 +930,7 @@ impl FsNode {
             stx_blocks: blocks as u64,
             stx_attributes_mask: 0, // TODO
 
-            stx_ctime: Self::statx_timestamp_from_time(info.time_create),
+            stx_ctime: Self::statx_timestamp_from_time(info.time_status_change),
             stx_mtime: Self::statx_timestamp_from_time(info.time_modify),
             stx_atime: Self::statx_timestamp_from_time(info.time_access),
 
@@ -1008,6 +1008,28 @@ impl FsNode {
     pub fn info_write(&self) -> RwLockWriteGuard<'_, FsNodeInfo> {
         self.info.write()
     }
+
+    // Update the ctime and mtime of a file to now.
+    pub fn update_ctime_mtime(&self) {
+        let mut info = self.info.write();
+        let now = fuchsia_runtime::utc_time();
+        info.time_status_change = now;
+        info.time_modify = now;
+    }
+
+    // Update the ctime of a file to now.
+    pub fn update_ctime(&self) {
+        let mut info = self.info.write();
+        let now = fuchsia_runtime::utc_time();
+        info.time_status_change = now;
+    }
+
+    // Update the atime of a file to now.
+    pub fn update_atime(&self) {
+        let mut info = self.info.write();
+        let now = fuchsia_runtime::utc_time();
+        info.time_access = now;
+    }
 }
 
 impl Drop for FsNode {
@@ -1070,7 +1092,7 @@ mod tests {
             info.uid = 9;
             info.gid = 10;
             info.link_count = 11;
-            info.time_create = zx::Time::from_nanos(1);
+            info.time_status_change = zx::Time::from_nanos(1);
             info.time_access = zx::Time::from_nanos(2);
             info.time_modify = zx::Time::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
