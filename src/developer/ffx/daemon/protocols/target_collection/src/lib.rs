@@ -71,7 +71,9 @@ async fn target_is_fastboot_tcp(addr: SocketAddr) -> bool {
             false
         }
         Err(e) => {
-            tracing::error!("Got error connecting to target over TCP: {:?}", e);
+            // Since we don't know if this target supports fastboot, this should
+            // be an info message, not an error
+            tracing::info!("Got error connecting to target over TCP: {:?}", e);
             false
         }
     }
@@ -119,7 +121,7 @@ async fn add_manual_target(
 
     let target = tc.merge_insert(target);
     if !is_fastboot_tcp {
-        tracing::error!("Running host pipe");
+        tracing::info!("Running host pipe");
         target.run_host_pipe();
     }
     target
