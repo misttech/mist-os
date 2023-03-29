@@ -14,10 +14,11 @@ use {
         model::{component::ComponentInstance, error::ModelError, storage},
     },
     ::routing::{
-        capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
-        error::AvailabilityRoutingError, mapper::NoopRouteMapper, route_capability,
-        route_storage_and_backing_directory,
+        self, capability_source::ComponentCapability,
+        component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
+        mapper::NoopRouteMapper,
     },
+    async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::{ExposeDecl, UseDecl, UseStorageDecl},
     fidl::epitaph::ChannelEpitaphExt,
@@ -30,6 +31,46 @@ use {
 pub type RouteRequest = ::routing::RouteRequest;
 pub type RouteSource = ::routing::RouteSource<ComponentInstance>;
 
+#[async_trait]
+pub trait Route {
+    /// Routes a capability from `target` to its source.
+    ///
+    /// If the capability is not allowed to be routed to the `target`, per the
+    /// [`crate::model::policy::GlobalPolicyChecker`], the capability is not opened and an error
+    /// is returned.
+    async fn route(self, target: &Arc<ComponentInstance>) -> Result<RouteSource, RoutingError>;
+}
+
+#[async_trait]
+impl Route for RouteRequest {
+    async fn route(self, target: &Arc<ComponentInstance>) -> Result<RouteSource, RoutingError> {
+        let optional_use = self.target_use_optional();
+        routing::route_capability(self, target, &mut NoopRouteMapper).await.map_err(|err| {
+            if optional_use {
+                match err {
+                    RoutingError::AvailabilityRoutingError(_) => {
+                        // `err` is already an AvailabilityRoutingError.
+                        // Return it as-is.
+                        err
+                    }
+                    _ => {
+                        // Wrap the error, to surface the target's
+                        // optional usage.
+                        RoutingError::AvailabilityRoutingError(
+                            AvailabilityRoutingError::FailedToRouteToOptionalTarget {
+                                reason: err.to_string(),
+                            },
+                        )
+                    }
+                }
+            } else {
+                // Not an optional `use` so return the error as-is.
+                err
+            }
+        })
+    }
+}
+
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.
 ///
 /// If the capability is not allowed to be routed to the `target`, per the
@@ -40,66 +81,20 @@ pub(super) async fn route_and_open_capability(
     target: &Arc<ComponentInstance>,
     open_options: OpenOptions<'_>,
 ) -> Result<(), ModelError> {
-    let route_source = match route_request {
-        RouteRequest::UseStorage(use_storage_decl) => {
-            route_storage_and_backing_directory(
-                use_storage_decl,
-                target,
-                &mut NoopRouteMapper,
-                &mut NoopRouteMapper,
-            )
-            .await?
-        }
-        _ => {
-            let optional_use = route_request.target_use_optional();
-            route_capability(route_request, target, &mut NoopRouteMapper).await.map_err(|err| {
-                if optional_use {
-                    match err {
-                        RoutingError::AvailabilityRoutingError(_) => {
-                            // `err` is already an AvailabilityRoutingError.
-                            // Return it as-is.
-                            err
-                        }
-                        _ => {
-                            // Wrap the error, to surface the target's
-                            // optional usage.
-                            RoutingError::AvailabilityRoutingError(
-                                AvailabilityRoutingError::FailedToRouteToOptionalTarget {
-                                    reason: err.to_string(),
-                                },
-                            )
-                        }
-                    }
-                } else {
-                    // Not an optional `use` so return the error as-is.
-                    err
-                }
-            })?
-        }
-    };
-    OpenRequest::new_from_route_source(route_source, target, open_options).open().await
-}
-
-/// Routes a capability from `target` to its source.
-///
-/// If the capability is not allowed to be routed to the `target`, per the
-/// [`crate::model::policy::GlobalPolicyChecker`], the capability is not opened and an error
-/// is returned.
-pub async fn route(
-    route_request: RouteRequest,
-    target: &Arc<ComponentInstance>,
-) -> Result<RouteSource, RoutingError> {
     match route_request {
-        RouteRequest::UseStorage(use_storage_decl) => {
-            route_storage_and_backing_directory(
-                use_storage_decl,
-                target,
-                &mut NoopRouteMapper,
-                &mut NoopRouteMapper,
-            )
-            .await
+        r @ RouteRequest::UseStorage(_) | r @ RouteRequest::OfferStorage(_) => {
+            let storage_source = r.route(target).await?;
+
+            let backing_dir_info = storage::route_backing_directory(storage_source.source).await?;
+
+            OpenRequest::new_from_storage_source(backing_dir_info, target, open_options)
+                .open()
+                .await
         }
-        _ => route_capability(route_request, target, &mut NoopRouteMapper).await,
+        r => {
+            let route_source = r.route(target).await?;
+            OpenRequest::new_from_route_source(route_source, target, open_options).open().await
+        }
     }
 }
 
@@ -122,8 +117,7 @@ pub(super) async fn route_and_open_namespace_capability(
     server_chan: &mut zx::Channel,
 ) -> Result<(), ModelError> {
     let route_request = request_for_namespace_capability_use(use_decl)?;
-    let open_options =
-        OpenOptions::for_namespace_capability(&route_request, flags, relative_path, server_chan)?;
+    let open_options = OpenOptions { flags, relative_path, server_chan };
     route_and_open_capability(route_request, target, open_options).await
 }
 
@@ -146,8 +140,7 @@ pub(super) async fn route_and_open_namespace_capability_from_expose(
     server_chan: &mut zx::Channel,
 ) -> Result<(), ModelError> {
     let route_request = request_for_namespace_capability_expose(expose_decl)?;
-    let open_options =
-        OpenOptions::for_namespace_capability(&route_request, flags, relative_path, server_chan)?;
+    let open_options = OpenOptions { flags, relative_path, server_chan };
     route_and_open_capability(route_request, target, open_options).await
 }
 
@@ -181,32 +174,24 @@ pub(super) async fn route_and_delete_storage(
     use_storage_decl: UseStorageDecl,
     target: &Arc<ComponentInstance>,
 ) -> Result<(), ModelError> {
-    match route_storage_and_backing_directory(
-        use_storage_decl,
-        target,
-        &mut NoopRouteMapper,
-        &mut NoopRouteMapper,
+    let storage_source = RouteRequest::UseStorage(use_storage_decl.clone()).route(target).await?;
+
+    let backing_dir_info = storage::route_backing_directory(storage_source.source).await?;
+
+    // As of today, the storage component instance must contain the target. This is because
+    // it is impossible to expose storage declarations up.
+    let relative_moniker = InstancedRelativeMoniker::scope_down(
+        &backing_dir_info.storage_source_moniker,
+        &target.instanced_moniker(),
     )
-    .await?
-    {
-        RouteSource::StorageBackingDirectory(storage_source_info) => {
-            // As of today, the storage component instance must contain the target. This is because
-            // it is impossible to expose storage declarations up.
-            let relative_moniker = InstancedRelativeMoniker::scope_down(
-                &storage_source_info.storage_source_moniker,
-                &target.instanced_moniker(),
-            )
-            .unwrap();
-            storage::delete_isolated_storage(
-                storage_source_info,
-                target.persistent_storage,
-                relative_moniker,
-                target.instance_id().as_ref(),
-            )
-            .await
-        }
-        _ => unreachable!("impossible route source"),
-    }
+    .unwrap();
+    storage::delete_isolated_storage(
+        backing_dir_info,
+        target.persistent_storage,
+        relative_moniker,
+        target.instance_id().as_ref(),
+    )
+    .await
 }
 
 static ROUTE_ERROR_HELP: &'static str = "To learn more, see \

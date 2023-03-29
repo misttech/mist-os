@@ -26,10 +26,7 @@ use {
             AvailabilityProtocolVisitor, AvailabilityServiceVisitor, AvailabilityState,
             AvailabilityStorageVisitor,
         },
-        capability_source::{
-            CapabilitySourceInterface, ComponentCapability, InternalCapability,
-            StorageCapabilitySource,
-        },
+        capability_source::{CapabilitySourceInterface, ComponentCapability, InternalCapability},
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
         },
@@ -58,10 +55,7 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
     from_enum::FromEnum,
     moniker::{AbsoluteMoniker, ChildMoniker},
-    std::{
-        path::{Path, PathBuf},
-        sync::Arc,
-    },
+    std::{path::PathBuf, sync::Arc},
     tracing::warn,
 };
 
@@ -141,16 +135,22 @@ impl RouteRequest {
 
 /// The data returned after successfully routing a capability to its source.
 #[derive(Debug)]
-pub enum RouteSource<C: ComponentInstanceInterface> {
-    Directory(CapabilitySourceInterface<C>, DirectoryState),
-    Event(CapabilitySourceInterface<C>),
-    EventStream(CapabilitySourceInterface<C>),
-    Protocol(CapabilitySourceInterface<C>),
-    Resolver(CapabilitySourceInterface<C>),
-    Runner(CapabilitySourceInterface<C>),
-    Service(CapabilitySourceInterface<C>),
-    Storage(CapabilitySourceInterface<C>),
-    StorageBackingDirectory(StorageCapabilitySource<C>),
+pub struct RouteSource<C: ComponentInstanceInterface> {
+    pub source: CapabilitySourceInterface<C>,
+    pub relative_path: PathBuf,
+}
+
+impl<C: ComponentInstanceInterface> RouteSource<C> {
+    fn new(source: CapabilitySourceInterface<C>) -> Self {
+        Self { source, relative_path: "".into() }
+    }
+
+    fn new_with_relative_path(
+        source: CapabilitySourceInterface<C>,
+        relative_path: PathBuf,
+    ) -> Self {
+        Self { source, relative_path }
+    }
 }
 
 /// Routes a capability to its source.
@@ -279,7 +279,7 @@ where
             mapper,
         )
         .await?;
-    Ok(RouteSource::Protocol(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Routes a Directory capability from `target` to its source, starting from `offer_decl`.
@@ -309,7 +309,7 @@ where
         .expose::<ExposeDirectoryDecl>()
         .route_from_offer(offer_decl, target.clone(), allowed_sources, &mut state, mapper)
         .await?;
-    Ok(RouteSource::Directory(source, state))
+    Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
 async fn route_service_from_offer<C, M>(
@@ -335,7 +335,7 @@ where
             mapper,
         )
         .await?;
-    Ok(RouteSource::Service(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `offer_decl`.
@@ -363,7 +363,7 @@ where
             mapper,
         )
         .await?;
-    Ok(RouteSource::EventStream(source))
+    Ok(RouteSource::new(source))
 }
 
 async fn route_storage_from_offer<C, M>(
@@ -392,7 +392,7 @@ where
             &mut route,
         )
         .await?;
-    Ok(RouteSource::Storage(source))
+    Ok(RouteSource::new(source))
 }
 
 async fn route_event_from_offer<C, M>(
@@ -425,7 +425,7 @@ where
             &mut route,
         )
         .await?;
-    Ok(RouteSource::Event(source))
+    Ok(RouteSource::new(source))
 }
 
 async fn route_runner_from_offer<C, M>(
@@ -445,7 +445,7 @@ where
         .expose::<ExposeRunnerDecl>()
         .route_from_offer(offer_decl, target.clone(), allowed_sources, &mut RunnerVisitor, mapper)
         .await?;
-    Ok(RouteSource::Runner(source))
+    Ok(RouteSource::new(source))
 }
 
 async fn route_resolver_from_offer<C, M>(
@@ -465,7 +465,7 @@ where
         .expose::<ExposeResolverDecl>()
         .route_from_offer(offer_decl, target.clone(), allowed_sources, &mut ResolverVisitor, mapper)
         .await?;
-    Ok(RouteSource::Resolver(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Routes a capability to its source.
@@ -483,47 +483,6 @@ where
     M: DebugRouteMapper + 'static,
 {
     route_event_stream_with_route(request, target, mapper, route).await
-}
-
-/// Routes a storage capability and its backing directory capability to their sources,
-/// returning the data needed to open the storage capability.
-///
-/// If either capability is not allowed to be routed to the `target`, per the
-/// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
-pub async fn route_storage_and_backing_directory<C, SM, BDM>(
-    use_decl: UseStorageDecl,
-    target: &Arc<C>,
-    storage_mapper: &mut SM,
-    backing_dir_mapper: &mut BDM,
-) -> Result<RouteSource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    SM: DebugRouteMapper + 'static,
-    BDM: DebugRouteMapper + 'static,
-{
-    // First route the storage capability to its source.
-    let storage_source = {
-        match route_capability(RouteRequest::UseStorage(use_decl), target, storage_mapper).await? {
-            RouteSource::Storage(source) => source,
-            _ => unreachable!("expected RouteSource::Storage"),
-        }
-    };
-
-    let (storage_decl, storage_component_instance) = match storage_source {
-        CapabilitySourceInterface::Component {
-            capability: ComponentCapability::Storage(storage_decl),
-            component,
-        } => (storage_decl, component.upgrade()?),
-        _ => unreachable!("unexpected storage source"),
-    };
-
-    // Now route the backing directory capability.
-    route_capability(
-        RouteRequest::StorageBackingDirectory(storage_decl),
-        &storage_component_instance,
-        backing_dir_mapper,
-    )
-    .await
 }
 
 /// Routes a Protocol capability from `target` to its source, starting from `use_decl`.
@@ -610,7 +569,7 @@ where
                     warn!(?use_decl, %err, "route_protocol error 4");
                     err
                 })?;
-            return Ok(RouteSource::Protocol(source));
+            return Ok(RouteSource::new(source));
         }
         UseSource::Self_ => {
             let mut availability_visitor = AvailabilityProtocolVisitor::new(&use_decl);
@@ -619,7 +578,7 @@ where
                 .use_::<UseProtocolDecl>()
                 .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
                 .await?;
-            Ok(RouteSource::Protocol(source))
+            Ok(RouteSource::new(source))
         }
         _ => {
             let mut availability_visitor = AvailabilityProtocolVisitor::new(&use_decl);
@@ -631,7 +590,7 @@ where
                 .await?;
 
             target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-            Ok(RouteSource::Protocol(source))
+            Ok(RouteSource::new(source))
         }
     }
 }
@@ -668,7 +627,7 @@ where
         .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Protocol(source))
+    Ok(RouteSource::new(source))
 }
 
 async fn route_service<C, M>(
@@ -688,7 +647,7 @@ where
                 .use_::<UseServiceDecl>()
                 .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
                 .await?;
-            Ok(RouteSource::Service(source))
+            Ok(RouteSource::new(source))
         }
         _ => {
             let mut availability_visitor = AvailabilityServiceVisitor::new(&use_decl);
@@ -701,7 +660,7 @@ where
                 .await?;
 
             target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-            Ok(RouteSource::Service(source))
+            Ok(RouteSource::new(source))
         }
     }
 }
@@ -731,14 +690,14 @@ where
         .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Service(source))
+    Ok(RouteSource::new(source))
 }
 
 /// The accumulated state of routing a Directory capability.
 #[derive(Clone, Debug)]
 pub struct DirectoryState {
     rights: WalkState<Rights>,
-    subdir: PathBuf,
+    pub subdir: PathBuf,
     availability_state: AvailabilityState,
 }
 
@@ -753,12 +712,6 @@ impl DirectoryState {
             subdir: subdir.unwrap_or_else(PathBuf::new),
             availability_state: availability.clone().into(),
         }
-    }
-
-    /// Returns a new path with `in_relative_path` appended to the end of this
-    /// DirectoryState's accumulated subdirectory path.
-    pub fn make_relative_path(&self, in_relative_path: String) -> PathBuf {
-        self.subdir.clone().attach(in_relative_path)
     }
 
     fn advance_with_offer(&mut self, offer: &OfferDirectoryDecl) -> Result<(), RoutingError> {
@@ -839,7 +792,7 @@ where
                 .use_::<UseDirectoryDecl>()
                 .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
                 .await?;
-            Ok(RouteSource::Service(source))
+            Ok(RouteSource::new(source))
         }
         _ => {
             let mut state = DirectoryState::new(
@@ -862,7 +815,7 @@ where
                 .await?;
 
             target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-            Ok(RouteSource::Directory(source, state))
+            Ok(RouteSource::new_with_relative_path(source, state.subdir))
         }
     }
 }
@@ -896,7 +849,7 @@ where
         .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Directory(source, state))
+    Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
 /// Verifies that the given component is in the index if its `storage_id` is StaticInstanceId.
@@ -962,7 +915,7 @@ where
     let source = route_to_storage_decl(use_decl, &target, mapper).await?;
     verify_instance_in_component_id_index(&source, target)?;
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Storage(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Routes the backing Directory capability of a Storage capability from `target` to its source,
@@ -988,25 +941,7 @@ where
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
 
-    let (dir_source_path, dir_source_instance) = match source {
-        CapabilitySourceInterface::Component { capability, component } => (
-            capability.source_path().expect("directory has no source path?").clone(),
-            Some(component.upgrade()?),
-        ),
-        CapabilitySourceInterface::Namespace { capability, .. } => {
-            (capability.source_path().expect("directory has no source path?").clone(), None)
-        }
-        _ => unreachable!("not valid sources"),
-    };
-    let dir_subdir = if state.subdir == Path::new("") { None } else { Some(state.subdir.clone()) };
-
-    Ok(RouteSource::StorageBackingDirectory(StorageCapabilitySource::<C> {
-        storage_provider: dir_source_instance,
-        backing_directory_path: dir_source_path,
-        backing_directory_subdir: dir_subdir,
-        storage_subdir: storage_decl.subdir.clone(),
-        storage_source_moniker: target.instanced_moniker().clone(),
-    }))
+    Ok(RouteSource::new_with_relative_path(source, state.subdir))
 }
 
 make_noop_visitor!(RunnerVisitor, {
@@ -1068,7 +1003,7 @@ where
     }?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Runner(source))
+    Ok(RouteSource::new(source))
 }
 
 make_noop_visitor!(ResolverVisitor, {
@@ -1096,7 +1031,7 @@ where
         .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Resolver(source))
+    Ok(RouteSource::new(source))
 }
 
 /// State accumulated from routing an Event capability to its source.
@@ -1154,7 +1089,7 @@ where
         .await?;
 
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::Event(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
@@ -1177,7 +1112,7 @@ where
         .route(use_decl, target.clone(), allowed_sources, &mut availability_visitor, mapper)
         .await?;
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::EventStream(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
@@ -1208,7 +1143,7 @@ where
         )
         .await?;
     target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::EventStream(source))
+    Ok(RouteSource::new(source))
 }
 
 /// Intermediate type to masquerade as Registration-style routing start point for the storage

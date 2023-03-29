@@ -18,15 +18,12 @@ use {
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
-            routing::{RouteRequest, RouteSource},
-            storage,
+            routing::{Route, RouteSource},
+            storage::{self, BackingDirectoryInfo},
         },
     },
-    ::routing::{
-        capability_source::{ComponentCapability, StorageCapabilitySource},
-        route_capability,
-    },
-    anyhow::{format_err, Error},
+    ::routing::capability_source::ComponentCapability,
+    anyhow::{format_err, Context, Error},
     async_trait::async_trait,
     cm_moniker::InstancedRelativeMoniker,
     cm_rust::{CapabilityName, ExposeDecl, OfferDecl, StorageDecl, UseDecl},
@@ -46,7 +43,7 @@ use {
     moniker::{AbsoluteMonikerBase, RelativeMoniker, RelativeMonikerBase},
     routing::{
         component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
-        mapper::NoopRouteMapper,
+        RouteRequest,
     },
     std::{
         convert::{From, TryFrom},
@@ -300,25 +297,23 @@ impl StorageAdmin {
         component: WeakComponentInstance,
         server_end: zx::Channel,
     ) -> Result<(), Error> {
+        let storage_source = RouteSource {
+            source: CapabilitySource::Component {
+                capability: ComponentCapability::Storage(storage_decl.clone()),
+                component: component.clone(),
+            },
+            relative_path: PathBuf::new(),
+        };
+        let backing_dir_source_info = storage::route_backing_directory(storage_source.source)
+            .await
+            .context("could not serve storage protocol, routing backing directory failed")?;
+
         let component = component.upgrade().map_err(|e| {
             format_err!(
                 "unable to serve storage admin protocol, model reference is no longer valid: {:?}",
                 e,
             )
         })?;
-
-        let storage_capability_source_info = {
-            match route_capability(
-                RouteRequest::StorageBackingDirectory(storage_decl),
-                &component,
-                &mut NoopRouteMapper,
-            )
-            .await?
-            {
-                RouteSource::StorageBackingDirectory(storage_source) => storage_source,
-                _ => unreachable!("expected RouteSource::StorageBackingDirectory"),
-            }
-        };
 
         let mut stream = ServerEnd::<fsys::StorageAdminMarker>::new(server_end)
             .into_stream()
@@ -342,7 +337,7 @@ impl StorageAdmin {
                         component.component_id_index().look_up_moniker(&abs_moniker).cloned();
 
                     let dir_proxy = storage::open_isolated_storage(
-                        &storage_capability_source_info,
+                        &backing_dir_source_info,
                         component.persistent_storage,
                         instanced_relative_moniker,
                         instance_id.as_ref(),
@@ -372,7 +367,7 @@ impl StorageAdmin {
                                 Self::serve_storage_iterator(
                                     root_component,
                                     iterator,
-                                    storage_capability_source_info.clone(),
+                                    backing_dir_source_info.clone(),
                                 )
                                 .unwrap_or_else(|error| {
                                     warn!(?error, "Error serving storage iterator")
@@ -400,7 +395,7 @@ impl StorageAdmin {
                         continue;
                     }
                     match storage::open_isolated_storage_by_id(
-                        &storage_capability_source_info,
+                        &backing_dir_source_info,
                         component_id,
                     )
                     .await
@@ -433,7 +428,7 @@ impl StorageAdmin {
                                 .look_up_moniker(&abs_moniker)
                                 .cloned();
                             let res = storage::delete_isolated_storage(
-                                storage_capability_source_info.clone(),
+                                backing_dir_source_info.clone(),
                                 component.persistent_storage,
                                 instanced_relative_moniker,
                                 instance_id.as_ref(),
@@ -455,7 +450,7 @@ impl StorageAdmin {
                 }
                 fsys::StorageAdminRequest::GetStatus { responder } => {
                     if let Ok(storage_root) =
-                        storage::open_storage_root(&storage_capability_source_info).await
+                        storage::open_storage_root(&backing_dir_source_info).await
                     {
                         responder.send_no_shutdown_on_err(
                             &mut Self::get_storage_status(&storage_root)
@@ -469,7 +464,7 @@ impl StorageAdmin {
                 fsys::StorageAdminRequest::DeleteAllStorageContents { responder } => {
                     // TODO(handle error properly)
                     if let Ok(storage_root) =
-                        storage::open_storage_root(&storage_capability_source_info).await
+                        storage::open_storage_root(&backing_dir_source_info).await
                     {
                         match Self::delete_all_storage(&storage_root, Self::delete_dir_contents)
                             .await
@@ -764,7 +759,7 @@ impl StorageAdmin {
     async fn serve_storage_iterator(
         root_component: Arc<ComponentInstance>,
         iterator: ServerEnd<fsys::StorageIteratorMarker>,
-        storage_capability_source_info: StorageCapabilitySource<ComponentInstance>,
+        storage_capability_source_info: BackingDirectoryInfo,
     ) -> Result<(), Error> {
         let mut components_to_visit = vec![root_component];
         let mut storage_users = vec![];
@@ -791,26 +786,26 @@ impl StorageAdmin {
                     _ => None,
                 });
             for use_storage in storage_uses {
-                match ::routing::route_storage_and_backing_directory(
-                    use_storage.clone(),
-                    &component,
-                    &mut NoopRouteMapper,
-                    &mut NoopRouteMapper,
-                )
-                .await
-                {
-                    Ok(RouteSource::StorageBackingDirectory(storage_source_info))
-                        if storage_source_info == storage_capability_source_info =>
-                    {
-                        let relative_moniker = InstancedRelativeMoniker::scope_down(
-                            &storage_source_info.storage_source_moniker,
-                            &component.instanced_moniker(),
-                        )
-                        .unwrap();
-                        storage_users.push(relative_moniker);
-                        break;
-                    }
-                    _ => (),
+                let storage_source =
+                    match RouteRequest::UseStorage(use_storage.clone()).route(&component).await {
+                        Ok(s) => s,
+                        Err(_) => continue,
+                    };
+
+                let backing_dir_info =
+                    match storage::route_backing_directory(storage_source.source).await {
+                        Ok(s) => s,
+                        Err(_) => continue,
+                    };
+
+                if backing_dir_info == storage_capability_source_info {
+                    let relative_moniker = InstancedRelativeMoniker::scope_down(
+                        &backing_dir_info.storage_source_moniker,
+                        &component.instanced_moniker(),
+                    )
+                    .unwrap();
+                    storage_users.push(relative_moniker);
+                    break;
                 }
             }
             for component in component_state.children().map(|(_, v)| v) {

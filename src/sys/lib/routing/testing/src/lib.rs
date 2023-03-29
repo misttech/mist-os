@@ -1867,14 +1867,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
         route_capability(RouteRequest::ExposeProtocol(expose_decl), &root_instance, &mut NoopRouteMapper).await,
-            Ok(RouteSource::Protocol(
-                CapabilitySourceInterface::<
+            Ok(RouteSource {
+                source: CapabilitySourceInterface::<
                     <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C
                     >::Component {
                         capability: ComponentCapability::Protocol(protocol_decl),
                         component,
-                    })
-            ) if protocol_decl == expected_protocol_decl && component.abs_moniker == expected_source_moniker
+                    },
+                relative_path,
+            }) if protocol_decl == expected_protocol_decl && component.abs_moniker == expected_source_moniker && relative_path == PathBuf::new()
         );
     }
 
@@ -2251,12 +2252,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         .await
         .expect("failed to route service");
         match source {
-            RouteSource::Service(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Aggregate {
-                capability: AggregateCapability::Service(name),
-                ..
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Aggregate {
+                        capability: AggregateCapability::Service(name),
+                        ..
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
             }
             _ => panic!("bad capability source"),
@@ -4502,12 +4507,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         .await
         .expect("failed to route service");
         match source {
-            RouteSource::Service(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4571,12 +4580,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         .await
         .expect("failed to route service");
         match source {
-            RouteSource::Service(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4653,12 +4666,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `c`.
         match source {
-            RouteSource::Service(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4737,14 +4754,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `c`.
         match source {
-            RouteSource::Service(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::FilteredService {
-                capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                component,
-                source_instance_filter,
-                instance_name_source_to_target,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::FilteredService {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
+                        component,
+                        source_instance_filter,
+                        instance_name_source_to_target,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4835,14 +4856,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `c`.
         match source {
-            RouteSource::Service(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::FilteredService {
-                capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
-                component,
-                source_instance_filter,
-                instance_name_source_to_target,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::FilteredService {
+                        capability: ComponentCapability::Service(ServiceDecl { name, source_path }),
+                        component,
+                        source_instance_filter,
+                        instance_name_source_to_target,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4905,12 +4930,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `a`.
         match source {
-            RouteSource::Runner(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -4985,12 +5014,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `a`.
         match source {
-            RouteSource::Runner(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -5062,12 +5095,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `b`.
         match source {
-            RouteSource::Runner(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -5142,12 +5179,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this source comes from `a`.
         match source {
-            RouteSource::Runner(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Component {
-                capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
-                component,
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Component {
+                        capability: ComponentCapability::Runner(RunnerDecl { name, source_path }),
+                        component,
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "elf");
                 assert_eq!(
                     source_path.expect("missing source path"),
@@ -5264,12 +5305,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this is a built-in source.
         match source {
-            RouteSource::Runner(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Builtin {
-                capability: InternalCapability::Runner(name),
-                ..
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Builtin {
+                        capability: InternalCapability::Runner(name),
+                        ..
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "elf");
             }
             _ => panic!("bad capability source"),
@@ -5302,12 +5347,16 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         // Verify this is a built-in source.
         match source {
-            RouteSource::Runner(CapabilitySourceInterface::<
-                <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
-            >::Builtin {
-                capability: InternalCapability::Runner(name),
-                ..
-            }) => {
+            RouteSource {
+                source:
+                    CapabilitySourceInterface::<
+                        <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
+                    >::Builtin {
+                        capability: InternalCapability::Runner(name),
+                        ..
+                    },
+                relative_path,
+            } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "elf");
             }
             _ => panic!("bad capability source"),

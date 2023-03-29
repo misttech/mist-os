@@ -23,7 +23,7 @@ use {
         routing::{
             self, route_and_open_capability,
             service::{CollectionServiceDirectory, CollectionServiceRoute},
-            OpenOptions, OpenRunnerOptions, RouteRequest,
+            OpenOptions, RouteRequest,
         },
     },
     ::routing::{
@@ -535,16 +535,13 @@ impl ComponentInstance {
                 let (client_channel, server_channel) =
                     endpoints::create_endpoints::<fcrunner::ComponentRunnerMarker>();
                 let mut server_channel = server_channel.into_channel();
-                let options = OpenRunnerOptions {
+                let options = OpenOptions {
                     flags: fio::OpenFlags::NOT_DIRECTORY,
+                    relative_path: "".into(),
                     server_chan: &mut server_channel,
                 };
-                route_and_open_capability(
-                    RouteRequest::Runner(runner.clone()),
-                    self,
-                    OpenOptions::Runner(options),
-                )
-                .await?;
+                route_and_open_capability(RouteRequest::Runner(runner.clone()), self, options)
+                    .await?;
 
                 return Ok(Arc::new(RemoteRunner::new(client_channel.into_proxy().unwrap()))
                     as Arc<dyn Runner>);

@@ -375,14 +375,22 @@ impl EventRegistry {
             route.push(component_route);
         }
         match route_source {
-            RouteSource::EventStream(CapabilitySource::Framework {
-                capability: InternalCapability::EventStream(source_name),
-                component,
-            }) => Ok((source_name, component.abs_moniker.into(), route)),
-            RouteSource::EventStream(CapabilitySource::Builtin {
-                capability: InternalCapability::EventStream(source_name),
-                ..
-            }) => Ok((source_name, ExtendedMoniker::ComponentManager, route)),
+            RouteSource {
+                source:
+                    CapabilitySource::Framework {
+                        capability: InternalCapability::EventStream(source_name),
+                        component,
+                    },
+                relative_path: _,
+            } => Ok((source_name, component.abs_moniker.into(), route)),
+            RouteSource {
+                source:
+                    CapabilitySource::Builtin {
+                        capability: InternalCapability::EventStream(source_name),
+                        ..
+                    },
+                relative_path: _,
+            } => Ok((source_name, ExtendedMoniker::ComponentManager, route)),
             _ => unreachable!(),
         }
     }

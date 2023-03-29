@@ -4,21 +4,30 @@
 
 pub mod admin_protocol;
 use {
-    crate::model::{
-        component::{ComponentInstance, StartReason},
-        error::ModelError,
+    crate::{
+        capability::CapabilitySource,
+        model::{
+            component::{ComponentInstance, StartReason},
+            error::ModelError,
+            routing::{Route, RouteSource},
+        },
+    },
+    ::routing::{
+        capability_source::ComponentCapability, component_id_index::ComponentInstanceId,
+        component_instance::ComponentInstanceInterface, error::RoutingError, RouteRequest,
     },
     anyhow::Error,
     clonable_error::ClonableError,
     cm_moniker::{InstancedAbsoluteMoniker, InstancedRelativeMoniker},
     cm_rust::CapabilityPath,
+    derivative::Derivative,
     fidl::endpoints,
     fidl_fuchsia_io as fio,
     moniker::RelativeMonikerBase,
-    routing::{
-        component_id_index::ComponentInstanceId, component_instance::ComponentInstanceInterface,
+    std::{
+        path::{Path, PathBuf},
+        sync::Arc,
     },
-    std::path::PathBuf,
     thiserror::Error,
 };
 
@@ -28,8 +37,43 @@ const FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
     .union(fio::OpenFlags::RIGHT_READABLE)
     .union(fio::OpenFlags::RIGHT_WRITABLE);
 
-pub type StorageCapabilitySource =
-    ::routing::capability_source::StorageCapabilitySource<ComponentInstance>;
+/// Information returned by the route_storage_capability function on the backing directory source
+/// of a storage capability.
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+pub struct BackingDirectoryInfo {
+    /// The component that's providing the backing directory capability for this storage
+    /// capability. If None, then the backing directory comes from component_manager's namespace.
+    pub storage_provider: Option<Arc<ComponentInstance>>,
+
+    /// The path to the backing directory in the providing component's outgoing directory (or
+    /// component_manager's namespace).
+    pub backing_directory_path: CapabilityPath,
+
+    /// The subdirectory inside of the backing directory capability to use, if any
+    pub backing_directory_subdir: Option<PathBuf>,
+
+    /// The subdirectory inside of the backing directory's sub-directory to use, if any. The
+    /// difference between this and backing_directory_subdir is that backing_directory_subdir is
+    /// appended to backing_directory_path first, and component_manager will create this subdir if
+    /// it doesn't exist but won't create backing_directory_subdir.
+    pub storage_subdir: Option<PathBuf>,
+
+    /// The moniker of the component that defines the storage capability, with instance ids. This
+    /// is used for generating moniker-based storage paths.
+    pub storage_source_moniker: InstancedAbsoluteMoniker,
+}
+
+impl PartialEq for BackingDirectoryInfo {
+    fn eq(&self, other: &Self) -> bool {
+        let self_source_component = self.storage_provider.as_ref().map(|s| s.abs_moniker());
+        let other_source_component = other.storage_provider.as_ref().map(|s| s.abs_moniker());
+        self_source_component == other_source_component
+            && self.backing_directory_path == other.backing_directory_path
+            && self.backing_directory_subdir == other.backing_directory_subdir
+            && self.storage_subdir == other.storage_subdir
+    }
+}
 
 /// Errors related to isolated storage.
 #[derive(Debug, Error, Clone)]
@@ -157,7 +201,7 @@ impl StorageError {
 }
 
 async fn open_storage_root(
-    storage_source_info: &StorageCapabilitySource,
+    storage_source_info: &BackingDirectoryInfo,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let (mut dir_proxy, local_server_end) =
         endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
@@ -215,11 +259,61 @@ async fn open_storage_root(
     Ok(dir_proxy)
 }
 
+/// Routes a backing directory for a storage capability to its source, returning the data needed to
+/// open the storage capability.
+///
+/// If the capability is not allowed to be routed to the `target`, per the
+/// [`crate::model::policy::GlobalPolicyChecker`], then an error is returned.
+///
+/// REQUIRES: `storage_source` is `ComponentCapability::Storage`.
+pub async fn route_backing_directory(
+    storage_source: CapabilitySource,
+) -> Result<BackingDirectoryInfo, RoutingError> {
+    let (storage_decl, storage_component) = match storage_source {
+        CapabilitySource::Component {
+            capability: ComponentCapability::Storage(storage_decl),
+            component,
+        } => (storage_decl, component.upgrade()?),
+        r => unreachable!("unexpected storage source: {:?}", r),
+    };
+
+    let source = RouteRequest::StorageBackingDirectory(storage_decl.clone())
+        .route(&storage_component)
+        .await?;
+
+    let (dir_source_path, dir_source_instance, relative_path) = match source {
+        RouteSource {
+            source: CapabilitySource::Component { capability, component },
+            relative_path,
+        } => (
+            capability.source_path().expect("directory has no source path?").clone(),
+            Some(component.upgrade()?),
+            relative_path,
+        ),
+        RouteSource { source: CapabilitySource::Namespace { capability, .. }, relative_path } => (
+            capability.source_path().expect("directory has no source path?").clone(),
+            None,
+            relative_path,
+        ),
+        _ => unreachable!("not valid sources"),
+    };
+    let dir_subdir =
+        if relative_path == Path::new("") { None } else { Some(relative_path.clone()) };
+
+    Ok(BackingDirectoryInfo {
+        storage_provider: dir_source_instance,
+        backing_directory_path: dir_source_path,
+        backing_directory_subdir: dir_subdir,
+        storage_subdir: storage_decl.subdir.clone(),
+        storage_source_moniker: storage_component.instanced_moniker().clone(),
+    })
+}
+
 /// Open the isolated storage sub-directory from the given storage capability source, creating it
 /// if necessary. The storage sub-directory is based on provided instance ID if present, otherwise
 /// it is based on the provided relative moniker.
 pub async fn open_isolated_storage(
-    storage_source_info: &StorageCapabilitySource,
+    storage_source_info: &BackingDirectoryInfo,
     persistent_storage: bool,
     relative_moniker: InstancedRelativeMoniker,
     instance_id: Option<&ComponentInstanceId>,
@@ -260,7 +354,7 @@ pub async fn open_isolated_storage(
 /// Open the isolated storage sub-directory from the given storage capability source, creating it
 /// if necessary. The storage sub-directory is based on provided instance ID.
 pub async fn open_isolated_storage_by_id(
-    storage_source_info: &StorageCapabilitySource,
+    storage_source_info: &BackingDirectoryInfo,
     instance_id: ComponentInstanceId,
 ) -> Result<fio::DirectoryProxy, ModelError> {
     let root_dir = open_storage_root(storage_source_info).await?;
@@ -287,7 +381,7 @@ pub async fn open_isolated_storage_by_id(
 /// this removes the backing storage directory, meaning if this is called while the using
 /// component is still alive, that component's storage handle will start returning errors.
 pub async fn delete_isolated_storage(
-    storage_source_info: StorageCapabilitySource,
+    storage_source_info: BackingDirectoryInfo,
     persistent_storage: bool,
     relative_moniker: InstancedRelativeMoniker,
     instance_id: Option<&ComponentInstanceId>,
@@ -505,7 +599,7 @@ mod tests {
 
         // Open.
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -524,7 +618,7 @@ mod tests {
 
         // Open again.
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -543,7 +637,7 @@ mod tests {
         let relative_moniker =
             InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1", "e:0"]).unwrap();
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -600,7 +694,7 @@ mod tests {
         )
         .expect("generated instance ID could not be parsed into ComponentInstanceId");
         let mut dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -636,7 +730,7 @@ mod tests {
 
         // check that re-opening the directory gives us the same marker file.
         dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -670,7 +764,7 @@ mod tests {
         // Try to open the storage. We expect an error.
         let relative_moniker = InstancedRelativeMoniker::try_from(vec!["c:0", "coll:d:1"]).unwrap();
         let res = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&test.model.root())),
                 backing_directory_path: CapabilityPath::try_from("/data").unwrap().clone(),
                 backing_directory_subdir: None,
@@ -722,7 +816,7 @@ mod tests {
 
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -741,7 +835,7 @@ mod tests {
 
         // Open parent's storage.
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -760,7 +854,7 @@ mod tests {
 
         // Delete the child's storage.
         delete_isolated_storage(
-            StorageCapabilitySource {
+            BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -776,7 +870,7 @@ mod tests {
 
         // Open parent's storage again. Should work.
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -799,7 +893,7 @@ mod tests {
 
         // Error -- tried to delete nonexistent storage.
         let err = delete_isolated_storage(
-            StorageCapabilitySource {
+            BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path,
                 backing_directory_subdir: None,
@@ -859,7 +953,7 @@ mod tests {
         .expect("generated ID could not be parsed into component instance ID");
         // Open and write to the storage for child.
         let dir = open_isolated_storage(
-            &StorageCapabilitySource {
+            &BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -887,7 +981,7 @@ mod tests {
 
         // Delete the child's storage.
         delete_isolated_storage(
-            StorageCapabilitySource {
+            BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path.clone(),
                 backing_directory_subdir: None,
@@ -908,7 +1002,7 @@ mod tests {
 
         // Error -- tried to delete nonexistent storage.
         let err = delete_isolated_storage(
-            StorageCapabilitySource {
+            BackingDirectoryInfo {
                 storage_provider: Some(Arc::clone(&b_component)),
                 backing_directory_path: dir_source_path,
                 backing_directory_subdir: None,

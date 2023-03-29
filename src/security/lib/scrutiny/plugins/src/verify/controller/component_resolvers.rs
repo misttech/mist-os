@@ -12,10 +12,7 @@ use {
     },
     cm_rust::UseDecl,
     moniker::AbsoluteMonikerBase,
-    routing::{
-        component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
-        RouteSource,
-    },
+    routing::component_instance::{ComponentInstanceInterface, ExtendedInstanceInterface},
     scrutiny::{model::controller::DataController, model::model::*},
     serde::{Deserialize, Serialize},
     serde_json::{json, value::Value},
@@ -80,23 +77,16 @@ impl ComponentResolversVisitor {
                 routing::RouteRequest::Resolver(resolver),
                 &resolver_register_instance,
             ) {
-                (Ok(source), _route) => {
-                    match source {
-                        RouteSource::Resolver(resolver) => {
-                            match resolver.source_instance().upgrade()? {
-                            routing::component_instance::ExtendedInstanceInterface::Component(
-                                component,
-                            ) => component,
-                            routing::component_instance::ExtendedInstanceInterface::AboveRoot(..) => {
-                                return Err(anyhow!("The plugin is unable to verify resolvers declared above the root."));
-                            }
-                        }
-                        }
-                        _ => {
-                            unreachable!("We only care about resolvers!")
-                        }
+                (Ok(s), _route) => match s.source.source_instance().upgrade()? {
+                    routing::component_instance::ExtendedInstanceInterface::Component(
+                        component,
+                    ) => component,
+                    routing::component_instance::ExtendedInstanceInterface::AboveRoot(..) => {
+                        return Err(anyhow!(
+                            "The plugin is unable to verify resolvers declared above the root."
+                        ));
                     }
-                }
+                },
                 (Err(err), _route) => {
                     eprintln!(
                         "Ignoring invalid resolver configuration for {}: {:#}",

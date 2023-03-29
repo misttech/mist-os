@@ -5,7 +5,7 @@
 use {
     crate::model::{
         component::{ComponentInstance, WeakComponentInstance},
-        routing::{route_and_open_capability, OpenOptions, OpenResolverOptions, RouteRequest},
+        routing::{route_and_open_capability, OpenOptions, RouteRequest},
     },
     ::routing::component_instance::ComponentInstanceInterface,
     ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
@@ -108,14 +108,15 @@ impl Resolver for RemoteResolver {
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fresolution::ResolverMarker>()
             .map_err(ResolverError::internal)?;
         let component = self.component.upgrade().map_err(ResolverError::routing_error)?;
-        let open_options = OpenResolverOptions {
+        let open_options = OpenOptions {
             flags: fio::OpenFlags::NOT_DIRECTORY,
+            relative_path: "".into(),
             server_chan: &mut server_end.into_channel(),
         };
         route_and_open_capability(
             RouteRequest::Resolver(self.registration.clone()),
             &component,
-            OpenOptions::Resolver(open_options),
+            open_options,
         )
         .await
         .map_err(ResolverError::routing_error)?;

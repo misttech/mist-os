@@ -25,9 +25,7 @@ use {
     futures::FutureExt,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase, ChildMoniker, ChildMonikerBase},
     routing::{
-        capability_source::{
-            CapabilitySourceInterface, ComponentCapability, StorageCapabilitySource,
-        },
+        capability_source::{CapabilitySourceInterface, ComponentCapability},
         component_id_index::ComponentIdIndex,
         component_instance::{
             ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
@@ -39,8 +37,7 @@ use {
         error::{AvailabilityRoutingError, ComponentInstanceError, RoutingError},
         mapper::{RouteMapper, RouteSegment},
         policy::GlobalPolicyChecker,
-        route_capability, route_event_stream_capability, route_storage_and_backing_directory,
-        RouteInfo, RouteRequest, RouteSource,
+        route_capability, route_event_stream_capability, RouteInfo, RouteRequest, RouteSource,
     },
     serde::{Deserialize, Serialize},
     std::{
@@ -1061,50 +1058,13 @@ impl ComponentModelForAnalyzer {
         &self,
         route_source: &RouteSource<ComponentInstanceForAnalyzer>,
     ) -> Result<(), AnalyzerModelError> {
-        match route_source {
-            RouteSource::Directory(source, _) => self.check_directory_source(source),
-            RouteSource::Event(_) => Ok(()),
-            RouteSource::EventStream(source) => self.check_protocol_source(source),
-            RouteSource::Protocol(source) => self.check_protocol_source(source),
-            RouteSource::Service(source) => self.check_service_source(source),
-            RouteSource::StorageBackingDirectory(source) => self.check_storage_source(source),
-            _ => unimplemented![],
-        }
-    }
-
-    // If the source of a directory capability is a component instance, checks that that
-    // instance is executable.
-    fn check_directory_source(
-        &self,
-        source: &CapabilitySourceInterface<ComponentInstanceForAnalyzer>,
-    ) -> Result<(), AnalyzerModelError> {
-        match source {
-            CapabilitySourceInterface::Component { component: weak, .. } => {
-                self.check_executable(&weak.upgrade()?)
-            }
-            CapabilitySourceInterface::Namespace { .. } => Ok(()),
-            CapabilitySourceInterface::Builtin { .. } => Ok(()),
-            CapabilitySourceInterface::Framework { .. } => Ok(()),
-            _ => unimplemented![],
-        }
-    }
-
-    // If the source of a protocol capability is a component instance, checks that that
-    // instance is executable.
-    //
-    // If the source is a capability, checks that the protocol is the `StorageAdmin`
-    // protocol and that the source is a valid storage capability.
-    fn check_protocol_source(
-        &self,
-        source: &CapabilitySourceInterface<ComponentInstanceForAnalyzer>,
-    ) -> Result<(), AnalyzerModelError> {
-        match source {
+        match &route_source.source {
             CapabilitySourceInterface::Component { component: weak, .. } => {
                 self.check_executable(&weak.upgrade()?)
             }
             CapabilitySourceInterface::Namespace { .. } => Ok(()),
             CapabilitySourceInterface::Capability { source_capability, component: weak } => {
-                self.check_protocol_capability_source(&weak.upgrade()?, &source_capability)
+                self.check_capability_source(&weak.upgrade()?, &source_capability)
             }
             CapabilitySourceInterface::Builtin { .. } => Ok(()),
             CapabilitySourceInterface::Framework { .. } => Ok(()),
@@ -1112,10 +1072,10 @@ impl ComponentModelForAnalyzer {
         }
     }
 
-    // A helper function validating a source of type `Capability` for a protocol capability.
-    // If the protocol is the `StorageAdmin` protocol, then it should have a valid storage
-    // source.
-    fn check_protocol_capability_source(
+    // A helper function validating a source of type `Capability`.
+    // The source should be a `StorageAdmin` protocol since that is only supported capability
+    // source, and it should route to a valid storage source.
+    fn check_capability_source(
         &self,
         source_component: &Arc<ComponentInstanceForAnalyzer>,
         source_capability: &ComponentCapability,
@@ -1142,34 +1102,6 @@ impl ComponentModelForAnalyzer {
             )),
         }
     }
-
-    // If the source of a service capability is a component instance, checks that that
-    // instance is executable.
-    fn check_service_source(
-        &self,
-        source: &CapabilitySourceInterface<ComponentInstanceForAnalyzer>,
-    ) -> Result<(), AnalyzerModelError> {
-        match source {
-            CapabilitySourceInterface::Component { component: weak, .. } => {
-                self.check_executable(&weak.upgrade()?)
-            }
-            CapabilitySourceInterface::Namespace { .. } => Ok(()),
-            _ => unimplemented![],
-        }
-    }
-
-    // If the source of a storage backing directory is a component instance, checks that that
-    // instance is executable.
-    fn check_storage_source(
-        &self,
-        source: &StorageCapabilitySource<ComponentInstanceForAnalyzer>,
-    ) -> Result<(), AnalyzerModelError> {
-        if let Some(provider) = &source.storage_provider {
-            self.check_executable(provider)?
-        }
-        Ok(())
-    }
-
     // A helper function which prepares a route request for capabilities which can be used
     // from an expose declaration, and returns None if the capability type cannot be used
     // from an expose.
@@ -1259,12 +1191,29 @@ impl ComponentModelForAnalyzer {
     ) {
         let mut storage_mapper = RouteMapper::new();
         let mut backing_dir_mapper = RouteMapper::new();
-        let result = route_storage_and_backing_directory(
-            use_decl,
-            target,
-            &mut storage_mapper,
-            &mut backing_dir_mapper,
-        )
+        let result = async {
+            let result =
+                route_capability(RouteRequest::UseStorage(use_decl), target, &mut storage_mapper)
+                    .await?;
+            let (storage_decl, storage_component) = match result {
+                RouteSource {
+                    source:
+                        CapabilitySourceInterface::Component {
+                            capability: ComponentCapability::Storage(storage_decl),
+                            component,
+                            ..
+                        },
+                    relative_path: _,
+                } => (storage_decl, component.upgrade()?),
+                _ => unreachable!("unexpected storage source"),
+            };
+            route_capability(
+                RouteRequest::StorageBackingDirectory(storage_decl),
+                &storage_component,
+                &mut backing_dir_mapper,
+            )
+            .await
+        }
         .now_or_never()
         .expect("future was not ready immediately");
         (result, storage_mapper.get_route(), backing_dir_mapper.get_route())

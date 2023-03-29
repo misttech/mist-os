@@ -10,7 +10,7 @@ use {
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             mutable_directory::MutableDirectory,
-            routing::{CapabilitySource, OpenRequest, RoutingError},
+            routing::{CapabilitySource, OpenOptions, OpenRequest, RouteSource, RoutingError},
         },
     },
     async_trait::async_trait,
@@ -503,12 +503,14 @@ impl lazy_immutable_dir::LazyDirectory for AggregateServiceDirectory {
             if let Ok(source) = self.provider.route_instance(&instance).await {
                 let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                     .map_err(|_| zx::Status::INTERNAL)?;
-                if let Ok(()) = OpenRequest::new_outgoing_directory(
-                    fio::OpenFlags::DIRECTORY,
-                    PathBuf::new(),
-                    source,
+                if let Ok(()) = OpenRequest::new_from_route_source(
+                    RouteSource { source, relative_path: "".into() },
                     &target,
-                    &mut server.into_channel(),
+                    OpenOptions {
+                        flags: fio::OpenFlags::DIRECTORY,
+                        relative_path: "".into(),
+                        server_chan: &mut server.into_channel(),
+                    },
                 )
                 .open()
                 .await
@@ -759,12 +761,14 @@ impl CollectionServiceDirectory {
 
         let (proxy, server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
 
-        OpenRequest::new_outgoing_directory(
-            fio::OpenFlags::DIRECTORY,
-            PathBuf::new(),
-            source.clone(),
+        OpenRequest::new_from_route_source(
+            RouteSource { source: source.clone(), relative_path: "".into() },
             &target,
-            &mut server.into_channel(),
+            OpenOptions {
+                flags: fio::OpenFlags::DIRECTORY,
+                relative_path: "".into(),
+                server_chan: &mut server.into_channel(),
+            },
         )
         .open()
         .on_timeout(OPEN_SERVICE_TIMEOUT.after_now(), || {
@@ -924,12 +928,17 @@ impl DirectoryEntry for ServiceInstanceDirectoryEntry {
                 relative_path = relative_path.join(path.into_string());
             }
 
-            if let Err(err) = OpenRequest::new_outgoing_directory(
-                flags,
-                relative_path,
-                self.source.clone(),
-                 &parent,
-                &mut server_end,
+            if let Err(err) = OpenRequest::new_from_route_source(
+                RouteSource {
+                    source: self.source.clone(),
+                    relative_path: "".into(),
+                },
+                &parent,
+                OpenOptions {
+                    flags,
+                    relative_path: relative_path.to_string_lossy().into(),
+                    server_chan: &mut server_end,
+                },
             ).open()
             .await
             {

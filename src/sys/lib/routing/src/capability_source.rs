@@ -11,7 +11,6 @@ use {
         error::RoutingError,
     },
     async_trait::async_trait,
-    cm_moniker::InstancedAbsoluteMoniker,
     cm_rust::{
         CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, DirectoryDecl,
         EventDecl, EventStreamDecl, ExposeDecl, ExposeDirectoryDecl, ExposeEventStreamDecl,
@@ -24,12 +23,7 @@ use {
     },
     derivative::Derivative,
     from_enum::FromEnum,
-    std::{
-        collections::HashMap,
-        fmt,
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::{collections::HashMap, fmt, sync::Weak},
     thiserror::Error,
 };
 
@@ -174,44 +168,6 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySourceInterface<C
                 }
             }
         )
-    }
-}
-
-/// Information returned by the route_storage_capability function on the source of a storage
-/// capability.
-#[derive(Debug, Derivative)]
-#[derivative(Clone(bound = ""))]
-pub struct StorageCapabilitySource<C: ComponentInstanceInterface> {
-    /// The component that's providing the backing directory capability for this storage
-    /// capability. If None, then the backing directory comes from component_manager's namespace.
-    pub storage_provider: Option<Arc<C>>,
-
-    /// The path to the backing directory in the providing component's outgoing directory (or
-    /// component_manager's namespace).
-    pub backing_directory_path: CapabilityPath,
-
-    /// The subdirectory inside of the backing directory capability to use, if any
-    pub backing_directory_subdir: Option<PathBuf>,
-
-    /// The subdirectory inside of the backing directory's sub-directory to use, if any. The
-    /// difference between this and backing_directory_subdir is that backing_directory_subdir is
-    /// appended to backing_directory_path first, and component_manager will create this subdir if
-    /// it doesn't exist but won't create backing_directory_subdir.
-    pub storage_subdir: Option<PathBuf>,
-
-    /// The moniker of the component that defines the storage capability, with instance ids. This
-    /// is used for generating moniker-based storage paths.
-    pub storage_source_moniker: InstancedAbsoluteMoniker,
-}
-
-impl<C: ComponentInstanceInterface> PartialEq for StorageCapabilitySource<C> {
-    fn eq(&self, other: &Self) -> bool {
-        let self_source_component = self.storage_provider.as_ref().map(|s| s.abs_moniker());
-        let other_source_component = other.storage_provider.as_ref().map(|s| s.abs_moniker());
-        self_source_component == other_source_component
-            && self.backing_directory_path == other.backing_directory_path
-            && self.backing_directory_subdir == other.backing_directory_subdir
-            && self.storage_subdir == other.storage_subdir
     }
 }
 

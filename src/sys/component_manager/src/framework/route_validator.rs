@@ -10,9 +10,7 @@ use {
             error::ModelError,
             hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             model::Model,
-            routing::{
-                self, service::CollectionServiceRoute, RouteRequest, RouteSource, RoutingError,
-            },
+            routing::{self, service::CollectionServiceRoute, Route, RouteRequest, RoutingError},
         },
     },
     async_trait::async_trait,
@@ -240,25 +238,9 @@ impl RouteValidator {
         request: RouteRequest,
         target: &Arc<ComponentInstance>,
     ) -> Result<(String, Option<Vec<fsys::ServiceInstance>>), RoutingError> {
-        let source = routing::route(request, target).await?;
-        let source = match source {
-            RouteSource::Directory(s, _) => s,
-            RouteSource::Event(s) => s,
-            RouteSource::EventStream(s) => s,
-            RouteSource::Protocol(s) => s,
-            RouteSource::Resolver(s) => s,
-            RouteSource::Runner(s) => s,
-            RouteSource::Service(s) => s,
-            RouteSource::Storage(s) => s,
-            RouteSource::StorageBackingDirectory(s) => {
-                let moniker = match s.storage_provider {
-                    Some(s) => ExtendedMoniker::ComponentInstance(s.abs_moniker.clone()),
-                    None => ExtendedMoniker::ComponentManager,
-                };
-                return Ok((Self::extended_moniker_to_str(scope_moniker, moniker), None));
-            }
-        };
-        let service_dir = match &source {
+        let source = request.route(target).await?;
+        let source = &source.source;
+        let service_dir = match source {
             CapabilitySource::Collection { capability, component, collection_name, .. } => {
                 let component = component.upgrade()?;
                 let route = CollectionServiceRoute {
@@ -387,7 +369,7 @@ async fn validate_uses(
         let capability = Some(use_.source_name().to_string());
         let decl_type = Some(fsys::DeclType::Use);
         if let Ok(route_request) = routing::request_for_namespace_capability_use(use_) {
-            let error = if let Err(e) = routing::route(route_request, &instance).await {
+            let error = if let Err(e) = route_request.route(&instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
             } else {
                 None
@@ -413,7 +395,7 @@ async fn validate_exposes(
         let capability = Some(expose.target_name().to_string());
         let decl_type = Some(fsys::DeclType::Expose);
         if let Ok(route_request) = routing::request_for_namespace_capability_expose(expose) {
-            let error = if let Err(e) = routing::route(route_request, instance).await {
+            let error = if let Err(e) = route_request.route(instance).await {
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..fsys::RouteError::EMPTY })
             } else {
                 None

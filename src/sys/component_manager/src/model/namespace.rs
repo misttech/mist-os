@@ -8,10 +8,7 @@ use {
         model::{
             component::{ComponentInstance, Package, WeakComponentInstance},
             error::NamespacePopulateError,
-            routing::{
-                self, route_and_open_capability, OpenDirectoryOptions, OpenEventStreamOptions,
-                OpenOptions, OpenProtocolOptions, OpenServiceOptions, OpenStorageOptions,
-            },
+            routing::{self, route_and_open_capability, OpenOptions},
         },
     },
     ::routing::{
@@ -333,19 +330,19 @@ async fn route_directory(
     let (route_request, open_options) = match &use_ {
         UseDecl::Directory(use_dir_decl) => (
             RouteRequest::UseDirectory(use_dir_decl.clone()),
-            OpenOptions::Directory(OpenDirectoryOptions {
+            OpenOptions {
                 flags: flags | fio::OpenFlags::DIRECTORY,
                 relative_path: String::new(),
                 server_chan: &mut server_end,
-            }),
+            },
         ),
         UseDecl::Storage(use_storage_decl) => (
             RouteRequest::UseStorage(use_storage_decl.clone()),
-            OpenOptions::Storage(OpenStorageOptions {
+            OpenOptions {
                 flags: flags | fio::OpenFlags::DIRECTORY,
                 relative_path: ".".into(),
                 server_chan: &mut server_end,
-            }),
+            },
         ),
         _ => panic!("not a directory or storage capability"),
     };
@@ -402,33 +399,30 @@ fn add_service_or_protocol_use(
                 match &use_ {
                             UseDecl::Service(use_service_decl) => {
                                 (RouteRequest::UseService(use_service_decl.clone()),
-                                 OpenOptions::Service(
-                                     OpenServiceOptions{
+                                     OpenOptions{
                                          flags,
                                          relative_path: relative_path.into_string(),
                                          server_chan: &mut server_end
                                      }
-                                 ))
+                                 )
                             },
                             UseDecl::Protocol(use_protocol_decl) => {
                                 (RouteRequest::UseProtocol(use_protocol_decl.clone()),
-                                 OpenOptions::Protocol(
-                                     OpenProtocolOptions{
+                                     OpenOptions{
                                          flags,
                                          relative_path: relative_path.into_string(),
                                          server_chan: &mut server_end
                                      }
-                                 ))
+                                 )
                             },
                             UseDecl::EventStream(stream)=> {
                                 (RouteRequest::UseEventStream(stream.clone()),
-                                 OpenOptions::EventStream(
-                                     OpenEventStreamOptions{
+                                     OpenOptions{
                                          flags,
                                          relative_path: stream.target_path.to_string(),
                                          server_chan: &mut server_end,
                                      }
-                                 ))
+                                 )
                             },
                             _ => panic!("add_service_or_protocol_use called with non-service or protocol capability"),
                         }

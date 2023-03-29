@@ -6,7 +6,7 @@ use {
     crate::model::{
         component::StartReason,
         error::{ModelError, NamespacePopulateError, StartActionError},
-        routing::{route_and_open_capability, OpenOptions, OpenStorageOptions},
+        routing::{route_and_open_capability, OpenOptions},
         testing::routing_test_helpers::*,
     },
     ::routing_test_helpers::{
@@ -665,13 +665,13 @@ async fn use_restricted_storage_open_failure() {
             availability: cm_rust::Availability::Required,
         }),
         &parent_consumer_instance,
-        OpenOptions::Storage(OpenStorageOptions {
+        OpenOptions {
             flags: fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
             relative_path: ".".into(),
             server_chan: &mut server_end,
-        }),
+        },
     )
     .await
     .expect("Unable to route.  oh no!!");
@@ -702,13 +702,13 @@ async fn use_restricted_storage_open_failure() {
             availability: cm_rust::Availability::Required,
         }),
         &parent_consumer_instance,
-        OpenOptions::Storage(OpenStorageOptions {
+        OpenOptions {
             flags: fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
             relative_path: ".".into(),
             server_chan: &mut server_end,
-        }),
+        },
     )
     .await;
     assert!(matches!(
@@ -795,13 +795,13 @@ async fn open_storage_subdirectory() {
             availability: cm_rust::Availability::Required,
         }),
         &consumer_instance,
-        OpenOptions::Storage(OpenStorageOptions {
+        OpenOptions {
             flags: fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
             relative_path: ".".into(),
             server_chan: &mut server_end,
-        }),
+        },
     )
     .await
     .expect("Unable to route.  oh no!!");
@@ -827,13 +827,13 @@ async fn open_storage_subdirectory() {
             availability: cm_rust::Availability::Required,
         }),
         &consumer_instance,
-        OpenOptions::Storage(OpenStorageOptions {
+        OpenOptions {
             flags: fio::OpenFlags::RIGHT_READABLE
                 | fio::OpenFlags::RIGHT_WRITABLE
                 | fio::OpenFlags::DIRECTORY,
             relative_path: "foo/bar".into(),
             server_chan: &mut server_end,
-        }),
+        },
     )
     .await
     .expect("Unable to route.  oh no!!");
