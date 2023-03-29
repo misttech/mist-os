@@ -12,6 +12,18 @@
 #include <asm-generic/socket.h>
 #include <gtest/gtest.h>
 
+#if !defined(__NR_memfd_create)
+#if defined(__x86_64__)
+#define __NR_memfd_create 319
+#elif defined(__i386__)
+#define __NR_memfd_create 356
+#elif defined(__aarch64__)
+#define __NR_memfd_create 279
+#elif defined(__arm__)
+#define __NR_memfd_create 385
+#endif
+#endif  // !defined(__NR_memfd_create)
+
 TEST(UnixSocket, ReadAfterClose) {
   int fds[2];
 
@@ -199,3 +211,41 @@ TEST(UnixSocket, SendZeroFds) {
   EXPECT_EQ(data[0], 'a');
   EXPECT_EQ(msg.msg_controllen, 0u);
 }
+
+#if defined(__NR_memfd_create)
+TEST(UnixSocket, SendMemFd) {
+  int fds[2];
+  ASSERT_EQ(0, socketpair(AF_UNIX, SOCK_STREAM, 0, fds));
+
+  int memfd = static_cast<int>(syscall(__NR_memfd_create, "test_memfd", 0));
+
+  char data[] = "";
+  struct iovec iov[] = {{
+      .iov_base = data,
+      .iov_len = 1,
+  }};
+  char buf[CMSG_SPACE(sizeof(int))];
+  struct msghdr msg = {
+      .msg_iov = iov,
+      .msg_iovlen = 1,
+      .msg_control = buf,
+      .msg_controllen = sizeof(buf),
+  };
+  struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg);
+  *cmsg = (struct cmsghdr){
+      .cmsg_len = CMSG_LEN(sizeof(int)),
+      .cmsg_level = SOL_SOCKET,
+      .cmsg_type = SCM_RIGHTS,
+  };
+  memmove(CMSG_DATA(cmsg), &memfd, sizeof(int));
+  msg.msg_controllen = cmsg->cmsg_len;
+
+  ASSERT_EQ(sendmsg(fds[0], &msg, 0), 1);
+
+  memset(data, 0, sizeof(data));
+  memset(buf, 0, sizeof(buf));
+  ASSERT_EQ(recvmsg(fds[1], &msg, 0), 1);
+  EXPECT_EQ(data[0], '\0');
+  EXPECT_GT(msg.msg_controllen, 0u);
+}
+#endif  // defined(__NR_memfd_create)

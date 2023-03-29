@@ -568,18 +568,18 @@ fn sendmsg_internal(
     let iovec =
         current_task.mm.read_iovec(message_header.msg_iov, message_header.msg_iovlen as i32)?;
 
-    let mut control_bytes_read = 0;
+    let mut next_message_offset = 0;
     let mut ancillary_data = Vec::new();
     let header_size = std::mem::size_of::<cmsghdr>();
     loop {
-        let space = message_header.msg_controllen - control_bytes_read;
+        let space = message_header.msg_controllen.saturating_sub(next_message_offset);
         if space < header_size {
             break;
         }
         let mut cmsg = cmsghdr::default();
         current_task
             .mm
-            .read_memory(message_header.msg_control + control_bytes_read, cmsg.as_bytes_mut())?;
+            .read_memory(message_header.msg_control + next_message_offset, cmsg.as_bytes_mut())?;
         // If the message header is not long enough to fit the required fields of the
         // control data, return EINVAL.
         if cmsg.cmsg_len < header_size {
@@ -589,10 +589,10 @@ fn sendmsg_internal(
         let data_size = std::cmp::min(cmsg.cmsg_len - header_size, space);
         let mut data = vec![0u8; data_size];
         current_task.mm.read_memory(
-            message_header.msg_control + control_bytes_read + header_size,
+            message_header.msg_control + next_message_offset + header_size,
             &mut data,
         )?;
-        control_bytes_read +=
+        next_message_offset +=
             round_up_to_increment(header_size + data.len(), std::mem::size_of::<usize>())?;
         ancillary_data.push(AncillaryData::from_cmsg(
             current_task,
