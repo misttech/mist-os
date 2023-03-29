@@ -95,24 +95,44 @@ declare_args() {
 #
 #     Type: list of paths (cannot be empty)
 #
-#   allow_directory_in_outputs:
+#   allow_directory_in_outputs (optional):
 #     If true, directories are allowed in `bazel_outputs`, which will allow
 #     users to send directories as a whole from Bazel to GN.
 #
 #     NOTE: Using directories as outputs can usually lead to incremental build
 #     issues in GN/Ninja, because timestamps on directories may not correctly
-#     represent freshness of its contents.
+#     represent freshness of its contents. See directory_timestamp_outputs below.
 #
 #     Type: boolean
 #     Default: false
 #
-#   ninja_outputs: (required)
-#     Must be a list with the same length as `bazel_outputs`,
-#     providing paths relative to the target_gen_dir for this action,
-#     specifying where each one of the corresponding item in `bazel_outputs`
-#     should be hard-linked / copied to.
+#   directory_timestamp_outputs: (optional)
 #
-#     Type: a list of output file paths, relative to target_gen_dir.
+#     When allow_directory_in_outputs is set, a list of one ore more output
+#     files inside the output directories. Paths are relative to target_gen_dir.
+#     This is useful to provide Ninja with a file timestamp it can rely on
+#     (directory timestamps are not usable, and not managed in a consistent way
+#     across platforms).
+#
+#     IMPORTANT: For incremental build correctness, these timestamps must always
+#     reflect the freshness of the whole directory content. For example:
+#
+#       bazel_action("foo_product_bundle") {
+#          command = "build"
+#          ...
+#          copy_outputs = [
+#            {
+#              bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}_out"
+#              ninja = "product_bundle"
+#            }
+#          ]
+#          directory_timestamp_outputs = [
+#            "product_bundle/product_bundle.json",
+#          ]
+#       }
+#
+#     Type: list of paths relative to target_gen_dir.
+#     Default: empty
 #
 #   extra_bazel_args: (optional)
 #     A list extra command line arguments to pass to Bazel.
@@ -375,6 +395,15 @@ template("bazel_action") {
     depfile = "$target_gen_dir/$target_name.d"
 
     outputs = _outputs
+    if (defined(invoker.directory_timestamp_outputs)) {
+      assert(
+          _allow_directory_in_outputs,
+          "directory_timestamp_outputs is not useful when there are no directory copies (allow_directory_in_outputs=false)")
+      foreach(path, invoker.directory_timestamp_outputs) {
+        outputs += [ target_gen_dir + "/" + path ]
+      }
+    }
+
     args = [
              "--bazel-launcher",
              rebase_path(bazel_launcher, root_build_dir),
