@@ -85,7 +85,7 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:144
+From //build/images/args.gni:151
 
 ### api_compatibility_testing
 
@@ -133,7 +133,7 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:177
+From //build/images/args.gni:184
 
 ### authorized_ssh_keys
 
@@ -143,7 +143,7 @@ for non-production builds and requires inclusion of configuration data from
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:164
+From //build/images/args.gni:171
 
 ### auto_update_packages
 
@@ -291,7 +291,7 @@ When set, include the corresponding Bazel assembly targets in this build.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:180
+From //build/images/args.gni:187
 
 ### bazel_quiet
 
@@ -376,15 +376,6 @@ From //boards/x64.gni:17
 
 From //build/images/filesystem_limits.gni:15
 
-### blobfs_enable_delivery_blobs
-
-Enable delivery blob support by default when mounting Blobfs. Delivery blobs can still be
-enabled via the `allow_delivery_blobs` mount option (e.g. for unit tests).
-
-**Current value (from the default):** `false`
-
-From //src/storage/blobfs/BUILD.gn:11
-
 ### blobfs_enable_streaming_writes
 
 Enable streaming writes by default when mounting Blobfs. Streaming writes can still be enabled
@@ -394,7 +385,7 @@ Streaming writes are only supported when writing delivery blobs or when compress
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:17
+From //src/storage/blobfs/BUILD.gn:14
 
 ### blobfs_maximum_runtime_bytes
 
@@ -424,7 +415,7 @@ metrics entries.
 
 **Current value (from the default):** `false`
 
-From //src/storage/blobfs/BUILD.gn:22
+From //src/storage/blobfs/BUILD.gn:19
 
 ### blobfs_product_maximum_bytes
 
@@ -1359,7 +1350,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:124
+From //build/toolchain/rbe.gni:137
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -1367,7 +1358,7 @@ From //out/not-default/args.gn:7
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:124
+From //build/toolchain/rbe.gni:137
 
 ### cxx_rbe_exec_strategy
 
@@ -1390,7 +1381,7 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:142
+From //build/toolchain/rbe.gni:155
 
 ### cxx_rbe_use_python_impl
 
@@ -1587,6 +1578,18 @@ From //third_party/pigweed/src/pw_build/defaults.gni:25
 **Current value (from the default):** `[]`
 
 From //third_party/pigweed/src/pw_build/defaults.gni:26
+
+### delivery_blob_type
+
+Controls what type of delivery blob blobfs accepts.
+Supported types can be found in //src/storage/blobfs/delivery_blob.h
+Valid values are integers, for example: 1
+By default no delivery blobs are accepted.
+This arg is for local developer only, products should not set this arg.
+
+**Current value (from the default):** `false`
+
+From //build/images/args.gni:148
 
 ### deny_warnings
 
@@ -4065,7 +4068,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:150
+From //build/images/args.gni:157
 
 ### include_clippy
 
@@ -4082,7 +4085,7 @@ Include fvm.blob.sparse.blk image into the build if set to true
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:147
+From //build/images/args.gni:154
 
 ### include_internal_fonts
 
@@ -4108,7 +4111,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:173
+From //build/images/args.gni:180
 
 ### include_zxdb_large_tests
 
@@ -6993,7 +6996,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:159
+From //build/images/args.gni:166
 
 ### recovery_logo_path
 
@@ -7186,16 +7189,7 @@ Supported modes are:
 
 **Current value (from the default):** `"copy"`
 
-From //src/sys/pkg/bin/package-tool/package-tool.gni:184
-
-### repository_publish_delivery_blob_type
-
-Controls what type of delivery blob to generate in the repository.
-Supported types can be found in //src/storage/blobfs/delivery_blob.h
-
-**Current value (from the default):** `-1`
-
-From //src/sys/pkg/bin/package-tool/package-tool.gni:188
+From //src/sys/pkg/bin/package-tool/package-tool.gni:185
 
 ### restat_cc
 
@@ -7283,7 +7277,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:116
+From //build/toolchain/rbe.gni:129
 
 ### rust_rbe_enable
 
@@ -7295,7 +7289,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:72
+From //build/toolchain/rbe.gni:85
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -7303,7 +7297,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:72
+From //build/toolchain/rbe.gni:85
 
 ### rust_rbe_exec_strategy
 
@@ -7326,7 +7320,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:90
+From //build/toolchain/rbe.gni:103
 
 ### rust_rbe_use_python_impl
 
@@ -8151,7 +8145,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:187
+From //build/images/args.gni:194
 
 ### use_blink
 
@@ -8523,7 +8517,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:169
+From //build/images/args.gni:176
 
 ### virtcon_boot_animation_path
 
