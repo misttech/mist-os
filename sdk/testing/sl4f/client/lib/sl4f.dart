@@ -19,6 +19,7 @@ export 'src/feedback_data_provider.dart';
 export 'src/flatland_example.dart';
 export 'src/input.dart';
 export 'src/inspect.dart';
+export 'src/media_session.dart';
 export 'src/modular.dart';
 export 'src/performance.dart';
 export 'src/proxy.dart';

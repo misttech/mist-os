@@ -3409,6 +3409,40 @@
       "name": "inspect.dart",
       "type": "file"
     },
+    "media_session.dart": {
+      "ClassDeclarationImpl": {
+        "MediaSession": {
+          "ConstructorDeclarationImpl": {
+            "MediaSession": {
+              "FieldFormalParameterImpl": {
+                "this._sl4f": {
+                  "name": "this._sl4f",
+                  "type": "FieldFormalParameterImpl"
+                }
+              },
+              "name": "MediaSession",
+              "type": "ConstructorDeclarationImpl"
+            }
+          },
+          "MethodDeclarationImpl": {
+            "getActiveSessionStatus": {
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "getActiveSessionStatus",
+              "returnType": "Future<String?>",
+              "type": "MethodDeclarationImpl"
+            }
+          },
+          "name": "MediaSession",
+          "type": "ClassDeclarationImpl"
+        }
+      },
+      "name": "media_session.dart",
+      "type": "file"
+    },
     "memory_metrics.dart": {
       "FunctionDeclarationImpl": {
         "memoryMetricsProcessor": {
@@ -5818,6 +5852,10 @@
         },
         "src/inspect.dart": {
           "name": "src/inspect.dart",
+          "type": "ExportDirectiveImpl"
+        },
+        "src/media_session.dart": {
+          "name": "src/media_session.dart",
           "type": "ExportDirectiveImpl"
         },
         "src/modular.dart": {
