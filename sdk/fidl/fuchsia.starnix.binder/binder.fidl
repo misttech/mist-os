@@ -99,6 +99,14 @@ protocol DevBinder {
         /// Mandatory
         3: binder server_end:Binder;
     });
+
+    /// Close the binder device node, previously opened with `Open`. The handle
+    /// is passed back to the service so that it can identify the device being
+    /// closed.
+    Close(resource table {
+        /// The Binder protocol opened previously.
+        1: binder client_end:Binder;
+    });
 };
 
 /// An opened connection to a binder driver.

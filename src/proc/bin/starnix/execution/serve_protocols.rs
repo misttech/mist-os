@@ -92,6 +92,10 @@ pub async fn serve_dev_binder(
                     control_handle.shutdown();
                 }
             }
+            fbinder::DevBinderRequest::Close { payload: _, control_handle: _ } => {
+                // Nothing to do here, as ordering between open and close is not important here, as
+                // all opened binder are opened with a different process.
+            }
         }
     }
     Ok(())
