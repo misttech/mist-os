@@ -25,6 +25,7 @@ static_library("core_dev_tools") {
     "analytics_executor.h",
     "command_line_options.h",
     "general_parameters.h",
+    "google_analytics_4_client.h",
     "google_analytics_client.h",
     "system_info.h",
     "user_agent.h",
@@ -43,6 +44,8 @@ static_library("core_dev_tools") {
     "command_line_options.h",
     "general_parameters.cc",
     "general_parameters.h",
+    "google_analytics_4_client.cc",
+    "google_analytics_4_client.h",
     "google_analytics_client.cc",
     "google_analytics_client.h",
     "system_info.cc",
@@ -58,6 +61,7 @@ static_library("core_dev_tools") {
     "//src/developer/debug/shared",
     "//src/developer/debug/zxdb/common",
     "//src/lib/analytics/cpp/google_analytics",
+    "//src/lib/analytics/cpp/google_analytics_4",
     "//src/lib/analytics/cpp/metric_properties",
     "//src/lib/fxl",
   ]
@@ -95,7 +99,7 @@ test("analytics_executor_manualtest") {
   sources = [ "analytics_executor_manualtest.cc" ]
   deps = [
     ":core_dev_tools",
-    "//src/developer/debug/shared",
+    "//src/developer/debug/zxdb/common",
     "//src/lib/fxl",
   ]
 }
@@ -106,7 +110,18 @@ test("google_analytics_client_manualtest") {
   sources = [ "google_analytics_client_manualtest.cc" ]
   deps = [
     ":core_dev_tools",
-    "//src/developer/debug/shared",
+    "//src/developer/debug/zxdb/common",
+    "//src/lib/fxl",
+  ]
+}
+
+test("google_analytics_4_client_manualtest") {
+  output_name =
+      "analytics_cpp_core_dev_tools_google_analytics_4_client_manualtest"
+  sources = [ "google_analytics_4_client_manualtest.cc" ]
+  deps = [
+    ":core_dev_tools",
+    "//src/developer/debug/zxdb/common",
     "//src/lib/fxl",
   ]
 }
@@ -116,6 +131,7 @@ group("tests") {
 
   deps = [
     ":analytics_executor_manualtest",
+    ":google_analytics_4_client_manualtest",
     ":google_analytics_client_manualtest",
     ":system_info_manualtest",
     ":unittests",

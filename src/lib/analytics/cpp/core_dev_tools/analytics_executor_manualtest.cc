@@ -74,8 +74,8 @@ int main(int argc, char* argv[]) {
   std::string url(argv[2]);
   std::string data(argv[3]);
 
-  debug_ipc::Curl::GlobalInit();
-  auto deferred_cleanup = fit::defer(debug_ipc::Curl::GlobalCleanup);
+  zxdb::Curl::GlobalInit();
+  auto deferred_cleanup = fit::defer(zxdb::Curl::GlobalCleanup);
 
   // This scope forces all the objects to be destroyed before the curl_global_cleanup call
   {

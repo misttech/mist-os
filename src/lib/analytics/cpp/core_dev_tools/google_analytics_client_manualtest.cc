@@ -20,7 +20,7 @@ int main(int argc, char* argv[]) {
   }
 
   std::string tracking_id(argv[1]);
-  std::string client_id(argv[1]);
+  std::string client_id(argv[2]);
 
   zxdb::Curl::GlobalInit();
   auto deferred_cleanup_curl = fit::defer(zxdb::Curl::GlobalCleanup);
@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
 
   auto event = GoogleAnalyticsEvent("test event", "test", "test label", 12345);
 
-  ga_client.AddEvent(event);
+  ga_client.AddHit(event);
 
   return 0;
 }
