@@ -76,11 +76,13 @@ def send_http_request(
             _LOGGER.debug(
                 "Sending HTTP request to url=%s with data=%s and headers=%s",
                 url, data, headers)
-
             req = urllib.request.Request(url, data=data_bytes, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as response:
-                response_body = response.read()
-            return json.loads(response_body.decode("utf-8"))
+                response_body = response.read().decode("utf-8")
+            _LOGGER.debug(
+                "HTTP response received from url=%s is '%s'", url,
+                response_body)
+            return json.loads(response_body)
         except Exception as err:  # pylint: disable=broad-except
             for exception_to_skip in exceptions_to_skip:
                 if isinstance(err, exception_to_skip):

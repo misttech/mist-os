@@ -29,7 +29,7 @@ class HoneyDewError(Exception):
         Note: Additionally, logs 'msg' to debug log level file.
         """
         super().__init__(msg)
-        _LOGGER.debug(repr(self))
+        _LOGGER.debug(repr(self), exc_info=True)
 
 
 class FfxCommandError(HoneyDewError):
@@ -48,6 +48,15 @@ class HttpRequestError(HoneyDewError):
         err_code (int): numeric code of the error.
     """
     err_code = 11
+
+
+class SSHCommandError(HoneyDewError):
+    """Exception for errors raised by SSH commands running on host machine.
+
+    Attributes:
+        err_code (int): numeric code of the error.
+    """
+    err_code = 12
 
 
 class FuchsiaDeviceError(HoneyDewError):

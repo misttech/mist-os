@@ -33,6 +33,9 @@ def check_ffx_connection(
 
     Returns:
         True if successful, False otherwise.
+
+    Raises:
+        errors.FfxCommandError: In case of failure.
     """
     # Sample ffx_target_show_info containing ssh_address:
     # [
@@ -58,15 +61,13 @@ def check_ffx_connection(
     # ]
     try:
         ffx_target_show_info = ffx_target_show(target, timeout)
-        target_entry = _get_label_entry(
-            ffx_target_show_info, label_value="target")
-        target_title_entry = _get_label_entry(
-            target_entry["child"], label_value="name")
-        return target_title_entry["value"] == target
-    except Exception:  # pylint: disable=broad-except
-        _LOGGER.warning(
-            "Failed to confirm if Host is able to communicate with %s.", target)
+    except subprocess.TimeoutExpired:
+        # which means fuchsia device is not currently connected to host
         return False
+    target_entry = _get_label_entry(ffx_target_show_info, label_value="target")
+    target_title_entry = _get_label_entry(
+        target_entry["child"], label_value="name")
+    return target_title_entry["value"] == target
 
 
 def ffx_target_show(
@@ -82,17 +83,23 @@ def ffx_target_show(
         Output of `ffx -t {target} target show`.
 
     Raises:
+        subprocess.TimeoutExpired: In case of timeout
         errors.FfxCommandError: In case of failure.
     """
     cmd = _CMDS["FUCHSIA_TARGETS_SHOW"].format(target=target)
     try:
+        _LOGGER.debug("Executing command `%s`", cmd)
         output = subprocess.check_output(
             cmd, shell=True, stderr=subprocess.STDOUT,
             timeout=timeout).decode()
         ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
+        _LOGGER.debug("`%s` returned: %s", cmd, ffx_target_show_info)
         return ffx_target_show_info
+    except subprocess.TimeoutExpired as err:
+        _LOGGER.debug(err, exc_info=True)
+        raise
     except Exception as err:  # pylint: disable=broad-except
-        raise errors.FfxCommandError(f"{cmd} command failed") from err
+        raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
 
 def get_target_address(

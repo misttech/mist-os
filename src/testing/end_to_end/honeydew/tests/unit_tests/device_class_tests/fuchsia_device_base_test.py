@@ -562,6 +562,22 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
 
         mock_check_output.assert_called_once()
 
+    @mock.patch.object(
+        fuchsia_device_base.subprocess,
+        "check_output",
+        side_effect=subprocess.CalledProcessError(
+            returncode=1, cmd="ssh fuchsia@12.34.56.78:ls"),
+        autospec=True)
+    def test_run_ssh_command_on_host_exception(self, mock_check_output):
+        """Testcase for FuchsiaDeviceBase._run_ssh_command_on_host() raising
+        errors.SSHCommandError exception"""
+        command = "some_command"
+
+        with self.assertRaises(errors.SSHCommandError):
+            self.fd_obj._run_ssh_command_on_host(command=command)
+
+        mock_check_output.assert_called_once()
+
     @parameterized.expand(
         [
             (

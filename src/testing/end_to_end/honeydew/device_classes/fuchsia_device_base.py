@@ -472,7 +472,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             SSH command output.
 
         Raises:
-            subprocess.CalledProcessError: On failure.
+            errors.SSHCommandError: On failure.
         """
         ssh_command = _SSH_COMMAND.format(
             ssh_options=_SSH_OPTIONS,
@@ -480,11 +480,16 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             ssh_user=self._ssh_user,
             ip_address=self._ip_address,
             command=command)
-
-        _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
-        output = subprocess.check_output(
-            ssh_command.split(), timeout=timeout).decode()
-        return output
+        try:
+            _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
+            output = subprocess.check_output(
+                ssh_command.split(), timeout=timeout).decode()
+            _LOGGER.debug(
+                "Output returned by SSH command '%s' is: '%s'", ssh_command,
+                output)
+            return output
+        except Exception as err:  # pylint: disable=broad-except
+            raise errors.SSHCommandError(err) from err
 
     def _start_sl4f_server(self) -> None:
         """Starts the SL4F server on fuchsia device.
@@ -510,12 +515,12 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """
         end_time = time.time() + timeout
 
-        # IP address may change on reboot. So get the ip address once again
-        self._ip_address = self._get_device_ip_address(timeout)
-
         # wait until device is responsive to FFX
+        self._wait_for_online(timeout)
+
+        # IP address may change on reboot. So get the ip address once again
         remaining_timeout = max(0, end_time - time.time())
-        self._wait_for_online(remaining_timeout)
+        self._ip_address = self._get_device_ip_address(remaining_timeout)
 
         # wait until device to allow ssh connection
         remaining_timeout = max(0, end_time - time.time())
