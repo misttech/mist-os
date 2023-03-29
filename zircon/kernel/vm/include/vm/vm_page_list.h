@@ -22,6 +22,9 @@
 #include <vm/pmm.h>
 #include <vm/vm.h>
 
+class VmPageList;
+class VMPLCursor;
+
 // RAII helper for representing content in a page list node. This supports being in one of five
 // states
 //  * Empty       - Contains nothing
@@ -612,9 +615,95 @@ class VmPageListNode final : public fbl::WAVLTreeContainable<ktl::unique_ptr<VmP
 
   uint64_t obj_offset_ = 0;
   VmPageOrMarker pages_[kPageFanOut];
+
+  friend VMPLCursor;
 };
 
-class VmPageList;
+// Cursor that can be used for iterating over contiguous blocks of entries in a page list. The
+// underlying page list must not have any entries removed while using this cursor, as the cursor
+// retains iterators into the page list. It is, however, safe to insert new entries.
+// The cursor can be used to iterate over empty contiguous slots, however iteration will always
+// cease if entries are not contiguous.
+class VMPLCursor {
+ public:
+  VMPLCursor() : index_(kPageFanOut) {}
+
+  // Retrieve the current VmPageOrMarker pointed at by the cursor. This will be a nullptr if the
+  // cursor is no longer valid. The slot pointed at may itself be empty.
+  // Note that it is up to the caller to know the offset, which it can track by remembering how
+  // many |step|s it has done.
+  VmPageOrMarkerRef current() const {
+    return VmPageOrMarkerRef(valid() ? &(node_->pages_[index_]) : nullptr);
+  }
+
+  // Move the cursor to the next entry. The next entry can then be retrieved by calling |current|,
+  // and if there is no next entry then current will return a nullptr.
+  void step() {
+    if (valid()) {
+      index_++;
+      if (index_ == kPageFanOut) {
+        inc_node();
+      }
+    }
+  }
+
+  // Calls the provided callback of type [](VmPageOrMarkerRef)->zx_status_t on every entry as long
+  // as they are contiguous. This is equivalent a loop calling |step| and |current|, but can
+  // produce more optimal code gen with the internal loop.
+  // The callback can return ZX_ERR_NEXT to continue, ZX_ERR_STOP to cease iteration gracefully, or
+  // any other status to terminate with that status code.
+  template <typename F>
+  zx_status_t ForEveryContiguous(F func) {
+    while (valid()) {
+      while (index_ < kPageFanOut) {
+        zx_status_t status = func(VmPageOrMarkerRef(&node_->pages_[index_]));
+        if (status != ZX_ERR_NEXT) {
+          return status == ZX_ERR_STOP ? ZX_OK : status;
+        }
+        index_++;
+      }
+      if (!inc_node()) {
+        return ZX_OK;
+      }
+    }
+    return ZX_OK;
+  }
+
+ private:
+  static constexpr size_t kPageFanOut = VmPageListNode::kPageFanOut;
+
+  VMPLCursor(fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>>::iterator&& node, uint index)
+      : node_(node), index_(index) {}
+
+  // Helper to increment the underlying node_, testing for contiguity.
+  bool inc_node() {
+    // Should only be incrementing if index is at the end, as otherwise we're not being contiguous.
+    DEBUG_ASSERT(index_ == kPageFanOut);
+    const uint64_t prev = node_->obj_offset_;
+    node_++;
+    if (node_.IsValid() && node_->obj_offset_ == prev + PAGE_SIZE * kPageFanOut) {
+      // node is valid and contiguous, reset the index_ to both remove the terminal sentinel, and
+      // resume iteration from the beginning.
+      index_ = 0;
+      // TODO: Once cursor is in use benchmark the impact of validating that the node is not empty.
+      return true;
+    }
+    return false;
+  }
+
+  // Helper to check if the node is valid or not by checking index for its sentinel value.
+  bool valid() const { return index_ < kPageFanOut; }
+
+  // Current node_ in the underlying page list currently being iterated. If this is invalid then
+  // index_ will be kPageFanOut
+  fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>>::iterator node_;
+
+  // The index into node_ that is currently being pointed at to be returned by |current|. The
+  // sentinel value of kPageFanOut is used to indicate that node_ is no longer valid.
+  uint index_;
+
+  friend VmPageList;
+};
 
 // Class which holds the list of vm_page structs removed from a VmPageList
 // by TakePages. The list include information about uncommitted pages and markers.
@@ -763,6 +852,10 @@ class VmPageList final {
   // Similar to `Lookup` but returns a VmPageOrMarkerRef that allows for limited mutation of the
   // slot. General mutation requires calling `LookupOrAllocate`.
   VmPageOrMarkerRef LookupMutable(uint64_t offset);
+
+  // Similar to `LookupMutable` but returns a VMPLCursor that allows for iterating over any
+  // contiguous slots from the provided offset.
+  VMPLCursor LookupMutableCursor(uint64_t offset);
 
   // Similar to `Lookup` but only returns `nullptr` if a slot cannot be allocated either due to out
   // of memory or due to offset being invalid.

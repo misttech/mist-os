@@ -1137,6 +1137,83 @@ static bool vmpl_contiguous_traversal_error_test() {
   END_TEST;
 }
 
+static bool vmpl_cursor_test() {
+  BEGIN_TEST;
+
+  VmPageList list;
+  list.InitializeSkew(0, 0);
+
+  // Add some entries to produce some contiguous and non-contiguous nodes.
+  constexpr uint64_t off1 = VmPageListNode::kPageFanOut * 3 + 4;
+  constexpr uint64_t off2 = VmPageListNode::kPageFanOut * 5 + 4;
+  constexpr uint64_t off3 = VmPageListNode::kPageFanOut * 6 + 1;
+  constexpr uint64_t off4 = VmPageListNode::kPageFanOut * 6 + 2;
+  constexpr uint64_t off5 = VmPageListNode::kPageFanOut * 8 + 1;
+
+  EXPECT_TRUE(AddMarker(&list, off1 * PAGE_SIZE));
+  EXPECT_TRUE(AddMarker(&list, off2 * PAGE_SIZE));
+  EXPECT_TRUE(AddMarker(&list, off3 * PAGE_SIZE));
+  EXPECT_TRUE(AddMarker(&list, off4 * PAGE_SIZE));
+  EXPECT_TRUE(AddMarker(&list, off5 * PAGE_SIZE));
+
+  // Looking up offsets that fall completely out of a node should yield an invalid cursor.
+  VMPLCursor cursor = list.LookupMutableCursor((off1 - VmPageListNode::kPageFanOut) * PAGE_SIZE);
+  EXPECT_FALSE(cursor.current());
+  cursor = list.LookupMutableCursor((off1 + VmPageListNode::kPageFanOut) * PAGE_SIZE);
+  EXPECT_FALSE(cursor.current());
+
+  // Looking up in a node should yield a cursor, even if nothing at the exact entry.
+  cursor = list.LookupMutableCursor((off1 - 1) * PAGE_SIZE);
+  EXPECT_TRUE(cursor.current());
+  EXPECT_TRUE(cursor.current()->IsEmpty());
+
+  // Cursor should iterate into the marker though.
+  cursor.step();
+  EXPECT_TRUE(cursor.current());
+  EXPECT_TRUE(cursor.current()->IsMarker());
+
+  // Further iteration should terminate at the end of the this node, as the next node is not
+  // contiguous.
+  cursor.step();
+  while (cursor.current()) {
+    EXPECT_TRUE(cursor.current()->IsEmpty());
+    cursor.step();
+  }
+
+  // Should be able to iterate across contiguous nodes.
+  cursor = list.LookupMutableCursor((off2 * PAGE_SIZE));
+  EXPECT_TRUE(cursor.current());
+  EXPECT_TRUE(cursor.current()->IsMarker());
+  cursor.step();
+
+  // Iterate to the next marker, which is in a different node, and count the number of items.
+  uint64_t items = 0;
+  cursor.ForEveryContiguous([&items](VmPageOrMarkerRef page_or_marker) {
+    items++;
+    return page_or_marker->IsMarker() ? ZX_ERR_STOP : ZX_ERR_NEXT;
+  });
+  EXPECT_EQ(off3 - off2, items);
+
+  // ForEveryContiguous will have left us at off3 when we stopped, so the next item should be off4,
+  // which is also a marker.
+  cursor.step();
+  EXPECT_TRUE(cursor.current());
+  EXPECT_TRUE(cursor.current()->IsMarker());
+
+  // Attempting to do this again should fail as next item is in the next node.
+  items = 0;
+  cursor.step();
+  cursor.ForEveryContiguous([&items](VmPageOrMarkerRef page_or_marker) {
+    items++;
+    return page_or_marker->IsMarker() ? ZX_ERR_STOP : ZX_ERR_NEXT;
+  });
+  EXPECT_FALSE(cursor.current());
+  // Should have iterated the remaining items in a node after off4
+  EXPECT_EQ(VmPageListNode::kPageFanOut - (off4 % VmPageListNode::kPageFanOut) - 1, items);
+
+  END_TEST;
+}
+
 static bool vmpl_interval_single_node_test() {
   BEGIN_TEST;
 
@@ -2837,6 +2914,7 @@ VM_UNITTEST(vmpl_contiguous_run_test)
 VM_UNITTEST(vmpl_contiguous_run_compare_test)
 VM_UNITTEST(vmpl_contiguous_traversal_end_test)
 VM_UNITTEST(vmpl_contiguous_traversal_error_test)
+VM_UNITTEST(vmpl_cursor_test)
 VM_UNITTEST(vmpl_interval_single_node_test)
 VM_UNITTEST(vmpl_interval_multiple_nodes_test)
 VM_UNITTEST(vmpl_interval_traversal_test)
