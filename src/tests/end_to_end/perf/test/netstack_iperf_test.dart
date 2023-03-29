@@ -78,9 +78,8 @@ void main(List<String> args) {
       // once iperf calculates throughput correctly when the server is the
       // receiver. In the meantime, derive the value from the other stats.
       if (!receiver['sender']) {
-        receiver['bits_per_second'] = (msgSize * 8) *
-            (receiver['packets'] - receiver['lost_packets']) /
-            receiver['seconds'];
+        receiver['bits_per_second'] =
+            (msgSize * 8) * receiver['packets'] / receiver['seconds'];
       }
     }
 
