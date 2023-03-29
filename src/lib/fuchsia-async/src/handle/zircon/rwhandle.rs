@@ -194,7 +194,29 @@ where
     pub fn is_closed(&self) -> bool {
         let signals =
             zx::Signals::from_bits_truncate(self.receiver().signals.load(Ordering::Relaxed));
-        signals.contains(OBJECT_PEER_CLOSED)
+        if signals.contains(OBJECT_PEER_CLOSED) {
+            return true;
+        }
+
+        // The signals bitset might not be updated if we haven't gotten around to processing the
+        // packet telling us that yet. To provide an up-to-date response, we query the current
+        // state of the signal.
+        //
+        // Note: we _could_ update the bitset with what we find here, if we're careful to also
+        // update READABLE + WRITEABLE at the same time, and also wakeup the tasks as necessary.
+        // But having `is_closed` wakeup tasks if it discovered a signal change seems too weird, so
+        // we just leave the bitset as-is and let the regular notification mechanism get around to
+        // it when it gets around to it.
+        match self.handle.wait_handle(OBJECT_PEER_CLOSED, zx::Time::INFINITE_PAST) {
+            Ok(_) => true,
+            Err(zx::Status::TIMED_OUT) => false,
+            Err(status) => {
+                // None of the other documented error statuses should be possible, either the type
+                // system doesn't allow it or the wait from `RWHandle::new()` would have already
+                // failed.
+                unreachable!("status: {status}")
+            }
+        }
     }
 
     /// Returns a future that completes when `is_closed()` is true.
@@ -275,5 +297,45 @@ where
 
     fn need_writable(&self, cx: &mut Context<'_>) -> Result<(), zx::Status> {
         self.need_signal(cx, &self.receiver.write_task, OBJECT_WRITABLE)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::TestExecutor;
+    use fuchsia_zircon as zx;
+    use std::task::Context;
+
+    #[test]
+    fn is_closed_immediately_after_close() {
+        let mut exec = TestExecutor::new();
+        let (tx, rx) = zx::Channel::create();
+        let rx_rw_handle = RWHandle::new(rx).unwrap();
+        let mut noop_ctx = Context::from_waker(futures::task::noop_waker_ref());
+        // Clear optimistic readable state
+        rx_rw_handle.need_readable(&mut noop_ctx).unwrap();
+        // Starting state: the channel is not closed (because we haven't closed it yet)
+        assert_eq!(rx_rw_handle.is_closed(), false);
+        // we will never set readable, so this should be Pending until we close
+        assert_eq!(rx_rw_handle.poll_readable(&mut noop_ctx), Poll::Pending);
+
+        drop(tx);
+
+        // Implementation note: the cached state will not be updated yet
+        assert_eq!(rx_rw_handle.poll_readable(&mut noop_ctx), Poll::Pending);
+        // But is_closed should return true immediately
+        assert_eq!(rx_rw_handle.is_closed(), true);
+        // Still not updated, and won't be until we let the executor process port packets
+        assert_eq!(rx_rw_handle.poll_readable(&mut noop_ctx), Poll::Pending);
+        // So we do
+        let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
+        // And now it is updated, so we observe Closed
+        assert_eq!(
+            rx_rw_handle.poll_readable(&mut noop_ctx),
+            Poll::Ready(Ok(ReadableState::Closed))
+        );
+        // And is_closed should still be true, of course.
+        assert_eq!(rx_rw_handle.is_closed(), true);
     }
 }

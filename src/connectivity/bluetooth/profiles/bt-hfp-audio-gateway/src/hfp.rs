@@ -912,9 +912,9 @@ mod tests {
 
         // The `connected` status is lazily populated. If the Call Manager goes away, then this
         // status should be updated the next time communication with the Call Manager is attempted.
+        let manager_id = hfp.call_manager.connection_id().expect("just set");
         drop(_call_manager_server);
         let peer_id = PeerId(123);
-        let manager_id = hfp.call_manager.connection_id().expect("just set");
         let (_peer_handler_client, peer_handler_server) =
             create_proxy::<PeerHandlerMarker>().unwrap();
         hfp.handle_internal_event(Event::PeerConnected {
