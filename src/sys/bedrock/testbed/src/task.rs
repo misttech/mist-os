@@ -7,74 +7,98 @@ use {
     exec::{Lifecycle, Start, Stop},
     fuchsia_async as fasync,
     futures::{channel::oneshot, join, lock::Mutex, Future},
+    std::sync::Arc,
+    thiserror::Error,
 };
 
 pub struct Task<Fut>
 where
-    Fut: Future<Output = ()> + Send + 'static,
+    Fut: Future + Send + 'static,
+    Fut::Output: Clone + Send + 'static,
 {
     fut: Fut,
 }
 
-/// `RunningTask` represents an asynchronous task that is running.
+/// `RunningTask` represents an asynchronous task that is running, and will
+/// produce `T` if ran to completion.
 ///
 /// If the `RunningTask` is dropped, the wrapped asynchronous task will be
 /// canceled as soon as possible.
-pub struct RunningTask {
+pub struct RunningTask<T>
+where
+    T: Clone + Send + 'static,
+{
     task: Option<fasync::Task<()>>,
-    done: Mutex<ColdReceiver>,
+    done: Mutex<ColdReceiver<T>>,
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum ExitReason {
-    RanToCompletion,
-    Canceled,
+/// The reason the task exited:
+///
+/// - `Some(T)` means the task ran to completion with a return value.
+/// - `None` means the task was canceled before it finished.
+pub type ExitReason<T> = Option<T>;
+
+/// A `Receiver<T>` that caches the result of the receive action.
+enum ColdReceiver<T: Clone + Send> {
+    Waiting(oneshot::Receiver<T>),
+    Obtained(ExitReason<T>),
 }
 
-/// A `Receiver<()>` that caches the result of the receive action.
-enum ColdReceiver {
-    Waiting(oneshot::Receiver<()>),
-    Obtained(ExitReason),
-}
-
-impl ColdReceiver {
-    fn new(r: oneshot::Receiver<()>) -> ColdReceiver {
+impl<T> ColdReceiver<T>
+where
+    T: Clone + Send + 'static,
+{
+    fn new(r: oneshot::Receiver<T>) -> ColdReceiver<T> {
         ColdReceiver::Waiting(r)
     }
 
-    async fn recv(&mut self) -> Result<ExitReason, AlreadyStopped> {
+    async fn recv(&mut self) -> Result<ExitReason<T>, AlreadyStopped> {
         match self {
             ColdReceiver::Waiting(receiver) => {
                 let reason = match receiver.await {
-                    Ok(()) => ExitReason::RanToCompletion,
-                    Err(_) => ExitReason::Canceled,
+                    Ok(value) => Some(value),
+                    Err(_) => None,
                 };
-                *self = ColdReceiver::Obtained(reason);
+                *self = ColdReceiver::Obtained(reason.clone());
                 return Ok(reason);
             }
-            ColdReceiver::Obtained(reason) => Ok(*reason),
+            ColdReceiver::Obtained(reason) => Ok(reason.clone()),
         }
+    }
+}
+
+/// `ArcError` is a convenient wrapper around an underlying error type to
+/// implement `Clone`. One may use this to broadcast their task exit
+/// information to others listening on the `on_exit` function.
+#[derive(Error, Debug, Clone)]
+#[error(transparent)]
+pub struct ArcError(Arc<anyhow::Error>);
+
+impl From<anyhow::Error> for ArcError {
+    fn from(value: anyhow::Error) -> Self {
+        ArcError(Arc::new(value))
     }
 }
 
 #[async_trait]
 impl<Fut> Start for Task<Fut>
 where
-    Fut: Future<Output = ()> + Send + 'static,
+    Fut: Future + Send + 'static,
+    Fut::Output: Clone + Send + 'static,
 {
     type Error = AlreadyStopped;
-    type Stop = RunningTask;
+    type Stop = RunningTask<Fut::Output>;
 
     async fn start(self) -> Result<Self::Stop, Self::Error> {
         let (mark_done, done) = oneshot::channel();
         Ok(RunningTask {
             task: Some(fasync::Task::spawn(async move {
-                self.fut.await;
+                let output = self.fut.await;
                 // If the receiver is dropped, that means the user has initiated
-                // task cancellation. We may reach here if the task is executing
-                // on a `SendExecutor`. We ignore errors here since this task is
+                // task cancellation. We may reach here if the task is being
+                // canceled remotely. We ignore errors here since this task is
                 // going away soon.
-                let _ = mark_done.send(());
+                let _ = mark_done.send(output);
             })),
             done: Mutex::new(ColdReceiver::new(done)),
         })
@@ -94,7 +118,10 @@ impl std::fmt::Display for AlreadyStopped {
 impl std::error::Error for AlreadyStopped {}
 
 #[async_trait]
-impl Stop for RunningTask {
+impl<T> Stop for RunningTask<T>
+where
+    T: Clone + Send + 'static,
+{
     type Error = AlreadyStopped;
 
     async fn stop(&mut self) -> Result<(), Self::Error> {
@@ -109,8 +136,11 @@ impl Stop for RunningTask {
 }
 
 #[async_trait]
-impl Lifecycle for RunningTask {
-    type Exit = ExitReason;
+impl<T> Lifecycle for RunningTask<T>
+where
+    T: Clone + Send + 'static,
+{
+    type Exit = ExitReason<T>;
 
     async fn on_exit(&self) -> Result<Self::Exit, Self::Error> {
         self.done.lock().await.recv().await
@@ -121,7 +151,8 @@ impl Lifecycle for RunningTask {
 /// The started runnable may be `stop`-ed to cancel the task.
 pub fn create_task<Fut>(fut: Fut) -> Task<Fut>
 where
-    Fut: Future<Output = ()> + Send + 'static,
+    Fut: Future + Send + 'static,
+    Fut::Output: Clone + Send + 'static,
 {
     Task { fut }
 }
@@ -173,9 +204,9 @@ mod task_tests {
 
         // They should all run to completion.
         let (on_exit_1, on_exit_2, on_exit_3) = join!(on_exit_1, on_exit_2, on_exit_3);
-        assert_eq!(on_exit_1?, ExitReason::RanToCompletion);
-        assert_eq!(on_exit_2?, ExitReason::RanToCompletion);
-        assert_eq!(on_exit_3?, ExitReason::RanToCompletion);
+        assert_eq!(on_exit_1?, Some(()));
+        assert_eq!(on_exit_2?, Some(()));
+        assert_eq!(on_exit_3?, Some(()));
 
         // This should be no-op since the async task already exited itself.
         running_task.stop().await?;
@@ -200,9 +231,31 @@ mod task_tests {
 
         // They should all be canceled.
         let (on_exit_1, on_exit_2, on_exit_3) = join!(on_exit_1, on_exit_2, on_exit_3);
-        assert_eq!(on_exit_1?, ExitReason::Canceled);
-        assert_eq!(on_exit_2?, ExitReason::Canceled);
-        assert_eq!(on_exit_3?, ExitReason::Canceled);
+        assert_eq!(on_exit_1?, None);
+        assert_eq!(on_exit_2?, None);
+        assert_eq!(on_exit_3?, None);
+        Ok(())
+    }
+
+    #[derive(Error, Debug, Clone, PartialEq, Eq)]
+    #[error("test error")]
+    struct TestError(u64);
+
+    #[fuchsia::test]
+    async fn on_exit_ran_to_completion_with_error() -> Result<()> {
+        let task = create_task(async move {
+            let err: Result<(), ArcError> = Err(ArcError::from(anyhow::Error::from(TestError(42))));
+            futures::future::ready(err).await?;
+            Ok(())
+        });
+        let mut running_task = task.start().await?;
+        let on_exit = running_task.on_exit().await?;
+        let task_result: Result<(), ArcError> = on_exit.expect("must run to completion");
+        let err = task_result.expect_err("task must fail with error");
+        let test_error = err.0.downcast_ref::<TestError>().unwrap();
+        assert_eq!(*test_error, TestError(42));
+
+        running_task.stop().await?;
         Ok(())
     }
 }
