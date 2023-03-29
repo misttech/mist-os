@@ -56,9 +56,9 @@ func TestDatagramSocketWithBlockingEndpoint(t *testing.T) {
 				return ep
 			}()
 
-			s, err := newDatagramSocketImpl(ns, header.UDPProtocolNumber, ipv4.ProtocolNumber, ep, wq)
+			s, err := newDatagramSocketImpl(ns, ipv4.ProtocolNumber, ep, wq)
 			if err != nil {
-				t.Fatalf("got newDatagramSocketImpl(_, %d, %d, _, _): %s", header.UDPProtocolNumber, ipv4.ProtocolNumber, err)
+				t.Fatalf("got newDatagramSocketImpl(_, %d, _, _): %s", ipv4.ProtocolNumber, err)
 			}
 
 			// Increment refcount and provide a cancel callback so the endpoint can be
@@ -229,9 +229,9 @@ func verifyZirconSocketClosed(t *testing.T, e *endpointWithSocket) {
 func TestCloseDatagramSocketClosesHandles(t *testing.T) {
 
 	ns, _, wq, ep := newNetstackAndEndpoint(t, header.UDPProtocolNumber)
-	s, err := newDatagramSocketImpl(ns, header.UDPProtocolNumber, ipv4.ProtocolNumber, ep, wq)
+	s, err := newDatagramSocketImpl(ns, ipv4.ProtocolNumber, ep, wq)
 	if err != nil {
-		t.Fatalf("newDatagramSocketImpl(_, %d, %d, _, _): %s", header.UDPProtocolNumber, ipv4.ProtocolNumber, err)
+		t.Fatalf("newDatagramSocketImpl(_, %d, _, _): %s", ipv4.ProtocolNumber, err)
 	}
 	addEndpoint(t, ns, &s.endpoint)
 	// Provide a cancel callback so the endpoint can be closed below.

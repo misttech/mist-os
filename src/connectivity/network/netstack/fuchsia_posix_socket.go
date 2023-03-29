@@ -1971,11 +1971,11 @@ var (
 	udpRxPreludeSize = udp_serde.RxUdpPreludeSize()
 )
 
-func newDatagramSocketImpl(ns *Netstack, transProto tcpip.TransportProtocolNumber, netProto tcpip.NetworkProtocolNumber, ep tcpip.Endpoint, wq *waiter.Queue) (*datagramSocketImpl, error) {
+func newDatagramSocketImpl(ns *Netstack, netProto tcpip.NetworkProtocolNumber, ep tcpip.Endpoint, wq *waiter.Queue) (*datagramSocketImpl, error) {
 	eps, err := newEndpointWithSocket(
 		ep,
 		wq,
-		transProto,
+		udp.ProtocolNumber,
 		netProto,
 		ns,
 		zx.SocketDatagram,
@@ -3900,7 +3900,7 @@ func (sp *providerImpl) DatagramSocket(ctx fidl.Context, domain socket.Domain, p
 		return socket.ProviderDatagramSocketResultWithResponse(socket.ProviderDatagramSocketResponseWithSynchronousDatagramSocket(socket.SynchronousDatagramSocketWithCtxInterface{Channel: peerC})), nil
 	}
 
-	s, err := newDatagramSocketImpl(sp.ns, transProto, netProto, ep, wq)
+	s, err := newDatagramSocketImpl(sp.ns, netProto, ep, wq)
 	if err != nil {
 		return socket.ProviderDatagramSocketResult{}, err
 	}
