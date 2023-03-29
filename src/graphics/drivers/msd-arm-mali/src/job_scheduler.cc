@@ -261,17 +261,29 @@ void JobScheduler::TryToSchedule() {
 }
 
 void JobScheduler::CancelAtomsForConnection(std::shared_ptr<MsdArmConnection> connection) {
-  auto removal_function = [connection](auto it) {
+  const char* atom_type = nullptr;
+  auto removal_function = [connection, &atom_type](auto it) {
     auto locked = it->connection().lock();
-    return !locked || locked == connection;
+    if (!locked || locked == connection) {
+      MAGMA_LOG(WARNING, "Canceling atom from list %s", atom_type);
+      std::vector<std::string> result = it->DumpInformation();
+      for (std::string& line : result) {
+        MAGMA_LOG(WARNING, "%s", line.c_str());
+      }
+      return true;
+    }
+    return false;
   };
+  atom_type = "Waiting";
   waiting_atoms_.erase(
       std::remove_if(waiting_atoms_.begin(), waiting_atoms_.end(), removal_function),
       waiting_atoms_.end());
+  atom_type = "JIT";
   jit_atoms_.erase(std::remove_if(jit_atoms_.begin(), jit_atoms_.end(), removal_function),
                    jit_atoms_.end());
-
+  atom_type = "Queued";
   atoms_.remove_if(removal_function);
+  atom_type = "Runnable";
   for (auto& runnable_list : runnable_atoms_)
     runnable_list.remove_if(removal_function);
 
