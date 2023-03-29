@@ -4,6 +4,8 @@
 
 #include "tools/symbolizer/symbolizer_impl.h"
 
+#include <lib/fit/defer.h>
+
 #include <fstream>
 #include <sstream>
 
@@ -18,6 +20,9 @@
 namespace symbolizer {
 
 namespace {
+
+using ::analytics::google_analytics_4::Value;
+using ::testing::ContainerEq;
 
 class SymbolizerImplTest : public ::testing::Test {
  public:
@@ -131,10 +136,12 @@ TEST(SymbolizerImpl, Analytics) {
   std::stringstream ss;
   Printer printer(ss);
   CommandLineOptions options;
-  std::map<std::string, std::string> parameters;
-  SymbolizerImpl::AnalyticsSender sender =
-      [&parameters](const analytics::google_analytics::Hit& hit) { parameters = hit.parameters(); };
-  SymbolizerImpl symbolizer(&printer, options, sender);
+  std::string measurement_json;
+  auto sender = [&measurement_json](const std::string& body) { measurement_json = body; };
+  auto deferred_cleanup_analytics = fit::defer(Analytics::CleanUp);
+  Analytics::InitTestingClient(std::move(sender));
+
+  SymbolizerImpl symbolizer(&printer, options);
 
   symbolizer.Reset(false);
   symbolizer.Module(0, "some_module", "deadbeef");
@@ -143,40 +150,40 @@ TEST(SymbolizerImpl, Analytics) {
   symbolizer.Backtrace(1, 0x7010, Symbolizer::AddressType::kUnknown, "");
   symbolizer.Reset(false);
 
-  ASSERT_EQ(parameters.size(), 15u);
+  rapidjson::Document measurement;
+  measurement.Parse(measurement_json);
+  ASSERT_TRUE(measurement.HasMember("events"));
+  auto& events = measurement["events"];
+  ASSERT_TRUE(events.IsArray());
+  ASSERT_GT(events.Size(), 0u);
+  auto& event = events[0];
+  ASSERT_TRUE(event.HasMember("params"));
+  auto& params = event["params"];
 
-  // cm1=<1 if "at least one invalid input" else 0>
-  ASSERT_EQ(parameters["cm1"], "0");
-  // cm2=<# modules>
-  ASSERT_EQ(parameters["cm2"], "1");
-  // cm3=<# modules with local symbols>
-  ASSERT_EQ(parameters["cm3"], "0");
-  // cm4=<# modules with cached symbols>
-  ASSERT_EQ(parameters["cm4"], "0");
-  // cm5=<# modules with downloaded symbols>
-  ASSERT_EQ(parameters["cm5"], "0");
-  // cm6=<# modules with downloading failure>
-  ASSERT_EQ(parameters["cm6"], "0");
-  // cm7=<# frames>
-  ASSERT_EQ(parameters["cm7"], "2");
-  // cm8=<# frames symbolized>
-  ASSERT_EQ(parameters["cm8"], "0");
-  // cm9=<# frames out of valid modules>
-  ASSERT_EQ(parameters["cm9"], "1");
-  // cm10=<1 if "remote symbol lookup is enabled" else 0>
-  ASSERT_EQ(parameters["cm10"], "0");
-  // cm11=<downloading time spent, in milliseconds>
-  ASSERT_EQ(parameters["cm11"], "0");
-
-  // t=timing
-  ASSERT_EQ(parameters["t"], "timing");
-  // utc=symbolization
-  ASSERT_EQ(parameters["utc"], "symbolization");
-  // utv=<empty>
-  ASSERT_EQ(parameters["utv"], "");
-
-  // utt=<total wall time spent, in milliseconds>
-  ASSERT_GE(std::stoi(parameters["utt"]), 0);
+  ASSERT_TRUE(params.HasMember("has_invalid_input"));
+  EXPECT_EQ(params["has_invalid_input"].GetBool(), false);
+  ASSERT_TRUE(params.HasMember("num_modules"));
+  EXPECT_EQ(params["num_modules"].GetInt(), 1);
+  ASSERT_TRUE(params.HasMember("num_modules_local"));
+  EXPECT_EQ(params["num_modules_local"].GetInt(), 0);
+  ASSERT_TRUE(params.HasMember("num_modules_cached"));
+  EXPECT_EQ(params["num_modules_cached"].GetInt(), 0);
+  ASSERT_TRUE(params.HasMember("num_modules_downloaded"));
+  EXPECT_EQ(params["num_modules_downloaded"].GetInt(), 0);
+  ASSERT_TRUE(params.HasMember("num_modules_download_fail"));
+  EXPECT_EQ(params["num_modules_download_fail"].GetInt(), 0);
+  ASSERT_TRUE(params.HasMember("num_frames"));
+  EXPECT_EQ(params["num_frames"].GetInt(), 2);
+  ASSERT_TRUE(params.HasMember("num_frames_symbolized"));
+  EXPECT_EQ(params["num_frames_symbolized"].GetInt(), 0);
+  ASSERT_TRUE(params.HasMember("num_frames_invalid"));
+  EXPECT_EQ(params["num_frames_invalid"].GetInt(), 1);
+  ASSERT_TRUE(params.HasMember("remote_symbol_enabled"));
+  EXPECT_EQ(params["remote_symbol_enabled"].GetBool(), false);
+  ASSERT_TRUE(params.HasMember("time_download_ms"));
+  EXPECT_EQ(params["time_download_ms"].GetInt(), 0);
+  ASSERT_TRUE(params.HasMember("time_total_ms"));
+  EXPECT_EQ(params["time_total_ms"].GetInt(), 0);
 }
 
 }  // namespace

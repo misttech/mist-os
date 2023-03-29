@@ -25,6 +25,7 @@ static_library("google_analytics") {
     "general_parameters.h",
     "hit.cc",
     "hit.h",
+    "noop_client.h",
     "timing.cc",
     "timing.h",
   ]

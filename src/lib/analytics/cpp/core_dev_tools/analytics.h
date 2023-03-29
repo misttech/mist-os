@@ -22,6 +22,8 @@
 #include "src/lib/analytics/cpp/core_dev_tools/google_analytics_client.h"
 #include "src/lib/analytics/cpp/core_dev_tools/persistent_status.h"
 #include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
+#include "src/lib/analytics/cpp/google_analytics/noop_client.h"
+#include "src/lib/analytics/cpp/google_analytics_4/testing_client.h"
 #include "src/lib/analytics/cpp/metric_properties/metric_properties.h"
 
 namespace analytics::core_dev_tools {
@@ -44,6 +46,8 @@ namespace analytics::core_dev_tools {
 //       friend class Analytics<ToolAnalytics>;
 //       static constexpr char kToolName[] = "tool";
 //       static constexpr int64_t kQuitTimeoutMs = 500; // wait for at most 500 ms before quitting
+//       static constexpr char kMeasurementId[] = "G-XXXXXXXXXX";
+//       static constexpr char kMeasurementKey[] = "YYYYYYYYYYYYYY";
 //       static constexpr char kTrackingId[] = "UA-XXXXX-Y";
 //       static constexpr char kEnableArgs[] = "--analytics=enable";
 //       static constexpr char kDisableArgs[] = "--analytics=disable";
@@ -135,7 +139,6 @@ class Analytics {
       // Set an empty application name (an) to make application version (av) usable. Otherwise, the
       // hit will be treated as invalid by Google Analytics.
       // See https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters#an
-      // for more information.
       parameters.SetApplicationName("");
 
       google_analytics::Event event(kEventCategoryGeneral, kEventActionInvoke);
@@ -164,6 +167,16 @@ class Analytics {
     delete client_ga4_;
     client_ga4_ = nullptr;
     client_is_cleaned_up_ = true;
+  }
+
+  // For tests only. Do not use with other Init* functions.
+  // With this init, data will not be sent to Google Analytics. But instead the
+  // sender function will be called with the POST body (passed as `const
+  // std::string&`), which is the JSON representation of a Measurement object.
+  static void InitTestingClient(std::function<void(const std::string&)> sender) {
+    client_ua_ = new google_analytics::NoOpClient();
+    client_ga4_ = new google_analytics_4::TestingClient(std::move(sender));
+    T::SetRuntimeAnalyticsStatus(AnalyticsStatus::kEnabled);
   }
 
  protected:

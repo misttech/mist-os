@@ -85,12 +85,15 @@ int Main(int argc, const char* argv[]) {
   }
 
   Printer printer(std::cout);
-  SymbolizerImpl symbolizer(&printer, options, Analytics::IfEnabledSendGoogleAnalyticsHit);
+  SymbolizerImpl symbolizer(&printer, options);
   LogParser parser(std::cin, &printer, &symbolizer);
 
   while (parser.ProcessNextLine()) {
     // until the eof in the input.
   }
+
+  // Calling Reset at the end to make sure symbolize event is sent.
+  symbolizer.Reset(false);
 
   return EXIT_SUCCESS;
 }

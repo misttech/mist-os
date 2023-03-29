@@ -32,10 +32,7 @@ class SymbolizerImpl : public Symbolizer,
                        public zxdb::DownloadObserver,
                        public zxdb::SystemObserver {
  public:
-  using AnalyticsSender = std::function<void(const analytics::google_analytics::Hit&)>;
-
-  SymbolizerImpl(Printer* printer, const CommandLineOptions& options,
-                 AnalyticsSender analytics_sender = nullptr);
+  SymbolizerImpl(Printer* printer, const CommandLineOptions& options);
   ~SymbolizerImpl() override;
 
   // |Symbolizer| implementation.
@@ -151,7 +148,6 @@ class SymbolizerImpl : public Symbolizer,
   // the analytics is not empty and worth sending.
   SymbolizationAnalyticsBuilder analytics_builder_;
   bool remote_symbol_lookup_enabled_ = false;
-  AnalyticsSender sender_;
 
   // Whether we're symbolizing a Dart stack trace.
   bool symbolizing_dart_ = false;

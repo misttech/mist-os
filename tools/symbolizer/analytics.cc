@@ -74,7 +74,7 @@ void SymbolizationAnalyticsBuilder::DownloadTimerStop() {
   download_time = std::chrono::steady_clock::now() - download_timer_start_;
 }
 
-analytics::google_analytics::Timing SymbolizationAnalyticsBuilder::build() {
+analytics::google_analytics::Timing SymbolizationAnalyticsBuilder::BuildUaHit() const {
   class AnalyticsGeneralParameters : public analytics::core_dev_tools::GeneralParameters {
    public:
     using analytics::core_dev_tools::GeneralParameters::SetCustomMetric;
@@ -117,6 +117,37 @@ analytics::google_analytics::Timing SymbolizationAnalyticsBuilder::build() {
   timing.AddGeneralParameters(parameters);
 
   return timing;
+}
+
+std::unique_ptr<SymbolizationEvent> SymbolizationAnalyticsBuilder::BuildGa4Event() const {
+  auto total_time_ms = std::chrono::duration_cast<std::chrono::milliseconds>(total_time).count();
+  auto download_time_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(download_time).count();
+  auto event_ptr = std::make_unique<SymbolizationEvent>();
+  event_ptr->SetParameter("has_invalid_input", at_least_one_invalid_input_);
+  event_ptr->SetParameter("num_modules", static_cast<int64_t>(number_of_modules_));
+  event_ptr->SetParameter("num_modules_local",
+                          static_cast<int64_t>(number_of_modules_with_local_symbols_));
+  event_ptr->SetParameter("num_modules_cached",
+                          static_cast<int64_t>(number_of_modules_with_cached_symbols_));
+  event_ptr->SetParameter("num_modules_downloaded",
+                          static_cast<int64_t>(number_of_modules_with_downloaded_symbols_));
+  event_ptr->SetParameter("num_modules_download_fail",
+                          static_cast<int64_t>(number_of_modules_with_downloading_failure_));
+  event_ptr->SetParameter("num_frames", static_cast<int64_t>(number_of_frames_));
+  event_ptr->SetParameter("num_frames_symbolized",
+                          static_cast<int64_t>(number_of_frames_symbolized_));
+  event_ptr->SetParameter("num_frames_invalid", static_cast<int64_t>(number_of_frames_invalid_));
+  event_ptr->SetParameter("remote_symbol_enabled", remote_symbol_lookup_enabled_);
+  event_ptr->SetParameter("time_download_ms", static_cast<int64_t>(download_time_ms));
+  event_ptr->SetParameter("time_total_ms", static_cast<int64_t>(total_time_ms));
+
+  return event_ptr;
+}
+
+void SymbolizationAnalyticsBuilder::SendAnalytics() const {
+  Analytics::IfEnabledSendGoogleAnalyticsHit(BuildUaHit());
+  Analytics::IfEnabledSendGa4Event(BuildGa4Event());
 }
 
 }  // namespace symbolizer

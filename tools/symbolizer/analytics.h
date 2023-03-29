@@ -6,6 +6,7 @@
 #define TOOLS_SYMBOLIZER_ANALYTICS_H_
 
 #include <chrono>
+#include <memory>
 
 #include "src/lib/analytics/cpp/core_dev_tools/analytics.h"
 #include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
@@ -13,6 +14,14 @@
 #include "src/lib/fxl/strings/substitute.h"
 
 namespace symbolizer {
+
+class SymbolizationEvent : public analytics::core_dev_tools::Ga4Event {
+ public:
+  SymbolizationEvent() : analytics::core_dev_tools::Ga4Event("symbolize") {}
+
+ private:
+  friend class SymbolizationAnalyticsBuilder;
+};
 
 class SymbolizationAnalyticsBuilder {
  public:
@@ -36,8 +45,14 @@ class SymbolizationAnalyticsBuilder {
   void DownloadTimerStart();
   void DownloadTimerStop();
 
-  // build the timing hit
-  analytics::google_analytics::Timing build();
+  // Build the timing hit
+  analytics::google_analytics::Timing BuildUaHit() const;
+
+  // Build the symbolize event
+  std::unique_ptr<SymbolizationEvent> BuildGa4Event() const;
+
+  // Send analytics
+  void SendAnalytics() const;
 
  private:
   bool valid_ = false;

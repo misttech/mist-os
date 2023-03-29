@@ -21,6 +21,7 @@ static_library("google_analytics_4") {
     "event.h",
     "measurement.cc",
     "measurement.h",
+    "testing_client.h",
   ]
 
   deps = [

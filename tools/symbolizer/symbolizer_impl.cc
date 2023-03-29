@@ -89,9 +89,8 @@ std::string FormatFrameIdAndAddress(uint64_t frame_id, uint64_t inline_index, ui
 
 }  // namespace
 
-SymbolizerImpl::SymbolizerImpl(Printer* printer, const CommandLineOptions& options,
-                               AnalyticsSender sender)
-    : printer_(printer), omit_module_lines_(options.omit_module_lines), sender_(std::move(sender)) {
+SymbolizerImpl::SymbolizerImpl(Printer* printer, const CommandLineOptions& options)
+    : printer_(printer), omit_module_lines_(options.omit_module_lines) {
   // Hook observers.
   session_.system().AddObserver(this);
   session_.AddDownloadObserver(this);
@@ -152,9 +151,7 @@ void SymbolizerImpl::Reset(bool symbolizing_dart) {
 
   if (analytics_builder_.valid()) {
     analytics_builder_.SetRemoteSymbolLookupEnabledBit(remote_symbol_lookup_enabled_);
-    if (sender_) {
-      sender_(analytics_builder_.build());
-    }
+    analytics_builder_.SendAnalytics();
     analytics_builder_ = {};
   }
 
