@@ -10,6 +10,7 @@
         binary: "data/tests/crash",
         user: "fuchsia:x:0:0",
         environ: [ "TEST_TMPDIR=/data/tmp" ],
+        test_type: "gtest",
     },
     use: [
         {

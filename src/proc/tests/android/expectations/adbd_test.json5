@@ -12,10 +12,10 @@
         {
             type: "expect_failure",
             matchers: [
-                "*io.ReadFd*",
-                "*adb_utils.mkdirs*",
-                "*socket_spec.socket_spec_listen_connect_tcp*",
-                "*sysdeps.stat*",
+                "io.ReadFd*",
+                "adb_utils.mkdirs*",
+                "socket_spec.socket_spec_listen_connect_tcp*",
+                "sysdeps.stat*",
                 "io.WriteFdExactly_whole",
                 "io.WriteFdExactly_partial",
                 "io.WriteFdExactly_string",
@@ -38,8 +38,8 @@
             type: "skip",
             matchers: [
                 // These tests currently time out.
-                "*PropertyMonitor*",
-                "*sysdeps_fd.*",
+                "PropertyMonitor*",
+                "sysdeps_fd.*",
 
                 // This test fails but sometimes times out.
                 "LocalSocketTest.close_socket_in_CLOSE_WAIT_state",
