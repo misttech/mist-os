@@ -243,11 +243,16 @@ zx_status_t VmObjectPhysical::CommitRangePinned(uint64_t offset, uint64_t len, b
 }
 
 zx_status_t VmObjectPhysical::LookupContiguous(uint64_t offset, uint64_t len, paddr_t* out_paddr) {
+  Guard<CriticalMutex> guard{lock()};
+  return LookupContiguousLocked(offset, len, out_paddr);
+}
+
+zx_status_t VmObjectPhysical::LookupContiguousLocked(uint64_t offset, uint64_t len,
+                                                     paddr_t* out_paddr) {
   canary_.Assert();
   if (unlikely(len == 0 || !IS_PAGE_ALIGNED(offset))) {
     return ZX_ERR_INVALID_ARGS;
   }
-  Guard<CriticalMutex> guard{lock()};
   if (unlikely(!InRange(offset, len, size_))) {
     return ZX_ERR_OUT_OF_RANGE;
   }
