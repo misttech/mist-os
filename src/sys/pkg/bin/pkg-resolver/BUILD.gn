@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/images/args.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/testing/environments.gni")
 import("//src/sys/pkg/bin/grand-swd-binary/gsb.gni")
@@ -136,8 +137,20 @@ group("production-component-and-config") {
   ]
 }
 
+group("eng-component-and-config") {
+  public_deps = [
+    ":component",
+    ":eng_config_values_from_gn",
+  ]
+}
+
 fuchsia_package("pkg-resolver") {
   deps = [ ":production-component-and-config" ]
+}
+
+fuchsia_package("pkg-resolver-eng") {
+  package_name = "pkg-resolver"
+  deps = [ ":eng-component-and-config" ]
 }
 
 fuchsia_component("unit-tests-root") {
@@ -186,9 +199,43 @@ fuchsia_structured_config_rust_lib("config_lib") {
   visibility = [ ":*" ]
 }
 
+# LINT.IfChange
+structured_config_values = {
+  fetch_delivery_blob = false
+  delivery_blob_fallback = false
+  allow_local_mirror = false
+
+  # Repository size is currently 100 KB. Allowing for 10x growth and assuming a
+  # 4,096 B/s minimum bandwidth (the default minimum bandwidth used by rust-tuf
+  # HttpRepository) results in a duration of (10 * 100,000 B) / (4,096 B/s) = 244 seconds.
+  # Round to the minute boundary to make it more clear when reconstructing logs
+  # that there is a designed timeout involved.
+  # TODO(fxbug.dev/62300) replace with granular timeouts in rust-tuf.
+  tuf_metadata_timeout_seconds = 240
+  blob_network_header_timeout_seconds = 30
+  blob_network_body_timeout_seconds = 30
+  blob_download_resumption_attempts_limit = 50
+}
+
+# LINT.ThenChange(/src/sys/pkg/tests/pkg-resolver/BUILD.gn)
+
+if (delivery_blob_type != false) {
+  # TODO(fxbug.dev/124299) support other delivery blob types in pkg-resolver.
+  assert(delivery_blob_type == 1)
+  structured_config_values.fetch_delivery_blob = true
+}
+
 fuchsia_structured_config_values("config_values_from_gn") {
   cm_label = ":manifest"
-  values_source = "config/values.json5"
+
+  values = structured_config_values
+}
+
+fuchsia_structured_config_values("eng_config_values_from_gn") {
+  cm_label = ":manifest"
+
+  values = structured_config_values
+  values.delivery_blob_fallback = true
 }
 
 group("tests") {

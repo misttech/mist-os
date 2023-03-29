@@ -302,3 +302,15 @@ group("default-images") {
   # Include Bazel assembly target if they are set.
   deps += bazel_assembly_targets
 }
+
+# Write delivery_blob_config.json file to be uploaded as a build artifact.
+if (delivery_blob_type != false) {
+  generated_file("delivery_blob_config") {
+    outputs = [ "$root_build_dir/delivery_blob_config.json" ]
+    output_conversion = "json"
+
+    contents = {
+      type = delivery_blob_type
+    }
+  }
+}

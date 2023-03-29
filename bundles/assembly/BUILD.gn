@@ -200,7 +200,6 @@ assembly_input_bundle("core_realm") {
   base_packages = [
     # The required SWD stack artifacts to enable packages in an FVM.
     "//src/sys/pkg/bin/pkg-cache",
-    "//src/sys/pkg/bin/pkg-resolver",
 
     # This is a required dependency of pkg-cache
     "//src/sys/pkg/bin/system-update-committer",
@@ -263,8 +262,7 @@ assembly_input_bundle("core_realm_networking") {
 assembly_input_bundle("core_realm_eng") {
   testonly = true
   base_packages = [
-    # Empty placeholder for now, this is setting up the pattern, before actually
-    # moving packages into it (the next CL)
+    "//src/sys/pkg/bin/pkg-resolver:pkg-resolver-eng",
 
     # Dash launcher should be available in every engineering-mode product.
     "//src/sys/tools/debug-dash-launcher",
@@ -309,6 +307,7 @@ assembly_input_bundle("core_realm_eng") {
 # This is mutually-exclusive with the `core_realm_eng` AIB.
 #
 assembly_input_bundle("core_realm_user_and_userdebug") {
+  base_packages = [ "//src/sys/pkg/bin/pkg-resolver" ]
   compiled_packages = [
     {
       name = "core"
