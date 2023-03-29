@@ -334,7 +334,7 @@ pub struct User {
   pub age: Option<u8>,
   pub name: Option<String>,
   pub unknown_data: Option<BTreeMap<u64, Vec<u8>>>,
-  #[deprecated = "Use `..Foo::empty()` to construct and `..` to match."]
+  #[deprecated = "Use `..Foo::EMPTY` to construct and `..` to match."]
   #[doc(hidden)]
   pub __non_exhaustive: (),
 }
