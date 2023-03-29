@@ -23,7 +23,6 @@ verify_arg () {
 verify_arg "1st argument" "$1" "-headers"
 verify_arg "2st argument" "$2" "-json=identify_license_out.json"
 verify_arg "3st argument" "$3" "input_licenses"
-verify_arg "4st argument" "$4" "b258523163_workaround.txt"
 
 verify_file_exists () {
     local file_path=$1
@@ -37,7 +36,6 @@ verify_file_exists () {
 verify_file_exists input_licenses/license0.txt
 verify_file_exists input_licenses/license1.txt
 verify_file_exists input_licenses/license2.txt
-verify_file_exists b258523163_workaround.txt
 
 write () {
     echo "$1" >> identify_license_out.json
@@ -53,13 +51,15 @@ write '            {'
 write '                "Name": "License Kind 1",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
-write '                "EndLine": 2'
+write '                "EndLine": 2,'
+write '                "Condition": "notice"'
 write '            },'
 write '            {'
 write '                "Name": "License Kind 2",'
 write '                "Confidence": 0.5,'
 write '                "StartLine": 2,'
-write '                "EndLine": 3'
+write '                "EndLine": 3,'
+write '                "Condition": "unencumbered"'
 write '            }'
 write '        ]'
 write '    },'
@@ -69,8 +69,16 @@ write '        "Classifications": ['
 write '            {'
 write '                "Name": "License Kind 3",'
 write '                "Confidence": 1,'
-write '                "StartLine": 2,'
-write '                "EndLine": 3'
+write '                "StartLine": 1,'
+write '                "EndLine": 2,'
+write '                "Condition": "unencumbered"'
+write '            },'
+write '            {'
+write '                "Name": "Unclassified",'
+write '                "Confidence": 1,'
+write '                "StartLine": 3,'
+write '                "EndLine": 3,'
+write '                "Condition": ""'
 write '            }'
 write '        ]'
 write '    }'

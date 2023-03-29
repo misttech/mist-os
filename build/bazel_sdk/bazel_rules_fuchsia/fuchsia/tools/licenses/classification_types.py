@@ -12,12 +12,6 @@ from fuchsia.tools.licenses.spdx_types import *
 from hashlib import md5
 from typing import Any, Callable, ClassVar, Dict, Pattern, List
 
-# Work-around for b/258523163. We need to guarantee that at least one license is
-# identified by https://github.com/google/licenseclassifier/tree/main/tools/identify_license
-# or it exists with an error.
-# TODO(b/258523163): Remove once fixed
-b258523163_workaround = 'b258523163_workaround.txt'
-
 
 @dataclasses.dataclass(frozen=True)
 class IdentifiedSnippet:
@@ -50,15 +44,17 @@ class IdentifiedSnippet:
     # A suggested override rule
     suggested_override_rule: "ConditionOverrideRule" = None
 
-    def create_empty(extracted_text_lines) -> "IdentifiedSnippet":
+    def create_empty(extracted_text_lines, condition) -> "IdentifiedSnippet":
         return IdentifiedSnippet(
             identified_as=IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION,
             confidence=1.0,
             start_line=1,
-            end_line=len(extracted_text_lines) + 1)
+            end_line=len(extracted_text_lines) + 1,
+            condition=condition)
 
     def from_identify_license_dict(
-            dictionary: Dict[str, Any], location: Any) -> "IdentifiedSnippet":
+            dictionary: Dict[str, Any], location: Any,
+            default_condition: str) -> "IdentifiedSnippet":
         """
         Create a IdentifiedSnippet instance from a dictionary in the output format of
         https://github.com/google/licenseclassifier/tree/main/tools/identify_license.
@@ -69,9 +65,16 @@ class IdentifiedSnippet:
             "Confidence": int or float
             "StartLine": int
             "EndLine": int
+            "Condition": str
         }
+
+        "Name" will be "Unclassified" for licenses that the tool can't identify.
         """
         r = DictReader(dictionary, location)
+
+        identified_as = r.get('Name')
+        if identified_as == 'Unclassified':
+            identified_as = IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
 
         # Confidence could be an int or a float. Convert to a float.
         try:
@@ -79,11 +82,16 @@ class IdentifiedSnippet:
         except LicenseException:
             confidence = float(r.get('Confidence', expected_type=int))
 
+        condition = r.get_or('Condition', expected_type=str, default=None)
+        if not condition:
+            condition = default_condition
+
         return IdentifiedSnippet(
-            identified_as=r.get('Name'),
+            identified_as=identified_as,
             confidence=confidence,
             start_line=r.get('StartLine', expected_type=int),
-            end_line=r.get('EndLine', expected_type=int))
+            end_line=r.get('EndLine', expected_type=int),
+            condition=condition)
 
     def to_json_dict(self):
         # The fields are output in a certain order to produce a more readable output.
@@ -152,7 +160,7 @@ class IdentifiedSnippet:
         )
 
     def number_of_lines(self):
-        return self.start_line - self.end_line + 1
+        return self.end_line - self.start_line + 1
 
     def add_snippet_text(self, lines: List[str]):
         text = '\n'.join(lines[self.start_line - 1:self.end_line])
@@ -160,9 +168,8 @@ class IdentifiedSnippet:
         return dataclasses.replace(
             self, snippet_text=text, snippet_checksum=checksum)
 
-    def set_conditions(self, policy: "ConditionsPolicy"):
-        return dataclasses.replace(
-            self, condition=policy.get_condition(self.identified_as))
+    def is_identified(self):
+        return self.identified_as != IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION
 
     def override_conditions(
             self, license: "LicenseClassification",
@@ -404,9 +411,10 @@ class LicenseClassification:
         return dataclasses.replace(
             self, identifications=[function(i) for i in self.identifications])
 
-    def set_conditions(self, policy: "ConditionsPolicy"):
+    def set_default_condition(
+            self, default_condition: str) -> "LicenseClassification":
         return self._transform_identifications(
-            lambda x: x.set_conditions(policy))
+            lambda x: x.set_condition(default_condition))
 
     def override_conditions(self, rule_set: "ConditionOverrideRuleSet"):
         # Optimize by filtering rules that match the license name and any dependents
@@ -443,10 +451,13 @@ class LicensesClassifications:
         return LicensesClassifications(classifications_by_id={})
 
     def from_identify_license_output_json(
-        identify_license_output_path: str,
-        license_paths_by_license_id: Dict[str,
-                                          str]) -> "LicensesClassifications":
+            identify_license_output_path: str,
+            license_paths_by_license_id: Dict[str, str],
+            default_condition: str) -> "LicensesClassifications":
         json_output = json.load(open(identify_license_output_path, 'r'))
+
+        print(json.dumps(json_output, indent="    "))
+
         # Expected results from https://github.com/google/licenseclassifier/tree/main/tools/identify_license
         # have the following json layout:
         # [
@@ -458,6 +469,7 @@ class LicensesClassifications:
         #                 "Confidence": int or float
         #                 "StartLine": int
         #                 "EndLine": int
+        #                 "Condition": str
         #             },
         #             { ...},
         #             ...
@@ -470,8 +482,7 @@ class LicensesClassifications:
         results_by_file_path = {}
         for one_output in json_output:
             file_name = one_output['Filepath']
-            if file_name == b258523163_workaround:
-                continue
+            assert file_name not in results_by_file_path
             results_by_file_path[file_name] = one_output['Classifications']
 
         identifications_by_license_id = defaultdict(list)
@@ -481,7 +492,8 @@ class LicensesClassifications:
                     identifications_by_license_id[license_id].append(
                         IdentifiedSnippet.from_identify_license_dict(
                             dictionary=match_json,
-                            location=identify_license_output_path))
+                            location=identify_license_output_path,
+                            default_condition=default_condition))
         license_classifications = {}
         for license_id, identifications in identifications_by_license_id.items(
         ):
@@ -531,7 +543,7 @@ class LicensesClassifications:
             return LicensesClassifications.from_json_list(
                 json_obj, json_file_path)
 
-    def _transform(
+    def _transform_each_classification(
         self, function: Callable[[LicenseClassification], LicenseClassification]
     ) -> "LicensesClassifications":
         """Returns a copy of this object with the classifications transformed by function"""
@@ -540,9 +552,10 @@ class LicensesClassifications:
             new[k] = function(v)
         return dataclasses.replace(self, classifications_by_id=new)
 
-    def set_conditions(
-            self, policy: "ConditionsPolicy") -> "LicensesClassifications":
-        return self._transform(lambda x: x.set_conditions(policy))
+    def set_default_condition(
+            self, default_condition: str) -> "LicensesClassifications":
+        return self._transform_each_classification(
+            lambda x: x.set_default_condition(default_condition))
 
     def add_classifications(
             self,
@@ -555,20 +568,22 @@ class LicensesClassifications:
         return dataclasses.replace(self, classifications_by_id=new)
 
     def add_licenses_information(self, spdx_index: SpdxIndex):
-        return self._transform(lambda x: x.add_license_information(spdx_index))
+        return self._transform_each_classification(
+            lambda x: x.add_license_information(spdx_index))
 
     def compute_identification_stats(self, spdx_index: SpdxIndex):
-        return self._transform(
+        return self._transform_each_classification(
             lambda x: x.compute_identification_stats(spdx_index))
 
     def override_conditions(
             self,
             rule_set: "ConditionOverrideRuleSet") -> "LicensesClassifications":
-        return self._transform(lambda x: x.override_conditions(rule_set))
+        return self._transform_each_classification(
+            lambda x: x.override_conditions(rule_set))
 
     def verify_conditions(
             self, allowed_conditions: Set[str]) -> "LicensesClassifications":
-        return self._transform(
+        return self._transform_each_classification(
             lambda x: x.verify_conditions(allowed_conditions))
 
     def verification_errors(self):
@@ -596,39 +611,6 @@ class LicensesClassifications:
 
     def license_ids(self):
         return self.classifications_by_id.keys()
-
-
-@dataclasses.dataclass(frozen=True)
-class ConditionsPolicy:
-    """
-    A map of identification names (e.g. MIT, GPL) to policy condition names
-    (e.g. notice, by_exception_only).
-    """
-    _condition_by_name: Dict[str, str]
-    _default_condition: str
-
-    def from_csv_file(csv_file_path, default_condition):
-        """
-        Creates a LicensesPolicy from a policy conditions csv file.
-
-        The file has 2 columns: license (name), condition
-        """
-        map: Dict[str, str] = {}
-
-        with open(csv_file_path, 'r') as read_obj:
-            csv_dict_reader = csv.DictReader(read_obj)
-            for row in csv_dict_reader:
-                name = row["license"]
-                assert name not in map, f"{name} already defined"
-                map[name] = row["condition"]
-        return ConditionsPolicy(map, default_condition)
-
-    def get_condition(self, identification_name: str):
-        """The condition associated with the name, or None"""
-        if identification_name in self._condition_by_name:
-            return self._condition_by_name[identification_name]
-        else:
-            return self._default_condition
 
 
 @dataclasses.dataclass(frozen=True)

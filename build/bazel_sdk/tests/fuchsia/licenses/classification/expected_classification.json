@@ -9,7 +9,7 @@
         "identifications": [
             {
                 "identified_as": "License Kind 3",
-                "condition": "some other disallowed condition",
+                "condition": "unencumbered",
                 "verified": true,
                 "overriden_conditions": [
                     "allowed condition"
@@ -42,16 +42,51 @@
                     }
                 ],
                 "confidence": 1.0,
-                "start_line": 2,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "af0d025f2d1193bea258782d5144e55c",
+                "snippet_text": "Some known\ntest license 2"
+            },
+            {
+                "identified_as": "[UNIDENTIFIED]",
+                "condition": "default condition",
+                "verified": false,
+                "verification_message": "'default condition' condition is not an allowed",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "Bar"
+                        ],
+                        "identifications": [
+                            "[UNIDENTIFIED]"
+                        ],
+                        "conditions": [
+                            "default condition"
+                        ],
+                        "snippet_checksums": [
+                            "63ade272d3a25260a50df773dbf2fed8"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
+                "confidence": 1.0,
+                "start_line": 3,
                 "end_line": 3,
-                "snippet_checksum": "1cfe5bf877f0b28cd1ada9c9ac705d34",
-                "snippet_text": "test license 2\n(used by both Bar and Baz)"
+                "snippet_checksum": "63ade272d3a25260a50df773dbf2fed8",
+                "snippet_text": "(used by both Bar and Baz)"
             }
         ],
         "identification_stats": {
             "size_bytes": 52,
             "size_lines": 3,
-            "unidentified_lines": 3
+            "unidentified_lines": 0
         }
     },
     {
@@ -65,9 +100,9 @@
         "identifications": [
             {
                 "identified_as": "License Kind 3",
-                "condition": "some other disallowed condition",
+                "condition": "unencumbered",
                 "verified": false,
-                "verification_message": "The overriding rules ['fuchsia/licenses/classification/test_policy_override_rule.json'] changed the conditions to ['allowed condition'] but the rules don't match the dependencies ['Package A'] that remain with the condition 'some other disallowed condition that is not allowed'.",
+                "verification_message": "The overriding rules ['fuchsia/licenses/classification/test_policy_override_rule.json'] changed the conditions to ['allowed condition'] but the rules don't match the dependencies ['Package A'] that remain with the condition 'unencumbered that is not allowed'.",
                 "overriden_conditions": [
                     "allowed condition"
                 ],
@@ -115,10 +150,10 @@
                             "License Kind 3"
                         ],
                         "conditions": [
-                            "some other disallowed condition"
+                            "unencumbered"
                         ],
                         "snippet_checksums": [
-                            "1cfe5bf877f0b28cd1ada9c9ac705d34"
+                            "af0d025f2d1193bea258782d5144e55c"
                         ],
                         "dependents": [
                             "Package A"
@@ -126,16 +161,52 @@
                     }
                 },
                 "confidence": 1.0,
-                "start_line": 2,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "af0d025f2d1193bea258782d5144e55c",
+                "snippet_text": "Some known\ntest license 2"
+            },
+            {
+                "identified_as": "[UNIDENTIFIED]",
+                "condition": "default condition",
+                "verified": false,
+                "verification_message": "'default condition' condition is not an allowed",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "Baz"
+                        ],
+                        "identifications": [
+                            "[UNIDENTIFIED]"
+                        ],
+                        "conditions": [
+                            "default condition"
+                        ],
+                        "snippet_checksums": [
+                            "63ade272d3a25260a50df773dbf2fed8"
+                        ],
+                        "dependents": [
+                            "Package A",
+                            "Package B"
+                        ]
+                    }
+                },
+                "confidence": 1.0,
+                "start_line": 3,
                 "end_line": 3,
-                "snippet_checksum": "1cfe5bf877f0b28cd1ada9c9ac705d34",
-                "snippet_text": "test license 2\n(used by both Bar and Baz)"
+                "snippet_checksum": "63ade272d3a25260a50df773dbf2fed8",
+                "snippet_text": "(used by both Bar and Baz)"
             }
         ],
         "identification_stats": {
             "size_bytes": 52,
             "size_lines": 3,
-            "unidentified_lines": 3
+            "unidentified_lines": 0
         }
     },
     {
@@ -150,8 +221,33 @@
         "identifications": [
             {
                 "identified_as": "License Kind 1",
-                "condition": "allowed condition",
-                "verified": true,
+                "condition": "notice",
+                "verified": false,
+                "verification_message": "'notice' condition is not an allowed",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "Foo"
+                        ],
+                        "identifications": [
+                            "License Kind 1"
+                        ],
+                        "conditions": [
+                            "notice"
+                        ],
+                        "snippet_checksums": [
+                            "fa2258a0fd04107e67394fdb57c0eecf"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
@@ -160,9 +256,9 @@
             },
             {
                 "identified_as": "License Kind 2",
-                "condition": "disallowed condition",
+                "condition": "unencumbered",
                 "verified": false,
-                "verification_message": "'disallowed condition' condition is not an allowed",
+                "verification_message": "'unencumbered' condition is not an allowed",
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
                     "bug": "<INSERT TICKET URL>",
@@ -177,7 +273,7 @@
                             "License Kind 2"
                         ],
                         "conditions": [
-                            "disallowed condition"
+                            "unencumbered"
                         ],
                         "snippet_checksums": [
                             "80c12e04fe66d3cf50eb6a4e8e2185fc"
@@ -197,7 +293,7 @@
         "identification_stats": {
             "size_bytes": 25,
             "size_lines": 2,
-            "unidentified_lines": 2
+            "unidentified_lines": -2
         }
     },
     {
@@ -247,7 +343,7 @@
         "identification_stats": {
             "size_bytes": 27,
             "size_lines": 2,
-            "unidentified_lines": 3
+            "unidentified_lines": -1
         }
     }
 ]

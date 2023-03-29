@@ -35,20 +35,20 @@ def _prepare_license_files(license_files_dir: str,
                 f'license{len(file_by_unique_text.keys())}.txt')
             file_by_unique_text[text] = file_path
             with open(file_path, 'w') as license_file:
-                license_file.write(license.extracted_text)
+                license_file.write(text)
         license_files_by_id[id] = file_path
 
     _log(
-        f"Identified {len(file_by_unique_text.keys())} unique license texts in"
-        f" {len(spdx_doc.extracted_licenses)} extracted licenses: {file_by_unique_text.values()}"
-    )
+        f"Found {len(file_by_unique_text.keys())} unique license texts in"
+        f" {len(license_files_by_id.keys())} extracted licenses.")
 
     return license_files_by_id
 
 
 def _invoke_identify_license(
         identify_license_path: str, license_files_dir: str,
-        license_files_by_id: Dict[str, str]) -> LicensesClassifications:
+        license_files_by_id: Dict[str, str],
+        default_condition: str) -> LicensesClassifications:
     """Invokes identify_license tool, returning an LicensesClassifications."""
     identify_license_output_path = 'identify_license_out.json'
 
@@ -57,15 +57,15 @@ def _invoke_identify_license(
     for path in [identify_license_path, license_files_dir] + license_paths:
         assert os.path.exists(path), f'{path} doesn\'t exist'
 
-    with open(b258523163_workaround, 'w') as f:
-        f.write(_UNENCUMBERED_LICENSE)
+    _log(
+        f'Producing {identify_license_output_path} using {identify_license_path}'
+    )
 
     command = [
         identify_license_path,
         '-headers',
         f'-json={identify_license_output_path}',
         license_files_dir,
-        b258523163_workaround,
     ]
 
     _log(f'identify_license invocation = {command}')
@@ -76,23 +76,23 @@ def _invoke_identify_license(
     ), f"{identify_license_output_path} doesn't exist"
 
     classifications = LicensesClassifications.from_identify_license_output_json(
-        identify_license_output_path, license_files_by_id)
+        identify_license_output_path, license_files_by_id, default_condition)
 
     _log(
-        f'Identified {classifications.identifications_count()} identifications in {classifications.licenses_count()} licenses'
+        f'Found {classifications.identifications_count()} identifications for {classifications.licenses_count()} licenses'
     )
 
     return classifications
 
 
 def _add_missing_identifications(
-        spdx_doc: SpdxDocument,
-        classifications: LicensesClassifications) -> LicensesClassifications:
+        spdx_doc: SpdxDocument, classifications: LicensesClassifications,
+        default_condition: str) -> LicensesClassifications:
     extra_classifications = []
     for l in spdx_doc.extracted_licenses:
         if l.license_id not in classifications.license_ids():
             identification = IdentifiedSnippet.create_empty(
-                l.extracted_text_lines())
+                l.extracted_text_lines(), condition=default_condition)
             extra_classifications.append(
                 LicenseClassification(
                     license_id=l.license_id, identifications=[identification]))
@@ -110,15 +110,9 @@ def _load_override_rules(rule_paths: List[str]) -> ConditionOverrideRuleSet:
 
 def _apply_policy_and_overrides(
     classification: LicensesClassifications,
-    conditions_policy_file_path: str,
-    default_condition: str,
     policy_override_rules_file_paths: List[str],
     allowed_conditions: List[str],
 ) -> LicensesClassifications:
-    conditions_policy = ConditionsPolicy.from_csv_file(
-        conditions_policy_file_path, default_condition)
-    classification = classification.set_conditions(conditions_policy)
-
     if policy_override_rules_file_paths:
         override_rules = _load_override_rules(policy_override_rules_file_paths)
         classification = classification.override_conditions(override_rules)
@@ -168,13 +162,6 @@ def main():
         'Expecting a binary with the same I/O as '
         'https://github.com/google/licenseidentify_license/tree/main/tools/identify_license',
         required=True,
-    )
-    parser.add_argument(
-        '--conditions_policy',
-        help=
-        'A CSV file mapping license identification names to condition names',
-        required=False,
-        default=None,
     )
     parser.add_argument(
         '--policy_override_rules',
@@ -230,16 +217,16 @@ def main():
     classification = _invoke_identify_license(
         identify_license_path=args.identify_license_bin,
         license_files_dir=licenses_dir,
-        license_files_by_id=license_files_by_id)
+        license_files_by_id=license_files_by_id,
+        default_condition=args.default_condition)
 
-    classification = _add_missing_identifications(spdx_doc, classification)
+    classification = _add_missing_identifications(
+        spdx_doc, classification, default_condition=args.default_condition)
     classification = classification.compute_identification_stats(spdx_index)
     classification = classification.add_licenses_information(spdx_index)
 
     classification = _apply_policy_and_overrides(
         classification,
-        conditions_policy_file_path=args.conditions_policy,
-        default_condition=args.default_condition,
         policy_override_rules_file_paths=args.policy_override_rules,
         allowed_conditions=args.allowed_conditions,
     )

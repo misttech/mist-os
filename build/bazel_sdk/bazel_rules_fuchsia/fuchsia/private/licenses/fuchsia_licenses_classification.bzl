@@ -14,9 +14,6 @@ def _fuchsia_licenses_classification_impl(ctx):
         "--output_file=%s" % out_json.path,
     ]
 
-    if ctx.file.conditions_policy:
-        inputs.append(ctx.file.conditions_policy)
-        arguments.append("--conditions_policy=%s" % ctx.file.conditions_policy.path)
     if ctx.attr.default_condition:
         arguments.append("--default_condition=%s" % ctx.attr.default_condition)
     if ctx.attr.allowed_conditions:
@@ -82,22 +79,9 @@ and build identify_license to match their organization OSS compliance policies.
             cfg = "exec",
             mandatory = True,
         ),
+        # TODO(tqr/121609): Remove once v/g usage is removed.
         "conditions_policy": attr.label(
-            doc = """A CSV file that maps license identification names to conditions.
-License snippets identified with the given name will be applied the
-given 'condition'. The CSV should have 2 columns: 'license', 'condition'.
-The rows should map a license identification name to a condition.
-
-For example:
-```
-license,condition
-MIT, allowed
-GPL, forbidden
-foo, bar
-```
-
-The specific conditions and their meanings are organization specific.
-""",
+            doc = """Unused""",
             allow_single_file = True,
             mandatory = False,
             default = None,
