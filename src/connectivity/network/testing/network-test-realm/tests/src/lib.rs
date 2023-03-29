@@ -55,7 +55,7 @@ const DURATION_FIVE_MINUTES: zx::Duration = zx::Duration::from_minutes(5);
 const MINIMUM_TIMEOUT: zx::Duration = zx::Duration::from_nanos(1);
 const NO_WAIT_TIMEOUT: zx::Duration = zx::Duration::from_nanos(0);
 const DEFAULT_PAYLOAD_LENGTH: u16 = 100;
-const NON_EXISTENT_INTERFACE_NAME: &'static str = "non_existent_interface";
+const NON_EXISTENT_INTERFACE_NAME: &'static str = "non_existent";
 
 const DEFAULT_IPV4_MULTICAST_ADDRESS: fnet::Ipv4Address = fidl_ip_v4!("224.1.2.3");
 const DEFAULT_IPV6_MULTICAST_ADDRESS: fnet::Ipv6Address = fidl_ip_v6!("ff02::3");

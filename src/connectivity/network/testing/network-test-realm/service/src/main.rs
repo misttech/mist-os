@@ -655,6 +655,7 @@ async fn ping_once<Ip: ping::IpExt>(
     if let Some(interface_name) = interface_name {
         socket.bind_device(Some(interface_name.as_bytes())).map_err(|e| match e.kind() {
             std::io::ErrorKind::InvalidInput => fntr::Error::InterfaceNotFound,
+            _ if e.raw_os_error() == Some(libc::ENODEV) => fntr::Error::InterfaceNotFound,
             _kind => {
                 error!("bind_device for interface: {} failed: {:?}", interface_name, e);
                 fntr::Error::Internal
