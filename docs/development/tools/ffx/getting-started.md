@@ -11,12 +11,10 @@ If you discover possible bugs or have questions or suggestions,
 ## Prerequisites
 
 To follow the examples in this doc, you'll need a Fuchsia device running. If you
-don't have a physical device connected, you can use an emulator with networking
-enabled by starting the emulator with the `--net tap` option.
+don't have a physical device connected, you can use an emulator.
 
 To start an emulator with networking enabled but without graphical user
-interface support,
-run `ffx emu start --net tap --headless`.
+interface support, run `ffx emu start --headless`.
 
 For more information on configuring the emulator
 see, [Start the Fuchsia emulator](/docs/get-started/set_up_femu.md).
@@ -133,7 +131,7 @@ NOTE: if the `RCS` column remains `N` for an extended amount of time and you hav
 already set this target's nodename to `target.default` _before_ initially starting
 ffx, [reach out](#contacting_the_ffx_team) to the `ffx` team.
 
-#### On Default Targets
+### On Default Targets
 
 Above we covered setting the default target using the command
 
@@ -149,6 +147,7 @@ fx ffx --target $NODENAME component list
 ```
 
 ### Interacting with multiple devices
+
 TODO: fill this out.
 
 ### Controlling the state of target devices
@@ -406,7 +405,25 @@ and include 1) all output
 above and 2) device syslog if available.Bug link: ...
 ```
 
+## Testing with ffx
+
+The `ffx` command is useful when writing integration tests which need to interact
+with the Fuchsia environment. However, since `ffx` is primarily designed for
+developers, it inspects the current environment for configuration and also starts
+a daemon in the background to coordinate communication with Fuchsia devices. This
+makes it more complex to write automated tests that use `ffx` since the configuration
+and daemon should be isolated in order to avoid side effects, or interference from
+the global environment.
+
+To achieve this isolation, test authors need to use [isolate directories][isolate-dir]
+when running tests which use `ffx`.
+
 ## Next steps
 
 - Please provide feedback on this doc by [reaching out to the ffx team](#contacting_the_ffx_team)!
 - Learn how to [extend `ffx`](/docs/development/tools/ffx/development/plugins.md).
+
+
+<!-- Reference links -->
+
+[isolate-dir]: development/integration_testing.md

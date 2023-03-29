@@ -8,6 +8,8 @@
 toc:
 - title: "Overview"
   path: /docs/development/tools/ffx/development/README.md
+- title: "Integration testing"
+  path: /docs/development/tools/ffx/development/integration_testing.md
 - title: "Developing an FFX subtool"
   path: /docs/development/tools/ffx/development/subtools/getting-started.md
 - title: "Experimental subtools"
