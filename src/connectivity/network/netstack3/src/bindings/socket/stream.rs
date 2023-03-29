@@ -16,7 +16,7 @@ use assert_matches::assert_matches;
 use explicit::ResultExt as _;
 use fidl::{
     endpoints::{ClientEnd, RequestStream as _},
-    AsHandleRef as _, HandleBased as _,
+    HandleBased as _,
 };
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_posix as fposix;
@@ -79,12 +79,19 @@ const MAX_TCP_KEEPCNT: u8 = 127;
 enum SocketId<I: Ip> {
     Unbound(UnboundId<I>, LocalZirconSocketAndNotifier),
     Bound(BoundId<I>, LocalZirconSocketAndNotifier),
-    Connection(ConnectionId<I>, bool),
+    Connection(ConnectionId<I>),
     Listener(ListenerId<I>),
 }
 
 #[derive(Debug)]
 pub(crate) struct ListenerState(zx::Socket);
+
+#[derive(Debug)]
+pub(crate) enum ConnectionStatus {
+    InProgress,
+    Connected { reported: bool },
+    Rejected { reported: bool },
+}
 
 pub(crate) trait SocketWorkerDispatcher:
     tcp::socket::NonSyncContext<
@@ -112,6 +119,27 @@ pub(crate) trait SocketWorkerDispatcher:
     ///
     /// Panics if `id` does not correspond to a listener.
     fn get_listener_mut<I: Ip>(&mut self, id: ListenerId<I>) -> &mut ListenerState;
+
+    /// Registers a newly created connection with its state.
+    ///
+    /// # Panics
+    /// Panics if `id` is already registered.
+    fn register_connection<I: Ip>(&mut self, id: ConnectionId<I>, status: ConnectionStatus);
+
+    /// Unregisters an existing connection when it is about to be closed.
+    ///
+    /// Returns the state that used to be registered.
+    ///
+    /// # Panics
+    /// Panics if `id` is non-existent.
+    fn unregister_connection<I: Ip>(&mut self, id: ConnectionId<I>) -> ConnectionStatus;
+
+    /// Returns a mutable reference to state for an existing connection.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `id` does not correspond to a connection.
+    fn get_connection_mut<I: Ip>(&mut self, id: ConnectionId<I>) -> &mut ConnectionStatus;
 }
 
 impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
@@ -142,6 +170,40 @@ impl SocketWorkerDispatcher for BindingsNonSyncCtxImpl {
             }
             IpVersion::V6 => {
                 self.tcp_v6_listeners.get_mut(id.into()).expect("invalid v6 ListenerId")
+            }
+        }
+    }
+
+    fn register_connection<I: Ip>(&mut self, id: ConnectionId<I>, status: ConnectionStatus) {
+        match I::VERSION {
+            IpVersion::V4 => {
+                assert_matches!(self.tcp_v4_connections.insert(id.into(), status), None)
+            }
+            IpVersion::V6 => {
+                assert_matches!(self.tcp_v6_connections.insert(id.into(), status), None)
+            }
+        }
+    }
+
+    fn unregister_connection<I: Ip>(&mut self, id: ConnectionId<I>) -> ConnectionStatus {
+        let status = match I::VERSION {
+            IpVersion::V4 => {
+                self.tcp_v4_connections.remove(id.into()).expect("invalid v4 ConnectionId")
+            }
+            IpVersion::V6 => {
+                self.tcp_v6_connections.remove(id.into()).expect("invalid v6 ConnectionId")
+            }
+        };
+        status
+    }
+
+    fn get_connection_mut<I: Ip>(&mut self, id: ConnectionId<I>) -> &mut ConnectionStatus {
+        match I::VERSION {
+            IpVersion::V4 => {
+                self.tcp_v4_connections.get_mut(id.into()).expect("invalid v4 ConnectionId")
+            }
+            IpVersion::V6 => {
+                self.tcp_v6_connections.get_mut(id.into()).expect("invalid v6 ConnectionId")
             }
         }
     }
@@ -218,11 +280,24 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
 
     fn on_connection_status_change<I: Ip>(
         &mut self,
-        _connection: ConnectionId<I>,
-        _update: ConnectionStatusUpdate,
+        connection: ConnectionId<I>,
+        update: ConnectionStatusUpdate,
     ) {
-        // TODO(https://fxbug.dev/103982): Record state and signal peer
-        // appropriately.
+        let status = self.get_connection_mut(connection);
+        match status {
+            ConnectionStatus::InProgress => match update {
+                ConnectionStatusUpdate::Connected => {
+                    *status = ConnectionStatus::Connected { reported: false }
+                }
+                ConnectionStatusUpdate::Reset => {
+                    *status = ConnectionStatus::Rejected { reported: false }
+                }
+            },
+            ConnectionStatus::Connected { reported: _ }
+            | ConnectionStatus::Rejected { reported: _ } => {
+                // TODO(https://fxbug.dev/103982): Signal peer on reset.
+            }
+        }
     }
 
     fn default_buffer_sizes() -> BufferSizes {
@@ -563,7 +638,10 @@ where
         match id {
             SocketId::Unbound(unbound, _) => remove_unbound::<I, _>(sync_ctx, unbound),
             SocketId::Bound(bound, _) => remove_bound::<I, _>(sync_ctx, bound),
-            SocketId::Connection(conn, _) => close_conn::<I, _>(sync_ctx, non_sync_ctx, conn),
+            SocketId::Connection(conn) => {
+                close_conn::<I, _>(sync_ctx, non_sync_ctx, conn);
+                let _: ConnectionStatus = non_sync_ctx.unregister_connection(conn);
+            }
             SocketId::Listener(listener) => {
                 let bound = shutdown_listener::<I, _>(sync_ctx, non_sync_ctx, listener);
                 let _: zx::Socket = non_sync_ctx.unregister_listener(listener);
@@ -697,26 +775,17 @@ where
                 *id = SocketId::Bound(bound, local_socket.take());
                 Ok(())
             }
-            SocketId::Bound(_, _) | SocketId::Connection(_, _) | SocketId::Listener(_) => {
+            SocketId::Bound(_, _) | SocketId::Connection(_) | SocketId::Listener(_) => {
                 Err(fposix::Errno::Einval)
             }
         }
     }
 
     async fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let Self { data: BindingData { id, peer }, ctx } = self;
+        let Self { data: BindingData { id, peer: _ }, ctx } = self;
         let addr = I::SocketAddress::from_sock_addr(addr)?;
         let mut guard = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
-        let is_established =
-            || match peer.wait_handle(ZXSIO_SIGNAL_CONNECTED, zx::Time::INFINITE_PAST) {
-                Ok(signals) => {
-                    debug_assert!(signals.contains(ZXSIO_SIGNAL_CONNECTED));
-                    true
-                }
-                Err(zx::Status::TIMED_OUT) => false,
-                Err(err) => panic!("unexpected error when observing signals: {:?}", err),
-            };
         let (ip, remote_port) =
             addr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
         let port = NonZeroU16::new(remote_port).ok_or(fposix::Errno::Einval)?;
@@ -746,30 +815,28 @@ where
                 Ok((connected, Arc::clone(socket), notifier.watcher()))
             }
             SocketId::Listener(_) => Err(fposix::Errno::Einval),
-            SocketId::Connection(_, ref mut established) => {
-                if *established {
-                    Err(fposix::Errno::Eisconn)
-                } else {
-                    *established = is_established();
-                    if *established {
-                        return Ok(());
-                    } else {
-                        Err(fposix::Errno::Ealready)
+            SocketId::Connection(id) => {
+                let status = non_sync_ctx.get_connection_mut(id);
+                match status {
+                    ConnectionStatus::Connected { reported } => {
+                        if !*reported {
+                            *reported = true;
+                            return Ok(());
+                        }
+                        Err(fposix::Errno::Eisconn)
                     }
+                    ConnectionStatus::Rejected { reported: _ } => Err(fposix::Errno::Econnrefused),
+                    ConnectionStatus::InProgress => Err(fposix::Errno::Ealready),
                 }
             }
         }?;
-        // The following logic matches what Linux does - if the connection is
-        // established before the return of the function then it will return
-        // success. However realistically speaking, this is unlikely to happen
-        // on Fuchsia. We keep this logic to keep parity with Linux and it has
-        // a small performance penalty (an extra syscall). If we later decide
-        // the benefit is not worth the cost, then we can just blindly return
-        // EINPROGRESS.
-        let established = is_established();
+        // It's safe to register the connection as in-progress because it can't
+        // complete without sending and receiving packets, which can't be done
+        // while the lock around the Ctx is held.
+        non_sync_ctx.register_connection(connection, ConnectionStatus::InProgress);
         spawn_send_task::<I>(ctx.clone(), socket, watcher, connection);
-        *id = SocketId::Connection(connection, established);
-        established.then(|| ()).ok_or(fposix::Errno::Einprogress)
+        *id = SocketId::Connection(connection);
+        Err(fposix::Errno::Einprogress)
     }
 
     async fn listen(self, backlog: i16) -> Result<(), fposix::Errno> {
@@ -814,7 +881,7 @@ where
                 );
                 Ok(())
             }
-            SocketId::Unbound(_, _) | SocketId::Connection(_, _) | SocketId::Listener(_) => {
+            SocketId::Unbound(_, _) | SocketId::Connection(_) | SocketId::Listener(_) => {
                 Err(fposix::Errno::Einval)
             }
         }
@@ -834,7 +901,7 @@ where
                 let BoundInfo { addr, port, device: _ } = get_listener_info::<I, _>(sync_ctx, id);
                 (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
             }
-            SocketId::Connection(id, _) => {
+            SocketId::Connection(id) => {
                 let ConnectionInfo { local_addr, remote_addr: _, device: _ } =
                     get_connection_info::<I, _>(sync_ctx, id);
                 local_addr.try_into_fidl_with_ctx(non_sync_ctx)
@@ -852,7 +919,7 @@ where
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) | SocketId::Listener(_) => {
                 Err(fposix::Errno::Enotconn)
             }
-            SocketId::Connection(id, _) => Ok({
+            SocketId::Connection(id) => Ok({
                 get_connection_info::<I, _>(sync_ctx, id)
                     .remote_addr
                     .try_into_fidl_with_ctx(non_sync_ctx)
@@ -876,6 +943,8 @@ where
                 let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
                 let (accepted, addr, peer) = accept::<I, _>(sync_ctx, non_sync_ctx, listener)
                     .map_err(IntoErrno::into_errno)?;
+                non_sync_ctx
+                    .register_connection(accepted, ConnectionStatus::Connected { reported: true });
                 let addr = addr
                     .try_into_fidl_with_ctx(&non_sync_ctx)
                     .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"));
@@ -887,8 +956,32 @@ where
                 spawn_connected_socket_task(ctx.clone(), accepted, peer, request_stream);
                 Ok((want_addr.then(|| Box::new(addr.into_sock_addr())), client))
             }
-            SocketId::Unbound(_, _) | SocketId::Connection(_, _) | SocketId::Bound(_, _) => {
+            SocketId::Unbound(_, _) | SocketId::Connection(_) | SocketId::Bound(_, _) => {
                 Err(fposix::Errno::Einval)
+            }
+        }
+    }
+
+    async fn get_error(self) -> Result<(), fposix::Errno> {
+        let Self { data: BindingData { id, peer: _ }, ctx } = self;
+        match *id {
+            SocketId::Unbound(_, _) | SocketId::Bound(_, _) | SocketId::Listener(_) => Ok(()),
+            SocketId::Connection(conn_id) => {
+                let mut guard = ctx.lock().await;
+                let Ctx { sync_ctx: _, non_sync_ctx } = guard.deref_mut();
+                let status = non_sync_ctx.get_connection_mut(conn_id);
+                match status {
+                    ConnectionStatus::InProgress => Err(fposix::Errno::Einprogress),
+                    ConnectionStatus::Connected { reported: _ } => Ok(()),
+                    ConnectionStatus::Rejected { reported } => {
+                        if !*reported {
+                            *reported = true;
+                            Err(fposix::Errno::Econnrefused)
+                        } else {
+                            Ok(())
+                        }
+                    }
+                }
             }
         }
     }
@@ -897,7 +990,7 @@ where
         let Self { data: BindingData { id, peer }, ctx } = self;
         match *id {
             SocketId::Unbound(_, _) | SocketId::Bound(_, _) => Err(fposix::Errno::Enotconn),
-            SocketId::Connection(conn_id, _) => {
+            SocketId::Connection(conn_id) => {
                 let mut my_disposition: Option<zx::SocketWriteDisposition> = None;
                 let mut peer_disposition: Option<zx::SocketWriteDisposition> = None;
                 if mode.contains(fposix_socket::ShutdownMode::WRITE) {
@@ -951,9 +1044,7 @@ where
             }
             SocketId::Bound(id, _) => set_bound_device(sync_ctx, non_sync_ctx, id, device),
             SocketId::Listener(id) => set_listener_device(sync_ctx, non_sync_ctx, id, device),
-            SocketId::Connection(id, _) => {
-                set_connection_device(sync_ctx, non_sync_ctx, id, device)
-            }
+            SocketId::Connection(id) => set_connection_device(sync_ctx, non_sync_ctx, id, device),
         }
         .map_err(IntoErrno::into_errno)
     }
@@ -967,9 +1058,7 @@ where
         match *id {
             SocketId::Unbound(id, _) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
             SocketId::Bound(id, _) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Connection(id, _) => {
-                set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size)
-            }
+            SocketId::Connection(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
             SocketId::Listener(id) => set_send_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
         }
     }
@@ -981,7 +1070,7 @@ where
         match *id {
             SocketId::Unbound(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Bound(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Connection(id, _) => send_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Connection(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Listener(id) => send_buffer_size(sync_ctx, non_sync_ctx, id),
         }
         // If the socket doesn't have a send buffer (e.g. because it was shut
@@ -1003,7 +1092,7 @@ where
                 set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size)
             }
             SocketId::Bound(id, _) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
-            SocketId::Connection(id, _) => {
+            SocketId::Connection(id) => {
                 set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size)
             }
             SocketId::Listener(id) => set_receive_buffer_size(sync_ctx, non_sync_ctx, id, new_size),
@@ -1017,7 +1106,7 @@ where
         match *id {
             SocketId::Unbound(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Bound(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
-            SocketId::Connection(id, _) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
+            SocketId::Connection(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
             SocketId::Listener(id) => receive_buffer_size(sync_ctx, non_sync_ctx, id),
         }
         // If the socket doesn't have a receive buffer (e.g. because the remote
@@ -1040,7 +1129,7 @@ where
             SocketId::Listener(id) => {
                 set_reuseaddr_listener(sync_ctx, id, value).map_err(IntoErrno::into_errno)
             }
-            SocketId::Connection(_, _) => Err(fposix::Errno::Enoprotoopt),
+            SocketId::Connection(_) => Err(fposix::Errno::Enoprotoopt),
         }
     }
 
@@ -1052,7 +1141,7 @@ where
             SocketId::Unbound(id, _) => reuseaddr(sync_ctx, id),
             SocketId::Bound(id, _) => reuseaddr(sync_ctx, id),
             SocketId::Listener(id) => reuseaddr(sync_ctx, id),
-            SocketId::Connection(id, _) => reuseaddr(sync_ctx, id),
+            SocketId::Connection(id) => reuseaddr(sync_ctx, id),
         }
     }
 
@@ -1075,7 +1164,7 @@ where
                 responder_send!(responder, &mut self.bind(addr).await);
             }
             fposix_socket::StreamSocketRequest::Connect { addr, responder } => {
-                responder_send!(responder, &mut self.connect(addr).await);
+                responder_send!(responder, &mut self.connect(addr).await.clone());
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
@@ -1122,8 +1211,7 @@ where
                 responder_send!(responder, &mut Ok(self.reuse_address().await));
             }
             fposix_socket::StreamSocketRequest::GetError { responder } => {
-                // TODO(https://fxbug.dev/103982): Retrieve the error.
-                responder_send!(responder, &mut Ok(()));
+                responder_send!(responder, &mut self.get_error().await);
             }
             fposix_socket::StreamSocketRequest::SetBroadcast { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
@@ -1516,7 +1604,7 @@ where
         match *id {
             SocketId::Unbound(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
             SocketId::Bound(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
-            SocketId::Connection(id, _) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
+            SocketId::Connection(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
             SocketId::Listener(id) => with_socket_options_mut(sync_ctx, non_sync_ctx, id, f),
         }
     }
@@ -1528,7 +1616,7 @@ where
         match *id {
             SocketId::Unbound(id, _) => with_socket_options(sync_ctx, id, f),
             SocketId::Bound(id, _) => with_socket_options(sync_ctx, id, f),
-            SocketId::Connection(id, _) => with_socket_options(sync_ctx, id, f),
+            SocketId::Connection(id) => with_socket_options(sync_ctx, id, f),
             SocketId::Listener(id) => with_socket_options(sync_ctx, id, f),
         }
     }
@@ -1548,7 +1636,7 @@ fn spawn_connected_socket_task<I: IpExt + IpSockAddrExt>(
     fasync::Task::spawn(SocketWorker::<BindingData<I>>::serve_stream_with(
         ctx,
         move |_: &mut SyncCtx<_>, _: &mut BindingsNonSyncCtxImpl, SocketWorkerProperties {}| {
-            BindingData { id: SocketId::Connection(accepted, true), peer }
+            BindingData { id: SocketId::Connection(accepted), peer }
         },
         SocketWorkerProperties {},
         request_stream,

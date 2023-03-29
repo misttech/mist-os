@@ -73,7 +73,6 @@
                 "AllInetTests/SimpleTcpSocketTest.ConnectUnspecifiedAddress/*",
                 "AllInetTests/SimpleTcpSocketTest.CloseNonConnectedLingerOption/*",
                 "AllInetTests/SimpleTcpSocketTest.CleanupOnConnectionRefused/*",
-                "AllInetTests/SimpleTcpSocketTest.BlockingConnectRefused/*",
                 "AllTCPSockets/AllSocketPairTest.BasicSendmmsg/*",
                 "AllTCPSockets/AllSocketPairTest.SendmmsgIsLimitedByMAXIOV/*",
                 "AllTCPSockets/AllSocketPairTest.BasicRecvmmsg/*",
