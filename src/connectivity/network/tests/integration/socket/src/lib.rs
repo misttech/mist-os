@@ -34,7 +34,7 @@ use net_declare::{
     fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_subnet, net_subnet_v4, std_ip_v4, std_socket_addr,
 };
 use net_types::{
-    ip::{Ip as _, IpAddress as _, IpInvariant, Ipv4, Ipv6},
+    ip::{Ip, IpAddress as _, IpInvariant, Ipv4, Ipv6},
     Witness as _,
 };
 use netemul::{RealmTcpListener as _, RealmTcpStream as _, RealmUdpSocket as _, TestInterface};
@@ -314,6 +314,63 @@ async fn execute_and_validate_preflights(
         .await
 }
 
+trait UdpSendMsgPreflightTestIpExt {
+    const PORT: u16;
+    const SOCKET_DOMAIN: fposix_socket::Domain;
+    const INSTALLED_ADDR: fnet::Subnet;
+    const REACHABLE_ADDR1: fnet::SocketAddress;
+    const REACHABLE_ADDR2: fnet::SocketAddress;
+    const UNREACHABLE_ADDR: fnet::SocketAddress;
+    const OTHER_SUBNET: fnet::Subnet;
+}
+
+impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
+    const PORT: u16 = 80;
+    const SOCKET_DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
+    const INSTALLED_ADDR: fnet::Subnet = fidl_subnet!("192.0.2.1/24");
+    const REACHABLE_ADDR1: fnet::SocketAddress =
+        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+            address: fidl_ip_v4!("192.0.2.101"),
+            port: Self::PORT,
+        });
+    const REACHABLE_ADDR2: fnet::SocketAddress =
+        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+            address: fidl_ip_v4!("192.0.2.102"),
+            port: Self::PORT,
+        });
+    const UNREACHABLE_ADDR: fnet::SocketAddress =
+        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
+            address: fidl_ip_v4!("198.51.100.1"),
+            port: Self::PORT,
+        });
+    const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
+}
+
+impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
+    const PORT: u16 = 80;
+    const SOCKET_DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
+    const INSTALLED_ADDR: fnet::Subnet = fidl_subnet!("2001:db8::1/64");
+    const REACHABLE_ADDR1: fnet::SocketAddress =
+        fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+            address: fidl_ip_v6!("2001:db8::1001"),
+            port: Self::PORT,
+            zone_index: 0,
+        });
+    const REACHABLE_ADDR2: fnet::SocketAddress =
+        fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+            address: fidl_ip_v6!("2001:db8::1002"),
+            port: Self::PORT,
+            zone_index: 0,
+        });
+    const UNREACHABLE_ADDR: fnet::SocketAddress =
+        fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress {
+            address: fidl_ip_v6!("2001:db8:ffff:ffff::1"),
+            port: Self::PORT,
+            zone_index: 0,
+        });
+    const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8:eeee:eeee::/64");
+}
+
 #[netstack_test]
 #[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
 #[test_case("ipv6_only_called", UdpCacheInvalidationReason::IPv6OnlyCalled)]
@@ -327,44 +384,25 @@ async fn execute_and_validate_preflights(
 )]
 #[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
 #[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
-async fn udp_send_msg_preflight_fidl(
+async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReason,
 ) {
-    const PORT: u16 = 80;
-    const INSTALLED_ADDR: fnet::Ipv4SocketAddress =
-        fnet::Ipv4SocketAddress { address: fidl_ip_v4!("192.0.2.0"), port: PORT };
-    const REACHABLE_ADDR1: fnet::SocketAddress =
-        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: fidl_ip_v4!("192.0.2.1"),
-            port: PORT,
-        });
-    const REACHABLE_ADDR2: fnet::SocketAddress =
-        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: fidl_ip_v4!("192.0.2.2"),
-            port: PORT,
-        });
-    const UNREACHABLE_ADDR: fnet::SocketAddress =
-        fnet::SocketAddress::Ipv4(fnet::Ipv4SocketAddress {
-            address: fidl_ip_v4!("198.51.100.1"),
-            port: PORT,
-        });
-    const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
-
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm_name = format!("{}_{}", root_name, test_name);
     let (_net, _netstack, iface, socket) =
-        setup_fastudp_network(&realm_name, &sandbox, fposix_socket::Domain::Ipv4).await;
+        setup_fastudp_network(&realm_name, &sandbox, I::SOCKET_DOMAIN).await;
 
-    let mut installed_subnet =
-        fnet::Subnet { addr: fnet::IpAddress::Ipv4(INSTALLED_ADDR.address), prefix_len: 16 };
-    iface.add_address_and_subnet_route(installed_subnet).await.expect("failed to add subnet route");
+    iface
+        .add_address_and_subnet_route(I::INSTALLED_ADDR)
+        .await
+        .expect("failed to add subnet route");
 
     let successful_preflights = execute_and_validate_preflights(
         [
             UdpSendMsgPreflight {
-                to_addr: Some(UNREACHABLE_ADDR),
+                to_addr: Some(I::UNREACHABLE_ADDR),
                 expected_result: UdpSendMsgPreflightExpectation::Failure(
                     fposix::Errno::Ehostunreach,
                 ),
@@ -382,7 +420,7 @@ async fn udp_send_msg_preflight_fidl(
     assert_eq!(successful_preflights, []);
 
     let successful_preflights = {
-        let mut connected_addr = REACHABLE_ADDR1;
+        let mut connected_addr = I::REACHABLE_ADDR1;
         let () = socket
             .connect(&mut connected_addr)
             .await
@@ -392,7 +430,7 @@ async fn udp_send_msg_preflight_fidl(
         // We deliberately repeat an address here to ensure that the preflight can
         // be called > 1 times with the same address.
         let mut preflights: Vec<UdpSendMsgPreflight> =
-            vec![REACHABLE_ADDR1, REACHABLE_ADDR2, REACHABLE_ADDR2]
+            vec![I::REACHABLE_ADDR1, I::REACHABLE_ADDR2, I::REACHABLE_ADDR2]
                 .iter()
                 .map(|socket_address| UdpSendMsgPreflight {
                     to_addr: Some(*socket_address),
@@ -419,7 +457,7 @@ async fn udp_send_msg_preflight_fidl(
 
     match invalidation_reason {
         UdpCacheInvalidationReason::ConnectCalled => {
-            let mut connected_addr = REACHABLE_ADDR2;
+            let mut connected_addr = I::REACHABLE_ADDR2;
             let () = socket
                 .connect(&mut connected_addr)
                 .await
@@ -450,6 +488,7 @@ async fn udp_send_msg_preflight_fidl(
                 .expect("failed to set so_broadcast");
         }
         UdpCacheInvalidationReason::AddressRemoved => {
+            let mut installed_subnet = I::INSTALLED_ADDR;
             let removed = iface
                 .control()
                 .remove_address(&mut installed_subnet)
@@ -460,13 +499,13 @@ async fn udp_send_msg_preflight_fidl(
         }
         UdpCacheInvalidationReason::RouteRemoved => {
             let () = iface
-                .del_subnet_route(installed_subnet)
+                .del_subnet_route(I::INSTALLED_ADDR)
                 .await
                 .expect("failed to delete subnet route");
         }
         UdpCacheInvalidationReason::RouteAdded => {
             let () =
-                iface.add_subnet_route(OTHER_SUBNET).await.expect("failed to add subnet route");
+                iface.add_subnet_route(I::OTHER_SUBNET).await.expect("failed to add subnet route");
         }
         UdpCacheInvalidationReason::SetConfigurationCalled => {
             let _prev_config = iface
