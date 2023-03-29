@@ -115,15 +115,18 @@ const __u32 EVIOCGABS_Y = EVIOCGABS(ABS_Y);
 
 // Symbols for remote binder device driver
 
-struct remote_binder_command {
+struct remote_binder_start_command {
   const char* incoming_service;
-  void (*wait_callback)();
 };
 
-const __u32 _REMOTE_BINDER_START = _IOR('R', 1, struct remote_binder_command);
+struct remote_binder_wait_command {
+  char spawn_thread;
+};
+
+const __u32 _REMOTE_BINDER_START = _IOR('R', 1, struct remote_binder_start_command);
 const __u32 REMOTE_BINDER_START = _REMOTE_BINDER_START;
 
-const __u32 _REMOTE_BINDER_WAIT = _IO('R', 2);
+const __u32 _REMOTE_BINDER_WAIT = _IOW('R', 2, struct remote_binder_wait_command);
 const __u32 REMOTE_BINDER_WAIT = _REMOTE_BINDER_WAIT;
 
 #endif  // SRC_PROC_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_

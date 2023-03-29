@@ -62,7 +62,8 @@ impl FileOps for RemoteBinderConnection {
         match request {
             uapi::REMOTE_BINDER_START => self.start()?,
             uapi::REMOTE_BINDER_WAIT => self.wait(current_task)?,
-            _ => return error!(ENOTSUP),
+            // Temporary return value to allow migrating the ioctl
+            _ => self.wait(current_task)?,
         }
         Ok(SUCCESS)
     }

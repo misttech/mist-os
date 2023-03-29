@@ -9561,11 +9561,10 @@ pub const EVIOCGABS_X: __u32 = 2149074240;
 pub const EVIOCGABS_Y: __u32 = 2149074241;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
-pub struct remote_binder_command {
+pub struct remote_binder_start_command {
     pub incoming_service: *const crate::x86_64_types::c_char,
-    pub wait_callback: ::std::option::Option<unsafe extern "C" fn()>,
 }
-impl Default for remote_binder_command {
+impl Default for remote_binder_start_command {
     fn default() -> Self {
         let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
         unsafe {
@@ -9574,10 +9573,15 @@ impl Default for remote_binder_command {
         }
     }
 }
-pub const _REMOTE_BINDER_START: __u32 = 2148553217;
-pub const REMOTE_BINDER_START: __u32 = 2148553217;
-pub const _REMOTE_BINDER_WAIT: __u32 = 20994;
-pub const REMOTE_BINDER_WAIT: __u32 = 20994;
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct remote_binder_wait_command {
+    pub spawn_thread: crate::x86_64_types::c_char,
+}
+pub const _REMOTE_BINDER_START: __u32 = 2148028929;
+pub const REMOTE_BINDER_START: __u32 = 2148028929;
+pub const _REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
 pub struct xt_match {
