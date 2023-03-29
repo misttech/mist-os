@@ -185,6 +185,12 @@ class SpdxExtractedLicensingInfo:
     def extracted_text_lines(self):
         return self.extracted_text.splitlines()
 
+    def unique_links(self):
+        links = []
+        links.extend(self.cross_refs)
+        links.extend(self.see_also)
+        return sorted(list(set(links)))
+
 
 @dataclasses.dataclass(frozen=True)
 class SpdxRelationship:

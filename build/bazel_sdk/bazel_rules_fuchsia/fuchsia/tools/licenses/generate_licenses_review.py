@@ -23,9 +23,19 @@ def _dedup(input: List[str]) -> List[str]:
     return sorted(list(set(input)))
 
 
-def _write_summary(
-        spdx_doc: SpdxDocument, index: SpdxIndex,
-        classification: LicensesClassifications, output_path: str):
+def _dependents_string(license_id, spdx_index) -> str:
+    dependents = [
+        ">".join([p.name
+                  for p in path])
+        for path in spdx_index.dependency_chains_for_license(license_id)
+    ]
+    return "\n".join(sorted(dependents))
+
+
+def _write_summary_csv(
+        spdx_doc: SpdxDocument, spdx_index: SpdxIndex,
+        classifications: LicensesClassifications, output_path: str):
+    """The summary CSV has a row for original license text, aggregates all the identifications and conditions in the text"""
     with open(output_path, "w") as csvfile:
         writer = csv.DictWriter(
             csvfile,
@@ -51,19 +61,6 @@ def _write_summary(
 
         for license in spdx_doc.extracted_licenses:
             license_id = license.license_id
-            dependents = [
-                ">".join([p.name
-                          for p in path])
-                for path in index.dependency_chains_for_license(
-                    license.license_id)
-            ]
-            links = []
-            for l in license.cross_refs:
-                links.append(l)
-            for l in license.see_also:
-                links.append(l)
-            links = _dedup(links)
-
             identifications = []
             conditions = []
             overriden_conditions = []
@@ -72,8 +69,8 @@ def _write_summary(
             tracking_issues = []
             comments = []
             identification_stats = {}
-            if license_id in classification.classifications_by_id:
-                license_classification = classification.classifications_by_id[
+            if license_id in classifications.classifications_by_id:
+                license_classification = classifications.classifications_by_id[
                     license_id]
                 overriden_conditions = []
 
@@ -108,7 +105,7 @@ def _write_summary(
                 "name":
                     license.name,
                 "link":
-                    "\n".join(_dedup(links)),
+                    '\n'.join(license.unique_links()),
                 "identifications":
                     ",\n".join(_dedup(identifications)),
                 "conditions":
@@ -123,7 +120,7 @@ def _write_summary(
                 "_spdx_license_id":
                     license_id,
                 "_dependents":
-                    ",\n".join(_dedup(dependents)),
+                    _dependents_string(license_id, spdx_index),
                 "_detailed_identifications":
                     ",\n".join(_dedup(detailed_identifications)),
                 "_detailed_overrides":
@@ -134,9 +131,86 @@ def _write_summary(
             writer.writerow(row)
 
 
+def _write_detailed_csv(
+        spdx_doc: SpdxDocument, spdx_index: SpdxIndex,
+        classifications: LicensesClassifications, output_path: str):
+    """The detailed CSV has a row for every identified license snippet, and includes the snippet text"""
+    with open(output_path, "w") as csvfile:
+        writer = csv.DictWriter(
+            csvfile,
+            fieldnames=[
+                "spdx_license_id",
+                "license_name",
+                "dependents",
+                "link",
+                "identification",
+                "start_line",
+                "end_line",
+                "total_lines",
+                "condition",
+                "overriden_conditions",
+                "overriding_rules",
+                "tracking_issues",
+                "comments",
+                "snippet_checksum",
+                "snippet_text",
+            ])
+        writer.writeheader()
+
+        for license in spdx_doc.extracted_licenses:
+            license_id = license.license_id
+            dependents = _dependents_string(license_id, spdx_index)
+            links = '\n'.join(license.unique_links())
+
+            if license_id in classifications.classifications_by_id:
+                for identification in classifications.classifications_by_id[
+                        license_id].identifications:
+
+                    row = {
+                        "spdx_license_id": license_id,
+                        "license_name": license.name,
+                        "dependents": dependents,
+                        "link": links,
+                        "identification": identification.identified_as,
+                        "start_line": identification.start_line,
+                        "end_line": identification.end_line,
+                        "total_lines": identification.number_of_lines(),
+                        "condition": identification.condition,
+                        "snippet_checksum": identification.snippet_checksum,
+                        "snippet_text": identification.snippet_text,
+                    }
+
+                    if identification.overriden_conditions:
+                        row["overriden_conditions"] = "\n".join(
+                            identification.overriden_conditions)
+
+                    if identification.overriding_rules:
+                        row["overriding_rules"] = "\n".join(
+                            [
+                                r.rule_file_path
+                                for r in identification.overriding_rules
+                            ])
+                        row["comments"] = "\n=======\\n".join(
+                            _dedup(
+                                [
+                                    "\n".join(r.comment)
+                                    for r in identification.overriding_rules
+                                    if r.comment
+                                ]))
+                        row["tracking_issues"] = "\n".join(
+                            [
+                                r.bug
+                                for r in identification.overriding_rules
+                                if r.bug
+                            ])
+
+                    writer.writerow(row)
+
+
 def _zip_everything(output_dir_path: str, output_zip_path: str):
+    _log("zipping license review material")
     with zipfile.ZipFile(output_zip_path, mode="w") as archive:
-        for root, dirs, files in os.walk(output_dir_path):
+        for root, _, files in os.walk(output_dir_path):
             for file in files:
                 archive.write(
                     os.path.join(root, file),
@@ -156,6 +230,13 @@ def main():
         '--classification_input',
         help='A json file containing the results of'
         ' @fuchsia_sdk `fuchsia_licenses_classification`',
+        required=False,
+    )
+    parser.add_argument(
+        '--extra_files',
+        help='Additional files to add to the output archive.',
+        type=str,
+        nargs='+',
         required=False,
     )
     parser.add_argument(
@@ -188,10 +269,10 @@ def main():
         shutil.copy(
             classification_input_path,
             os.path.join(output_dir, "classification.json"))
-        classification = LicensesClassifications.from_json(
+        classifications = LicensesClassifications.from_json(
             classification_input_path)
     else:
-        classification = LicensesClassifications.create_empty()
+        classifications = LicensesClassifications.create_empty()
 
     extracted_licenses_dir = os.path.join(output_dir, "extracted_licenses")
     os.mkdir(extracted_licenses_dir)
@@ -201,9 +282,21 @@ def main():
                   "w") as license_file:
             license_file.write(license.extracted_text)
 
-    _write_summary(
-        spdx_doc, spdx_index, classification,
+    _write_summary_csv(
+        spdx_doc, spdx_index, classifications,
         os.path.join(output_dir, "summary.csv"))
+
+    _write_detailed_csv(
+        spdx_doc, spdx_index, classifications,
+        os.path.join(output_dir, "detailed.csv"))
+
+    if args.extra_files:
+        extra_files_dir = os.path.join(output_dir, "extra_files")
+        os.mkdir(extra_files_dir)
+        for source in args.extra_files:
+            destination = os.path.join(
+                extra_files_dir, os.path.basename(source))
+            shutil.copy(source, destination)
 
     output_file_path = args.output_file
     _log(f'Saving all the files into {output_file_path}!')

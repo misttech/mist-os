@@ -21,13 +21,13 @@
             },
             {
                 "identified_as": "License Kind 2",
-                "condition": "disallowed condition",
+                "condition": "forbidden condition",
                 "verified": true,
                 "confidence": 1.0,
                 "start_line": 3,
                 "end_line": 4,
                 "snippet_checksum": "fa2258a0fd04107e67394fdb57c0eecf",
-                "snippet_text": "Some dissalowed\ntest license 2",
+                "snippet_text": "Some forbidden\ntest license 2",
                 "overriden_conditions": [
                     "allowed_condition"
                 ],
@@ -61,9 +61,9 @@
             },
             {
                 "identified_as": "License Kind 3",
-                "condition": "disallowed condition",
+                "condition": "forbidden condition",
                 "verified": false,
-                "verification_message": "'disallowed condition' condition is not an allowed",
+                "verification_message": "'forbidden condition' condition is not an allowed",
                 "suggested_override_rule": {
                     "override_condition_to": "<CHOOSE ONE OF 'allowed condition'>",
                     "bug": "<INSERT TICKET URL>",
@@ -78,7 +78,7 @@
                             "License Kind 2"
                         ],
                         "conditions": [
-                            "disallowed condition"
+                            "forbidden condition"
                         ],
                         "snippet_checksums": [
                             "80c12e04fe66d3cf50eb6a4e8e2185fc"

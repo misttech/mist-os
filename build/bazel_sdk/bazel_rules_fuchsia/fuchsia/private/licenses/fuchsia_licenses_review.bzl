@@ -19,6 +19,11 @@ def _fuchsia_licenses_review(ctx):
         run_inputs.append(ctx.file.classification_input)
         run_arguments.append("--classification_input=%s" % ctx.file.classification_input.path)
 
+    if ctx.files.extra_files:
+        for extra_file in ctx.files.extra_files:
+            run_inputs.append(extra_file)
+            run_arguments.append("--extra_files=%s" % extra_file.path)
+
     ctx.actions.run(
         progress_message = "Generating license review material into %s" % out_dir.path,
         inputs = run_inputs,
@@ -58,6 +63,10 @@ https://github.com/spdx/spdx-spec/blob/master/schemas/spdx-schema.json
         "classification_input": attr.label(
             doc = "The output of `fuchsia_licenses_classification` invocation (optional).",
             allow_single_file = True,
+        ),
+        "extra_files": attr.label_list(
+            doc = "Additional files to add to the archive.",
+            allow_files = True,
         ),
         "_generate_licenses_review_tool": attr.label(
             executable = True,
