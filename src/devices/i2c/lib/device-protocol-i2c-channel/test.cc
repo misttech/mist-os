@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/async-loop/cpp/loop.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
@@ -15,6 +16,8 @@
 #include <zxtest/zxtest.h>
 
 #include "src/devices/testing/mock-ddk/mock-device.h"
+
+namespace {
 
 // An I2C device that requires retries.
 class FlakyI2cDevice : public fake_i2c::FakeI2c {
@@ -122,212 +125,272 @@ class I2cDevice : public fidl::WireServer<fuchsia_hardware_i2c::Device> {
   std::vector<bool> stop_;
 };
 
-class I2cChannelTest : public zxtest::Test {
+template <typename Device>
+class I2cServer {
  public:
-  I2cChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread), outgoing_(loop_.dispatcher()) {}
+  explicit I2cServer(async_dispatcher_t* dispatcher)
+      : dispatcher_(dispatcher), outgoing_(dispatcher) {}
 
-  void SetUp() override { loop_.StartThread(); }
-
-  void TearDown() override { loop_.Shutdown(); }
-
- protected:
-  fidl::ClientEnd<fuchsia_hardware_i2c::Device> BindI2c(
-      fidl::WireServer<fuchsia_hardware_i2c::Device>* server) {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-    EXPECT_TRUE(endpoints.is_ok());
-
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), server);
-    return std::move(endpoints->client);
+  void BindProtocol(fidl::ServerEnd<fuchsia_hardware_i2c::Device> server_end) {
+    bindings_.AddBinding(dispatcher_, std::move(server_end), &i2c_dev_,
+                         fidl::kIgnoreBindingClosure);
   }
 
-  async::Loop loop_;
+  void PublishService(fidl::ServerEnd<fuchsia_io::Directory> directory) {
+    zx::result service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
+        fuchsia_hardware_i2c::Service::InstanceHandler({
+            .device = bindings_.CreateHandler(&i2c_dev_, dispatcher_, fidl::kIgnoreBindingClosure),
+        }));
+    ASSERT_OK(service_result.status_value());
+    ASSERT_OK(outgoing_.Serve(std::move(directory)));
+  }
+
+  Device& i2c_dev() { return i2c_dev_; }
+
+ private:
+  async_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;
+  fidl::ServerBindingGroup<fuchsia_hardware_i2c::Device> bindings_;
+  Device i2c_dev_;
 };
 
-TEST_F(I2cChannelTest, NoRetries) {
-  FlakyI2cDevice i2c_dev;
-  ddk::I2cChannel channel(BindI2c(&i2c_dev));
+class I2cFlakyChannelTest : public zxtest::Test {
+ public:
+  using Server = I2cServer<FlakyI2cDevice>;
+
+  I2cFlakyChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) { loop_.StartThread(); }
+
+  void SetUp() final {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
+    ASSERT_OK(endpoints.status_value());
+    i2c_server_.AsyncCall(&Server::BindProtocol, std::move(endpoints->server));
+    i2c_channel_.emplace(std::move(endpoints->client));
+  }
+
+  ddk::I2cChannel& i2c_channel() { return i2c_channel_.value(); }
+
+  async_patterns::TestDispatcherBound<Server>& i2c_server() { return i2c_server_; }
+
+ private:
+  async::Loop loop_;
+  async_patterns::TestDispatcherBound<Server> i2c_server_{loop_.dispatcher(), std::in_place,
+                                                          async_patterns::PassDispatcher};
+  std::optional<ddk::I2cChannel> i2c_channel_;
+};
+
+TEST_F(I2cFlakyChannelTest, NoRetries) {
   // No retry, the first error is returned.
   uint8_t buffer[1] = {0x12};
   constexpr uint8_t kNumberOfRetries = 0;
-  auto ret = channel.WriteSyncRetries(buffer, sizeof(buffer), kNumberOfRetries, zx::usec(1));
+  auto ret = i2c_channel().WriteSyncRetries(buffer, sizeof(buffer), kNumberOfRetries, zx::usec(1));
   EXPECT_EQ(ret.status, ZX_ERR_INTERNAL);
   EXPECT_EQ(ret.retries, 0);
 }
 
-TEST_F(I2cChannelTest, RetriesAllFail) {
-  FlakyI2cDevice i2c_dev;
-  ddk::I2cChannel channel(BindI2c(&i2c_dev));
+TEST_F(I2cFlakyChannelTest, RetriesAllFail) {
   // 2 retries, corresponding error is returned. The first time Transact is called we get a
   // ZX_ERR_INTERNAL. Then the first retry gives us ZX_ERR_NOT_SUPPORTED and then the second
   // gives us ZX_ERR_NO_RESOURCES.
   constexpr uint8_t kNumberOfRetries = 2;
   uint8_t buffer[1] = {0x34};
-  auto ret = channel.ReadSyncRetries(0x56, buffer, sizeof(buffer), kNumberOfRetries, zx::usec(1));
+  auto ret =
+      i2c_channel().ReadSyncRetries(0x56, buffer, sizeof(buffer), kNumberOfRetries, zx::usec(1));
   EXPECT_EQ(ret.status, ZX_ERR_NO_RESOURCES);
   EXPECT_EQ(ret.retries, 2);
 }
 
-TEST_F(I2cChannelTest, RetriesOk) {
-  FlakyI2cDevice i2c_dev;
-  ddk::I2cChannel channel(BindI2c(&i2c_dev));
+TEST_F(I2cFlakyChannelTest, RetriesOk) {
   // 4 retries requested but no error, return ok.
   uint8_t tx_buffer[1] = {0x78};
   uint8_t rx_buffer[1] = {0x90};
   constexpr uint8_t kNumberOfRetries = 5;
-  auto ret = channel.WriteReadSyncRetries(tx_buffer, sizeof(tx_buffer), rx_buffer,
-                                          sizeof(rx_buffer), kNumberOfRetries, zx::usec(1));
+  auto ret = i2c_channel().WriteReadSyncRetries(tx_buffer, sizeof(tx_buffer), rx_buffer,
+                                                sizeof(rx_buffer), kNumberOfRetries, zx::usec(1));
   EXPECT_EQ(ret.status, ZX_OK);
   EXPECT_EQ(ret.retries, 4);
 }
 
+class I2cChannelTest : public zxtest::Test {
+ public:
+  using Server = I2cServer<I2cDevice>;
+
+  I2cChannelTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) { loop_.StartThread(); }
+
+  void SetUp() final {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
+    ASSERT_OK(endpoints.status_value());
+    i2c_server_.AsyncCall(&Server::BindProtocol, std::move(endpoints->server));
+    i2c_channel_.emplace(std::move(endpoints->client));
+  }
+
+  ddk::I2cChannel& i2c_channel() { return i2c_channel_.value(); }
+
+  async_patterns::TestDispatcherBound<Server>& i2c_server() { return i2c_server_; }
+
+ private:
+  async::Loop loop_;
+  async_patterns::TestDispatcherBound<Server> i2c_server_{loop_.dispatcher(), std::in_place,
+                                                          async_patterns::PassDispatcher};
+  std::optional<ddk::I2cChannel> i2c_channel_;
+};
+
 TEST_F(I2cChannelTest, FidlRead) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  ASSERT_TRUE(endpoints.is_ok());
+  static constexpr std::array<uint8_t, 4> expected_rx_data{0x12, 0x34, 0xab, 0xcd};
 
-  I2cDevice i2c_dev;
-  auto binding = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &i2c_dev);
-
-  const std::array<uint8_t, 4> expected_rx_data{0x12, 0x34, 0xab, 0xcd};
-
-  ddk::I2cChannel client(std::move(endpoints->client));
-  i2c_dev.set_rx_data({expected_rx_data.data(), expected_rx_data.data() + expected_rx_data.size()});
+  i2c_server().SyncCall([](Server* server) {
+    server->i2c_dev().set_rx_data(
+        {expected_rx_data.data(), expected_rx_data.data() + expected_rx_data.size()});
+  });
 
   uint8_t buf[4];
-  EXPECT_OK(client.ReadSync(0x89, buf, expected_rx_data.size()));
-  ASSERT_EQ(i2c_dev.tx_data().size(), 1);
-  EXPECT_EQ(i2c_dev.tx_data()[0], 0x89);
+  EXPECT_OK(i2c_channel().ReadSync(0x89, buf, expected_rx_data.size()));
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), 1);
+    EXPECT_EQ(server->i2c_dev().tx_data()[0], 0x89);
+  });
   EXPECT_BYTES_EQ(buf, expected_rx_data.data(), expected_rx_data.size());
 
   uint8_t buf1[5];
   // I2cChannel will copy as much data as it receives, even if it is less than the amount requested.
-  EXPECT_OK(client.ReadSync(0x98, buf1, sizeof(buf1)));
-  ASSERT_EQ(i2c_dev.tx_data().size(), 1);
-  EXPECT_EQ(i2c_dev.tx_data()[0], 0x98);
+  EXPECT_OK(i2c_channel().ReadSync(0x98, buf1, sizeof(buf1)));
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), 1);
+    EXPECT_EQ(server->i2c_dev().tx_data()[0], 0x98);
+  });
   EXPECT_BYTES_EQ(buf1, expected_rx_data.data(), expected_rx_data.size());
 
   uint8_t buf2[3];
   // I2cChannel will copy no more than the amount requested.
-  EXPECT_OK(client.ReadSync(0x18, buf2, sizeof(buf2)));
-  ASSERT_EQ(i2c_dev.tx_data().size(), 1);
-  EXPECT_EQ(i2c_dev.tx_data()[0], 0x18);
+  EXPECT_OK(i2c_channel().ReadSync(0x18, buf2, sizeof(buf2)));
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), 1);
+    EXPECT_EQ(server->i2c_dev().tx_data()[0], 0x18);
+  });
   EXPECT_BYTES_EQ(buf2, expected_rx_data.data(), sizeof(buf2));
 }
 
 TEST_F(I2cChannelTest, FidlWrite) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  ASSERT_TRUE(endpoints.is_ok());
+  static constexpr std::array<uint8_t, 4> expected_tx_data{0x0f, 0x1e, 0x2d, 0x3c};
 
-  I2cDevice i2c_dev;
-  auto binding = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &i2c_dev);
+  EXPECT_OK(i2c_channel().WriteSync(expected_tx_data.data(), expected_tx_data.size()));
 
-  const std::array<uint8_t, 4> expected_tx_data{0x0f, 0x1e, 0x2d, 0x3c};
-
-  ddk::I2cChannel client(std::move(endpoints->client));
-
-  EXPECT_OK(client.WriteSync(expected_tx_data.data(), expected_tx_data.size()));
-  ASSERT_EQ(i2c_dev.tx_data().size(), expected_tx_data.size());
-  EXPECT_BYTES_EQ(i2c_dev.tx_data().data(), expected_tx_data.data(), expected_tx_data.size());
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), expected_tx_data.size());
+    EXPECT_BYTES_EQ(server->i2c_dev().tx_data().data(), expected_tx_data.data(),
+                    expected_tx_data.size());
+  });
 }
 
 TEST_F(I2cChannelTest, FidlWriteRead) {
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_i2c::Device>();
-  ASSERT_TRUE(endpoints.is_ok());
+  static constexpr std::array<uint8_t, 4> expected_rx_data{0x12, 0x34, 0xab, 0xcd};
+  static constexpr std::array<uint8_t, 4> expected_tx_data{0x0f, 0x1e, 0x2d, 0x3c};
 
-  I2cDevice i2c_dev;
-  auto binding = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), &i2c_dev);
-
-  const std::array<uint8_t, 4> expected_rx_data{0x12, 0x34, 0xab, 0xcd};
-  const std::array<uint8_t, 4> expected_tx_data{0x0f, 0x1e, 0x2d, 0x3c};
-
-  ddk::I2cChannel client(std::move(endpoints->client));
-  i2c_dev.set_rx_data({expected_rx_data.data(), expected_rx_data.data() + expected_rx_data.size()});
+  i2c_server().SyncCall([](Server* server) {
+    server->i2c_dev().set_rx_data(
+        {expected_rx_data.data(), expected_rx_data.data() + expected_rx_data.size()});
+  });
 
   uint8_t buf[4];
-  EXPECT_OK(client.WriteReadSync(expected_tx_data.data(), expected_tx_data.size(), buf,
-                                 expected_rx_data.size()));
-  ASSERT_EQ(i2c_dev.tx_data().size(), expected_tx_data.size());
-  EXPECT_BYTES_EQ(i2c_dev.tx_data().data(), expected_tx_data.data(), expected_tx_data.size());
+  EXPECT_OK(i2c_channel().WriteReadSync(expected_tx_data.data(), expected_tx_data.size(), buf,
+                                        expected_rx_data.size()));
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), expected_tx_data.size());
+    EXPECT_BYTES_EQ(server->i2c_dev().tx_data().data(), expected_tx_data.data(),
+                    expected_tx_data.size());
+  });
   EXPECT_BYTES_EQ(buf, expected_rx_data.data(), expected_rx_data.size());
 
   uint8_t buf1[5];
-  EXPECT_OK(
-      client.WriteReadSync(expected_tx_data.data(), expected_tx_data.size(), buf1, sizeof(buf1)));
-  EXPECT_BYTES_EQ(i2c_dev.tx_data().data(), expected_tx_data.data(), expected_tx_data.size());
+  EXPECT_OK(i2c_channel().WriteReadSync(expected_tx_data.data(), expected_tx_data.size(), buf1,
+                                        sizeof(buf1)));
+  i2c_server().SyncCall([](Server* server) {
+    EXPECT_BYTES_EQ(server->i2c_dev().tx_data().data(), expected_tx_data.data(),
+                    expected_tx_data.size());
+  });
   EXPECT_BYTES_EQ(buf1, expected_rx_data.data(), expected_rx_data.size());
 
   uint8_t buf2[3];
-  EXPECT_OK(
-      client.WriteReadSync(expected_tx_data.data(), expected_tx_data.size(), buf2, sizeof(buf2)));
-  EXPECT_BYTES_EQ(i2c_dev.tx_data().data(), expected_tx_data.data(), expected_tx_data.size());
+  EXPECT_OK(i2c_channel().WriteReadSync(expected_tx_data.data(), expected_tx_data.size(), buf2,
+                                        sizeof(buf2)));
+  i2c_server().SyncCall([](Server* server) {
+    EXPECT_BYTES_EQ(server->i2c_dev().tx_data().data(), expected_tx_data.data(),
+                    expected_tx_data.size());
+  });
   EXPECT_BYTES_EQ(buf2, expected_rx_data.data(), sizeof(buf2));
 
-  EXPECT_OK(client.WriteReadSync(nullptr, 0, buf, expected_rx_data.size()));
-  EXPECT_EQ(i2c_dev.tx_data().size(), 0);
+  EXPECT_OK(i2c_channel().WriteReadSync(nullptr, 0, buf, expected_rx_data.size()));
+  i2c_server().SyncCall([](Server* server) { EXPECT_EQ(server->i2c_dev().tx_data().size(), 0); });
   EXPECT_BYTES_EQ(buf, expected_rx_data.data(), expected_rx_data.size());
 }
 
-TEST_F(I2cChannelTest, GetFidlProtocolFromParent) {
-  I2cDevice i2c_dev;
+class I2cChannelServiceTest : public zxtest::Test {
+ public:
+  using Server = I2cServer<I2cDevice>;
+
+  I2cChannelServiceTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) { loop_.StartThread(); }
+
+  void SetUp() final {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints.status_value());
+    i2c_server_.AsyncCall(&Server::PublishService, std::move(endpoints->server));
+    directory_ = std::move(endpoints->client);
+  }
+
+  async_patterns::TestDispatcherBound<Server>& i2c_server() { return i2c_server_; }
+
+  fidl::ClientEnd<fuchsia_io::Directory> TakeDirectory() { return std::move(directory_); }
+
+ private:
+  async::Loop loop_;
+  async_patterns::TestDispatcherBound<Server> i2c_server_{loop_.dispatcher(), std::in_place,
+                                                          async_patterns::PassDispatcher};
+  fidl::ClientEnd<fuchsia_io::Directory> directory_;
+};
+
+TEST_F(I2cChannelServiceTest, GetFidlProtocolFromParent) {
   auto parent = MockDevice::FakeRootParent();
-
-  auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
-      fuchsia_hardware_i2c::Service::InstanceHandler(
-          {.device = i2c_dev.bind_handler(loop_.dispatcher())}));
-  ZX_ASSERT(service_result.is_ok());
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(endpoints.is_ok());
-  ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
-
-  parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client));
-
-  ddk::I2cChannel client(parent.get());
-  ASSERT_TRUE(client.is_valid());
+  parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, TakeDirectory());
+  ddk::I2cChannel i2c_channel{parent.get()};
+  ASSERT_TRUE(i2c_channel.is_valid());
 
   // Issue a simple call to make sure the connection is working.
-  i2c_dev.set_rx_data({0xab});
+  i2c_server().SyncCall([](Server* server) { server->i2c_dev().set_rx_data({0xab}); });
 
   uint8_t rx;
-  EXPECT_OK(client.ReadSync(0x89, &rx, 1));
-  ASSERT_EQ(i2c_dev.tx_data().size(), 1);
-  EXPECT_EQ(i2c_dev.tx_data()[0], 0x89);
+  EXPECT_OK(i2c_channel.ReadSync(0x89, &rx, 1));
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), 1);
+    EXPECT_EQ(server->i2c_dev().tx_data()[0], 0x89);
+  });
   EXPECT_EQ(rx, 0xab);
 
   // Move the client and verify that the new one is functional.
-  ddk::I2cChannel new_client = std::move(client);
+  ddk::I2cChannel new_client = std::move(i2c_channel);
 
-  i2c_dev.set_rx_data({0x12});
+  i2c_server().SyncCall([](Server* server) { server->i2c_dev().set_rx_data({0x12}); });
   EXPECT_OK(new_client.ReadSync(0x34, &rx, 1));
-  ASSERT_EQ(i2c_dev.tx_data().size(), 1);
-  EXPECT_EQ(i2c_dev.tx_data()[0], 0x34);
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), 1);
+    EXPECT_EQ(server->i2c_dev().tx_data()[0], 0x34);
+  });
   EXPECT_EQ(rx, 0x12);
 }
 
-TEST_F(I2cChannelTest, GetFidlProtocolFromFragment) {
-  I2cDevice i2c_dev;
+TEST_F(I2cChannelServiceTest, GetFidlProtocolFromFragment) {
   auto parent = MockDevice::FakeRootParent();
+  parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, TakeDirectory(), "fragment-name");
+  ddk::I2cChannel i2c_channel{parent.get(), "fragment-name"};
+  ASSERT_TRUE(i2c_channel.is_valid());
 
-  auto service_result = outgoing_.AddService<fuchsia_hardware_i2c::Service>(
-      fuchsia_hardware_i2c::Service::InstanceHandler(
-          {.device = i2c_dev.bind_handler(loop_.dispatcher())}));
-  ZX_ASSERT(service_result.is_ok());
-
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(endpoints.is_ok());
-  ZX_ASSERT(outgoing_.Serve(std::move(endpoints->server)).is_ok());
-
-  parent->AddFidlService(fuchsia_hardware_i2c::Service::Name, std::move(endpoints->client),
-                         "fragment-name");
-
-  ddk::I2cChannel client(parent.get(), "fragment-name");
-  ASSERT_TRUE(client.is_valid());
-
-  i2c_dev.set_rx_data({0x56});
+  i2c_server().SyncCall([](Server* server) { server->i2c_dev().set_rx_data({0x56}); });
 
   uint8_t rx;
-  EXPECT_OK(client.ReadSync(0x78, &rx, 1));
-  ASSERT_EQ(i2c_dev.tx_data().size(), 1);
-  EXPECT_EQ(i2c_dev.tx_data()[0], 0x78);
+  EXPECT_OK(i2c_channel.ReadSync(0x78, &rx, 1));
+  i2c_server().SyncCall([](Server* server) {
+    ASSERT_EQ(server->i2c_dev().tx_data().size(), 1);
+    EXPECT_EQ(server->i2c_dev().tx_data()[0], 0x78);
+  });
   EXPECT_EQ(rx, 0x56);
 }
+
+}  // namespace
