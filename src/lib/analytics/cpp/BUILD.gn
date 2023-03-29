@@ -8,6 +8,7 @@ if (is_host) {
     deps = [
       "core_dev_tools:unittests",
       "google_analytics:unittests",
+      "google_analytics_4:unittests",
       "metric_properties:unittests",
     ]
   }
