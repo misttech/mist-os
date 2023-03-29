@@ -32,11 +32,27 @@ impl Measurable for fidl::PackageIndexEntry {
 mod tests {
     use {super::*, proptest::prelude::*};
 
+    /// Truncates `s` to be at most `max_len` bytes.
+    fn truncate_str(s: &str, max_len: usize) -> &str {
+        if s.len() <= max_len {
+            return s;
+        }
+        // TODO(https://github.com/rust-lang/rust/issues/93743): Use floor_char_boundary when stable.
+        let mut index = max_len;
+        while index > 0 && !s.is_char_boundary(index) {
+            index -= 1;
+        }
+        &s[..index]
+    }
+
     prop_compose! {
         fn arb_package_index_entry()(
             url in ".{0,2048}",
             blob_id: crate::BlobId,
         ) -> fidl::PackageIndexEntry {
+            // The regex accepts up to 2048 Unicode code points, but the max
+            // length from FIDL is in terms of bytes, not code points.
+            let url = truncate_str(&url, 2048).to_owned();
             fidl::PackageIndexEntry {
                 package_url: fidl::PackageUrl { url, },
                 meta_far_blob_id: blob_id.into(),

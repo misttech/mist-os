@@ -17,7 +17,7 @@ use {
         Peer, ServiceConsumerProxyInterface, ServiceProviderRequest, ServiceProviderRequestStream,
         ServicePublisherProxyInterface,
     },
-    fidl_fuchsia_overnet_triangletests as triangle, fidl_test_placeholders as echo,
+    fidl_test_echo as echo, fidl_test_triangle as triangle,
     fuchsia_async::Task,
     futures::prelude::*,
     overnet_core::{NodeId, NodeIdGenerator},

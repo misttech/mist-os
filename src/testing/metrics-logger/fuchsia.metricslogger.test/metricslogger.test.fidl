@@ -4,7 +4,7 @@
 library fuchsia.metricslogger.test;
 
 // Type aliase for client Id for convenience
-alias ClientId = string:8;
+alias ClientId = string:16;
 
 /// Errors associated with MetricsLogger methods.
 /// If the request contains any of the following errors, it will fail without

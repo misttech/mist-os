@@ -15,7 +15,7 @@ use {
         ServiceConsumerProxyInterface, ServiceProviderRequest, ServiceProviderRequestStream,
         ServicePublisherProxyInterface,
     },
-    fidl_test_placeholders as echo,
+    fidl_test_echo as echo,
     fuchsia_async::Task,
     futures::prelude::*,
     overnet_core::NodeIdGenerator,

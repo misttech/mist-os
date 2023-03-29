@@ -5,7 +5,7 @@
 // [START fidl_echo]
 library fidl.examples.routing.echo;
 
-const MAX_STRING_LENGTH uint64 = 32;
+const MAX_STRING_LENGTH uint64 = 64;
 
 @discoverable
 protocol Echo {

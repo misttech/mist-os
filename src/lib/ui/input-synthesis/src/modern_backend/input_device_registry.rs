@@ -12,7 +12,7 @@ use {
         Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
         ContactInputDescriptor, DeviceDescriptor, DeviceInfo, InputDeviceMarker,
         KeyboardDescriptor, KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range,
-        TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType,
+        TouchDescriptor, TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
     },
     std::convert::TryFrom,
 };
@@ -34,7 +34,6 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
         width: u32,
         height: u32,
     ) -> Result<Box<dyn synthesizer::InputDevice>, Error> {
-        const MAX_CONTACTS: u32 = 255;
         self.add_device(DeviceDescriptor {
             // Required for DeviceDescriptor.
             device_info: Some(new_fake_device_info()),
@@ -60,10 +59,13 @@ impl synthesizer::InputDeviceRegistry for self::InputDeviceRegistry {
                             }),
                             ..ContactInputDescriptor::EMPTY
                         })
-                        .take(usize::try_from(MAX_CONTACTS).context("usize is impossibly small")?)
+                        .take(
+                            usize::try_from(TOUCH_MAX_CONTACTS)
+                                .context("usize is impossibly small")?,
+                        )
                         .collect(),
                     ),
-                    max_contacts: Some(MAX_CONTACTS),
+                    max_contacts: Some(TOUCH_MAX_CONTACTS),
                     touch_type: Some(TouchType::Touchscreen),
                     buttons: Some(vec![]),
                     ..TouchInputDescriptor::EMPTY
