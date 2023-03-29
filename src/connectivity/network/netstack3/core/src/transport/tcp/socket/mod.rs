@@ -2863,11 +2863,12 @@ pub fn send_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
 
 /// Set the size of the send buffer for this socket and future derived sockets.
 pub fn set_receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
     size: usize,
 ) {
+    let mut sync_ctx = Locked::new(sync_ctx);
     I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx, size)), id.into()),
         |(IpInvariant((sync_ctx, ctx, size)), id)| {
@@ -2882,10 +2883,11 @@ pub fn set_receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketI
 /// Get the size of the receive buffer for this socket and future derived
 /// sockets.
 pub fn receive_buffer_size<I: Ip, C: crate::NonSyncContext, Id: Into<SocketId<I>>>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: Id,
 ) -> Option<usize> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(size) = I::map_ip(
         (IpInvariant((&mut sync_ctx, ctx)), id.into()),
         |(IpInvariant((sync_ctx, ctx)), id)| {

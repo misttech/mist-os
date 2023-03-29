@@ -59,7 +59,7 @@ mod integration;
 pub mod tcp;
 pub mod udp;
 
-use lock_order::lock::RwLockFor;
+use lock_order::{lock::RwLockFor, Locked};
 use net_types::{
     ip::{IpAddress, Ipv4, Ipv6},
     SpecifiedAddr, ZonedAddr,
@@ -145,12 +145,12 @@ pub(crate) enum TransportLayerTimerId {
 
 /// Handle a timer event firing in the transport layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
     ctx: &mut NonSyncCtx,
     id: TransportLayerTimerId,
 ) {
     match id {
-        TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(&mut sync_ctx, ctx, id),
+        TransportLayerTimerId::Tcp(id) => tcp::socket::handle_timer(sync_ctx, ctx, id),
     }
 }
 

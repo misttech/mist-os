@@ -1862,10 +1862,11 @@ pub fn set_conn_udp_device<I: IpExt, C: crate::NonSyncContext>(
 ///
 /// Panics if `id` is not a valid socket ID.
 pub fn get_udp_bound_device<I: IpExt, C: crate::NonSyncContext>(
-    mut sync_ctx: &SyncCtx<C>,
+    sync_ctx: &SyncCtx<C>,
     ctx: &C,
     id: SocketId<I>,
 ) -> Option<WeakDeviceId<C>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     let IpInvariant(device) = I::map_ip::<_, IpInvariant<Option<WeakDeviceId<C>>>>(
         (IpInvariant((&mut sync_ctx, ctx)), id),
         |(IpInvariant((sync_ctx, ctx)), id)| {

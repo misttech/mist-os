@@ -49,6 +49,7 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, marker::PhantomData, time};
 
 use derivative::Derivative;
+use lock_order::Locked;
 use log::trace;
 use net_types::{
     ip::{AddrSubnetEither, IpAddr, Ipv4, Ipv6, SubnetEither},
@@ -434,7 +435,7 @@ pub fn handle_timer<NonSyncCtx: NonSyncContext>(
             device::handle_timer(&mut sync_ctx, ctx, x);
         }
         TimerId(TimerIdInner::TransportLayer(x)) => {
-            transport::handle_timer(&mut sync_ctx, ctx, x);
+            transport::handle_timer(&mut Locked::new(sync_ctx), ctx, x);
         }
         TimerId(TimerIdInner::IpLayer(x)) => {
             ip::handle_timer(&mut sync_ctx, ctx, x);
