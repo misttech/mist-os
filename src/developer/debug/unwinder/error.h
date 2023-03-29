@@ -6,6 +6,7 @@
 #define SRC_DEVELOPER_DEBUG_UNWINDER_ERROR_H_
 
 #include <string>
+#include <utility>
 #include <variant>
 
 #include "src/lib/fxl/strings/string_printf.h"
@@ -21,6 +22,8 @@ class Error {
     msg_ = fxl::StringVPrintf(fmt, ap);
     va_end(ap);
   }
+
+  explicit Error(std::string msg) : has_err_(true), msg_(std::move(msg)) {}
 
   bool has_err() const { return has_err_; }
   bool ok() const { return !has_err(); }

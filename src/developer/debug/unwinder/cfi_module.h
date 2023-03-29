@@ -32,6 +32,9 @@ class CfiModule {
   // Unwind one frame.
   [[nodiscard]] Error Step(Memory* stack, const Registers& current, Registers& next);
 
+  // Check whether a given PC is in the valid range.
+  bool IsValidPC(uint64_t pc) const { return pc >= pc_begin_ && pc < pc_end_; }
+
  private:
   // DWARF Common Information Entry.
   struct DwarfCie {

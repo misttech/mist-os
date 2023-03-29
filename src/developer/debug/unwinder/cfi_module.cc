@@ -231,7 +231,7 @@ Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) 
   if (auto err = current.GetPC(pc); err.has_err()) {
     return err;
   }
-  if (pc < pc_begin_ || pc >= pc_end_) {
+  if (!IsValidPC(pc)) {
     return Error("pc %#" PRIx64 " is outside of the executable area", pc);
   }
 
@@ -552,7 +552,7 @@ Error CfiModule::StepPLT(Memory* stack, const Registers& current, Registers& nex
     if (auto err = stack->Read(sp, sp_val); err.has_err()) {
       return err;
     }
-    if (sp_val < pc_begin_ || sp_val >= pc_end_) {
+    if (!IsValidPC(sp_val)) {
       return Error("It doesn't look like a PLT trampoline");
     }
     // A trampoline will usually not scratch any registers, we could copy all the register values.
@@ -567,7 +567,7 @@ Error CfiModule::StepPLT(Memory* stack, const Registers& current, Registers& nex
     if (auto err = current.Get(RegisterID::kArm64_lr, lr); err.has_err()) {
       return err;
     }
-    if (lr < pc_begin_ || lr >= pc_end_) {
+    if (!IsValidPC(lr)) {
       return Error("It doesn't look like a PLT trampoline");
     }
     next = current;

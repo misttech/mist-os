@@ -111,6 +111,8 @@ class Registers {
   void Clear() { regs_.clear(); }
 
  private:
+  const char* GetRegName(RegisterID reg_id) const;
+
   Arch arch_;
   std::map<RegisterID, uint64_t> regs_;
 };

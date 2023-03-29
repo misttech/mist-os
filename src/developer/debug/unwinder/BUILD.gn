@@ -21,8 +21,9 @@ sdk_source_set("unwinder") {
   sdk_headers_for_internal_use = [
     "cfi_module.h",
     "cfi_parser.h",
-    "dwarf_expr.h",
     "cfi_unwinder.h",
+    "dwarf_expr.h",
+    "fp_unwinder.h",
     "scs_unwinder.h",
   ]
   sources = [
@@ -30,6 +31,7 @@ sdk_source_set("unwinder") {
     "cfi_parser.cc",
     "cfi_unwinder.cc",
     "dwarf_expr.cc",
+    "fp_unwinder.cc",
     "memory.cc",
     "registers.cc",
     "scs_unwinder.cc",
@@ -67,12 +69,13 @@ source_set("tests") {
     "dwarf_expr_unittest.cc",
     "memory_unittest.cc",
   ]
-  if (!is_mac) {
-    sources += [ "unwind_local_unittest.cc" ]
-  }
 
   deps = [
     ":unwinder",
     "//third_party/googletest:gtest",
   ]
+
+  if (!is_mac) {
+    deps += [ "tests" ]
+  }
 }

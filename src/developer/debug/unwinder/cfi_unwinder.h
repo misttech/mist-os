@@ -16,9 +16,16 @@ class CfiUnwinder {
  public:
   explicit CfiUnwinder(const std::vector<Module>& modules);
 
+  // |is_return_address| indicates whether the current PC is pointing to a return address,
+  // in which case it'll be adjusted to find the correct CFI entry.
   Error Step(Memory* stack, Registers current, Registers& next, bool is_return_address);
 
+  // For other unwinders that want to check whether a value looks like a valid PC.
+  bool IsValidPC(uint64_t pc);
+
  private:
+  Error GetCfiModuleFor(uint64_t pc, CfiModule** out);
+
   // Inputs.
   std::map<uint64_t, Module> module_map_;
 

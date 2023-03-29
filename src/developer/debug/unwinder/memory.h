@@ -19,6 +19,8 @@ class Memory {
   virtual ~Memory() = default;
   virtual Error ReadBytes(uint64_t addr, uint64_t size, void* dst) = 0;
 
+  // Read an object and advance the addr by the read size. Do not advance if failed.
+  // TODO(dangyi): rename this to ReadAndAdvance to indicate that |addr| will change.
   template <class Type>
   [[nodiscard]] Error Read(uint64_t& addr, Type& res) {
     if (auto err = ReadBytes(addr, sizeof(res), &res); err.has_err()) {

@@ -54,12 +54,15 @@ class Unwinder {
   // Each module can supply its own data accessor and address mode.
   explicit Unwinder(const std::vector<Module>& modules);
 
-  // Unwind from a stack and a set of registers.
+  // Unwind from a stack and a set of registers up to given |max_depth|.
   //
   // |stack| could be null, in which case it will become an |UnavailableMemory|.
   std::vector<Frame> Unwind(Memory* stack, const Registers& registers, size_t max_depth = 50);
 
  private:
+  // Unwind one frame.
+  Error Step(Memory* stack, const Frame& current, Frame& next);
+
   CfiUnwinder cfi_unwinder_;
 };
 

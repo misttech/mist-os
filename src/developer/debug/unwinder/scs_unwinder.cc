@@ -6,7 +6,7 @@
 
 namespace unwinder {
 
-Error ShadowCallStackUnwinder::Step(const Registers& current, Registers& next) {
+Error ShadowCallStackUnwinder::Step(Memory* scs, const Registers& current, Registers& next) {
   if (current.arch() != Registers::Arch::kArm64) {
     return Error("Shadow call stack is only supported on arm64");
   }
@@ -17,11 +17,19 @@ Error ShadowCallStackUnwinder::Step(const Registers& current, Registers& next) {
   if (!x18) {
     return Error("No shadow call stack");
   }
+
+  // The shadow call stack is pushed/popped via
+  //
+  //    str     x30, [x18], #8    ; post-indexed
+  //    ...
+  //    ldr     x30, [x18, #-8]!  ; pre-indexed
+  //
+  // So x18 points to the next available slots.
   uint64_t ra;
-  if (auto err = scs_->Read(x18 - 8, ra); err.has_err()) {
+  if (auto err = scs->Read(x18 - 8, ra); err.has_err()) {
     return err;
   }
-  next.Clear();
+
   // A zero ra indicates the beginning of the shadow call stack.
   if (ra) {
     next.SetPC(ra);

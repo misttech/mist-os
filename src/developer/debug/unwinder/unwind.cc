@@ -14,6 +14,7 @@
 
 #include "src/developer/debug/unwinder/cfi_unwinder.h"
 #include "src/developer/debug/unwinder/error.h"
+#include "src/developer/debug/unwinder/fp_unwinder.h"
 #include "src/developer/debug/unwinder/memory.h"
 #include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/unwinder/registers.h"
@@ -54,37 +55,70 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
     stack = &unavailable_memory;
   }
 
-  std::vector<Frame> res = {{registers, Frame::Trust::kContext, Success()}};
-  ShadowCallStackUnwinder scs_unwinder(stack);
+  std::vector<Frame> res = {{registers, Frame::Trust::kContext, /*placeholder*/ Success()}};
 
   while (--max_depth) {
-    Registers next(registers.arch());
-    Frame::Trust trust;
-
     Frame& current = res.back();
-    trust = Frame::Trust::kCFI;
-    current.error =
-        cfi_unwinder_.Step(stack, current.regs, next, current.trust != Frame::Trust::kContext);
 
-    if (current.error.has_err() && scs_unwinder.Step(current.regs, next).ok()) {
-      trust = Frame::Trust::kSCS;
-      current.error = Success();
-    }
+    Frame next(Registers(current.regs.arch()), /*placeholder*/ Frame::Trust::kCFI,
+               /*placeholder*/ Success());
 
-    if (current.error.has_err()) {
-      break;
-    }
+    current.error = Step(stack, current, next);
 
     // An undefined PC (e.g. on Linux) or 0 PC (e.g. on Fuchsia) marks the end of the unwinding.
     // Don't include this in the output because it's not a real frame and provides no information.
-    if (uint64_t pc; next.GetPC(pc).has_err() || pc == 0) {
+    // A failed unwinding will also end up with an undefined PC.
+    if (uint64_t pc; next.regs.GetPC(pc).has_err() || pc == 0) {
       break;
     }
 
-    res.emplace_back(std::move(next), trust, Success());
+    res.push_back(std::move(next));
   }
 
   return res;
+}
+
+Error Unwinder::Step(Memory* stack, const Frame& current, Frame& next) {
+  FramePointerUnwinder fp_unwinder(&cfi_unwinder_);
+  ShadowCallStackUnwinder scs_unwinder;
+
+  bool success = false;
+  std::string err_msg;
+
+  bool is_first_frame = current.trust == Frame::Trust::kContext;
+
+  // Try CFI first because it's the most accurate one.
+  if (auto err = cfi_unwinder_.Step(stack, current.regs, next.regs, !is_first_frame); err.ok()) {
+    next.trust = Frame::Trust::kCFI;
+    success = true;
+  } else {
+    err_msg = "CFI: " + err.msg();
+  }
+
+  // Try frame pointers second because it plays well with the CFI.
+  if (!success) {
+    if (auto err = fp_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
+      next.trust = Frame::Trust::kFP;
+      success = true;
+    } else {
+      err_msg += "; FP: " + err.msg();
+    }
+  }
+
+  // Try shadow call stacks last because it can only recover PC.
+  if (!success) {
+    if (auto err = scs_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
+      next.trust = Frame::Trust::kSCS;
+      success = true;
+    } else {
+      err_msg += "; SCS: " + err.msg();
+    }
+  }
+
+  if (!err_msg.empty()) {
+    return Error(err_msg);
+  }
+  return Success();
 }
 
 std::vector<Frame> Unwind(Memory* memory, const std::vector<uint64_t>& modules,
