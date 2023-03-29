@@ -42,9 +42,22 @@ rbe_common_sh_tools = [ "//build/rbe/fuchsia-rbe-action.sh" ]
 
 rustc_remote_wrapper = "//build/rbe/rustc-remote-wrapper.sh"
 
-# Dependencies for all RBE-enabled rust actions.
-rust_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_sh_tools +
-                [ rustc_remote_wrapper ]
+if (rust_rbe_use_python_impl) {
+  rustc_remote_wrapper = "//build/rbe/rustc_remote_wrapper.py"
+
+  # Dependencies for all RBE-enabled rust actions.
+  rust_rbe_deps =
+      rbe_common_tools + rbe_common_scripts + rbe_common_py_scripts + [
+        "//build/rbe/rustc.py",
+        rustc_remote_wrapper,
+      ]
+} else {
+  rustc_remote_wrapper = "//build/rbe/rustc-remote-wrapper.sh"
+
+  # Dependencies for all RBE-enabled rust actions.
+  rust_rbe_deps = rbe_common_tools + rbe_common_scripts + rbe_common_sh_tools +
+                  [ rustc_remote_wrapper ]
+}
 
 if (cxx_rbe_use_python_impl) {
   cxx_remote_wrapper = "//build/rbe/cxx_remote_wrapper.py"

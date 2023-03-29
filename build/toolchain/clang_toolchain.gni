@@ -87,16 +87,17 @@ template("clang_toolchain") {
 
     if (cxx_rbe_enable) {
       # Use reclient to remotely build C++.
+      _cxx_remote_wrapper_path = rebase_path(cxx_remote_wrapper, root_build_dir)
       if (cxx_rbe_use_python_impl) {
         compiler_prefix =
             string_join(" ",
                         [
                           rebase_path(python_exe_src, root_build_dir),
                           "-S",
-                          rebase_path(cxx_remote_wrapper, root_build_dir),
+                          _cxx_remote_wrapper_path,
                         ])
       } else {
-        compiler_prefix = rebase_path(cxx_remote_wrapper, root_build_dir)
+        compiler_prefix = _cxx_remote_wrapper_path
       }
       assert(cxx_rbe_exec_strategy == "remote" ||
                  cxx_rbe_exec_strategy == "local" ||
@@ -188,11 +189,18 @@ template("clang_toolchain") {
           # Compare local vs. remote build.
           # Allow caching.
           # Use local concurrency.
-          _rewrapper_flags = " --compare --fsatrace --exec_strategy=remote"
+          _rewrapper_flags = [
+            "--compare",
+            "--fsatrace",
+            "--exec_strategy=remote",
+          ]
         } else if (rust_rbe_check == "determinism") {
           # Determinism check is run locally, and doesn't use RBE,
           # even though it uses the same wrapper script.
-          _rewrapper_flags = " --local --check-determinism"
+          _rewrapper_flags = [
+            "--local",
+            "--check-determinism",
+          ]
         } else {
           assert(rust_rbe_exec_strategy == "remote" ||
                      rust_rbe_exec_strategy == "remote_local_fallback" ||
@@ -200,22 +208,36 @@ template("clang_toolchain") {
                      rust_rbe_exec_strategy == "racing",
                  "Unsupported RBE exec_strategy: \"$rust_rbe_exec_strategy\".")
           if (rust_rbe_exec_strategy == "remote") {
-            _rewrapper_flags = " --exec_strategy=remote"
+            _rewrapper_flags = [ "--exec_strategy=remote" ]
           } else if (rust_rbe_exec_strategy == "remote_local_fallback") {
-            _rewrapper_flags = " --exec_strategy=remote_local_fallback"
+            _rewrapper_flags = [ "--exec_strategy=remote_local_fallback" ]
           } else if (rust_rbe_exec_strategy == "local") {
-            _rewrapper_flags =
-                " --exec_strategy=local --remote_update_cache=false"
+            _rewrapper_flags = [
+              "--exec_strategy=local",
+              "--remote_update_cache=false",
+            ]
           } else if (rust_rbe_exec_strategy == "racing") {
-            _rewrapper_flags = " --exec_strategy=racing"
+            _rewrapper_flags = [ "--exec_strategy=racing" ]
           }
         }
         if (restat_rust) {
           # re-client has built-in support for write-if-changed behavior
-          _rewrapper_flags += " --preserve_unchanged_output_mtime"
+          _rewrapper_flags += [ "--preserve_unchanged_output_mtime" ]
         }
-        _rustc_wrapper = rebase_path(rustc_remote_wrapper, root_build_dir) +
-                         _rewrapper_flags + " -- "
+        _rustc_remote_wrapper_path =
+            rebase_path(rustc_remote_wrapper, root_build_dir)
+        if (rust_rbe_use_python_impl) {
+          _rustc_wrapper_tokens = [
+            rebase_path(python_exe_src, root_build_dir),
+            "-S",
+            _rustc_remote_wrapper_path,
+          ]
+        } else {
+          _rustc_wrapper_tokens = [ _rustc_remote_wrapper_path ]
+        }
+        _rustc_wrapper = string_join(" ",
+                                     _rustc_wrapper_tokens + _rewrapper_flags +
+                                         [ "--" ]) + " "
       }
       _rust_concurrent_jobs = concurrent_jobs.remote
     } else {
