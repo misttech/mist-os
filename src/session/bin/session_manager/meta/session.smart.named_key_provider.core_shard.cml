@@ -1,4 +1,21 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-{}
+{
+    capabilities: [
+        {
+            // Protocols from v1 components.
+            // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
+            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
+        },
+    ],
+    offer: [
+        {
+            // Routed from v1 components.
+            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
+            from: "self",
+            to: "#session-manager",
+            dependency: "weak_for_migration",
+        },
+    ],
+}

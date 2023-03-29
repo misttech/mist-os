@@ -19,13 +19,6 @@
     // [2]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/session/bin/session_manager/meta/session_manager.cml
     //
     // TODO(fxbug.dev/103234): Remove this shard
-    capabilities: [
-        {
-            // Protocols from v1 components.
-            // See also //src/sys/appmgr/meta/appmgr.core_shard.cml
-            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
-        },
-    ],
 
     // Protocols used from a child are routed to the v1 sys realm.
     use: [],
@@ -41,13 +34,6 @@
             protocol: "fuchsia.lightsensor.Sensor",
             from: "#ui",
             to: "#session-manager",
-        },
-        {
-            // Routed from v1 components.
-            protocol: [ "google.cast.cryptokey.NamedKeyProvider" ],
-            from: "self",
-            to: "#session-manager",
-            dependency: "weak_for_migration",
         },
         {
             protocol: "fuchsia.ultrasound.Factory",
