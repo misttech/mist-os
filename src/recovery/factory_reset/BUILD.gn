@@ -15,23 +15,17 @@ source_set("lib") {
   ]
 
   public_deps = [
-    # <factory_reset.h> has #include <fuchsia/recovery/cpp/fidl.h>
-    "//sdk/fidl/fuchsia.fs:fuchsia.fs_hlcpp",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
-
-    # <factory_reset.h> has #include <fuchsia/hardware/power/statecontrol/cpp/fidl.h>
-    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_hlcpp",
-
-    # <factory_reset.h> has #include <fbl/unique_fd.h>
-    "//zircon/system/ulib/fbl",
-
     # <factory_reset.h> has #include <fidl/fuchsia.fshost/cpp.wire.h>
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
+
+    # <factory_reset.h> has #include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
+    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_cpp_wire",
+
+    # <factory_reset.h> has #include <fidl/fuchsia.recovery/cpp/wire.h>
+    "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_cpp_wire",
   ]
 
   deps = [
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/syslog/cpp",
@@ -54,8 +48,7 @@ executable("bin") {
   public_deps = [
     ":lib",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/cpp",
+    "//sdk/lib/component/outgoing/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]
@@ -105,10 +98,9 @@ test("factory_reset_unittests") {
 
   deps = [
     ":lib",
+    "////src/lib/testing/loop_fixture",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_hlcpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//src/devices/testing/driver-integration-test-shim",
     "//src/lib/fxl/test:gtest_main",
@@ -121,7 +113,6 @@ test("factory_reset_unittests") {
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fzl",
   ]
 }
 

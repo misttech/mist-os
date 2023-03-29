@@ -2,31 +2,51 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <dirent.h>
-#include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fidl/cpp/binding_set.h>
-#include <lib/sys/cpp/component_context.h>
-#include <unistd.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+
+#include <iostream>
 
 #include "src/recovery/factory_reset/factory_reset.h"
 
 int main(int argc, const char** argv) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  zx::result dev = component::Connect<fuchsia_io::Directory>("/dev");
+  if (dev.is_error()) {
+    std::cerr << "failed to open '/dev': " << dev.status_string();
+    return -1;
+  }
 
-  fbl::unique_fd dev_fd;
-  dev_fd.reset(open("/dev", O_RDONLY | O_DIRECTORY));
+  zx::result admin = component::Connect<fuchsia_hardware_power_statecontrol::Admin>();
+  if (admin.is_error()) {
+    std::cerr << "failed to connect to fuchsia.hardware.power.statecontrol/Admin: "
+              << admin.status_string();
+    return -1;
+  }
 
-  std::unique_ptr<sys::ComponentContext> context =
-      sys::ComponentContext::CreateAndServeOutgoingDirectory();
+  zx::result fshost = component::Connect<fuchsia_fshost::Admin>();
+  if (fshost.is_error()) {
+    std::cerr << "failed to connect to fuchsia.fshost/Admin: " << fshost.status_string();
+    return -1;
+  }
 
-  auto admin = context->svc()->Connect<fuchsia::hardware::power::statecontrol::Admin>();
-  factory_reset::FactoryReset factory_reset(std::move(dev_fd), std::move(admin),
-                                            *component::Connect<fuchsia_fshost::Admin>());
-  fidl::BindingSet<fuchsia::recovery::FactoryReset> bindings;
-  context->outgoing()->AddPublicService(bindings.GetHandler(&factory_reset));
-  loop.Run();
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  component::OutgoingDirectory outgoing(loop.dispatcher());
+
+  factory_reset::FactoryReset factory_reset(loop.dispatcher(), std::move(dev).value(),
+                                            std::move(admin.value()), std::move(fshost.value()));
+  fidl::ServerBindingGroup<fuchsia_recovery::FactoryReset> bindings;
+  if (zx::result<> result = outgoing.AddUnmanagedProtocol<fuchsia_recovery::FactoryReset>(
+          bindings.CreateHandler(&factory_reset, loop.dispatcher(), fidl::kIgnoreBindingClosure));
+      result.is_error()) {
+    std::cerr << "failed to expose fuchsia.recovery/FactoryReset: " << result.status_string();
+    return -1;
+  }
+
+  if (zx_status_t status = loop.Run(); status != ZX_OK) {
+    std::cerr << "failed to run async loop: " << zx_status_get_string(status);
+    return -1;
+  }
   return 0;
 }

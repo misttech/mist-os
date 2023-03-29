@@ -6,31 +6,31 @@
 #define SRC_RECOVERY_FACTORY_RESET_FACTORY_RESET_H_
 
 #include <fidl/fuchsia.fshost/cpp/wire.h>
-#include <fuchsia/hardware/power/statecontrol/cpp/fidl.h>
-#include <fuchsia/recovery/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.power.statecontrol/cpp/wire.h>
+#include <fidl/fuchsia.recovery/cpp/wire.h>
 #include <zircon/types.h>
-
-#include <fbl/unique_fd.h>
 
 namespace factory_reset {
 
 // Implements a simple version of Factory Reset that shreds zxcrypt and then
 // reboots.
-class FactoryReset : public fuchsia::recovery::FactoryReset {
+class FactoryReset : public fidl::WireServer<fuchsia_recovery::FactoryReset> {
  public:
-  FactoryReset(fbl::unique_fd dev_fd, fuchsia::hardware::power::statecontrol::AdminPtr admin,
+  FactoryReset(async_dispatcher_t* dispatcher, fidl::ClientEnd<fuchsia_io::Directory> dev,
+               fidl::ClientEnd<fuchsia_hardware_power_statecontrol::Admin> admin,
                fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin);
   // Performs the factory reset.
-  void Reset(ResetCallback callback) override;
+  void Reset(fit::callback<void(zx_status_t)> callback);
+  void Reset(ResetCompleter::Sync& completer) override;
 
  private:
   // Finds the zxcrypt partition, then overwrites its superblocks with random
   // data, causing them to be unusable.
-  zx_status_t Shred() const;
+  void Shred(fit::callback<void(zx_status_t)> callback) const;
 
-  fuchsia::hardware::power::statecontrol::AdminPtr admin_;
-  fbl::unique_fd dev_fd_;
-  fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin_;
+  fidl::ClientEnd<fuchsia_io::Directory> dev_;
+  fidl::WireClient<fuchsia_hardware_power_statecontrol::Admin> admin_;
+  fidl::WireClient<fuchsia_fshost::Admin> fshost_admin_;
 };
 
 }  // namespace factory_reset

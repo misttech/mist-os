@@ -8,7 +8,7 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <fuchsia/fs/cpp/fidl.h>
+#include <lib/component/incoming/cpp/clone.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fdio.h>
@@ -85,110 +85,155 @@ zx_status_t ShredFxfsDevice(const fidl::ClientEnd<fuchsia_hardware_block::Block>
   return ZX_OK;
 }
 
-FactoryReset::FactoryReset(fbl::unique_fd dev_fd,
-                           fuchsia::hardware::power::statecontrol::AdminPtr admin,
+FactoryReset::FactoryReset(async_dispatcher_t* dispatcher,
+                           fidl::ClientEnd<fuchsia_io::Directory> dev,
+                           fidl::ClientEnd<fuchsia_hardware_power_statecontrol::Admin> admin,
                            fidl::ClientEnd<fuchsia_fshost::Admin> fshost_admin)
-    : admin_(std::move(admin)),
-      dev_fd_(std::move(dev_fd)),
-      fshost_admin_(std::move(fshost_admin)) {}
+    : dev_(std::move(dev)),
+      admin_(std::move(admin), dispatcher),
+      fshost_admin_(std::move(fshost_admin), dispatcher) {}
 
-zx_status_t FactoryReset::Shred() const {
+void FactoryReset::Shred(fit::callback<void(zx_status_t)> callback) const {
   // First try and shred the data volume using fshost.
-  auto result = fidl::WireCall(fshost_admin_)->ShredDataVolume();
-  if (!result.ok()) {
-    FX_LOGS(WARNING) << "Failed to call ShredDataVolume: " << result.FormatDescription();
-  } else if (result->is_ok()) {
-    FX_LOGS(INFO) << "fshost ShredDataVolume succeeded";
-    return ZX_OK;
-  } else if (result->error_value() != ZX_ERR_NOT_SUPPORTED) {
-    FX_PLOGS(WARNING, result->error_value()) << "fshost ShredDataVolume failed";
-  }
-  // Fall back to shredding all zxcrypt devices and Fxfs volumes...
-
-  int fd = openat(dev_fd_.get(), kBlockPath, O_RDONLY);
-  if (fd < 0) {
-    FX_LOGS(ERROR) << "Error opening " << kBlockPath << ": " << strerror(errno);
-    return ZX_ERR_NOT_FOUND;
-  }
-  DIR* dir = fdopendir(fd);
-  fdio_cpp::UnownedFdioCaller caller(dirfd(dir));
-  auto cleanup = fit::defer([dir]() { closedir(dir); });
-  // Attempts to shred every zxcrypt volume found.
-  while (true) {
-    dirent* de = readdir(dir);
-    if (de == nullptr) {
-      return ZX_OK;
-    }
-    zx::result block =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), de->d_name);
-    if (block.is_error()) {
-      FX_PLOGS(WARNING, block.status_value()) << "Error opening " << de->d_name;
-      continue;
-    }
-    zx_status_t status;
-    switch (fs_management::DetectDiskFormat(block.value())) {
-      case fs_management::kDiskFormatZxcrypt: {
-        fbl::unique_fd block_fd;
-        if (zx_status_t status = fdio_fd_create(block.value().TakeChannel().release(),
-                                                block_fd.reset_and_get_address());
-            status != ZX_OK) {
-          FX_PLOGS(WARNING, status) << "Error creating file descriptor from " << de->d_name;
+  auto cb = [this, callback = std::move(callback)](const auto& result) mutable {
+    callback([this, &result]() {
+      if (result.ok()) {
+        const fit::result response = result.value();
+        if (response.is_ok()) {
+          FX_LOGS(INFO) << "fshost ShredDataVolume succeeded";
+          return ZX_OK;
+        }
+        if (response.is_error()) {
+          if (response.error_value() != ZX_ERR_NOT_SUPPORTED) {
+            FX_PLOGS(ERROR, response.error_value()) << "fshost ShredDataVolume failed";
+          }
+        }
+      } else {
+        FX_LOGS(ERROR) << "Failed to call ShredDataVolume: " << result.FormatDescription();
+      }
+      // Fall back to shredding all zxcrypt devices and Fxfs volumes...
+      zx::result block_dir = component::ConnectAt<fuchsia_io::Directory>(dev_, kBlockPath);
+      if (block_dir.is_error()) {
+        FX_PLOGS(ERROR, block_dir.error_value()) << "Failed to open '" << kBlockPath << "'";
+        return block_dir.error_value();
+      }
+      int fd;
+      if (zx_status_t status = fdio_fd_create(block_dir.value().TakeChannel().release(), &fd);
+          status != ZX_OK) {
+        FX_PLOGS(ERROR, status) << "Failed to create fd from '" << kBlockPath << "'";
+        return status;
+      }
+      DIR* const dir = fdopendir(fd);
+      auto cleanup = fit::defer([dir]() { closedir(dir); });
+      fdio_cpp::UnownedFdioCaller caller(dirfd(dir));
+      // Attempts to shred every zxcrypt volume found.
+      while (true) {
+        dirent* de = readdir(dir);
+        if (de == nullptr) {
+          return ZX_OK;
+        }
+        if (std::string_view(de->d_name) == ".") {
           continue;
         }
+        zx::result block =
+            component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), de->d_name);
+        if (block.is_error()) {
+          FX_PLOGS(ERROR, block.status_value()) << "Error opening " << de->d_name;
+          continue;
+        }
+        zx_status_t status;
+        switch (fs_management::DetectDiskFormat(block.value())) {
+          case fs_management::kDiskFormatZxcrypt: {
+            fbl::unique_fd block_fd;
+            if (zx_status_t status = fdio_fd_create(block.value().TakeChannel().release(),
+                                                    block_fd.reset_and_get_address());
+                status != ZX_OK) {
+              FX_PLOGS(ERROR, status) << "Error creating file descriptor from " << de->d_name;
+              continue;
+            }
+            fbl::unique_fd dev_fd;
+            {
+              zx::result dev = component::Clone(dev_);
+              if (dev.is_error()) {
+                FX_PLOGS(ERROR, dev.error_value()) << "Error cloning connection to /dev";
+                continue;
+              }
+              if (zx_status_t status = fdio_fd_create(dev.value().TakeChannel().release(),
+                                                      dev_fd.reset_and_get_address());
+                  status != ZX_OK) {
+                FX_PLOGS(ERROR, status) << "Error creating file descriptor from /dev";
+                continue;
+              }
+            }
 
-        status = ShredZxcryptDevice(std::move(block_fd), dev_fd_.duplicate());
-        break;
+            status = ShredZxcryptDevice(std::move(block_fd), std::move(dev_fd));
+            break;
+          }
+          case fs_management::kDiskFormatFxfs: {
+            status = ShredFxfsDevice(block.value());
+            break;
+          }
+          default:
+            continue;
+        }
+        if (status != ZX_OK) {
+          FX_PLOGS(ERROR, status) << "Error shredding " << de->d_name;
+          return status;
+        }
+        FX_LOGS(INFO) << "Successfully shredded " << de->d_name;
       }
-      case fs_management::kDiskFormatFxfs: {
-        status = ShredFxfsDevice(block.value());
-        break;
-      }
-      default:
-        continue;
-    }
-    if (status != ZX_OK) {
-      FX_PLOGS(ERROR, status) << "Error shredding " << de->d_name;
-      return status;
-    }
-    FX_LOGS(INFO) << "Successfully shredded " << de->d_name;
-  }
+    }());
+  };
+  fshost_admin_->ShredDataVolume().ThenExactlyOnce(std::move(cb));
 }
 
-void FactoryReset::Reset(ResetCallback callback) {
-  FX_LOGS(ERROR) << "Reset called. Starting shred";
-  if (zx_status_t status = Shred(); status != ZX_OK) {
-    FX_PLOGS(ERROR, status) << "Shred failed";
-    callback(status);
-    return;
-  }
-  FX_LOGS(ERROR) << "Finished shred";
-
-  uint8_t key_info[kms_stateless::kExpectedKeyInfoSize] = "zxcrypt";
-  switch (zx_status_t status = kms_stateless::RotateHardwareDerivedKeyFromService(key_info);
-          status) {
-    case ZX_OK:
-      break;
-    case ZX_ERR_NOT_SUPPORTED:
-      FX_LOGS(ERROR)
-          << "FactoryReset: The device does not support rotatable hardware keys. Ignoring";
-      break;
-    default:
-      FX_PLOGS(ERROR, status) << "FactoryReset: RotateHardwareDerivedKey() failed";
+void FactoryReset::Reset(fit::callback<void(zx_status_t)> callback) {
+  FX_LOGS(INFO) << "Reset called. Starting shred";
+  Shred([this, callback = std::move(callback)](zx_status_t status) mutable {
+    if (status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Shred failed";
       callback(status);
       return;
-  }
-  // Reboot to initiate the recovery.
-  FX_LOGS(ERROR) << "Requesting reboot...";
-  admin_->Reboot(fuchsia::hardware::power::statecontrol::RebootReason::FACTORY_DATA_RESET,
-                 [callback{std::move(callback)}](
-                     fuchsia::hardware::power::statecontrol::Admin_Reboot_Result status) {
-                   if (status.is_err()) {
-                     FX_LOGS(ERROR) << "Reboot call failed: " << status.err();
-                     callback(status.err());
-                   } else {
-                     callback(ZX_OK);
-                   }
-                 });
+    }
+    FX_LOGS(INFO) << "Finished shred";
+
+    uint8_t key_info[kms_stateless::kExpectedKeyInfoSize] = "zxcrypt";
+    switch (zx_status_t status = kms_stateless::RotateHardwareDerivedKeyFromService(key_info);
+            status) {
+      case ZX_OK:
+        break;
+      case ZX_ERR_NOT_SUPPORTED:
+        FX_LOGS(WARNING)
+            << "FactoryReset: The device does not support rotatable hardware keys. Ignoring";
+        break;
+      default:
+        FX_PLOGS(ERROR, status) << "FactoryReset: RotateHardwareDerivedKey() failed";
+        callback(status);
+        return;
+    }
+    // Reboot to initiate the recovery.
+    FX_LOGS(INFO) << "Requesting reboot...";
+    auto cb = [callback = std::move(callback)](const auto& result) mutable {
+      if (!result.ok()) {
+        FX_PLOGS(ERROR, result.status()) << "Reboot call failed";
+        callback(result.status());
+        return;
+      }
+      const auto& response = result.value();
+      if (response.is_error()) {
+        FX_PLOGS(ERROR, response.error_value()) << "Reboot returned error";
+        callback(response.error_value());
+        return;
+      }
+      callback(ZX_OK);
+    };
+    admin_->Reboot(fuchsia_hardware_power_statecontrol::wire::RebootReason::kFactoryDataReset)
+        .ThenExactlyOnce(std::move(cb));
+  });
+}
+
+void FactoryReset::Reset(ResetCompleter::Sync& completer) {
+  Reset([completer = completer.ToAsync()](zx_status_t status) mutable { completer.Reply(status); });
 }
 
 }  // namespace factory_reset
