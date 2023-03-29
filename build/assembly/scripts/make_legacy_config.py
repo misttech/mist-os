@@ -219,5 +219,7 @@ if __name__ == "__main__":
     except PackageManifestParsingException as exc:
         logger.exception(
             "A problem occurred attempting to load a PackageManifest")
+    except AssemblyInputBundleCreationException as exc:
+        logger.exception("A problem occured building the legacy bundle")
     finally:
         sys.exit()

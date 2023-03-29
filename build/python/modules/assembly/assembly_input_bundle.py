@@ -41,7 +41,12 @@ SubpackageManifests = Dict[Merkle, FilePath]
 ConfigDataEntries = Dict[PackageName, Set[FileEntry]]
 
 
-class DuplicatePackageException(Exception):
+class AssemblyInputBundleCreationException(Exception):
+    """To be raised when AIB creation fails for some reason"""
+    ...
+
+
+class DuplicatePackageException(AssemblyInputBundleCreationException):
     """To be raised when an attempt is made to add multiple packages with the same name to the same
     invocation of the AIBCreator"""
     ...
@@ -710,9 +715,14 @@ class AIBCreator:
             if "config-data" == package_name:
                 continue
 
-            self._copy_package(
-                manifest, os.path.dirname(package_manifest_path),
-                rebased_destination, blobs, deps)
+            try:
+                self._copy_package(
+                    manifest, os.path.dirname(package_manifest_path),
+                    rebased_destination, blobs, deps)
+            except Exception as e:
+                raise AssemblyInputBundleCreationException(
+                    f"Copying '{set_name}' package '{package_name}' with manifest: {package_manifest_path}"
+                ) from e
 
             # Track the package manifest in our set of packages
             packages.append(rebased_destination)
@@ -749,8 +759,7 @@ class AIBCreator:
             source = blob.source_path
             if source is None:
                 raise ValueError(
-                    f"Found a blob with no source path: {package_name}::{blob.path} in {package_manifest_path}"
-                )
+                    f"Found a blob with no source path: {blob.path}")
 
             # Make the path relative to the package manifest if necessary.
             if manifest.blob_sources_relative == 'file':
@@ -797,10 +806,15 @@ class AIBCreator:
                     # Track in deps, since it was opened.
                     deps.add(subpackage.manifest_path)
 
-                self._copy_package(
-                    subpackage_manifest,
-                    os.path.dirname(subpackage.manifest_path),
-                    subpackage_destination, blobs, deps)
+                try:
+                    self._copy_package(
+                        subpackage_manifest,
+                        os.path.dirname(subpackage.manifest_path),
+                        subpackage_destination, blobs, deps)
+                except Exception as e:
+                    raise AssemblyInputBundleCreationException(
+                        f"Copying subpackage '{subpackage.name}' with manifest: {subpackage.manifest_path}"
+                    ) from e
 
         package_manifest_destination = os.path.join(
             self.outdir, rebased_destination)
