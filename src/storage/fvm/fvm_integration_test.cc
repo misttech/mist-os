@@ -87,7 +87,7 @@ size_t UsableSlicesCount(size_t disk_size, size_t slice_size) {
 using driver_integration_test::IsolatedDevmgr;
 
 class FvmTest : public zxtest::Test {
- public:
+ protected:
   void SetUp() override {
     IsolatedDevmgr::Args args;
     args.disable_block_watcher = true;
@@ -95,8 +95,6 @@ class FvmTest : public zxtest::Test {
     ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr_));
     ASSERT_OK(
         device_watcher::RecursiveWaitForFile(devfs_root().get(), "sys/platform/00:00:2d/ramctl"));
-
-    ASSERT_OK(loop_.StartThread());
 
     fdio_ns_t* name_space;
     ASSERT_OK(fdio_ns_get_installed(&name_space));
@@ -170,11 +168,9 @@ class FvmTest : public zxtest::Test {
                                                         req);
   }
 
- protected:
-  async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+ private:
   IsolatedDevmgr devmgr_;
   ramdisk_client_t* ramdisk_ = nullptr;
-  fs_management::MountOptions mounting_options_;
 };
 
 void FvmTest::CreateRamdisk(uint64_t block_size, uint64_t block_count) {
@@ -307,7 +303,7 @@ class VmoClient : public fbl::RefCounted<VmoClient> {
 
   fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device() const { return device_; }
 
-  groupid_t group() { return 0; }
+  static groupid_t group() { return 0; }
 
  private:
   const fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device_;
@@ -2223,7 +2219,8 @@ TEST_F(FvmTest, TestCorruptMount) {
   query_request.vslice_start[3] = minfs::kFVMBlockDataStart / kMinfsBlocksPerSlice;
 
   // Run the test for Minfs.
-  CorruptMountHelper(devfs_root(), partition_path->c_str(), mounting_options_,
+  fs_management::MountOptions mounting_options;
+  CorruptMountHelper(devfs_root(), partition_path->c_str(), mounting_options,
                      fs_management::kDiskFormatMinfs, query_request);
 
   size_t kBlobfsBlocksPerSlice = kSliceSize / blobfs::kBlobfsBlockSize;
@@ -2233,10 +2230,9 @@ TEST_F(FvmTest, TestCorruptMount) {
   query_request.vslice_start[2] = blobfs::kFVMDataStart / kBlobfsBlocksPerSlice;
 
   // Run the test for Blobfs.
-  fs_management::MountOptions options = mounting_options_;
-  options.component_child_name = kTestBlobfsChildName;
-  options.component_collection_name = kTestCollectionName;
-  CorruptMountHelper(devfs_root(), partition_path->c_str(), options,
+  mounting_options.component_child_name = kTestBlobfsChildName;
+  mounting_options.component_collection_name = kTestCollectionName;
+  CorruptMountHelper(devfs_root(), partition_path->c_str(), mounting_options,
                      fs_management::kDiskFormatBlobfs, query_request);
 
   // Clean up
@@ -2418,9 +2414,10 @@ TEST_F(FvmTest, TestMounting) {
   ASSERT_OK(device);
 
   // Mount the VPart
+  fs_management::MountOptions mounting_options;
   auto mounted_filesystem =
       fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatMinfs,
-                           mounting_options_, fs_management::LaunchStdioAsync);
+                           mounting_options, fs_management::LaunchStdioAsync);
   ASSERT_EQ(mounted_filesystem.status_value(), ZX_OK);
   auto data = mounted_filesystem->DataRoot();
   ASSERT_EQ(data.status_value(), ZX_OK);
@@ -2497,8 +2494,9 @@ TEST_F(FvmTest, TestMkfs) {
     fdio_cpp::FdioCaller partition_caller(std::move(vp_fd));
     zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
     ASSERT_OK(device);
+    fs_management::MountOptions mounting_options;
     ASSERT_NE(fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatMinfs,
-                                   mounting_options_, fs_management::LaunchStdioSync)
+                                   mounting_options, fs_management::LaunchStdioSync)
                   .status_value(),
               ZX_OK);
   }
@@ -2510,7 +2508,7 @@ TEST_F(FvmTest, TestMkfs) {
     zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
     ASSERT_OK(device);
 
-    fs_management::MountOptions mounting_options = mounting_options_;
+    fs_management::MountOptions mounting_options;
     mounting_options.component_child_name = kTestBlobfsChildName;
     mounting_options.component_collection_name = kTestCollectionName;
     ASSERT_EQ(fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatBlobfs,
@@ -2530,9 +2528,10 @@ TEST_F(FvmTest, TestMkfs) {
   fdio_cpp::FdioCaller partition_caller(std::move(vp_fd));
   zx::result device = partition_caller.take_as<fuchsia_hardware_block::Block>();
   ASSERT_OK(device);
+  fs_management::MountOptions mounting_options;
   auto mounted_filesystem =
       fs_management::Mount(std::move(device.value()), fs_management::kDiskFormatMinfs,
-                           mounting_options_, fs_management::LaunchStdioAsync);
+                           mounting_options, fs_management::LaunchStdioAsync);
   ASSERT_EQ(mounted_filesystem.status_value(), ZX_OK);
   auto data = mounted_filesystem->DataRoot();
   ASSERT_EQ(data.status_value(), ZX_OK);
