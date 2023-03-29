@@ -26,9 +26,83 @@ _SCRIPT_BASENAME = os.path.basename(__file__)
 PROJECT_ROOT = fuchsia.project_root_dir()
 PROJECT_ROOT_REL = os.path.relpath(PROJECT_ROOT, start=os.curdir)
 
+# Local subprocess and remote environment calls need this when a
+# command is prefixed with an X=Y environment variable.
+_ENV = '/usr/bin/env'
+
+# This is a known path where remote execution occurs.
+# This should only be used for workarounds as a last resort.
+_REMOTE_PROJECT_ROOT = '/b/f/w'
+
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
+
+
+def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
+    if not command:
+        return []
+    if '=' in command[0]:
+        # Commands that start with X=Y local environment variables
+        # need to be run with 'env'.
+        return [_ENV] + command
+    return command
+
+
+def resolved_shlibs_from_ldd(lines: Iterable[str]) -> Iterable[str]:
+    """Parse 'ldd' output.
+
+    Args:
+      lines: stdout text of 'ldd'
+
+    Example line:
+      librustc_driver-897e90da9cc472c4.so => /home/my_project/tools/rust/bin/../lib/librustc_driver.so (0x00007f6fdf600000)
+
+    Should yield:
+      /home/my_project/tools/rust/bin/../lib/librustc_driver.so
+    """
+    for line in lines:
+        lib, sep, resolved = line.strip().partition('=>')
+        if sep == '=>':
+            yield resolved.strip().split(' ')[0]
+
+
+def host_tool_shlibs(executable: str) -> Iterable[str]:
+    """Identify shared libraries of an executable.
+
+    This only works on platforms with `ldd`.
+
+    Yields:
+      paths to non-system shared libraries
+    """
+    # TODO: do this once in the entire build, as early as GN time
+    # TODO: support Mac OS using `otool -L`
+    ldd_output = subprocess.run(
+        ['ldd', executable], capture_output=True, text=True)
+    if ldd_output.returncode != 0:
+        raise Exception(
+            f"Failed to determine shared libraries of '{executable}'.")
+
+    yield from resolved_shlibs_from_ldd(ldd_output.stdout.splitlines())
+
+
+def host_tool_nonsystem_shlibs(executable: str) -> Iterable[str]:
+    """Identify non-system shared libraries of a host tool.
+
+    The host tool's shared libraries will need to be uploaded
+    for remote execution.  (The caller should verify that
+    the shared library paths fall under the remote action's exec_root.)
+
+    Limitation: this works for only linux-x64 ELF binaries, but this is
+    fine because only linux-x64 remote workers are available.
+
+    Yields:
+      paths to non-system shared libraries
+    """
+    for lib in host_tool_shlibs(executable):
+        if any(lib.startswith(prefix) for prefix in ('/usr/lib', '/lib')):
+            continue  # filter out system libs
+        yield lib
 
 
 def relativize_to_exec_root(path: str, start=None) -> str:
@@ -74,7 +148,7 @@ class RemoteAction(object):
         self._working_dir = os.path.abspath(working_dir or os.curdir)
         self._exec_root = os.path.abspath(exec_root or PROJECT_ROOT)
         # Parse and strip out --remote-* flags from command.
-        remote_args, self._remote_command = _REMOTE_FLAG_ARG_PARSER.parse_known_args(
+        remote_args, self._remote_command = REMOTE_FLAG_ARG_PARSER.parse_known_args(
             command)
         self._remote_disable = remote_args.disable
         self._options = (options or []) + remote_args.flags
@@ -99,7 +173,7 @@ class RemoteAction(object):
         """This is the original command that would have been run locally.
         All of the --remote-* flags have been removed at this point.
         """
-        return self._remote_command
+        return auto_env_prefix_command(self._remote_command)
 
     @property
     def options(self) -> Sequence[str]:
@@ -162,9 +236,9 @@ class RemoteAction(object):
 
     def _inputs_list_file(self) -> str:
         inputs_list_file = self._output_files[0] + '.inputs'
+        contents = '\n'.join(self.inputs_relative_to_project_root) + '\n'
         with open(inputs_list_file, 'w') as f:
-            for i in self.inputs_relative_to_project_root:
-                f.write(i + '\n')
+            f.write(contents)
         return inputs_list_file
 
     def _generate_rewrapper_command_prefix(self) -> Iterable[str]:
@@ -199,12 +273,16 @@ class RemoteAction(object):
             yield from self._generate_rewrapper_command_prefix()
             yield '--'
 
-        yield from self._remote_command
+        yield from self.local_command
 
     @property
     def command(self) -> Sequence[str]:
         """This is the fully constructed rewrapper command executed on the host."""
         return list(self._generate_command())
+
+    @property
+    def command_quoted_str(self) -> str:
+        return ' '.join(shlex.quote(t) for t in self.command)
 
     # features to port over from fuchsia-rbe-action.sh:
     # TODO(http://fxbug.dev/96250): implement fsatrace mutator
@@ -213,7 +291,8 @@ class RemoteAction(object):
 
     def _cleanup(self):
         for f in self._cleanup_files:
-            os.remove(f)
+            if os.path.exists(f):
+                os.remove(f)
 
     def run(self) -> int:
         """Remotely execute the command.
@@ -229,6 +308,30 @@ class RemoteAction(object):
         finally:
             if not self._save_temps:
                 self._cleanup()
+
+    def run_with_main_args(self, main_args: argparse.Namespace) -> int:
+        """Run depending on verbosity and dry-run mode.
+
+        This serves as a template for main() programs whose
+        primary execution action is RemoteAction.run().
+
+        Args:
+          main_args: struct with (.verbose, .dry_run, .label)
+
+        Returns:
+          exit code
+        """
+        command_str = self.command_quoted_str
+        if main_args.verbose and not main_args.dry_run:
+            msg(command_str)
+        if main_args.dry_run:
+            label_str = " "
+            if main_args.label:
+                label_str += f"[{main_args.label}] "
+            msg(f"[dry-run only]{label_str}{command_str}")
+            return 0
+
+        return self.run()
 
 
 def _rewrapper_arg_parser() -> argparse.ArgumentParser:
@@ -294,7 +397,7 @@ def _remote_flag_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-_REMOTE_FLAG_ARG_PARSER = _remote_flag_arg_parser()
+REMOTE_FLAG_ARG_PARSER = _remote_flag_arg_parser()
 
 
 def inherit_main_arg_parser_flags(
@@ -406,17 +509,7 @@ def main(argv: Sequence[str]) -> None:
     remote_action = remote_action_from_args(
         main_args=main_args, remote_options=other_remote_options)
 
-    command_str = ' '.join(shlex.quote(t) for t in remote_action.command)
-    if main_args.verbose and not main_args.dry_run:
-        msg(command_str)
-    if main_args.dry_run:
-        label_str = " "
-        if main_args.label:
-            label_str += f"[{main_args.label}] "
-        msg(f"[dry-run only]{label_str}{command_str}")
-        return 0
-
-    return remote_action.run()
+    return remote_action.run_with_main_args(main_args)
 
 
 if __name__ == "__main__":

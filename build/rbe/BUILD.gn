@@ -12,9 +12,11 @@ group("tests") {
     ":cl_utils_test($host_toolchain)",
     ":cxx_remote_wrapper_test($host_toolchain)",
     ":cxx_test($host_toolchain)",
+    ":fuchsia_test($host_toolchain)",
     ":relativize_args_test($host_toolchain)",
     ":remote_action_test($host_toolchain)",
     ":rustc_remote_wrapper_test($host_toolchain)",
+    ":rustc_test($host_toolchain)",
   ]
 }
 
@@ -30,7 +32,10 @@ if (is_host) {
   _cxx_sources = [ "cxx.py" ] + _cl_utils_sources
   _cxx_remote_wrapper_sources =
       [ "cxx_remote_wrapper.py" ] + _cxx_sources + _remote_action_sources
-  _rustc_remote_wrapper_sources = [ "rustc_remote_wrapper.py" ]
+  _rustc_sources = [ "rustc.py" ] + _cl_utils_sources
+  _rustc_remote_wrapper_sources =
+      [ "rustc_remote_wrapper.py" ] + _rustc_sources + _remote_action_sources +
+      _fuchsia_sources
 
   python_library("cl_utils") {
     sources = _cl_utils_sources
@@ -59,6 +64,10 @@ if (is_host) {
   python_library("fuchsia") {
     sources = _fuchsia_sources
   }
+  python_host_test("fuchsia_test") {
+    main_source = "fuchsia_test.py"
+    sources = _fuchsia_sources
+  }
 
   python_library("relativize_args") {
     sources = [ "relativize_args.py" ]
@@ -74,6 +83,14 @@ if (is_host) {
   python_host_test("remote_action_test") {
     main_source = "remote_action_test.py"
     sources = _remote_action_sources
+  }
+
+  python_library("rustc") {
+    sources = _rustc_sources
+  }
+  python_host_test("rustc_test") {
+    main_source = "rustc_test.py"
+    sources = _rustc_sources
   }
 
   python_library("rustc_remote_wrapper") {

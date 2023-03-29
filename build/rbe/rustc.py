@@ -1,0 +1,366 @@
+#!/usr/bin/env python3.8
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+"""C++ compilation commands and attributes.
+"""
+
+import argparse
+import collections
+import dataclasses
+import enum
+import os
+
+import cl_utils
+
+from typing import Dict, Iterable, Sequence, Tuple
+
+_RUSTC_FUSED_FLAGS = {'-C', '-L', '-Z'}
+
+
+def _remove_prefix(base: str, prefix: str) -> str:
+    # str.removeprefix is only available in Python 3.9+
+    if base.startswith(prefix):
+        return base[len(prefix):]
+    return base
+
+
+def _remove_suffix(base: str, suffix: str) -> str:
+    # str.removesuffix is only available in Python 3.9+
+    if base.endswith(suffix):
+        return base[:-len(suffix)]
+    return base
+
+
+def _rustc_command_scanner() -> argparse.ArgumentParser:
+    """Analyze rustc command attributes.
+
+    Flags should already be canonicalized through `expand_fused_flags()`.
+    """
+    parser = argparse.ArgumentParser(
+        description="Detects Rust compilation attributes",
+        argument_default=[],
+    )
+    parser.add_argument(
+        "-o",  # required
+        type=str,
+        dest="output",
+        default="",
+        help="compiler output",
+    )
+    parser.add_argument(
+        "--crate-type",
+        type=str,
+        default="",
+        help="Rust compiler output crate type",
+    )
+    parser.add_argument(
+        "--sysroot",
+        type=str,
+        default="",
+        help="compiler sysroot",
+    )
+    parser.add_argument(
+        "--target",
+        type=str,
+        default="",
+        help="target platform",
+    )
+    parser.add_argument(
+        "--emit",
+        action='append',
+        default=[],
+        help=
+        "Types of outputs to produce.  Values can be 'key' or 'key=value' form.",
+    )
+    parser.add_argument(
+        "--extern",
+        action='append',
+        default=[],
+        help="Specify where transitive dependencies can be found",
+    )
+    for f in _RUSTC_FUSED_FLAGS:
+        parser.add_argument(
+            f,
+            type=str,
+            action='append',
+            dest="{}_flags".format(f.lstrip('-')),
+            default=[],
+            help=f"All {f}* flags",
+        )
+    return parser
+
+
+_RUSTC_COMMAND_SCANNER = _rustc_command_scanner()
+
+
+class CrateType(enum.Enum):
+    UNKNOWN = 0
+    RLIB = 1  # "rlib"
+    BINARY = 2  # "bin"
+    CDYLIB = 3  # "cdylib"
+    DYLIB = 4  # "dylib"
+    PROC_MACRO = 5  # "proc-macro"
+    STATICLIB = 6  # "staticlib"
+
+
+def parse_crate_type(crate_type) -> CrateType:
+    return {
+        "rlib": CrateType.RLIB,
+        "bin": CrateType.BINARY,
+        "cdylib": CrateType.CDYLIB,
+        "dylib": CrateType.DYLIB,
+        "proc-macro": CrateType.PROC_MACRO,
+        "staticlib": CrateType.STATICLIB,
+    }.get(crate_type, CrateType.UNKNOWN)
+
+
+class InputType(enum.Enum):
+    SOURCE = 0
+    LINKABLE = 1  # Any of: .a, .so, .dylib
+
+
+@dataclasses.dataclass
+class RustcInput(object):
+    file: str
+    type: InputType
+
+
+def is_linkable(f: str) -> bool:
+    return any(
+        f.endswith(suffix)
+        for suffix in ('.a', '.o', '.so', '.dylib', '.so.debug', '.ld'))
+
+
+def find_direct_inputs(command: Iterable[str]) -> Iterable[RustcInput]:
+    for tok in command:
+        if tok.endswith('.rs'):
+            yield RustcInput(file=tok, type=InputType.SOURCE)
+        elif is_linkable(tok):
+            yield RustcInput(file=tok, type=InputType.LINKABLE)
+
+
+def find_compiler_from_command(command: Iterable[str]) -> str:
+    for tok in command:
+        if 'rustc' in tok:
+            return tok
+    return None  # or raise error
+
+
+class RustAction(object):
+    """This is a rustc compile action."""
+
+    def __init__(self, command: Sequence[str]):
+        # keep a copy of the original command
+        self._command = command
+        # analyze command using canonical expanded form
+        self._attributes, remaining_args = _RUSTC_COMMAND_SCANNER.parse_known_args(
+            list(
+                cl_utils.expand_fused_flags(self._command, _RUSTC_FUSED_FLAGS)))
+        self._compiler = find_compiler_from_command(remaining_args)
+        self._env = [
+            tok for tok in remaining_args[:remaining_args.index(self._compiler)]
+            if '=' in tok
+        ]
+        self._crate_type = parse_crate_type(self._attributes.crate_type)
+        self._direct_inputs = list(find_direct_inputs(remaining_args))
+        self._C_flags = cl_utils.keyed_flags_to_values_dict(
+            self._attributes.C_flags)
+        self._Z_flags = cl_utils.keyed_flags_to_values_dict(
+            self._attributes.Z_flags)
+        self._L_flags = cl_utils.keyed_flags_to_values_dict(
+            self._attributes.L_flags)
+        self._emit = cl_utils.keyed_flags_to_values_dict(
+            cl_utils.flatten_comma_list(self._attributes.emit))
+        self._extern = cl_utils.keyed_flags_to_values_dict(
+            cl_utils.flatten_comma_list(self._attributes.extern))
+
+        # post-process some flags
+        self._sysroot = ''
+        self._want_sysroot_libgcc = False
+        self._link_arg_files = []
+        for arg in self._link_arg_flags:
+            if arg == '-lgcc':
+                self._want_sysroot_libgcc = True
+                continue
+            left, sep, right = arg.partition('=')
+            if left == '--sysroot':
+                self._sysroot = right
+                continue
+            if is_linkable(arg):
+                self._link_arg_files.append(arg)
+
+    @property
+    def env(self) -> Sequence[str]:
+        return self._env
+
+    @property
+    def command(self) -> Sequence[str]:
+        """The original command, but fused flags like '-Cfoo' are expanded."""
+        return self._command
+
+    @property
+    def output_file(self) -> str:
+        return self._attributes.output  # usually this is the -o file
+
+    @property
+    def compiler(self) -> str:
+        return self._compiler
+
+    @property
+    def crate_type(self) -> CrateType:
+        return self._crate_type
+
+    @property
+    def needs_linker(self) -> bool:
+        return self.crate_type in {
+            CrateType.BINARY, CrateType.PROC_MACRO, CrateType.DYLIB,
+            CrateType.CDYLIB
+        }
+
+    @property
+    def want_sysroot_libgcc(self) -> bool:
+        return self._want_sysroot_libgcc
+
+    @property
+    def target(self) -> str:
+        return self._attributes.target
+
+    @property
+    def direct_sources(self) -> Sequence[str]:
+        return [
+            s.file for s in self._direct_inputs if s.type == InputType.SOURCE
+        ]
+
+    @property
+    def emit(self) -> Dict[str, str]:
+        return self._emit
+
+    @property
+    def emit_llvm_ir(self) -> bool:
+        return 'llvm-ir' in self.emit
+
+    @property
+    def emit_llvm_bc(self) -> bool:
+        return 'llvm-bc' in self.emit
+
+    @property
+    def save_analysis(self) -> bool:
+        return cl_utils.last_value_of_dict_flag(
+            self._Z_flags, 'save-analysis', 'no') == 'yes'
+
+    @property
+    def llvm_time_trace(self) -> bool:
+        return 'llvm-time-trace' in self._Z_flags
+
+    @property
+    def extra_filename(self) -> str:
+        return cl_utils.last_value_of_dict_flag(self._C_flags, 'extra-filename')
+
+    @property
+    def depfile(self) -> str:
+        # TODO: removeprefix './'
+        return cl_utils.last_value_of_dict_flag(self.emit, 'dep-info', '')
+
+    @property
+    def linker(self) -> str:
+        return cl_utils.last_value_of_dict_flag(self._C_flags, 'linker')
+
+    @property
+    def _link_arg_flags(self) -> Sequence[str]:
+        return self._C_flags.get('link-arg', [])
+
+    @property
+    def link_arg_files(self) -> Sequence[str]:
+        return self._link_arg_files
+
+    @property
+    def link_map_output(self) -> str:
+        # The linker can produce a .map output file.
+        for arg in self._C_flags.get('link-args', []):
+            if arg.startswith('--Map='):
+                return _remove_prefix(_remove_prefix(arg, '--Map='), './')
+        return None
+
+    @property
+    def sysroot(self) -> str:
+        return self._sysroot
+
+    @property
+    def native(self) -> Sequence[str]:
+        return self._L_flags.get('native', [])
+
+    @property
+    def native_link_arg_files(self) -> Iterable[str]:
+        for path in self.native:
+            if os.path.isdir(path):
+                # TODO: debug print
+                pass
+            elif os.path.isfile(path):
+                yield path
+                # caller might need to prepend $build_dir
+
+    @property
+    def explicit_link_arg_files(self) -> Sequence[str]:
+        return [
+            s.file for s in self._direct_inputs if s.type == InputType.LINKABLE
+        ]
+
+    @property
+    def externs(self) -> Dict[str, Sequence[str]]:
+        return self._extern
+
+    def extern_paths(self) -> Iterable[str]:
+        for lib, paths in self.externs.items():
+            if paths:  # ignore any empty lists
+                yield paths[-1]  # last value wins
+
+    @property
+    def _output_file_base(self) -> str:
+        return _remove_suffix(self.output_file, '.rlib')
+
+    @property
+    def _auxiliary_output_path(self) -> str:
+        return self._output_file_base + self.extra_filename
+
+    def extra_output_files(self) -> Iterable[str]:
+        base = self._auxiliary_output_path
+        if self.emit_llvm_ir:
+            yield base + '.ll'
+        if self.emit_llvm_bc:
+            yield base + '.bc'
+        if self.save_analysis:
+            analysis_file = os.path.join(
+                'save-analysis-temp',
+                os.path.basename(self._auxiliary_output_path) + '.json')
+            yield _remove_prefix(analysis_file, './')
+        if self.llvm_time_trace:
+            trace_file = self._output_file_base + '.llvm_timings.json'
+            yield trace_file
+        link_map = self.link_map_output
+        if link_map:
+            yield link_map
+
+    def dep_only_command(self, depfile_name: str) -> Iterable[str]:
+        """Generate a command that only produces a depfile."""
+        new_emit_args = [
+            f'--emit=dep-info={depfile_name}', '-Z', 'binary-dep-depinfo'
+        ]
+        replaced_emit = False
+        for tok in self.command:
+            if tok.startswith('--emit'):  # replace the original emit
+                if replaced_emit:
+                    pass
+                else:
+                    replaced_emit = True
+                    yield from new_emit_args
+            else:
+                yield tok
+
+        # if we haven't seen emit yet, add it
+        if not replaced_emit:
+            yield from new_emit_args
+
+
+# TODO: write a main() routine just for printing debug info about a compile
+# command

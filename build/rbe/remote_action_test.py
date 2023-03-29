@@ -14,6 +14,66 @@ import remote_action
 import cl_utils
 
 
+class ResolvedShlibsFromLddTests(unittest.TestCase):
+
+    def test_sample(self):
+        ldd_output = """
+	linux-vdso.so.1 (0x00007ffd653b2000)
+	librustc_driver-897e90da9cc472c4.so => /usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so (0x00007f6fdf600000)
+	libstd-374958b5d3497a8f.so => /usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so (0x00007f6fdf45c000)
+	libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f6fe2cc6000)
+	librt.so.1 => /lib/x86_64-linux-gnu/librt.so.1 (0x00007f6fe2cc1000)
+	libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007f6fe2cba000)
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f6fdf27b000)
+	libLLVM-15-rust-1.70.0-nightly.so => /usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so (0x00007f6fdb000000)
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f6fe2921000)
+	/lib64/ld-linux-x86-64.so.2 (0x00007f6fe2ce6000)
+"""
+        self.assertEqual(
+            list(
+                remote_action.resolved_shlibs_from_ldd(
+                    ldd_output.splitlines())),
+            [
+                '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
+                '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
+                '/lib/x86_64-linux-gnu/libdl.so.2',
+                '/lib/x86_64-linux-gnu/librt.so.1',
+                '/lib/x86_64-linux-gnu/libpthread.so.0',
+                '/lib/x86_64-linux-gnu/libc.so.6',
+                '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
+                '/lib/x86_64-linux-gnu/libm.so.6',
+            ])
+
+
+class HostToolNonsystemShlibsTests(unittest.TestCase):
+
+    def test_sample(self):
+        unfiltered_shlibs = [
+            '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
+            '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
+            '/lib/x86_64-linux-gnu/libdl.so.2',
+            '/lib/x86_64-linux-gnu/librt.so.1',
+            '/lib/x86_64-linux-gnu/libpthread.so.0',
+            '/lib/x86_64-linux-gnu/libc.so.6',
+            '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
+            '/lib/x86_64-linux-gnu/libm.so.6',
+            '/usr/lib/something_else.so',
+        ]
+        with mock.patch.object(
+                remote_action, 'host_tool_shlibs',
+                return_value=unfiltered_shlibs) as mock_host_tool_shlibs:
+            self.assertEqual(
+                list(
+                    remote_action.host_tool_nonsystem_shlibs(
+                        '../path/to/rustc')),
+                [
+                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/librustc_driver-897e90da9cc472c4.so',
+                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/libstd-374958b5d3497a8f.so',
+                    '/usr/home/janedoe/my_project/tools/rust/linux-x64/bin/../lib/../lib/libLLVM-15-rust-1.70.0-nightly.so',
+                ])
+        mock_host_tool_shlibs.assert_called_once()
+
+
 class RewrapperArgParserTests(unittest.TestCase):
 
     def test_exec_root(self):
@@ -61,6 +121,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(action.local_command, ['echo'])
 
+    def test_local_command_with_env(self):
+        local_command = (['FOO=BAR', 'echo'])
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(['--'] + local_command)
+        action = remote_action.remote_action_from_args(main_args)
+        self.assertEqual(
+            action.local_command, [remote_action._ENV] + local_command)
+
     def test_verbose(self):
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(['--verbose', '--', 'echo'])
@@ -70,6 +138,12 @@ class RemoteActionMainParserTests(unittest.TestCase):
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(['--dry-run', '--', 'echo'])
         self.assertTrue(main_args.dry_run)
+        action = remote_action.remote_action_from_args(main_args)
+        with mock.patch.object(remote_action.RemoteAction, 'run') as mock_run:
+            exit_code = action.run_with_main_args(main_args)
+        self.assertEqual(exit_code, 0)
+        mock_run.assert_not_called()
+
 
     @mock.patch.object(fuchsia, 'REPROXY_WRAP', '/path/to/reproxy-wrap.sh')
     def test_auto_reproxy(self):
@@ -104,7 +178,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
 class RemoteActionFlagParserTests(unittest.TestCase):
 
     def test_defaults(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args([])
         self.assertFalse(remote_args.disable)
         self.assertEqual(remote_args.inputs, [])
@@ -113,15 +187,31 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(remote_args.flags, [])
         self.assertEqual(other, [])
 
+    def test_command_without_forwarding(self):
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
+        command = [
+            'clang++', '--target=powerpc-apple-darwin8',
+            '-fcrash-diagnostics-dir=nothing/to/see/here',
+            '-c', 'hello.cxx', '-o',
+            'hello.o'
+        ]
+        remote_args, other = p.parse_known_args(command)
+        self.assertFalse(remote_args.disable)
+        self.assertEqual(remote_args.inputs, [])
+        self.assertEqual(remote_args.output_files, [])
+        self.assertEqual(remote_args.output_dirs, [])
+        self.assertEqual(remote_args.flags, [])
+        self.assertEqual(other, command)
+
     def test_disable(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args(
             ['cat', 'foo.txt', '--remote-disable'])
         self.assertTrue(remote_args.disable)
         self.assertEqual(other, ['cat', 'foo.txt'])
 
     def test_inputs(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args(
             [
                 'cat', '--remote-inputs=bar.txt', 'bar.txt',
@@ -131,7 +221,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(other, ['cat', 'bar.txt', 'quux.txt'])
 
     def test_inputs_comma(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args(
             [
                 'cat', '--remote-inputs=w,x', 'bar.txt', '--remote-inputs=y,z',
@@ -143,7 +233,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(other, ['cat', 'bar.txt', 'quux.txt'])
 
     def test_output_files_comma(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args(
             [
                 './generate.sh', '--remote-outputs=w,x', 'bar.txt',
@@ -155,7 +245,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(other, ['./generate.sh', 'bar.txt', 'quux.txt'])
 
     def test_output_dirs_comma(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args(
             [
                 './generate_dirs.sh', '--remote-output-dirs=w,x', 'bar.txt',
@@ -167,7 +257,7 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         self.assertEqual(other, ['./generate_dirs.sh', 'bar.txt', 'quux.txt'])
 
     def test_flags(self):
-        p = remote_action._REMOTE_FLAG_ARG_PARSER
+        p = remote_action.REMOTE_FLAG_ARG_PARSER
         remote_args, other = p.parse_known_args(
             [
                 'cat', '--remote-flag=--foo=bar', 'bar.txt',

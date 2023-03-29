@@ -78,16 +78,25 @@ def _command_to_str(command: Iterable[str]) -> str:
 
 class CxxRemoteAction(object):
 
-    def __init__(self, argv: Sequence[str], working_dir: str = None):
+    def __init__(
+        self,
+        argv: Sequence[str],
+        exec_root: str = None,
+        working_dir: str = None,
+    ):
+        self._working_dir = os.path.abspath(working_dir or os.curdir)
+        self._exec_root = os.path.abspath(
+            exec_root or remote_action.PROJECT_ROOT)
+        # forward all unknown flags to rewrapper
         self._main_args, main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
             argv)
-        # forward all unknown flags to rewrapper
         # forwarded rewrapper options with values must be written as '--flag=value',
         # not '--flag value' because argparse doesn't know what unhandled flags
         # expect values.
+        self._forwarded_remote_args, filtered_command = remote_action.REMOTE_FLAG_ARG_PARSER.parse_known_args(
+            self._main_args.command)
 
-        self._working_dir = os.path.abspath(working_dir or os.curdir)
-        self._cxx_action = cxx.CxxAction(command=self._main_args.command)
+        self._cxx_action = cxx.CxxAction(command=filtered_command)
 
         if not self._cxx_action.target and self._cxx_action.compiler_is_clang:
             raise Exception(
@@ -111,7 +120,7 @@ class CxxRemoteAction(object):
 
         self._cpp_strategy = self._resolve_cpp_strategy()
 
-        remote_inputs = []
+        remote_inputs = self._forwarded_remote_args.inputs.copy()
         self._cleanup_files = []
         self._local_preprocess_command = None
         if self.cpp_strategy == 'local':
@@ -128,18 +137,22 @@ class CxxRemoteAction(object):
             #   ZX_DEBUG_ASSERT.
 
         # Prepare remote compile action
-        remote_output_dirs = []
-        remote_options = [
+        remote_output_dirs = self._forwarded_remote_args.output_dirs.copy()
+        remote_options = main_remote_options + [
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
         ]
         # The output file is inferred automatically by rewrapper in C++ mode,
         # but naming it explicitly here makes it easier for RemoteAction
         # to use the output file name for other auxiliary files.
-        remote_output_files = [self._cxx_action.output_file]
+        remote_output_files = [
+            self._cxx_action.output_file
+        ] + self._forwarded_remote_args.output_files
 
         if self._cxx_action.crash_diagnostics_dir:
             remote_output_dirs.append(self._cxx_action.crash_diagnostics_dir)
+
+        remote_options.extend(self._forwarded_remote_args.flags)
 
         # Support for remote cross-compilation:
         if fuchsia.HOST_PREBUILT_PLATFORM_SUBDIR != 'linux-x64':
@@ -152,17 +165,22 @@ class CxxRemoteAction(object):
 
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,
-            remote_options=main_remote_options + remote_options,
+            remote_options=remote_options,
             command=remote_command,
             inputs=remote_inputs,
             output_files=remote_output_files,
             output_dirs=remote_output_dirs,
             working_dir=self.working_dir,
+            exec_root=self.exec_root,
         )
 
     @property
     def working_dir(self) -> str:
         return self._working_dir
+
+    @property
+    def exec_root(self) -> str:
+        return self._exec_root
 
     @property
     def verbose(self) -> bool:
@@ -230,16 +248,9 @@ class CxxRemoteAction(object):
                 )
                 return cpp_status
 
-        remote_command_str = _command_to_str(self._remote_action.command)
-        if self.verbose and not self.dry_run:
-            msg(remote_command_str)
-        if self.dry_run:
-            msg(f"[dry-run only] {remote_command_str}")
-            return 0
-
         # Remote compile C++
         try:
-            return self._remote_action.run()
+            return self._remote_action.run_with_main_args(self._main_args)
         # TODO: normalize absolute paths in remotely generated depfile (gcc)
         finally:
             if not self._main_args.save_temps:
@@ -248,7 +259,11 @@ class CxxRemoteAction(object):
 
 
 def main(argv: Sequence[str]) -> int:
-    cxx_remote_action = CxxRemoteAction(argv)
+    cxx_remote_action = CxxRemoteAction(
+        argv,  # [remote options] -- C-compile-command...
+        exec_root=remote_action.PROJECT_ROOT,
+        working_dir=os.curdir,
+    )
     return cxx_remote_action.run()
 
 
