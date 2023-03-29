@@ -65,9 +65,12 @@ class VmObjectPaged final : public VmObject {
                                     fbl::RefPtr<VmObjectPaged>* vmo);
 
   zx_status_t Resize(uint64_t size) override;
+
+  uint64_t size_locked() const TA_REQ(lock()) { return cow_pages_locked()->size_locked(); }
+
   uint64_t size() const override TA_EXCL(lock()) {
     Guard<CriticalMutex> guard{lock()};
-    return cow_pages_locked()->size_locked();
+    return size_locked();
   }
   bool is_contiguous() const override { return (options_ & kContiguous); }
   bool is_resizable() const override { return (options_ & kResizable); }
@@ -354,8 +357,6 @@ class VmObjectPaged final : public VmObject {
     AssertHeld(cow_pages_->lock_ref());
     return cow_pages_.get();
   }
-
-  uint64_t size_locked() const TA_REQ(lock()) { return cow_pages_locked()->size_locked(); }
 
   // This is a debug only state that is used to simplify assertions and validations around blocking
   // on page requests. If false no operations on this VMO will ever fill out the PageRequest
