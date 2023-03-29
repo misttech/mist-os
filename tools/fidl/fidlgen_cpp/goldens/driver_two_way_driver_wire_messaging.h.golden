@@ -22,6 +22,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_drivertwoway {
 
 class TwoWay;
@@ -470,5 +473,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_drivertwoway::TwoWay> fina
 namespace fidl {
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

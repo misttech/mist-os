@@ -13,6 +13,11 @@
 
 #include <cinttypes>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

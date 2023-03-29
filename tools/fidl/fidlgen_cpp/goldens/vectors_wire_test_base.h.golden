@@ -8,3 +8,8 @@
 #pragma once
 
 #include <fidl/test.vectors/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
+#pragma clang diagnostic pop

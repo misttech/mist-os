@@ -1,5 +1,9 @@
 #include <fidl/test.handles/cpp/driver/natural_messaging.h>
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
@@ -27,3 +31,5 @@ void fdf::Server<::test_handles::DriverProtocol>::dispatch_message(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

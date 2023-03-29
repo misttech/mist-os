@@ -27,6 +27,9 @@
 #include <fidl/test.inheritancewithrecursivedecl/cpp/common_types.h>
 #include <fidl/test.inheritancewithrecursivedecl/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_inheritancewithrecursivedecl {
 
 namespace wire {
@@ -178,5 +181,7 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritancewithrecursivedecl::w
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

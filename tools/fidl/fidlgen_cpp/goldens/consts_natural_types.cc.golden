@@ -7,4 +7,9 @@
 
 #include <fidl/test.consts/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 const char* ::test_consts::kUsername = "\"squeenze\"";
+
+#pragma clang diagnostic pop

@@ -7,6 +7,9 @@
 
 #include <fidl/test.union/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_union::Pizza::Storage_ test_union::Pizza::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.toppings)};
@@ -402,3 +405,5 @@ std::shared_ptr<::test_union::OnlyReservedFlexibleUnion::Storage_> test_union::O
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

@@ -23,6 +23,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_largemessages {
 
 class BoundedKnownToBeSmall;
@@ -814,5 +817,7 @@ struct IsUnion<::test_largemessages::SemiBoundedMaybeLarge> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_largemessages::SemiBoundedMaybeLarge, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_largemessages::SemiBoundedMaybeLarge> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocols/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse::Storage_ test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.ret)};
@@ -274,3 +277,5 @@ std::shared_ptr<::test_protocols::TheUnion::Storage_> test_protocols::TheUnion::
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

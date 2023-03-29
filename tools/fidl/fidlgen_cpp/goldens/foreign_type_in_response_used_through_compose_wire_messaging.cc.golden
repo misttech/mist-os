@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_foreigntypeinresponseusedthroughcompose {
 
 [[maybe_unused]] constexpr uint64_t kTop_GetFoo_Ordinal = 4619180266423108403lu;
@@ -210,3 +213,5 @@ void ::fidl::internal::TransactionalResponse<::test_foreigntypeinresponseusedthr
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

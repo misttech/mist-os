@@ -7,6 +7,9 @@
 
 #include <fidl/test.placementofattributes/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_placementofattributes::ExampleEnum>::Format(std::ostream& os, const ::test_placementofattributes::ExampleEnum& value) {
   os << "test_placementofattributes::ExampleEnum";
   os << "::";
@@ -94,5 +97,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::E
 std::ostream& operator<<(std::ostream& os, const ::test_placementofattributes::ExampleUnion& value) {
   return fidl::ostream::Formatter<::test_placementofattributes::ExampleUnion>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_placementofattributes

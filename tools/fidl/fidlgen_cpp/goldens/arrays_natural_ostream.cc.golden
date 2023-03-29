@@ -7,6 +7,9 @@
 
 #include <fidl/test.arrays/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_arrays::StructSmallArray>::Format(std::ostream& os, const ::test_arrays::StructSmallArray& value) {
   os << "test_arrays::StructSmallArray";
   os << "{ ";
@@ -91,5 +94,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_arrays::UnionSmallArray&
 std::ostream& operator<<(std::ostream& os, const ::test_arrays::UnionLargeArray& value) {
   return fidl::ostream::Formatter<::test_arrays::UnionLargeArray>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_arrays

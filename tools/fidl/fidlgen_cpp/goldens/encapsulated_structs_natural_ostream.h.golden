@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_encapsulatedstructs::Int8Int32> {
   static std::ostream& Format(std::ostream& os, const ::test_encapsulatedstructs::Int8Int32& value);
@@ -52,3 +55,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::Non
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value);
 
 }  // namespace test_encapsulatedstructs
+
+#pragma clang diagnostic pop

@@ -7,6 +7,9 @@
 
 #include <fidl/test.placementofattributes/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_placementofattributes::ExampleProtocolMethodRequest::Storage_ test_placementofattributes::ExampleProtocolMethodRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.arg)};
@@ -33,3 +36,5 @@ std::shared_ptr<::test_placementofattributes::ExampleUnion::Storage_> test_place
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

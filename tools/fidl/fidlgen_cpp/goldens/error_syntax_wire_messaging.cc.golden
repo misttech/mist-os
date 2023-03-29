@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_errorsyntax {
 
 [[maybe_unused]] constexpr uint64_t kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Ordinal = 3565108794310607393lu;
@@ -419,3 +422,5 @@ void ::fidl::internal::TransactionalResponse<::test_errorsyntax::ExampleUseOfErr
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

@@ -50,6 +50,9 @@
 #endif  // __Fuchsia__
 
 #include <fidl/fdf/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_handles {
 
 class Handles;
@@ -989,5 +992,7 @@ struct internal::NaturalCodingTraits<::test_handles::FdfHandles, ::fidl::interna
     : public ::fidl::internal::NaturalStructCodingTraits<::test_handles::FdfHandles, 12> {};
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

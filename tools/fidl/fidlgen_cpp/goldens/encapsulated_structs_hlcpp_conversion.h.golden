@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/encapsulatedstructs/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -154,6 +157,8 @@ struct HLCPPToNaturalTraits<::test::encapsulatedstructs::TopLevelStruct> {
       .b = ::fidl::HLCPPToNatural(std::move(value.b)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

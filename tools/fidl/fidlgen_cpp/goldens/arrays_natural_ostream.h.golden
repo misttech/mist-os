@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_arrays::StructSmallArray> {
   static std::ostream& Format(std::ostream& os, const ::test_arrays::StructSmallArray& value);
@@ -52,3 +55,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_arrays::UnionSmallArray&
 std::ostream& operator<<(std::ostream& os, const ::test_arrays::UnionLargeArray& value);
 
 }  // namespace test_arrays
+
+#pragma clang diagnostic pop

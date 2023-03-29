@@ -7,6 +7,9 @@
 
 #include <fidl/test.error/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_error::ExampleFooRequest::Storage_ test_error::ExampleFooRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.s)};
@@ -37,3 +40,5 @@ std::shared_ptr<::test_error::ExampleFooResult::Storage_> test_error::ExampleFoo
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

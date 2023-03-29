@@ -7,6 +7,9 @@
 
 #include <fidl/test.handles/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 void ::test_handles::wire::Handles::_CloseHandles() {
   plain_handle.reset();
@@ -55,3 +58,5 @@ void ::test_handles::wire::FdfHandles::_CloseHandles() {
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

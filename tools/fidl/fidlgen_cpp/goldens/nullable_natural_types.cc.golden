@@ -7,6 +7,9 @@
 
 #include <fidl/test.nullable/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_nullable::StructWithNullableString::Storage_ test_nullable::StructWithNullableString::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.val)};
@@ -70,3 +73,5 @@ std::shared_ptr<::test_nullable::SimpleUnion::Storage_> test_nullable::SimpleUni
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

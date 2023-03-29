@@ -28,6 +28,9 @@
 #include <fidl/test.bindingsdenylist/cpp/markers.h>
 #include <fidl/test.dependent/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bindingsdenylist {
 
 namespace wire {
@@ -2217,5 +2220,7 @@ struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEac
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_bindingsdenylist::wire::DenyEachBindingOnlyDenySyzkallerResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

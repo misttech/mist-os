@@ -26,6 +26,9 @@
 #include <fidl/test.bitsconstants/cpp/common_types.h>
 #include <fidl/test.bitsconstants/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bitsconstants {
 
 namespace wire {
@@ -59,5 +62,7 @@ struct internal::WireCodingTraits<::test_bitsconstants::wire::BitsType, ::fidl::
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

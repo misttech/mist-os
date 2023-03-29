@@ -27,7 +27,8 @@
 
 
   #include <fidl/test.protocollayouts.imported/cpp/wire_messaging.h>
-  
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
     
   namespace test_protocollayouts {
 
@@ -5880,6 +5881,8 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayouts::MainProtoc
 
 #endif  // __Fuchsia__
 
+
+  #pragma clang diagnostic pop
 
   
 

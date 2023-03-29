@@ -7,6 +7,9 @@
 
 #include <fidl/test.table/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_table::EmptyTable::Storage_ test_table::EmptyTable::CloneStorage_() const {
   return Storage_{};
 }
@@ -112,3 +115,5 @@
       ::fidl::internal::NaturalClone(storage_.v63),
       ::fidl::internal::NaturalClone(storage_.v64)};
 }
+
+#pragma clang diagnostic pop

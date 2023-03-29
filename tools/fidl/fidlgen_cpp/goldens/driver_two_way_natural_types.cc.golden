@@ -7,6 +7,9 @@
 
 #include <fidl/test.drivertwoway/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_drivertwoway::TwoWayAddRequest::Storage_ test_drivertwoway::TwoWayAddRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.addend1),
@@ -17,3 +20,5 @@
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.sum)};
 }
+
+#pragma clang diagnostic pop

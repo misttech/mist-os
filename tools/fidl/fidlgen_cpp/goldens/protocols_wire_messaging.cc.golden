@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 
   
 
@@ -4926,6 +4929,7 @@ void ::fidl::internal::TransactionalRequest<::test_protocols::MethodWithUnion::U
 #endif  // __Fuchsia__
 
 
+#pragma clang diagnostic pop
 
 
 

@@ -27,6 +27,9 @@
 #include <fidl/test.requestflexibleenvelope/cpp/common_types.h>
 #include <fidl/test.requestflexibleenvelope/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_requestflexibleenvelope {
 
 namespace wire {
@@ -677,5 +680,7 @@ struct ::fidl::internal::WireCodingTraits<::test_requestflexibleenvelope::wire::
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_requestflexibleenvelope::wire::StrictFoo, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_requestflexibleenvelope::wire::StrictFoo, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

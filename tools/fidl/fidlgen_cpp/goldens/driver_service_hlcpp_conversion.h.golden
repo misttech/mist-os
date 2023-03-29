@@ -12,8 +12,13 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/driverservice/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

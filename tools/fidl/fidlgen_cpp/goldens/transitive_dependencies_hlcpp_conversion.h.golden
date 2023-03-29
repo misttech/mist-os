@@ -13,6 +13,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/transitivedependencies/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -38,6 +41,8 @@ struct HLCPPToNaturalTraits<::test::transitivedependencies::Baz> {
       .g = ::fidl::HLCPPToNatural(std::move(value.g)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

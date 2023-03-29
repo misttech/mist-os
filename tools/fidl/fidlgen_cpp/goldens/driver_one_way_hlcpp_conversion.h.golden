@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/driveroneway/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -58,6 +61,8 @@ struct HLCPPToNaturalTraits<::test::driveroneway::OneWaySendRequest> {
       .payload = ::fidl::HLCPPToNatural(std::move(value.payload)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

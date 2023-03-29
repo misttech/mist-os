@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_union::Pizza> {
   static std::ostream& Format(std::ostream& os, const ::test_union::Pizza& value);
@@ -230,5 +233,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_union::TestProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_union::TestProtocol>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

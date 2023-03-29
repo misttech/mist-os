@@ -13,6 +13,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/aliases/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -57,6 +60,8 @@ struct HLCPPToNaturalTraits<::test::aliases::ExampleOfUseOfAliases> {
       .field_of_nullable_client_end = ::fidl::HLCPPToNatural(std::move(value.field_of_nullable_client_end)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

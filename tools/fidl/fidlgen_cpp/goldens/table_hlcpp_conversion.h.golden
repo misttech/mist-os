@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/table/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -612,6 +615,8 @@ struct HLCPPToNaturalTraits<::test::table::SixtyFourOrdinalTable> {
   }
   return natural;
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

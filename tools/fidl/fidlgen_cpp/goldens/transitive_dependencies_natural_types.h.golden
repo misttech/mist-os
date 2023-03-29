@@ -20,6 +20,9 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.middle/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_transitivedependencies {
 
 class Baz;
@@ -124,5 +127,7 @@ struct IsStruct<::test_transitivedependencies::Baz> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_transitivedependencies::Baz, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_transitivedependencies::Baz, 4> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

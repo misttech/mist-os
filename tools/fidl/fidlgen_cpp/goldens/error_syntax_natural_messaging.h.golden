@@ -18,6 +18,9 @@
 #include <lib/fidl/cpp/unified_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interaction_handler.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 
 }  // namespace fidl
@@ -281,3 +284,5 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_errorsyntax::ExampleUseO
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

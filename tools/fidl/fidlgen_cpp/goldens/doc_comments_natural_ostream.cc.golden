@@ -7,6 +7,9 @@
 
 #include <fidl/test.doccomments/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_doccomments::MyStrictEnum>::Format(std::ostream& os, const ::test_doccomments::MyStrictEnum& value) {
   os << "test_doccomments::MyStrictEnum";
   os << "::";
@@ -149,5 +152,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_doccomments::FlexibleUni
 std::ostream& operator<<(std::ostream& os, const ::test_doccomments::Table& value) {
   return fidl::ostream::Formatter<::test_doccomments::Table>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_doccomments

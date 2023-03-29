@@ -17,6 +17,9 @@
 #endif  // __Fuchsia__
 #include <lib/fidl/cpp/wire_natural_conversions.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -155,5 +158,7 @@ struct WireTypeForNaturalType<::fidl::Response<::test_requestflexibleenvelope::P
 };
 
 #endif  // __Fuchsia__
+#pragma clang diagnostic pop
+
 }  // namespace internal
 }  // namespace fidl

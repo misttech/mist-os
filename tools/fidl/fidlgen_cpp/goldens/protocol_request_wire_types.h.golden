@@ -27,6 +27,9 @@
 #include <fidl/test.protocolrequest/cpp/common_types.h>
 #include <fidl/test.protocolrequest/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_protocolrequest {
 
 namespace wire {
@@ -322,5 +325,7 @@ struct ::fidl::internal::WireCodingTraits<::test_protocolrequest::wire::ParentTa
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

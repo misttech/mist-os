@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_error {
 
 [[maybe_unused]] constexpr uint64_t kExample_foo_Ordinal = 1107623248440401476lu;
@@ -239,3 +242,5 @@ void ::fidl::internal::TransactionalResponse<::test_error::Example::Foo>::_InitH
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

@@ -23,6 +23,9 @@ fidl/{{ .LibraryDots }}/cpp/wire_types.cc
 
   #include <{{ .Library | Filename "WireTypesHeader" }}>
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   {{- range .Consts }}
     {{ template "Const:WireTypesSource" . }}
   {{- end }}
@@ -39,7 +42,8 @@ fidl/{{ .LibraryDots }}/cpp/wire_types.cc
     {{ template "Table:WireTypesSource" . }}
   {{- end }}
 
-  {{- end }}{{/* if not SingleComponentLibraryName */}}
+  #pragma clang diagnostic pop
+  {{ end }}{{/* if not SingleComponentLibraryName */}}
 
   {{ EndOfFile }}
 {{ end }}

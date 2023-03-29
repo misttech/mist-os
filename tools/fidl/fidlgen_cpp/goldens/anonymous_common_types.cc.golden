@@ -7,6 +7,9 @@
 
 #include <fidl/test.anonymous/cpp/common_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_anonymous {
 
 extern "C" const fidl_type_t test_anonymous_OpTable;
@@ -50,3 +53,5 @@ size_t fidl::internal::DisplayError<::test_anonymous::SomeProtocolSomeMethodErro
   return ::fidl::internal::FormatApplicationError(
       static_cast<uint32_t>(value), name, &::test_anonymous::test_anonymous_SomeProtocol_SomeMethod_ErrorTable, destination, capacity);
 }
+
+#pragma clang diagnostic pop

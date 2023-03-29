@@ -13,6 +13,9 @@
 
 #include <cinttypes>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bits {
 
 // |MyBits| is strict, hence is guaranteed to only contain
@@ -436,5 +439,7 @@ template <>
 struct ContainsHandle<::test_bits::EmptyBits> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bits::EmptyBits>);
 static_assert(sizeof(::test_bits::EmptyBits) == sizeof(uint32_t));
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

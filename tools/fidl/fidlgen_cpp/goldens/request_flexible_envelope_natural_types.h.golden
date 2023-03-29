@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_requestflexibleenvelope {
 
 class ProtocolRequestStrictResponseFlexibleRequest;
@@ -722,5 +725,7 @@ struct IsUnion<::test_requestflexibleenvelope::StrictFoo> : public std::true_typ
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::StrictFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_requestflexibleenvelope::StrictFoo> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

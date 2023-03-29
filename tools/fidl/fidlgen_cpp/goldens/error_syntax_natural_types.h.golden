@@ -22,6 +22,9 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.errorsyntax.parent/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_errorsyntax {
 
 class ExampleUseOfErrorSyntaxCallWhichMayFailRequest;
@@ -473,5 +476,7 @@ struct IsUnion<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

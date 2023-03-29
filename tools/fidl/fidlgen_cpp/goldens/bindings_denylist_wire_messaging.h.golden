@@ -27,7 +27,8 @@
 
 
   #include <fidl/test.dependent/cpp/wire_messaging.h>
-  
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
     
   namespace test_bindingsdenylist {
 
@@ -3415,6 +3416,8 @@ class ::fidl::internal::WireBufferEventSender<::test_bindingsdenylist::ImportsSa
 
 #endif  // __Fuchsia__
 
+
+  #pragma clang diagnostic pop
 
   
 

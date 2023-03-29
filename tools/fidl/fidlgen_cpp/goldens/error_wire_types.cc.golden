@@ -7,8 +7,13 @@
 
 #include <fidl/test.error/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 void ::test_error::wire::ExampleFooResult::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(ExampleFooResult) == sizeof(fidl_xunion_v2_t));
   static_assert(offsetof(ExampleFooResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
   static_assert(offsetof(ExampleFooResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
 }
+
+#pragma clang diagnostic pop

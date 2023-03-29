@@ -7,6 +7,9 @@
 
 #include <fidl/test.anonymous/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_anonymous::OverrideTest::Storage_ test_anonymous::OverrideTest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.op),
@@ -94,3 +97,5 @@ std::shared_ptr<::test_anonymous::SomeProtocolSomeMethodResult::Storage_> test_a
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

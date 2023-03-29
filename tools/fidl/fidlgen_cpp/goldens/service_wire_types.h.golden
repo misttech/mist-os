@@ -27,9 +27,14 @@
 #include <fidl/test.service/cpp/common_types.h>
 #include <fidl/test.service/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_service {
 
 }  // namespace test_service
 namespace fidl {
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

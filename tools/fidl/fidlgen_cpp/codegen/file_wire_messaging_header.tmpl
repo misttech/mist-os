@@ -37,6 +37,8 @@ fidl/{{ .LibraryDots }}/cpp/wire_messaging.h
     #include <{{ . | Filename "WireMessagingHeader" }}>
   {{ end -}}
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
 
   {{- range (call .ProtocolsForTransport "Channel") }}
     {{ template "Protocol:ForwardDeclaration:WireMessagingHeader" . }}
@@ -60,6 +62,8 @@ fidl/{{ .LibraryDots }}/cpp/wire_messaging.h
     {{ template "Protocol:EventSender:WireMessagingHeader" . }}
 
   {{- end }}
+
+  #pragma clang diagnostic pop
 
   {{ UnsetTransport -}}
   {{ EndOfFile }}

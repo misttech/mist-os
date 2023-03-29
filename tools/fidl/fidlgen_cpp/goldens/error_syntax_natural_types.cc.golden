@@ -7,6 +7,9 @@
 
 #include <fidl/test.errorsyntax/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::Storage_ test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.s)};
@@ -37,3 +40,5 @@ std::shared_ptr<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResul
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

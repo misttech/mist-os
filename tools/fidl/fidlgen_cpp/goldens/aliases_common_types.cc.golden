@@ -7,6 +7,9 @@
 
 #include <fidl/test.aliases/cpp/common_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_aliases {
 
 extern "C" const fidl_type_t test_aliases_obj_typeTable;
@@ -27,3 +30,5 @@ size_t fidl::internal::DisplayError<::test_aliases::ObjType>::Format(
   return ::fidl::internal::FormatApplicationError(
       static_cast<uint32_t>(value), name, &::test_aliases::test_aliases_obj_typeTable, destination, capacity);
 }
+
+#pragma clang diagnostic pop

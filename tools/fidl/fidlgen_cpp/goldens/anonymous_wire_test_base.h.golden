@@ -8,6 +8,10 @@
 #pragma once
 
 #include <fidl/test.anonymous/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace testing {
 
@@ -29,5 +33,7 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_anonymous::SomeProtoc
   virtual ~WireSyncEventHandlerTestBase<::test_anonymous::SomeProtocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
 };
+#pragma clang diagnostic pop
+
 }  // namespace testing
 }  // namespace fidl

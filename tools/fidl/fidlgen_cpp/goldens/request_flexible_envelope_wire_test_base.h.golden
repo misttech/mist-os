@@ -8,6 +8,10 @@
 #pragma once
 
 #include <fidl/test.requestflexibleenvelope/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace testing {
 
@@ -34,5 +38,7 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_requestflexibleenvelo
   virtual ~WireSyncEventHandlerTestBase<::test_requestflexibleenvelope::Protocol>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
 };
+#pragma clang diagnostic pop
+
 }  // namespace testing
 }  // namespace fidl

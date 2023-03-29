@@ -8,6 +8,9 @@
 
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse::Storage_ test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.some_field)};
@@ -1946,3 +1949,5 @@ std::shared_ptr<::test_unknowninteractions::UnknownInteractionsClosedDriverProto
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

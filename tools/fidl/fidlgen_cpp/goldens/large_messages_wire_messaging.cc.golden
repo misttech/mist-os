@@ -10,6 +10,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_largemessages {
 
 [[maybe_unused]] constexpr uint64_t kOverflowing_DecodeBoundedKnownToBeSmall_Ordinal = 5952259942637616356lu;
@@ -1570,3 +1573,5 @@ void ::fidl::internal::TransactionalResponse<::test_largemessages::Overflowing::
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

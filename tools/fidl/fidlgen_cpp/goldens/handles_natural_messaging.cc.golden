@@ -8,6 +8,9 @@
 #include <fidl/test.handles/cpp/natural_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
@@ -50,3 +53,5 @@ void fidl::Server<::test_handles::SomeProtocol>::dispatch_message(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

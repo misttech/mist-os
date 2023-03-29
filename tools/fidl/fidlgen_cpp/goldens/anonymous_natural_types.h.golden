@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_anonymous {
 
 class OverrideTest;
@@ -1285,5 +1288,7 @@ struct internal::NaturalCodingTraits<::test_anonymous::SomeProtocolSomeMethodErr
     *value = *decoder->template GetPtr<::test_anonymous::SomeProtocolSomeMethodError>(offset);
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

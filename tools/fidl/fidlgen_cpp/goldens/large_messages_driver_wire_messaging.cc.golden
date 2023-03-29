@@ -10,3 +10,8 @@
 #include <lib/fidl_driver/cpp/unknown_interactions.h>
 
 #include <memory>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
+#pragma clang diagnostic pop

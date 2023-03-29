@@ -7,6 +7,9 @@
 
 #include <fidl/test.drivertwoway/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_drivertwoway::TwoWayAddRequest>::Format(std::ostream& os, const ::test_drivertwoway::TwoWayAddRequest& value) {
   os << "test_drivertwoway::TwoWayAddRequest";
   os << "{ ";
@@ -35,5 +38,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_drivertwoway::TwoWayAddR
 std::ostream& operator<<(std::ostream& os, const ::test_drivertwoway::TwoWayAddResponse& value) {
   return fidl::ostream::Formatter<::test_drivertwoway::TwoWayAddResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_drivertwoway

@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bits {
 
 }  // namespace test_bits
@@ -84,5 +87,7 @@ struct internal::NaturalCodingTraits<::test_bits::EmptyBits, ::fidl::internal::N
     *value = *decoder->template GetPtr<::test_bits::EmptyBits>(offset);
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

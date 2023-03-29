@@ -13,6 +13,9 @@
 
 #include <cinttypes>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_consts {
 
 // |BitsType| is strict, hence is guaranteed to only contain
@@ -143,5 +146,7 @@ template <>
 struct IsFidlType<::test_consts::EnumType> : public std::true_type {};
 template <>
 struct ContainsHandle<::test_consts::EnumType> : public std::false_type {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

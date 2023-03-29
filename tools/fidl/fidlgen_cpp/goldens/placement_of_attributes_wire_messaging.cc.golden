@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_placementofattributes {
 
 [[maybe_unused]] constexpr uint64_t kExampleProtocol_Method_Ordinal = 6023439637367187273lu;
@@ -150,3 +153,5 @@ void ::fidl::internal::TransactionalRequest<::test_placementofattributes::Exampl
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

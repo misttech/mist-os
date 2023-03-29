@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_arrays {
 
 class StructSmallArray;
@@ -633,5 +636,7 @@ struct IsUnion<::test_arrays::UnionLargeArray> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_arrays::UnionLargeArray> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

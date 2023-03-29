@@ -31,6 +31,9 @@ fidl/{{ .LibraryDots }}/cpp/type_conversions.h
   #include <{{ . | Filename "TypeConversionsHeader" }}>
 {{ end -}}
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{ EnsureNamespace "fidl::internal" }}
 {{ range .Bits }}{{ template "Bits:Traits:TypeConversionsHeader" . }}{{ end }}
 {{ range .Enums }}{{ template "Enums:Traits:TypeConversionsHeader" . }}{{ end }}
@@ -63,5 +66,7 @@ fidl/{{ .LibraryDots }}/cpp/type_conversions.h
 {{- end }}
 {{- EndifFuchsia -}}
 
-{{- EndOfFile }}
+#pragma clang diagnostic pop
+
+{{ EndOfFile }}
 {{ end }}

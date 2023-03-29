@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_encapsulatedstructs {
 
 class Int8Int32;
@@ -763,5 +766,7 @@ struct internal::NaturalCodingTraits<::test_encapsulatedstructs::TopLevelStruct,
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::TopLevelStruct, 40> {};
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

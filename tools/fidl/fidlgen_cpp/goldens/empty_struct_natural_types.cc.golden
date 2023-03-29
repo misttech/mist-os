@@ -7,6 +7,9 @@
 
 #include <fidl/test.emptystruct/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_emptystruct::Empty::Storage_ test_emptystruct::Empty::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.__reserved)};
@@ -31,3 +34,5 @@
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.e)};
 }
+
+#pragma clang diagnostic pop

@@ -13,6 +13,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/protocolpayloads/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -608,6 +611,8 @@ struct HLCPPToNaturalTraits<::test::protocolpayloads::MainProtocol_OnImportWithE
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::protocolpayloads::MainProtocol_OnImportWithError_Result");
   }
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

@@ -7,6 +7,9 @@
 
 #include <fidl/test.handles/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_handles::Handles>::Format(std::ostream& os, const ::test_handles::Handles& value) {
   os << "test_handles::Handles";
   os << "{ ";
@@ -103,5 +106,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_handles::Handles& value)
 std::ostream& operator<<(std::ostream& os, const ::test_handles::FdfHandles& value) {
   return fidl::ostream::Formatter<::test_handles::FdfHandles>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_handles

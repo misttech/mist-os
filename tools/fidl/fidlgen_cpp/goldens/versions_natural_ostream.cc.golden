@@ -7,6 +7,9 @@
 
 #include <fidl/test.versions/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_versions::Enum>::Format(std::ostream& os, const ::test_versions::Enum& value) {
   os << "test_versions::Enum";
   os << "::";
@@ -86,5 +89,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_versions::Table& value) 
 std::ostream& operator<<(std::ostream& os, const ::test_versions::Union& value) {
   return fidl::ostream::Formatter<::test_versions::Union>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_versions

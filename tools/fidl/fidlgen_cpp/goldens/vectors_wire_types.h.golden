@@ -26,6 +26,9 @@
 #include <fidl/test.vectors/cpp/common_types.h>
 #include <fidl/test.vectors/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_vectors {
 
 namespace wire {
@@ -99,5 +102,7 @@ struct ::fidl::internal::WireCodingTraits<::test_vectors::wire::ExampleUseOfVect
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

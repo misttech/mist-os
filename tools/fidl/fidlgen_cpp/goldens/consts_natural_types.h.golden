@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_consts {
 
 constexpr bool kEnabledFlag = true;
@@ -113,5 +116,7 @@ struct internal::NaturalCodingTraits<::test_consts::EnumType, ::fidl::internal::
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

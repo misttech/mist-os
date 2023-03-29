@@ -23,6 +23,8 @@
 #endif  // __Fuchsia__
 
 #include <fidl/fdf/cpp/wire_messaging.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_handles {
 
@@ -238,3 +240,5 @@ class ::fidl::internal::WireBufferEventSender<::test_handles::SomeProtocol>
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

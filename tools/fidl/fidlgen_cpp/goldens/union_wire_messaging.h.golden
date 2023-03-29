@@ -22,6 +22,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_union {
 
 class TestProtocol;
@@ -889,3 +892,5 @@ class ::fidl::internal::WireBufferEventSender<::test_union::TestProtocol>
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

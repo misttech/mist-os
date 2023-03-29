@@ -8,6 +8,10 @@
 #pragma once
 
 #include <fidl/test.inheritancewithrecursivedecl/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace testing {
 
@@ -53,5 +57,7 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_inheritancewithrecurs
   virtual ~WireSyncEventHandlerTestBase<::test_inheritancewithrecursivedecl::Child>() = default;
   virtual void NotImplemented_(const std::string& name) = 0;
 };
+#pragma clang diagnostic pop
+
 }  // namespace testing
 }  // namespace fidl

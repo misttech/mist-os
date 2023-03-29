@@ -8,6 +8,9 @@
 
 #include <fidl/test.largemessages/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_largemessages::BoundedKnownToBeSmall>::Format(std::ostream& os, const ::test_largemessages::BoundedKnownToBeSmall& value) {
   os << "test_largemessages::BoundedKnownToBeSmall";
   os << "{ ";
@@ -102,5 +105,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_largemessages::Elements&
 std::ostream& operator<<(std::ostream& os, const ::test_largemessages::UnboundedMaybeLargeResource& value) {
   return fidl::ostream::Formatter<::test_largemessages::UnboundedMaybeLargeResource>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_largemessages

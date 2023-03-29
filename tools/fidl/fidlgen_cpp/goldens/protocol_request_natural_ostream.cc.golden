@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocolrequest/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_protocolrequest::ParentGetChildResponse>::Format(std::ostream& os, const ::test_protocolrequest::ParentGetChildResponse& value) {
   os << "test_protocolrequest::ParentGetChildResponse";
   os << "{ ";
@@ -57,5 +60,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentT
 std::ostream& operator<<(std::ostream& os, const ::test_protocolrequest::ParentTakeChildRequestRequest& value) {
   return fidl::ostream::Formatter<::test_protocolrequest::ParentTakeChildRequestRequest>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_protocolrequest

@@ -37,6 +37,8 @@ fidl/{{ .LibraryDots }}/cpp/driver/wire_messaging.h
     #include <{{ . | Filename "driver/WireMessagingHeader" }}>
   {{ end -}}
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
 
   {{- range (call .ProtocolsForTransport "Driver") }}
     {{ template "Protocol:ForwardDeclaration:WireMessagingHeader" . }}
@@ -57,6 +59,8 @@ fidl/{{ .LibraryDots }}/cpp/driver/wire_messaging.h
   {{- range (call .ProtocolsForTransport "Driver") }}
     {{ template "Protocol:ClientImpl:driver/MessagingHeader" . }}
   {{- end }}
+
+  #pragma clang diagnostic pop
 
   {{ UnsetTransport -}}
   {{ EndOfFile }}

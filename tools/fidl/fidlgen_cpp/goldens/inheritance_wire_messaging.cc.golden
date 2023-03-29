@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_inheritance {
 
 [[maybe_unused]] constexpr uint64_t ksuper_foo_Ordinal = 7540745593380780216lu;
@@ -418,3 +421,5 @@ void ::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>::_Ini
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

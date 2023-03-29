@@ -27,6 +27,9 @@
 #include <fidl/test.importedconstvalues/cpp/common_types.h>
 #include <fidl/test.importedconstvalues/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_importedconstvalues {
 
 namespace wire {
@@ -101,5 +104,7 @@ struct ::fidl::internal::WireCodingTraits<::test_importedconstvalues::wire::MySt
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

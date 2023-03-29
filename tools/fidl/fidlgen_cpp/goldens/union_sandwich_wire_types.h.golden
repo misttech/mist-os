@@ -26,6 +26,9 @@
 #include <fidl/test.unionsandwich/cpp/common_types.h>
 #include <fidl/test.unionsandwich/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_unionsandwich {
 
 namespace wire {
@@ -1073,5 +1076,7 @@ struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize3
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize36Alignment4, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_unionsandwich::wire::UnionSize36Alignment4, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

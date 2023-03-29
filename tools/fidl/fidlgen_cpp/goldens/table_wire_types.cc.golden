@@ -7,6 +7,9 @@
 
 #include <fidl/test.table/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 bool ::fidl::WireTableFrame<::test_table::wire::EmptyTable>::HasUnknownData() const {
   return false;
 }
@@ -416,3 +419,5 @@ bool ::test_table::wire::SixtyFourOrdinalTable::HasUnknownData() const {
   }
   return frame_ptr_->HasUnknownData();
 }
+
+#pragma clang diagnostic pop

@@ -27,6 +27,9 @@ fidl/{{ .LibraryDots }}/cpp/common_types.h
   #include <{{ . | Filename "CommonTypesHeader" }}>
 {{ end -}}
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{ range .Bits }}{{ template "Bits:CommonTypesHeader" . }}{{ end }}
 {{ range .Enums }}{{ template "Enum:CommonTypesHeader" . }}{{ end }}
 
@@ -34,6 +37,8 @@ fidl/{{ .LibraryDots }}/cpp/common_types.h
 
 {{ range .Bits }}{{ template "Bits:Traits:CommonTypesHeader" . }}{{ end }}
 {{ range .Enums }}{{ template "Enum:Traits:CommonTypesHeader" . }}{{ end }}
+
+#pragma clang diagnostic pop
 
 {{ EndOfFile }}
 {{ end }}

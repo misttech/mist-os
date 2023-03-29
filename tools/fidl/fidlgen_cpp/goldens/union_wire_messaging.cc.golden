@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_union {
 
 [[maybe_unused]] constexpr uint64_t kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal = 6628358876445129155lu;
@@ -361,3 +364,5 @@ void ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::Flexibl
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

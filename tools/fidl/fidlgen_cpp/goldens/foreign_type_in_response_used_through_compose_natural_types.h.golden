@@ -23,9 +23,14 @@
 
 #include <fidl/test.bottom/cpp/natural_types.h>
 #include <fidl/test.middle/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_foreigntypeinresponseusedthroughcompose {
 
 }  // namespace test_foreigntypeinresponseusedthroughcompose
 namespace fidl {
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

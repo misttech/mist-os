@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 
   
 
@@ -2706,6 +2709,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocolpayloads
 #endif  // __Fuchsia__
 
 
+#pragma clang diagnostic pop
 
 
 

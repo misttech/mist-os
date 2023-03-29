@@ -26,6 +26,9 @@
 #include <fidl/test.padding/cpp/common_types.h>
 #include <fidl/test.padding/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_padding {
 
 namespace wire {
@@ -1155,5 +1158,7 @@ struct ::fidl::internal::WireCodingTraits<::test_padding::wire::Padding2ByteAlig
     internal::WireCheckPadding<uint16_t>(decoder, position + 4, 0xff00);
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

@@ -41,6 +41,9 @@ do not support them in the bindings. */}}
 #include <{{ .Library | Filename "NaturalTypesHeader" }}>
 #include <{{ .Library | Filename "WireMessagingHeader" }}>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{ "" }}
 
 {{ EnsureNamespace "fidl" }}
@@ -71,8 +74,8 @@ do not support them in the bindings. */}}
 {{- end }}
 {{- end }}
 
-{{- end }}{{/* if not SingleComponentLibraryName */}}
-
+#pragma clang diagnostic pop
+{{ end }}{{/* if not SingleComponentLibraryName */}}
 {{ UnsetTransport -}}
 {{ EndOfFile }}
 {{ end }}

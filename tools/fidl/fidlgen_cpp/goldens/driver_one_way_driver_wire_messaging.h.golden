@@ -22,6 +22,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_driveroneway {
 
 class OneWay;
@@ -291,5 +294,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_driveroneway::OneWay> fina
 namespace fidl {
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

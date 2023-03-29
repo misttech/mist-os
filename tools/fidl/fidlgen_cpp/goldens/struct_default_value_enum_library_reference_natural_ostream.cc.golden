@@ -7,6 +7,9 @@
 
 #include <fidl/test.structdefaultvalueenumlibraryreference/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_structdefaultvalueenumlibraryreference::Foo>::Format(std::ostream& os, const ::test_structdefaultvalueenumlibraryreference::Foo& value) {
   os << "test_structdefaultvalueenumlibraryreference::Foo";
   os << "{ ";
@@ -21,5 +24,7 @@ namespace test_structdefaultvalueenumlibraryreference {
 std::ostream& operator<<(std::ostream& os, const ::test_structdefaultvalueenumlibraryreference::Foo& value) {
   return fidl::ostream::Formatter<::test_structdefaultvalueenumlibraryreference::Foo>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_structdefaultvalueenumlibraryreference

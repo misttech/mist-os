@@ -23,6 +23,8 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.exampleusing/cpp/wire_messaging.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_placementofattributes {
 
@@ -388,3 +390,5 @@ class ::fidl::internal::WireBufferEventSender<::test_placementofattributes::Exam
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

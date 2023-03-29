@@ -12,6 +12,11 @@
 #include <fidl/test.struct/cpp/natural_types.h>
 #include <lib/fidl_driver/cpp/natural_messaging.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

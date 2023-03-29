@@ -7,6 +7,9 @@
 
 #include <fidl/test.escaping/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_escaping::DocCommentWithQuotes::Storage_ test_escaping::DocCommentWithQuotes::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.__reserved)};
@@ -29,3 +32,5 @@ const char* ::test_escaping::kSmileLeadingZero = "😀";
 const char* ::test_escaping::kDollar = "$";
 
 const char* ::test_escaping::kDollarBrace = "${";
+
+#pragma clang diagnostic pop

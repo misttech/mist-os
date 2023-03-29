@@ -13,6 +13,8 @@
 #include <lib/stdcompat/optional.h>
 
 #include <cinttypes>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_aliases {
 
@@ -40,5 +42,7 @@ template <>
 struct IsFidlType<::test_aliases::ObjType> : public std::true_type {};
 template <>
 struct ContainsHandle<::test_aliases::ObjType> : public std::false_type {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

@@ -7,6 +7,9 @@
 
 #include <fidl/test.unionsandwich/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_unionsandwich::SandwichUnionSize8Alignment4::Storage_ test_unionsandwich::SandwichUnionSize8Alignment4::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.before),
@@ -88,3 +91,5 @@ std::shared_ptr<::test_unionsandwich::UnionSize36Alignment4::Storage_> test_unio
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

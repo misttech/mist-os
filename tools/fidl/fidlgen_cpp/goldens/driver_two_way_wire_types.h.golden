@@ -27,6 +27,9 @@
 #include <fidl/test.drivertwoway/cpp/common_types.h>
 #include <fidl/test.drivertwoway/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_drivertwoway {
 
 namespace wire {
@@ -160,5 +163,7 @@ struct ::fidl::internal::WireCodingTraits<::test_drivertwoway::wire::TwoWayAddRe
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

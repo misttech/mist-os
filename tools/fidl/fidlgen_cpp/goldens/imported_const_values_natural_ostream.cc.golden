@@ -7,6 +7,9 @@
 
 #include <fidl/test.importedconstvalues/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_importedconstvalues::MyStruct>::Format(std::ostream& os, const ::test_importedconstvalues::MyStruct& value) {
   os << "test_importedconstvalues::MyStruct";
   os << "{ ";
@@ -21,5 +24,7 @@ namespace test_importedconstvalues {
 std::ostream& operator<<(std::ostream& os, const ::test_importedconstvalues::MyStruct& value) {
   return fidl::ostream::Formatter<::test_importedconstvalues::MyStruct>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_importedconstvalues

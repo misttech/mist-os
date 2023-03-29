@@ -7,6 +7,9 @@
 
 #include <fidl/test.bindingsdenylist/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest>::Format(std::ostream& os, const ::test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest& value) {
   os << "test_bindingsdenylist::DenyEachBindingOnlyDenyDartRequest";
   os << "{ ";
@@ -318,5 +321,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::Member
 std::ostream& operator<<(std::ostream& os, const ::test_bindingsdenylist::OnlyAppearsInImportingLibrary& value) {
   return fidl::ostream::Formatter<::test_bindingsdenylist::OnlyAppearsInImportingLibrary>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_bindingsdenylist

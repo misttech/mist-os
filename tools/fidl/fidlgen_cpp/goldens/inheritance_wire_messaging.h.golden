@@ -22,6 +22,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_inheritance {
 
 class Super;
@@ -1132,3 +1135,5 @@ class ::fidl::internal::WireBufferEventSender<::test_inheritance::Sub>
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

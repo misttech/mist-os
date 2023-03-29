@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_inheritancewithrecursivedecl {
 
 [[maybe_unused]] constexpr uint64_t kParent_First_Ordinal = 3973163707930985819lu;
@@ -382,3 +385,5 @@ void ::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl:
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

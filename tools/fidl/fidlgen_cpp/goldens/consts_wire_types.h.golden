@@ -26,6 +26,9 @@
 #include <fidl/test.consts/cpp/common_types.h>
 #include <fidl/test.consts/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_consts {
 
 namespace wire {
@@ -126,5 +129,7 @@ struct internal::WireCodingTraits<::test_consts::wire::EnumType, ::fidl::interna
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

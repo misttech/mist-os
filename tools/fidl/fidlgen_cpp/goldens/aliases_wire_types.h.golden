@@ -28,6 +28,9 @@
 #include <fidl/test.aliases/cpp/markers.h>
 #include <fidl/test.someotherlibrary/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_aliases {
 
 namespace wire {
@@ -183,5 +186,7 @@ struct ::fidl::internal::WireCodingTraits<::test_aliases::wire::ExampleOfUseOfAl
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

@@ -18,11 +18,16 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.cc
 
 #include <{{ .Library | Filename "NaturalTypesHeader" }}>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{ range .Structs }}{{ template "Struct:NaturalTypesSource" . }}{{ end }}
 {{ range .Tables }}{{ template "Table:NaturalTypesSource" . }}{{ end }}
 {{ range .Unions }}{{ template "Union:NaturalTypesSource" . }}{{ end }}
 
 {{ range .Consts }}{{ template "Const:NaturalTypesSource" . }}{{ end }}
+
+#pragma clang diagnostic pop
 
 {{ EndOfFile }}
 {{- end }}

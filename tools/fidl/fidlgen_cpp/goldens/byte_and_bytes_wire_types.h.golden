@@ -26,6 +26,9 @@
 #include <fidl/test.byteandbytes/cpp/common_types.h>
 #include <fidl/test.byteandbytes/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_byteandbytes {
 
 namespace wire {
@@ -93,5 +96,7 @@ struct ::fidl::internal::WireCodingTraits<::test_byteandbytes::wire::ByteAndByte
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

@@ -7,6 +7,9 @@
 
 #include <fidl/test.union/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_union::Pizza>::Format(std::ostream& os, const ::test_union::Pizza& value) {
   os << "test_union::Pizza";
   os << "{ ";
@@ -514,5 +517,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_union::EmptyFlexibleUnio
 std::ostream& operator<<(std::ostream& os, const ::test_union::OnlyReservedFlexibleUnion& value) {
   return fidl::ostream::Formatter<::test_union::OnlyReservedFlexibleUnion>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_union

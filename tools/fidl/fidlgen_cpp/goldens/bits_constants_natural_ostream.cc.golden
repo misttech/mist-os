@@ -7,6 +7,9 @@
 
 #include <fidl/test.bitsconstants/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_bitsconstants::BitsType>::Format(std::ostream& os, const ::test_bitsconstants::BitsType& value) {
   os << "test_bitsconstants::BitsType";
   os << "(";
@@ -35,5 +38,7 @@ namespace test_bitsconstants {
 std::ostream& operator<<(std::ostream& os, const ::test_bitsconstants::BitsType& value) {
   return fidl::ostream::Formatter<::test_bitsconstants::BitsType>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_bitsconstants

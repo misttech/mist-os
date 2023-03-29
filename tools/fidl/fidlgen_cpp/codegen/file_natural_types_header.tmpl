@@ -40,6 +40,9 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.h
 #include <{{ . | Filename "NaturalTypesHeader" }}>
 {{ end -}}
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{ EnsureNamespace . }}
 
 {{ range .Structs }}{{ template "Struct:ForwardDeclaration:NaturalTypesHeader" . }}{{ end }}
@@ -65,6 +68,8 @@ fidl/{{ .LibraryDots }}/cpp/natural_types.h
 {{ range .Unions }}{{ template "Union:Traits:NaturalTypesHeader" . }}{{ end }}
 {{ range .Bits }}{{ template "Bits:Traits:NaturalTypesHeader" . }}{{ end }}
 {{ range .Enums }}{{ template "Enum:Traits:NaturalTypesHeader" . }}{{ end }}
+
+#pragma clang diagnostic pop
 
 {{ EndOfFile }}
 {{ end }}

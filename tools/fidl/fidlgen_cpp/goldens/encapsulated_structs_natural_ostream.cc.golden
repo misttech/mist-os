@@ -7,6 +7,9 @@
 
 #include <fidl/test.encapsulatedstructs/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_encapsulatedstructs::Int8Int32>::Format(std::ostream& os, const ::test_encapsulatedstructs::Int8Int32& value) {
   os << "test_encapsulatedstructs::Int8Int32";
   os << "{ ";
@@ -93,5 +96,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::Non
 std::ostream& operator<<(std::ostream& os, const ::test_encapsulatedstructs::TopLevelStruct& value) {
   return fidl::ostream::Formatter<::test_encapsulatedstructs::TopLevelStruct>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_encapsulatedstructs

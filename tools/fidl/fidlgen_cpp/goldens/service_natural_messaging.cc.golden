@@ -8,6 +8,9 @@
 #include <fidl/test.service/cpp/natural_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_service {
 
 [[maybe_unused]] constexpr inline uint64_t kFirstProtocol_MethodOnFirst_Ordinal = 6352548393671797041lu;
@@ -183,3 +186,5 @@ void fidl::Server<::test_service::SecondProtocol>::dispatch_message(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

@@ -10,6 +10,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
@@ -45,3 +48,5 @@ void fdf::WireServer<::test_handles::DriverProtocol>::dispatch_message(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

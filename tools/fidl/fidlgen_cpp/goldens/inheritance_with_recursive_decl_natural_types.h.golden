@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_inheritancewithrecursivedecl {
 
 class ParentFirstRequest;
@@ -223,5 +226,7 @@ struct internal::NaturalCodingTraits<::test_inheritancewithrecursivedecl::ChildS
     : public ::fidl::internal::NaturalStructCodingTraits<::test_inheritancewithrecursivedecl::ChildSecondRequest, 4> {};
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

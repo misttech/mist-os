@@ -7,6 +7,9 @@
 
 #include <fidl/test.aliases/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_aliases::ObjType>::Format(std::ostream& os, const ::test_aliases::ObjType& value) {
   os << "test_aliases::ObjType";
   os << "::";
@@ -54,5 +57,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_aliases::ObjType& value)
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ExampleOfUseOfAliases& value) {
   return fidl::ostream::Formatter<::test_aliases::ExampleOfUseOfAliases>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_aliases

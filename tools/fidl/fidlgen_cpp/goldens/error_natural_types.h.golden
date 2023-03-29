@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_error {
 
 class ExampleFooRequest;
@@ -472,5 +475,7 @@ struct IsUnion<::test_error::ExampleFooResult> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_error::ExampleFooResult> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

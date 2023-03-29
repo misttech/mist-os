@@ -8,6 +8,9 @@
 
 #include <fidl/test.unknowninteractions/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -1355,3 +1358,5 @@ bool ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolSt
   }
   return frame_ptr_->HasUnknownData();
 }
+
+#pragma clang diagnostic pop

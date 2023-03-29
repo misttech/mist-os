@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/escaping/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -37,6 +40,8 @@ struct HLCPPToNaturalTraits<::test::escaping::DocCommentWithQuotes> {
       .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

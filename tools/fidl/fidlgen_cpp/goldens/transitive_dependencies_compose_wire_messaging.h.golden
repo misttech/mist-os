@@ -24,6 +24,8 @@
 
 #include <fidl/test.bottom/cpp/wire_messaging.h>
 #include <fidl/test.middle/cpp/wire_messaging.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_transitivedependenciescompose {
 
@@ -567,3 +569,5 @@ class ::fidl::internal::WireBufferEventSender<::test_transitivedependenciescompo
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

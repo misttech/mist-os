@@ -17,6 +17,9 @@
 
   #include <{{ .Library | Filename "NaturalOStreamHeader" }}>
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   {{ EnsureNamespace "" }}
 
   {{- range .Enums }}
@@ -121,6 +124,8 @@
       }
     {{- end }}
   {{- end }}
+
+  #pragma clang diagnostic pop
 
   {{ EndOfFile }}
 {{- end }}

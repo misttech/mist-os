@@ -8,6 +8,9 @@
 
   #include <fidl/test.unknowninteractions/cpp/natural_ostream.h>
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   
 
     std::ostream& fidl::ostream::Formatter<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse>::Format(std::ostream& os, const ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse& value) {
@@ -3082,5 +3085,7 @@
       std::ostream& operator<<(std::ostream& os, const ::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse& value) {
         return fidl::ostream::Formatter<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrTopResponse>::Format(os, value);
       }
+
+  #pragma clang diagnostic pop
 
   }  // namespace test_unknowninteractions

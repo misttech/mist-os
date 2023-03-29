@@ -8,3 +8,8 @@
 #include <fidl/test.driverhandle/cpp/wire_messaging.h>
 
 #include <memory>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
+#pragma clang diagnostic pop

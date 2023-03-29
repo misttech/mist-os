@@ -27,6 +27,9 @@ do not support them in the bindings. */}}
 
 #include <{{ .Library | Filename "NaturalMessagingHeader" }}>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{/* Define natural extensions to the wire messaging layer. */}}
 {{- range .Decls }}
 {{- if Eq .Kind Kinds.Protocol }}{{ $protocol := . }}
@@ -52,7 +55,9 @@ do not support them in the bindings. */}}
 {{- end }}
 {{- end }}
 
-{{- end }}{{/* if not SingleComponentLibraryName */}}
+#pragma clang diagnostic pop
+
+{{ end }}{{/* if not SingleComponentLibraryName */}}
 
 {{ UnsetTransport -}}
 {{ EndOfFile }}

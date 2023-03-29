@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bitsconstants {
 
 constexpr ::test_bitsconstants::BitsType kConst1 = ::test_bitsconstants::BitsType::kA;
@@ -48,5 +51,7 @@ struct internal::NaturalCodingTraits<::test_bitsconstants::BitsType, ::fidl::int
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

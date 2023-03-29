@@ -7,6 +7,9 @@
 
 #include <fidl/test.encapsulatedstructs/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_encapsulatedstructs::Int8Int32::Storage_ test_encapsulatedstructs::Int8Int32::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a),
@@ -38,3 +41,5 @@
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

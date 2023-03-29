@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_doccomments {
 
 [[maybe_unused]] constexpr uint64_t kInterface_Method_Ordinal = 5017051197196532121lu;
@@ -228,3 +231,5 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_doccomments::Int
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

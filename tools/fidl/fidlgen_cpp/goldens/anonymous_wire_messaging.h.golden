@@ -22,6 +22,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_anonymous {
 
 class SomeProtocol;
@@ -589,3 +592,5 @@ class ::fidl::internal::WireBufferEventSender<::test_anonymous::SomeProtocol>
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

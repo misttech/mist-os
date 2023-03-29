@@ -7,6 +7,9 @@
 
 #include <fidl/test.requestflexibleenvelope/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::Storage_ test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.s)};
@@ -58,3 +61,5 @@ std::shared_ptr<::test_requestflexibleenvelope::StrictFoo::Storage_> test_reques
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

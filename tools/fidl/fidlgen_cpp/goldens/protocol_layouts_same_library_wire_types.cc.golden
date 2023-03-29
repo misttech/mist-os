@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocollayoutssamelibrary/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 void ::test_protocollayoutssamelibrary::wire::UnionPayload::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(UnionPayload) == sizeof(fidl_xunion_v2_t));
   static_assert(offsetof(UnionPayload, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
@@ -324,3 +327,5 @@ bool ::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonWithErrorRespons
   }
   return frame_ptr_->HasUnknownData();
 }
+
+#pragma clang diagnostic pop

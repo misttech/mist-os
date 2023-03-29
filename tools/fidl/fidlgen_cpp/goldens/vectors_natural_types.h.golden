@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_vectors {
 
 class ExampleUseOfVectors;
@@ -145,5 +148,7 @@ struct IsStruct<::test_vectors::ExampleUseOfVectors> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_vectors::ExampleUseOfVectors, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_vectors::ExampleUseOfVectors, 32> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

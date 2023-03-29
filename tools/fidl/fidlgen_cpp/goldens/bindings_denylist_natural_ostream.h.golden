@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_bindingsdenylist::OnlyLlcpp> {
   static std::ostream& Format(std::ostream& os, const ::test_bindingsdenylist::OnlyLlcpp& value);
@@ -283,5 +286,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_bindingsdenylist::ImportsSameNameContext>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

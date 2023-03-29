@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_emptystruct {
 
 class Empty;
@@ -525,5 +528,7 @@ struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : publi
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveResponse, 1> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

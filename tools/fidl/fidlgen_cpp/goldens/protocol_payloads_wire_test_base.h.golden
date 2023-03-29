@@ -8,6 +8,10 @@
 #pragma once
 
 #include <fidl/test.protocolpayloads/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace testing {
 
@@ -108,5 +112,7 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_protocolpayloads::Mai
     NotImplemented_("OnAnonWithError");
   }
 };
+#pragma clang diagnostic pop
+
 }  // namespace testing
 }  // namespace fidl

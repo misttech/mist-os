@@ -8,6 +8,9 @@
 #include <fidl/test.protocollayouts/cpp/natural_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_protocollayouts {
 
 [[maybe_unused]] constexpr inline uint64_t kMainProtocol_OneWayAnonComposed_Ordinal = 467706262354916833lu;
@@ -1162,3 +1165,5 @@ void fidl::Server<::test_protocollayouts::MainProtocol>::dispatch_message(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

@@ -13,6 +13,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/handles/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -181,6 +184,8 @@ struct HLCPPToNaturalTraits<::test::handles::FdfHandles> {
       .server_end_driver = ::fidl::HLCPPToNatural(std::move(value.server_end_driver)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

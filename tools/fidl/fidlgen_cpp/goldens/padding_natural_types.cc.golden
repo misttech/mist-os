@@ -7,6 +7,9 @@
 
 #include <fidl/test.padding/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_padding::Padding1ByteEnd::Storage_ test_padding::Padding1ByteEnd::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a),
@@ -107,3 +110,5 @@
       ::fidl::internal::NaturalClone(storage_.b),
       ::fidl::internal::NaturalClone(storage_.c)};
 }
+
+#pragma clang diagnostic pop

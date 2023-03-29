@@ -23,6 +23,8 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.errorsyntax.parent/cpp/wire_messaging.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_errorsyntax {
 
@@ -937,3 +939,5 @@ class ::fidl::internal::WireBufferEventSender<::test_errorsyntax::ExampleUseOfEr
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

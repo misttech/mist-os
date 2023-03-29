@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_aliases::ObjType> {
   static std::ostream& Format(std::ostream& os, const ::test_aliases::ObjType& value);
@@ -29,3 +32,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_aliases::ObjType& value)
 std::ostream& operator<<(std::ostream& os, const ::test_aliases::ExampleOfUseOfAliases& value);
 
 }  // namespace test_aliases
+
+#pragma clang diagnostic pop

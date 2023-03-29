@@ -7,3 +7,8 @@
 // fidl_experiment = unknown_interactions
 
 #include <fidl/test.largemessages/cpp/common_types.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
+#pragma clang diagnostic pop

@@ -9,6 +9,10 @@
 #pragma once
 
 #include <fidl/test.unknowninteractions/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace testing {
 
@@ -333,5 +337,7 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_unknowninteractions::
     NotImplemented_("StrictEventTableErr");
   }
 };
+#pragma clang diagnostic pop
+
 }  // namespace testing
 }  // namespace fidl

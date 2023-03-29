@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_table::EmptyTable> {
   static std::ostream& Format(std::ostream& os, const ::test_table::EmptyTable& value);
@@ -64,3 +67,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_table::ExtensionTable& v
 std::ostream& operator<<(std::ostream& os, const ::test_table::SixtyFourOrdinalTable& value);
 
 }  // namespace test_table
+
+#pragma clang diagnostic pop

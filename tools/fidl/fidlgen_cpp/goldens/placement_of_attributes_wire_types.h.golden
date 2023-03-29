@@ -28,6 +28,9 @@
 #include <fidl/test.placementofattributes/cpp/common_types.h>
 #include <fidl/test.placementofattributes/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_placementofattributes {
 
 namespace wire {
@@ -664,5 +667,7 @@ struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::Ex
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::ExampleUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_placementofattributes::wire::ExampleUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

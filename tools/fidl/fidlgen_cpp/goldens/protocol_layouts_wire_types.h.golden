@@ -31,6 +31,9 @@
   #include <fidl/test.protocollayouts.imported/cpp/wire_types.h>
   
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   namespace test_protocollayouts {
 
 
@@ -3929,6 +3932,8 @@ struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProt
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public ::fidl::internal::WireCodingTraits<::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+  #pragma clang diagnostic pop
 
   }  // namespace fidl
 

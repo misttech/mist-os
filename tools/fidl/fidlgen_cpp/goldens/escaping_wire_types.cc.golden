@@ -7,6 +7,9 @@
 
 #include <fidl/test.escaping/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 const char* ::test_escaping::wire::kBasic = "'\"\\\n\r\t";
 
 const char* ::test_escaping::wire::kNull = "\x00";
@@ -24,3 +27,5 @@ const char* ::test_escaping::wire::kSmileLeadingZero = "😀";
 const char* ::test_escaping::wire::kDollar = "$";
 
 const char* ::test_escaping::wire::kDollarBrace = "${";
+
+#pragma clang diagnostic pop

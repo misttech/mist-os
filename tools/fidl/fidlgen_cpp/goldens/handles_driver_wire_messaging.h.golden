@@ -23,6 +23,8 @@
 #endif  // __Fuchsia__
 
 #include <fidl/fdf/cpp/driver/wire_messaging.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace test_handles {
 
@@ -164,5 +166,7 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_handles::DriverProtocol> f
 namespace fidl {
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

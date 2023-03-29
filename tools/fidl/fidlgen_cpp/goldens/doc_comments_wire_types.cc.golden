@@ -7,6 +7,9 @@
 
 #include <fidl/test.doccomments/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 void ::test_doccomments::wire::StrictUnion::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(StrictUnion) == sizeof(fidl_xunion_v2_t));
   static_assert(offsetof(StrictUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
@@ -50,3 +53,5 @@ bool ::test_doccomments::wire::Table::HasUnknownData() const {
   }
   return frame_ptr_->HasUnknownData();
 }
+
+#pragma clang diagnostic pop

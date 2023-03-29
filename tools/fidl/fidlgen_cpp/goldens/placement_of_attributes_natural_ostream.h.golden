@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_placementofattributes::ExampleBits> {
   static std::ostream& Format(std::ostream& os, const ::test_placementofattributes::ExampleBits& value);
@@ -81,5 +84,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_placementofattributes::ExampleProtocol>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

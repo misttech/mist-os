@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_drivertwoway {
 
 class TwoWayAddRequest;
@@ -247,5 +250,7 @@ struct IsStruct<::test_drivertwoway::TwoWayAddResponse> : public std::true_type 
 template <>
 struct internal::NaturalCodingTraits<::test_drivertwoway::TwoWayAddResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_drivertwoway::TwoWayAddResponse, 2> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

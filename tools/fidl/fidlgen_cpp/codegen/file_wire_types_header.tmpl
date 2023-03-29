@@ -45,6 +45,9 @@ fidl/{{ .LibraryDots }}/cpp/wire_types.h
     #include <{{ . | Filename "WireTypesHeader" }}>
   {{ end }}
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   {{ EnsureNamespace . }}
 
   {{ range .Bits }}{{ template "Bits:WireTypesHeader" . }}{{ end }}
@@ -73,6 +76,8 @@ fidl/{{ .LibraryDots }}/cpp/wire_types.h
   {{ range .Structs }}{{ template "Struct:Traits:WireTypesHeader" . }}{{ end }}
   {{ range .Tables }}{{ template "Table:Traits:WireTypesHeader" . }}{{ end }}
   {{ range .Unions }}{{ template "Union:Traits:WireTypesHeader" . }}{{ end }}
+
+  #pragma clang diagnostic pop
 
   {{ EndOfFile }}
 {{ end }}

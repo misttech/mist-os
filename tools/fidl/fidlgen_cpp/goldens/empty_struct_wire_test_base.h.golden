@@ -8,6 +8,10 @@
 #pragma once
 
 #include <fidl/test.emptystruct/cpp/wire.h>
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace testing {
 
@@ -37,5 +41,7 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_emptystruct::EmptyPro
     NotImplemented_("Receive");
   }
 };
+#pragma clang diagnostic pop
+
 }  // namespace testing
 }  // namespace fidl

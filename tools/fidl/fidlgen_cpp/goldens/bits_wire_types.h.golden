@@ -26,6 +26,9 @@
 #include <fidl/test.bits/cpp/common_types.h>
 #include <fidl/test.bits/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bits {
 
 namespace wire {
@@ -102,5 +105,7 @@ struct internal::WireCodingTraits<::test_bits::wire::EmptyBits, ::fidl::internal
   static void Decode(internal::WireDecoder* decoder, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

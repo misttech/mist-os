@@ -27,6 +27,9 @@
 #include <fidl/test.anonymous/cpp/common_types.h>
 #include <fidl/test.anonymous/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_anonymous {
 
 namespace wire {
@@ -1824,5 +1827,7 @@ struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSo
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_anonymous::wire::SomeProtocolSomeMethodResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

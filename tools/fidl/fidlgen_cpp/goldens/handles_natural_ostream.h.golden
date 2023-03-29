@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_handles::Handles> {
   static std::ostream& Format(std::ostream& os, const ::test_handles::Handles& value);
@@ -84,5 +87,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_handles::DriverProtocol>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_handles::DriverProtocol>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fdf

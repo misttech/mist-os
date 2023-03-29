@@ -7,6 +7,9 @@
 
 #include <fidl/test.errorsyntax/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest>::Format(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest& value) {
   os << "test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest";
   os << "{ ";
@@ -63,5 +66,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseO
 std::ostream& operator<<(std::ostream& os, const ::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse& value) {
   return fidl::ostream::Formatter<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailTopResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_errorsyntax

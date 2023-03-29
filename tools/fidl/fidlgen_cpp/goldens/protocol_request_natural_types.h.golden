@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_protocolrequest {
 
 class ParentGetChildResponse;
@@ -421,5 +424,7 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentTakeChildRequ
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolrequest::ParentTakeChildRequestRequest, 4> {};
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

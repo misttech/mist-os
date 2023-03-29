@@ -13,6 +13,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse> {
   static std::ostream& Format(std::ostream& os, const ::test_unknowninteractions::UnknownInteractionsProtocolStrictTwoWayFieldsResponse& value);
@@ -1450,5 +1453,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fdf

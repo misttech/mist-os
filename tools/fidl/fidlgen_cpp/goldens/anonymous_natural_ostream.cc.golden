@@ -7,6 +7,9 @@
 
 #include <fidl/test.anonymous/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_anonymous::Op>::Format(std::ostream& os, const ::test_anonymous::Op& value) {
   os << "test_anonymous::Op";
   os << "::";
@@ -251,5 +254,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolS
 std::ostream& operator<<(std::ostream& os, const ::test_anonymous::SomeProtocolSomeMethodTopResponse& value) {
   return fidl::ostream::Formatter<::test_anonymous::SomeProtocolSomeMethodTopResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_anonymous

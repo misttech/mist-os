@@ -20,6 +20,9 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.dependent/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_structdefaultvalueenumlibraryreference {
 
 class Foo;
@@ -124,5 +127,7 @@ struct IsStruct<::test_structdefaultvalueenumlibraryreference::Foo> : public std
 template <>
 struct internal::NaturalCodingTraits<::test_structdefaultvalueenumlibraryreference::Foo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_structdefaultvalueenumlibraryreference::Foo, 4> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

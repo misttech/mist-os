@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_escaping {
 
 class DocCommentWithQuotes;
@@ -142,5 +145,7 @@ struct IsStruct<::test_escaping::DocCommentWithQuotes> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_escaping::DocCommentWithQuotes, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_escaping::DocCommentWithQuotes> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

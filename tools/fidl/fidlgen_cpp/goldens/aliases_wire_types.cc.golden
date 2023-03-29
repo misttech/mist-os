@@ -7,6 +7,9 @@
 
 #include <fidl/test.aliases/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 void ::test_aliases::wire::ExampleOfUseOfAliases::_CloseHandles() {
   field_of_channel.reset();
@@ -15,3 +18,5 @@ void ::test_aliases::wire::ExampleOfUseOfAliases::_CloseHandles() {
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

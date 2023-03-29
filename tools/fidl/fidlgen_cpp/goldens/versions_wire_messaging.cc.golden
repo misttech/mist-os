@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
@@ -194,3 +197,5 @@ void ::fidl::internal::TransactionalRequest<::test_versions::Protocol::Foo>::_In
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

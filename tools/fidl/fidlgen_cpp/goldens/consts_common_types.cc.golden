@@ -7,6 +7,9 @@
 
 #include <fidl/test.consts/cpp/common_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_consts {
 
 extern "C" const fidl_type_t test_consts_EnumTypeTable;
@@ -27,3 +30,5 @@ size_t fidl::internal::DisplayError<::test_consts::EnumType>::Format(
   return ::fidl::internal::FormatApplicationError(
       static_cast<int32_t>(value), name, &::test_consts::test_consts_EnumTypeTable, destination, capacity);
 }
+
+#pragma clang diagnostic pop

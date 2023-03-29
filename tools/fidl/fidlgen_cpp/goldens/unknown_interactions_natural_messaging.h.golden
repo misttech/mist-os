@@ -22,6 +22,9 @@
 #include <fidl/test.unknowninteractions/cpp/natural_types.h>
 #include <fidl/test.unknowninteractions/cpp/wire_messaging.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 
 
 namespace fidl {
@@ -3729,6 +3732,8 @@ struct ::fidl::internal::NaturalServerDispatcher<::test_unknowninteractions::Unk
 #endif  // __Fuchsia__
 
 
+
+#pragma clang diagnostic pop
 
 
 

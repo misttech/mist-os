@@ -13,6 +13,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/errorsyntax/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -171,6 +174,8 @@ struct HLCPPToNaturalTraits<::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhi
       ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::errorsyntax::ExampleUseOfErrorSyntax_CallWhichMayFail_Result");
   }
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

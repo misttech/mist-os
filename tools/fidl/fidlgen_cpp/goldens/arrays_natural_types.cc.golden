@@ -7,6 +7,9 @@
 
 #include <fidl/test.arrays/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_arrays::StructSmallArray::Storage_ test_arrays::StructSmallArray::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a)};
@@ -50,3 +53,5 @@ std::shared_ptr<::test_arrays::UnionLargeArray::Storage_> test_arrays::UnionLarg
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

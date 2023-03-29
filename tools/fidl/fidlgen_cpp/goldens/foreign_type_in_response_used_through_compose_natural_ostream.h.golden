@@ -14,6 +14,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_foreigntypeinresponseusedthroughcompose {
 
 }  // namespace test_foreigntypeinresponseusedthroughcompose
@@ -45,5 +48,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_foreigntypeinresponseusedthroughcompose::Top>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

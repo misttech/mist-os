@@ -30,6 +30,9 @@
   #include <fidl/test.union/cpp/common_types.h>
   
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   namespace test_union {
 
 
@@ -5432,6 +5435,8 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::OnlyReservedFlexib
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_union::wire::OnlyReservedFlexibleUnion, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
   : public ::fidl::internal::WireCodingTraits<::test_union::wire::OnlyReservedFlexibleUnion, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+  #pragma clang diagnostic pop
 
   }  // namespace fidl
 

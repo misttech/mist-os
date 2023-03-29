@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_emptystruct {
 
 [[maybe_unused]] constexpr uint64_t kEmptyProtocol_Send_Ordinal = 1378773277029173000lu;
@@ -388,3 +391,5 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_emptystruct::Emp
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

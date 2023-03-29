@@ -27,7 +27,8 @@
 #endif  // __Fuchsia__
 
 
-  
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
     
   namespace test_unknowninteractions {
 
@@ -10993,6 +10994,8 @@ class ::fidl::internal::WireWeakSyncClientImpl<::test_unknowninteractions::Unkno
 
 #endif  // __Fuchsia__
 
+
+  #pragma clang diagnostic pop
 
   }  // namespace fidl
 

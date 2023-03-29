@@ -7,11 +7,16 @@
 
 #include <fidl/test.service/cpp/type_conversions.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+#pragma clang diagnostic pop
+
 }  // namespace internal
 }  // namespace fidl

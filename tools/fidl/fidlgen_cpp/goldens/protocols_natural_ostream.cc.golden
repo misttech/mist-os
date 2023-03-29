@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocols/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_protocols::ErrorEnum>::Format(std::ostream& os, const ::test_protocols::ErrorEnum& value) {
   os << "test_protocols::ErrorEnum";
   os << "::";
@@ -641,5 +644,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocols::MethodWithUni
 std::ostream& operator<<(std::ostream& os, const ::test_protocols::MethodWithUnionUnionMethodResponse& value) {
   return fidl::ostream::Formatter<::test_protocols::MethodWithUnionUnionMethodResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_protocols

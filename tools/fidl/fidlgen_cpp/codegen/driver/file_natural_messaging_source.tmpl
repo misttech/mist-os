@@ -16,7 +16,10 @@
 
 #include <{{ .Library | Filename "driver/NaturalMessagingHeader" }}>
 
-{{- range .Decls }}
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
+{{ range .Decls }}
 {{- if Eq .Kind Kinds.Protocol }}{{ $protocol := . }}
 {{- range $transport, $_ := .Transports }}
 {{- if eq $transport "Driver" -}}
@@ -29,6 +32,8 @@
 {{- end }}
 {{- end }}
 {{- end }}
+
+#pragma clang diagnostic pop
 
 {{ UnsetTransport -}}
 {{ EndOfFile }}

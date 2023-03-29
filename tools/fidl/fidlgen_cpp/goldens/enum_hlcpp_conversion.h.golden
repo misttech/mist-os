@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/enum/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -31,6 +34,8 @@ template <>
 struct NaturalToHLCPPTraits<::test_enum::MyEmptyFlexibleEnum> : public NaturalToHLCPPTraitsEnum<::test_enum::MyEmptyFlexibleEnum, ::test::enum_::MyEmptyFlexibleEnum, uint32_t> {};
 template <>
 struct HLCPPToNaturalTraits<::test::enum_::MyEmptyFlexibleEnum> : public HLCPPToNaturalTraitsEnum<::test::enum_::MyEmptyFlexibleEnum, ::test_enum::MyEmptyFlexibleEnum> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

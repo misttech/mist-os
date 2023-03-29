@@ -27,6 +27,9 @@
 #include <fidl/test.encapsulatedstructs/cpp/common_types.h>
 #include <fidl/test.encapsulatedstructs/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_encapsulatedstructs {
 
 namespace wire {
@@ -460,5 +463,7 @@ struct ::fidl::internal::WireCodingTraits<::test_encapsulatedstructs::wire::TopL
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

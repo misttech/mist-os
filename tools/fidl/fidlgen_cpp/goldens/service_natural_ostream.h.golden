@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_service {
 
 }  // namespace test_service
@@ -68,5 +71,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_service::SecondProtocol>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_service::SecondProtocol>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

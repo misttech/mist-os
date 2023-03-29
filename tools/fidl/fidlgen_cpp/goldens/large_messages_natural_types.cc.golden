@@ -8,6 +8,9 @@
 
 #include <fidl/test.largemessages/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_largemessages::BoundedKnownToBeSmall::Storage_ test_largemessages::BoundedKnownToBeSmall::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.bytes)};
@@ -54,3 +57,5 @@ std::shared_ptr<::test_largemessages::SemiBoundedMaybeLarge::Storage_> test_larg
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

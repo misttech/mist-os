@@ -29,6 +29,9 @@
 #include <fidl/test.largemessages/cpp/common_types.h>
 #include <fidl/test.largemessages/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_largemessages {
 
 namespace wire {
@@ -726,5 +729,7 @@ struct ::fidl::internal::WireCodingTraits<::test_largemessages::wire::SemiBounde
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_largemessages::wire::SemiBoundedMaybeLarge, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_largemessages::wire::SemiBoundedMaybeLarge, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

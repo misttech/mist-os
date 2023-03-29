@@ -7,7 +7,12 @@
 
 #include <fidl/test.structdefaultvalueenumlibraryreference/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_structdefaultvalueenumlibraryreference::Foo::Storage_ test_structdefaultvalueenumlibraryreference::Foo::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.field)};
 }
+
+#pragma clang diagnostic pop

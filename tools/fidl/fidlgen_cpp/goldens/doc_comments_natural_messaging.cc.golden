@@ -8,6 +8,9 @@
 #include <fidl/test.doccomments/cpp/natural_messaging.h>
 #include <lib/fidl/cpp/wire/unknown_interactions.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_doccomments {
 
 [[maybe_unused]] constexpr inline uint64_t kInterface_Method_Ordinal = 5017051197196532121lu;
@@ -135,3 +138,5 @@ void fidl::Server<::test_doccomments::Interface>::dispatch_message(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

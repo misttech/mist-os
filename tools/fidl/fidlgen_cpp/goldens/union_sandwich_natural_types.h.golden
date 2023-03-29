@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_unionsandwich {
 
 class SandwichUnionSize8Alignment4;
@@ -1229,5 +1232,7 @@ struct IsUnion<::test_unionsandwich::UnionSize36Alignment4> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::UnionSize36Alignment4, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unionsandwich::UnionSize36Alignment4> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

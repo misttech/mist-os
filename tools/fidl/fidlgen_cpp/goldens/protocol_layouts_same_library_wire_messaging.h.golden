@@ -26,7 +26,8 @@
 #endif  // __Fuchsia__
 
 
-  
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
     
   namespace test_protocollayoutssamelibrary {
 
@@ -7241,6 +7242,8 @@ class ::fidl::internal::WireBufferEventSender<::test_protocollayoutssamelibrary:
 
 #endif  // __Fuchsia__
 
+
+  #pragma clang diagnostic pop
 
   
 

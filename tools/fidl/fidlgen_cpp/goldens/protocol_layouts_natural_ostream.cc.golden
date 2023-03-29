@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocollayouts/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse>::Format(std::ostream& os, const ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse& value) {
   os << "test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse";
   os << "{ ";
@@ -319,5 +322,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainPro
 std::ostream& operator<<(std::ostream& os, const ::test_protocollayouts::MainProtocolOnAnonWithErrorRequest& value) {
   return fidl::ostream::Formatter<::test_protocollayouts::MainProtocolOnAnonWithErrorRequest>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_protocollayouts

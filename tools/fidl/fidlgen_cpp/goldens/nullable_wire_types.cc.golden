@@ -7,6 +7,9 @@
 
 #include <fidl/test.nullable/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 void ::test_nullable::wire::StructWithNullableHandle::_CloseHandles() {
   val.reset();
@@ -33,3 +36,5 @@ void ::test_nullable::wire::SimpleUnion::SizeAndOffsetAssertionHelper() {
   static_assert(offsetof(SimpleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
   static_assert(offsetof(SimpleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
 }
+
+#pragma clang diagnostic pop

@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_consts::EnumType> {
   static std::ostream& Format(std::ostream& os, const ::test_consts::EnumType& value);
@@ -28,3 +31,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_consts::EnumType& value)
 std::ostream& operator<<(std::ostream& os, const ::test_consts::BitsType& value);
 
 }  // namespace test_consts
+
+#pragma clang diagnostic pop

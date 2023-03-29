@@ -23,7 +23,11 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.protocollayouts.imported/cpp/driver/wire_messaging.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
 
 namespace fidl {
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

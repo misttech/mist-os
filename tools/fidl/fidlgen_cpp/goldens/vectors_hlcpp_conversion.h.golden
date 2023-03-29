@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/vectors/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -39,6 +42,8 @@ struct HLCPPToNaturalTraits<::test::vectors::ExampleUseOfVectors> {
       .vector_of_vector_of_bool = ::fidl::HLCPPToNatural(std::move(value.vector_of_vector_of_bool)),
   }};
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

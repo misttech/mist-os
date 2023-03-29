@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/union/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -1097,6 +1100,8 @@ struct HLCPPToNaturalTraits<::test::union_::OnlyReservedFlexibleUnion> {
       return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
   }
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

@@ -7,6 +7,9 @@
 
 #include <fidl/test.emptystruct/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_emptystruct::Empty>::Format(std::ostream& os, const ::test_emptystruct::Empty& value) {
   os << "test_emptystruct::Empty";
   os << "{ ";
@@ -69,5 +72,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_emptystruct::EmptyProtoc
 std::ostream& operator<<(std::ostream& os, const ::test_emptystruct::EmptyProtocolSendAndReceiveResponse& value) {
   return fidl::ostream::Formatter<::test_emptystruct::EmptyProtocolSendAndReceiveResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_emptystruct

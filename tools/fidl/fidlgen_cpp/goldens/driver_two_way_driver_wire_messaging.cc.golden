@@ -10,6 +10,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_drivertwoway {
 
 [[maybe_unused]] constexpr uint64_t kTwoWay_Add_Ordinal = 989730524426044687lu;
@@ -162,3 +165,5 @@ void ::fidl::internal::TransactionalRequest<::test_drivertwoway::TwoWay::Add>::_
 void ::fidl::internal::TransactionalResponse<::test_drivertwoway::TwoWay::Add>::_InitHeader() {
   ::fidl::InitTxnHeader(&header, 0, ::test_drivertwoway::kTwoWay_Add_Ordinal, ::test_drivertwoway::kTwoWay_Add_DynamicFlags);
 }
+
+#pragma clang diagnostic pop

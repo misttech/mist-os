@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocolrequest/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 void ::test_protocolrequest::wire::ParentGetChildResponse::_CloseHandles() {
   c.reset();
@@ -34,3 +37,5 @@ void ::test_protocolrequest::wire::ParentTakeChildRequestRequest::_CloseHandles(
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

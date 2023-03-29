@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocols/cpp/common_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_protocols {
 
 extern "C" const fidl_type_t test_protocols_ErrorEnumTable;
@@ -27,3 +30,5 @@ size_t fidl::internal::DisplayError<::test_protocols::ErrorEnum>::Format(
   return ::fidl::internal::FormatApplicationError(
       static_cast<uint32_t>(value), name, &::test_protocols::test_protocols_ErrorEnumTable, destination, capacity);
 }
+
+#pragma clang diagnostic pop

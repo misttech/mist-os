@@ -22,6 +22,9 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.exampleusing/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_placementofattributes {
 
 class ExampleProtocolMethodRequest;
@@ -479,5 +482,7 @@ struct internal::NaturalCodingTraits<::test_placementofattributes::ExampleEnum, 
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

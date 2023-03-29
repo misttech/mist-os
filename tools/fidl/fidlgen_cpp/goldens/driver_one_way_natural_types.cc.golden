@@ -7,6 +7,9 @@
 
 #include <fidl/test.driveroneway/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_driveroneway::Payload::Storage_ test_driveroneway::Payload::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.value)};
@@ -16,3 +19,5 @@
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.payload)};
 }
+
+#pragma clang diagnostic pop

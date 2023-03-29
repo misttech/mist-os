@@ -12,6 +12,9 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <test/consts/cpp/fidl.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace fidl {
 namespace internal {
 
@@ -23,6 +26,8 @@ template <>
 struct NaturalToHLCPPTraits<::test_consts::BitsType> : public NaturalToHLCPPTraitsBits<::test_consts::BitsType, ::test::consts::BitsType, uint32_t> {};
 template <>
 struct HLCPPToNaturalTraits<::test::consts::BitsType> : public HLCPPToNaturalTraitsBits<::test::consts::BitsType, ::test_consts::BitsType, uint32_t> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace internal
 }  // namespace fidl

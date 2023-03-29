@@ -12,6 +12,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 
   
 
@@ -4894,6 +4897,7 @@ void ::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownI
     
     
 
+#pragma clang diagnostic pop
 
 
 

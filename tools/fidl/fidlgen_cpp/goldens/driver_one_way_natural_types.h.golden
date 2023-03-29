@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_driveroneway {
 
 class Payload;
@@ -225,5 +228,7 @@ struct IsStruct<::test_driveroneway::OneWaySendRequest> : public std::true_type 
 template <>
 struct internal::NaturalCodingTraits<::test_driveroneway::OneWaySendRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::OneWaySendRequest, 4> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

@@ -27,6 +27,9 @@
 #include <fidl/test.inheritance/cpp/common_types.h>
 #include <fidl/test.inheritance/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_inheritance {
 
 namespace wire {
@@ -154,5 +157,7 @@ struct ::fidl::internal::WireCodingTraits<::test_inheritance::wire::SuperFooResp
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

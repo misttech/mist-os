@@ -7,6 +7,9 @@
 
 #include <fidl/test.enum/cpp/common_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_enum {
 
 extern "C" const fidl_type_t test_enum_MyStrictEnumTable;
@@ -88,3 +91,5 @@ size_t fidl::internal::DisplayError<::test_enum::MyEmptyFlexibleEnum>::Format(
   return ::fidl::internal::FormatApplicationError(
       static_cast<uint32_t>(value), name, &::test_enum::test_enum_MyEmptyFlexibleEnumTable, destination, capacity);
 }
+
+#pragma clang diagnostic pop

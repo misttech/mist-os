@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_doccomments::MyStrictBits> {
   static std::ostream& Format(std::ostream& os, const ::test_doccomments::MyStrictBits& value);
@@ -92,5 +95,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fidl::ClientEnd<::test
 inline std::ostream& operator<<(std::ostream& os, const ::fidl::ServerEnd<::test_doccomments::Interface>& value) {
   return fidl::ostream::Formatter<::fidl::ServerEnd<::test_doccomments::Interface>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

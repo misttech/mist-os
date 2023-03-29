@@ -26,6 +26,9 @@
 #include <fidl/test.arrays/cpp/common_types.h>
 #include <fidl/test.arrays/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_arrays {
 
 namespace wire {
@@ -1133,5 +1136,7 @@ struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_arrays::wire::UnionLargeArray, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

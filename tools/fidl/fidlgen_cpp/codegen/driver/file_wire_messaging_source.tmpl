@@ -28,6 +28,9 @@ do not support them in the bindings. */}}
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 {{ "" }}
 
 
@@ -35,8 +38,8 @@ do not support them in the bindings. */}}
 {{- range (call .ProtocolsForTransport "Driver") }}
   {{ template "Protocol:WireMessagingSource" . }}
 {{ end }}
-{{ "" }}
-{{- end }}{{/* if not SingleComponentLibraryName */}}
+#pragma clang diagnostic pop
+{{ end }}{{/* if not SingleComponentLibraryName */}}
 
 {{ UnsetTransport -}}
 {{ EndOfFile }}

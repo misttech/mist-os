@@ -22,6 +22,9 @@
 #endif  // __Fuchsia__
 
 #include <fidl/test.someotherlibrary/cpp/natural_types.h>
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_aliases {
 
 class ExampleOfUseOfAliases;
@@ -309,5 +312,7 @@ struct internal::NaturalCodingTraits<::test_aliases::ObjType, ::fidl::internal::
     }
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

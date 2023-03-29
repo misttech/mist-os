@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_unionsandwich::UnionSize8Alignment4> {
   static std::ostream& Format(std::ostream& os, const ::test_unionsandwich::UnionSize8Alignment4& value);
@@ -70,3 +73,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_unionsandwich::UnionSize
 std::ostream& operator<<(std::ostream& os, const ::test_unionsandwich::SandwichUnionSize36Alignment4& value);
 
 }  // namespace test_unionsandwich
+
+#pragma clang diagnostic pop

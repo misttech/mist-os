@@ -7,6 +7,9 @@
 
 #include <fidl/test.driverhandle/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 void ::test_driverhandle::wire::ClientEndWrapper::_CloseHandles() {
   value.reset();
@@ -65,3 +68,5 @@ void ::test_driverhandle::wire::T::_CloseHandles() {
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

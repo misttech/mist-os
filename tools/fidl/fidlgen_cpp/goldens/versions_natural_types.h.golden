@@ -21,6 +21,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_versions {
 
 class Struct;
@@ -363,5 +366,7 @@ struct internal::NaturalCodingTraits<::test_versions::Enum, ::fidl::internal::Na
     *value = *decoder->template GetPtr<::test_versions::Enum>(offset);
   }
 };
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

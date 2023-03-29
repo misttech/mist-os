@@ -10,6 +10,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
@@ -171,3 +174,5 @@ void ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtoc
 }
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

@@ -9,6 +9,9 @@
 
 #include <memory>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_anonymous {
 
 [[maybe_unused]] constexpr uint64_t kSomeProtocol_SomeMethod_Ordinal = 2515914517457749720lu;
@@ -239,3 +242,5 @@ void ::fidl::internal::TransactionalResponse<::test_anonymous::SomeProtocol::Som
 #ifdef __Fuchsia__
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

@@ -7,6 +7,9 @@
 
 #include <fidl/test.unionsandwich/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 void ::test_unionsandwich::wire::UnionSize8Alignment4::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(UnionSize8Alignment4) == sizeof(fidl_xunion_v2_t));
   static_assert(offsetof(UnionSize8Alignment4, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
@@ -30,3 +33,5 @@ void ::test_unionsandwich::wire::UnionSize36Alignment4::SizeAndOffsetAssertionHe
   static_assert(offsetof(UnionSize36Alignment4, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
   static_assert(offsetof(UnionSize36Alignment4, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
 }
+
+#pragma clang diagnostic pop

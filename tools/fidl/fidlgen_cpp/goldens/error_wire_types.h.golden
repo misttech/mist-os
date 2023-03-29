@@ -27,6 +27,9 @@
 #include <fidl/test.error/cpp/common_types.h>
 #include <fidl/test.error/cpp/markers.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_error {
 
 namespace wire {
@@ -419,5 +422,7 @@ struct ::fidl::internal::WireCodingTraits<::test_error::wire::ExampleFooResult, 
 template <bool IsRecursive>
 struct ::fidl::internal::WireCodingTraits<::test_error::wire::ExampleFooResult, ::fidl::internal::WireCodingConstraintEmpty, IsRecursive>
     : public ::fidl::internal::WireCodingTraits<::test_error::wire::ExampleFooResult, ::fidl::internal::WireCodingConstraintUnion<false>, IsRecursive> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

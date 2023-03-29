@@ -22,6 +22,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_service {
 
 class FirstProtocol;
@@ -1217,3 +1220,5 @@ class ::fidl::internal::WireBufferEventSender<::test_service::SecondProtocol>
 };
 
 #endif  // __Fuchsia__
+
+#pragma clang diagnostic pop

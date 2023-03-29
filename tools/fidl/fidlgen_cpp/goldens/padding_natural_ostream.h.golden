@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_padding::Padding1ByteEnd> {
   static std::ostream& Format(std::ostream& os, const ::test_padding::Padding1ByteEnd& value);
@@ -112,3 +115,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_padding::Padding4ByteAli
 std::ostream& operator<<(std::ostream& os, const ::test_padding::Padding2ByteAlignmentLength6& value);
 
 }  // namespace test_padding
+
+#pragma clang diagnostic pop

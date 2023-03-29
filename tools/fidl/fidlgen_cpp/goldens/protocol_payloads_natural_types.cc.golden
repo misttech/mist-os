@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocolpayloads/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_protocolpayloads::LocalStructPayload::Storage_ test_protocolpayloads::LocalStructPayload::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.a),
@@ -180,3 +183,5 @@ std::shared_ptr<::test_protocolpayloads::MainProtocolOnImportWithErrorResult::St
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

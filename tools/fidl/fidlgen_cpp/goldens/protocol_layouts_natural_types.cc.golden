@@ -7,6 +7,9 @@
 
 #include <fidl/test.protocollayouts/cpp/natural_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 ::test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse::Storage_ test_protocollayouts::MainProtocolTwoWayImportWithErrorTopResponse::CloneStorage_() const {
   return Storage_{
       ::fidl::internal::NaturalClone(storage_.result)};
@@ -205,3 +208,5 @@ std::shared_ptr<::test_protocollayouts::MainProtocolOnAnonWithErrorResult::Stora
       return std::make_shared<Storage_>();
   }
 }
+
+#pragma clang diagnostic pop

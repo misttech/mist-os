@@ -16,6 +16,9 @@
 
   
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   namespace fidl {
 namespace internal {
 
@@ -6111,6 +6114,8 @@ namespace internal {
             ZX_PANIC("Can't convert invalid strict union %s from HLCPP to Natural", "::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result");
       }
     }
+
+  #pragma clang diagnostic pop
 
   }  // namespace internal
 }  // namespace fidl

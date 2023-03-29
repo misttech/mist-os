@@ -13,6 +13,9 @@
 
 #include <cinttypes>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_bitsconstants {
 
 // |BitsType| is strict, hence is guaranteed to only contain
@@ -124,5 +127,7 @@ template <>
 struct ContainsHandle<::test_bitsconstants::BitsType> : public std::false_type {};
 static_assert(std::is_standard_layout_v<::test_bitsconstants::BitsType>);
 static_assert(sizeof(::test_bitsconstants::BitsType) == sizeof(uint32_t));
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

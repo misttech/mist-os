@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_handlesintypes::ObjType> {
   static std::ostream& Format(std::ostream& os, const ::test_handlesintypes::ObjType& value);
@@ -58,3 +61,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyRes
 std::ostream& operator<<(std::ostream& os, const ::test_handlesintypes::EmptyResourceUnion& value);
 
 }  // namespace test_handlesintypes
+
+#pragma clang diagnostic pop

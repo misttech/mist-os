@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_enum::MyStrictEnum> {
   static std::ostream& Format(std::ostream& os, const ::test_enum::MyStrictEnum& value);
@@ -40,3 +43,5 @@ std::ostream& operator<<(std::ostream& os, const ::test_enum::MyFlexibleEnumWith
 std::ostream& operator<<(std::ostream& os, const ::test_enum::MyEmptyFlexibleEnum& value);
 
 }  // namespace test_enum
+
+#pragma clang diagnostic pop

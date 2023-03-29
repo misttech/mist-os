@@ -12,6 +12,9 @@
 
 #include <iostream>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 template <>
 struct fidl::ostream::Formatter<::test_drivertwoway::TwoWayAddRequest> {
   static std::ostream& Format(std::ostream& os, const ::test_drivertwoway::TwoWayAddRequest& value);
@@ -56,5 +59,7 @@ inline std::ostream& operator<<(std::ostream& os, const ::fdf::ClientEnd<::test_
 inline std::ostream& operator<<(std::ostream& os, const ::fdf::ServerEnd<::test_drivertwoway::TwoWay>& value) {
   return fidl::ostream::Formatter<::fdf::ServerEnd<::test_drivertwoway::TwoWay>>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace fdf

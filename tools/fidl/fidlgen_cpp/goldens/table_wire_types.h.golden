@@ -29,6 +29,9 @@
   #include <fidl/test.table/cpp/common_types.h>
   
 
+  #pragma clang diagnostic push
+  #pragma clang diagnostic ignored "-Wshadow"
+
   namespace test_table {
 
 
@@ -8466,6 +8469,8 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SixtyFourOrdinalTa
   }
 };
   
+
+  #pragma clang diagnostic pop
 
   }  // namespace fidl
 

@@ -7,6 +7,9 @@
 
 #include <fidl/test.requestflexibleenvelope/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest>::Format(std::ostream& os, const ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest& value) {
   os << "test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest";
   os << "{ ";
@@ -93,5 +96,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_requestflexibleenvelope:
 std::ostream& operator<<(std::ostream& os, const ::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse& value) {
   return fidl::ostream::Formatter<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_requestflexibleenvelope

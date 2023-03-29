@@ -7,6 +7,9 @@
 
 #include <fidl/test.arrays/cpp/wire_types.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 void ::test_arrays::wire::UnionSmallArray::SizeAndOffsetAssertionHelper() {
   static_assert(sizeof(UnionSmallArray) == sizeof(fidl_xunion_v2_t));
   static_assert(offsetof(UnionSmallArray, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
@@ -62,3 +65,5 @@ bool ::test_arrays::wire::TableLargeArray::HasUnknownData() const {
   }
   return frame_ptr_->HasUnknownData();
 }
+
+#pragma clang diagnostic pop

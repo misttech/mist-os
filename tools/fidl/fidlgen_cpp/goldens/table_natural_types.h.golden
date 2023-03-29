@@ -19,6 +19,9 @@
 
 #endif  // __Fuchsia__
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 namespace test_table {
 
 class EmptyTable;
@@ -1555,5 +1558,7 @@ struct IsTable<::test_table::SixtyFourOrdinalTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::SixtyFourOrdinalTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::SixtyFourOrdinalTable> {};
+
+#pragma clang diagnostic pop
 
 }  // namespace fidl

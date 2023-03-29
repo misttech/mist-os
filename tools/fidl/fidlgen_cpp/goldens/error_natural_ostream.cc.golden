@@ -7,6 +7,9 @@
 
 #include <fidl/test.error/cpp/natural_ostream.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wshadow"
+
 std::ostream& fidl::ostream::Formatter<::test_error::ExampleFooRequest>::Format(std::ostream& os, const ::test_error::ExampleFooRequest& value) {
   os << "test_error::ExampleFooRequest";
   os << "{ ";
@@ -63,5 +66,7 @@ std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooResult&
 std::ostream& operator<<(std::ostream& os, const ::test_error::ExampleFooTopResponse& value) {
   return fidl::ostream::Formatter<::test_error::ExampleFooTopResponse>::Format(os, value);
 }
+
+#pragma clang diagnostic pop
 
 }  // namespace test_error
