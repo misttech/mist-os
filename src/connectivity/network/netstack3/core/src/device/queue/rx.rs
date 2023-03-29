@@ -65,7 +65,9 @@ pub(crate) trait ReceiveQueueContext<D: Device, C>: ReceiveQueueTypes<D, C> {
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
 
+pub(crate) trait ReceiveDequePacketContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     /// Handle a received packet.
     fn handle_packet(
         &mut self,
@@ -78,12 +80,18 @@ pub(crate) trait ReceiveQueueContext<D: Device, C>: ReceiveQueueTypes<D, C> {
 
 pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     type ReceiveQueueCtx<'a>: ReceiveQueueContext<
-        D,
-        C,
-        Meta = Self::Meta,
-        Buffer = Self::Buffer,
-        DeviceId = Self::DeviceId,
-    >;
+            D,
+            C,
+            Meta = Self::Meta,
+            Buffer = Self::Buffer,
+            DeviceId = Self::DeviceId,
+        > + ReceiveDequePacketContext<
+            D,
+            C,
+            Meta = Self::Meta,
+            Buffer = Self::Buffer,
+            DeviceId = Self::DeviceId,
+        >;
 
     /// Calls the function with the RX deque state and the RX queue context.
     fn with_dequed_packets_and_rx_queue_ctx<
@@ -228,7 +236,9 @@ mod tests {
         ) -> O {
             cb(&mut self.get_mut().queue)
         }
+    }
 
+    impl ReceiveDequePacketContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         fn handle_packet(
             &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,

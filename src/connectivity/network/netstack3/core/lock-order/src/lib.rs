@@ -361,19 +361,6 @@ impl<T, L> Locked<'_, T, L> {
         let Self(t, PhantomData) = self;
         **t
     }
-
-    /// Escape hatch for retrieving &T to enable un-guarded locking.
-    ///
-    /// This allowes calling code to access the locking object directly. This
-    /// function should be used with care, since it allows callers to violate
-    /// the lock ordering guarantees of `Locked` and potentially introduce
-    /// deadlocks!
-    pub fn unwrap_lock_order_protection(&self) -> &T {
-        // TODO(https://fxbug.dev/121205): Remove this dangerous escape hatch
-        // when it is no longer used.
-        let Self(t, _marker) = self;
-        *t
-    }
 }
 
 #[cfg(test)]

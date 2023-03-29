@@ -14,7 +14,7 @@ use lock_order::{
     Locked,
 };
 use net_types::{
-    ip::{Ip as _, IpAddress, IpVersion, Ipv4, Ipv6},
+    ip::{Ip as _, IpAddress, IpVersion},
     SpecifiedAddr,
 };
 use packet::{Buf, BufferMut, Serializer};
@@ -24,8 +24,9 @@ use crate::{
     device::{
         queue::{
             rx::{
-                BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveQueue, ReceiveQueueContext,
-                ReceiveQueueNonSyncContext, ReceiveQueueState, ReceiveQueueTypes,
+                BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequePacketContext,
+                ReceiveQueue, ReceiveQueueContext, ReceiveQueueNonSyncContext, ReceiveQueueState,
+                ReceiveQueueTypes,
             },
             tx::{
                 BufVecU8Allocator, BufferTransmitQueueHandler, TransmitDequeueContext,
@@ -321,7 +322,11 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
             cb(&mut x)
         })
     }
+}
 
+impl<C: NonSyncContext> ReceiveDequePacketContext<LoopbackDevice, C>
+    for Locked<'_, SyncCtx<C>, crate::lock_ordering::LoopbackRxDequeue>
+{
     fn handle_packet(
         &mut self,
         ctx: &mut C,
@@ -329,19 +334,16 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
         meta: IpVersion,
         buf: Buf<Vec<u8>>,
     ) {
-        // TODO(https://fxbug.dev/120973): Remove this and push the Locked
-        // wrapper through the receive path.
-        let sync_ctx = self.unwrap_lock_order_protection();
         match meta {
-            IpVersion::V4 => crate::ip::receive_ip_packet::<_, _, Ipv4>(
-                sync_ctx,
+            IpVersion::V4 => crate::ip::receive_ipv4_packet(
+                self,
                 ctx,
                 &device_id.clone().into(),
                 FrameDestination::Unicast,
                 buf,
             ),
-            IpVersion::V6 => crate::ip::receive_ip_packet::<_, _, Ipv6>(
-                sync_ctx,
+            IpVersion::V6 => crate::ip::receive_ipv6_packet(
+                self,
                 ctx,
                 &device_id.clone().into(),
                 FrameDestination::Unicast,

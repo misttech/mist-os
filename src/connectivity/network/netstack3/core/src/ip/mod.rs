@@ -35,10 +35,11 @@ use lock_order::{
 use derivative::Derivative;
 use lock_order::lock::UnlockedAccess;
 use log::{debug, trace};
+#[cfg(test)]
+use net_types::ip::IpVersion;
 use net_types::{
     ip::{
-        GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr,
-        Mtu, Subnet,
+        GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
@@ -1703,6 +1704,7 @@ macro_rules! try_parse_ip_packet {
 ///
 /// `receive_ip_packet` calls [`receive_ipv4_packet`] or [`receive_ipv6_packet`]
 /// depending on the type parameter, `I`.
+#[cfg(test)]
 pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>, I: Ip>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
