@@ -85,6 +85,9 @@ class DirWatcher {
   // This method does not take ownership of |dir_fd|.
   static zx_status_t Create(int dir_fd, std::unique_ptr<DirWatcher>* out_dir_watcher);
 
+  // Creates a new |DirWatcher| instance to watch the directory |dir| is connected to..
+  static zx::result<DirWatcher> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dir);
+
   // Users should call Create instead. This is public for make_unique.
   explicit DirWatcher(fidl::ClientEnd<fuchsia_io::DirectoryWatcher> client)
       : client_(std::move(client)) {}

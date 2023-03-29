@@ -18,31 +18,46 @@
 
 namespace device_watcher {
 
-__EXPORT
-zx_status_t DirWatcher::Create(int dir_fd, std::unique_ptr<DirWatcher>* out_dir_watcher) {
+namespace {
+zx::result<fidl::ClientEnd<fuchsia_io::DirectoryWatcher>> Watch(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> dir) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::DirectoryWatcher>();
   if (endpoints.is_error()) {
-    return endpoints.status_value();
+    return endpoints.take_error();
   }
   auto& [client, server] = endpoints.value();
-
-  fdio_t* const io = fdio_unsafe_fd_to_io(dir_fd);
-  const auto release = fit::defer([io]() { fdio_unsafe_release(io); });
-  const zx_handle_t channel = fdio_unsafe_borrow_channel(io);
-
   const fidl::WireResult result =
-      fidl::WireCall(fidl::UnownedClientEnd<fuchsia_io::Directory>(channel))
-          ->Watch(fuchsia_io::wire::WatchMask::kRemoved, 0, std::move(server));
+      fidl::WireCall(dir)->Watch(fuchsia_io::wire::WatchMask::kRemoved, 0, std::move(server));
   if (!result.ok()) {
-    return result.status();
+    return zx::error(result.status());
   }
   const fidl::WireResponse response = result.value();
   if (zx_status_t status = response.s; status != ZX_OK) {
-    return status;
+    return zx::error(status);
   }
-  *out_dir_watcher = std::make_unique<DirWatcher>(std::move(client));
+  return zx::ok(std::move(client));
+}
+}  // namespace
 
-  return ZX_OK;
+__EXPORT
+zx::result<DirWatcher> DirWatcher::Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dir) {
+  zx::result client = Watch(dir);
+  if (client.is_error()) {
+    return client.take_error();
+  }
+  return zx::ok(DirWatcher(std::move(client.value())));
+}
+
+__EXPORT
+zx_status_t DirWatcher::Create(int dir_fd, std::unique_ptr<DirWatcher>* out_dir_watcher) {
+  fdio_t* const io = fdio_unsafe_fd_to_io(dir_fd);
+  const auto release = fit::defer([io]() { fdio_unsafe_release(io); });
+  const zx_handle_t channel = fdio_unsafe_borrow_channel(io);
+  zx::result client = Watch(fidl::UnownedClientEnd<fuchsia_io::Directory>(channel));
+  if (client.is_ok()) {
+    *out_dir_watcher = std::make_unique<DirWatcher>(std::move(client.value()));
+  }
+  return client.status_value();
 }
 
 __EXPORT
