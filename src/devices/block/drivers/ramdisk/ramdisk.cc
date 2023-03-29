@@ -119,7 +119,8 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
   bool dead;
   bool read = false;
 
-  switch ((txn.operation()->command &= BLOCK_OP_MASK)) {
+  const auto flags = txn.operation()->command & BLOCK_FLAG_MASK;
+  switch (txn.operation()->command &= BLOCK_OP_MASK) {
     case BLOCK_OP_READ: {
       read = true;
       __FALLTHROUGH;
@@ -128,6 +129,10 @@ void Ramdisk::BlockImplQueue(block_op_t* bop, block_impl_queue_callback completi
       if (zx_status_t status = block::CheckIoRange(txn.operation()->rw, block_count_);
           status != ZX_OK) {
         txn.Complete(status);
+        return;
+      }
+      if (flags & BLOCK_FL_FORCE_ACCESS) {
+        txn.Complete(ZX_ERR_NOT_SUPPORTED);
         return;
       }
 

@@ -370,6 +370,10 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
         txn_complete(txn, status);
         return;
       }
+      if (txn->op.command & BLOCK_FL_FORCE_ACCESS) {
+        txn_complete(txn, ZX_ERR_NOT_SUPPORTED);
+        return;
+      }
       LTRACEF("txn %p, command %#x\n", txn, txn->op.command);
       break;
     case BLOCK_OP_FLUSH:

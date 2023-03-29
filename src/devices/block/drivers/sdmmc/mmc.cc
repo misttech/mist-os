@@ -427,6 +427,8 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
   if (raw_ext_csd_[MMC_EXT_CSD_CACHE_CTRL] & MMC_EXT_CSD_CACHE_EN_MASK) {
     return ZX_ERR_BAD_STATE;
   }
+  // Since the cache is never enabled, report FUA as being supported.
+  block_info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
 
   return ZX_OK;
 }

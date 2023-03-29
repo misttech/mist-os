@@ -60,6 +60,7 @@ zx_status_t Disk::AddDisk() {
   if (mode_sense_data.is_error()) {
     return mode_sense_data.status_value();
   }
+  dpo_fua_available_ = mode_sense_data.value().dpo_fua_available();
   write_protected_ = mode_sense_data.value().write_protected();
 
   zx::result write_cache_enabled = controller_->ModeSenseWriteCacheEnabled(target_, lun_);
@@ -107,8 +108,9 @@ void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
   info_out->block_size = block_size_bytes_;
   info_out->block_count = block_count_;
   info_out->max_transfer_size = max_transfer_bytes_;
-  info_out->flags =
-      (write_protected_ ? BLOCK_FLAG_READONLY : 0) | (removable_ ? BLOCK_FLAG_REMOVABLE : 0);
+  info_out->flags = (write_protected_ ? BLOCK_FLAG_READONLY : 0) |
+                    (removable_ ? BLOCK_FLAG_REMOVABLE : 0) |
+                    (dpo_fua_available_ ? BLOCK_FLAG_FUA_SUPPORT : 0);
   *block_op_size_out = controller_->BlockOpSize();
 }
 
@@ -126,6 +128,11 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
         completion_cb(cookie, status, op);
         return;
       }
+      if (!dpo_fua_available_ && (op->command & BLOCK_FL_FORCE_ACCESS)) {
+        completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);
+        return;
+      }
+
       const bool is_write = op_type == BLOCK_OP_WRITE;
       const bool is_fua = op->command & BLOCK_FL_FORCE_ACCESS;
       uint8_t cdb_buffer[16] = {};

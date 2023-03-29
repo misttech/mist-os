@@ -180,7 +180,8 @@ zx_status_t SataDevice::Init() {
 
   const bool fua_command_supported =
       devinfo.command_set1_2 & SATA_DEVINFO_CMD_SET1_2_WRITE_DMA_FUA_EXT_SUPPORTED;
-  if (fua_command_supported) {
+  // READ_FPDMA_QUEUED and WRITE_FPDMA_QUEUED commands also support FUA.
+  if (fua_command_supported || use_command_queue_) {
     info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
   }
   inspect_device.RecordBool("fua_command_supported", fua_command_supported);
@@ -222,6 +223,10 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
         txn->Complete(status);
         return;
       }
+      if (!(info_.flags & BLOCK_FLAG_FUA_SUPPORT) && (bop->command & BLOCK_FL_FORCE_ACCESS)) {
+        txn->Complete(ZX_ERR_NOT_SUPPORTED);
+        return;
+      }
 
       txn->device = 0x40;
       if (BLOCK_OP(bop->command) == BLOCK_OP_READ) {
@@ -233,13 +238,12 @@ void SataDevice::BlockImplQueue(block_op_t* bop, block_impl_queue_callback compl
       } else {
         if (use_command_queue_) {
           txn->cmd = SATA_CMD_WRITE_FPDMA_QUEUED;
-          if (BLOCK_FLAGS(bop->command) & BLOCK_FL_FORCE_ACCESS) {
+          if (bop->command & BLOCK_FL_FORCE_ACCESS) {
             txn->device |= 1 << 7;  // Set FUA
           }
         } else {
-          txn->cmd = (BLOCK_FLAGS(bop->command) & BLOCK_FL_FORCE_ACCESS)
-                         ? SATA_CMD_WRITE_DMA_FUA_EXT
-                         : SATA_CMD_WRITE_DMA_EXT;
+          txn->cmd = (bop->command & BLOCK_FL_FORCE_ACCESS) ? SATA_CMD_WRITE_DMA_FUA_EXT
+                                                            : SATA_CMD_WRITE_DMA_EXT;
         }
       }
 

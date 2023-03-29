@@ -70,6 +70,7 @@ class Disk : public DeviceType,
   uint16_t lun() const { return lun_; }
 
   bool removable() const { return removable_; }
+  bool dpo_fua_available() const { return dpo_fua_available_; }
   bool write_protected() const { return write_protected_; }
   bool write_cache_enabled() const { return write_cache_enabled_; }
   uint64_t block_count() const { return block_count_; }
@@ -89,6 +90,7 @@ class Disk : public DeviceType,
   uint32_t max_transfer_blocks_;
 
   bool removable_;
+  bool dpo_fua_available_;
   bool write_protected_;
   bool write_cache_enabled_;
   uint64_t block_count_;

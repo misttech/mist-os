@@ -37,7 +37,6 @@
 #define SATA_MAX_BLOCK_COUNT 0x10000  // 16-bit count
 
 #define BLOCK_OP(op) ((op)&BLOCK_OP_MASK)
-#define BLOCK_FLAGS(op) ((op)&BLOCK_FLAG_MASK)
 
 namespace ahci {
 

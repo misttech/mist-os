@@ -181,6 +181,10 @@ void BlockDevice::BlockImplQueue(block_op_t* operation, block_impl_queue_callbac
         completion_cb(cookie, status, operation);
         return;
       }
+      if (operation->command & BLOCK_FL_FORCE_ACCESS) {
+        completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, operation);
+        return;
+      }
       break;
     }
     case BLOCK_OP_TRIM:

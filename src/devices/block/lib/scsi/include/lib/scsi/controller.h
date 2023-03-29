@@ -150,6 +150,7 @@ struct ModeSense6ParameterHeader {
   uint8_t block_descriptor_length;
 
   DEF_SUBBIT(device_specific_parameter, 7, write_protected);
+  DEF_SUBBIT(device_specific_parameter, 4, dpo_fua_available);
 } __PACKED;
 
 static_assert(sizeof(ModeSense6ParameterHeader) == 4, "Mode Sense 6 parameters must be 4 bytes");
