@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fxtest/fxtest.dart';
@@ -237,6 +238,12 @@ class FuchsiaTestCommand {
             "--ignore-missing-packages",
           ];
 
+          int? delivery_blob_type = await readDeliveryBlobType(
+              outputDir + "/delivery_blob_config.json");
+          if (delivery_blob_type != null) {
+            args.addAll(["--delivery-blob-type", "${delivery_blob_type}"]);
+          }
+
           args.add("--package-list");
           args.add(outputDir + "/all_package_manifests.list");
           args.add(amberFilesDir);
@@ -295,6 +302,17 @@ class FuchsiaTestCommand {
       testDefinitions: testDefinitions,
       testsConfig: testsConfig,
     );
+  }
+
+  Future<int?> readDeliveryBlobType(
+    String path,
+  ) async {
+    File file = await File(path);
+    if (!await file.exists()) {
+      return null;
+    }
+    final delivery_blob_config = jsonDecode(await file.readAsString());
+    return delivery_blob_config["type"];
   }
 
   void noMatchesHelp({
