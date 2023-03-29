@@ -32,8 +32,8 @@ use std::rc::Rc;
 ///   multiple temperature sensors to determine their individual thermal load values. It also
 ///   differs from ThermalPolicy because it calculates ThermalLoad based on observed filtered
 ///   temperature with respect to configured per-sensor onset/reboot temperatures, whereas
-///   ThermalPolicy uses proportional and integral errors (where "error" is the filtered temperature
-///   delta with respect to a configured target temperature).
+///   ThermalPolicy uses integral errors (where "error" is the filtered temperature delta with
+///   respect to a configured target temperature).
 ///
 ///   To do this, the node polls each of the provided temperature handler nodes at their specified
 ///   polling intervals. The temperature is used to calculate a per-sensor thermal load value (each

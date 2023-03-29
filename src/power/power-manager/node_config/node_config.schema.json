@@ -661,10 +661,6 @@
                                         "minimum": 0,
                                         "exclusiveMinimum": true
                                     },
-                                    "proportional_gain": {
-                                        "type": "number",
-                                        "minimum": 0
-                                    },
                                     "integral_gain": {
                                         "type": "number",
                                         "minimum": 0
@@ -678,7 +674,6 @@
                                     "e_integral_min",
                                     "e_integral_max",
                                     "sustainable_power",
-                                    "proportional_gain",
                                     "integral_gain"
                                 ]
                             }

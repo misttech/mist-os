@@ -433,7 +433,6 @@ fn default_policy_params() -> ThermalPolicyParams {
             e_integral_min: -20.0,
             e_integral_max: 0.0,
             sustainable_power: Watts(1.3),
-            proportional_gain: 0.0,
             integral_gain: 0.2,
         },
         thermal_shutdown_temperature: Celsius(95.0),

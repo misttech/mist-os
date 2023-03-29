@@ -61,7 +61,6 @@ impl<'a> ThermalPolicyBuilder<'a> {
             e_integral_min: f64,
             e_integral_max: f64,
             sustainable_power: f64,
-            proportional_gain: f64,
             integral_gain: f64,
         }
 
@@ -113,7 +112,6 @@ impl<'a> ThermalPolicyBuilder<'a> {
                     e_integral_min: data.config.controller_params.e_integral_min,
                     e_integral_max: data.config.controller_params.e_integral_max,
                     sustainable_power: Watts(data.config.controller_params.sustainable_power),
-                    proportional_gain: data.config.controller_params.proportional_gain,
                     integral_gain: data.config.controller_params.integral_gain,
                 },
                 thermal_shutdown_temperature: Celsius(data.config.thermal_shutdown_temperature),
@@ -235,9 +233,6 @@ pub struct ThermalControllerParams {
     /// The available power when there is no temperature error
     pub sustainable_power: Watts,
 
-    /// The proportional gain [W / degC] for the PI control calculation
-    pub proportional_gain: f64,
-
     /// The integral gain [W / (degC * s)] for the PI control calculation
     pub integral_gain: f64,
 }
@@ -291,10 +286,9 @@ impl ThermalPolicy {
     /// following steps will be taken:
     ///     1. Read the current temperature from the temperature driver specified in ThermalConfig
     ///     2. Filter the raw temperature value using a low-pass filter
-    ///     3. Use the new filtered temperature to calculate the proportional error and integral
-    ///        error of temperature relative to the configured target temperature
-    ///     4. Use the proportional error and integral error to derive thermal load and available
-    ///        power values
+    ///     3. Use the new filtered temperature to calculate the integral error of temperature
+    ///        relative to the configured target temperature
+    ///     4. Use the integral error to derive thermal load and available power values
     ///     5. Update the relevant nodes with the new thermal load and available power information
     async fn iterate_thermal_control(&self) -> Result<(), Error> {
         fuchsia_trace::duration!("power_manager", "ThermalPolicy::iterate_thermal_control");
@@ -303,8 +297,7 @@ impl ThermalPolicy {
         let time_delta = self.get_time_delta(timestamp);
 
         let temperature = self.state.temperature_filter.get_temperature(timestamp).await?;
-        let (error_proportional, error_integral) =
-            self.get_temperature_error(temperature.filtered, time_delta);
+        let error_integral = self.get_temperature_error(temperature.filtered, time_delta);
         let thermal_load = Self::calculate_thermal_load(
             error_integral,
             self.config.policy_params.controller_params.e_integral_min,
@@ -341,7 +334,7 @@ impl ThermalPolicy {
         );
 
         // Update the power allocation according to the new temperature error readings
-        let result = self.update_power_allocation(error_proportional, error_integral).await;
+        let result = self.update_power_allocation(error_integral).await;
         log_if_err!(result, "Error running thermal feedback controller");
         fuchsia_trace::instant!(
             "power_manager",
@@ -365,9 +358,9 @@ impl ThermalPolicy {
         time_delta
     }
 
-    /// Calculates proportional error and integral error of temperature using the provided input
-    /// temperature and time delta. Stores the new integral error and logs it to Inspect.
-    fn get_temperature_error(&self, temperature: Celsius, time_delta: Seconds) -> (f64, f64) {
+    /// Calculates integral error of temperature using the provided input temperature and time
+    /// delta. Stores the new integral error and logs it to Inspect.
+    fn get_temperature_error(&self, temperature: Celsius, time_delta: Seconds) -> f64 {
         let controller_params = &self.config.policy_params.controller_params;
         let error_proportional = controller_params.target_temperature.0 - temperature.0;
         let error_integral = num_traits::clamp(
@@ -377,7 +370,7 @@ impl ThermalPolicy {
         );
         self.state.error_integral.set(error_integral);
         self.inspect.error_integral.set(error_integral);
-        (error_proportional, error_integral)
+        error_integral
     }
 
     /// Logs various state data that is updated on each iteration of the thermal policy.
@@ -529,20 +522,15 @@ impl ThermalPolicy {
         }
     }
 
-    /// Updates the power allocation according to the provided proportional error and integral error
+    /// Updates the power allocation according to the provided integral error
     /// of temperature.
-    async fn update_power_allocation(
-        &self,
-        error_proportional: f64,
-        error_integral: f64,
-    ) -> Result<(), Error> {
+    async fn update_power_allocation(&self, error_integral: f64) -> Result<(), Error> {
         fuchsia_trace::duration!(
             "power_manager",
             "ThermalPolicy::update_power_allocation",
-            "error_proportional" => error_proportional,
             "error_integral" => error_integral
         );
-        let available_power = self.calculate_available_power(error_proportional, error_integral);
+        let available_power = self.calculate_available_power(error_integral);
         self.log_platform_metric(PlatformMetric::AvailablePower(available_power)).await;
         fuchsia_trace::counter!(
             "power_manager",
@@ -556,19 +544,16 @@ impl ThermalPolicy {
 
     /// A PI control algorithm that uses temperature as the measured process variable, and
     /// available power as the control variable.
-    fn calculate_available_power(&self, error_proportional: f64, error_integral: f64) -> Watts {
+    fn calculate_available_power(&self, error_integral: f64) -> Watts {
         fuchsia_trace::duration!(
             "power_manager",
             "ThermalPolicy::calculate_available_power",
-            "error_proportional" => error_proportional,
             "error_integral" => error_integral
         );
 
         let controller_params = &self.config.policy_params.controller_params;
-        let p_term = error_proportional * controller_params.proportional_gain;
         let i_term = error_integral * controller_params.integral_gain;
-        let power_available =
-            f64::max(0.0, controller_params.sustainable_power.0 + p_term + i_term);
+        let power_available = f64::max(0.0, controller_params.sustainable_power.0 + i_term);
 
         Watts(power_available)
     }
@@ -674,7 +659,6 @@ impl InspectData {
         ctrl_params_node.record_double("e_integral_min", params.e_integral_min);
         ctrl_params_node.record_double("e_integral_max", params.e_integral_max);
         ctrl_params_node.record_double("sustainable_power (W)", params.sustainable_power.0);
-        ctrl_params_node.record_double("proportional_gain", params.proportional_gain);
         ctrl_params_node.record_double("integral_gain", params.integral_gain);
         policy_params_node.record(ctrl_params_node);
 
@@ -702,7 +686,6 @@ pub mod tests {
                 e_integral_min: -20.0,
                 e_integral_max: 0.0,
                 sustainable_power: Watts(1.1),
-                proportional_gain: 0.0,
                 integral_gain: 0.2,
             },
             thermal_shutdown_temperature: Celsius(95.0),
@@ -766,8 +749,7 @@ pub mod tests {
         assert_eq!(node.state.max_time_delta.get(), Seconds(1.5));
     }
 
-    /// Tests that the `get_temperature_error` function correctly calculates proportional error and
-    /// integral error.
+    /// Tests that the `get_temperature_error` function correctly calculates integral error.
     #[fasync::run_singlethreaded(test)]
     async fn test_get_temperature_error() {
         let mut policy_params = default_policy_params();
@@ -786,9 +768,9 @@ pub mod tests {
         let node_futures = FuturesUnordered::new();
         let node = ThermalPolicyBuilder::new(thermal_config).build(&node_futures).await.unwrap();
 
-        assert_eq!(node.get_temperature_error(Celsius(40.0), Seconds(1.0)), (40.0, 0.0));
-        assert_eq!(node.get_temperature_error(Celsius(90.0), Seconds(1.0)), (-10.0, -10.0));
-        assert_eq!(node.get_temperature_error(Celsius(90.0), Seconds(1.0)), (-10.0, -20.0));
+        assert_eq!(node.get_temperature_error(Celsius(40.0), Seconds(1.0)), 0.0);
+        assert_eq!(node.get_temperature_error(Celsius(90.0), Seconds(1.0)), -10.0);
+        assert_eq!(node.get_temperature_error(Celsius(90.0), Seconds(1.0)), -20.0);
     }
 
     /// Tests that the ThermalPolicy will correctly divide total available power amongst multiple
@@ -912,7 +894,6 @@ pub mod tests {
                             "e_integral_max": policy_params.controller_params.e_integral_max,
                             "sustainable_power (W)":
                                 policy_params.controller_params.sustainable_power.0,
-                            "proportional_gain": policy_params.controller_params.proportional_gain,
                             "integral_gain": policy_params.controller_params.integral_gain,
                         }
                     }
@@ -936,7 +917,6 @@ pub mod tests {
                     "e_integral_min": -20.0,
                     "e_integral_max": 0.0,
                     "sustainable_power": 0.876,
-                    "proportional_gain": 0.0,
                     "integral_gain": 0.08
                 }
             },
@@ -972,7 +952,6 @@ pub mod tests {
         policy_params.controller_params.e_integral_max = 0.0;
         policy_params.controller_params.e_integral_min = -20.0;
         policy_params.thermal_shutdown_temperature = Celsius(80.0);
-        policy_params.controller_params.proportional_gain = 0.0;
         policy_params.controller_params.integral_gain = 0.1;
         policy_params.controller_params.sustainable_power = Watts(1.0);
         policy_params.controller_params.filter_time_constant = Seconds(0.0);
