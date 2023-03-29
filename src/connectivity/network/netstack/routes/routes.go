@@ -353,11 +353,12 @@ func (rt *RouteTable) UpdateStackLocked(stack *stack.Stack, onUpdateSucceeded fu
 		}
 	}
 	stack.SetRouteTable(t)
-	// Notify clients of `fuchsia.net.routes/Watcher` of the changes.
-	rt.sender.flushChanges()
 
 	_ = syslog.VLogTf(syslog.DebugVerbosity, tag, "UpdateStack route table: %+v", t)
 	onUpdateSucceeded()
+
+	// Notify clients of `fuchsia.net.routes/Watcher` of the changes.
+	rt.sender.flushChanges()
 }
 
 // UpdateStack updates stack with the current route table.
