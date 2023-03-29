@@ -32,17 +32,6 @@ type stackImpl struct {
 	dnsWatchers *dnsServerWatcherCollection
 }
 
-func (ns *Netstack) getForwardingTableDeprecated() []stack.ForwardingEntry {
-	ert := ns.GetExtendedRouteTable()
-	entries := make([]stack.ForwardingEntry, 0, len(ert))
-	for _, er := range ert {
-		entry := fidlconv.TCPIPRouteToForwardingEntry(er.Route)
-		entry.Metric = uint32(er.Metric)
-		entries = append(entries, entry)
-	}
-	return entries
-}
-
 // validateSubnet returns true if the prefix length is valid and no
 // address bits are set beyond the prefix length.
 func validateSubnet(subnet net.Subnet) bool {
@@ -105,10 +94,6 @@ func (ns *Netstack) delForwardingEntry(entry stack.ForwardingEntry) stack.StackD
 		return stack.StackDelForwardingEntryResultWithErr(stack.ErrorNotFound)
 	}
 	return stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{})
-}
-
-func (ni *stackImpl) GetForwardingTableDeprecated(fidl.Context) ([]stack.ForwardingEntry, error) {
-	return ni.ns.getForwardingTableDeprecated(), nil
 }
 
 func (ni *stackImpl) AddForwardingEntry(_ fidl.Context, entry stack.ForwardingEntry) (stack.StackAddForwardingEntryResult, error) {

@@ -4,11 +4,13 @@
 
 #![cfg(test)]
 
-use std::mem::size_of;
+use std::{collections::HashSet, mem::size_of};
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
-use fidl_fuchsia_net_stack as net_stack;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
@@ -19,7 +21,7 @@ use futures::{
 use net_declare::net_ip_v6;
 use net_types::{
     ethernet::Mac,
-    ip::{self as net_types_ip, Ip},
+    ip::{self as net_types_ip, Ip, Ipv6},
     LinkLocalAddress as _, MulticastAddr, MulticastAddress as _, SpecifiedAddress as _,
     Witness as _,
 };
@@ -31,8 +33,8 @@ use netstack_testing_common::{
         fail_dad_with_na, fail_dad_with_ns, send_ra, send_ra_with_router_lifetime, DadState,
     },
     realms::{constants, KnownServiceProvider, Netstack, NetstackVersion, TestSandboxExt as _},
-    setup_network, setup_network_with, sleep, ASYNC_EVENT_CHECK_INTERVAL,
-    ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
+    setup_network, setup_network_with, ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT,
+    ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT,
 };
 use netstack_testing_macros::netstack_test;
 use packet::ParsablePacket as _;
@@ -632,26 +634,29 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
     };
 
     async fn check_route_table(
-        stack: &net_stack::StackProxy,
-        want_routes: &[net_stack::ForwardingEntry],
+        realm: &netemul::TestRealm<'_>,
+        want_routes: &[fnet_routes_ext::InstalledRoute<Ipv6>],
     ) {
-        let check_attempts = ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds()
-            / ASYNC_EVENT_CHECK_INTERVAL.into_seconds();
-        for attempt in 0..check_attempts {
-            let () = sleep(ASYNC_EVENT_CHECK_INTERVAL.into_seconds()).await;
-            let route_table =
-                stack.get_forwarding_table_deprecated().await.expect("failed to get route table");
-
-            if want_routes.iter().all(|route| route_table.contains(route)) {
-                return;
-            }
-            println!("route table at attempt={}:\n{:?}", attempt, route_table);
-        }
-
-        panic!(
-            "timed out on waiting for a route table entry after {} seconds",
-            ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds(),
-        )
+        let ipv6_route_stream = {
+            let state_v6 = realm
+                .connect_to_protocol::<fnet_routes::StateV6Marker>()
+                .expect("connect to protocol");
+            fnet_routes_ext::event_stream_from_state::<Ipv6>(&state_v6)
+                .expect("failed to connect to watcher")
+        };
+        futures::pin_mut!(ipv6_route_stream);
+        let mut routes = HashSet::new();
+        fnet_routes_ext::wait_for_routes(ipv6_route_stream, &mut routes, |accumulated_routes| {
+            want_routes.iter().all(|route| accumulated_routes.contains(route))
+        })
+        .on_timeout(fuchsia_async::Time::after(ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT), || {
+            panic!(
+                "timed out on waiting for a route table entry after {} seconds",
+                ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT.into_seconds()
+            )
+        })
+        .await
+        .expect("error while waiting for routes to satisfy predicate");
     }
 
     let name = format!("{}_{}", test_name, sub_test_name);
@@ -661,9 +666,6 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
     const METRIC: u32 = 200;
     let (_network, realm, iface, fake_ep) =
         setup_network::<N>(&sandbox, name, Some(METRIC)).await.expect("failed to setup network");
-
-    let stack =
-        realm.connect_to_protocol::<net_stack::StackMarker>().expect("failed to get stack proxy");
 
     if forwarding {
         enable_ipv6_forwarding(&iface).await;
@@ -690,47 +692,68 @@ async fn on_and_off_link_route_discovery<N: Netstack>(
 
     let nicid = iface.id();
     check_route_table(
-        &stack,
+        &realm,
         &[
             // Test that a default route through the router is installed.
-            net_stack::ForwardingEntry {
-                subnet: net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: net_types_ip::Ipv6::UNSPECIFIED_ADDRESS.ipv6_bytes(),
+            fnet_routes_ext::InstalledRoute {
+                route: fnet_routes_ext::Route {
+                    destination: net_types::ip::Subnet::new(
+                        net_types::ip::Ipv6::UNSPECIFIED_ADDRESS,
+                        0,
+                    )
+                    .unwrap(),
+                    action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                        outbound_interface: nicid,
+                        next_hop: Some(net_types::SpecifiedAddr::new(ipv6_consts::LINK_LOCAL_ADDR))
+                            .unwrap(),
                     }),
-                    prefix_len: 0,
+                    properties: fnet_routes_ext::RouteProperties {
+                        specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                            metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                fnet_routes::Empty,
+                            ),
+                        },
+                    },
                 },
-                device_id: nicid,
-                next_hop: Some(Box::new(net::IpAddress::Ipv6(net::Ipv6Address {
-                    addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
-                }))),
-                metric: METRIC,
+                effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC },
             },
-            // Test that a route to `SUBNET_WITH_MORE_SPECIFIC_ROUTE` exists through the router.
-            net_stack::ForwardingEntry {
-                subnet: net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: SUBNET_WITH_MORE_SPECIFIC_ROUTE.network().ipv6_bytes(),
+            // Test that a route to `SUBNET_WITH_MORE_SPECIFIC_ROUTE` exists
+            // through the router.
+            fnet_routes_ext::InstalledRoute {
+                route: fnet_routes_ext::Route {
+                    destination: SUBNET_WITH_MORE_SPECIFIC_ROUTE,
+                    action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                        outbound_interface: nicid,
+                        next_hop: Some(net_types::SpecifiedAddr::new(ipv6_consts::LINK_LOCAL_ADDR))
+                            .unwrap(),
                     }),
-                    prefix_len: SUBNET_WITH_MORE_SPECIFIC_ROUTE.prefix(),
+                    properties: fnet_routes_ext::RouteProperties {
+                        specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                            metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                fnet_routes::Empty,
+                            ),
+                        },
+                    },
                 },
-                device_id: nicid,
-                next_hop: Some(Box::new(net::IpAddress::Ipv6(net::Ipv6Address {
-                    addr: ipv6_consts::LINK_LOCAL_ADDR.ipv6_bytes(),
-                }))),
-                metric: METRIC,
+                effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC },
             },
             // Test that the prefix should be discovered after it is advertised.
-            net_stack::ForwardingEntry {
-                subnet: net::Subnet {
-                    addr: net::IpAddress::Ipv6(net::Ipv6Address {
-                        addr: ipv6_consts::GLOBAL_PREFIX.network().ipv6_bytes(),
+            fnet_routes_ext::InstalledRoute::<Ipv6> {
+                route: fnet_routes_ext::Route {
+                    destination: ipv6_consts::GLOBAL_PREFIX,
+                    action: fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                        outbound_interface: nicid,
+                        next_hop: None,
                     }),
-                    prefix_len: ipv6_consts::GLOBAL_PREFIX.prefix(),
+                    properties: fnet_routes_ext::RouteProperties {
+                        specified_properties: fnet_routes_ext::SpecifiedRouteProperties {
+                            metric: fnet_routes::SpecifiedMetric::InheritedFromInterface(
+                                fnet_routes::Empty,
+                            ),
+                        },
+                    },
                 },
-                device_id: nicid,
-                next_hop: None,
-                metric: METRIC,
+                effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric: METRIC },
             },
         ][..],
     )
@@ -1217,64 +1240,57 @@ async fn add_device_adds_link_local_subnet_route<N: Netstack>(name: &str) {
 
     let id = iface.id();
 
-    // TODO(https://fxbug.dev/101842): Replace this with a proper routes API
-    // that we do not have to poll over. For now, the only flake-safe way of
-    // going about this is to poll the API.
-    let stack = realm
-        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-        .expect("connect to protocol)");
-    let forwarding_table_stream = futures::stream::unfold(stack, |stack| async move {
-        let table = stack.get_forwarding_table_deprecated().await.expect("get forwarding table");
-        Some((table, stack))
-    });
-    futures::pin_mut!(forwarding_table_stream);
+    // Connect to the routes watcher and filter out all routing events unrelated
+    // to the link-local subnet route.
+    let ipv6_route_stream = {
+        let state_v6 =
+            realm.connect_to_protocol::<fnet_routes::StateV6Marker>().expect("connect to protocol");
+        fnet_routes_ext::event_stream_from_state::<Ipv6>(&state_v6)
+            .expect("failed to connect to watcher")
+    };
 
-    forwarding_table_stream
-        .by_ref()
-        .filter_map(|forwarding_table| {
-            futures::future::ready(
-                forwarding_table
-                    .into_iter()
-                    .any(
-                        |fidl_fuchsia_net_stack::ForwardingEntry {
-                             subnet,
-                             device_id,
-                             next_hop,
-                             metric: _,
-                         }| {
-                            device_id == id
-                                && next_hop.is_none()
-                                && subnet == net_declare::fidl_subnet!("fe80::/64")
-                        },
-                    )
-                    .then(|| ()),
-            )
+    let link_local_subnet_route_events = ipv6_route_stream.filter_map(|event| {
+        let event = event.expect("error in stream");
+        futures::future::ready(match &event {
+            fnet_routes_ext::Event::Existing(route)
+            | fnet_routes_ext::Event::Added(route)
+            | fnet_routes_ext::Event::Removed(route) => {
+                let fnet_routes_ext::InstalledRoute {
+                    route: fnet_routes_ext::Route { destination, action, properties: _ },
+                    effective_properties: _,
+                } = route;
+                let (outbound_interface, next_hop) = match action {
+                    fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                        outbound_interface,
+                        next_hop,
+                    }) => (outbound_interface, next_hop),
+                    fnet_routes_ext::RouteAction::Unknown => {
+                        panic!("observed route with unknown action")
+                    }
+                };
+                (*outbound_interface == id
+                    && next_hop.is_none()
+                    && *destination == net_declare::net_subnet_v6!("fe80::/64"))
+                .then(|| event)
+            }
+            fnet_routes_ext::Event::Idle => None,
+            fnet_routes_ext::Event::Unknown => {
+                panic!("observed unknown event in stream");
+            }
         })
-        .next()
-        .await
-        .expect("stream ended");
+    });
+    futures::pin_mut!(link_local_subnet_route_events);
+
+    // Verify the link local subnet route is added.
+    assert_matches!(
+        link_local_subnet_route_events.next().await.expect("stream unexpectedly ended"),
+        fnet_routes_ext::Event::Existing(_) | fnet_routes_ext::Event::Added(_)
+    );
 
     // Removing the device should also remove the subnet route.
     drop(iface);
-
-    forwarding_table_stream
-        .by_ref()
-        .filter_map(|forwarding_table| {
-            futures::future::ready(
-                forwarding_table
-                    .into_iter()
-                    .all(
-                        |fidl_fuchsia_net_stack::ForwardingEntry {
-                             subnet: _,
-                             device_id,
-                             next_hop: _,
-                             metric: _,
-                         }| { device_id != id },
-                    )
-                    .then(|| ()),
-            )
-        })
-        .next()
-        .await
-        .expect("stream ended");
+    assert_matches!(
+        link_local_subnet_route_events.next().await.expect("stream unexpectedly ended"),
+        fnet_routes_ext::Event::Removed(_)
+    );
 }

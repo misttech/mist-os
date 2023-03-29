@@ -326,39 +326,45 @@ async fn inspect_routing_table<N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("failed to create realm");
 
-    let stack = realm
-        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-        .expect("failed to connect to fuchsia.net.stack/Stack");
+    // NB: The Netstack component won't be started until we attempt to access
+    // one of its FIDL services. Connect to fuchsia.net.interfaces/State to
+    // start it.
+    let _interfaces_state = realm
+        .connect_to_protocol::<fidl_fuchsia_net_interfaces::StateMarker>()
+        .expect("failed to connect to fuchsia.net.interfaces/State");
 
-    // Capture the state of the routing table to verify the inspect data, and
-    // confirm that it's not empty.
-    let routing_table =
-        stack.get_forwarding_table_deprecated().await.expect("get_route_table FIDL error");
-    assert!(!routing_table.is_empty());
-    println!("Got routing table: {:#?}", routing_table);
-
+    // NB: Hardcode the expected routes rather than look them up via FIDL
+    // (fuchsia.net.routes). They are "keyed" in the inspect data by their
+    // insertion order, but the `fuchsia.net.routes` API do not guarantee
+    // listing routes in any particular order.
     let mut routing_table_assertion = TreeAssertion::new("Routes", true);
-    for (i, route) in routing_table.into_iter().enumerate() {
-        let index = &i.to_string();
-        let fidl_fuchsia_net_stack_ext::ForwardingEntry { subnet, device_id, next_hop, metric } =
-            route.into();
-        let route_assertion = tree_assertion!(var index: {
-            "Destination": format!(
-                "{}",
-                subnet,
-            ),
-            "Gateway": match next_hop {
-                Some(next_hop) => next_hop.to_string(),
-                None => String::new(),
-            },
-            "NIC": device_id.to_string(),
-            "Metric": metric.to_string(),
-            "MetricTracksInterface": AnyProperty,
-            "Dynamic": AnyProperty,
-            "Enabled": AnyProperty,
-        });
-        routing_table_assertion.add_child_assertion(route_assertion);
-    }
+    routing_table_assertion.add_child_assertion(tree_assertion!("0": {
+        "Destination": "127.0.0.0/8",
+        "Gateway": "",
+        "NIC": "1",
+        "Metric": "100",
+        "MetricTracksInterface": "true",
+        "Dynamic": AnyProperty,
+        "Enabled": AnyProperty,
+    }));
+    routing_table_assertion.add_child_assertion(tree_assertion!("1": {
+        "Destination": "::1/128",
+        "Gateway": "",
+        "NIC": "1",
+        "Metric": "100",
+        "MetricTracksInterface": "true",
+        "Dynamic": AnyProperty,
+        "Enabled": AnyProperty,
+    }));
+    routing_table_assertion.add_child_assertion(tree_assertion!("2": {
+        "Destination": "255.255.255.255/32",
+        "Gateway": "",
+        "NIC": "1",
+        "Metric": "99999",
+        "MetricTracksInterface": "false",
+        "Dynamic": AnyProperty,
+        "Enabled": AnyProperty,
+    }));
 
     let data = get_inspect_data(&realm, "netstack", "Routes", "routes")
         .await

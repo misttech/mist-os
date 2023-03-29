@@ -14,6 +14,8 @@
 
 pub mod testutil;
 
+use std::collections::HashSet;
+
 use async_utils::fold;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
@@ -555,7 +557,7 @@ pub trait FidlRouteIpExt: Ip {
     type StateMarker: fidl::endpoints::DiscoverableProtocolMarker;
     /// The "watcher" protocol to use for this IP version.
     type WatcherMarker: fidl::endpoints::ProtocolMarker;
-    /// The type of "event" returned by the this IP version's watcher protocol.
+    /// The type of "event" returned by this IP version's watcher protocol.
     type WatchEvent: TryInto<Event<Self>, Error = FidlConversionError>
         + Clone
         + std::fmt::Debug
@@ -712,6 +714,74 @@ pub async fn collect_routes_until_idle<
     .map_err(|_accumulated_thus_far: Result<C, CollectRoutesUntilIdleError<I>>| {
         CollectRoutesUntilIdleError::StreamEnded
     })?
+}
+
+/// Errors returned by [`wait_for_routes`].
+#[derive(Clone, Debug, Error)]
+pub enum WaitForRoutesError<I: FidlRouteIpExt> {
+    /// There was an error in the event stream.
+    #[error("there was an error in the event stream: {0}")]
+    ErrorInStream(WatchError),
+    /// There was an `Added` event for an already existing route.
+    #[error("observed an added event for an already existing route: {0:?}")]
+    AddedAlreadyExisting(InstalledRoute<I>),
+    /// There was a `Removed` event for a non-existent route.
+    #[error("observed a removed event for a non-existent route: {0:?}")]
+    RemovedNonExistent(InstalledRoute<I>),
+    /// There was an `Unknown` event in the stream.
+    #[error("observed an unknown event")]
+    UnknownEvent,
+    /// The event stream unexpectedly ended.
+    #[error("the event stream unexpectedly ended")]
+    StreamEnded,
+}
+
+/// Wait for a condition on routing state to be satisfied.
+///
+/// With the given `initial_state`, take events from `event_stream` and update
+/// the state, calling `predicate` whenever the state changes. When predicates
+/// returns `True` yield `Ok(())`.
+pub async fn wait_for_routes<
+    I: FidlRouteIpExt,
+    S: futures::Stream<Item = Result<Event<I>, WatchError>> + Unpin,
+    F: Fn(&HashSet<InstalledRoute<I>>) -> bool,
+>(
+    event_stream: S,
+    initial_state: &mut HashSet<InstalledRoute<I>>,
+    predicate: F,
+) -> Result<(), WaitForRoutesError<I>> {
+    fold::try_fold_while(
+        event_stream.map_err(WaitForRoutesError::ErrorInStream),
+        initial_state,
+        |accumulated_routes, event| {
+            futures::future::ready({
+                match event {
+                    Event::Existing(route) | Event::Added(route) => accumulated_routes
+                        .insert(route)
+                        .then_some(())
+                        .ok_or(WaitForRoutesError::AddedAlreadyExisting(route)),
+                    Event::Removed(route) => accumulated_routes
+                        .remove(&route)
+                        .then_some(())
+                        .ok_or(WaitForRoutesError::RemovedNonExistent(route)),
+                    Event::Idle => Ok(()),
+                    Event::Unknown => Err(WaitForRoutesError::UnknownEvent),
+                }
+                .map(|()| {
+                    if predicate(&accumulated_routes) {
+                        fold::FoldWhile::Done(())
+                    } else {
+                        fold::FoldWhile::Continue(accumulated_routes)
+                    }
+                })
+            })
+        },
+    )
+    .await?
+    .short_circuited()
+    .map_err(|_accumulated_thus_far: &mut HashSet<InstalledRoute<I>>| {
+        WaitForRoutesError::StreamEnded
+    })
 }
 
 #[cfg(test)]
@@ -1618,5 +1688,100 @@ mod tests {
             &trailing_events[..],
             &[Ok(Event::Added(found_route))] if found_route == route
         );
+    }
+
+    #[netstack_test]
+    async fn wait_for_routes_errors<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+    ) {
+        let mut state = HashSet::new();
+        let event_stream =
+            futures::stream::once(futures::future::ready(Err(WatchError::EmptyEventBatch)));
+        assert_matches!(
+            wait_for_routes::<I, _, _>(event_stream, &mut state, |_| true).await,
+            Err(WaitForRoutesError::ErrorInStream(WatchError::EmptyEventBatch))
+        );
+        assert!(state.is_empty());
+
+        let event_stream = futures::stream::empty();
+        assert_matches!(
+            wait_for_routes::<I, _, _>(event_stream, &mut state, |_| true).await,
+            Err(WaitForRoutesError::StreamEnded)
+        );
+        assert!(state.is_empty());
+
+        let event_stream = futures::stream::once(futures::future::ready(Ok(Event::<I>::Unknown)));
+        assert_matches!(
+            wait_for_routes::<I, _, _>(event_stream, &mut state, |_| true).await,
+            Err(WaitForRoutesError::UnknownEvent)
+        );
+        assert!(state.is_empty());
+    }
+
+    #[netstack_test]
+    async fn wait_for_routes_add_remove<I: net_types::ip::Ip + FidlRouteIpExt>(
+        // TODO(https://fxbug.dev/119320): remove `_test_name` once optional.
+        _test_name: &str,
+    ) {
+        let into_stream = |t| futures::stream::once(futures::future::ready(t));
+
+        let route = arbitrary_test_route::<I>();
+        let mut state = HashSet::new();
+
+        // Verify that checking for the presence of a route blocks until the
+        // route is added.
+        let has_route = |routes: &HashSet<InstalledRoute<I>>| routes.contains(&route);
+        assert_matches!(
+            wait_for_routes::<I, _, _>(futures::stream::pending(), &mut state, has_route)
+                .now_or_never(),
+            None
+        );
+        assert!(state.is_empty());
+        assert_matches!(
+            wait_for_routes::<I, _, _>(into_stream(Ok(Event::Added(route))), &mut state, has_route)
+                .now_or_never(),
+            Some(Ok(()))
+        );
+        assert_eq!(state, HashSet::from_iter([route]));
+
+        // Re-add the route and observe an error.
+        assert_matches!(
+            wait_for_routes::<I, _, _>(into_stream(Ok(Event::Added(route))), &mut state, has_route)
+                .now_or_never(),
+            Some(Err(WaitForRoutesError::AddedAlreadyExisting(r))) if r == route
+        );
+        assert_eq!(state, HashSet::from_iter([route]));
+
+        // Verify that checking for the absence of a route blocks until the
+        // route is removed.
+        let does_not_have_route = |routes: &HashSet<InstalledRoute<I>>| !routes.contains(&route);
+        assert_matches!(
+            wait_for_routes::<I, _, _>(futures::stream::pending(), &mut state, does_not_have_route)
+                .now_or_never(),
+            None
+        );
+        assert_eq!(state, HashSet::from_iter([route]));
+        assert_matches!(
+            wait_for_routes::<I, _, _>(
+                into_stream(Ok(Event::Removed(route))),
+                &mut state,
+                does_not_have_route
+            )
+            .now_or_never(),
+            Some(Ok(()))
+        );
+        assert!(state.is_empty());
+
+        // Remove a non-existent route and observe an error.
+        assert_matches!(
+            wait_for_routes::<I, _, _>(
+                into_stream(Ok(Event::Removed(route))),
+                &mut state,
+                does_not_have_route
+            ).now_or_never(),
+            Some(Err(WaitForRoutesError::RemovedNonExistent(r))) if r == route
+        );
+        assert!(state.is_empty());
     }
 }

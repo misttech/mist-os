@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use core::ops::{Deref as _, DerefMut as _};
+use core::ops::DerefMut as _;
 
 use super::{
-    util::{IntoFidl, TryFromFidlWithContext as _, TryIntoCore as _, TryIntoFidlWithContext as _},
+    util::{IntoFidl, TryFromFidlWithContext as _, TryIntoCore as _},
     BindingsNonSyncCtxImpl,
 };
 
@@ -38,16 +38,6 @@ impl StackFidlWorker {
         stream
             .try_fold(Self { netstack }, |worker, req| async {
                 match req {
-                    StackRequest::GetForwardingTableDeprecated { responder } => {
-                        responder_send!(
-                            responder,
-                            &mut worker
-                                .lock_worker()
-                                .await
-                                .fidl_get_forwarding_table_deprecated()
-                                .iter_mut()
-                        );
-                    }
                     StackRequest::AddForwardingEntry { entry, responder } => {
                         responder_send!(
                             responder,
@@ -110,21 +100,6 @@ impl StackFidlWorker {
 }
 
 impl<'a> LockedFidlWorker<'a> {
-    fn fidl_get_forwarding_table_deprecated(self) -> Vec<fidl_net_stack::ForwardingEntry> {
-        let Ctx { sync_ctx, non_sync_ctx } = self.ctx.deref();
-
-        netstack3_core::ip::get_all_routes(sync_ctx)
-            .into_iter()
-            .filter_map(|entry| match entry.try_into_fidl_with_ctx(&non_sync_ctx) {
-                Ok(entry) => Some(entry),
-                Err(e) => {
-                    error!("Failed to map forwarding entry into FIDL: {:?}", e);
-                    None
-                }
-            })
-            .collect()
-    }
-
     fn fidl_add_forwarding_entry(
         mut self,
         entry: ForwardingEntry,

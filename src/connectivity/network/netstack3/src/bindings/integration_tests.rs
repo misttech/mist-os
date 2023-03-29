@@ -32,7 +32,7 @@ use netstack3_core::{
 
 use crate::bindings::{
     devices::Devices,
-    util::{ConversionContext as _, IntoFidl as _},
+    util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
     BindingsNonSyncCtxImpl, RequestStreamExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
 
@@ -744,7 +744,20 @@ async fn test_list_del_routes() {
         },
     ];
 
-    let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
+    async fn get_routing_table(ts: &TestStack) -> Vec<fidl_net_stack::ForwardingEntry> {
+        let mut ctx = ts.ctx().await;
+        let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
+        netstack3_core::ip::get_all_routes(sync_ctx)
+            .into_iter()
+            .map(|entry| {
+                entry
+                    .try_into_fidl_with_ctx(&non_sync_ctx)
+                    .expect("failed to map forwarding entry into FIDL")
+            })
+            .collect()
+    }
+
+    let routes = get_routing_table(test_stack).await;
     assert_eq!(routes, expected_routes);
 
     // delete route1:
@@ -760,7 +773,7 @@ async fn test_list_del_routes() {
     );
 
     // check that route was deleted (should've disappeared from core)
-    let routes = stack.get_forwarding_table_deprecated().await.expect("Can get forwarding table");
+    let routes = get_routing_table(test_stack).await;
     let expected_routes =
         expected_routes.into_iter().filter(|route| route != &route1_fwd_entry).collect::<Vec<_>>();
     assert_eq!(routes, expected_routes);

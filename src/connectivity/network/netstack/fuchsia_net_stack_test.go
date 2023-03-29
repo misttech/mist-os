@@ -64,8 +64,16 @@ func TestFuchsiaNetStack(t *testing.T) {
 		t.Cleanup(ifs.RemoveByUser)
 		ni := stackImpl{ns: ns}
 
-		table, err := ni.GetForwardingTableDeprecated(context.Background())
-		AssertNoError(t, err)
+		getTable := func(ns *Netstack) []stack.ForwardingEntry {
+			ert := ns.GetExtendedRouteTable()
+			entries := make([]stack.ForwardingEntry, 0, len(ert))
+			for _, er := range ert {
+				entry := fidlconv.TCPIPRouteToForwardingEntry(er.Route)
+				entry.Metric = uint32(er.Metric)
+				entries = append(entries, entry)
+			}
+			return entries
+		}
 
 		// The multicast subnet routes that are implicitly installed on all devices.
 		ipv4MulticastSubnetRoute := stack.ForwardingEntry{
@@ -128,8 +136,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if addResult != stack.StackAddForwardingEntryResultWithResponse(stack.StackAddForwardingEntryResponse{}) {
 			t.Fatalf("got ni.AddForwardingEntry(%#v) = %#v, want = Response()", localRoute, addResult)
 		}
-		table, err = ni.GetForwardingTableDeprecated(context.Background())
-		AssertNoError(t, err)
+		table := getTable(ns)
 		expectedTable := []stack.ForwardingEntry{
 			wantLocalRoute,
 			ipv4MulticastSubnetRoute,
@@ -145,7 +152,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if addResult != stack.StackAddForwardingEntryResultWithResponse(stack.StackAddForwardingEntryResponse{}) {
 			t.Errorf("got ni.AddForwardingEntry(%#v) = %#v, want = Response()", localRoute, addResult)
 		}
-		table, err = ni.GetForwardingTableDeprecated(context.Background())
+		table = getTable(ns)
 		AssertNoError(t, err)
 		if diff := cmp.Diff(expectedTable, table, cmpopts.IgnoreTypes(struct{}{})); diff != "" {
 			t.Fatalf("forwarding table mismatch (-want +got):\n%s", diff)
@@ -157,7 +164,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if addResult != stack.StackAddForwardingEntryResultWithResponse(stack.StackAddForwardingEntryResponse{}) {
 			t.Errorf("got ni.AddForwardingEntry(%#v) = %#v, want = Response()", defaultRoute, addResult)
 		}
-		table, err = ni.GetForwardingTableDeprecated(context.Background())
+		table = getTable(ns)
 		AssertNoError(t, err)
 		expectedTable = []stack.ForwardingEntry{
 			wantLocalRoute,
@@ -189,7 +196,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if delResult != stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{}) {
 			t.Fatalf("got ni.DelForwardingEntry(%#v) = Err(%s), want = Response()", localRoute, delResult.Err)
 		}
-		table, err = ni.GetForwardingTableDeprecated(context.Background())
+		table = getTable(ns)
 		AssertNoError(t, err)
 		expectedTable = []stack.ForwardingEntry{
 			ipv4MulticastSubnetRoute,
@@ -206,7 +213,7 @@ func TestFuchsiaNetStack(t *testing.T) {
 		if delResult != stack.StackDelForwardingEntryResultWithResponse(stack.StackDelForwardingEntryResponse{}) {
 			t.Fatalf("got ni.DelForwardingEntry(%#v) = Err(%s), want = Response()", localRoute, delResult.Err)
 		}
-		table, err = ni.GetForwardingTableDeprecated(context.Background())
+		table = getTable(ns)
 		AssertNoError(t, err)
 		expectedTable = []stack.ForwardingEntry{
 			ipv4MulticastSubnetRoute,

@@ -4,12 +4,14 @@
 use {
     anyhow::{format_err, Context as _, Error},
     fidl_fuchsia_net_interfaces as fnet_interfaces,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_routes as fnet_routes,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext,
     fidl_fuchsia_net_stack::StackMarker,
     fuchsia_async as fasync,
     fuchsia_component::client,
     fuchsia_syslog::fx_log_info,
     net_declare::fidl_subnet,
+    net_types::ip::Ipv6,
     prettytable::{cell, format, row, Table},
     std::collections::HashMap,
     std::io::{Read as _, Write as _},
@@ -116,19 +118,36 @@ async fn run_fuchsia_node() -> Result<(), Error> {
 
     fx_log_info!("successfully added entries to route table");
 
-    let route_table =
-        stack.get_forwarding_table_deprecated().await.context("error retrieving routing table")?;
+    let ipv6_routing_table = {
+        let state_v6 = client::connect_to_protocol::<fnet_routes::StateV6Marker>()
+            .context("connect to protocol")?;
+        let stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&state_v6)
+            .context("failed to connect to watcher")?;
+        futures::pin_mut!(stream);
+        fnet_routes_ext::collect_routes_until_idle::<_, Vec<_>>(stream)
+            .await
+            .context("failed to get routing table")?
+    };
 
     let mut t = Table::new();
     t.set_format(format::FormatBuilder::new().padding(2, 2).build());
 
     t.set_titles(row!["Destination", "Gateway", "NICID", "Metric"]);
-    for entry in route_table {
-        let fidl_fuchsia_net_stack_ext::ForwardingEntry { subnet, device_id, next_hop, metric } =
-            entry.into();
+    for route in ipv6_routing_table {
+        let fnet_routes_ext::InstalledRoute {
+            route: fnet_routes_ext::Route { destination, action, properties: _ },
+            effective_properties: fnet_routes_ext::EffectiveRouteProperties { metric },
+        } = route;
+        let (outbound_interface, next_hop) = match action {
+            fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                outbound_interface,
+                next_hop,
+            }) => (outbound_interface, next_hop),
+            fnet_routes_ext::RouteAction::Unknown => panic!("route with unknown action"),
+        };
         let next_hop = next_hop.map(|next_hop| next_hop.to_string());
         let next_hop = next_hop.as_ref().map_or("-", |s| s.as_str());
-        t.add_row(row![subnet, next_hop, device_id, metric]);
+        t.add_row(row![destination, next_hop, outbound_interface, metric]);
     }
 
     fx_log_info!("{}", t.printstd());

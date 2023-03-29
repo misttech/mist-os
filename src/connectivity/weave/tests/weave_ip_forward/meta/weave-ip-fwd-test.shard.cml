@@ -130,6 +130,7 @@
         {
             protocol: [
                 "fuchsia.net.interfaces.State",
+                "fuchsia.net.routes.StateV6",
                 "fuchsia.net.stack.Stack",
             ],
             from: "#fuchsia-netstack",

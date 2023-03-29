@@ -8,7 +8,10 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_net as fnet;
 use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
+use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_posix_socket as fposix_socket;
 use fuchsia_async::{
     self as fasync,
@@ -19,7 +22,7 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon_status as zx_status;
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_mac, fidl_subnet, std_ip_v6, std_socket_addr};
-use net_types::ip::{IpAddress as _, IpVersion};
+use net_types::ip::{IpAddress as _, IpVersion, Ipv4};
 use netemul::RealmUdpSocket as _;
 use netstack_testing_common::{
     devices::create_tun_device,
@@ -510,10 +513,6 @@ async fn add_address_success<N: Netstack>(name: &str) {
         .connect_to_protocol::<fidl_fuchsia_net_debug::InterfacesMarker>()
         .expect(<fidl_fuchsia_net_debug::InterfacesMarker as fidl::endpoints::DiscoverableProtocolMarker>::PROTOCOL_NAME);
 
-    let stack = realm
-        .connect_to_protocol::<fidl_fuchsia_net_stack::StackMarker>()
-        .expect("connect to protocol");
-
     let (control, server) = fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
         .expect("create Control proxy");
     let () = debug_control.get_admin(*id, server).expect("get admin");
@@ -529,13 +528,25 @@ async fn add_address_success<N: Netstack>(name: &str) {
                 .await
                 .expect("add address failed unexpectedly");
 
-        // Ensure that no route to the subnet was added as a result of adding the address.
-        assert!(stack
-            .get_forwarding_table_deprecated()
-            .await
-            .expect("FIDL error calling fuchsia.net.stack/Stack.GetForwardingTable")
-            .into_iter()
-            .all(|r| r.subnet != subnet));
+        let ipv4_routing_table = {
+            let state_v4 = realm
+                .connect_to_protocol::<fnet_routes::StateV4Marker>()
+                .expect("connect to protocol");
+            let stream = fnet_routes_ext::event_stream_from_state::<Ipv4>(&state_v4)
+                .expect("failed to connect to watcher");
+            futures::pin_mut!(stream);
+            fnet_routes_ext::collect_routes_until_idle::<_, Vec<_>>(stream)
+                .await
+                .expect("failed to get routing table")
+        };
+        // Ensure that no route to the subnet was added as a result of adding
+        // the address.
+        let subnet_route_is_missing = ipv4_routing_table.iter().all(|route| {
+            <net_types::ip::Subnet<net_types::ip::Ipv4Addr> as IntoExt<fnet::Subnet>>::into_ext(
+                route.route.destination,
+            ) != subnet
+        });
+        assert!(subnet_route_is_missing);
 
         let event_stream =
             fidl_fuchsia_net_interfaces_ext::event_stream_from_state(&interface_state)
