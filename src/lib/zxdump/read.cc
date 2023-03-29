@@ -1153,6 +1153,18 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
   auto add_segment = [where, &process](uint64_t vaddr,
                                        Process::Segment segment)  //
       -> fit::result<Error> {
+    if (vaddr % process.dump_page_size() != 0) {
+      return fit::error(Error{
+          "ELF core file PT_LOAD segment p_vaddr not page-aligned",
+          ZX_ERR_IO_DATA_INTEGRITY,
+      });
+    }
+    if (segment.offset % process.dump_page_size() != 0) {
+      return fit::error(Error{
+          "ELF core file PT_LOAD segment p_offset not page-aligned",
+          ZX_ERR_IO_DATA_INTEGRITY,
+      });
+    }
     ZX_DEBUG_ASSERT(segment.memsz > 0);
     if (!process.memory_.empty()) {
       const auto& [last_vaddr, last_segment] = *process.memory_.crbegin();
