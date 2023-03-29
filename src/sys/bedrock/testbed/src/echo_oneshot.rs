@@ -19,13 +19,13 @@
 //! Since the `Sender`/`Receiver` channel is one-shot, the client cannot reconnect.
 
 use {
+    crate::task::{create_task, AlreadyStopped, ArcError, RunningTask},
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    exec::{Start, Stop},
+    exec::{Lifecycle, Start},
     fidl::endpoints::{spawn_stream_handler, Proxy},
     fidl::HandleBased,
     fidl_fuchsia_examples as fexamples, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::try_join,
     tracing::info,
 };
 
@@ -70,38 +70,33 @@ impl EchoServer {
 
 #[async_trait]
 impl Start for EchoServer {
-    type Error = Error;
-    type Stop = Self;
+    type Error = AlreadyStopped;
+    type Stop = RunningTask<Result<(), ArcError>>;
 
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
-        info!("started EchoServer");
+        create_task(async move {
+            info!("started EchoServer");
 
-        let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming
-            .entries
-            .lock()
-            .await
-            .remove(ECHO_CAP_NAME)
-            .context("no echo cap in incoming")?;
-        let echo_sender = echo_cap
-            .downcast::<cap::oneshot::Sender>()
-            .map_err(|_| anyhow!("echo cap is not a Sender"))?;
-        info!("(server) echo sender: {:?}", echo_sender);
+            let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
+            let echo_cap = incoming
+                .entries
+                .lock()
+                .await
+                .remove(ECHO_CAP_NAME)
+                .context("no echo cap in incoming")?;
+            let echo_sender = echo_cap
+                .downcast::<cap::oneshot::Sender>()
+                .map_err(|_| anyhow!("echo cap is not a Sender"))?;
+            info!("(server) echo sender: {:?}", echo_sender);
 
-        // Start the echo server and send the client end.
-        let echo_handle = Box::new(Echo::new().into_handle_cap());
-        echo_sender.send(echo_handle).expect("failed to send Echo");
+            // Start the echo server and send the client end.
+            let echo_handle = Box::new(Echo::new().into_handle_cap());
+            echo_sender.send(echo_handle).expect("failed to send Echo");
 
-        Ok(self)
-    }
-}
-
-#[async_trait]
-impl Stop for EchoServer {
-    type Error = Error;
-
-    async fn stop(&mut self) -> Result<(), Self::Error> {
-        Ok(())
+            Ok(())
+        })
+        .start()
+        .await
     }
 }
 
@@ -117,49 +112,43 @@ impl EchoClient {
 
 #[async_trait]
 impl Start for EchoClient {
-    type Error = Error;
-    type Stop = Self;
+    type Error = AlreadyStopped;
+    type Stop = RunningTask<Result<(), ArcError>>;
 
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
-        info!("started EchoClient");
-        let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let mut entries = incoming.entries.lock().await;
-        let echo_cap = entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
-        let echo_receiver = echo_cap
-            .downcast_mut::<cap::oneshot::Receiver>()
-            .context("echo cap is not a Receiver")?;
-        info!("(client) echo receiver: {:?}", echo_receiver);
-        // Get the echo client end from the receiver.
-        let echo_handle = echo_receiver
-            .await?
-            .downcast::<cap::Handle>()
-            .map_err(|_| anyhow!("echo is not a Handle"))?;
-        info!("(client) echo_handle: {:?}", echo_handle);
+        create_task(async move {
+            info!("started EchoClient");
+            let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
+            let mut entries = incoming.entries.lock().await;
+            let echo_cap = entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+            let echo_receiver = echo_cap
+                .downcast_mut::<cap::oneshot::Receiver>()
+                .context("echo cap is not a Receiver")?;
+            info!("(client) echo receiver: {:?}", echo_receiver);
+            // Get the echo client end from the receiver.
+            let echo_handle = echo_receiver
+                .await
+                .map_err(|e| anyhow::Error::from(e))?
+                .downcast::<cap::Handle>()
+                .map_err(|_| anyhow!("echo is not a Handle"))?;
+            info!("(client) echo_handle: {:?}", echo_handle);
 
-        let echo_proxy = fexamples::EchoProxy::from_channel(
-            fasync::Channel::from_channel(echo_handle.into_handle_based::<zx::Channel>())
-                .context("failed to create channel")?,
-        );
+            let echo_proxy = fexamples::EchoProxy::from_channel(
+                fasync::Channel::from_channel(echo_handle.into_handle_based::<zx::Channel>())
+                    .context("failed to create channel")?,
+            );
 
-        let message = "Hello, bedrock!";
-        let response =
-            echo_proxy.echo_string(message).await.context("failed to call EchoString")?;
-        assert_eq!(response, message.to_string());
+            let message = "Hello, bedrock!";
+            let response =
+                echo_proxy.echo_string(message).await.context("failed to call EchoString")?;
+            assert_eq!(response, message.to_string());
 
-        info!("(client) got a response: {:?}", response);
+            info!("(client) got a response: {:?}", response);
 
-        drop(entries); // Release the lock.
-
-        Ok(self)
-    }
-}
-
-#[async_trait]
-impl Stop for EchoClient {
-    type Error = Error;
-
-    async fn stop(&mut self) -> Result<(), Self::Error> {
-        Ok(())
+            Ok(())
+        })
+        .start()
+        .await
     }
 }
 
@@ -175,7 +164,9 @@ async fn test_echo_oneshot() -> Result<(), Error> {
     client_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_receiver));
     let client = EchoClient::new(client_incoming);
 
-    try_join!(server.start(), client.start())?;
+    let _server_task = server.start().await?;
+    let client_task = client.start().await?;
+    client_task.on_exit().await?.expect("should be able to observe client task exit")?;
 
     Ok(())
 }

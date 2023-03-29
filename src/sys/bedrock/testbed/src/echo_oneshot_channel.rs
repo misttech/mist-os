@@ -18,13 +18,14 @@
 //! the client cannot reconnect.
 
 use {
+    crate::task::{create_task, AlreadyStopped, ArcError, RunningTask},
     anyhow::{anyhow, Context, Error},
     async_trait::async_trait,
-    exec::{Start, Stop},
+    exec::{Lifecycle, Start},
     fidl::endpoints::{create_endpoints, Proxy, RequestStream},
     fidl::HandleBased,
     fidl_fuchsia_examples as fexamples, fuchsia_async as fasync, fuchsia_zircon as zx,
-    futures::{try_join, StreamExt, TryStreamExt},
+    futures::{StreamExt, TryStreamExt},
     tracing::{error, info},
 };
 
@@ -43,57 +44,53 @@ impl EchoServer {
 
 #[async_trait]
 impl Start for EchoServer {
-    type Error = Error;
-    type Stop = Self;
+    type Error = AlreadyStopped;
+    type Stop = RunningTask<Result<(), ArcError>>;
 
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
-        info!("started EchoServer");
+        create_task(async move {
+            info!("started EchoServer");
 
-        let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming
-            .entries
-            .lock()
-            .await
-            .remove(ECHO_CAP_NAME)
-            .context("no echo cap in incoming")?;
-        let echo_handle =
-            echo_cap.downcast::<cap::Handle>().map_err(|_| anyhow!("echo cap is not a Handle"))?;
-        info!("(server) echo handle: {:?}", echo_handle);
+            let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
+            let echo_cap = incoming
+                .entries
+                .lock()
+                .await
+                .remove(ECHO_CAP_NAME)
+                .context("no echo cap in incoming")?;
+            let echo_handle = echo_cap
+                .downcast::<cap::Handle>()
+                .map_err(|_| anyhow!("echo cap is not a Handle"))?;
+            info!("(server) echo handle: {:?}", echo_handle);
 
-        let echo_stream = fexamples::EchoRequestStream::from_channel(
-            fasync::Channel::from_channel((*echo_handle).into_handle_based::<zx::Channel>())
-                .context("failed to create channel")?,
-        );
+            let echo_stream = fexamples::EchoRequestStream::from_channel(
+                fasync::Channel::from_channel((*echo_handle).into_handle_based::<zx::Channel>())
+                    .context("failed to create channel")?,
+            );
 
-        // Serve the Echo protocol on the server end.
-        echo_stream
-            .map(|result| result.context("failed request"))
-            .try_for_each(|request| async move {
-                match request {
-                    fexamples::EchoRequest::EchoString { value, responder } => {
-                        responder.send(&value).context("error sending EchoString response")?;
+            // Serve the Echo protocol on the server end.
+            echo_stream
+                .map(|result| result.context("failed request"))
+                .try_for_each(|request| async move {
+                    match request {
+                        fexamples::EchoRequest::EchoString { value, responder } => {
+                            responder.send(&value).context("error sending EchoString response")?;
+                        }
+                        fexamples::EchoRequest::SendString { value, control_handle } => {
+                            control_handle
+                                .send_on_string(&value)
+                                .context("error sending SendString event")?;
+                        }
                     }
-                    fexamples::EchoRequest::SendString { value, control_handle } => {
-                        control_handle
-                            .send_on_string(&value)
-                            .context("error sending SendString event")?;
-                    }
-                }
-                Ok(())
-            })
-            .await
-            .unwrap_or_else(|err| error!(error=%err, "FIDL stream handler failed"));
+                    Ok(())
+                })
+                .await
+                .unwrap_or_else(|err| error!(error=%err, "FIDL stream handler failed"));
 
-        Ok(self)
-    }
-}
-
-#[async_trait]
-impl Stop for EchoServer {
-    type Error = Error;
-
-    async fn stop(&mut self) -> Result<(), Self::Error> {
-        Ok(())
+            Ok(())
+        })
+        .start()
+        .await
     }
 }
 
@@ -109,44 +106,40 @@ impl EchoClient {
 
 #[async_trait]
 impl Start for EchoClient {
-    type Error = Error;
-    type Stop = Self;
+    type Error = AlreadyStopped;
+    type Stop = RunningTask<Result<(), ArcError>>;
 
     async fn start(mut self) -> Result<Self::Stop, Self::Error> {
-        info!("started EchoClient");
-        let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-        let echo_cap = incoming
-            .entries
-            .lock()
-            .await
-            .remove(ECHO_CAP_NAME)
-            .context("no echo cap in incoming")?;
-        let echo_handle =
-            echo_cap.downcast::<cap::Handle>().map_err(|_| anyhow!("echo cap is not a Handle"))?;
-        info!("(client) echo handle: {:?}", echo_handle);
+        create_task(async move {
+            info!("started EchoClient");
+            let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
+            let echo_cap = incoming
+                .entries
+                .lock()
+                .await
+                .remove(ECHO_CAP_NAME)
+                .context("no echo cap in incoming")?;
+            let echo_handle = echo_cap
+                .downcast::<cap::Handle>()
+                .map_err(|_| anyhow!("echo cap is not a Handle"))?;
+            info!("(client) echo handle: {:?}", echo_handle);
 
-        let echo_proxy = fexamples::EchoProxy::from_channel(
-            fasync::Channel::from_channel((*echo_handle).into_handle_based::<zx::Channel>())
-                .context("failed to create channel")?,
-        );
+            let echo_proxy = fexamples::EchoProxy::from_channel(
+                fasync::Channel::from_channel((*echo_handle).into_handle_based::<zx::Channel>())
+                    .context("failed to create channel")?,
+            );
 
-        let message = "Hello, bedrock!";
-        let response =
-            echo_proxy.echo_string(message).await.context("failed to call EchoString")?;
-        assert_eq!(response, message.to_string());
+            let message = "Hello, bedrock!";
+            let response =
+                echo_proxy.echo_string(message).await.context("failed to call EchoString")?;
+            assert_eq!(response, message.to_string());
 
-        info!("(client) got a response: {:?}", response);
+            info!("(client) got a response: {:?}", response);
 
-        Ok(self)
-    }
-}
-
-#[async_trait]
-impl Stop for EchoClient {
-    type Error = Error;
-
-    async fn stop(&mut self) -> Result<(), Self::Error> {
-        Ok(())
+            Ok(())
+        })
+        .start()
+        .await
     }
 }
 
@@ -166,7 +159,9 @@ async fn test_echo_oneshot_channel() -> Result<(), Error> {
     client_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_client_cap));
     let client = EchoClient::new(client_incoming);
 
-    try_join!(server.start(), client.start())?;
+    let _server_task = server.start().await?;
+    let client_task = client.start().await?;
+    client_task.on_exit().await?.expect("should be able to observe client task exit")?;
 
     Ok(())
 }
