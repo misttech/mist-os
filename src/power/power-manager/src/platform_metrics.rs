@@ -7,7 +7,7 @@ use crate::log_if_err;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::ok_or_default_err;
-use crate::types::{Celsius, Seconds, ThermalLoad, Watts};
+use crate::types::{Celsius, Seconds, ThermalLoad};
 use crate::utils::{get_current_timestamp, CobaltIntHistogram, CobaltIntHistogramConfig};
 use anyhow::{format_err, Context, Error, Result};
 use async_trait::async_trait;
@@ -303,9 +303,6 @@ impl PlatformMetrics {
             PlatformMetric::ThermalLoad(thermal_load, driver_path) => {
                 self.handle_log_thermal_load(*thermal_load, &driver_path)
             }
-
-            // TODO(fxbug.dev/98245): log these metrics in a useful way
-            PlatformMetric::AvailablePower(_) | PlatformMetric::CpuPowerUsage(_, _) => {}
         };
 
         Ok(MessageReturn::LogPlatformMetric)
@@ -407,12 +404,6 @@ pub enum PlatformMetric {
 
     /// Records a thermal load value for the given sensor path.
     ThermalLoad(crate::types::ThermalLoad, String),
-
-    /// Records the current available power.
-    AvailablePower(Watts),
-
-    /// Records an amount of power used by the given CPU domain.
-    CpuPowerUsage(String, Watts),
 }
 
 #[async_trait(?Send)]

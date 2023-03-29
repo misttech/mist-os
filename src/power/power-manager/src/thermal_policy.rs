@@ -531,7 +531,6 @@ impl ThermalPolicy {
             "error_integral" => error_integral
         );
         let available_power = self.calculate_available_power(error_integral);
-        self.log_platform_metric(PlatformMetric::AvailablePower(available_power)).await;
         fuchsia_trace::counter!(
             "power_manager",
             "ThermalPolicy available_power",
@@ -586,8 +585,6 @@ impl ThermalPolicy {
                 .send_message(&node, &Message::SetMaxPowerConsumption(total_available_power))
                 .await?
             {
-                self.log_platform_metric(PlatformMetric::CpuPowerUsage(node.name(), power_used))
-                    .await;
                 total_available_power = total_available_power - power_used;
             }
         }
@@ -1008,65 +1005,34 @@ pub mod tests {
 
         let mut stepper = TimeStepper { executor, node_futures };
 
-        // Not throttled yet
+        // Cause the thermal policy to send `ThrottlingResultShutdown`.
+        mock_temperature.add_msg_response_pair((
+            msg_eq!(ReadTemperature),
+            msg_ok_return!(ReadTemperature(Celsius(80.0))),
+        ));
+        mock_metrics.add_msg_response_pair((
+            msg_eq!(LogPlatformMetric(PlatformMetric::ThrottlingResultShutdown)),
+            msg_ok_return!(LogPlatformMetric),
+        ));
+        stepper.iterate_policy();
+
+        // On a real system, the shutdown would have occured. But since the test continues executing
+        // even after the shutdown request is sent, we can perform a few more rounds of testing.
+        //
+        // Temperature is reduced, no shutdown message is sent.
         mock_temperature.add_msg_response_pair((
             msg_eq!(ReadTemperature),
             msg_ok_return!(ReadTemperature(Celsius(50.0))),
         ));
-        mock_metrics.add_msg_response_pair((
-            msg_eq!(LogPlatformMetric(PlatformMetric::AvailablePower(Watts(1.0),))),
-            msg_ok_return!(LogPlatformMetric),
-        ));
         stepper.iterate_policy();
 
-        // Throttling begins because 55 degC is greater than `target_temperature` (50 degC)
-        mock_temperature.add_msg_response_pair((
-            msg_eq!(ReadTemperature),
-            msg_ok_return!(ReadTemperature(Celsius(52.0))),
-        ));
-        mock_metrics.add_msg_response_pair((
-            msg_eq!(LogPlatformMetric(PlatformMetric::AvailablePower(Watts(0.8),))),
-            msg_ok_return!(LogPlatformMetric),
-        ));
-        stepper.iterate_policy();
-
-        // Throttling still active, available power is reduced
-        mock_temperature.add_msg_response_pair((
-            msg_eq!(ReadTemperature),
-            msg_ok_return!(ReadTemperature(Celsius(52.0))),
-        ));
-        mock_metrics.add_msg_response_pair((
-            msg_eq!(LogPlatformMetric(PlatformMetric::AvailablePower(Watts(0.6),))),
-            msg_ok_return!(LogPlatformMetric),
-        ));
-        stepper.iterate_policy();
-
-        // End thermal throttling
-        mock_temperature.add_msg_response_pair((
-            msg_eq!(ReadTemperature),
-            msg_ok_return!(ReadTemperature(Celsius(35.0))),
-        ));
-        mock_metrics.add_msg_response_pair((
-            msg_eq!(LogPlatformMetric(PlatformMetric::AvailablePower(Watts(1.0),))),
-            msg_ok_return!(LogPlatformMetric),
-        ));
-        stepper.iterate_policy();
-
-        // Cause the thermal policy to enter thermal shutdown
+        // Cause the thermal policy to send `ThrottlingResultShutdown`.
         mock_temperature.add_msg_response_pair((
             msg_eq!(ReadTemperature),
             msg_ok_return!(ReadTemperature(Celsius(90.0))),
         ));
         mock_metrics.add_msg_response_pair((
             msg_eq!(LogPlatformMetric(PlatformMetric::ThrottlingResultShutdown)),
-            msg_ok_return!(LogPlatformMetric),
-        ));
-
-        // On a real system, the shutdown would occur before these messages are sent. But since the
-        // test continues executing even after the shutdown request is sent, we need to add them to
-        // the expected messages.
-        mock_metrics.add_msg_response_pair((
-            msg_eq!(LogPlatformMetric(PlatformMetric::AvailablePower(Watts(0.0),))),
             msg_ok_return!(LogPlatformMetric),
         ));
         stepper.iterate_policy();
