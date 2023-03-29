@@ -1276,10 +1276,18 @@ build_api_module("product_size_checker_output") {
 # Contains information about 0 or 1 product bundles produced by the build.
 #
 # Type: list(scope)
+#   name
+#     Required: <product.board> name of the product bundle.
 #   path
 #     Required: Path to the product bundle directory.
+#   product_version
+#     Required: A string indicating the version of the product bundle.
 #   transfer_manifest_path
-#     Required: Path to the transfer manifest listing the product bundle artifacts.
+#     Required: Path to the transfer manifest listing the product bundle
+#               artifacts.
+#   transfer_manifest_url
+#     Required: 'transfer_manifest_path' with a "file://" prefix if the file is
+#               local, otherwise it's the remote location of the transfer.json.
 #   label
 #     Required: Label (with toolchain) that generated this product bundle.
 build_api_module("product_bundles") {

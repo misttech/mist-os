@@ -413,13 +413,27 @@ template("product_bundle") {
       public_deps += [ ":${labels.scrutiny_recovery}" ]
     }
 
+    # This value can be set (e.g. for testing) with `--args sdk_id=1234` on the
+    # `fx set` call.
+    # In the future, the product bundles should be versioned independently of
+    # the sdk version. So far they have been the same value.
+    product_version = sdk_id
+    if (product_version == "") {
+      product_version = "unversioned"
+    }
+
+    # A json file will be created by '//build/config/build_api_modules.gni'.
     metadata = {
       product_bundles = [
         {
           label = get_label_info(":$target_name", "label_with_toolchain")
           path = rebase_path(files.outdir, root_build_dir)
+          name = "${build_info_product}.${build_info_board}"
+          product_version = product_version
           transfer_manifest_path =
               rebase_path(files.transfer_manifest, root_build_dir)
+          transfer_manifest_url =
+              "file://" + rebase_path(files.transfer_manifest, root_build_dir)
         },
       ]
     }
