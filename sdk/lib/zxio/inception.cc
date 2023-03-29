@@ -72,6 +72,11 @@ zx_status_t zxio_create_with_allocator(fidl::ClientEnd<fuchsia_io::Node> node,
     case fio::wire::NodeInfoDeprecated::Tag::kService:
       type = ZXIO_OBJECT_TYPE_SERVICE;
       break;
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    case fio::wire::NodeInfoDeprecated::Tag::kSymlink:
+      type = ZXIO_OBJECT_TYPE_SYMLINK;
+      break;
+#endif
   }
   zx_status_t status = allocator(type, &storage, out_context);
   if (status != ZX_OK || storage == nullptr) {

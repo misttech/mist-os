@@ -32,6 +32,7 @@ Symbols:
   - { Name: zxio_open_async, Type: Func }
   - { Name: zxio_read, Type: Func }
   - { Name: zxio_read_at, Type: Func }
+  - { Name: zxio_read_link, Type: Func }
   - { Name: zxio_readv, Type: Func }
   - { Name: zxio_readv_at, Type: Func }
   - { Name: zxio_recvmsg, Type: Func }

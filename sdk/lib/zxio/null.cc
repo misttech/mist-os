@@ -269,3 +269,7 @@ zx_status_t zxio_null_init(zxio_t* io) {
   zxio_init(io, &zxio_null_ops);
   return ZX_OK;
 }
+
+zx_status_t zxio_default_read_link(zxio_t* io, const uint8_t** out_target, size_t* out_target_len) {
+  return ZX_ERR_NOT_SUPPORTED;
+}

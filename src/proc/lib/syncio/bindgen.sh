@@ -20,7 +20,6 @@ readonly RAW_LINES="// Copyright 2021 The Fuchsia Authors. All rights reserved.
 PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
 ./prebuilt/third_party/rust_bindgen/linux-x64/bindgen \
   --no-layout-tests \
-  --size_t-is-usize \
   --with-derive-default \
   --allowlist-function "zxio_.*" \
   --allowlist-var "ZXIO_SHUTDOWN.*" \

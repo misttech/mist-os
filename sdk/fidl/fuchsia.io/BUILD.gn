@@ -20,6 +20,7 @@ fidl("fuchsia.io") {
     "node2.fidl",
     "rights-abilities.fidl",
     "rights-request.fidl",
+    "symlink.fidl",
   ]
 
   public_deps = [

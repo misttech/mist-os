@@ -893,3 +893,11 @@ zx_status_t zxio_socket(zxio_service_connector service_connector, int domain, in
   *out_code = 0;
   return ZX_OK;
 }
+
+zx_status_t zxio_read_link(zxio_t* io, const uint8_t** out_target, size_t* out_target_len) {
+  if (!zxio_is_valid(io)) {
+    return ZX_ERR_BAD_HANDLE;
+  }
+  zxio_internal_t* zio = to_internal(io);
+  return zio->ops->read_link(io, out_target, out_target_len);
+}

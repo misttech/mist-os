@@ -35,4 +35,10 @@ type NodeProtocolKinds = flexible bits : uint64 {
     ///
     /// The connection will speak the [`File`] protocol.
     FILE = 0x4;
+
+    /// The symlink representation of a node.
+    ///
+    /// The connection will speak the [`Symlink`] protocol.
+    @available(added=HEAD)
+    SYMLINK = 0x8;
 };

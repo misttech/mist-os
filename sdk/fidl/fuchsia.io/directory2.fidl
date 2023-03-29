@@ -136,6 +136,8 @@ protocol Directory2 {
                         /// result in a `ZX_ERR_NOT_SUPPORTED` epitaph.
                         TRUNCATE = 0x02;
                     };
+                    @available(added=HEAD)
+                    3: symlink @generated_name("SymlinkProtocolFlags") flexible bits : uint64 {};
                 };
 
                 /// Specifies behavior with respect to existence. If an object

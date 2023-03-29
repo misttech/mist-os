@@ -156,6 +156,7 @@ typedef struct zxio_datagram_prelude_size {
 #define ZXIO_OBJECT_TYPE_RAW_SOCKET                   ((zxio_object_type_t)11)
 #define ZXIO_OBJECT_TYPE_PACKET_SOCKET                ((zxio_object_type_t)12)
 #define ZXIO_OBJECT_TYPE_DATAGRAM_SOCKET              ((zxio_object_type_t)13)
+#define ZXIO_OBJECT_TYPE_SYMLINK                      ((zxio_object_type_t)14)
 // clang-format on
 
 // File and directory access ---------------------------------------------------
@@ -169,10 +170,7 @@ typedef uint64_t zxio_node_protocols_t;
 #define ZXIO_NODE_PROTOCOL_CONNECTOR ((zxio_node_protocols_t)1ul << 0)
 #define ZXIO_NODE_PROTOCOL_DIRECTORY ((zxio_node_protocols_t)1ul << 1)
 #define ZXIO_NODE_PROTOCOL_FILE ((zxio_node_protocols_t)1ul << 2)
-
-#define ZXIO_NODE_PROTOCOL_ALL                                                             \
-  (ZXIO_NODE_PROTOCOL_CONNECTOR | ZXIO_NODE_PROTOCOL_DIRECTORY | ZXIO_NODE_PROTOCOL_FILE | \
-   ZXIO_NODE_PROTOCOL_MEMORY | ZXIO_NODE_PROTOCOL_DEVICE)
+#define ZXIO_NODE_PROTOCOL_SYMLINK ((zxio_node_protocols_t)1ul << 3)
 
 typedef uint64_t zxio_id_t;
 

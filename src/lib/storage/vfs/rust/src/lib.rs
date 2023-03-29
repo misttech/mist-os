@@ -20,6 +20,7 @@ pub mod directory;
 pub mod file;
 pub mod remote;
 pub mod service;
+pub mod symlink;
 pub mod token_registry;
 pub mod tree_builder;
 

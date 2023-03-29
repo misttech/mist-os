@@ -17,6 +17,7 @@
 #include <lib/zxio/cpp/vector.h>
 #include <lib/zxio/ops.h>
 #include <lib/zxio/zxio.h>
+#include <zircon/availability.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -110,6 +111,11 @@ zx_status_t zxio_pty_init(zxio_storage_t* storage, zx::eventpair event,
                           fidl::ClientEnd<fuchsia_hardware_pty::Device> client);
 
 zx_status_t zxio_pipe_init(zxio_storage_t* pipe, zx::socket socket, zx_info_socket_t info);
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fuchsia_io::Symlink> client,
+                              std::vector<uint8_t> target);
+#endif
 
 // debuglog --------------------------------------------------------------------
 

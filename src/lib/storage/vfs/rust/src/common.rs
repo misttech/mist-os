@@ -152,6 +152,24 @@ pub fn rights_to_posix_mode_bits(readable: bool, writable: bool, executable: boo
         | if executable { libc::S_IXUSR } else { 0 };
 }
 
+// TODO(https://fxbug.dev/124432): Consolidate with other implementations that do the same thing.
+/// Map a set of io1 rights flags for files to their respective io2 Operations.
+///
+/// Changing this function can be dangerous! Allowed operations may have security implications.
+pub fn io1_rights_to_io2_operations(flags: &fio::OpenFlags) -> fio::Operations {
+    let mut operations = fio::Operations::empty();
+    if flags.contains(fio::OpenFlags::RIGHT_READABLE) {
+        operations |= fio::Operations::READ_BYTES;
+    }
+    if flags.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+        operations |= fio::Operations::WRITE_BYTES;
+    }
+    if flags.contains(fio::OpenFlags::RIGHT_EXECUTABLE) {
+        operations |= fio::Operations::EXECUTE;
+    }
+    operations
+}
+
 #[cfg(test)]
 mod tests {
     use super::inherit_rights_for_clone;

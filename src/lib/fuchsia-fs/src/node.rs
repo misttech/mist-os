@@ -90,6 +90,7 @@ pub enum Kind {
     Service,
     File,
     Directory,
+    Symlink,
     Unknown,
 }
 
@@ -99,6 +100,7 @@ impl Kind {
             fio::NodeInfoDeprecated::Service(_) => Kind::Service,
             fio::NodeInfoDeprecated::File(_) => Kind::File,
             fio::NodeInfoDeprecated::Directory(_) => Kind::Directory,
+            fio::NodeInfoDeprecated::Symlink(_) => Kind::Symlink,
         }
     }
 

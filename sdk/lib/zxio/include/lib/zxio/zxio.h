@@ -508,6 +508,13 @@ ZXIO_EXPORT zx_status_t zxio_set_window_size(zxio_t* io, uint32_t width, uint32_
 // Executes the given specific ioctl.
 ZXIO_EXPORT zx_status_t zxio_ioctl(zxio_t* io, int request, int16_t* out_code, va_list va);
 
+// Returns the target of the symbolic link. The returned target will remain valid for as long as the
+// io object does.
+//
+// Returns ZX_ERR_NOT_SUPPORTED if |io| isn't a symbolic link.
+ZXIO_EXPORT zx_status_t zxio_read_link(zxio_t* io, const uint8_t** out_target,
+                                       size_t* out_target_len);
+
 __END_CDECLS
 
 #endif  // LIB_ZXIO_INCLUDE_LIB_ZXIO_ZXIO_H_

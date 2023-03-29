@@ -743,6 +743,15 @@ impl Zxio {
             _ => Ok(Err(ZxioErrorCode(out_code))),
         }
     }
+
+    pub fn read_link(&self) -> Result<&[u8], zx::Status> {
+        let mut target = std::ptr::null();
+        let mut target_len = 0;
+        let status = unsafe { zxio::zxio_read_link(self.as_ptr(), &mut target, &mut target_len) };
+        zx::ok(status)?;
+        // SAFETY: target will live as long as the underlying zxio object lives.
+        unsafe { Ok(std::slice::from_raw_parts(target, target_len)) }
+    }
 }
 
 impl Drop for Zxio {

@@ -109,6 +109,14 @@ protocol Node2 {
         ///
         /// See [`NodeProtocolKinds.FILE`].
         3: file FileInfo;
+
+        /// Auxilliary data for the symlink representation of a node. The
+        /// selection of this variant in [`Representation`] implies that the
+        /// connection speaks the [`Symlink`] protocol.
+        ///
+        /// See [`NodeProtocolKinds.SYMLINK`].
+        @available(added=HEAD)
+        4: symlink SymlinkInfo;
     });
 
     // TODO(https://fxbug.dev/77623): uncomment and implement.

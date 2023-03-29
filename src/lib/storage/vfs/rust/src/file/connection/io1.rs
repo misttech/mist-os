@@ -4,14 +4,14 @@
 
 use {
     crate::{
-        common::{inherit_rights_for_clone, send_on_open_with_error, GET_FLAGS_VISIBLE},
+        common::{
+            inherit_rights_for_clone, io1_rights_to_io2_operations, send_on_open_with_error,
+            GET_FLAGS_VISIBLE,
+        },
         directory::entry::DirectoryEntry,
         execution_scope::ExecutionScope,
         file::{
-            common::{
-                get_backing_memory_validate_flags, io1_rights_to_io2_operations,
-                new_connection_validate_flags,
-            },
+            common::{get_backing_memory_validate_flags, new_connection_validate_flags},
             File, FileIo, RawFileIoConnection,
         },
         path::Path,

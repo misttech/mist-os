@@ -388,6 +388,14 @@ zx_status_t zxio_create_with_nodeinfo(fidl::ClientEnd<fio::Node> node,
     case fio::wire::NodeInfoDeprecated::Tag::kService: {
       return zxio_node_init(storage, std::move(node));
     }
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+    case fio::wire::NodeInfoDeprecated::Tag::kSymlink: {
+      fio::wire::SymlinkObject& symlink = info.symlink();
+      const auto& span = symlink.target.get();
+      return zxio_symlink_init(storage, fidl::ClientEnd<fio::Symlink>(node.TakeChannel()),
+                               std::vector(span.begin(), span.end()));
+    }
+#endif
   }
 }
 

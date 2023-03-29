@@ -633,7 +633,7 @@ impl StorageAdmin {
                         _ => {}
                     }
                 }
-                ffs_dir::DirentKind::File => {
+                ffs_dir::DirentKind::Symlink | ffs_dir::DirentKind::File => {
                     match dir.unlink(&entry.name, fio::UnlinkOptions::EMPTY).await {
                         Err(e) => errors.push(DeletionErrorCause::FileRequest(e)),
                         Ok(Err(e)) => errors.push(DeletionErrorCause::File(e)),

@@ -135,13 +135,13 @@ class DirentIteratorImpl {
         return ZXIO_NODE_PROTOCOL_DIRECTORY;
       case DT_REG:
         return ZXIO_NODE_PROTOCOL_FILE;
+      case DT_LNK:
+        return ZXIO_NODE_PROTOCOL_SYMLINK;
       case DT_BLK:
         // Not supported.
       case DT_CHR:
         // Not supported.
       case DT_FIFO:
-        // Not supported.
-      case DT_LNK:
         // Not supported.
       case DT_SOCK:
         // Not supported.
@@ -179,14 +179,14 @@ zxio_node_protocols_t ToZxioNodeProtocols(uint32_t mode) {
       // fuchsia::io has mode type service which breaks stat.
       // TODO(fxbug.dev/52930): return ZXIO_NODE_PROTOCOL_CONNECTOR instead.
       return ZXIO_NODE_PROTOCOL_FILE;
+    case S_IFLNK:
+      return ZXIO_NODE_PROTOCOL_SYMLINK;
     case S_IFBLK:
       // Block-oriented devices are not supported on Fuchsia.
     case S_IFCHR:
       // Character-oriented devices are not supported on Fuchsia.
     case S_IFIFO:
       // Named pipes are not supported on Fuchsia.
-    case S_IFLNK:
-      // Symbolic links are not supported on Fuchsia.
     case S_IFSOCK:
       // Named sockets are not supported on Fuchsia.
     default:
@@ -210,6 +210,9 @@ uint32_t ToIo1ModeFileType(zxio_node_protocols_t protocols) {
     // There is no good analogue for FIDL services in POSIX land...
     // Returning "regular file" as a fallback.
     return S_IFREG;
+  }
+  if (protocols & ZXIO_NODE_PROTOCOL_SYMLINK) {
+    return S_IFLNK;
   }
   return 0;
 }
@@ -1367,6 +1370,45 @@ constexpr zxio_ops_t File::kOps = ([]() {
   return ops;
 })();
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
+class Symlink : public Remote<fio::Symlink> {
+ public:
+  Symlink(fidl::ClientEnd<fio::Symlink> client_end, std::vector<uint8_t> target)
+      : Remote(std::move(client_end), kOps), target_(std::move(target)) {}
+
+ private:
+  zx_status_t Close(const bool should_wait) {
+    const zx_status_t status = Remote::Close(should_wait);
+    this->~Symlink();
+    return status;
+  }
+
+  zx_status_t ReadLink(const uint8_t** out_target, size_t* out_target_len) const {
+    *out_target = target_.data();
+    *out_target_len = target_.size();
+    return ZX_OK;
+  }
+
+  static const zxio_ops_t kOps;
+  const std::vector<uint8_t> target_;
+};
+
+constexpr zxio_ops_t Symlink::kOps = ([]() {
+  using Adaptor = Adaptor<Symlink>;
+  zxio_ops_t ops = zxio_default_ops;
+  ops.close = Adaptor::From<&Symlink::Close>;
+  ops.release = Adaptor::From<&Symlink::Release>;
+  ops.borrow = Adaptor::From<&Symlink::Borrow>;
+  ops.clone = Adaptor::From<&Symlink::Clone>;
+  ops.attr_get = Adaptor::From<&Symlink::AttrGet>;
+  ops.flags_get = Adaptor::From<&Symlink::FlagsGet>;
+  ops.read_link = Adaptor::From<&Symlink::ReadLink>;
+  return ops;
+})();
+
+#endif  // #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+
 }  // namespace
 
 zx_status_t zxio_dir_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Directory> client) {
@@ -1390,6 +1432,14 @@ zx_status_t zxio_pty_init(zxio_storage_t* storage, zx::eventpair event,
   new (storage) Pty(std::move(client), std::move(event));
   return ZX_OK;
 }
+
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+zx_status_t zxio_symlink_init(zxio_storage_t* storage, fidl::ClientEnd<fio::Symlink> client,
+                              std::vector<uint8_t> target) {
+  new (storage) Symlink(std::move(client), std::move(target));
+  return ZX_OK;
+}
+#endif
 
 uint32_t zxio_node_protocols_to_posix_type(zxio_node_protocols_t protocols) {
   return ToIo1ModeFileType(protocols);

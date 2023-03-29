@@ -30,6 +30,7 @@
 		zxio_open_async;
 		zxio_read;
 		zxio_read_at;
+		zxio_read_link;
 		zxio_readv;
 		zxio_readv_at;
 		zxio_recvmsg;
