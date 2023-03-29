@@ -144,6 +144,7 @@ test("fdio-gtest") {
 
   deps = [
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/fbl",
   ]
 
@@ -151,7 +152,6 @@ test("fdio-gtest") {
     sources += [ "fdio_socketpair.cc" ]
     deps += [
       "//sdk/lib/fdio",
-      "//src/lib/testing/predicates",
       "//zircon/system/ulib/zx",
     ]
   }
