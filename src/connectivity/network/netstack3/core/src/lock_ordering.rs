@@ -109,6 +109,10 @@ use core::{convert::Infallible as Never, marker::PhantomData};
 use lock_order::{impl_lock_after, relation::LockAfter};
 use net_types::ip::{Ipv4, Ipv6};
 
+pub(crate) struct IcmpSockets<I>(PhantomData<I>, Never);
+pub(crate) struct IcmpTokenBucket<I>(PhantomData<I>, Never);
+pub(crate) struct IcmpSendTimestampReply<I>(PhantomData<I>, Never);
+
 pub(crate) struct TcpSockets<I>(PhantomData<I>, Never);
 pub(crate) struct TcpIsnGenerator<I>(PhantomData<I>, Never);
 
@@ -144,7 +148,11 @@ pub(crate) enum LoopbackTxDequeue {}
 impl LockAfter<Unlocked> for LoopbackTxDequeue {}
 impl_lock_after!(LoopbackTxDequeue => EthernetTxDequeue);
 impl_lock_after!(EthernetTxDequeue => LoopbackRxDequeue);
-impl_lock_after!(LoopbackRxDequeue => TcpSockets<Ipv4>);
+impl_lock_after!(LoopbackRxDequeue => IcmpSockets<Ipv4>);
+impl_lock_after!(IcmpSockets<Ipv4> => IcmpTokenBucket<Ipv4>);
+impl_lock_after!(IcmpTokenBucket<Ipv4> => IcmpSockets<Ipv6>);
+impl_lock_after!(IcmpSockets<Ipv6> => IcmpTokenBucket<Ipv6>);
+impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpSockets<Ipv4>);
 
 // Ideally we'd have separate impls `LoopbackRxDequeue => TcpSockets<Ipv4>` and
 // for `Ipv6`, but that doesn't play well with the blanket impls. Linearize IPv4

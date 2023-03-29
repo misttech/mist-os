@@ -7,6 +7,7 @@
 use core::{convert::TryInto as _, fmt::Debug, num::NonZeroU8};
 
 use derivative::Derivative;
+use lock_order::{lock::UnlockedAccess, relation::LockBefore, Locked};
 use log::{debug, error, trace};
 use net_types::{
     ip::{
@@ -682,7 +683,7 @@ pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>>:
         O,
         F: FnOnce(&IcmpSockets<I::Addr, IpSock<I, Self::WeakDeviceId, DefaultSendOptions>>) -> O,
     >(
-        &self,
+        &mut self,
         cb: F,
     ) -> O;
 
@@ -743,9 +744,28 @@ pub(crate) trait InnerIcmpv4Context<C: IcmpNonSyncCtx<Ipv4>>:
     fn should_send_timestamp_reply(&self) -> bool;
 }
 
+// TODO(https://fxbug.dev/121448): Remove this when it is unused.
 impl<C: NonSyncContext> InnerIcmpv4Context<C> for &'_ SyncCtx<C> {
     fn should_send_timestamp_reply(&self) -> bool {
-        self.state.ipv4.icmp.send_timestamp_reply
+        InnerIcmpv4Context::<C>::should_send_timestamp_reply(&Locked::new(*self))
+    }
+}
+
+impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>
+    for SyncCtx<C>
+{
+    type Data<'l> = &'l bool where Self: 'l;
+
+    fn access(&self) -> Self::Data<'_> {
+        &self.state.ipv4.icmp.send_timestamp_reply
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>>
+    InnerIcmpv4Context<C> for Locked<'_, SyncCtx<C>, L>
+{
+    fn should_send_timestamp_reply(&self) -> bool {
+        *self.unlocked_access::<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>()
     }
 }
 
@@ -2706,13 +2726,13 @@ fn receive_icmp_echo_reply<
 /// `send_icmpv4_echo_request` panics if `conn` is not associated with an ICMPv4
 /// connection.
 pub fn send_icmpv4_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     conn: IcmpConnId<Ipv4>,
     seq_num: u16,
     body: B,
 ) -> Result<(), (B, IpSockSendError)> {
-    send_icmp_echo_request_inner(&mut sync_ctx, ctx, conn, seq_num, body)
+    send_icmp_echo_request_inner(&mut Locked::new(sync_ctx), ctx, conn, seq_num, body)
 }
 
 /// Send an ICMPv6 echo request on an existing connection.
@@ -2722,13 +2742,13 @@ pub fn send_icmpv4_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B
 /// `send_icmpv6_echo_request` panics if `conn` is not associated with an ICMPv6
 /// connection.
 pub fn send_icmpv6_echo_request<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     conn: IcmpConnId<Ipv6>,
     seq_num: u16,
     body: B,
 ) -> Result<(), (B, IpSockSendError)> {
-    send_icmp_echo_request_inner(&mut sync_ctx, ctx, conn, seq_num, body)
+    send_icmp_echo_request_inner(&mut Locked::new(sync_ctx), ctx, conn, seq_num, body)
 }
 
 fn send_icmp_echo_request_inner<
@@ -2786,9 +2806,9 @@ pub enum IcmpSockCreationError {
 
 /// Creates a new unbound ICMPv4 socket.
 pub fn create_icmpv4_unbound<NonSyncCtx: NonSyncContext>(
-    mut ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
 ) -> IcmpUnboundId<Ipv4> {
-    create_icmpv4_unbound_inner(&mut ctx)
+    create_icmpv4_unbound_inner(&mut Locked::new(sync_ctx))
 }
 
 // TODO(https://fxbug.dev/48578): Make this the external function (replacing the
@@ -2804,9 +2824,9 @@ fn create_icmpv4_unbound_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C
 
 /// Creates a new unbound ICMPv6 socket.
 pub fn create_icmpv6_unbound<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
 ) -> IcmpUnboundId<Ipv6> {
-    create_icmpv6_unbound_inner(&mut sync_ctx)
+    create_icmpv6_unbound_inner(&mut Locked::new(sync_ctx))
 }
 
 // TODO(https://fxbug.dev/48578): Make this the external function (replacing the
@@ -2826,10 +2846,10 @@ fn create_icmpv6_unbound_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C
 ///
 /// Panics if `id` is not a valid [`IcmpUnboundId`].
 pub fn remove_icmpv4_unbound<NonSyncCtx: NonSyncContext>(
-    mut ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     id: IcmpUnboundId<Ipv4>,
 ) {
-    remove_icmpv4_unbound_inner(&mut ctx, id)
+    remove_icmpv4_unbound_inner(&mut Locked::new(sync_ctx), id)
 }
 
 // TODO(https://fxbug.dev/48578): Make this the external function (replacing the
@@ -2855,10 +2875,10 @@ fn remove_icmpv4_unbound_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C
 ///
 /// Panics if `id` is not a valid [`IcmpUnboundId`].
 pub fn remove_icmpv6_unbound<NonSyncCtx: NonSyncContext>(
-    mut ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     id: IcmpUnboundId<Ipv6>,
 ) {
-    remove_icmpv6_unbound_inner(&mut ctx, id)
+    remove_icmpv6_unbound_inner(&mut Locked::new(sync_ctx), id)
 }
 
 // TODO(https://fxbug.dev/48578): Make this the external function (replacing the
@@ -2891,14 +2911,14 @@ fn remove_icmpv6_unbound_inner<C: IcmpNonSyncCtx<Ipv6>, SC: InnerIcmpv6Context<C
 ///
 /// Panics if `id` is an invalid [`IcmpUnboundId`].
 pub fn connect_icmpv4<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     id: IcmpUnboundId<Ipv4>,
     local_addr: Option<SpecifiedAddr<Ipv4Addr>>,
     remote_addr: SpecifiedAddr<Ipv4Addr>,
     icmp_id: u16,
 ) -> Result<IcmpConnId<Ipv4>, IcmpSockCreationError> {
-    connect_icmpv4_inner(&mut sync_ctx, ctx, id, local_addr, remote_addr, icmp_id)
+    connect_icmpv4_inner(&mut Locked::new(sync_ctx), ctx, id, local_addr, remote_addr, icmp_id)
 }
 
 // TODO(https://fxbug.dev/48578): Make this the external function (replacing the
@@ -2933,14 +2953,14 @@ fn connect_icmpv4_inner<C: IcmpNonSyncCtx<Ipv4>, SC: InnerIcmpv4Context<C>>(
 ///
 /// Panics if `id` is an invalid [`IcmpUnboundId`].
 pub fn connect_icmpv6<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     id: IcmpUnboundId<Ipv6>,
     local_addr: Option<SpecifiedAddr<Ipv6Addr>>,
     remote_addr: SpecifiedAddr<Ipv6Addr>,
     icmp_id: u16,
 ) -> Result<IcmpConnId<Ipv6>, IcmpSockCreationError> {
-    connect_icmpv6_inner(&mut sync_ctx, ctx, id, local_addr, remote_addr, icmp_id)
+    connect_icmpv6_inner(&mut Locked::new(sync_ctx), ctx, id, local_addr, remote_addr, icmp_id)
 }
 
 // TODO(https://fxbug.dev/48578): Make this the external function (replacing the
@@ -4048,7 +4068,7 @@ mod tests {
                 }
 
                 fn with_icmp_sockets<O, F: FnOnce(&IcmpSockets<<$ip as Ip>::Addr, IpSock<$ip, FakeWeakDeviceId<FakeDeviceId>, DefaultSendOptions>>) -> O>(
-                    &self,
+                    &mut self,
                     cb: F,
                 ) -> O {
                     cb(&self.get_ref().sockets)
