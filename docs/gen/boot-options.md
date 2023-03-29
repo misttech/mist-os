@@ -1134,6 +1134,14 @@ of performance variability. Some workloads may benefit from disabling Turbo; if
 this command line flag is set to false, turbo is disabled for all CPUs in the
 system.
 
+### kernel.x86.enable_pcid=\<bool>
+
+**Default:** `false`
+
+This option controls whether PCIDs are used, if there is sufficient CPU support.
+If this option is enabled and there is not sufficient CPU support, then this
+option has no effect.
+
 ### kernel.smp.maxcpus=\<uint32_t>
 
 **Default:** `0x20`

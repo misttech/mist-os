@@ -188,7 +188,11 @@ void arch_early_init(void) {
   mp_set_curr_cpu_online(true);
 }
 
-void arch_prevm_init(void) { x86_cpu_feature_init(); }
+void arch_prevm_init(void) {
+  x86_cpu_feature_init();
+  // Perform some MMU initialization that is dependent on having done the previous feature init.
+  x86_mmu_feature_init();
+}
 
 void arch_init(void) {
   const struct x86_model_info* model = x86_get_model();

@@ -49,8 +49,10 @@ const x86_microarch_config_t* x86_microarch_config;
 static struct x86_model_info model_info;
 
 bool g_x86_feature_fsgsbase;
-bool g_x86_feature_pcid_good;
+bool g_x86_feature_invpcid;
+bool g_x86_feature_pcid_enabled;
 bool g_x86_feature_has_smap;
+
 bool g_has_meltdown;
 bool g_has_l1tf;
 bool g_l1d_flush_on_vmentry;
@@ -170,8 +172,7 @@ void x86_feature_early_init_percpu(void) {
       x86_hypervisor == X86_HYPERVISOR_KVM && x86_feature_test(X86_FEATURE_KVM_PV_IPI);
   g_x86_feature_has_smap = x86_feature_test(X86_FEATURE_SMAP);
   g_x86_feature_fsgsbase = x86_feature_test(X86_FEATURE_FSGSBASE);
-  g_x86_feature_pcid_good =
-      x86_feature_test(X86_FEATURE_PCID) && x86_feature_test(X86_FEATURE_INVPCID);
+  g_x86_feature_invpcid = x86_feature_test(X86_FEATURE_INVPCID);
 }
 
 // Invoked on the boot CPU during boot, after platform is available.
@@ -247,6 +248,8 @@ void x86_cpu_feature_init() {
     case X86_VENDOR_UNKNOWN:
       break;
   }
+  g_x86_feature_pcid_enabled =
+      x86_feature_test(X86_FEATURE_PCID) && g_x86_feature_invpcid && gBootOptions->x86_enable_pcid;
 }
 
 // Invoked on each CPU during boot, after platform init has taken place.
@@ -454,7 +457,7 @@ void x86_feature_debug(void) {
   print_property("md_clear", g_has_md_clear);
   print_property("md_clear_user_return", g_md_clear_on_user_return);
   print_property("swapgs_bug", g_has_swapgs_bug);
-  print_property("pcid_good", g_x86_feature_pcid_good);
+  print_property("pcid_good", g_x86_feature_pcid_enabled);
   print_property("spec_ctrl", g_has_spec_ctrl);
   print_property("ssb", g_has_ssb);
   print_property("ssbd", g_has_ssbd);

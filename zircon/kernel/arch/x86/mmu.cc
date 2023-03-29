@@ -11,6 +11,7 @@
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/arch/x86/system.h>
 #include <lib/counters.h>
+#include <lib/id_allocator.h>
 #include <lib/zircon-internal/macros.h>
 #include <string.h>
 #include <trace.h>
@@ -48,6 +49,8 @@ KCOUNTER(tlb_invalidations_full_nonglobal_received, "mmu.tlb_invalidation_full_n
 KCOUNTER(ept_tlb_invalidations, "mmu.ept_tlb_invalidations")
 // Count the total number of context switches on the cpu
 KCOUNTER(context_switches, "mmu.context_switches")
+// Count the total number of fast context switches on the cpu (using PCID feature)
+KCOUNTER(context_switches_pcid, "mmu.context_switches_pcid")
 
 /* Default address width including virtual/physical address.
  * newer versions fetched below */
@@ -56,6 +59,10 @@ uint8_t g_max_paddr_width = 32;
 
 /* True if the system supports 1GB pages */
 static bool supports_huge_pages = false;
+
+/* a global bitmap to track which PCIDs are in use */
+using PCIDAllocator = id_allocator::IdAllocator<uint16_t, 4096, 1>;
+static lazy_init::LazyInit<PCIDAllocator> pcid_allocator;
 
 /* top level kernel page tables, initialized in start.S */
 volatile pt_entry_t pml4[NO_OF_PT_ENTRIES] __ALIGNED(PAGE_SIZE);
@@ -78,8 +85,6 @@ volatile pt_entry_t linear_map_pdp[(64ULL * GB) / (2 * MB)] __ALIGNED(PAGE_SIZE)
 /* which of the above variables is the top level page table */
 #define KERNEL_PT pml4
 
-// Width of the PCID identifier
-#define X86_PCID_BITS (12)
 // When this bit is set in the source operand of a MOV CR3, TLB entries and paging structure
 // caches for the active PCID may be preserved. If the bit is clear, entries will be cleared.
 // See Intel Volume 3A, 4.10.4.1
@@ -137,25 +142,91 @@ bool x86_mmu_check_paddr(paddr_t paddr) {
   return paddr <= max_paddr;
 }
 
+static void invlpg(vaddr_t addr) {
+  __asm__ volatile("invlpg %0" ::"m"(*reinterpret_cast<uint8_t*>(addr)));
+}
+
+struct InvpcidDescriptor {
+  uint64_t pcid{};
+  uint64_t address{};
+};
+
+static void invpcid_va_pcid(vaddr_t addr, uint16_t pcid) {
+  // Mode 0 of INVPCID takes both the virtual address + pcid and locally shoots
+  // down non global pages with it on the current cpu.
+  uint64_t mode = 0;
+  InvpcidDescriptor desc = {
+      .pcid = pcid,
+      .address = addr,
+  };
+
+  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+}
+
+static void invpcid_pcid_all(uint16_t pcid) {
+  // Mode 1 of INVPCID takes only the pcid and locally shoots down all non global
+  // pages tagged with it on the current cpu.
+  uint64_t mode = 1;
+  InvpcidDescriptor desc = {
+      .pcid = pcid,
+      .address = 0,
+  };
+
+  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+}
+
+static void invpcid_all_including_global() {
+  // Mode 2 of INVPCID shoots down all tlb entries in all pcids including global pages
+  // on the current cpu.
+  uint64_t mode = 2;
+  InvpcidDescriptor desc = {
+      .pcid = 0,
+      .address = 0,
+  };
+
+  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+}
+
+static void invpcid_all_excluding_global() {
+  // Mode 3 of INVPCID shoots down all tlb entries in all pcids excluding global pages
+  // on the current cpu.
+  uint64_t mode = 3;
+  InvpcidDescriptor desc = {
+      .pcid = 0,
+      .address = 0,
+  };
+
+  __asm__ volatile("invpcid %0, %1" ::"m"(desc), "r"(mode));
+}
+
 /**
  * @brief  invalidate all TLB entries, excluding global entries
  */
 static void x86_tlb_nonglobal_invalidate() {
-  // Read CR3 and immediately write it back.
-  arch::X86Cr3::Read().Write();
+  if (g_x86_feature_invpcid) {
+    // If using PCID, make sure we invalidate all entries in all PCIDs.
+    // If just using INVPCID, take advantage of the fancier instruction.
+    invpcid_all_excluding_global();
+  } else {
+    // Read CR3 and immediately write it back.
+    arch::X86Cr3::Read().Write();
+  }
 }
 
 /**
  * @brief  invalidate all TLB entries, including global entries
  */
 static void x86_tlb_global_invalidate() {
-  /* See Intel 3A section 4.10.4.1 */
-  auto cr4 = arch::X86Cr4::Read();
-  if (likely(cr4.pge())) {
+  if (g_x86_feature_invpcid) {
+    // If using PCID, make sure we invalidate all entries in all PCIDs.
+    // If just using INVPCID, take advantage of the fancier instruction.
+    invpcid_all_including_global();
+  } else {
+    // See Intel 3A section 4.10.4.1
+    auto cr4 = arch::X86Cr4::Read();
+    DEBUG_ASSERT(cr4.pge());  // Global pages *must* be enabled.
     cr4.set_pge(false).Write();
     cr4.set_pge(true).Write();
-  } else {
-    x86_tlb_nonglobal_invalidate();
   }
 }
 
@@ -264,18 +335,21 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
   kcounter_add(tlb_invalidations_sent, 1);
 
   const auto aspace = static_cast<X86ArchVmAspace*>(ctx());
-  const ulong cr3 = phys();
+  const ulong root_ptable_phys = phys();
   const uint16_t vpid = aspace->arch_vpid();
+  const uint16_t pcid = aspace->pcid();
 
   struct TlbInvalidatePage_context {
-    ulong target_cr3;
+    paddr_t target_root_ptable;
     const PendingTlbInvalidation* pending;
     uint16_t vpid;
+    uint16_t pcid;
   };
-  struct TlbInvalidatePage_context task_context = {
-      .target_cr3 = cr3,
+  TlbInvalidatePage_context task_context = {
+      .target_root_ptable = root_ptable_phys,
       .pending = pending,
       .vpid = vpid,
+      .pcid = pcid,
   };
 
   // TODO(fxbug.dev/95763): Consider whether it is better to invalidate a VPID
@@ -291,7 +365,8 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
    * case, it will get a spurious request to flush. */
   mp_ipi_target_t target;
   cpu_mask_t target_mask = 0;
-  if (pending->contains_global) {
+  // TODO(31418): Avoid always shooting down a PCID on all cores.
+  if (pending->contains_global || pcid != MMU_X86_UNUSED_PCID) {
     target = MP_IPI_TARGET_ALL;
   } else {
     target = MP_IPI_TARGET_MASK;
@@ -305,8 +380,13 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
 
     kcounter_add(tlb_invalidations_received, 1);
 
-    if (context->target_cr3 != arch::X86Cr3::Read().base() && !context->pending->contains_global) {
-      /* This invalidation doesn't apply to this CPU, ignore it */
+    /* This invalidation doesn't apply to this CPU if:
+     * - PCID feature is not being used
+     * - It doesn't contain any global pages (ie, isn't the kernel)
+     * - The target aspace is different (different target cr3)
+     */
+    if (!g_x86_feature_pcid_enabled && !context->pending->contains_global &&
+        context->target_root_ptable != arch::X86Cr3::Read().base()) {
       tlb_invalidations_received_invalid.Add(1);
       return;
     }
@@ -336,7 +416,19 @@ void X86PageTableMmu::TlbInvalidate(PendingTlbInvalidation* pending) {
         case PageTableLevel::PDP_L:
         case PageTableLevel::PD_L:
         case PageTableLevel::PT_L:
-          __asm__ volatile("invlpg %0" ::"m"(*(uint8_t*)item.addr()));
+          /* Terminal entry is being asked to be flushed. If it's a global page
+           * or not belonging to a special pcid, use the invlpg instruction.
+           */
+          if (item.is_global() || context->pcid == MMU_X86_UNUSED_PCID) {
+            invlpg(item.addr());
+          } else {
+            /* This is a user page with a tagged PCID.
+             * TODO: benchmark if it's worth adding a conditional here to use invlpg
+             * if its the active aspace on this cpu.
+             */
+            invpcid_va_pcid(item.addr(), context->pcid);
+          }
+
           maybe_invvpid(InvVpid::INDIVIDUAL_ADDRESS, context->vpid, item.addr());
           break;
       }
@@ -564,6 +656,27 @@ zx_status_t X86ArchVmAspace::Init() {
     X86PageTableMmu* mmu = new (&page_table_storage_.mmu) X86PageTableMmu();
     pt_ = mmu;
 
+    if (g_x86_feature_pcid_enabled) {
+      // assign a PCID
+      zx::result<uint16_t> result = pcid_allocator->TryAlloc();
+      if (result.is_error()) {
+        // TODO(fxbug.dev/124428): Implement some kind of PCID recycling.
+        LTRACEF("X86: ran out of PCIDs when assigning new aspace\n");
+        return ZX_ERR_NO_RESOURCES;
+      }
+      pcid_ = result.value();
+      DEBUG_ASSERT(pcid_ != MMU_X86_UNUSED_PCID && pcid_ < 4096);
+
+      // Assigning this PCID across from where it was last used is effectively changing all the non
+      // kernel mappings, so make sure to invalidate everywhere.
+      DEBUG_ASSERT(g_x86_feature_invpcid);
+      auto pcid_invalidate = [](void* raw_context) -> void {
+        const uint16_t pcid = *reinterpret_cast<uint16_t*>(raw_context);
+        invpcid_pcid_all(pcid);
+      };
+      mp_sync_exec(MP_IPI_TARGET_ALL, 0, pcid_invalidate, &pcid_);
+    }
+
     zx_status_t status = mmu->Init(this, test_page_alloc_func_);
     if (status != ZX_OK) {
       return status;
@@ -574,7 +687,8 @@ zx_status_t X86ArchVmAspace::Init() {
       return status;
     }
 
-    LTRACEF("user aspace: pt phys %#" PRIxPTR ", virt %p\n", pt_->phys(), pt_->virt());
+    LTRACEF("user aspace: pt phys %#" PRIxPTR ", virt %p, pcid %#hx\n", pt_->phys(), pt_->virt(),
+            pcid_);
   }
 
   return ZX_OK;
@@ -595,6 +709,10 @@ zx_status_t X86ArchVmAspace::Destroy() {
     static_cast<X86PageTableEpt*>(pt_)->Destroy(base_, size_);
   } else {
     static_cast<X86PageTableMmu*>(pt_)->Destroy(base_, size_);
+    if (pcid_ != MMU_X86_UNUSED_PCID) {
+      auto result = pcid_allocator->Free(pcid_);
+      DEBUG_ASSERT(result.is_ok());
+    }
   }
   return ZX_OK;
 }
@@ -651,7 +769,20 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
 
     paddr_t phys = aspace->pt_phys();
     LTRACEF_LEVEL(3, "switching to aspace %p, pt %#" PRIXPTR "\n", aspace, phys);
-    arch::X86Cr3::Write(phys);
+
+    // Load the new cr3, add in the pcid if it's supported
+    if (aspace->pcid_ != MMU_X86_UNUSED_PCID) {
+      DEBUG_ASSERT(g_x86_feature_pcid_enabled);
+      DEBUG_ASSERT(aspace->pcid_ < 4096);
+      context_switches_pcid.Add(1);
+      arch::X86Cr3PCID cr3;
+      cr3.set_noflush(1);
+      cr3.set_base(phys);
+      cr3.set_pcid(aspace->pcid_ & 0xfff);
+      cr3.Write();
+    } else {
+      arch::X86Cr3::Write(phys);
+    }
     if (old_aspace != nullptr) {
       [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
       // Make sure we were actually previously running on this CPU
@@ -666,6 +797,9 @@ void X86ArchVmAspace::ContextSwitch(X86ArchVmAspace* old_aspace, X86ArchVmAspace
     // Switching to the kernel aspace
     LTRACEF_LEVEL(3, "switching to kernel aspace, pt %#" PRIxPTR "\n", kernel_pt_phys);
 
+    // Write the kernel top level page table. Note: even when using PCID we do not
+    // need to do anything special here since we are intrinsically loading PCID 0 with
+    // the noflush bit clear which is fine since the kernel uses global pages.
     arch::X86Cr3::Write(kernel_pt_phys);
     if (old_aspace != nullptr) {
       [[maybe_unused]] uint32_t prev = old_aspace->active_cpus_.fetch_and(~cpu_bit);
@@ -755,13 +889,32 @@ void x86_mmu_early_init() {
   }
 
   LTRACEF("paddr_width %u vaddr_width %u\n", g_max_paddr_width, g_max_vaddr_width);
+
+  pcid_allocator.Initialize();
 }
 
 void x86_mmu_init() {
+  printf("MMU: max physical address bits %u max virtual address bits %u\n", g_max_paddr_width,
+         g_max_vaddr_width);
+  if (g_x86_feature_pcid_enabled) {
+    printf("MMU: Using PCID + INVPCID\n");
+  } else if (g_x86_feature_invpcid) {
+    printf("MMU: Using INVPCID\n");
+  }
+
   ASSERT_MSG(g_max_vaddr_width >= kX86VAddrBits,
              "Maximum number of virtual address bits (%u) is less than the assumed number of bits"
              " being used (%u)\n",
              g_max_vaddr_width, kX86VAddrBits);
+}
+
+void x86_mmu_feature_init() {
+  // Use of PCID is detected late and on the boot cpu is this happens after x86_mmu_percpu_init
+  // and so we enable it again here. For other CPUs, and when coming in and out of suspend, it
+  // will happen correctly in x86_mmu_percpu_init.
+  arch::X86Cr4 cr4 = arch::X86Cr4::Read();
+  cr4.set_pcide(g_x86_feature_pcid_enabled);
+  cr4.Write();
 }
 
 void x86_mmu_percpu_init() {
@@ -771,11 +924,12 @@ void x86_mmu_percpu_init() {
       .set_cd(false)  // Clear cache-disable.
       .Write();
 
-  // Set or clear the SMEP & SMAP bits in CR4 based on features we've detected.
+  // Set or clear the SMEP & SMAP & PCIDE bits in CR4 based on features we've detected.
   // Make sure global pages are enabled.
   arch::X86Cr4 cr4 = arch::X86Cr4::Read();
   cr4.set_smep(x86_feature_test(X86_FEATURE_SMEP));
   cr4.set_smap(g_x86_feature_has_smap);
+  cr4.set_pcide(g_x86_feature_pcid_enabled);
   cr4.set_pge(true);
   cr4.Write();
 

@@ -84,6 +84,12 @@ this command line flag is set to false, turbo is disabled for all CPUs in the
 system.
 )""")
 
+DEFINE_OPTION("kernel.x86.enable_pcid", bool, x86_enable_pcid, {false}, R"""(
+This option controls whether PCIDs are used, if there is sufficient CPU support.
+If this option is enabled and there is not sufficient CPU support, then this
+option has no effect.
+)""")
+
 // TODO(fxb/80082): Unify arch agnostic options.
 DEFINE_OPTION("kernel.smp.maxcpus", uint32_t, x86_smp_max_cpus, {32}, R"""(
 This option caps the number of CPUs to initialize.  It cannot be greater than *SMP\_MAX\_CPUS* 

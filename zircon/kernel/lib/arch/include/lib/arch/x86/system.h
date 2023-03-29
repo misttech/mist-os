@@ -54,9 +54,9 @@ struct X86Cr2 : public SysRegBase<X86Cr2> {
 
 ARCH_X86_SYSREG(X86Cr2, "cr2");
 
-// [intel/vol3]: 2.5 Control Registers: CR3
+// [intel/vol3]: 2.5 Control Registers: CR3 without PCID feature
 struct X86Cr3 : public SysRegBase<X86Cr3> {
-  DEF_UNSHIFTED_FIELD(63, 12, base);  // 4k-aligned physical byte address.
+  DEF_UNSHIFTED_FIELD(51, 12, base);  // 4k-aligned physical byte address.
 
   // Bits [12:5] and [2:0] are reserved and ignored, but "assumed to be zero".
   // In case of future additions it's probably best to write them back as
@@ -67,6 +67,17 @@ struct X86Cr3 : public SysRegBase<X86Cr3> {
 };
 
 ARCH_X86_SYSREG(X86Cr3, "cr3");
+
+// [intel/vol3]: 2.5 Control Registers: CR3 with CR4.PCIDE enabled
+struct X86Cr3PCID : public SysRegBase<X86Cr3PCID> {
+  DEF_BIT(63, noflush);  // When this bit is set upon load, do not flush the PCID's TLB.
+
+  DEF_UNSHIFTED_FIELD(51, 12, base);  // 4k-aligned physical byte address.
+
+  DEF_FIELD(11, 0, pcid);  // 12 bit PCID associated with this mmu context
+};
+
+ARCH_X86_SYSREG(X86Cr3PCID, "cr3");
 
 // [intel/vol3]: 2.5 Control Registers: CR4
 struct X86Cr4 : public SysRegBase<X86Cr4> {

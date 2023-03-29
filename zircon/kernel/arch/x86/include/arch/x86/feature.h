@@ -213,6 +213,7 @@ void x86_feature_debug();
 #define X86_FEATURE_HUGE_PAGE X86_CPUID_BIT(0x80000001, 3, 26)
 #define X86_FEATURE_RDTSCP X86_CPUID_BIT(0x80000001, 3, 27)
 #define X86_FEATURE_INVAR_TSC X86_CPUID_BIT(0x80000007, 3, 8)
+#define X86_FEATURE_INVLPGB X86_CPUID_BIT(0x80000008, 1, 3)
 
 /* cpu vendors */
 enum x86_vendor_list { X86_VENDOR_UNKNOWN, X86_VENDOR_INTEL, X86_VENDOR_AMD };
@@ -254,8 +255,12 @@ enum x86_microarch_list {
   X86_MICROARCH_AMD_ZEN,
 };
 
+// Pre-computed complex features to test for or features that are tested extremely
+// regularly in the system.
 extern bool g_x86_feature_fsgsbase;
-extern bool g_x86_feature_pcid_good;
+extern bool g_x86_feature_invpcid;
+// Combination of both PCID & INVLPCID features present, and enabled by kernel cmdline option.
+extern bool g_x86_feature_pcid_enabled;
 extern bool g_x86_feature_has_smap;
 
 enum x86_hypervisor_list {
