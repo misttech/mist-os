@@ -16,12 +16,12 @@
 #include "src/lib/analytics/cpp/core_dev_tools/analytics_status.h"
 #include "src/lib/analytics/cpp/core_dev_tools/command_line_options.h"
 #include "src/lib/analytics/cpp/core_dev_tools/environment_status.h"
+#include "src/lib/analytics/cpp/core_dev_tools/ga4_common_events.h"
 #include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
+#include "src/lib/analytics/cpp/core_dev_tools/google_analytics_4_client.h"
 #include "src/lib/analytics/cpp/core_dev_tools/google_analytics_client.h"
 #include "src/lib/analytics/cpp/core_dev_tools/persistent_status.h"
 #include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
-#include "src/lib/analytics/cpp/google_analytics/client.h"
-#include "src/lib/analytics/cpp/google_analytics/event.h"
 #include "src/lib/analytics/cpp/metric_properties/metric_properties.h"
 
 namespace analytics::core_dev_tools {
@@ -90,11 +90,9 @@ class Analytics {
       Init(analytics_option);
     }
 
-    // Remove "&& bot.IsRunByBot()" if one wants to add "ds=user" parameter for non-bot users
-    // Currently, non-bot users will have "(not set)" for the "ds" (data source) parameter, which
-    // appears to be enough for now
-    if (enable_on_bots && IsEnabled() && bot.IsRunByBot()) {
-      FX_DCHECK(!client_ && !client_is_cleaned_up_);
+    if (enable_on_bots && IsEnabled()) {
+      FX_DCHECK(!client_ua_ && !client_ga4_ && !client_is_cleaned_up_);
+      CreateAndPrepareGa4Client(bot);
       CreateAndPrepareGoogleAnalyticsClient(bot);
     }
   }
@@ -143,6 +141,8 @@ class Analytics {
       google_analytics::Event event(kEventCategoryGeneral, kEventActionInvoke);
       event.AddGeneralParameters(parameters);
       SendGoogleAnalyticsHit(event);
+
+      SendGa4Event(std::make_unique<InvokeEvent>());
     }
   }
 
@@ -152,9 +152,17 @@ class Analytics {
     }
   }
 
+  static void IfEnabledSendGa4Event(std::unique_ptr<google_analytics_4::Event> event) {
+    if (IsEnabled()) {
+      SendGa4Event(std::move(event));
+    }
+  }
+
   static void CleanUp() {
-    delete client_;
-    client_ = nullptr;
+    delete client_ua_;
+    client_ua_ = nullptr;
+    delete client_ga4_;
+    client_ga4_ = nullptr;
     client_is_cleaned_up_ = true;
   }
 
@@ -164,10 +172,19 @@ class Analytics {
 
   static void SendGoogleAnalyticsHit(const google_analytics::Hit& hit) {
     if (!client_is_cleaned_up_) {
-      if (!client_) {
+      if (!client_ua_) {
         CreateAndPrepareGoogleAnalyticsClient();
       }
-      client_->AddHit(hit);
+      client_ua_->AddHit(hit);
+    }
+  }
+
+  static void SendGa4Event(std::unique_ptr<google_analytics_4::Event> event) {
+    if (!client_is_cleaned_up_) {
+      if (!client_ga4_) {
+        CreateAndPrepareGa4Client();
+      }
+      client_ga4_->AddEvent(std::move(event));
     }
   }
 
@@ -236,16 +253,23 @@ class Analytics {
   static void InitSubLaunchedFirst() { T::SetRuntimeAnalyticsStatus(AnalyticsStatus::kDisabled); }
 
   static void CreateAndPrepareGoogleAnalyticsClient(std::optional<BotInfo> bot = std::nullopt) {
-    client_ = new GoogleAnalyticsClient(T::kQuitTimeoutMs);
-    internal::PrepareGoogleAnalyticsClient(*client_, T::kToolName, T::kTrackingId, bot);
+    client_ua_ = new GoogleAnalyticsClient(T::kQuitTimeoutMs);
+    internal::PrepareGoogleAnalyticsClient(*client_ua_, T::kToolName, T::kTrackingId, bot);
+  }
+
+  static void CreateAndPrepareGa4Client(std::optional<BotInfo> bot = std::nullopt) {
+    client_ga4_ = new Ga4Client(T::kQuitTimeoutMs);
+    internal::PrepareGa4Client(*client_ga4_, T::kMeasurementId, T::kMeasurementKey, bot);
   }
 
   static void SendAnalyticsManualEnableEvent() {
     SendGoogleAnalyticsHit(google_analytics::Event(kEventCategoryAnalytics, kEventActionEnable));
+    SendGa4Event(ChangeAnalyticsStatusEvent::CreateManuallyEnabledEvent());
   }
 
   static void SendAnalyticsDisableEvent() {
     SendGoogleAnalyticsHit(google_analytics::Event(kEventCategoryAnalytics, kEventActionDisable));
+    SendGa4Event(ChangeAnalyticsStatusEvent::CreateDisabledEvent());
   }
 
   inline static bool client_is_cleaned_up_ = false;
@@ -254,7 +278,8 @@ class Analytics {
   // (1) there is no ownership transfer
   // (2) the life time of the pointed-to object is managed manually
   // (3) using a raw pointer here makes code simpler and easier to read
-  inline static google_analytics::Client* client_ = nullptr;
+  inline static google_analytics::Client* client_ua_ = nullptr;
+  inline static google_analytics_4::Client* client_ga4_ = nullptr;
 };
 
 }  // namespace analytics::core_dev_tools

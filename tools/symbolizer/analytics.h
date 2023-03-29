@@ -64,6 +64,8 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
 
   static constexpr char kToolName[] = "symbolizer";
   static constexpr int64_t kQuitTimeoutMs = 500;
+  static constexpr char kMeasurementId[] = "G-B0SP6NVLC6";
+  static constexpr char kMeasurementKey[] = "ABmnNSKcQX21P9EcYQDt2Q";
   static constexpr char kTrackingId[] = "UA-127897021-14";
   static constexpr char kEnableArgs[] = "--analytics=enable";
   static constexpr char kDisableArgs[] = "--analytics=disable";

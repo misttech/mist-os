@@ -9,8 +9,16 @@
 
 namespace analytics {
 
+// DEPRECATED: will be removed when UA support is stopped
 // Get the same output as `uname -ms`
 std::string GetOsVersion();
+
+struct SystemInfo {
+  std::string os;
+  std::string arch;
+};
+
+SystemInfo GetSystemInfo();
 
 }  // namespace analytics
 

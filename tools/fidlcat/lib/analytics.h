@@ -16,6 +16,8 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
 
   static constexpr char kToolName[] = "fidlcat";
   static constexpr int64_t kQuitTimeoutMs = 500;
+  static constexpr char kMeasurementId[] = "G-Q65G4CDNFV";
+  static constexpr char kMeasurementKey[] = "laylnxMAQn6eMJW3vsaPww";
   static constexpr char kTrackingId[] = "UA-127897021-13";
   static constexpr char kEnableArgs[] = "--analytics=enable";
   static constexpr char kDisableArgs[] = "--analytics=disable";

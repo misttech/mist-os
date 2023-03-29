@@ -15,6 +15,7 @@ using ::analytics::GetOsVersion;
 using ::analytics::core_dev_tools::AnalyticsOption;
 using ::analytics::core_dev_tools::GeneralParameters;
 using ::analytics::core_dev_tools::GoogleAnalyticsEvent;
+using ::analytics::core_dev_tools::InvokeEvent;
 
 void Analytics::Init(Session& session, AnalyticsOption analytics_option) {
   InitBotAware(analytics_option, false);
@@ -41,6 +42,8 @@ void Analytics::IfEnabledSendInvokeEvent(Session* session) {
     GoogleAnalyticsEvent event(kEventCategoryGeneral, kEventActionInvoke);
     event.AddGeneralParameters(parameters);
     SendGoogleAnalyticsHit(event);
+
+    SendGa4Event(std::make_unique<InvokeEvent>());
   }
 }
 

@@ -42,6 +42,7 @@ static_library("core_dev_tools") {
     "analytics_status.h",
     "command_line_options.cc",
     "command_line_options.h",
+    "ga4_common_events.h",
     "general_parameters.cc",
     "general_parameters.h",
     "google_analytics_4_client.cc",

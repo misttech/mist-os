@@ -25,6 +25,8 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
 
   static constexpr char kToolName[] = "zxdb";
   static constexpr int64_t kQuitTimeoutMs = 500;
+  static constexpr char kMeasurementId[] = "G-MT0S0L238V";
+  static constexpr char kMeasurementKey[] = "ftnVxL9mSuKh52n-HaCjoQ";
   static constexpr char kTrackingId[] = "UA-127897021-11";
   static constexpr char kEnableArgs[] = "--analytics=enable";
   static constexpr char kDisableArgs[] = "--analytics=disable";

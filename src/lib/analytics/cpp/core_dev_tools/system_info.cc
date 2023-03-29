@@ -18,4 +18,12 @@ std::string GetOsVersion() {
   return fxl::Substitute("$0 $1", name.sysname, name.machine);
 }
 
+SystemInfo GetSystemInfo() {
+  struct utsname name;
+  if (uname(&name) != 0) {
+    return {"unknown", "unknown"};
+  }
+  return {name.sysname, name.machine};
+}
+
 }  // namespace analytics
