@@ -12,7 +12,7 @@ use std::{
     borrow::Cow,
     collections::HashMap,
     path::{Path, PathBuf},
-    process::{Child, ExitStatus, Stdio},
+    process::ExitStatus,
     time::SystemTime,
 };
 use tempfile::TempDir;
@@ -205,6 +205,10 @@ impl Isolate {
             Some(tmpdir.path().join(".ffx_env").to_owned()),
         );
 
+        // NOTE: config values from this Isolate might not be found correctly,
+        // due to issues with caching.  Until this is fixed (TODO(fxb/124465)),
+        // callers should call `ffx_config::cache_invalidate()` if they will be
+        // querying config values, e.g. "log.dir".
         Ok(Isolate { tmpdir, env_ctx })
     }
 
@@ -250,16 +254,14 @@ impl Isolate {
         self.tmpdir.path().join("daemon.sock")
     }
 
+    pub fn env_context(&self) -> &EnvironmentContext {
+        &self.env_ctx
+    }
+
     pub async fn ffx_cmd(&self, args: &[&str]) -> Result<std::process::Command> {
         let mut cmd = self.env_ctx.rerun_prefix().await?;
         cmd.args(args);
         Ok(cmd)
-    }
-
-    pub async fn ffx_spawn(&self, args: &[&str]) -> Result<Child> {
-        let mut cmd = self.ffx_cmd(args).await?;
-        let child = cmd.stdout(Stdio::null()).stderr(Stdio::null()).spawn()?;
-        Ok(child)
     }
 
     pub async fn ffx(&self, args: &[&str]) -> Result<CommandOutput> {

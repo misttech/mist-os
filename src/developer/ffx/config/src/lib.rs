@@ -30,6 +30,7 @@ mod storage;
 pub use api::query::{BuildOverride, ConfigQuery, SelectMode};
 pub use config_macros::FfxConfigBacked;
 
+pub use cache::invalidate as cache_invalidate;
 pub use cache::{global_env, global_env_context, init, test_init, TestEnv};
 pub use environment::{Environment, EnvironmentContext};
 pub use sdk::{self, Sdk, SdkRoot};

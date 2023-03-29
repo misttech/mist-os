@@ -14,6 +14,7 @@ use hoist::{Hoist, OvernetInstance};
 use std::{
     path::{Path, PathBuf},
     pin::Pin,
+    process::{Child, Command},
     time::Duration,
 };
 
@@ -120,13 +121,39 @@ pub async fn find_and_connect(hoist: &Hoist, socket_path: PathBuf) -> Result<Dae
         .context("connecting to the ffx daemon")
 }
 
+// We have both spawn_daemon(), and run_daemon() below, because we want
+// the daemon to be handled in two different ways. "Real" invocations use
+// spawn_daemon(), because it daemonizes the process, disconnecting it from the
+// controlling terminal, etc.  "Test" invocations uses run_daemon(), because
+// they want to have control of the child process, running wait(), etc.
 #[tracing::instrument]
 pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
+    let mut cmd = daemon_cmd(context).await?;
+    tracing::info!("Starting new background ffx daemon from {:?}", &cmd.get_program());
+    daemonize(&mut cmd)
+        .spawn()
+        .context("spawning daemon start")?
+        .wait()
+        .map(|_| ())
+        .context("waiting for daemon start")
+}
+
+// See the above comment for spawn_daemon(). This function is only used by the
+// "ffx self-test" function `test_config_flag()`.
+#[tracing::instrument]
+pub async fn run_daemon(context: &EnvironmentContext) -> Result<Child> {
+    let mut cmd = daemon_cmd(context).await?;
+    tracing::info!("Starting new ffx daemon from {:?}", &cmd.get_program());
+    let child = cmd.spawn().context("running daemon start")?;
+    Ok(child)
+}
+
+#[tracing::instrument]
+async fn daemon_cmd(context: &EnvironmentContext) -> Result<Command> {
     use std::process::Stdio;
 
     let mut cmd = context.rerun_prefix().await?;
     let socket_path = context.get_ascendd_path().await.context("No socket path configured")?;
-    tracing::info!("Starting new ffx background daemon from {:?}", &cmd.get_program());
 
     let mut stdout = Stdio::null();
     let mut stderr = Stdio::null();
@@ -142,12 +169,7 @@ pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
     cmd.arg("daemon");
     cmd.arg("start");
     cmd.arg("--path").arg(socket_path);
-    daemonize(&mut cmd)
-        .spawn()
-        .context("spawning daemon start")?
-        .wait()
-        .map(|_| ())
-        .context("waiting for daemon start")
+    Ok(cmd)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
