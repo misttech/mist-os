@@ -31,7 +31,7 @@ def _instantiate_local_path(ctx, manifests):
         ctx.report_progress("Copying local SDK from %s" % local_sdk_path)
         local_sdk = ctx.path(local_sdk_path)
         if not local_sdk.exists:
-            fail("Cannot find SDK in local Fuchsia build: %s" % local_sdk)
+            fail("Cannot find SDK in local Fuchsia build: %s\n\nPlease build it with\n\n\t\t'fx build generate_fuchsia_sdk_repository'" % local_sdk)
 
         manifests.append({"root": "%s/." % local_sdk, "manifest": "meta/manifest.json"})
 
@@ -50,7 +50,6 @@ def _instantiate_local_env(ctx):
     if not local_sdk.exists:
         fail("Cannot find SDK in local Fuchsia build.Please build it with\n\n\t\t'fx build generate_fuchsia_sdk_repository'\n\nor unset variable %s: %s" % (_LOCAL_FUCHSIA_PLATFORM_BUILD, local_fuchsia_dir))
     ctx.symlink(local_sdk, ".")
-
 
 def _merge_rules_fuchsia(ctx):
     rules_fuchsia_root = ctx.path(ctx.attr._rules_fuchsia_root).dirname
