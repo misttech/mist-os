@@ -27,12 +27,23 @@ class Component {
     return result == 'Success';
   }
 
-  /// Launches a component given by [url].
+  /// Launches a component given by [url], and wait for the component to stop.
   Future<dynamic> launch(String url, [List<String>? args]) async {
     if (args != null && args.isNotEmpty) {
-      return await _sl4f
-          .request('component_facade.Launch', {'url': url, 'arguments': args});
+      return await _sl4f.request('component_facade.Launch',
+          {'url': url, 'arguments': args, 'wait_until_stop': true});
     }
-    return await _sl4f.request('component_facade.Launch', {'url': url});
+    return await _sl4f.request(
+        'component_facade.Launch', {'url': url, 'wait_until_stop': true});
+  }
+
+  /// Launches a component given by [url], and detach the component.
+  Future<dynamic> launchAndDetach(String url, [List<String>? args]) async {
+    if (args != null && args.isNotEmpty) {
+      return await _sl4f.request('component_facade.Launch',
+          {'url': url, 'arguments': args, 'wait_until_stop': false});
+    }
+    return await _sl4f.request(
+        'component_facade.Launch', {'url': url, 'wait_until_stop': false});
   }
 }

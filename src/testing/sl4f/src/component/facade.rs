@@ -32,13 +32,14 @@ impl ComponentFacade {
         ComponentFacade {}
     }
 
-    /// Launch component with url and optional arguments and detach directly
+    /// Launch component with url and optional arguments
     /// # Arguments
     /// * `args`: will be parsed to ComponentLaunchRequest in create_launch_app
     ///   with fields:
     ///   - `url`: url of the component (ending in `.cmx` for CFv1 or `.cm` for
     ///     CFv2)
     ///   - `arguments`: optional arguments for the component (CFv1 only)
+    ///   - `wait_until_stop`: if true, block until the component stops running
     pub async fn launch(&self, args: Value) -> Result<ComponentLaunchResponse, Error> {
         let tag = "ComponentFacade::create_launch_app";
         let req: ComponentLaunchRequest = from_value(args)?;
@@ -64,16 +65,21 @@ impl ComponentFacade {
                     "CFv2 components currently don't support command line arguments"
                 ));
             }
-            self.launch_v2(tag, &component_url).await
+            self.launch_v2(tag, &component_url, req.wait_until_stop).await
         }
     }
 
-    /// Launch component with url and optional arguments and detach directly
+    /// Launch component with url
     /// # Arguments
     /// * `tag`: the sl4f command tag/name
     /// * `url`: url of the component
-    /// * `arguments`: optional arguments for the component
-    async fn launch_v2(&self, tag: &str, url: &str) -> Result<ComponentLaunchResponse, Error> {
+    /// * `wait_until_stop`: if true, block until the component stops running
+    async fn launch_v2(
+        &self,
+        tag: &str,
+        url: &str,
+        wait_until_stop: bool,
+    ) -> Result<ComponentLaunchResponse, Error> {
         let collection_name = LAUNCHED_COMPONENTS_COLLECTION_NAME;
         let child_name =
             if let (Some(last_dot), Some(last_slash)) = (url.rfind('.'), (url.rfind('/'))) {
@@ -121,32 +127,36 @@ impl ComponentFacade {
         // Connect to the Binder protocol to start the component.
         let _ = client::connect_to_protocol_at_dir_root::<fcomponent::BinderMarker>(&exposed_dir)?;
 
-        // Important! The `moniker_regex` must end with `$` to ensure the
-        // `EventMatcher` does not observe stopped events of child components of
-        // the launched component.
-        info!("Waiting for Stopped events for child {child_name}");
-        let stopped_event = EventMatcher::ok()
-            .moniker_regex(format!("./{LAUNCHED_COMPONENTS_COLLECTION_NAME}:{child_name}$"))
-            .wait::<Stopped>(&mut event_stream)
-            .await
-            .context(format!("failed to observe {child_name} Stopped event"))?;
+        if wait_until_stop {
+            // Important! The `moniker_regex` must end with `$` to ensure the
+            // `EventMatcher` does not observe stopped events of child components of
+            // the launched component.
+            info!("Waiting for Stopped events for child {child_name}");
+            let stopped_event = EventMatcher::ok()
+                .moniker_regex(format!("./{LAUNCHED_COMPONENTS_COLLECTION_NAME}:{child_name}$"))
+                .wait::<Stopped>(&mut event_stream)
+                .await
+                .context(format!("failed to observe {child_name} Stopped event"))?;
 
-        if let Err(err) = realm.destroy_child(&mut child_ref).await? {
-            fx_err_and_bail!(
-                &with_line!(tag),
-                format_err!("Failed to destroy CFv2 child: {err:?}")
-            );
-        }
-
-        let stopped_payload =
-            stopped_event.result().map_err(|err| anyhow!("StoppedError: {err:?}"))?;
-        info!("Returning {stopped_payload:?} event for child {child_name}");
-        match stopped_payload.status {
-            ExitStatus::Crash(status) => {
-                info!("Component terminated unexpectedly. Status: {status}");
-                Ok(ComponentLaunchResponse::Fail(status as i64))
+            if let Err(err) = realm.destroy_child(&mut child_ref).await? {
+                fx_err_and_bail!(
+                    &with_line!(tag),
+                    format_err!("Failed to destroy CFv2 child: {err:?}")
+                );
             }
-            ExitStatus::Clean => Ok(ComponentLaunchResponse::Success),
+
+            let stopped_payload =
+                stopped_event.result().map_err(|err| anyhow!("StoppedError: {err:?}"))?;
+            info!("Returning {stopped_payload:?} event for child {child_name}");
+            match stopped_payload.status {
+                ExitStatus::Crash(status) => {
+                    info!("Component terminated unexpectedly. Status: {status}");
+                    Ok(ComponentLaunchResponse::Fail(status as i64))
+                }
+                ExitStatus::Clean => Ok(ComponentLaunchResponse::Success),
+            }
+        } else {
+            Ok(ComponentLaunchResponse::Success)
         }
     }
 

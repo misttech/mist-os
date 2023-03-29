@@ -110,5 +110,8 @@ group("test") {
     ":sl4f_astro_performance_test($host_toolchain)",
     ":sl4f_test($host_toolchain)",
     ":sl4f_test_astro_only($host_toolchain)",
+
+    # used to test sl4f launch component.
+    "//src/tests/end_to_end/sl4f/testing:sl4f-testing",
   ]
 }

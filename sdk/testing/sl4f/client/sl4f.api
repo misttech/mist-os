@@ -1244,6 +1244,46 @@
               "returnType": "Future<dynamic>",
               "type": "MethodDeclarationImpl"
             },
+            "launchAndDetach": {
+              "SimpleFormalParameterImpl": {
+                "args": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": true,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": true,
+                  "isPositional": true,
+                  "isRequired": false,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": false,
+                  "name": "args",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "List<String>?"
+                },
+                "url": {
+                  "isConst": false,
+                  "isFinal": false,
+                  "isOptional": false,
+                  "isOptionalNamed": false,
+                  "isOptionalPositional": false,
+                  "isPositional": true,
+                  "isRequired": true,
+                  "isRequiredNamed": false,
+                  "isRequiredPositional": true,
+                  "name": "url",
+                  "type": "SimpleFormalParameterImpl",
+                  "varType": "String"
+                }
+              },
+              "isAbstract": false,
+              "isGetter": false,
+              "isOperator": false,
+              "isSetter": false,
+              "isStatic": false,
+              "name": "launchAndDetach",
+              "returnType": "Future<dynamic>",
+              "type": "MethodDeclarationImpl"
+            },
             "list": {
               "isAbstract": false,
               "isGetter": false,

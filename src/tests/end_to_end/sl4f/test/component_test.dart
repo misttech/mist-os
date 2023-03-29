@@ -45,5 +45,30 @@ void main() {
               .launch('fuchsia-pkg://fuchsia.com/fake#meta/fake.cm'),
           throwsException);
     });
+
+    test('test launch component and wait for stop', () async {
+      expect(
+          await sl4f.Component(sl4fDriver).launch(
+              'fuchsia-pkg://fuchsia.com/sl4f-testing#meta/self-stop-component.cm'),
+          'Success');
+      final alive =
+          await sl4f.Component(sl4fDriver).search('self-stop-component.cm');
+      expect(alive, false);
+    });
+
+    test('test launch component and keep component alive', () async {
+      // destroy the child component at the begin and the end to ensure it is clean.
+      await sl4fDriver.ssh.run('component destroy "daemon-component"');
+      expect(
+          await sl4f.Component(sl4fDriver).launchAndDetach(
+              'fuchsia-pkg://fuchsia.com/sl4f-testing#meta/daemon-component.cm'),
+          'Success');
+      var alive =
+          await sl4f.Component(sl4fDriver).search('daemon-component.cm');
+      expect(alive, true);
+      await sl4fDriver.ssh.run('component destroy "daemon-component"');
+      alive = await sl4f.Component(sl4fDriver).search('daemon-component.cm');
+      expect(alive, false);
+    });
   }, timeout: Timeout(_timeout));
 }

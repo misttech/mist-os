@@ -37,6 +37,7 @@ pub enum ComponentSearchResult {
 pub struct ComponentLaunchRequest {
     pub url: Option<String>,
     pub arguments: Option<Vec<String>>,
+    pub wait_until_stop: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
