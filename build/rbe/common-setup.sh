@@ -48,10 +48,35 @@ function timetrace() {
 # The value is an absolute path.
 readonly default_project_root="$(readlink -f "$script_dir"/../..)"
 
+# OS/Arch detection logic can also be found in 'tools/devshell/lib/platform.sh'
+[[ -n "${_FUCHSIA_RBE_CACHE_VAR_host_os+x}" ]] || {
+  # This is cached to avoid repeating calls to uname.
+  detected_os="$(uname -s)"
+  case "$detected_os" in
+    Darwin) export _FUCHSIA_RBE_CACHE_VAR_host_os="mac" ;;
+    Linux) export _FUCHSIA_RBE_CACHE_VAR_host_os="linux" ;;
+    *) echo >&2 "Unknown operating system: $detected_os" ; exit 1 ;;
+  esac
+}
+
+[[ -n "${_FUCHSIA_RBE_CACHE_VAR_host_arch+x}" ]] || {
+  # This is cached to avoid repeating calls to uname.
+  detected_arch="$(uname -m)"
+  case "$detected_arch" in
+    x86_64) export _FUCHSIA_RBE_CACHE_VAR_host_arch="x64" ;;
+    arm64) export _FUCHSIA_RBE_CACHE_VAR_host_arch="arm64" ;;
+    *) echo >&2 "Unknown machine architecture: $detected_arch" ; exit 1 ;;
+  esac
+}
+
+# This points to the host platform subdir of our prebuilt tools.
+readonly HOST_PLATFORM="${_FUCHSIA_RBE_CACHE_VAR_host_os}-${_FUCHSIA_RBE_CACHE_VAR_host_arch}"
+
 function _check_realpath_works_for_relative_paths() {
   if which realpath
   then
-    # test if it is usable for calculating relative paths
+    # GNU coreutils' realpath is different from BSD utils' realpath.
+    # Test if it is usable for calculating relative paths.
     realpath -s --relative-to=.. "$script" 2>&1 > /dev/null || return 1
     return 0  # success
   else
@@ -69,8 +94,9 @@ function _check_realpath_works_for_relative_paths() {
     export _FUCHSIA_RBE_CACHE_VAR_relpath_uses=realpath
   else
     # Point to our prebuilt python3.
-    python="$(ls "$default_project_root"/prebuilt/third_party/python3/*/bin/python3)" || {
-      echo "*** Python interpreter not found under $default_project_root/prebuilt/third_party/python3."
+    python="$default_project_root"/prebuilt/third_party/python3/"$HOST_PLATFORM"/bin/python3
+    test -x "$python" || {
+      echo "*** Python interpreter not found at expected location: $python."
       exit 1
     }
     export _FUCHSIA_RBE_CACHE_VAR_relpath_uses="$python"
@@ -97,22 +123,3 @@ case "$_FUCHSIA_RBE_CACHE_VAR_relpath_uses" in
     ;;
 esac
 
-[[ -n "${_FUCHSIA_RBE_CACHE_VAR_host_os+x}" ]] || {
-  # This is cached to avoid repeating calls to uname.
-  detected_os="$(uname -s)"
-  case "$detected_os" in
-    Darwin) export _FUCHSIA_RBE_CACHE_VAR_host_os="mac" ;;
-    Linux) export _FUCHSIA_RBE_CACHE_VAR_host_os="linux" ;;
-    *) echo >&2 "Unknown operating system: $detected_os" ; exit 1 ;;
-  esac
-}
-
-[[ -n "${_FUCHSIA_RBE_CACHE_VAR_host_arch+x}" ]] || {
-  # This is cached to avoid repeating calls to uname.
-  detected_arch="$(uname -m)"
-  case "$detected_arch" in
-    x86_64) export _FUCHSIA_RBE_CACHE_VAR_host_arch="x64" ;;
-    arm64) export _FUCHSIA_RBE_CACHE_VAR_host_arch="arm64" ;;
-    *) echo >&2 "Unknown machine architecture: $detected_arch" ; exit 1 ;;
-  esac
-}

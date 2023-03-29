@@ -4,6 +4,8 @@
 # found in the LICENSE file.
 
 # See https://github.com/bazelbuild/remote-apis-sdks
+# `remotetool` can be used to inspect past remote actions, re-execute them,
+# fetch artifacts, etc.
 
 set -uo pipefail
 
@@ -13,13 +15,15 @@ script_dir="$(dirname "$script")"
 # defaults
 config="$script_dir"/fuchsia-reproxy.cfg
 
-remotetool="$(which remotetool)" || {
-  cat <<EOF
-  No 'remotetool' found in PATH.
+source "$script_dir"/common-setup.sh
 
-  'remotetool' can be built and installed from:
-  https://github.com/bazelbuild/remote-apis-sdks
-EOF
+project_root="$(readlink -f "$script_dir"/../..)"
+project_root_rel="$(relpath . "$project_root")"
+
+# Assume there is only the host platform tool under prebuilt
+remotetool="$project_root_rel"/prebuilt/third_party/remote-apis-sdks/"$HOST_PLATFORM"/remotetool
+test -x "$remotetool" || {
+  echo "'remotetool' not found in prebuilts at $remotetool"
   exit 1
 }
 
