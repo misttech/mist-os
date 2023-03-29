@@ -24,6 +24,7 @@ cuckoo_kernel_zbi_test_params = {
     "fx",
     "network",
     "test-manager",
+    "test_realm",
     "forensics",
     "swd_policy.unrestricted",
   ]

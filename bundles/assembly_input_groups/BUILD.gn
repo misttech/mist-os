@@ -49,6 +49,14 @@ assembly_input_groups("test-manager") {
   ]
 }
 
+# Enables test realms launching test components.
+assembly_input_groups("test_realm") {
+  testonly = true
+  base_packages = [ "//src/sys/testing" ]
+
+  core_realm_shards = [ "//src/sys/testing:test_realm_core_shard" ]
+}
+
 # The only use-case of this package, and why it only exposes a core realm shard is
 # for sshd host deps to be happy. And just like sshd depends on appmgr, so does appmgr
 # on memory-monitor.

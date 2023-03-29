@@ -1,0 +1,386 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+// Add test realm to core
+{
+    children: [
+        {
+            name: "testing",
+            url: "fuchsia-pkg://fuchsia.com/testing#meta/test_realm.cm",
+            environment: "#core-env",
+        },
+    ],
+    offer: [
+        // Needed by come tests or test runners
+        {
+            directory: "dev-builtin",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            protocol: [
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.SvcStashProvider",
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.diagnostics.ArchiveAccessor",
+                "fuchsia.diagnostics.FeedbackArchiveAccessor",
+                "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                "fuchsia.hardware.pty.Device",
+                "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.logger.Log",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "debug_started",
+                "destroyed",
+                "directory_ready",
+                "discovered",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#testing",
+            scope: "#testing",
+        },
+
+        // From optional core components
+        {
+            protocol: [
+                "fuchsia.media.Audio",
+                "fuchsia.media.AudioCore",
+                "fuchsia.media.AudioDeviceEnumerator",
+                "fuchsia.media.ProfileProvider",
+            ],
+            from: "#audio_core",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.factory.WeaveFactoryStoreProvider",
+            from: "#factory_store_providers",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.feedback.CrashReporter",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
+            from: "#feedback",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.web.ContextProvider",
+            from: "#context_provider",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [ "fuchsia.media.drm.Widevine" ],
+            from: "#widevine_cdm",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#full-resolver",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.intl.PropertyProvider",
+            from: "#intl",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            storage: "data",
+            from: "self",
+            to: "#testing",
+        },
+        {
+            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            from: "#trace_manager",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+
+        // Test realms may offer subdirectories of config-data to test
+        // components. See:
+        // https://fuchsia.dev/fuchsia-src/development/components/data#product-specific_configuration_with_config_data
+        {
+            directory: "config-data",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            protocol: "fuchsia.fonts.Provider",
+            from: "#font_provider",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.exception.Handler",
+            from: "#exceptions",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.hwinfo.Board",
+                "fuchsia.hwinfo.Device",
+                "fuchsia.hwinfo.Product",
+            ],
+            from: "#hwinfo",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.memorypressure.Provider",
+            from: "#memory_monitor",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+            ],
+            from: "#sysmem_connector",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            // TODO(fxbug.dev/107526): After removing "weak" from the block
+            // below, merge them together
+            protocol: [
+                "fuchsia.input.virtualkeyboard.ControllerCreator",
+                "fuchsia.ui.input3.Keyboard",
+            ],
+            from: "#ui",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
+            protocol: [
+                "fuchsia.session.scene.Manager",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.composition.Screenshot",
+                "fuchsia.ui.scenic.Scenic",
+            ],
+            from: "#ui",
+            to: "#testing",
+
+            // TODO(fxbug.dev/107526): break the cycle, then merge the 2 blocks
+            dependency: "weak",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.vulkan.loader.Loader",
+            from: "#vulkan_loader",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+
+        // Needed by some non-hermetic tests
+        {
+            protocol: [
+                "fuchsia.boot.RootResource",
+                "fuchsia.kernel.Counter",
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.EnergyInfoResource",
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
+                "fuchsia.kernel.MexecResource",
+                "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.RootJob",
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.Stats",
+                "fuchsia.process.Launcher",
+                "fuchsia.scheduler.ProfileProvider",
+            ],
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            to: "#testing",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-display-controller",
+            to: "#testing",
+            subdir: "display-controller",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-mediacodec",
+            to: "#testing",
+            subdir: "media-codec",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-goldfish-address-space",
+            to: "#testing",
+            subdir: "goldfish-address-space",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-goldfish-control",
+            to: "#testing",
+            subdir: "goldfish-control",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-goldfish-pipe",
+            to: "#testing",
+            subdir: "goldfish-pipe",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-goldfish-sync",
+            to: "#testing",
+            subdir: "goldfish-sync",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-gpu",
+            to: "#testing",
+            subdir: "gpu",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-gpu-performance-counters",
+            to: "#testing",
+            subdir: "gpu-performance-counters",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-audio-input",
+            to: "#testing",
+            subdir: "audio-input",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-audio-output",
+            to: "#testing",
+            subdir: "audio-output",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-input",
+            to: "#testing",
+            subdir: "input",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-input-report",
+            to: "#testing",
+            subdir: "input-report",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-tee",
+            to: "#testing",
+            subdir: "tee",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-securemem",
+            to: "#testing",
+            subdir: "securemem",
+        },
+
+        // Tests of the media system want to test against the real hardware
+        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-mediacodec",
+            to: "#testing",
+            subdir: "media-codec",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-sysmem",
+            to: "#testing",
+            subdir: "sysmem",
+        },
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: "#testing",
+        },
+
+        // Tests of the media system change their behavior based on board
+        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+        {
+            protocol: "fuchsia.sysinfo.SysInfo",
+            from: "parent",
+            to: "#testing",
+        },
+
+        // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
+        // and chromium realm.
+        // TODO(fxbug.dev/83038): Remove once e2e is better supported.
+        {
+            protocol: [ "fuchsia.net.http.Loader" ],
+            from: "#network",
+            to: "#testing",
+        },
+
+        // Needed by Chromium and Dart + Flutter runners
+        {
+            protocol: "fuchsia.posix.socket.Provider",
+            from: "#network",
+            to: "#testing",
+        },
+
+        // Needed by Starnix tests.
+        {
+            protocol: "fuchsia.posix.socket.raw.Provider",
+            from: "#network",
+            to: "#testing",
+        },
+
+        // Profiling tests need access to the ktrace data
+        {
+            protocol: [
+                "fuchsia.tracing.kernel.Controller",
+                "fuchsia.tracing.kernel.Reader",
+            ],
+            from: "parent",
+            to: "#testing",
+        },
+    ],
+}

@@ -18,6 +18,7 @@ group("test_support") {
   deps = [
     "//src/sys/run_test_suite:run_test_suite",
     "//src/sys/test_manager",
+    "//src/sys/testing",
   ]
 }
 

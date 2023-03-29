@@ -1,0 +1,320 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    collections: [
+        {
+            name: "system-tests",
+            environment: "#test-env",
+            durability: "transient",
+        },
+    ],
+    offer: [
+        {
+            // Tests are permitted to use /dev/null and /dev/zero.
+            directory: "dev-builtin",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            protocol: [
+                // Tests can write to debug logs
+                "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.process.Launcher",
+
+                // Tests can produce trace.
+                "fuchsia.tracing.provider.Registry",
+            ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            event_stream: [
+                "capability_requested",
+                "debug_started",
+                "destroyed",
+                "directory_ready",
+                "discovered",
+                "started",
+                "stopped",
+            ],
+            from: "parent",
+            to: "#system-tests",
+            scope: "#system-tests",
+        },
+
+        // These capabilities are offered for use by certain non-hermetic tests.
+        {
+            // update https://fuchsia.dev/fuchsia-src/concepts/testing/v2/test_runner_framework#legacy_non-hermetic_tests
+            // when this list is updated.
+            protocol: [
+                "fuchsia.boot.ReadOnlyLog",
+                "fuchsia.boot.RootResource",
+
+                // Needed for test_manager_tests and test runner tests.
+                // TODO(fxbug.dev/86464): Remove this once we have facet API.
+                "fuchsia.component.resolution.Resolver",
+                "fuchsia.exception.Handler",
+
+                // fuchsia.hardware.pty.Device is needed for terminal_tests.
+                // TODO(fxbug.dev/97992): Remove this once the test is hermetic.
+                "fuchsia.hardware.pty.Device",
+                "fuchsia.kernel.Counter",
+                "fuchsia.kernel.CpuResource",
+                "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.EnergyInfoResource",
+                "fuchsia.kernel.HypervisorResource",
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IoportResource",
+                "fuchsia.kernel.IrqResource",
+                "fuchsia.kernel.MexecResource",
+                "fuchsia.kernel.MmioResource",
+                "fuchsia.kernel.PowerResource",
+                "fuchsia.kernel.RootJob",
+                "fuchsia.kernel.RootJobForInspect",
+                "fuchsia.kernel.SmcResource",
+                "fuchsia.kernel.Stats",
+                "fuchsia.kernel.VmexResource",
+                "fuchsia.media.ProfileProvider",
+
+                // Needed for Bluetooth streaming E2E tests.
+                // TODO(fxbug.dev/90434): Consider removing when mediaplayer is v2.
+                "fuchsia.media.SessionAudioConsumerFactory",
+
+                // Needed for //src/cobalt/bin/meta/cobalt_testapp_for_prober_do_not_run_manually.cml
+                // TODO(fxbug.dev/83038): Remove once e2e is better supported.
+                "fuchsia.net.http.Loader",
+                "fuchsia.posix.socket.Provider",
+                "fuchsia.scheduler.ProfileProvider",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.sysmem2.Allocator",
+                "fuchsia.vulkan.loader.Loader",
+            ],
+            from: "parent",
+            to: "#system-tests",
+        },
+        {
+            protocol: "fuchsia.diagnostics.ArchiveAccessor",
+            from: "parent",
+            as: "fuchsia.diagnostics.RealArchiveAccessor",
+            to: [ "#system-tests" ],
+        },
+        {
+            storage: "fxfs_tests_data",
+            from: "self",
+            as: "data",
+            to: [ "#system-tests" ],
+            rights: [ "rw*" ],
+        },
+        {
+            directory: "root-ssl-certificates",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+
+        // audio_core_hardware_tests records from the real microphone, so it needs system audio.
+        // bt-a2dp-loopback-test needs system audio.
+        {
+            protocol: [
+                "fuchsia.media.Audio",
+                "fuchsia.media.AudioDeviceEnumerator",
+            ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            protocol: [ "fuchsia.factory.WeaveFactoryStoreProvider" ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
+        // Test realms may offer subdirectories of config-data to test
+        // components. See:
+        // https://fuchsia.dev/fuchsia-src/development/components/data#product-specific_configuration_with_config_data
+        {
+            directory: "config-data",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+        {
+            storage: "cache",
+            from: "self",
+            to: [ "#system-tests" ],
+        },
+
+        // temporary solution for tests that depend on having admin rights on
+        // /tmp. Will be removed once these tests either remove this requirement
+        // or begin hosting their own memfs.
+        {
+            directory: "memfs",
+            from: "#test_tmpfs",
+            as: "deprecated-tmp",
+            to: [ "#system-tests" ],
+        },
+
+        // Some non-hermetic tests require access to real input.
+        {
+            directory: "dev-input",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-input-report",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+
+        // Some non-hermetic tests require access to the real display controller.
+        {
+            directory: "dev-display-controller",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+
+        // Some non-hermetic tests require access to the GPU and vulkan
+        {
+            directory: "dev-goldfish-address-space",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-goldfish-control",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-goldfish-pipe",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-goldfish-sync",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-gpu-performance-counters",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+
+        // audio_driver_tests requires access to audio input and output.
+        {
+            directory: [
+                "dev-audio-input",
+                "dev-audio-output",
+            ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
+        // optee_test requires access to /dev/class/tee.
+        {
+            directory: "dev-tee",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+
+        // Tests of the media system want to test against the real hardware
+        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+        {
+            directory: "dev-mediacodec",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-sysmem",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "dev-securemem",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            directory: "boot",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "rx*" ],
+        },
+
+        // Tests of the media system change their behavior based on board
+        // TODO(fxbug.dev/83512): Remove when specialized test realms are ready.
+        {
+            protocol: "fuchsia.sysinfo.SysInfo",
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
+        // System tests can capture a trace.
+        {
+            protocol: [ "fuchsia.tracing.controller.Controller" ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
+        // CPU Profiling tests require access to ktrace data to parse results
+        {
+            protocol: [
+                "fuchsia.tracing.kernel.Controller",
+                "fuchsia.tracing.kernel.Reader",
+            ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
+        // CPU Profiling tests require access to the /dev/sys/cpu-trace device
+        {
+            directory: "sys",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+
+        // flutter_*_runner
+        {
+            protocol: [
+                "fuchsia.fonts.Provider",
+                "fuchsia.intl.PropertyProvider",
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.scenic.Scenic",
+            ],
+            from: "parent",
+            to: [ "#system-tests" ],
+        },
+
+        // `tz_version_parrot` tests use the system tzdata.
+        {
+            directory: "tzdata-icu-44-le",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+        {
+            storage: "tmp",
+            from: "self",
+            to: [ "#system-tests" ],
+        },
+        {
+            directory: "dev-gpu",
+            from: "parent",
+            to: [ "#system-tests" ],
+            rights: [ "r*" ],
+        },
+    ],
+}

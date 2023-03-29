@@ -38,6 +38,7 @@ core_realm_shards += [
 
   # TODO(fxbug.dev/80375): only include in eng builds
   "//src/sys/test_manager:test_manager_core_shard",
+  "//src/sys/testing:test_realm_core_shard",
   "//src/sys/fuzzing:fuzzing-core-shard",
   "//src/developer/sshd-host:core_shard",
   "//src/sys/cache_manager:core_shard",
