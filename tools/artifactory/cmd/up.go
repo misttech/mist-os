@@ -55,6 +55,9 @@ const (
 	// The blobs manifest. TODO(fxbug.dev/60322) remove this.
 	blobManifestName = "blobs.json"
 
+	// The delivery blob config.
+	deliveryBlobConfigName = "delivery_blob_config.json"
+
 	// A list of all Public Platform Surface Areas.
 	ctsPlasaReportName = "test_coverage_report.plasa.json"
 
@@ -105,6 +108,7 @@ Emits a GCS upload manifest for a build with the following structure:
 │   │   │   ├── packages
 │   │   │   │   ├── all_blobs.json
 │   │   │   │   ├── blobs.json
+│   │   │   │   ├── delivery_blob_config.json
 │   │   │   │   ├── elf_sizes.json
 │   │   │   │   ├── repository
 │   │   │   │   │   ├── targets
@@ -203,6 +207,10 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 		{
 			Source:      path.Join(buildDir, blobManifestName),
 			Destination: path.Join(packageNamespaceDir, blobManifestName),
+		},
+		{
+			Source:      path.Join(buildDir, deliveryBlobConfigName),
+			Destination: path.Join(packageNamespaceDir, deliveryBlobConfigName),
 		},
 		{
 			Source:      path.Join(buildDir, elfSizesManifestName),
