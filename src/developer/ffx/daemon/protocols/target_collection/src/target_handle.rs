@@ -50,6 +50,7 @@ struct TargetHandleInner {
 impl TargetHandleInner {
     #[tracing::instrument(skip(self, _cx))]
     async fn handle(&self, _cx: &Context, req: ffx::TargetRequest) -> Result<()> {
+        tracing::debug!("handling request {req:?}");
         match req {
             ffx::TargetRequest::GetSshLogs { responder } => {
                 let logs = self.target.host_pipe_log_buffer().lines();

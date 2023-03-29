@@ -205,6 +205,7 @@ impl FidlProtocol for TargetCollectionProtocol {
 
     #[tracing::instrument(skip(self, cx))]
     async fn handle(&self, cx: &Context, req: ffx::TargetCollectionRequest) -> Result<()> {
+        tracing::debug!("handling request {req:?}");
         let target_collection = cx.get_target_collection().await?;
         match req {
             ffx::TargetCollectionRequest::ListTargets { reader, query, .. } => {
