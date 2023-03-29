@@ -66,13 +66,14 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
     ASSERT_EQ(0, ioctl(fd.get(), EVIOCGID, &buf)) << "get identifier failed: " << strerror(errno);
   }
 
-  // Getting the supported keys must succeed, with `BTN_TOUCH` supported.
+  // Getting the supported keys must succeed, with `BTN_TOUCH` and `BTN_TOOL_FINGER` supported.
   {
     constexpr auto kBufSize = min_bytes(KEY_MAX);
     std::array<uint8_t, kBufSize> buf{};
     ASSERT_EQ(0, ioctl(fd.get(), EVIOCGBIT(EV_KEY, kBufSize), &buf))
         << "get supported keys failed: " << strerror(errno);
     ASSERT_TRUE(get_bit(buf, BTN_TOUCH)) << " BTN_TOUCH not supported (but should be)";
+    ASSERT_TRUE(get_bit(buf, BTN_TOOL_FINGER)) << " BTN_TOOL_FINGER not supported (but should be)";
   }
 
   // Getting the supported absolute position attributes must succeed, with `ABS_X` and
@@ -135,6 +136,26 @@ TEST(InputTest, DevicePropertiesMatchTouchProperties) {
         << "get supported input properties features failed: " << strerror(errno);
     ASSERT_TRUE(get_bit(buf, INPUT_PROP_DIRECT))
         << " INPUT_PROP_DIRECT not supported (but should be)";
+  }
+
+  // Getting the x-axis range must succeed. The exact axis parameters are device dependent,
+  // but some basic validation is possible.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_X), &buf))
+        << "get x-axis info failed: " << strerror(errno);
+    ASSERT_EQ(0.0, buf.minimum);
+    ASSERT_GT(buf.maximum, 0.0);
+  }
+
+  // Getting the x-axis range must succeed. The exact axis parameters are device dependent,
+  // but some basic validation is possible.
+  {
+    input_absinfo buf{};
+    ASSERT_EQ(0, ioctl(fd.get(), EVIOCGABS(ABS_Y), &buf))
+        << "get y-axis info failed: " << strerror(errno);
+    ASSERT_EQ(0.0, buf.minimum);
+    ASSERT_GT(buf.maximum, 0.0);
   }
 }
 
