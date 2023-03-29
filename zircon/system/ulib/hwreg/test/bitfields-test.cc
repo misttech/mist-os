@@ -701,6 +701,44 @@ TEST(RegisterTestCase, UnshiftedField) {
   }
 }
 
+template <unsigned int N>
+struct TemplatedReg : public hwreg::RegisterBase<TemplatedReg<N>, uint32_t> {
+  using SelfType = TemplatedReg<N>;
+
+  static_assert(N < 32);
+
+  DEF_FIELD(N, 0, head);
+
+  static auto Get() { return hwreg::RegisterAddr<TemplatedReg<N>>(0); }
+};
+
+TEST(RegisterTestCase, Templated) {
+  volatile uint32_t fake_reg = 0xffff'ffff;
+  hwreg::RegisterMmio mmio(&fake_reg);
+
+  {
+    auto reg = TemplatedReg<0>::Get().ReadFrom(&mmio);
+    EXPECT_EQ(reg.head(), 0b1);
+  }
+
+  {
+    auto reg = TemplatedReg<4>::Get().ReadFrom(&mmio);
+    EXPECT_EQ(reg.head(), 0b11111);
+  }
+
+  {
+    auto reg = TemplatedReg<31>::Get().ReadFrom(&mmio);
+    EXPECT_EQ(reg.head(), 0xffff'ffff);
+  }
+
+  {
+    auto reg = TemplatedReg<1>::Get().ReadFrom(&mmio);
+    reg.set_head(0);
+    reg.WriteTo(&mmio);
+    EXPECT_EQ(reg.head(), 0);
+  }
+}
+
 TEST(RegisterTestCase, Print) {
   class TestReg : public hwreg::RegisterBase<TestReg, uint32_t, hwreg::EnablePrinter> {
    public:

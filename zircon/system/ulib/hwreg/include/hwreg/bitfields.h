@@ -17,6 +17,7 @@
 // This file provides some helpers for accessing bitfields in registers.
 //
 // Example usage:
+// ```
 //
 //   // Define bitfields for an "AuxControl" 32-bit register.
 //   class AuxControl : public hwreg::RegisterBase<AuxControl, uint32_t> {
@@ -64,6 +65,7 @@
 //       // Write the register value to MMIO.
 //       reg.WriteTo(reg_io);
 //   }
+// ```
 //
 // Note that this produces efficient code with GCC and Clang, which are
 // capable of optimizing away the intermediate objects.
@@ -82,13 +84,32 @@
 // overlapping other fields masked off, without shifting anything.
 // Enums: Enums can be used in register field definitions using the
 // DEF_ENUM_FIELD macro as shown below
+// ```
 // enum LinkState {
 //      Connected = 0,
 //      Disconnected = 1,
 //      Disabled = 2,
 //      ...
-//};
-//    DEF_ENUM_FIELD(LinkState, 8, 5, PLS);
+// };
+// ...
+// DEF_ENUM_FIELD(LinkState, 8, 5, PLS);
+// ```
+//
+// Register types may be templated, but in order to do so `SelfType` must be
+// explicitly defined:
+// ```
+// template <unsigned int N>
+// struct TemplatedReg : public hwreg::RegisterBase<TemplatedReg<N>, uint32_t> {
+//     using SelfType = TemplatedReg<N>;
+//
+//     DEF_FIELD(N, 0, lower);
+//     ...
+// };
+// ```
+// The DEF_* macros rely on SelfType being unambiguously defined within the
+// scope at which they are used. In a non-templated case, we inherit this for
+// free from the RegisterBase base class; otherwise, it needs to be explicitly
+// redeclared (as above).
 
 namespace hwreg {
 
@@ -194,9 +215,10 @@ class RegisterBase {
   constexpr IntType rsvdz_mask() const { return params_.rsvdz_mask; }
 
  protected:
-  internal::FieldParameters<PrinterEnabled::value, ValueType> params_;
+  internal::FieldParameters<PrinterEnabled::value, ValueType>& params() { return params_; }
 
  private:
+  internal::FieldParameters<PrinterEnabled::value, ValueType> params_;
   ValueType reg_value_ = 0;
   uint32_t reg_addr_ = 0;
 };
@@ -270,54 +292,75 @@ class BitfieldRef {
   const IntType mask_;
 };
 
+//
+// We take care to use `typename SelfType::ValueType` over `ValueType` below,
+// since the defined contract above is that `SelfType` alone must be
+// (unambiguously) defined within the applied scope. Similarly, we explicitly
+// access `params()` and `reg_value_ptr()` via `this` so as to sidestep any
+// possible ambiguity (e.g., in the case of a templated register type).
+//
+
 // Declares multi-bit fields in a derived class of RegisterBase<D, T>.  This
 // produces functions "T NAME() const" and "D& set_NAME(T)".  Both bit indices
 // are inclusive.
 #define DEF_FIELD(BIT_HIGH, BIT_LOW, NAME)                                                         \
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                       \
-  static_assert((BIT_HIGH) < sizeof(ValueType) * CHAR_BIT, "Upper bit is out of range");           \
+  static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
+                "Upper bit is out of range");                                                      \
   struct NAME##Marker {};                                                                          \
   __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> Field##BIT_HIGH##_##BIT_LOW = \
-      hwreg::internal::Field<SelfType, NAME##Marker>(&params_, #NAME, (BIT_HIGH), (BIT_LOW));      \
-  ValueType NAME() const {                                                                         \
-    return hwreg::BitfieldRef<const ValueType>(reg_value_ptr(), (BIT_HIGH), (BIT_LOW)).get();      \
+      hwreg::internal::Field<SelfType, NAME##Marker>(&this->params(), #NAME, (BIT_HIGH),           \
+                                                     (BIT_LOW));                                   \
+  typename SelfType::ValueType NAME() const {                                                      \
+    return hwreg::BitfieldRef<const typename SelfType::ValueType>(this->reg_value_ptr(),           \
+                                                                  (BIT_HIGH), (BIT_LOW))           \
+        .get();                                                                                    \
   }                                                                                                \
-  SelfType& set_##NAME(ValueType val) {                                                            \
-    hwreg::BitfieldRef<ValueType>(reg_value_ptr(), (BIT_HIGH), (BIT_LOW)).set(val);                \
+  SelfType& set_##NAME(typename SelfType::ValueType val) {                                         \
+    hwreg::BitfieldRef<typename SelfType::ValueType>(this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW)) \
+        .set(val);                                                                                 \
     return *this;                                                                                  \
   }                                                                                                \
   static_assert(true)  // eat a ;
 
 #define DEF_UNSHIFTED_FIELD(BIT_HIGH, BIT_LOW, NAME)                                               \
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                       \
-  static_assert((BIT_HIGH) < sizeof(ValueType) * CHAR_BIT, "Upper bit is out of range");           \
+  static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
+                "Upper bit is out of range");                                                      \
   struct NAME##Marker {};                                                                          \
   __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> Field##BIT_HIGH##_##BIT_LOW = \
-      hwreg::internal::Field<SelfType, NAME##Marker>(&params_, #NAME, (BIT_HIGH), (BIT_LOW));      \
-  ValueType NAME() const {                                                                         \
-    return hwreg::BitfieldRef<const ValueType>(reg_value_ptr(), (BIT_HIGH), (BIT_LOW), true)       \
+      hwreg::internal::Field<SelfType, NAME##Marker>(&this->params(), #NAME, (BIT_HIGH),           \
+                                                     (BIT_LOW));                                   \
+  typename SelfType::ValueType NAME() const {                                                      \
+    return hwreg::BitfieldRef<const typename SelfType::ValueType>(this->reg_value_ptr(),           \
+                                                                  (BIT_HIGH), (BIT_LOW), true)     \
         .get();                                                                                    \
   }                                                                                                \
-  SelfType& set_##NAME(ValueType val) {                                                            \
-    hwreg::BitfieldRef<ValueType>(reg_value_ptr(), (BIT_HIGH), (BIT_LOW), true).set(val);          \
+  SelfType& set_##NAME(typename SelfType::ValueType val) {                                         \
+    hwreg::BitfieldRef<typename SelfType::ValueType>(this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW), \
+                                                     true)                                         \
+        .set(val);                                                                                 \
     return *this;                                                                                  \
   }                                                                                                \
   static_assert(true)  // eat a ;
 
 #define DEF_ENUM_FIELD(TYPE, BIT_HIGH, BIT_LOW, NAME)                                              \
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                       \
-  static_assert((BIT_HIGH) < sizeof(ValueType) * CHAR_BIT, "Upper bit is out of range");           \
+  static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
+                "Upper bit is out of range");                                                      \
   static_assert(std::is_enum<TYPE>::value, "Field type is not an enum");                           \
   struct NAME##Marker {};                                                                          \
   __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> Field##BIT_HIGH##_##BIT_LOW = \
-      hwreg::internal::Field<SelfType, NAME##Marker>(&params_, #NAME, (BIT_HIGH), (BIT_LOW));      \
+      hwreg::internal::Field<SelfType, NAME##Marker>(&this->params(), #NAME, (BIT_HIGH),           \
+                                                     (BIT_LOW));                                   \
   TYPE NAME() const {                                                                              \
-    return static_cast<TYPE>(                                                                      \
-        hwreg::BitfieldRef<const ValueType>(reg_value_ptr(), (BIT_HIGH), (BIT_LOW)).get());        \
+    return static_cast<TYPE>(hwreg::BitfieldRef<const typename SelfType::ValueType>(               \
+                                 this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW))                     \
+                                 .get());                                                          \
   }                                                                                                \
   SelfType& set_##NAME(TYPE val) {                                                                 \
-    hwreg::BitfieldRef<ValueType>(reg_value_ptr(), (BIT_HIGH), (BIT_LOW))                          \
-        .set(static_cast<ValueType>(val));                                                         \
+    hwreg::BitfieldRef<typename SelfType::ValueType>(this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW)) \
+        .set(static_cast<typename SelfType::ValueType>(val));                                      \
     return *this;                                                                                  \
   }                                                                                                \
   static_assert(true)  // eat a ;
@@ -331,16 +374,17 @@ class BitfieldRef {
 // automatically zeroed.  Both bit indices are inclusive.
 #define DEF_RSVDZ_FIELD(BIT_HIGH, BIT_LOW)                                                       \
   static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                     \
-  static_assert((BIT_HIGH) < sizeof(ValueType) * CHAR_BIT, "Upper bit is out of range");         \
+  static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                    \
+                "Upper bit is out of range");                                                    \
   struct Field##BIT_HIGH##_##BIT_LOW##Marker {};                                                 \
   __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker>      \
       Field##BIT_HIGH##_##BIT_LOW =                                                              \
           hwreg::internal::Field<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker>(                 \
-              &params_, "RsvdZ", (BIT_HIGH), (BIT_LOW));                                         \
+              &this->params(), "RsvdZ", (BIT_HIGH), (BIT_LOW));                                  \
   __NO_UNIQUE_ADDRESS hwreg::internal::RsvdZField<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker> \
       RsvdZ##BIT_HIGH##_##BIT_LOW =                                                              \
           hwreg::internal::RsvdZField<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker>(            \
-              &params_, (BIT_HIGH), (BIT_LOW))
+              &this->params(), (BIT_HIGH), (BIT_LOW))
 
 // Declares single-bit reserved-zero fields in a derived class of RegisterBase<D, T>.
 // This will ensure that on RegisterBase<T>::WriteTo(), reserved-zero bits are
