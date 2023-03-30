@@ -395,7 +395,7 @@ class VmCowPages final : public VmHierarchyBase,
     None,
     // Only overwrite slots that represent zeros. In the case of anonymous VMOs, both gaps and zero
     // page markers represent zeros, as the entire VMO is implicitly zero on creation. For pager
-    // backed VMOs, zero page markers and gaps after supply_zero_offset_ represent zeros.
+    // backed VMOs, zero page markers and zero intervals represent zeros.
     Zero,
     // Overwrite any slots, regardless of the type of content.
     NonZero,
@@ -554,7 +554,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Calls DebugValidatePageSplitsLocked on this and every parent in the chain, returning true if
   // all return true.  Also calls DebugValidateBacklinksLocked() on every node in the hierarchy.
   bool DebugValidatePageSplitsHierarchyLocked() const TA_REQ(lock());
-  bool DebugValidateSupplyZeroOffsetLocked() const TA_REQ(lock());
+  bool DebugValidateZeroIntervalsLocked() const TA_REQ(lock());
 
   // VMO_FRUGAL_VALIDATION
   bool DebugValidateVmoPageBorrowingLocked() const TA_REQ(lock());
@@ -599,7 +599,6 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugIsEmpty(uint64_t offset) const;
   vm_page_t* DebugGetPage(uint64_t offset) const TA_EXCL(lock());
   vm_page_t* DebugGetPageLocked(uint64_t offset) const TA_REQ(lock());
-  uint64_t DebugGetSupplyZeroOffset() const TA_EXCL(lock());
 
   // Exposed for testing.
   DiscardableVmoTracker* DebugGetDiscardableTracker() const { return discardable_tracker_.get(); }
@@ -941,12 +940,6 @@ class VmCowPages final : public VmHierarchyBase,
   void UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyState dirty_state,
                               bool is_pending_add = false) TA_REQ(lock());
 
-  // If supply_zero_offset_ falls within the specified range [start_offset, end_offset), try to
-  // advance supply_zero_offset_ over any pages in the range that might have been committed
-  // immediately following supply_zero_offset_. |start_offset| and |end_offset| should be
-  // page-aligned.
-  void TryAdvanceSupplyZeroOffsetLocked(uint64_t start_offset, uint64_t end_offset) TA_REQ(lock());
-
   // Helper to invalidate any DIRTY requests in the specified range by spuriously resolving them.
   void InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
@@ -1091,73 +1084,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   void CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) TA_REQ(lock());
 
-  // Update supply_zero_offset_ to the specified page-aligned |offset|, and potentially also reset
-  // awaiting_clean_zero_range_end_ if required. (See comments near declaration of
-  // awaiting_clean_zero_range_end_ for additional context.)
-  void UpdateSupplyZeroOffsetLocked(uint64_t offset) TA_REQ(lock()) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-    uint64_t prev_supply_zero_offset = supply_zero_offset_;
-    supply_zero_offset_ = offset;
-
-    // If there was no zero range AwaitingClean, there is nothing more to do.
-    if (awaiting_clean_zero_range_end_ == 0) {
-      return;
-    }
-    DEBUG_ASSERT(prev_supply_zero_offset < awaiting_clean_zero_range_end_);
-
-    // The AwaitingClean zero range we were tracking was [prev_supply_zero_offset,
-    // awaiting_clean_zero_range_end_). If |offset| lies within this range, we still have a valid
-    // AwaitingClean sub-range that we can continue tracking i.e. [offset,
-    // awaiting_clean_zero_range_end_). Otherwise, the AwaitingClean zero range is no longer valid
-    // and must be reset.
-    if (!(offset >= prev_supply_zero_offset && offset < awaiting_clean_zero_range_end_)) {
-      awaiting_clean_zero_range_end_ = 0;
-    }
-
-    // If awaiting_clean_zero_range_end_ is non-zero, it should be strictly greater than
-    // supply_zero_offset_, as it is used to track the range [supply_zero_offset_,
-    // awaiting_clean_zero_range_end_).
-    DEBUG_ASSERT(awaiting_clean_zero_range_end_ == 0 ||
-                 supply_zero_offset_ < awaiting_clean_zero_range_end_);
-  }
-
-  // Consider trimming the AwaitingClean zero range (if there is one) to end at the specified
-  // page-aligned |end_offset|. The AwaitingClean zero range always starts at supply_zero_offset_.
-  // (See comments near declaration of awaiting_clean_zero_range_end_ for additional context.)
-  //
-  // Three scenarios are possible here:
-  //  - If awaiting_clean_zero_range_end_ is 0, no AwaitingClean zero range is being tracked, so
-  //  nothing needs to be done.
-  //  - If |end_offset| lies within [supply_zero_offset_, awaiting_clean_zero_range_end_), the zero
-  //  range should now end at |end_offset|. The new AwaitingClean zero range becomes
-  //  [supply_zero_offset_, end_offset).
-  //  - If |end_offset| lies outside of [supply_zero_offset_, awaiting_clean_zero_range_end_), it
-  //  does not affect the AwaitingClean zero range.
-  void ConsiderTrimAwaitingCleanZeroRangeLocked(uint64_t end_offset) TA_REQ(lock()) {
-    DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
-
-    // No AwaitingClean zero range was being tracked.
-    if (awaiting_clean_zero_range_end_ == 0) {
-      return;
-    }
-    DEBUG_ASSERT(supply_zero_offset_ < awaiting_clean_zero_range_end_);
-
-    // Trim the zero range to the new end offset.
-    if (end_offset >= supply_zero_offset_ && end_offset < awaiting_clean_zero_range_end_) {
-      awaiting_clean_zero_range_end_ = end_offset;
-      // Reset awaiting_clean_zero_range_end_ if this leaves us with no valid range.
-      if (awaiting_clean_zero_range_end_ == supply_zero_offset_) {
-        awaiting_clean_zero_range_end_ = 0;
-      }
-    }
-
-    // If awaiting_clean_zero_range_end_ is non-zero, it should be strictly greater than
-    // supply_zero_offset_, as it is used to track the range [supply_zero_offset_,
-    // awaiting_clean_zero_range_end_).
-    DEBUG_ASSERT(awaiting_clean_zero_range_end_ == 0 ||
-                 supply_zero_offset_ < awaiting_clean_zero_range_end_);
-  }
-
   // Unlocked wrapper around ReplacePageLocked intended to be called via the VmCowPagesContainer.
   zx_status_t ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
                           vm_page_t** after_page, LazyPageRequest* page_request) TA_EXCL(lock()) {
@@ -1261,36 +1187,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   // The page source, if any.
   const fbl::RefPtr<PageSource> page_source_;
-
-  // The offset beyond which new page requests are fulfilled by supplying zero pages, rather than
-  // having the page source supply pages. Only relevant if there is a valid page_source_ and it
-  // preserves page content.
-  //
-  // Updating supply_zero_offset_ might affect the AwaitingClean zero range being tracked by
-  // [supply_zero_offset_, awaiting_clean_zero_range_end_), and so supply_zero_offset_ should not
-  // be directly assigned. Use the UpdateSupplyZeroOffsetLocked() helper instead. See comments near
-  // awaiting_clean_zero_range_end_ for more context.
-  uint64_t supply_zero_offset_ TA_GUARDED(lock()) = UINT64_MAX;
-
-  // If supply_zero_offset_ is relevant, and there is a range beyond it that is AwaitingClean, i.e.
-  // gaps (zeroes) on which WritebackBegin was called but not WritebackEnd,
-  // awaiting_clean_zero_range_end_ tracks the end of that range. In other words, if there exists
-  // such a range that is AwaitingClean, that range is [supply_zero_offset_,
-  // awaiting_clean_zero_range_end_). Note that this range might have some committed (un-Clean)
-  // pages, but the AwaitingClean state pertains only to the *gaps*, since pages have their own
-  // dirty tracking.
-  //
-  // Will be set to 0 otherwise. So awaiting_clean_zero_range_end_ will either be 0, or will be
-  // strictly greater than supply_zero_offset_.
-  //
-  // Note that there can be at most one such range that is AwaitingClean at a time.
-  //
-  // The motivation for this value is to be able to transition zero ranges starting at
-  // supply_zero_offset_ to Clean once they have been written back by the user pager, without having
-  // to track per-page dirty state for the zero ranges, which are represented in the page list by
-  // gaps.
-  // TODO(rashaeqbal): Consider removing this once page lists can support custom zero ranges.
-  uint64_t awaiting_clean_zero_range_end_ TA_GUARDED(lock()) = 0;
 
   // Count eviction events so that we can report them to the user.
   uint64_t eviction_event_count_ TA_GUARDED(lock()) = 0;

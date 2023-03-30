@@ -526,17 +526,6 @@ zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOp
     return ZX_ERR_NO_MEMORY;
   }
 
-  {
-    // If the page source preserves content, initialize supply_zero_offset_ to size. All initial
-    // content for a newly created VMO is provided by the page source, i.e. there is no content that
-    // the kernel implicitly supplies with zero.
-    Guard<CriticalMutex> guard{cow->lock()};
-    if (cow->is_source_preserving_page_content()) {
-      DEBUG_ASSERT(IS_PAGE_ALIGNED(size));
-      cow->UpdateSupplyZeroOffsetLocked(size);
-    }
-  }
-
   *cow_pages = ktl::move(cow);
   return ZX_OK;
 }
@@ -1216,8 +1205,7 @@ void VmCowPages::DumpLocked(uint depth, bool verbose) const {
     for (uint i = 0; i < depth + 1; ++i) {
       printf("  ");
     }
-    printf("page_source preserves content %d supply_zero_offset %#" PRIx64 "\n",
-           is_source_preserving_page_content(), supply_zero_offset_);
+    printf("page_source preserves content %d\n", is_source_preserving_page_content());
     page_source_->Dump(depth + 1);
   }
 
@@ -1510,13 +1498,45 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  VmPageOrMarker* page = page_list_.LookupOrAllocate(offset);
+  VmPageOrMarker* page;
+  // If we're backed by a page source that preserves content (user pager), we cannot directly update
+  // empty slots in the page list. An empty slot might lie in a sparse zero interval, which would
+  // require splitting the interval around the required offset before it can be manipulated.
+  //
+  // TODO(fxbug.dev/122842): Use a common LookupOrAllocate API for all cases, with a formalized
+  // interval treatment flag such that non pager-backed VMOs can skip the cost of checking for
+  // intervals.
+  if (is_source_preserving_page_content()) {
+    // We can overwrite zero intervals if we're allowed to overwrite zeros (or non-zeros).
+    bool can_overwrite_intervals = overwrite != CanOverwriteContent::None;
+    auto [slot, is_in_interval] =
+        page_list_.LookupOrAllocateCheckForInterval(offset, can_overwrite_intervals);
+    if (is_in_interval) {
+      // Return error if the offset lies in an interval but we cannot overwrite intervals.
+      if (!can_overwrite_intervals) {
+        // The lookup should not have returned a slot for us to manipulate if it was in an interval
+        // that cannot be overwritten, even if that slot was already populated (by an interval
+        // sentinel).
+        DEBUG_ASSERT(!slot);
+        return ZX_ERR_ALREADY_EXISTS;
+      }
+      // If offset was in an interval, we should have an interval slot to overwrite at this point.
+      DEBUG_ASSERT(slot);
+      DEBUG_ASSERT(slot->IsIntervalSlot());
+      DEBUG_ASSERT(slot->IsIntervalZero());
+    }
+    page = slot;
+  } else {
+    page = page_list_.LookupOrAllocate(offset);
+  }
   if (!page) {
     return ZX_ERR_NO_MEMORY;
   }
   // The slot might have started empty and in error paths we will not fill it, so make sure it gets
   // returned in that case.
   auto return_slot = fit::defer([page, offset, this] {
+    // If we started with an interval slot to manipulate, we should have been able to overwrite it.
+    DEBUG_ASSERT(!page->IsIntervalSlot());
     if (unlikely(page->IsEmpty())) {
       AssertHeld(lock_ref());
       page_list_.ReturnEmptySlot(offset);
@@ -1535,19 +1555,6 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
     if (!page->IsEmpty()) {
       return ZX_ERR_ALREADY_EXISTS;
     }
-    // This VMO is backed by a page source and the slot is empty. Check if this empty slot
-    // represents zero content. For page sources that preserve content (pager backed VMOs), pages
-    // starting at the supply_zero_offset_ have an implicit initial content of zero. These pages are
-    // not supplied by the user pager, and are instead supplied by the kernel as zero pages. So for
-    // pager backed VMOs, we should not overwrite this zero content.
-    //
-    // TODO(rashaeqbal): Consider replacing supply_zero_offset_ with a single zero range in the page
-    // list itself, so that all content resides in the page list. This might require supporting
-    // custom sized ranges in the page list; we don't want to pay the cost of individual zero page
-    // markers per page or multiple fixed sized zero ranges.
-    if (is_source_preserving_page_content() && offset >= supply_zero_offset_) {
-      return ZX_ERR_ALREADY_EXISTS;
-    }
   }
 
   // We're only permitted to overwrite zero content. This has different meanings based on the
@@ -1557,11 +1564,11 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
   //  time of creation. So both zero page markers and empty slots represent zero content. Therefore
   //  the only content type that cannot be overwritten in this case is an actual page.
   //
-  //  * For pager backed VMOs, content is either explicitly supplied by the user pager before
-  //  supply_zero_offset_, or implicitly supplied as zeros beyond supply_zero_offset_. So zero
-  //  content is represented by either zero page markers before supply_zero_offset_ (supplied by the
-  //  user pager), or by gaps after supply_zero_offset_ (supplied by the kernel). Therefore the only
-  //  content type that cannot be overwritten in this case as well is an actual page.
+  //  * For pager backed VMOs, content is either explicitly supplied by the user pager, or
+  //  implicitly supplied as zeros by the kernel. Zero content is represented by either zero page
+  //  markers (supplied by the user pager), or by sparse zero intervals (supplied by the kernel).
+  //  Therefore the only content type that cannot be overwritten in this case as well is an actual
+  //  page.
   if (overwrite == CanOverwriteContent::Zero && page->IsPageOrRef()) {
     // If we have a page source, the page source should be able to validate the page.
     // Note that having a page source implies that any content must be an actual page and so
@@ -1604,6 +1611,7 @@ zx_status_t VmCowPages::AddPageLocked(VmPageOrMarker* p, uint64_t offset,
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return ZX_OK;
 }
 
@@ -2064,14 +2072,14 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
   // If the VMO does not require us to trap dirty transitions, simply mark the pages dirty, and move
   // them to the dirty page queue. Do this only for the first consecutive run of committed pages
   // within the range starting at offset. Any absent pages will need to be provided by the page
-  // source, which might fail and terminate the lookup early. Any zero page markers might need to be
-  // forked, which can fail too. Only mark those pages dirty that the lookup is guaranteed to return
-  // successfully.
+  // source, which might fail and terminate the lookup early. Any zero page markers and zero
+  // intervals might need to be forked, which can fail too. Only mark those pages dirty that the
+  // lookup is guaranteed to return successfully.
   if (!page_source_->ShouldTrapDirtyTransitions()) {
     zx_status_t status = page_list_.ForEveryPageAndGapInRange(
         [this, &dirty_len, start_offset](const VmPageOrMarker* p, uint64_t off) {
-          if (p->IsMarker()) {
-            // Found a marker. End the traversal.
+          if (p->IsMarker() || p->IsIntervalZero()) {
+            // Found a marker or zero interval. End the traversal.
             return ZX_ERR_STOP;
           }
           // VMOs with a page source will never have compressed references, so this should be a
@@ -2110,51 +2118,38 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
     DEBUG_ASSERT(status == ZX_OK);
 
     *dirty_len_out = dirty_len;
-    VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+    VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
     return ZX_OK;
   }
 
   // Otherwise, generate a DIRTY page request for pages in the range which need to transition to
-  // Dirty. The eligibility criteria is different depending on which side of supply_zero_offset_ the
-  // page lies.
-  //
-  //  - For pages before supply_zero_offset_:
-  //  Find a contiguous run of non-Dirty pages (committed pages as well as zero page markers).
+  // Dirty. Pages that qualify are:
+  //  - Any contiguous run of non-Dirty pages (committed pages as well as zero page markers).
   //  For the purpose of generating DIRTY requests, both Clean and AwaitingClean pages are
   //  considered equivalent. This is because pages that are in AwaitingClean will need another
   //  acknowledgment from the user pager before they can be made Dirty (the filesystem might need to
   //  reserve additional space for them etc.).
-  //
-  //  - For pages at and after supply_zero_offset_:
-  //    - Any gaps are implicit zero pages, i.e. the kernel supplies zero pages when they are
-  //    accessed. Since these pages are not supplied by the user pager via zx_pager_supply_pages, we
-  //    will need to wait on a DIRTY request before the gap can be replaced by an actual page for
-  //    writing (the filesystem might need to reserve additional space).
-  //    - There can exist actual pages beyond supply_zero_offset_ from previous writes, but these
-  //    will either be Dirty or AwaitingClean, since we cannot mark a page Clean beyond
-  //    supply_zero_offset_ without also advancing supply_zero_offset_ after the Clean page. This is
-  //    because the range after supply_zero_offset_ is supplied by the kernel, not the user pager,
-  //    so if we were to Clean a page beyond supply_zero_offset_, it might get evicted, and then
-  //    incorrectly supplied by the kernel as a zero page. It is possible for pages to be in
-  //    AwaitingClean if the user pager is attempting to write them back, in which case a future
-  //    write to the page is treated the same as before supply_zero_offset_. It must be trapped so
-  //    that the filesystem can acknowledge it again (it might need to reserve additional space
-  //    again).
+  //  - Any zero intervals are implicit zero pages, i.e. the kernel supplies zero pages when they
+  //  are accessed. Since these pages are not supplied by the user pager via zx_pager_supply_pages,
+  //  we will need to wait on a DIRTY request before the sparse range can be replaced by an actual
+  //  page for writing (the filesystem might need to reserve additional space).
   uint64_t pages_to_dirty_len = 0;
 
-  // Helper lambda used in the page list traversal below. Try to add page at |dirty_page_offset| to
-  // the run of dirty pages being tracked. Return codes are the same as those used by
-  // VmPageList::ForEveryPageAndGapInRange to continue or terminate traversal.
-  auto accumulate_dirty_page = [&pages_to_dirty_len, &dirty_len,
-                                start_offset](uint64_t dirty_page_offset) -> zx_status_t {
+  // Helper lambda used in the page list traversal below. Try to add pages in the range
+  // [dirty_pages_start, dirty_pages_end) to the run of dirty pages being tracked. Return codes are
+  // the same as those used by VmPageList::ForEveryPageAndGapInRange to continue or terminate
+  // traversal.
+  auto accumulate_dirty_pages = [&pages_to_dirty_len, &dirty_len, start_offset](
+                                    uint64_t dirty_pages_start,
+                                    uint64_t dirty_pages_end) -> zx_status_t {
     // Bail if we were tracking a non-zero run of pages to be dirtied as we cannot extend
     // pages_to_dirty_len anymore.
     if (pages_to_dirty_len > 0) {
       return ZX_ERR_STOP;
     }
     // Append the page to the dirty range being tracked if it immediately follows it.
-    if (start_offset + dirty_len == dirty_page_offset) {
-      dirty_len += PAGE_SIZE;
+    if (start_offset + dirty_len == dirty_pages_start) {
+      dirty_len += (dirty_pages_end - dirty_pages_start);
       return ZX_ERR_NEXT;
     }
     // Otherwise we cannot accumulate any more contiguous dirty pages.
@@ -2181,83 +2176,85 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
     return ZX_ERR_STOP;
   };
 
-  // First consider the portion of the range that ends before supply_zero_offset_.
-  // We don't have a range to consider here if offset was greater than supply_zero_offset_.
-  if (start_offset < supply_zero_offset_) {
-    const uint64_t end = ktl::min(supply_zero_offset_, end_offset);
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-        [&accumulate_dirty_page, &accumulate_pages_to_dirty, this](const VmPageOrMarker* p,
-                                                                   uint64_t off) {
-          if (p->IsPage()) {
-            vm_page_t* page = p->Page();
-            DEBUG_ASSERT(is_page_dirty_tracked(page));
-            // VMOs that trap dirty transitions should not have loaned pages.
-            DEBUG_ASSERT(!page->is_loaned());
-            // Page is already dirty. Try to add it to the dirty run.
-            if (is_page_dirty(page)) {
-              return accumulate_dirty_page(off);
-            }
-            // If the page is clean, mark it accessed to grant it some protection from eviction
-            // until the pager has a chance to respond to the DIRTY request.
-            if (is_page_clean(page)) {
-              AssertHeld(lock_ref());
-              UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
-            }
-          }
-          DEBUG_ASSERT(!p->IsReference());
-          // This is a either a zero page marker (which represents a clean zero page) or a committed
-          // page which is not already Dirty. Try to add it to the range of pages to be dirtied.
-          return accumulate_pages_to_dirty(off, off + PAGE_SIZE);
-        },
-        [](uint64_t start, uint64_t end) {
-          // We found a gap. End the traversal.
-          return ZX_ERR_STOP;
-        },
-        start_offset, end);
-
-    // We don't expect an error from the traversal above. If an incompatible contiguous page or
-    // a gap is encountered, we will simply terminate early.
-    DEBUG_ASSERT(status == ZX_OK);
-  }
-
-  // Now consider the portion of the range that starts at/after supply_zero_offset_, and see if we
-  // can extend an already existing to-dirty range, or start a new one. [offset, offset + len) might
-  // have fallen entirely before supply_zero_offset_, in which case we have no remaining portion to
-  // consider here.
-  if (supply_zero_offset_ < end_offset) {
-    const uint64_t start = ktl::max(start_offset, supply_zero_offset_);
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-        [&accumulate_dirty_page, &accumulate_pages_to_dirty](const VmPageOrMarker* p,
-                                                             uint64_t off) {
-          // We can only find un-Clean committed pages beyond supply_zero_offset_. There can be no
-          // markers as well as they represent Clean zero pages.
-          ASSERT(p->IsPage());
+  // This tracks the beginning of an interval that falls in the specified range. Since we might
+  // start partway inside an interval, this is initialized to start_offset so that we only consider
+  // the portion of the interval inside the range. If we did not start inside an interval, we will
+  // end up reinitializing this when we do find an interval start, before this value is used, so it
+  // is safe to initialize to start_offset in all cases.
+  uint64_t interval_start_off = start_offset;
+  // This tracks whether we saw an interval start sentinel in the traversal, but have not yet
+  // encountered a matching interval end sentinel. Should we end the traversal partway in an
+  // interval, we will need to handle the portion of the interval between the interval start and the
+  // end of the specified range.
+  bool unmatched_interval_start = false;
+  bool found_page_or_gap = false;
+  zx_status_t status = page_list_.ForEveryPageAndGapInRange(
+      [&accumulate_dirty_pages, &accumulate_pages_to_dirty, &interval_start_off,
+       &unmatched_interval_start, &found_page_or_gap, this](const VmPageOrMarker* p, uint64_t off) {
+        found_page_or_gap = true;
+        if (p->IsPage()) {
           vm_page_t* page = p->Page();
-          ASSERT(is_page_dirty_tracked(page));
-          ASSERT(!is_page_clean(page));
+          DEBUG_ASSERT(is_page_dirty_tracked(page));
+          // VMOs that trap dirty transitions should not have loaned pages.
           DEBUG_ASSERT(!page->is_loaned());
-
           // Page is already dirty. Try to add it to the dirty run.
           if (is_page_dirty(page)) {
-            return accumulate_dirty_page(off);
+            return accumulate_dirty_pages(off, off + PAGE_SIZE);
           }
+          // If the page is clean, mark it accessed to grant it some protection from eviction
+          // until the pager has a chance to respond to the DIRTY request.
+          if (is_page_clean(page)) {
+            AssertHeld(lock_ref());
+            UpdateOnAccessLocked(page, VMM_PF_FLAG_SW_FAULT);
+          }
+        } else if (p->IsIntervalZero()) {
+          if (p->IsIntervalStart() || p->IsIntervalSlot()) {
+            unmatched_interval_start = true;
+            interval_start_off = off;
+          }
+          if (p->IsIntervalEnd() || p->IsIntervalSlot()) {
+            unmatched_interval_start = false;
+            // We need to commit pages if this is an interval, irrespective of the dirty state.
+            return accumulate_pages_to_dirty(interval_start_off, off + PAGE_SIZE);
+          }
+          return ZX_ERR_NEXT;
+        }
 
-          // This page was not Dirty, the only other state a page beyond supply_zero_offset_ could
-          // be in is AwaitingClean.
-          ASSERT(is_page_awaiting_clean(page));
-          // Try to add this page to the range of pages to be dirtied.
-          return accumulate_pages_to_dirty(off, off + PAGE_SIZE);
-        },
-        [&accumulate_pages_to_dirty](uint64_t start, uint64_t end) {
-          // We need to request a Dirty transition for the gap. Try to add it to the range of pages
-          // to be dirtied.
-          return accumulate_pages_to_dirty(start, end);
-        },
-        start, end_offset);
+        // We don't compress pages in pager-backed VMOs.
+        DEBUG_ASSERT(!p->IsReference());
+        // This is a either a zero page marker (which represents a clean zero page) or a committed
+        // page which is not already Dirty. Try to add it to the range of pages to be dirtied.
+        DEBUG_ASSERT(p->IsMarker() || !is_page_dirty(p->Page()));
+        return accumulate_pages_to_dirty(off, off + PAGE_SIZE);
+      },
+      [&found_page_or_gap](uint64_t start, uint64_t end) {
+        found_page_or_gap = true;
+        // We found a gap. End the traversal.
+        return ZX_ERR_STOP;
+      },
+      start_offset, end_offset);
 
-    // We don't expect an error from the traversal above. If an already dirty page or a
-    // non-contiguous page/gap is encountered, we will simply terminate early.
-    DEBUG_ASSERT(status == ZX_OK);
+  // We don't expect an error from the traversal above. If an incompatible contiguous page or
+  // a gap is encountered, we will simply terminate early.
+  DEBUG_ASSERT(status == ZX_OK);
+
+  // Process the last remaining interval if there is one.
+  if (unmatched_interval_start) {
+    DEBUG_ASSERT(interval_start_off >= start_offset);
+    DEBUG_ASSERT(interval_start_off < end_offset);
+    accumulate_pages_to_dirty(interval_start_off, end_offset);
+  }
+
+  // Account for the case where we started and ended in unpopulated slots inside an interval, i.e we
+  // did not find either a page or a gap in the traversal. We would not have accumulated any pages
+  // in that case.
+  if (!found_page_or_gap) {
+    DEBUG_ASSERT(page_list_.IsOffsetInZeroInterval(start_offset));
+    DEBUG_ASSERT(page_list_.IsOffsetInZeroInterval(end_offset - PAGE_SIZE));
+    DEBUG_ASSERT(dirty_len == 0);
+    DEBUG_ASSERT(pages_to_dirty_len == 0);
+    // The entire range falls in an interval so it needs a DIRTY request.
+    pages_to_dirty_len = end_offset - start_offset;
   }
 
   // We should either have found dirty pages or pages that need to be dirtied, but not both.
@@ -2268,7 +2265,7 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
 
   *dirty_len_out = dirty_len;
 
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
 
   // No pages need to transition to Dirty.
   if (pages_to_dirty_len == 0) {
@@ -2289,8 +2286,8 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
     vmo_debug_info = {.vmo_ptr = reinterpret_cast<uintptr_t>(paged_ref_),
                       .vmo_id = paged_ref_->user_id_locked()};
   }
-  zx_status_t status = page_source_->RequestDirtyTransition(page_request->get(), start_offset,
-                                                            pages_to_dirty_len, vmo_debug_info);
+  status = page_source_->RequestDirtyTransition(page_request->get(), start_offset,
+                                                pages_to_dirty_len, vmo_debug_info);
   // The page source will never succeed synchronously.
   DEBUG_ASSERT(status != ZX_OK);
   return status;
@@ -2552,6 +2549,8 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
   // that we cannot handle, determining whether we can substitute the zero_page and potentially
   // consulting a page_source.
   vm_page_t* p = nullptr;
+  // Whether the offset was found in a zero interval.
+  bool found_zero_interval = false;
   if (page_or_mark && page_or_mark->IsPageOrRef()) {
     if (page_or_mark->IsReference()) {
       AssertHeld(page_owner->lock_ref());
@@ -2570,23 +2569,24 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     // of a read, return the zero page, however in practice this is not a useful optimization and
     // adds extra complexity.
     AssertHeld(page_owner->lock_ref());
-    if ((page_or_mark && page_or_mark->IsMarker()) || !page_owner->page_source_) {
-      // We can use the zero page, since we have a marker, or no page source.
+    if ((page_or_mark && (page_or_mark->IsMarker() || page_or_mark->IsIntervalZero())) ||
+        !page_owner->page_source_) {
+      // We can use the zero page, since we have a marker / zero interval, or no page source.
       p = vm_get_zero_page();
+      if (page_or_mark && page_or_mark->IsIntervalZero()) {
+        // We only support dirty zero intervals for now.
+        DEBUG_ASSERT(page_or_mark->IsZeroIntervalDirty());
+        found_zero_interval = true;
+      }
     } else {
       // We will attempt to get the page from the page source.
 
       AssertHeld(page_owner->lock_ref());
-      // Before requesting the page source, check if we can implicitly supply a zero page. Pages in
-      // the range [supply_zero_offset_, size_) can be supplied with zeros.
-      if (owner_offset >= page_owner->supply_zero_offset_) {
-        // The supply_zero_offset_ is only relevant for page sources preserving page content. For
-        // other types of VMOs, the supply_zero_offset_ will be set to UINT64_MAX, so we can never
-        // end up here.
+      // Before requesting the page source, check if this offset falls in a zero interval and we can
+      // implicitly supply a zero page.
+      if (page_owner->page_list_.IsOffsetInZeroInterval(owner_offset)) {
         DEBUG_ASSERT(page_owner->is_source_preserving_page_content());
-        DEBUG_ASSERT(IS_PAGE_ALIGNED(page_owner->supply_zero_offset_));
-        DEBUG_ASSERT(page_owner->supply_zero_offset_ <= page_owner->size_);
-
+        found_zero_interval = true;
         // Set p to the zero page and fall through. We will correctly fork the zero page if we're
         // writing to it.
         p = vm_get_zero_page();
@@ -2594,13 +2594,11 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
         // Otherwise request the page from the page source.
         // The page owner should have a backing page source that we will request the page from.
         DEBUG_ASSERT(page_owner->page_source_);
+        // The page source should be responsible for supplying the page, not the kernel.
+        DEBUG_ASSERT(!page_owner->page_list_.IsOffsetInZeroInterval(owner_offset));
 
-        DEBUG_ASSERT(owner_offset < page_owner->supply_zero_offset_);
-
-        // Try and batch more pages up to |max_waitable_pages| but before the supply zero offset.
-        uint64_t max_request_len = ktl::min(max_waitable_pages * PAGE_SIZE,
-                                            page_owner->supply_zero_offset_ - owner_offset);
-
+        // Try and batch more pages up to |max_waitable_pages|.
+        uint64_t max_request_len = max_waitable_pages * PAGE_SIZE;
         // Limit |max_request_len| to the number of pages missing in the VMO that are owned by
         // |page_owner|.
         if (max_request_len > PAGE_SIZE) {
@@ -2619,11 +2617,13 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
           DEBUG_ASSERT(tmp_owner_offset == owner_offset);
         }
 
-        // Limit |max_request_len| to the first page visible in the page owner.
+        // Limit |max_request_len| to the first page, marker, or interval visible in the page owner.
         if (max_request_len > PAGE_SIZE) {
           [[maybe_unused]] zx_status_t status = page_owner->page_list_.ForEveryPageInRange(
               [&max_request_len, owner_offset](const VmPageOrMarker* p, uint64_t off) {
-                // TODO(fxbug.dev/122842): Add appropriate check for interval here.
+                // If this is an interval sentinel, it can only be a start or slot, since we know we
+                // started in a true gap outside of an interval.
+                DEBUG_ASSERT(!p->IsInterval() || p->IsIntervalSlot() || p->IsIntervalStart());
                 max_request_len = off - owner_offset;
                 return ZX_ERR_STOP;
               },
@@ -2693,13 +2693,9 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
     // should not be trapped.
     //
     // We need to generate a DIRTY request if the caller explicitly requested so with mark_dirty, or
-    // if the offset lies beyond supply_zero_offset_. A page that lies beyond supply_zero_offset_
-    // *cannot* be Clean. A gap beyond supply_zero_offset_ is conceptually already dirty (and zero),
-    // so we're transitioning to a dirty actual page here, i.e. we cannot lose dirtiness when we
-    // fork the zero page here.
+    // if the offset lies in a zero interval.
     if (is_source_preserving_page_content() && page_source_->ShouldTrapDirtyTransitions() &&
-        (mark_dirty == DirtyTrackingAction::DirtyAllPagesOnWrite ||
-         offset >= supply_zero_offset_)) {
+        (mark_dirty == DirtyTrackingAction::DirtyAllPagesOnWrite || found_zero_interval)) {
       // The only page we can be forking here is the zero page. A non-slice child VMO does not
       // support dirty page tracking.
       DEBUG_ASSERT(p == vm_get_zero_page());
@@ -2752,13 +2748,11 @@ zx_status_t VmCowPages::LookupPagesLocked(uint64_t offset, uint pf_flags,
       // The forked page was just allocated, and so cannot be a loaned page.
       DEBUG_ASSERT(!res_page->is_loaned());
 
-      // Mark the forked page dirty or clean depending on the mark_dirty action requested. However,
-      // if the page lies beyond supply_zero_offset_ it *cannot* be Clean. A gap beyond
-      // supply_zero_offset_ is conceptually already dirty (and zero), so we're transitioning to a
-      // dirty actual page here, i.e. we cannot lose dirtiness when we fork the zero page here.
+      // Mark the forked page dirty or clean depending on the mark_dirty action requested. For zero
+      // intervals, preserve the interval's dirty state (which is only dirty for now).
       UpdateDirtyStateLocked(
           res_page, offset,
-          mark_dirty == DirtyTrackingAction::DirtyAllPagesOnWrite || offset >= supply_zero_offset_
+          mark_dirty == DirtyTrackingAction::DirtyAllPagesOnWrite || found_zero_interval
               ? DirtyState::Dirty
               : DirtyState::Clean,
           /*is_pending_add=*/true);
@@ -3139,11 +3133,10 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
     // This is already considered zero as there's a marker.
     return true;
   }
-  if (is_source_preserving_page_content() && page_offset >= supply_zero_offset_) {
-    // Uncommitted pages beyond supply_zero_offset_ are supplied as zeros by the kernel.
-    if (!slot || slot->IsEmpty()) {
-      return true;
-    }
+  if (is_source_preserving_page_content() &&
+      ((slot && slot->IsIntervalZero()) || page_list_.IsOffsetInZeroInterval(page_offset))) {
+    // Pages in zero intervals are supplied as zero by the kernel.
+    return true;
   }
   // If we don't have a page or reference here we need to check our parent.
   if (!slot || !slot->IsPageOrRef()) {
@@ -3250,6 +3243,157 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   const uint64_t start = page_start_base;
   const uint64_t end = page_end_base;
 
+  // If the VMO is directly backed by a page source that preserves content, it should be the root
+  // VMO of the hierarchy.
+  DEBUG_ASSERT(!is_source_preserving_page_content() || !parent_);
+
+  // If the page source preserves content, we can perform efficient zeroing by inserting dirty zero
+  // intervals. Handle this case separately.
+  if (is_source_preserving_page_content()) {
+    // Inserting zero intervals can modify the page list such that new nodes are added and deleted.
+    // So we cannot safely insert zero intervals while iterating the page list. The pattern we
+    // follow here is:
+    // 1. Traverse the page list to find a range that can be represented by a zero interval instead.
+    // 2. When such a range is found, break out of the traversal, and insert the zero interval.
+    // 3. Advance past the zero interval we inserted and resume the traversal from there, until
+    // we've covered the entire range.
+
+    // The start offset at which to start the next traversal loop.
+    uint64_t next_start_offset = start;
+    do {
+      // Zeroing a zero interval is a no-op. Track whether we find ourselves in a zero interval.
+      bool in_interval = false;
+      // The start of the zero interval if we are in one.
+      uint64_t interval_start = next_start_offset;
+      const uint64_t prev_start_offset = next_start_offset;
+      // State tracking information for inserting a new zero interval.
+      struct {
+        bool add_zero_interval;
+        uint64_t start;
+        uint64_t end;
+        bool replace_page;
+        VmPageOrMarker* page_to_replace;
+      } state = {.add_zero_interval = false,
+                 .start = 0,
+                 .end = 0,
+                 .replace_page = false,
+                 .page_to_replace = nullptr};
+
+      zx_status_t status = page_list_.RemovePagesAndIterateGaps(
+          [&](VmPageOrMarker* p, uint64_t off) {
+            // We cannot have references in pager-backed VMOs.
+            DEBUG_ASSERT(!p->IsReference());
+
+            // If this is a page, see if we can remove it and absorb it into a zero interval.
+            if (p->IsPage()) {
+              AssertHeld(lock_ref());
+              if (p->Page()->object.pin_count > 0) {
+                // Cannot remove this page if it is pinned. Lookup the page and zero it. Looking up
+                // ensures that we request dirty transition if needed by the pager.
+                __UNINITIALIZED LookupInfo lookup_page;
+                zx_status_t st =
+                    LookupPagesLocked(off, VMM_PF_FLAG_SW_FAULT | VMM_PF_FLAG_WRITE,
+                                      VmObject::DirtyTrackingAction::DirtyAllPagesOnWrite, 1, 1,
+                                      nullptr, page_request, &lookup_page);
+                if (st != ZX_OK) {
+                  return st;
+                }
+                // Zero the page we looked up.
+                DEBUG_ASSERT(lookup_page.num_pages == 1);
+                DEBUG_ASSERT(lookup_page.paddrs[0] == p->Page()->paddr());
+                ZeroPage(lookup_page.paddrs[0]);
+                *zeroed_len_out += PAGE_SIZE;
+                next_start_offset = off + PAGE_SIZE;
+                return ZX_ERR_NEXT;
+              }
+              // Break out of the traversal. We can release the page and add a zero interval
+              // instead.
+              state = {.add_zero_interval = true,
+                       .start = off,
+                       .end = off + PAGE_SIZE,
+                       .replace_page = true,
+                       .page_to_replace = p};
+              return ZX_ERR_STOP;
+            }
+
+            // Otherwise this is a marker or zero interval, in which case we already have zeroes.
+            DEBUG_ASSERT(p->IsMarker() || p->IsIntervalZero());
+            if (p->IsIntervalStart()) {
+              // Track the interval start so we know how much to add to zeroed_len_out later.
+              interval_start = off;
+              in_interval = true;
+            } else if (p->IsIntervalEnd()) {
+              // Add the range from interval start to end.
+              *zeroed_len_out += (off + PAGE_SIZE - interval_start);
+              in_interval = false;
+            } else {
+              // This is either a single interval slot or a marker.
+              *zeroed_len_out += PAGE_SIZE;
+            }
+            next_start_offset = off + PAGE_SIZE;
+            return ZX_ERR_NEXT;
+          },
+          [&](uint64_t gap_start, uint64_t gap_end) {
+            AssertHeld(lock_ref());
+            // This gap will be replaced with a zero interval. Invalidate any read requests in this
+            // range.
+            InvalidateReadRequestsLocked(gap_start, gap_end - gap_start);
+            // We have found a new zero interval to insert. Break out of the traversal.
+            state = {.add_zero_interval = true,
+                     .start = gap_start,
+                     .end = gap_end,
+                     .replace_page = false,
+                     .page_to_replace = nullptr};
+            return ZX_ERR_STOP;
+          },
+          next_start_offset, end);
+      // Bubble up any errors from LookupPagesLocked.
+      if (status != ZX_OK) {
+        return status;
+      }
+
+      // Add any new zero interval.
+      if (state.add_zero_interval) {
+        if (state.replace_page) {
+          DEBUG_ASSERT(state.page_to_replace);
+          DEBUG_ASSERT(state.start + PAGE_SIZE == state.end);
+          vm_page_t* page = state.page_to_replace->ReleasePage();
+          DEBUG_ASSERT(page->object.pin_count == 0);
+          PQRemoveLocked(page);
+          DEBUG_ASSERT(!list_in_list(&page->queue_node));
+          list_add_tail(&freed_list, &page->queue_node);
+          // TODO(fxbug.dev/122842): Consider not returning this empty node and instead reusing it
+          // for the zero interval. Currently AddZeroInterval does not expect to find any empty
+          // nodes, so it can fail if we don't return this slot first. For now just assert that we
+          // do not fail to add the zero interval, so that we do not lose the page contents.
+          page_list_.ReturnEmptySlot(state.start);
+        }
+        status = page_list_.AddZeroInterval(state.start, state.end,
+                                            VmPageOrMarker::IntervalDirtyState::Dirty);
+        DEBUG_ASSERT(!state.replace_page || status == ZX_OK);
+        if (status != ZX_OK) {
+          DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+          return status;
+        }
+        *zeroed_len_out += (state.end - state.start);
+        next_start_offset = state.end;
+      }
+
+      // Handle the last partial interval. Or the case where we did not advance next_start_offset at
+      // all, which can only happen if the range fell entirely inside an interval.
+      if (in_interval || next_start_offset == prev_start_offset) {
+        *zeroed_len_out += (end - interval_start);
+        next_start_offset = end;
+      }
+    } while (next_start_offset < end);
+
+    VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
+    return ZX_OK;
+  }
+
+  // We've already handled this case above and returned early.
+  DEBUG_ASSERT(!is_source_preserving_page_content());
+
   // If we're zeroing at the end of our parent range we can update to reflect this similar to a
   // resize. This does not work if we are a slice, but we checked for that earlier. Whilst this does
   // not actually zero the range in question, it makes future zeroing of the range far more
@@ -3270,28 +3414,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       parent_limit_ = start;
     }
   }
-
-  // If the source preserves page content, empty slots beyond supply_zero_offset_ are implicitly
-  // dirty and zero. Therefore, if supply_zero_offset_ falls in the specified range, we can simply
-  // update supply_zero_offset_ to start, indicating that the range from start is now all dirty and
-  // zero. Removing pages and markers beyond supply_zero_offset_ is going to be handled in the main
-  // page traversal loop. The only exception here is if there are any pinned pages which we will not
-  // be able to remove, so simply skip this optimization in that case and fall back to the general
-  // case.
-  if (is_source_preserving_page_content() &&
-      (start < supply_zero_offset_ && supply_zero_offset_ <= end) &&
-      !AnyPagesPinnedLocked(start, supply_zero_offset_ - start)) {
-    // Resolve any read requests that might exist in the range [start, supply_zero_offset_), since
-    // this range is now going to be supplied as zeroes by the kernel; the user pager cannot supply
-    // pages in this range anymore.
-    InvalidateReadRequestsLocked(start, supply_zero_offset_ - start);
-
-    UpdateSupplyZeroOffsetLocked(start);
-  }
-
-  // If the VMO is directly backed by a page source that preserves content, it should be the root
-  // VMO of the hierarchy.
-  DEBUG_ASSERT(!is_source_preserving_page_content() || !parent_);
 
   // Helper lambda to determine if this VMO can see parent contents at offset, or if a length is
   // specified as well in the range [offset, offset + length).
@@ -3350,10 +3472,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
 
   // In the ideal case we can zero by making there be an Empty slot in our page list. This is true
   // when we're not specifically avoiding decommit on zero and there is nothing pinned.
-  // Additionally, if the page source is preserving content, an empty slot at this offset should
-  // imply zero, and this is only true for offsets starting at supply_zero_offset_. For offsets
-  // preceding supply_zero_offset_ an empty slot signifies absent content that has not yet been
-  // supplied by the page source.
   //
   // Note that this lambda is only checking for pre-conditions in *this* VMO which allow us to
   // represent zeros with an empty slot. We will combine this check with additional checks for
@@ -3363,8 +3481,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
         (slot && slot->IsPage() && slot->Page()->object.pin_count > 0)) {
       return false;
     }
-    // Offsets less than supply_zero_offset_ cannot be decommitted.
-    return !is_source_preserving_page_content() || offset >= supply_zero_offset_;
+    DEBUG_ASSERT(!is_source_preserving_page_content());
+    return true;
   };
 
   // Like can_decommit_slot but for a range.
@@ -3372,8 +3490,8 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     if (!can_decommit_zero_pages_locked() || AnyPagesPinnedLocked(offset, length)) {
       return false;
     }
-    // Offsets less than supply_zero_offset_ cannot be decommitted.
-    return !is_source_preserving_page_content() || offset >= supply_zero_offset_;
+    DEBUG_ASSERT(!is_source_preserving_page_content());
+    return true;
   };
 
   // Helper lambda to zero the slot at offset either by inserting a marker or by zeroing the actual
@@ -3601,7 +3719,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       start, end);
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return status;
 }
@@ -4237,15 +4355,15 @@ void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
   const uint64_t start = offset;
   const uint64_t end = offset + len;
 
-  // Pages before supply_zero_offset_ in state Clean and AwaitingClean might be waiting on
-  // DIRTY requests. Pages after supply_zero_offset_ in AwaitingClean might be waiting on
-  // DIRTY requests. So we need to traverse the entire range to find such pages.
   zx_status_t status = page_list_.ForEveryPageAndContiguousRunInRange(
-      [supply_zero_offset = supply_zero_offset_](const VmPageOrMarker* p, uint64_t off) {
-        // We can't have any markers after supply_zero_offset_.
-        DEBUG_ASSERT(off < supply_zero_offset || p->IsPageOrRef());
+      [](const VmPageOrMarker* p, uint64_t off) {
         // A marker is a clean zero page and might have an outstanding DIRTY request.
         if (p->IsMarker()) {
+          return true;
+        }
+        // An interval is an uncommitted zero page and might have an outstanding DIRTY request
+        // irrespective of dirty state.
+        if (p->IsIntervalZero()) {
           return true;
         }
         // Although a reference is implied to be clean, VMO backed by a page source should never
@@ -4254,9 +4372,6 @@ void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
 
         vm_page_t* page = p->Page();
         DEBUG_ASSERT(is_page_dirty_tracked(page));
-        // We can only have un-Clean non-loaned pages after supply_zero_offset_.
-        DEBUG_ASSERT(off < supply_zero_offset || !is_page_clean(page));
-        DEBUG_ASSERT(off < supply_zero_offset || !page->is_loaned());
 
         // A page that is not Dirty already might have an outstanding DIRTY request.
         if (!is_page_dirty(page)) {
@@ -4280,8 +4395,8 @@ void VmCowPages::InvalidateDirtyRequestsLocked(uint64_t offset, uint64_t len) {
   DEBUG_ASSERT(status == ZX_OK);
 
   // Now resolve DIRTY requests for any gaps. After request generation, pages could either
-  // have been evicted, or supply_zero_offset_ advanced on writeback, leading to gaps. So it
-  // is possible for gaps to have outstanding DIRTY requests.
+  // have been evicted, or zero intervals written back, leading to gaps. So it is possible for gaps
+  // to have outstanding DIRTY requests.
   status = page_list_.ForEveryPageAndGapInRange(
       [](const VmPageOrMarker* p, uint64_t off) {
         // Nothing to do for pages. We already handled them above.
@@ -4339,21 +4454,29 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
       }
     }
 
-    // If the page source is preserving content, supply_zero_offset_ and/or
-    // awaiting_clean_zero_range_end_ might need updating.
+    // If pager-backed and the new size falls partway in an interval, we will need to clip the
+    // interval.
     if (is_source_preserving_page_content()) {
-      if (s < supply_zero_offset_) {
-        // If the new size is smaller than supply_zero_offset_, supply_zero_offset_ can be clipped
-        // to the new size. The supply_zero_offset_ is used to supply zero pages at the tail end of
-        // the VMO and must therefore fall within the VMO size.
-        // This will also update awaiting_clean_zero_range_end_ if required.
-        UpdateSupplyZeroOffsetLocked(s);
-        // We should have reset the AwaitingClean zero range as it is out of bounds now.
-        DEBUG_ASSERT(awaiting_clean_zero_range_end_ == 0);
-      } else {
-        // We might need to trim the AwaitingClean zero range [supply_zero_offset_,
-        // awaiting_clean_zero_range_end_) if the new size falls partway into that range.
-        ConsiderTrimAwaitingCleanZeroRangeLocked(s);
+      // Check if the first populated slot we find in the now-invalid range is an interval end.
+      uint64_t interval_end = UINT64_MAX;
+      zx_status_t status = page_list_.ForEveryPageInRange(
+          [&interval_end](const VmPageOrMarker* p, uint64_t off) {
+            if (p->IsIntervalEnd()) {
+              interval_end = off;
+            }
+            // We found the first populated slot. Stop the traversal.
+            return ZX_ERR_STOP;
+          },
+          s, size_);
+      DEBUG_ASSERT(status == ZX_OK);
+
+      if (interval_end != UINT64_MAX) {
+        DEBUG_ASSERT(interval_end >= s);
+        status = page_list_.ClipIntervalEnd(interval_end, interval_end - s + PAGE_SIZE);
+        if (status != ZX_OK) {
+          DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+          return status;
+        }
       }
     }
 
@@ -4412,6 +4535,16 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
 
     // inform all our children or mapping that there's new bits
     RangeChangeUpdateLocked(start, len, RangeChangeOp::Unmap);
+
+    // If pager-backed, need to insert a dirty zero interval beyond the old size.
+    if (is_source_preserving_page_content()) {
+      zx_status_t status =
+          page_list_.AddZeroInterval(start, end, VmPageOrMarker::IntervalDirtyState::Dirty);
+      if (status != ZX_OK) {
+        DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+        return status;
+      }
+    }
   }
 
   // save bytewise size
@@ -4420,7 +4553,7 @@ zx_status_t VmCowPages::ResizeLocked(uint64_t s) {
   IncrementHierarchyGenerationCountLocked();
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
   return ZX_OK;
 }
@@ -4879,64 +5012,63 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
 
   // If any of the pages in the range are zero page markers (Clean zero pages), they need to be
   // forked in order to be dirtied (written to). Find the number of such pages that need to be
-  // allocated. We might also need to allocate zero pages to replace empty slots starting at
-  // supply_zero_offset_. See comment near DIRTY request generation in PrepareForWriteLocked for
-  // more details.
+  // allocated. We also need to allocate zero pages to replace sparse zero intervals.
   size_t zero_pages_count = 0;
-
-  // First consider the portion of the range that ends before supply_zero_offset_.
-  // We don't have a range to consider here if offset was greater than supply_zero_offset_.
-  if (start_offset < supply_zero_offset_) {
-    const uint64_t end = ktl::min(supply_zero_offset_, end_offset);
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-        [&zero_pages_count](const VmPageOrMarker* p, uint64_t off) {
-          if (p->IsMarker()) {
+  // This tracks the beginning of an interval that falls in the specified range. Since we might
+  // start partway inside an interval, this is initialized to start_offset so that we only consider
+  // the portion of the interval inside the range. If we did not start inside an interval, we will
+  // end up reinitializing this when we do find an interval start, before this value is used, so it
+  // is safe to initialize to start_offset in all cases.
+  uint64_t interval_start = start_offset;
+  // This tracks whether we saw an interval start sentinel in the traversal, but have not yet
+  // encountered a matching interval end sentinel. Should we end the traversal partway in an
+  // interval, we will need to handle the portion of the interval between the interval start and the
+  // end of the specified range.
+  bool unmatched_interval_start = false;
+  bool found_page_or_gap = false;
+  zx_status_t status = page_list_.ForEveryPageAndGapInRange(
+      [&zero_pages_count, &interval_start, &unmatched_interval_start, &found_page_or_gap](
+          const VmPageOrMarker* p, uint64_t off) {
+        found_page_or_gap = true;
+        if (p->IsMarker()) {
+          zero_pages_count++;
+        } else if (p->IsIntervalZero()) {
+          if (p->IsIntervalStart()) {
+            interval_start = off;
+            unmatched_interval_start = true;
+          } else if (p->IsIntervalEnd()) {
+            zero_pages_count += (off - interval_start + PAGE_SIZE) / PAGE_SIZE;
+            unmatched_interval_start = false;
+          } else {
+            DEBUG_ASSERT(p->IsIntervalSlot());
             zero_pages_count++;
           }
-          DEBUG_ASSERT(!p->IsReference());
-          return ZX_ERR_NEXT;
-        },
-        [](uint64_t start, uint64_t end) {
-          // A gap indicates a page that has not been supplied yet. It will need to be supplied
-          // first. Although we will never generate a DIRTY request for absent pages before
-          // supply_zero_offset_ in the first place, it is still possible for a clean page to get
-          // evicted after the DIRTY request was generated. It is also possible for the
-          // supply_zero_offset_ to get advanced itself due to a racing writeback, such that an old
-          // DIRTY request (for uncommitted pages beyond supply_zero_offset_) now starts before the
-          // advanced supply_zero_offset_.
-          //
-          // Spuriously resolve the DIRTY page request, and let the waiter(s) retry looking up the
-          // page, which will generate a READ request first to supply the missing page.
-          return ZX_ERR_NOT_FOUND;
-        },
-        start_offset, end);
+        }
+        DEBUG_ASSERT(!p->IsReference());
+        return ZX_ERR_NEXT;
+      },
+      [&found_page_or_gap](uint64_t start, uint64_t end) {
+        found_page_or_gap = true;
+        // A gap indicates a page that has not been supplied yet. It will need to be supplied
+        // first. Although we will never generate a DIRTY request for absent pages in the first
+        // place, it is still possible for a clean page to get evicted after the DIRTY request was
+        // generated. It is also possible for a dirty zero interval to have been written back such
+        // that we have an old DIRTY request for the interval.
+        //
+        // Spuriously resolve the DIRTY page request, and let the waiter(s) retry looking up the
+        // page, which will generate a READ request first to supply the missing page.
+        return ZX_ERR_NOT_FOUND;
+      },
+      start_offset, end_offset);
 
-    if (status != ZX_OK) {
-      return status;
-    }
+  if (status != ZX_OK) {
+    return status;
   }
 
-  // Now consider the portion of the range that starts at/after supply_zero_offset_.
-  // [offset, offset + len) might have fallen entirely before supply_zero_offset_, in which case we
-  // have no remaining portion to consider here.
-  if (supply_zero_offset_ < end_offset) {
-    const uint64_t start = ktl::max(start_offset, supply_zero_offset_);
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-        [](const VmPageOrMarker* p, uint64_t off) {
-          // Nothing to do if a page is found except assert a few things we know.
-          DEBUG_ASSERT(p->IsPage());
-          DEBUG_ASSERT(is_page_dirty_tracked(p->Page()));
-          DEBUG_ASSERT(!is_page_clean(p->Page()));
-          DEBUG_ASSERT(!p->Page()->is_loaned());
-          return ZX_ERR_NEXT;
-        },
-        [&zero_pages_count](uint64_t start, uint64_t end) {
-          zero_pages_count += ((end - start) / PAGE_SIZE);
-          return ZX_ERR_NEXT;
-        },
-        start, end_offset);
-    // We don't expect an error from the traversal.
-    DEBUG_ASSERT(status == ZX_OK);
+  // Handle the last interval or if we did not enter the traversal callbacks at all.
+  if (unmatched_interval_start || !found_page_or_gap) {
+    DEBUG_ASSERT(found_page_or_gap || interval_start == start_offset);
+    zero_pages_count += (end_offset - interval_start) / PAGE_SIZE;
   }
 
   // Utilize the already allocated pages in alloc_list.
@@ -4950,7 +5082,7 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
     // calls to the PMM to allocate single pages. If the PMM returns ZX_ERR_SHOULD_WAIT, fall back
     // to allocating one page at a time below, giving reclamation strategies a better chance to
     // catch up with incoming allocation requests.
-    zx_status_t status = pmm_alloc_pages(zero_pages_count, pmm_alloc_flags_, alloc_list);
+    status = pmm_alloc_pages(zero_pages_count, pmm_alloc_flags_, alloc_list);
     if (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT) {
       return status;
     }
@@ -4983,118 +5115,103 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
       zero_pages_count--;
     }
 
+    // We have to mark all the requested pages Dirty *atomically*. The user pager might be tracking
+    // filesystem space reservations based on the success / failure of this call. So if we fail
+    // partway, the user pager might think that no pages in the specified range have been dirtied,
+    // which would be incorrect. If there are any conditions that would cause us to fail, evaluate
+    // those before actually adding the pages, so that we can return the failure early before
+    // starting to mark pages Dirty.
+    //
+    // Install page slots for all the intervals we'll be adding zero pages in. Page insertion will
+    // only proceed once we've allocated all the slots without any errors.
+    // Populating slots will alter the page list. So break out of the traversal upon finding an
+    // interval, populate slots in it, and then resume the traversal after the interval.
+    uint64_t next_start_offset = start_offset;
+    do {
+      struct {
+        bool found_interval;
+        uint64_t start;
+        uint64_t end;
+      } state = {.found_interval = false, .start = 0, .end = 0};
+      status = page_list_.ForEveryPageAndContiguousRunInRange(
+          [](const VmPageOrMarker* p, uint64_t off) {
+            return p->IsIntervalStart() || p->IsIntervalEnd();
+          },
+          [](const VmPageOrMarker* p, uint64_t off) {
+            DEBUG_ASSERT(p->IsIntervalZero());
+            return ZX_ERR_NEXT;
+          },
+          [&state](uint64_t start, uint64_t end, bool is_interval) {
+            DEBUG_ASSERT(is_interval);
+            state = {.found_interval = true, .start = start, .end = end};
+            return ZX_ERR_STOP;
+          },
+          next_start_offset, end_offset);
+      DEBUG_ASSERT(status == ZX_OK);
+
+      // No intervals remain.
+      if (!state.found_interval) {
+        break;
+      }
+      // Ensure we're making forward progress.
+      DEBUG_ASSERT(state.end - state.start >= PAGE_SIZE);
+      zx_status_t st = page_list_.PopulateSlotsInInterval(state.start, state.end);
+      if (st != ZX_OK) {
+        DEBUG_ASSERT(st == ZX_ERR_NO_MEMORY);
+        // Before returning, we need to undo any slots we might have populated in intervals we
+        // previously encountered. This is a rare error case and can be inefficient.
+        for (uint64_t off = start_offset; off < state.start; off += PAGE_SIZE) {
+          auto slot = page_list_.Lookup(off);
+          if (slot) {
+            // If this is an interval sentinel, it should only be a slot, since we've populated
+            // all intervals so far.
+            DEBUG_ASSERT(!slot->IsInterval() || slot->IsIntervalSlot());
+            if (slot->IsIntervalSlot()) {
+              page_list_.ReturnIntervalSlot(off);
+            }
+          }
+        }
+        return st;
+      }
+      next_start_offset = state.end;
+    } while (next_start_offset < end_offset);
+
+    // All operations from this point on must succeed so we can atomically mark pages dirty.
+
     // Increment the generation count as we're going to be inserting new pages.
     IncrementHierarchyGenerationCountLocked();
 
-    // Install newly allocated pages in place of the zero page markers before supply_zero_offset_.
-    if (start_offset < supply_zero_offset_) {
-      const uint64_t end = ktl::min(supply_zero_offset_, end_offset);
-      status = page_list_.ForEveryPageInRange(
-          [this, &alloc_list](const VmPageOrMarker* p, uint64_t off) {
-            if (p->IsMarker()) {
-              DEBUG_ASSERT(!list_is_empty(alloc_list));
-              AssertHeld(lock_ref());
+    // Install newly allocated pages in place of the zero page markers and interval sentinels. Start
+    // with clean zero pages even for the intervals, so that the dirty transition logic below can
+    // uniformly transition them to dirty along with pager supplied pages.
+    status = page_list_.ForEveryPageInRange(
+        [this, &alloc_list](const VmPageOrMarker* p, uint64_t off) {
+          if (p->IsMarker() || p->IsIntervalSlot()) {
+            DEBUG_ASSERT(!list_is_empty(alloc_list));
+            AssertHeld(lock_ref());
 
-              // AddNewPageLocked will also zero the page and update any mappings.
-              //
-              // TODO(rashaeqbal): Depending on how often we end up forking zero markers, we might
-              // want to pass do_range_udpate = false, and defer updates until later, so we can
-              // perform a single batch update.
-              zx_status_t status =
-                  AddNewPageLocked(off, list_remove_head_type(alloc_list, vm_page, queue_node),
-                                   CanOverwriteContent::Zero, nullptr);
-              // AddNewPageLocked will not fail with ZX_ERR_ALREADY_EXISTS as we can overwrite
-              // markers with OverwriteInitialContent, nor with ZX_ERR_NO_MEMORY as we don't need to
-              // allocate a new slot in the page list, we're simply replacing its content.
-              ASSERT(status == ZX_OK);
-            }
-            return ZX_ERR_NEXT;
-          },
-          start_offset, end);
+            // AddNewPageLocked will also zero the page and update any mappings.
+            //
+            // TODO(rashaeqbal): Depending on how often we end up forking zero markers, we might
+            // want to pass do_range_udpate = false, and defer updates until later, so we can
+            // perform a single batch update.
+            zx_status_t status =
+                AddNewPageLocked(off, list_remove_head_type(alloc_list, vm_page, queue_node),
+                                 CanOverwriteContent::Zero, nullptr);
+            // AddNewPageLocked will not fail with ZX_ERR_ALREADY_EXISTS as we can overwrite
+            // markers and interval slots since they are zero, nor with ZX_ERR_NO_MEMORY as we don't
+            // need to allocate a new slot in the page list, we're simply replacing its content.
+            ASSERT(status == ZX_OK);
+          }
+          return ZX_ERR_NEXT;
+        },
+        start_offset, end_offset);
 
-      // We don't expect an error from the traversal.
-      DEBUG_ASSERT(status == ZX_OK);
-    }
-
-    // Deferred cleanup if inserting pages starting at supply_zero_offset_ fails partway below.
-    // Pages starting at supply_zero_offset_ can only be Dirty. So if we added any new pages with
-    // the intention of dirtying them in this function, but we could not successfully do so (because
-    // allocation for a page list node failed part of the way), we need to roll back.
-    //
-    // Note that this roll back is fine as it does not risk forward progress, as opposed to rolling
-    // back in case of ZX_ERR_SHOULD_WAIT. The caller will not retry with an error status of
-    // ZX_ERR_NO_MEMORY.
-    auto zero_offset_cleanup = fit::defer([this, end_offset]() {
-      AssertHeld(lock_ref());
-      if (supply_zero_offset_ < end_offset) {
-        list_node_t freed_list;
-        list_initialize(&freed_list);
-
-        page_list_.RemovePages(
-            [&freed_list, this](VmPageOrMarker* p, uint64_t off) {
-              AssertHeld(lock_ref());
-              DEBUG_ASSERT(p->IsPage());
-              vm_page_t* page = p->Page();
-              DEBUG_ASSERT(is_page_dirty_tracked(page));
-              DEBUG_ASSERT(!page->is_loaned());
-              // The only Clean pages will be the new ones we inserted in this function.
-              if (is_page_clean(page)) {
-                vm_page_t* released_page = p->ReleasePage();
-                DEBUG_ASSERT(released_page == page);
-                DEBUG_ASSERT(page->object.pin_count == 0);
-                PQRemoveLocked(page);
-                DEBUG_ASSERT(!list_in_list(&page->queue_node));
-                list_add_tail(&freed_list, &page->queue_node);
-              }
-              return ZX_ERR_NEXT;
-            },
-            supply_zero_offset_, end_offset);
-
-        if (!list_is_empty(&freed_list)) {
-          FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
-        }
-      }
-      VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
-    });
-
-    // Install zero pages in gaps starting at supply_zero_offset_.
-    for (uint64_t off = ktl::max(start_offset, supply_zero_offset_); off < end_offset;
-         off += PAGE_SIZE) {
-      auto slot = page_list_.Lookup(off);
-      if (slot && !slot->IsEmpty()) {
-        // We can only find un-Clean pages beyond supply_zero_offset_.
-        DEBUG_ASSERT(slot->IsPage());
-        DEBUG_ASSERT(is_page_dirty_tracked(slot->Page()));
-        DEBUG_ASSERT(!is_page_clean(slot->Page()));
-        DEBUG_ASSERT(!slot->Page()->is_loaned());
-        continue;
-      }
-
-      DEBUG_ASSERT(!list_is_empty(alloc_list));
-      // AddNewPageLocked will also zero the page and update any mappings.
-      status = AddNewPageLocked(off, list_remove_head_type(alloc_list, vm_page, queue_node),
-                                CanOverwriteContent::Zero, nullptr);
-      // We know that there was no page here so AddNewPageLocked will not fail with
-      // ZX_ERR_ALREADY_EXISTS. The only possible error is ZX_ERR_NO_MEMORY if we failed to allocate
-      // the slot.
-      if (status == ZX_ERR_NO_MEMORY) {
-        return status;
-      }
-      ASSERT(status == ZX_OK);
-    }
-
-    // We were able to successfully insert all the required pages. Cancel the cleanup.
-    zero_offset_cleanup.cancel();
+    // We don't expect an error from the traversal.
+    DEBUG_ASSERT(status == ZX_OK);
   }
 
-  // After this point, we have to mark all the requested pages Dirty *atomically*. The user pager
-  // might be tracking filesystem space reservations based on the success / failure of this call. So
-  // if we fail partway, the user pager might think that no pages in the specified range have been
-  // dirtied, which would be incorrect. If there are any conditions that would cause us to fail,
-  // evaluate those before reaching here, so that we can return the failure early before starting to
-  // mark pages Dirty.
-
-  zx_status_t status = page_list_.ForEveryPageAndContiguousRunInRange(
+  status = page_list_.ForEveryPageAndContiguousRunInRange(
       [](const VmPageOrMarker* p, uint64_t off) {
         DEBUG_ASSERT(!p->IsReference());
         if (p->IsPage()) {
@@ -5125,40 +5242,8 @@ zx_status_t VmCowPages::DirtyPagesLocked(uint64_t offset, uint64_t len, list_nod
   // All pages have been dirtied successfully, so cancel the cleanup on error.
   invalidate_requests_on_error.cancel();
 
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return status;
-}
-
-void VmCowPages::TryAdvanceSupplyZeroOffsetLocked(uint64_t start_offset, uint64_t end_offset) {
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(start_offset));
-  DEBUG_ASSERT(IS_PAGE_ALIGNED(end_offset));
-
-  if (supply_zero_offset_ >= start_offset && supply_zero_offset_ < end_offset) {
-    uint64_t new_zero_offset = supply_zero_offset_;
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-        [&new_zero_offset](const VmPageOrMarker* p, uint64_t off) {
-          ASSERT(p->IsPage());
-          vm_page_t* page = p->Page();
-          ASSERT(is_page_dirty_tracked(page));
-          ASSERT(!is_page_clean(page));
-          DEBUG_ASSERT(!page->is_loaned());
-          new_zero_offset += PAGE_SIZE;
-          return ZX_ERR_NEXT;
-        },
-        [](uint64_t start, uint64_t end) {
-          // Bail if we found a gap.
-          return ZX_ERR_STOP;
-        },
-        supply_zero_offset_, end_offset);
-    // We don't expect a failure from the traversal.
-    DEBUG_ASSERT(status == ZX_OK);
-
-    // Advance supply_zero_offset_.
-    // This will also update awaiting_clean_zero_range_end_ if required.
-    UpdateSupplyZeroOffsetLocked(new_zero_offset);
-  }
-
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
 }
 
 zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len,
@@ -5177,119 +5262,46 @@ zx_status_t VmCowPages::EnumerateDirtyRangesLocked(uint64_t offset, uint64_t len
   const uint64_t start_offset = ROUNDDOWN(offset, PAGE_SIZE);
   const uint64_t end_offset = ROUNDUP(offset + len, PAGE_SIZE);
 
-  // If supply_zero_offset_ falls in the range being enumerated, try to advance supply_zero_offset_
-  // over any pages that might have been committed immediately after it. This gives us the
-  // opportunity to coalesce committed pages across supply_zero_offset_ into a single dirty range.
-  //
-  // Cap the amount of work by only considering advancing supply_zero_offset_ until end_offset. We
-  // will be iterating over the range [start_offset, end_offset) to enumerate dirty ranges anyway,
-  // so attempting to advance supply_zero_offset_ within this range still keeps the order of work
-  // performed in this call the same.
-  TryAdvanceSupplyZeroOffsetLocked(start_offset, end_offset);
-
-  // First consider the portion of the range that ends before supply_zero_offset_.
-  // We don't have a range to consider here if offset was greater than supply_zero_offset_.
-  if (start_offset < supply_zero_offset_) {
-    const uint64_t end = ktl::min(supply_zero_offset_, end_offset);
-    zx_status_t status = page_list_.ForEveryPageAndContiguousRunInRange(
-        [](const VmPageOrMarker* p, uint64_t off) {
-          // Enumerate both AwaitingClean and Dirty pages, i.e. anything that is not Clean.
-          // AwaitingClean pages are "dirty" too for the purposes of this enumeration, since their
-          // modified contents are still in the process of being written back.
-          DEBUG_ASSERT(!p->IsReference());
-          if (p->IsPage()) {
-            vm_page_t* page = p->Page();
-            DEBUG_ASSERT(is_page_dirty_tracked(page));
-            DEBUG_ASSERT(is_page_clean(page) || !page->is_loaned());
-            return !is_page_clean(page);
-          }
-          return false;
-        },
-        [](const VmPageOrMarker* p, uint64_t off) {
-          DEBUG_ASSERT(p->IsPage());
+  zx_status_t status = page_list_.ForEveryPageAndContiguousRunInRange(
+      [](const VmPageOrMarker* p, uint64_t off) {
+        // Enumerate both AwaitingClean and Dirty pages, i.e. anything that is not Clean.
+        // AwaitingClean pages are "dirty" too for the purposes of this enumeration, since their
+        // modified contents are still in the process of being written back.
+        DEBUG_ASSERT(!p->IsReference());
+        if (p->IsPage()) {
+          vm_page_t* page = p->Page();
+          DEBUG_ASSERT(is_page_dirty_tracked(page));
+          DEBUG_ASSERT(is_page_clean(page) || !page->is_loaned());
+          return !is_page_clean(page);
+        }
+        // Enumerate any dirty zero intervals.
+        if (p->IsIntervalZero()) {
+          // For now we only support dirty intervals.
+          DEBUG_ASSERT(!p->IsZeroIntervalClean());
+          return !p->IsZeroIntervalClean();
+        }
+        return false;
+      },
+      [](const VmPageOrMarker* p, uint64_t off) {
+        if (p->IsPage()) {
           vm_page_t* page = p->Page();
           DEBUG_ASSERT(is_page_dirty_tracked(page));
           DEBUG_ASSERT(!is_page_clean(page));
           DEBUG_ASSERT(!page->is_loaned());
           DEBUG_ASSERT(page->object.get_page_offset() == off);
-          return ZX_ERR_NEXT;
-        },
-        [&dirty_range_fn](uint64_t start, uint64_t end, bool unused) {
-          return dirty_range_fn(start, end - start, /*range_is_zero=*/false);
-        },
-        start_offset, end);
+        } else if (p->IsIntervalZero()) {
+          DEBUG_ASSERT(!p->IsZeroIntervalClean());
+        }
+        return ZX_ERR_NEXT;
+      },
+      [&dirty_range_fn](uint64_t start, uint64_t end, bool is_interval) {
+        // Zero intervals are enumerated as zero ranges.
+        return dirty_range_fn(start, end - start, /*range_is_zero=*/is_interval);
+      },
+      start_offset, end_offset);
 
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
-  // Now consider the portion of the range that starts at/after supply_zero_offset_. All pages
-  // beyond supply_zero_offset_ must be reported Dirty so that they can be written back. Gaps must
-  // be reported as zero so that writing them back may be optimized.
-  // [offset, offset + len) might have fallen entirely before supply_zero_offset_, in which case we
-  // have no remaining portion to consider here.
-  if (supply_zero_offset_ < end_offset) {
-    const uint64_t start = ktl::max(start_offset, supply_zero_offset_);
-
-    // Counters to track a potential run of committed pages.
-    uint64_t committed_start = start;
-    uint64_t committed_len = 0;
-
-    zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-        [&committed_start, &committed_len](const VmPageOrMarker* p, uint64_t off) {
-          // We can only find un-Clean pages beyond supply_zero_offset_. There can be no markers as
-          // they represent Clean zero pages.
-          ASSERT(p->IsPage());
-          vm_page_t* page = p->Page();
-          ASSERT(is_page_dirty_tracked(page));
-          ASSERT(!is_page_clean(page));
-          DEBUG_ASSERT(!page->is_loaned());
-
-          // Start a run of committed pages if we are not tracking one yet.
-          if (committed_len == 0) {
-            committed_start = off;
-          }
-          // Add this page to the committed run and proceed to the next one.
-          DEBUG_ASSERT(committed_start + committed_len == off);
-          committed_len += PAGE_SIZE;
-          return ZX_ERR_NEXT;
-        },
-        [&committed_start, &committed_len, &dirty_range_fn](uint64_t start, uint64_t end) {
-          // If we were tracking a committed run, process it first.
-          if (committed_len > 0) {
-            // This gap should immediately follow the previous run of committed pages.
-            DEBUG_ASSERT(committed_start + committed_len == start);
-            zx_status_t status =
-                dirty_range_fn(committed_start, committed_len, /*range_is_zero=*/false);
-            // Only proceed to the next range if the return status indicates we can.
-            if (status != ZX_ERR_NEXT) {
-              return status;
-            }
-            // Reset committed_len for tracking another committed run later.
-            committed_len = 0;
-          }
-
-          // Process this gap now. Indicate that this range is zero.
-          return dirty_range_fn(start, end - start, /*range_is_zero=*/true);
-        },
-        start, end_offset);
-
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    // Process any last remaining committed run.
-    if (committed_len > 0) {
-      status = dirty_range_fn(committed_start, committed_len, /*range_is_zero=*/false);
-      if (status != ZX_ERR_STOP && status != ZX_ERR_NEXT) {
-        return status;
-      }
-    }
-  }
-
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
-  return ZX_OK;
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
+  return status;
 }
 
 zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool is_zero_range) {
@@ -5310,22 +5322,23 @@ zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool
 
   const uint64_t start_offset = offset;
   const uint64_t end_offset = offset + len;
-  // We only need to consider transitioning pages if the caller has specified that this is not a
-  // zero range. For a zero range, we cannot start cleaning any pages because the caller has
+  // We only need to consider transitioning committed pages if the caller has specified that this is
+  // not a zero range. For a zero range, we cannot start cleaning any pages because the caller has
   // expressed intent to write back zeros in this range; any pages we clean might get evicted and
   // incorrectly supplied again as zero pages, leading to data loss.
   //
-  // When querying dirty ranges, gaps beyond supply_zero_offset_ are indicated as dirty zero ranges.
-  // So it's perfectly reasonable for the user pager to write back these zero ranges efficiently
-  // without having to read the actual contents of the range, which would read zeroes anyway. There
-  // can exist a race however, where the user pager has just discovered a dirty zero range, and
-  // before it starts writing it out, an actual page gets dirtied in that range. Consider the
-  // following example that demonstrates the race:
-  //  1. The range [5, 10) is indicated as a dirty zero range when the user pager queries dirty
-  //  ranges.
-  //  2. A write comes in for page 7 and it is marked Dirty.
+  // When querying dirty ranges, zero page intervals are indicated as dirty zero ranges. So it's
+  // perfectly reasonable for the user pager to write back these zero ranges efficiently without
+  // having to read the actual contents of the range, which would read zeroes anyway. There can
+  // exist a race however, where the user pager has just discovered a dirty zero range, and before
+  // it starts writing it out, an actual page gets dirtied in that range. Consider the following
+  // example that demonstrates the race:
+  //  1. The zero interval [5, 10) is indicated as a dirty zero range when the user pager queries
+  //  dirty ranges.
+  //  2. A write comes in for page 7 and it is marked Dirty. The interval is split up into two: [5,
+  //  7) and [8, 10).
   //  3. The user pager prepares to write the range [5, 10) with WritebackBegin.
-  //  4. Gaps as well as page 7 are marked AwaitingClean.
+  //  4. Both the intervals as well as page 7 are marked AwaitingClean.
   //  5. The user pager still thinks that [5, 10) is zero and writes back zeroes for the range.
   //  6. The user pager does a WritebackEnd on [5, 10), and page 7 gets marked Clean.
   //  7. At some point in the future, page 7 gets evicted. The data on page 7 (which was prematurely
@@ -5333,59 +5346,68 @@ zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool
   //
   // This race occurred because there was a mismatch between what the user pager and the kernel
   // think the contents of the range being written back are. The user pager intended to mark only
-  // zero ranges (gaps) clean, not actual pages. The is_zero_range flag captures this intent, so
-  // that the kernel does not incorrectly clean actual committed pages. Committed dirty pages will
-  // be returned as actual dirty pages (not dirty zero ranges) on a subsequent call to query dirty
+  // zero ranges clean, not actual pages. The is_zero_range flag captures this intent, so that the
+  // kernel does not incorrectly clean actual committed pages. Committed dirty pages will be
+  // returned as actual dirty pages (not dirty zero ranges) on a subsequent call to query dirty
   // ranges, and can be cleaned then.
-  if (!is_zero_range) {
-    // All Dirty pages need to be marked AwaitingClean, irrespective of where they lie w.r.t.
-    // supply_zero_offset_. If the VMO traps Dirty transitions, future writes need to be trapped in
-    // order to generate DIRTY requests before marking the pages Dirty again. The userpager has
-    // indicated that it is writing back contents as they exist at the time of this call, so new
-    // writes altering those contents should be trapped and acknowledged by the userpager (the
-    // filesystem might need to reserve additional space for the new writes).
-    zx_status_t status = page_list_.ForEveryPageInRange(
-        [this](const VmPageOrMarker* p, uint64_t off) {
-          // VMOs with a page source should never have references.
-          DEBUG_ASSERT(!p->IsReference());
-          // If the page is pinned we have to leave it Dirty in case it is still being written to
-          // via DMA. The VM system will be unaware of these writes, and so we choose to be
-          // conservative here and might end up with pinned pages being left dirty for longer, until
-          // a writeback is attempted after the unpin.
-          if (p->IsPage() && p->Page()->object.pin_count > 0) {
-            return ZX_ERR_NEXT;
-          }
-          // Transition pages from Dirty to AwaitingClean.
-          if (p->IsPage() && is_page_dirty(p->Page())) {
-            AssertHeld(lock_ref());
-            UpdateDirtyStateLocked(p->Page(), off, DirtyState::AwaitingClean);
-          }
-          // We can only find actual pages beyond supply_zero_offset_ (no markers), and they will be
-          // AwaitingClean, either from before this call or from having transitioned them to
-          // AwaitingClean above. Pages beyond supply_zero_offset_ are un-Clean.
-          AssertHeld(lock_ref());
-          ASSERT(off < supply_zero_offset_ || (p->IsPage() && is_page_awaiting_clean(p->Page())));
-          return ZX_ERR_NEXT;
-        },
-        start_offset, end_offset);
-    // We don't expect a failure from the traversal.
-    DEBUG_ASSERT(status == ZX_OK);
-  }
 
-  // If we were not tracking an awaiting clean zero range, see if we can start tracking one.
-  if (awaiting_clean_zero_range_end_ == 0) {
-    // We can only track an awaiting clean zero range if the start of the range, i.e.
-    // supply_zero_offset_ lies completely within the specified range.
-    if (supply_zero_offset_ >= start_offset && supply_zero_offset_ < end_offset) {
-      awaiting_clean_zero_range_end_ = end_offset;
-    }
-  } else {
-    DEBUG_ASSERT(supply_zero_offset_ < awaiting_clean_zero_range_end_);
-    // If we were already tracking an awaiting clean zero range, see if we can extend it.
-    if (awaiting_clean_zero_range_end_ >= start_offset &&
-        awaiting_clean_zero_range_end_ < end_offset) {
-      awaiting_clean_zero_range_end_ = end_offset;
-    }
+  auto interval_start = VmPageOrMarkerRef(nullptr);
+  uint64_t interval_start_off;
+  zx_status_t status = page_list_.ForEveryPageInRangeMutable(
+      [is_zero_range, &interval_start, &interval_start_off, this](VmPageOrMarkerRef p,
+                                                                  uint64_t off) {
+        // VMOs with a page source should never have references.
+        DEBUG_ASSERT(!p->IsReference());
+        // If the page is pinned we have to leave it Dirty in case it is still being written to
+        // via DMA. The VM system will be unaware of these writes, and so we choose to be
+        // conservative here and might end up with pinned pages being left dirty for longer, until
+        // a writeback is attempted after the unpin.
+        // If the caller indicates that they're only cleaning zero pages, any committed pages need
+        // to be left dirty.
+        if (p->IsPage() && (p->Page()->object.pin_count > 0 || is_zero_range)) {
+          return ZX_ERR_NEXT;
+        }
+        // Transition pages from Dirty to AwaitingClean.
+        if (p->IsPage() && is_page_dirty(p->Page())) {
+          AssertHeld(lock_ref());
+          UpdateDirtyStateLocked(p->Page(), off, DirtyState::AwaitingClean);
+        } else if (p->IsIntervalZero()) {
+          // Transition zero intervals to AwaitingClean.
+          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          if (p->IsIntervalStart() || p->IsIntervalSlot()) {
+            // Start tracking a dirty interval. It will only transition once the end is encountered.
+            DEBUG_ASSERT(!interval_start);
+            interval_start = p;
+            interval_start_off = off;
+          }
+          if (p->IsIntervalEnd() || p->IsIntervalSlot()) {
+            // Now that we've encountered the end, the entire interval can be transitioned to
+            // AwaitingClean. This is done by setting the AwaitingCleanLength of the start sentinel.
+            // TODO: If the writeback began partway into the interval, try to coalesce the start's
+            // awaiting clean length with the range being cleaned here if it immediately follows.
+            if (interval_start) {
+              // Set the new AwaitingClean length to the max of the old value and the new one.
+              // See comments in WritebackEndLocked for an explanation.
+              const uint64_t old_len = interval_start->GetZeroIntervalAwaitingCleanLength();
+              interval_start.SetZeroIntervalAwaitingCleanLength(
+                  ktl::max(off - interval_start_off + PAGE_SIZE, old_len));
+            }
+            // Reset the interval start so we can track a new one later.
+            interval_start = VmPageOrMarkerRef(nullptr);
+          }
+        }
+        return ZX_ERR_NEXT;
+      },
+      start_offset, end_offset);
+  // We don't expect a failure from the traversal.
+  DEBUG_ASSERT(status == ZX_OK);
+
+  // Process the last partial interval.
+  if (interval_start) {
+    DEBUG_ASSERT(interval_start->IsIntervalStart());
+    const uint64_t old_len = interval_start->GetZeroIntervalAwaitingCleanLength();
+    interval_start.SetZeroIntervalAwaitingCleanLength(
+        ktl::max(end_offset - interval_start_off, old_len));
   }
 
   // Set any mappings for this range to read-only, so that a permission fault is triggered the next
@@ -5395,7 +5417,7 @@ zx_status_t VmCowPages::WritebackBeginLocked(uint64_t offset, uint64_t len, bool
   // have their write permission removed, so this is a no-op for them.
   RangeChangeUpdateLocked(start_offset, end_offset - start_offset, RangeChangeOp::RemoveWrite);
 
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return ZX_OK;
 }
 
@@ -5418,79 +5440,83 @@ zx_status_t VmCowPages::WritebackEndLocked(uint64_t offset, uint64_t len) {
   const uint64_t start_offset = offset;
   const uint64_t end_offset = offset + len;
 
-  // If writeback begins partway into the zero range described by supply_zero_offset_, return early.
-  // We cannot clean any pages beyond supply_zero_offset_ unless we can also advance
-  // supply_zero_offset_ to skip over the pages being cleaned; pages starting at supply_zero_offset_
-  // are implicitly un-Clean.
-  if (start_offset > supply_zero_offset_) {
-    return ZX_OK;
-  }
-
-  // First consider the range before supply_zero_offset_.
-  if (start_offset < supply_zero_offset_) {
-    const uint64_t end = ktl::min(end_offset, supply_zero_offset_);
-    zx_status_t status = page_list_.ForEveryPageInRange(
-        [this](const VmPageOrMarker* p, uint64_t off) {
-          // VMOs with a page source should never have references.
-          DEBUG_ASSERT(!p->IsReference());
-          // Transition pages from AwaitingClean to Clean.
-          if (p->IsPage() && is_page_awaiting_clean(p->Page())) {
-            AssertHeld(lock_ref());
-            UpdateDirtyStateLocked(p->Page(), off, DirtyState::Clean);
-          }
-          return ZX_ERR_NEXT;
-        },
-        start_offset, end);
-    // We don't expect a failure from the traversal.
-    DEBUG_ASSERT(status == ZX_OK);
-  }
-
-  // No more work to be done if the range was entirely before supply_zero_offset.
-  if (end_offset <= supply_zero_offset_) {
-    return ZX_OK;
-  }
-
-  // If there is no AwaitingClean zero range, we cannot mark any more pages Clean.
-  if (awaiting_clean_zero_range_end_ == 0) {
-    return ZX_OK;
-  }
-  // Otherwise try to process the AwaitingClean zero range.
-
-  DEBUG_ASSERT(supply_zero_offset_ < awaiting_clean_zero_range_end_);
-
-  // End offset of the zero range that we can transition to Clean, and then advance
-  // supply_zero_offset_ beyond.
-  uint64_t zero_range_end = ktl::min(awaiting_clean_zero_range_end_, end_offset);
-
-  DEBUG_ASSERT(supply_zero_offset_ < zero_range_end);
-
-  // Clean any committed AwaitingClean pages in the range we will be advancing supply_zero_offset_
-  // over. Note that we know we cannot fail beyond this point, so it is safe to clean pages as the
-  // supply_zero_offset_ will be advanced over them. In other words, we are certain that we are not
-  // violating the constraint that supply_zero_offset_ cannot be followed by Clean pages.
-  zx_status_t status = page_list_.ForEveryPageAndGapInRange(
-      [this](const VmPageOrMarker* p, uint64_t off) {
-        ASSERT(p->IsPage());
-        vm_page_t* page = p->Page();
-        ASSERT(is_page_dirty_tracked(page));
-        ASSERT(!is_page_clean(page));
-        if (is_page_awaiting_clean(page)) {
-          // Mark the page Clean.
+  // Mark any AwaitingClean pages Clean. Remove AwaitingClean intervals that can be fully cleaned,
+  // otherwise clip the interval start removing the part that has been cleaned.
+  VmPageOrMarker* interval_start = nullptr;
+  uint64_t interval_start_off;
+  // This tracks the end offset until which all zero intervals can be marked clean. This is a
+  // running counter that is maintained across multiple zero intervals. Each time we encounter
+  // a new interval start, we take the max of the existing value and the AwaitingCleanLength of the
+  // new interval. This is because when zero intervals are truncated at the end, their
+  // AwaitingCleanLength does not get updated, even if it's larger than the current interval length.
+  // The reason here is that it should be possible to apply the AwaitingCleanLength to any new zero
+  // intervals that get added later beyond the truncated interval. The user pager has indicated its
+  // intent to write a range as zeros, so until the point that is actually completes the writeback,
+  // it doesn't matter if zero intervals are removed and re-added, as long as they fall in the range
+  // that was initially indicated as being written back as zeros.
+  uint64_t interval_awaiting_clean_end = start_offset;
+  page_list_.RemovePages(
+      [&interval_start, &interval_start_off, &interval_awaiting_clean_end, this](VmPageOrMarker* p,
+                                                                                 uint64_t off) {
+        // VMOs with a page source should never have references.
+        DEBUG_ASSERT(!p->IsReference());
+        // Transition pages from AwaitingClean to Clean.
+        if (p->IsPage() && is_page_awaiting_clean(p->Page())) {
           AssertHeld(lock_ref());
-          UpdateDirtyStateLocked(page, off, DirtyState::Clean);
+          UpdateDirtyStateLocked(p->Page(), off, DirtyState::Clean);
+        } else if (p->IsIntervalZero()) {
+          // Handle zero intervals.
+          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          if (p->IsIntervalStart() || p->IsIntervalSlot()) {
+            DEBUG_ASSERT(!interval_start);
+            // Start tracking an interval.
+            interval_start = p;
+            interval_start_off = off;
+            // See if we can advance interval_awaiting_clean_end to include the AwaitingCleanLength
+            // of this interval.
+            interval_awaiting_clean_end = ktl::max(interval_awaiting_clean_end,
+                                                   off + p->GetZeroIntervalAwaitingCleanLength());
+          }
+          if (p->IsIntervalEnd() || p->IsIntervalSlot()) {
+            // Can only transition the end if we saw the corresponding start.
+            if (interval_start) {
+              AssertHeld(lock_ref());
+              if (off < interval_awaiting_clean_end) {
+                // The entire interval is clean, so can remove it.
+                if (interval_start_off != off) {
+                  *interval_start = VmPageOrMarker::Empty();
+                  // Return the start slot as it could have come from an earlier page list node.
+                  page_list_.ReturnEmptySlot(interval_start_off);
+                }
+                // This empty slot with be returned by the RemovePages iterator.
+                *p = VmPageOrMarker::Empty();
+              } else {
+                // The entire interval cannot be marked clean. Move forward the start by awaiting
+                // clean length, which will also clear the AwaitingCleanLength for the resulting
+                // interval.
+                // Ignore any errors. Cleaning is best effort. If this fails, the interval will
+                // remain as is and get retried on another writeback attempt.
+                page_list_.ClipIntervalStart(interval_start_off,
+                                             interval_awaiting_clean_end - interval_start_off);
+              }
+              // Either way, the interval start tracking needs to be reset.
+              interval_start = nullptr;
+            }
+          }
         }
         return ZX_ERR_NEXT;
       },
-      [](uint64_t start, uint64_t end) { return ZX_ERR_NEXT; }, supply_zero_offset_,
-      zero_range_end);
-  // We don't expect a failure from the traversal.
-  DEBUG_ASSERT(status == ZX_OK);
+      start_offset, end_offset);
 
-  // Advance supply_zero_offset_ beyond the range we just cleaned. This will also update
-  // awaiting_clean_zero_range_end_ if required.
-  UpdateSupplyZeroOffsetLocked(zero_range_end);
+  // Handle the last partial interval.
+  if (interval_start) {
+    // Ignore any errors. Cleaning is best effort. If this fails, the interval will remain as is and
+    // get retried on another writeback attempt.
+    page_list_.ClipIntervalStart(
+        interval_start_off, ktl::min(interval_awaiting_clean_end, end_offset) - interval_start_off);
+  }
 
-  VMO_VALIDATION_ASSERT(DebugValidateSupplyZeroOffsetLocked());
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
   return ZX_OK;
 }
 
@@ -5560,7 +5586,15 @@ void VmCowPages::DetachSourceLocked() {
           *p = VmPageOrMarker::Empty();
           return ZX_ERR_NEXT;
         }
-        // VMOs with a parge source cannot have references.
+
+        // Zero intervals are dirty so they cannot be removed.
+        if (p->IsIntervalZero()) {
+          // TODO: Remove clean intervals once they are supported.
+          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          return ZX_ERR_NEXT;
+        }
+
+        // VMOs with a page source cannot have references.
         DEBUG_ASSERT(p->IsPage());
 
         // We cannot remove the page if it is dirty-tracked but not clean.
@@ -6393,57 +6427,67 @@ bool VmCowPages::DebugValidateVmoPageBorrowingLocked() const {
   return result;
 }
 
-bool VmCowPages::DebugValidateSupplyZeroOffsetLocked() const {
-  if (supply_zero_offset_ == UINT64_MAX) {
-    return true;
-  }
-  if (!is_source_preserving_page_content()) {
-    dprintf(INFO, "supply_zero_offset_=%zu for non pager backed vmo\n", supply_zero_offset_);
-    return false;
-  }
-  if (supply_zero_offset_ > size_) {
-    dprintf(INFO, "supply_zero_offset_=%zu larger than size=%zu\n", supply_zero_offset_, size_);
-    return false;
-  }
-  if (awaiting_clean_zero_range_end_ != 0 &&
-      supply_zero_offset_ >= awaiting_clean_zero_range_end_) {
-    dprintf(INFO, "supply_zero_offset_=%zu larger than awaiting_clean_zero_range_end_=%zu\n",
-            supply_zero_offset_, awaiting_clean_zero_range_end_);
-    return false;
-  }
+bool VmCowPages::DebugValidateZeroIntervalsLocked() const {
+  bool in_interval = false;
+  auto dirty_state = VmPageOrMarker::IntervalDirtyState::Untracked;
+  zx_status_t status = page_list_.ForEveryPage(
+      [&in_interval, &dirty_state, pager_backed = is_source_preserving_page_content()](
+          const VmPageOrMarker* p, uint64_t off) {
+        if (!pager_backed) {
+          if (p->IsInterval()) {
+            dprintf(INFO, "found interval at offset 0x%" PRIx64 " in non pager backed vmo\n", off);
+            return ZX_ERR_BAD_STATE;
+          }
+          return ZX_ERR_NEXT;
+        }
 
-  zx_status_t status = page_list_.ForEveryPageInRange(
-      [supply_zero_offset = supply_zero_offset_](const VmPageOrMarker* p, uint64_t off) {
-        if (p->IsMarker()) {
-          dprintf(INFO, "found marker at offset %zu (supply_zero_offset_=%zu)\n", off,
-                  supply_zero_offset);
-          return ZX_ERR_BAD_STATE;
+        if (p->IsInterval()) {
+          DEBUG_ASSERT(p->IsIntervalZero());
+          DEBUG_ASSERT(p->IsZeroIntervalDirty());
+          if (p->IsIntervalStart()) {
+            if (in_interval) {
+              dprintf(INFO, "interval start at 0x%" PRIx64 " while already in interval\n", off);
+              return ZX_ERR_BAD_STATE;
+            }
+            in_interval = true;
+            dirty_state = p->GetZeroIntervalDirtyState();
+          } else if (p->IsIntervalEnd()) {
+            if (!in_interval) {
+              dprintf(INFO, "interval end at 0x%" PRIx64 " while not in interval\n", off);
+              return ZX_ERR_BAD_STATE;
+            }
+            if (p->GetZeroIntervalDirtyState() != dirty_state) {
+              dprintf(INFO, "dirty state mismatch - start %lu, end %lu\n", (uint64_t)(dirty_state),
+                      (uint64_t)(p->GetZeroIntervalDirtyState()));
+              return ZX_ERR_BAD_STATE;
+            }
+            in_interval = false;
+            dirty_state = VmPageOrMarker::IntervalDirtyState::Untracked;
+          } else {
+            if (in_interval) {
+              dprintf(INFO, "interval slot at 0x%" PRIx64 " while already in interval\n", off);
+              return ZX_ERR_BAD_STATE;
+            }
+          }
+          return ZX_ERR_NEXT;
         }
+
         if (p->IsReference()) {
-          dprintf(INFO, "found reference at offset %zu (supply_zero_offset_=%zu)\n", off,
-                  supply_zero_offset);
+          dprintf(INFO, "found compressed ref at offset 0x%" PRIx64 " in pager backed vmo\n", off);
           return ZX_ERR_BAD_STATE;
         }
-        vm_page_t* page = p->Page();
-        if (!is_page_dirty_tracked(page)) {
-          dprintf(INFO, "page at offset %zu not dirty tracked (supply_zero_offset_=%zu)\n", off,
-                  supply_zero_offset);
+
+        if (p->IsPage() && in_interval) {
+          dprintf(INFO, "found page at 0x%" PRIx64 " in interval\n", off);
           return ZX_ERR_BAD_STATE;
         }
-        if (is_page_clean(page)) {
-          dprintf(INFO, "page at offset %zu clean (supply_zero_offset_=%zu)\n", off,
-                  supply_zero_offset);
-          return ZX_ERR_BAD_STATE;
-        }
-        if (page->is_loaned()) {
-          dprintf(INFO, "page at offset %zu loaned (supply_zero_offset_=%zu)\n", off,
-                  supply_zero_offset);
+
+        if (p->IsMarker() && in_interval) {
+          dprintf(INFO, "found marker at 0x%" PRIx64 " in interval\n", off);
           return ZX_ERR_BAD_STATE;
         }
         return ZX_ERR_NEXT;
-      },
-      supply_zero_offset_, size_);
-
+      });
   return status == ZX_OK;
 }
 
@@ -6554,11 +6598,6 @@ vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
     return p->Page();
   }
   return nullptr;
-}
-
-uint64_t VmCowPages::DebugGetSupplyZeroOffset() const {
-  Guard<CriticalMutex> guard{lock()};
-  return supply_zero_offset_;
 }
 
 bool VmCowPages::DebugIsHighMemoryPriority() const {

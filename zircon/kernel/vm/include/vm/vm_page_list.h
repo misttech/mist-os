@@ -494,6 +494,13 @@ class VmPageOrMarkerRef {
     return page_or_marker_->ChangeReferenceValue(ref);
   }
 
+  // Forward dirty state updates as an allowed mutation.
+  void SetZeroIntervalAwaitingCleanLength(uint64_t len) {
+    DEBUG_ASSERT(page_or_marker_);
+    DEBUG_ASSERT(page_or_marker_->IsIntervalZero());
+    page_or_marker_->SetZeroIntervalAwaitingCleanLength(len);
+  }
+
  private:
   VmPageOrMarker* page_or_marker_ = nullptr;
 };
@@ -1015,6 +1022,9 @@ class VmPageList final {
   // Clips an interval from the end by len, i.e. moves the end from interval_end to
   // interval_end - len. The total length of the interval must be larger than len.
   zx_status_t ClipIntervalEnd(uint64_t interval_end, uint64_t len);
+
+  // Returns true if the specified offset falls in a sparse zero interval.
+  bool IsOffsetInZeroInterval(uint64_t offset) const;
 
  private:
   // Returns true if the specified offset falls in a sparse page interval.

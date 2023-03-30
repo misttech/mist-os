@@ -659,6 +659,29 @@ zx_status_t VmPageList::PopulateSlotsInInterval(uint64_t start_offset, uint64_t 
   return ZX_OK;
 }
 
+bool VmPageList::IsOffsetInZeroInterval(uint64_t offset) const {
+  // Find the node that would contain this offset.
+  const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
+  // If the node containing offset is populated, the lower bound will return that node. If not
+  // populated, it will return the next populated node.
+  auto pln = list_.lower_bound(node_offset);
+
+  // Could not find a valid node >= node_offset. So offset cannot be part of an interval, an
+  // interval would have an end slot.
+  if (!pln.IsValid()) {
+    return false;
+  }
+  // The page list shouldn't have any empty nodes.
+  DEBUG_ASSERT(!pln->IsEmpty());
+
+  // Check if offset is in an interval also querying the associated sentinel.
+  const VmPageOrMarker* interval = nullptr;
+  bool in_interval = IfOffsetInIntervalHelper(offset, *pln, &interval);
+  DEBUG_ASSERT(!in_interval || interval);
+  DEBUG_ASSERT(!in_interval || interval->IsInterval());
+  return in_interval ? interval->IsIntervalZero() : false;
+}
+
 bool VmPageList::IsOffsetInInterval(uint64_t offset) const {
   // Find the node that would contain this offset.
   const uint64_t node_offset = offset_to_node_offset(offset, list_skew_);
