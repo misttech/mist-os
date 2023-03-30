@@ -53,6 +53,13 @@ impl Errno {
     }
 }
 
+impl Clone for Errno {
+    fn clone(&self) -> Self {
+        let anyhow = self.anyhow.as_ref().map(|e| anyhow::anyhow!(e.to_string()));
+        Errno { code: self.code, anyhow }
+    }
+}
+
 impl PartialEq for Errno {
     fn eq(&self, other: &Self) -> bool {
         self.code == other.code
