@@ -429,19 +429,23 @@ class RegionList final {
     // round up the end of the previous region to the requested alignment, so
     // all gaps reported will be for aligned ranges.
     vaddr_t prev_region_end = ROUNDUP(parent_base, align);
-    for (const auto& region : regions_) {
-      AssertHeld(region.lock_ref());
-      if (region.base_locked() > prev_region_end) {
-        const size_t gap = region.base_locked() - prev_region_end;
-        if (!func(prev_region_end, gap)) {
+
+    auto region = regions_.begin();
+    if (region.IsValid()) {
+      AssertHeld(region->lock_ref());
+      for (; region != regions_.end(); region++) {
+        if (region->base_locked() > prev_region_end) {
+          const size_t gap = region->base_locked() - prev_region_end;
+          if (!func(prev_region_end, gap)) {
+            return;
+          }
+        }
+        if (add_overflow(region->base_locked(), region->size_locked(), &prev_region_end)) {
+          // This region is already the last region.
           return;
         }
+        prev_region_end = ROUNDUP(prev_region_end, align);
       }
-      if (add_overflow(region.base_locked(), region.size_locked(), &prev_region_end)) {
-        // This region is already the last region.
-        return;
-      }
-      prev_region_end = ROUNDUP(prev_region_end, align);
     }
 
     // Grab the gap to the right of the last region (note that if there are no
