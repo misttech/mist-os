@@ -5,7 +5,6 @@
 #include "fvm.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
@@ -214,14 +213,19 @@ fbl::unique_fd TryBindToFvmDriver(const fbl::unique_fd& devfs_root,
   char path[PATH_MAX] = {};
   zx_status_t status = GetTopoPathFromFd(partition_fd, path, sizeof(path));
   if (status != ZX_OK) {
-    ERROR("Failed to get topological path\n");
-    return fbl::unique_fd();
+    ERROR("Failed to get topological path: %s\n", zx_status_get_string(status));
+    return {};
   }
 
   char fvm_path[PATH_MAX];
   snprintf(fvm_path, sizeof(fvm_path), "%s/fvm", &path[5]);
 
-  if (fbl::unique_fd fvm(openat(devfs_root.get(), fvm_path, O_RDONLY)); fvm) {
+  fbl::unique_fd fvm;
+  if (zx_status_t status =
+          fdio_open_fd_at(devfs_root.get(), fvm_path, 0, fvm.reset_and_get_address());
+      status != ZX_OK) {
+    LOG("Failed to open fvm: %s, proceeding to rebind...\n", zx_status_get_string(status));
+  } else {
     return fvm;
   }
 
@@ -348,7 +352,11 @@ zx::result<zxcrypt::VolumeManager> ZxcryptCreate(PartitionInfo* part) {
   // TODO(security): fxbug.dev/31073. We need to bind with channel in order to pass a key here.
   // TODO(security): fxbug.dev/31733. The created volume must marked as needing key rotation.
 
-  fbl::unique_fd devfs_root(open("/dev", O_RDONLY));
+  fbl::unique_fd devfs_root;
+  if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root.reset_and_get_address());
+      status != ZX_OK) {
+    return zx::error(status);
+  }
 
   zxcrypt::VolumeManager zxcrypt_manager(std::move(part->new_part), std::move(devfs_root));
   zx::channel client_chan;

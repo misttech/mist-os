@@ -6,7 +6,6 @@
 
 #include <dirent.h>
 #include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
@@ -57,11 +56,12 @@ zx::result<Configuration> CurrentSlotToConfiguration(std::string_view slot) {
 
 bool FindPartitionLabelByGuid(const fbl::unique_fd& devfs_root, const uint8_t* guid,
                               std::string& out) {
-  constexpr char kBlockDevPath[] = "class/block/";
   out.clear();
-  fbl::unique_fd d_fd(openat(devfs_root.get(), kBlockDevPath, O_RDONLY));
-  if (!d_fd) {
-    ERROR("Cannot inspect block devices\n");
+  fbl::unique_fd d_fd;
+  if (zx_status_t status =
+          fdio_open_fd_at(devfs_root.get(), "class/block", 0, d_fd.reset_and_get_address());
+      status != ZX_OK) {
+    ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
     return false;
   }
 

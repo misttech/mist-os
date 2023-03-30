@@ -5,7 +5,6 @@
 #include "src/storage/lib/paver/paver.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
@@ -459,7 +458,10 @@ WriteFirmwareResult CreateWriteFirmwareResult(std::variant<zx_status_t, bool>* v
 void Paver::FindDataSink(FindDataSinkRequestView request, FindDataSinkCompleter::Sync& _completer) {
   // Use global devfs if one wasn't injected via set_devfs_root.
   if (!devfs_root_) {
-    devfs_root_ = fbl::unique_fd(open("/dev", O_RDONLY));
+    if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root_.reset_and_get_address());
+        status != ZX_OK) {
+      ERROR("Failed to open /dev: %s\n", zx_status_get_string(status));
+    }
   }
   if (!svc_root_) {
     svc_root_ = OpenServiceRoot();
@@ -478,7 +480,10 @@ void Paver::UseBlockDevice(fidl::ClientEnd<fuchsia_hardware_block::Block> block_
                            fidl::ServerEnd<fuchsia_paver::DynamicDataSink> dynamic_data_sink) {
   // Use global devfs if one wasn't injected via set_devfs_root.
   if (!devfs_root_) {
-    devfs_root_ = fbl::unique_fd(open("/dev", O_RDONLY));
+    if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root_.reset_and_get_address());
+        status != ZX_OK) {
+      ERROR("Failed to open /dev: %s\n", zx_status_get_string(status));
+    }
   }
   if (!svc_root_) {
     svc_root_ = OpenServiceRoot();
@@ -492,7 +497,10 @@ void Paver::FindBootManager(FindBootManagerRequestView request,
                             FindBootManagerCompleter::Sync& _completer) {
   // Use global devfs if one wasn't injected via set_devfs_root.
   if (!devfs_root_) {
-    devfs_root_ = fbl::unique_fd(open("/dev", O_RDONLY));
+    if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root_.reset_and_get_address());
+        status != ZX_OK) {
+      ERROR("Failed to open /dev: %s\n", zx_status_get_string(status));
+    }
   }
   if (!svc_root_) {
     svc_root_ = OpenServiceRoot();
@@ -904,7 +912,10 @@ void Paver::FindSysconfig(FindSysconfigRequestView request,
 void Paver::FindSysconfig(fidl::ServerEnd<fuchsia_paver::Sysconfig> sysconfig) {
   // Use global devfs if one wasn't injected via set_devfs_root.
   if (!devfs_root_) {
-    devfs_root_ = fbl::unique_fd(open("/dev", O_RDONLY));
+    if (zx_status_t status = fdio_open_fd("/dev", 0, devfs_root_.reset_and_get_address());
+        status != ZX_OK) {
+      ERROR("Failed to open /dev: %s\n", zx_status_get_string(status));
+    }
   }
   if (!svc_root_) {
     svc_root_ = OpenServiceRoot();

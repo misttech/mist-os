@@ -6,15 +6,12 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/unsafe.h>
 #include <lib/fdio/watcher.h>
 
 #include <string_view>
@@ -126,9 +123,12 @@ zx::result<zx::channel> OpenPartition(const fbl::unique_fd& devfs_root, const ch
     return ZX_ERR_STOP;
   };
 
-  fbl::unique_fd dir_fd(openat(devfs_root.get(), path, O_RDONLY));
-  if (!dir_fd) {
-    return zx::error(ZX_ERR_IO);
+  fbl::unique_fd dir_fd;
+  if (zx_status_t status = fdio_open_fd_at(devfs_root.get(), path,
+                                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                                           dir_fd.reset_and_get_address());
+      status != ZX_OK) {
+    return zx::error(status);
   }
 
   zx_time_t deadline = zx_deadline_after(timeout);

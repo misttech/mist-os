@@ -5,13 +5,14 @@
 #include "src/storage/lib/paver/gpt.h"
 
 #include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
+#include <lib/fdio/directory.h>
 #include <lib/fit/defer.h>
 
 #include <string_view>
 
 #include <fbl/algorithm.h>
+#include <fbl/unique_fd.h>
 #include <gpt/c/gpt.h>
 
 #include "src/storage/lib/paver/pave-logging.h"
@@ -112,10 +113,11 @@ zx::result<> RebindGptDriver(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_r
 }
 
 bool GptDevicePartitioner::FindGptDevices(const fbl::unique_fd& devfs_root, GptDevices* out) {
-  constexpr char kBlockDevPath[] = "class/block/";
-  fbl::unique_fd d_fd(openat(devfs_root.get(), kBlockDevPath, O_RDONLY));
-  if (!d_fd) {
-    ERROR("Cannot inspect block devices: %s\n", strerror(errno));
+  fbl::unique_fd d_fd;
+  if (zx_status_t status =
+          fdio_open_fd_at(devfs_root.get(), "class/block", 0, d_fd.reset_and_get_address());
+      status != ZX_OK) {
+    ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
     return false;
   }
   DIR* d = fdopendir(d_fd.release());
@@ -131,9 +133,10 @@ bool GptDevicePartitioner::FindGptDevices(const fbl::unique_fd& devfs_root, GptD
     if (std::string_view{de->d_name} == ".") {
       continue;
     }
-    fbl::unique_fd fd(openat(dirfd(d), de->d_name, O_RDONLY));
-    if (!fd) {
-      ERROR("Cannot open %s: %s\n", de->d_name, strerror(errno));
+    fbl::unique_fd fd;
+    if (zx_status_t status = fdio_open_fd_at(dirfd(d), de->d_name, 0, fd.reset_and_get_address());
+        status != ZX_OK) {
+      ERROR("Cannot open %s: %s\n", de->d_name, zx_status_get_string(status));
       continue;
     }
     fdio_cpp::FdioCaller caller(std::move(fd));
@@ -239,7 +242,7 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
     printf("Rebound GPT driver successfully\n");
   }
 
-  return zx::ok(new GptDevicePartitioner(devfs_root.duplicate(), svc_root, std::move(gpt), info));
+  return zx::ok(new GptDevicePartitioner(std::move(devfs_root), svc_root, std::move(gpt), info));
 }
 
 zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::InitializeGpt(
@@ -408,11 +411,11 @@ zx::result<Uuid> GptDevicePartitioner::CreateGptPartition(const char* name, cons
   if (zx_status_t status = gpt_->AddPartition(name, type.bytes(), guid.bytes(), offset, blocks, 0);
       status != ZX_OK) {
     ERROR("Failed to add partition\n");
-    return zx::error(ZX_ERR_IO);
+    return zx::error(status);
   }
   if (zx_status_t status = gpt_->Sync(); status != ZX_OK) {
     ERROR("Failed to sync GPT\n");
-    return zx::error(ZX_ERR_IO);
+    return zx::error(status);
   }
   if (auto status = zx::make_result(gpt_->ClearPartition(offset, 1)); status.is_error()) {
     ERROR("Failed to clear first block of new partition\n");

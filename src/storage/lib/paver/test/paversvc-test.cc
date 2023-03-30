@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.fshost/cpp/wire.h>
@@ -193,7 +192,7 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
       completer.Reply({});
       return;
     }
-    completer.Reply(fidl::StringView::FromExternal(iter->second.data()));
+    completer.Reply(fidl::StringView::FromExternal(iter->second));
   }
 
   // Stubs
@@ -219,7 +218,9 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
 
   void SetArgResponse(std::string arg_response) { arg_response_ = std::move(arg_response); }
 
-  void AddStringArgs(std::string key, std::string value) { string_args_[key] = value; }
+  void AddStringArgs(std::string key, std::string value) {
+    string_args_[std::move(key)] = std::move(value);
+  }
 
  private:
   bool astro_sysconfig_abr_wear_leveling_ = false;
@@ -1765,8 +1766,9 @@ TEST_F(PaverServiceSkipBlockTest, WipeVolumeCreatesFvm) {
   ASSERT_FALSE(path.empty());
 
   std::string blob_path = path + "/blobfs-p-1/block";
-  fbl::unique_fd blob_device(openat(device_->devfs_root().get(), blob_path.c_str(), O_RDONLY));
-  ASSERT_TRUE(blob_device);
+  fbl::unique_fd blob_device;
+  ASSERT_OK(fdio_open_fd_at(device_->devfs_root().get(), blob_path.c_str(), 0,
+                            blob_device.reset_and_get_address()));
   fdio_cpp::UnownedFdioCaller blob_device_caller(blob_device);
 
   constexpr uint8_t kBlobType[GPT_GUID_LEN] = GUID_BLOB_VALUE;
@@ -1780,8 +1782,9 @@ TEST_F(PaverServiceSkipBlockTest, WipeVolumeCreatesFvm) {
   EXPECT_BYTES_EQ(kEmptyData, buffer, kBufferSize);
 
   std::string data_path = path + "/data-p-2/block";
-  fbl::unique_fd data_device(openat(device_->devfs_root().get(), data_path.c_str(), O_RDONLY));
-  ASSERT_TRUE(data_device);
+  fbl::unique_fd data_device;
+  ASSERT_OK(fdio_open_fd_at(device_->devfs_root().get(), data_path.c_str(), 0,
+                            data_device.reset_and_get_address()));
   fdio_cpp::UnownedFdioCaller data_device_caller(data_device);
 
   constexpr uint8_t kDataType[GPT_GUID_LEN] = GUID_DATA_VALUE;
@@ -2161,9 +2164,8 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
   zx::result gpt_chan = component::Clone(block_interface, component::AssumeProtocolComposesNode);
   ASSERT_OK(gpt_chan.status_value());
   fbl::unique_fd block_fd;
-  ASSERT_TRUE(zx::make_result(fdio_fd_create(gpt_chan.value().TakeChannel().release(),
-                                             block_fd.reset_and_get_address()))
-                  .is_ok());
+  ASSERT_OK(
+      fdio_fd_create(gpt_chan.value().TakeChannel().release(), block_fd.reset_and_get_address()));
   fbl::unique_fd fvm_fd(FvmPartitionFormat(devmgr_.devfs_root(), std::move(block_fd), header,
                                            paver::BindOption::Reformat));
   ASSERT_TRUE(fvm_fd);
@@ -2232,7 +2234,8 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
 
 TEST_F(PaverServiceLuisTest, OneShotRecovery) {
   // TODO(b/255567130): There's an discussion whether use one-shot-recovery to implement
-  // RebootToRecovery in power-manager. If the approach is taken, paver e2e test will cover this.
+  // RebootToRecovery in power-manager. If the approach is taken, paver e2e test will
+  // cover this.
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::BootManager>();

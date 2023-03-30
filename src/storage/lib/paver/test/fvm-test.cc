@@ -4,9 +4,9 @@
 
 #include "src/storage/lib/paver/fvm.h"
 
-#include <fcntl.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/zx/result.h>
 
@@ -177,6 +177,15 @@ TEST_F(FvmTest, TryBindAlreadyFormattedWithBiggerSize) {
   ASSERT_EQ(paver::FormatResult::kReformatted, result);
 }
 
+constexpr char kRamdisk0BlobPath[] =
+    "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block";
+constexpr char kRamdisk0DataPath[] =
+    "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block";
+constexpr char kRamdisk1BlobPath[] =
+    "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/blobfs-p-1/block";
+constexpr char kRamdisk1DataPath[] =
+    "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/data-p-2/block";
+
 TEST_F(FvmTest, AllocateEmptyPartitions) {
   ASSERT_NO_FAILURES(CreateRamdisk());
   zx::result fd = this->fd();
@@ -188,15 +197,13 @@ TEST_F(FvmTest, AllocateEmptyPartitions) {
 
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part));
 
-  fbl::unique_fd blob(openat(devfs_root().get(),
-                             "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
-                             O_RDONLY));
-  ASSERT_TRUE(blob.is_valid());
+  fbl::unique_fd blob;
+  ASSERT_OK(
+      fdio_open_fd_at(devfs_root().get(), kRamdisk0BlobPath, 0, blob.reset_and_get_address()));
 
-  fbl::unique_fd data(openat(devfs_root().get(),
-                             "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block",
-                             O_RDONLY));
-  ASSERT_TRUE(data.is_valid());
+  fbl::unique_fd data;
+  ASSERT_OK(
+      fdio_open_fd_at(devfs_root().get(), kRamdisk0DataPath, 0, data.reset_and_get_address()));
 }
 
 TEST_F(FvmTest, WipeWithMultipleFvm) {
@@ -211,15 +218,13 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part1));
 
   {
-    fbl::unique_fd blob(openat(devfs_root().get(),
-                               "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
-                               O_RDONLY));
-    ASSERT_TRUE(blob.is_valid());
+    fbl::unique_fd blob;
+    ASSERT_OK(
+        fdio_open_fd_at(devfs_root().get(), kRamdisk0BlobPath, 0, blob.reset_and_get_address()));
 
-    fbl::unique_fd data(openat(devfs_root().get(),
-                               "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block",
-                               O_RDONLY));
-    ASSERT_TRUE(data.is_valid());
+    fbl::unique_fd data;
+    ASSERT_OK(
+        fdio_open_fd_at(devfs_root().get(), kRamdisk0DataPath, 0, data.reset_and_get_address()));
   }
 
   // Save the old device.
@@ -236,15 +241,13 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part2));
 
   {
-    fbl::unique_fd blob(openat(devfs_root().get(),
-                               "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/blobfs-p-1/block",
-                               O_RDONLY));
-    ASSERT_TRUE(blob.is_valid());
+    fbl::unique_fd blob;
+    ASSERT_OK(
+        fdio_open_fd_at(devfs_root().get(), kRamdisk1BlobPath, 0, blob.reset_and_get_address()));
 
-    fbl::unique_fd data(openat(devfs_root().get(),
-                               "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/data-p-2/block",
-                               O_RDONLY));
-    ASSERT_TRUE(data.is_valid());
+    fbl::unique_fd data;
+    ASSERT_OK(
+        fdio_open_fd_at(devfs_root().get(), kRamdisk1DataPath, 0, data.reset_and_get_address()));
   }
 
   std::array<uint8_t, fvm::kGuidSize> blobfs_guid = GUID_BLOB_VALUE;
@@ -252,18 +255,16 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
 
   // Check we can still open the first ramdisk's blobfs:
   {
-    fbl::unique_fd blob(openat(devfs_root().get(),
-                               "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
-                               O_RDONLY));
-    ASSERT_TRUE(blob.is_valid());
+    fbl::unique_fd blob;
+    ASSERT_OK(
+        fdio_open_fd_at(devfs_root().get(), kRamdisk0BlobPath, 0, blob.reset_and_get_address()));
   }
 
   // But not the second's.
   {
-    fbl::unique_fd blob(openat(devfs_root().get(),
-                               "sys/platform/00:00:2d/ramctl/ramdisk-1/block/fvm/blobfs-p-1/block",
-                               O_RDONLY));
-    ASSERT_TRUE(blob.is_valid());
+    fbl::unique_fd blob;
+    ASSERT_OK(
+        fdio_open_fd_at(devfs_root().get(), kRamdisk1BlobPath, 0, blob.reset_and_get_address()));
   }
 }
 
@@ -278,15 +279,14 @@ TEST_F(FvmTest, Unbind) {
 
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part));
 
-  fbl::unique_fd blob(openat(devfs_root().get(),
-                             "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
-                             O_RDONLY));
-  ASSERT_TRUE(blob.is_valid());
+  fbl::unique_fd blob;
+  ASSERT_OK(
+      fdio_open_fd_at(devfs_root().get(), kRamdisk0BlobPath, 0, blob.reset_and_get_address()));
 
-  fbl::unique_fd data(openat(devfs_root().get(),
-                             "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block",
-                             O_RDONLY));
-  ASSERT_TRUE(data.is_valid());
+  fbl::unique_fd data;
+  ASSERT_OK(
+      fdio_open_fd_at(devfs_root().get(), kRamdisk0DataPath, 0, data.reset_and_get_address()));
+
   ASSERT_OK(paver::FvmUnbind(devfs_root(), "/dev/sys/platform/00:00:2d/ramctl/ramdisk-0/block"));
   fvm_part.reset();
   blob.reset();
@@ -304,15 +304,13 @@ TEST_F(FvmTest, UnbindInvalidPath) {
 
   ASSERT_OK(paver::AllocateEmptyPartitions(devfs_root(), fvm_part));
 
-  fbl::unique_fd blob(openat(devfs_root().get(),
-                             "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
-                             O_RDONLY));
-  ASSERT_TRUE(blob.is_valid());
+  fbl::unique_fd blob;
+  ASSERT_OK(
+      fdio_open_fd_at(devfs_root().get(), kRamdisk0BlobPath, 0, blob.reset_and_get_address()));
 
-  fbl::unique_fd data(openat(devfs_root().get(),
-                             "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/data-p-2/block",
-                             O_RDONLY));
-  ASSERT_TRUE(data.is_valid());
+  fbl::unique_fd data;
+  ASSERT_OK(
+      fdio_open_fd_at(devfs_root().get(), kRamdisk0DataPath, 0, data.reset_and_get_address()));
 
   // Path too short
   ASSERT_EQ(paver::FvmUnbind(devfs_root(), "/dev"), ZX_ERR_INVALID_ARGS);

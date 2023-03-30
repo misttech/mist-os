@@ -444,8 +444,8 @@ zx::result<std::unique_ptr<abr::Client>> ChromebookX64AbrClientFactory::New(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
   fbl::unique_fd none;
-  auto partitioner = CrosDevicePartitioner::Initialize(std::move(devfs_root), std::move(svc_root),
-                                                       paver::Arch::kX64, none);
+  auto partitioner =
+      CrosDevicePartitioner::Initialize(std::move(devfs_root), svc_root, paver::Arch::kX64, none);
 
   if (partitioner.is_error()) {
     return partitioner.take_error();
