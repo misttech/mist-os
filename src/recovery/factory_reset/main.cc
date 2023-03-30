@@ -44,6 +44,11 @@ int main(int argc, const char** argv) {
     return -1;
   }
 
+  if (zx::result<> result = outgoing.ServeFromStartupInfo(); result.is_error()) {
+    std::cerr << "failed to serve outgoing directory: " << result.status_string();
+    return -1;
+  }
+
   if (zx_status_t status = loop.Run(); status != ZX_OK) {
     std::cerr << "failed to run async loop: " << zx_status_get_string(status);
     return -1;
