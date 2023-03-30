@@ -424,18 +424,19 @@ impl_timer_context!(
 
 /// Handles a generic timer event.
 pub fn handle_timer<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     id: TimerId<NonSyncCtx>,
 ) {
     trace!("handle_timer: dispatching timerid: {:?}", id);
+    let mut sync_ctx = Locked::new(sync_ctx);
 
     match id {
         TimerId(TimerIdInner::DeviceLayer(x)) => {
             device::handle_timer(&mut sync_ctx, ctx, x);
         }
         TimerId(TimerIdInner::TransportLayer(x)) => {
-            transport::handle_timer(&mut Locked::new(sync_ctx), ctx, x);
+            transport::handle_timer(&mut sync_ctx, ctx, x);
         }
         TimerId(TimerIdInner::IpLayer(x)) => {
             ip::handle_timer(&mut sync_ctx, ctx, x);
@@ -525,10 +526,12 @@ pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
 
 /// Adds a route to the forwarding table.
 pub fn add_route<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     entry: ip::types::AddableEntryEither<DeviceId<NonSyncCtx>>,
 ) -> Result<(), ip::forwarding::AddRouteError> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+
     let ip::types::DecomposedAddableEntryEither { subnet, device, gateway, metric } =
         entry.decompose();
     match (device, gateway) {
@@ -554,10 +557,11 @@ pub fn add_route<NonSyncCtx: NonSyncContext>(
 /// Delete a route from the forwarding table, returning `Err` if no
 /// route was found to be deleted.
 pub fn del_route<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     subnet: SubnetEither,
 ) -> error::Result<()> {
+    let mut sync_ctx = Locked::new(sync_ctx);
     map_addr_version!(
         subnet: SubnetEither;
         crate::ip::del_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet),

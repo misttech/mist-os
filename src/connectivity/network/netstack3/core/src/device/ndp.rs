@@ -29,6 +29,7 @@ mod tests {
     };
 
     use assert_matches::assert_matches;
+    use lock_order::Locked;
     use log::trace;
     use net_declare::net::{mac, subnet_v6};
     use net_types::{
@@ -67,14 +68,14 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress, testutil::receive_frame,
-            DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, Mtu,
+            add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress, set_routing_enabled,
+            testutil::receive_frame, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
+            FrameDestination, Mtu,
         },
         ip::{
             device::{
                 get_ipv6_hop_limit, is_ip_routing_enabled,
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
-                set_ipv6_routing_enabled,
                 slaac::{SlaacConfiguration, SlaacTimerId, TemporarySlaacAddressConfiguration},
                 state::{
                     AddrConfig, AddressState, Ipv6AddressEntry, Ipv6DeviceConfiguration, Lifetime,
@@ -1425,7 +1426,7 @@ mod tests {
         non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
         // Enable routing on device.
-        set_ipv6_routing_enabled(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         assert!(is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, &device));
 
@@ -1435,7 +1436,7 @@ mod tests {
         assert_empty(non_sync_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
         // Unsetting routing should succeed.
-        set_ipv6_routing_enabled(&mut sync_ctx, &mut non_sync_ctx, &device, false)
+        set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting routing enabled");
         assert!(!is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, &device));
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
@@ -1638,7 +1639,7 @@ mod tests {
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
-        set_ipv6_routing_enabled(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
 
         let src_mac = config.remote_mac;
@@ -2173,7 +2174,7 @@ mod tests {
         // Set the retransmit timer between neighbor solicitations to be greater
         // than the preferred lifetime of the prefix.
         Ipv6DeviceHandler::set_discovered_retrans_timer(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device,
             NonZeroDuration::from_nonzero_secs(nonzero!(10u64)),
@@ -3112,7 +3113,7 @@ mod tests {
         // REGEN_ADVANCE to be large, which increases the window between when an
         // address is regenerated and when it becomes deprecated.
         Ipv6DeviceHandler::set_discovered_retrans_timer(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device,
             NonZeroDuration::new(max_preferred_lifetime / 4).unwrap(),

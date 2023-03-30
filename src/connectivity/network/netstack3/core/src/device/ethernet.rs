@@ -1159,12 +1159,11 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::FakeFrameCtx,
-        device::DeviceId,
+        device::{set_routing_enabled, DeviceId},
         error::{ExistsError, NotFoundError},
         ip::{
             device::{
-                is_ip_routing_enabled, nud::DynamicNeighborUpdateSource, set_routing_enabled,
-                state::AssignedAddress,
+                is_ip_routing_enabled, nud::DynamicNeighborUpdateSource, state::AssignedAddress,
             },
             dispatch_receive_ip_packet_name, receive_ip_packet,
             testutil::{is_in_ip_multicast, FakeDeviceId},
@@ -1639,7 +1638,7 @@ mod tests {
         assert_empty(non_sync_ctx.frames_sent().iter());
 
         // Set routing and expect packets to be forwarded.
-        set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_routing_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         assert!(is_routing_enabled::<I>(&mut sync_ctx, &device));
         // Should not update other Ip routing status.
@@ -1688,7 +1687,7 @@ mod tests {
         check_icmp::<I>(&non_sync_ctx.frames_sent()[1].1);
 
         // Attempt to unset router
-        set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
+        set_routing_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting routing enabled");
         assert!(!is_routing_enabled::<I>(&mut sync_ctx, &device));
         check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);

@@ -811,71 +811,6 @@ impl<
     }
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv4, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    type IpDeviceIdCtx<'a> =
-        <Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked> as IpStateContext<
-            Ipv4,
-            NonSyncCtx,
-        >>::IpDeviceIdCtx<'a>;
-
-    fn with_ip_routing_table<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv4, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut Locked::new(*self), cb)
-    }
-
-    fn with_ip_routing_table_mut<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv4, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        IpStateContext::<Ipv4, _>::with_ip_routing_table_mut(&mut Locked::new(*self), cb)
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> Ipv4StateContext<NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
-        Locked::new(*self).with_next_packet_id(cb)
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpStateContext<Ipv6, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    type IpDeviceIdCtx<'a> =
-        <Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked> as IpStateContext<
-            Ipv6,
-            NonSyncCtx,
-        >>::IpDeviceIdCtx<'a>;
-
-    fn with_ip_routing_table<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &ForwardingTable<Ipv6, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        IpStateContext::<Ipv6, _>::with_ip_routing_table(&mut Locked::new(*self), cb)
-    }
-
-    fn with_ip_routing_table_mut<
-        O,
-        F: FnOnce(&mut Self::IpDeviceIdCtx<'_>, &mut ForwardingTable<Ipv6, Self::DeviceId>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        IpStateContext::<Ipv6, _>::with_ip_routing_table_mut(&mut Locked::new(*self), cb)
-    }
-}
-
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     Ipv4StateContext<NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
@@ -1381,19 +1316,15 @@ impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeo
 
 /// Handle a timer event firing in the IP layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
     ctx: &mut NonSyncCtx,
     id: IpLayerTimerId,
 ) {
     match id {
-        IpLayerTimerId::ReassemblyTimeoutv4(key) => {
-            TimerHandler::handle_timer(&mut sync_ctx, ctx, key)
-        }
-        IpLayerTimerId::ReassemblyTimeoutv6(key) => {
-            TimerHandler::handle_timer(&mut sync_ctx, ctx, key)
-        }
-        IpLayerTimerId::PmtuTimeoutv4(id) => TimerHandler::handle_timer(&mut sync_ctx, ctx, id),
-        IpLayerTimerId::PmtuTimeoutv6(id) => TimerHandler::handle_timer(&mut sync_ctx, ctx, id),
+        IpLayerTimerId::ReassemblyTimeoutv4(key) => TimerHandler::handle_timer(sync_ctx, ctx, key),
+        IpLayerTimerId::ReassemblyTimeoutv6(key) => TimerHandler::handle_timer(sync_ctx, ctx, key),
+        IpLayerTimerId::PmtuTimeoutv4(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
+        IpLayerTimerId::PmtuTimeoutv6(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
     }
 }
 
@@ -3780,7 +3711,7 @@ mod tests {
         {
             let Ctx { sync_ctx, non_sync_ctx } = &mut alice;
             set_routing_enabled::<_, _, I>(
-                &mut &*sync_ctx,
+                &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 &alice_device_ids[0].clone().into(),
                 true,
@@ -3896,8 +3827,13 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = dispatcher_builder.build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_routing_enabled::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
-            .expect("error setting routing enabled");
+        set_routing_enabled::<_, _, Ipv6>(
+            &mut Locked::new(sync_ctx),
+            &mut non_sync_ctx,
+            &device,
+            true,
+        )
+        .expect("error setting routing enabled");
         let frame_dst = FrameDestination::Unicast;
 
         // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
@@ -4666,7 +4602,7 @@ mod tests {
             AddrSubnet::from_witness(v6_config.local_ip, 64).unwrap().subnet(),
         );
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.clone().build();
-        let mut sync_ctx = &sync_ctx;
+        let mut sync_ctx = Locked::new(&sync_ctx);
         let v4_dev: DeviceId<_> = device_ids[dev_idx0].clone().into();
         let v6_dev: DeviceId<_> = device_ids[dev_idx1].clone().into();
 
@@ -4780,7 +4716,7 @@ mod tests {
             let tentative: UnicastAddr<Ipv6Addr> = local_mac.to_ipv6_link_local().addr().get();
             assert_eq!(
                 receive_ipv6_packet_action(
-                    &mut sync_ctx,
+                    &mut Locked::new(sync_ctx),
                     &mut non_sync_ctx,
                     &device,
                     tentative.into_specified()
@@ -4841,8 +4777,10 @@ mod tests {
 
         // Receive packet destined to a host with no route when forwarding is
         // enabled both globally and on the inbound device.
-        *sync_ctx.state.ipv4.inner.table.write() = Default::default();
-        *sync_ctx.state.ipv6.inner.table.write() = Default::default();
+        *sync_ctx.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>() =
+            Default::default();
+        *sync_ctx.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>() =
+            Default::default();
         assert_eq!(
             receive_ipv4_packet_action(
                 &mut sync_ctx,
@@ -4991,7 +4929,7 @@ mod tests {
         dest_ip: SpecifiedAddr<I::Addr>,
         expected_result: Result<IpSockRoute<I, Device>, IpSockRouteError>,
     ) where
-        for<'a> &'a SyncCtx<FakeNonSyncCtx>:
+        for<'a> Locked<'a, SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
             IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         set_logger_for_test();
@@ -5006,7 +4944,7 @@ mod tests {
         }
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
         let mut device_ids = device_ids.into_iter().map(Into::into).collect::<Vec<_>>();
-        let mut sync_ctx = &sync_ctx;
+        let sync_ctx = &sync_ctx;
         let loopback_id = crate::device::add_loopback_device(
             sync_ctx,
             Ipv6::MINIMUM_LINK_MTU,
@@ -5045,7 +4983,7 @@ mod tests {
         let egress_device = egress_device.map(|d| &device_ids[d.index()]);
 
         let result = IpSocketContext::<I, _>::lookup_route(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             egress_device,
             local_ip,

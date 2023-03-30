@@ -1033,6 +1033,7 @@ pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: ethernet::MaxFrameSize =
 #[cfg(test)]
 mod tests {
     use ip_test_macro::ip_test;
+    use lock_order::Locked;
     use packet::{Buf, Serializer};
     use packet_formats::{
         icmp::{IcmpEchoRequest, IcmpPacketBuilder, IcmpUnusedCode},
@@ -1069,7 +1070,7 @@ mod tests {
 
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
             BufferIpSocketHandler::<Ipv4, _, _>::send_oneshot_ip_packet(
-                &mut &*sync_ctx,
+                &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 None, // device
                 None, // local_ip
@@ -1242,7 +1243,7 @@ mod tests {
         // Alice sends Bob a ping.
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
             BufferIpSocketHandler::<Ipv4, _, _>::send_oneshot_ip_packet(
-                &mut &*sync_ctx,
+                &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 None, // device
                 None, // local_ip
@@ -1335,14 +1336,14 @@ mod tests {
     }
 
     fn send_packet<'a, A: IpAddress>(
-        mut sync_ctx: &'a FakeSyncCtx,
+        sync_ctx: &'a FakeSyncCtx,
         ctx: &mut FakeNonSyncCtx,
         src_ip: SpecifiedAddr<A>,
         dst_ip: SpecifiedAddr<A>,
         device: &DeviceId<FakeNonSyncCtx>,
     ) where
         A::Version: TestIpExt,
-        &'a FakeSyncCtx: BufferIpLayerHandler<
+        Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
             A::Version,
             FakeNonSyncCtx,
             Buf<Vec<u8>>,
@@ -1359,7 +1360,7 @@ mod tests {
             mtu: None,
         };
         BufferIpLayerHandler::<A::Version, _, _>::send_ip_packet_from_device(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             ctx,
             meta,
             Buf::new(vec![1, 2, 3, 4], ..),
@@ -1370,7 +1371,7 @@ mod tests {
     #[ip_test]
     fn test_send_to_many<I: Ip + TestIpExt>()
     where
-        for<'a> &'a FakeSyncCtx: BufferIpLayerHandler<
+        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
             I,
             FakeNonSyncCtx,
             Buf<Vec<u8>>,

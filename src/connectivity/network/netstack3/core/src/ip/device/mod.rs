@@ -1450,6 +1450,7 @@ mod tests {
     use alloc::vec;
     use fakealloc::collections::HashSet;
 
+    use lock_order::Locked;
     use net_declare::net_ip_v6;
     use net_types::{ip::Ipv6, LinkLocalAddr};
 
@@ -1577,15 +1578,19 @@ mod tests {
             config.ip_config.ip_enabled = true;
         });
         assert_eq!(
-            IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(sync_ctx, device_id, |state| {
-                state
-                    .ip_state
-                    .iter_addrs()
-                    .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
-                        addr_sub.ipv6_unicast_addr()
-                    })
-                    .collect::<HashSet<_>>()
-            }),
+            IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+                &mut Locked::new(*sync_ctx),
+                device_id,
+                |state| {
+                    state
+                        .ip_state
+                        .iter_addrs()
+                        .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
+                            addr_sub.ipv6_unicast_addr()
+                        })
+                        .collect::<HashSet<_>>()
+                }
+            ),
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
             "enabled device expected to generate link-local address"
         );
@@ -1702,7 +1707,7 @@ mod tests {
         );
 
         IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &device_id,
             |state| {
                 assert_empty(state.ip_state.iter_addrs());
@@ -1711,13 +1716,13 @@ mod tests {
 
         let multicast_addr = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS;
         join_ip_multicast::<Ipv6, _, _>(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device_id,
             multicast_addr,
         );
         add_ipv6_addr_subnet(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device_id,
             ll_addr.to_witness(),
@@ -1726,7 +1731,7 @@ mod tests {
         .expect("add MAC based IPv6 link-local address");
         assert_eq!(
             IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &device_id,
                 |state| {
                     state
@@ -1787,7 +1792,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &device_id,
                 |state| {
                     state
@@ -1804,7 +1809,7 @@ mod tests {
         );
 
         leave_ip_multicast::<Ipv6, _, _>(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device_id,
             multicast_addr,
@@ -1872,7 +1877,7 @@ mod tests {
 
         let assigned_addr = AddrSubnet::new(net_ip_v6!("fe80::1"), 64).unwrap();
         add_ipv6_addr_subnet(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device_id,
             assigned_addr,
@@ -1893,7 +1898,7 @@ mod tests {
         // removed.
         assert_eq!(
             Ipv6DeviceHandler::remove_duplicate_tentative_address(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &device_id,
                 assigned_addr.ipv6_unicast_addr()
@@ -1912,7 +1917,7 @@ mod tests {
 
         assert_eq!(
             IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &device_id,
                 |state| {
                     state

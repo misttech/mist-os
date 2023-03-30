@@ -1202,14 +1202,12 @@ impl_timer_context!(
 
 /// Handle a timer event firing in the device layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
     ctx: &mut NonSyncCtx,
     DeviceLayerTimerId(id): DeviceLayerTimerId<NonSyncCtx>,
 ) {
     match id {
-        DeviceLayerTimerIdInner::Ethernet(id) => {
-            ethernet::handle_timer(&mut Locked::new(sync_ctx), ctx, id)
-        }
+        DeviceLayerTimerIdInner::Ethernet(id) => ethernet::handle_timer(sync_ctx, ctx, id),
     }
 }
 
@@ -1818,12 +1816,17 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
 
 /// Enables or disables IP packet routing on `device`.
 pub fn set_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     enabled: bool,
 ) -> Result<(), NotSupportedError> {
-    crate::ip::device::set_routing_enabled::<_, _, I>(&mut sync_ctx, ctx, device, enabled)
+    crate::ip::device::set_routing_enabled::<_, _, I>(
+        &mut Locked::new(sync_ctx),
+        ctx,
+        device,
+        enabled,
+    )
 }
 
 /// Returns whether IP packet routing is enabled on `device`.
@@ -1846,12 +1849,13 @@ pub fn is_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
 /// For IPv6, this function also joins the solicited-node multicast group and
 /// begins performing Duplicate Address Detection (DAD).
 pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext, A: IpAddress>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr_sub: AddrSubnet<A>,
 ) -> Result<(), ExistsError> {
     trace!("add_ip_addr_subnet: adding addr {:?} to device {:?}", addr_sub, device);
+    let mut sync_ctx = Locked::new(sync_ctx);
 
     match addr_sub.into() {
         AddrSubnetEither::V4(addr_sub) => {
@@ -1871,12 +1875,13 @@ pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext, A: IpAddress>(
 ///
 /// Should only be called on user action.
 pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     addr: &SpecifiedAddr<A>,
 ) -> Result<(), NotFoundError> {
     trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
+    let mut sync_ctx = Locked::new(sync_ctx);
 
     match Into::into(*addr) {
         IpAddr::V4(addr) => crate::ip::device::del_ipv4_addr(&mut sync_ctx, ctx, &device, &addr),

@@ -3013,11 +3013,10 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
-        device::{DeviceId, FrameDestination},
+        device::{set_routing_enabled, DeviceId, FrameDestination},
         ip::{
             device::{
                 route_discovery::Ipv6DiscoveredRoute,
-                set_routing_enabled,
                 state::{DelIpv6AddrReason, IpDeviceStateIpExt, SlaacConfig},
                 IpDeviceHandler,
             },
@@ -3156,7 +3155,7 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_routing_enabled::<_, _, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_routing_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         match I::VERSION {
             IpVersion::V4 => receive_ip_packet::<_, _, Ipv4>(
