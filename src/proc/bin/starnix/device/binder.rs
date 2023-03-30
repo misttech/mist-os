@@ -103,11 +103,17 @@ impl BinderConnection {
             error!(EINVAL)
         }
     }
+
+    pub fn close(&self) {
+        if let Some(binder_process) = self.driver.procs.write().remove(&self.identifier) {
+            binder_process.close();
+        }
+    }
 }
 
 impl Drop for BinderConnection {
     fn drop(&mut self) {
-        self.driver.procs.write().remove(&self.identifier);
+        self.close();
     }
 }
 
@@ -259,6 +265,10 @@ impl RemoteBinderConnection {
             .ioctl(current_task, &self.binder_process, request, user_arg)
             .map(|_| ())
     }
+
+    pub fn close(&self) {
+        self.binder_connection.close();
+    }
 }
 
 #[derive(Debug, Default)]
@@ -280,6 +290,9 @@ struct BinderProcessState {
     active_transactions: BTreeMap<UserAddress, ActiveTransaction>,
     /// The list of processes that should be notified if this process dies.
     death_subscribers: Vec<(Weak<BinderProcess>, binder_uintptr_t)>,
+    /// Whether the binder connection for this process is closed. Once closed, any blocking
+    /// operation will be aborted and return an EBADF error.
+    closed: bool,
 }
 
 #[derive(Default, Debug)]
@@ -325,6 +338,10 @@ impl CommandQueueWithWaitQueue {
         handler: EventHandler,
     ) -> WaitCanceler {
         self.waiters.wait_async_events(waiter, events, handler)
+    }
+
+    fn notify_all(&self) {
+        self.waiters.notify_all();
     }
 }
 
@@ -504,6 +521,15 @@ impl BinderProcess {
 
     fn lock<'a>(self: &'a Arc<Self>) -> BinderProcessGuard<'a> {
         Guard::new(self, self.state.lock())
+    }
+
+    fn close(self: &Arc<Self>) {
+        let mut state = self.lock();
+        if !state.closed {
+            state.closed = true;
+            state.thread_pool.notify_all();
+            self.command_queue.lock().notify_all();
+        }
     }
 
     /// Return the `ResourceAccessor` to use to access the resources of this process.
@@ -1054,6 +1080,12 @@ struct ThreadPool(BTreeMap<pid_t, Arc<BinderThread>>);
 impl ThreadPool {
     fn has_available_thread(&self) -> bool {
         self.0.values().any(|t| t.lock().is_available())
+    }
+
+    fn notify_all(&self) {
+        for t in self.0.values() {
+            t.lock().command_queue.notify_all();
+        }
     }
 }
 
@@ -2447,6 +2479,7 @@ impl BinderDriver {
                         }
                     }
                 }
+                connection.close();
                 Ok(())
             }
             .unwrap_or_else(|_: anyhow::Error| {
@@ -2458,6 +2491,7 @@ impl BinderDriver {
     fn get_context_manager(
         &self,
         current_task: &CurrentTask,
+        binder_proc: &Arc<BinderProcess>,
     ) -> Result<(Arc<BinderObject>, Arc<BinderProcess>), Errno> {
         let context_manager = loop {
             let state = self.context_manager_and_queue.lock();
@@ -2467,6 +2501,13 @@ impl BinderDriver {
             let waiter = Waiter::new();
             state.wait_queue.wait_async(&waiter);
             std::mem::drop(state);
+
+            // Ensure the file descriptor has not been closed, after registering for the waiters
+            // but before waiting.
+            if binder_proc.lock().closed {
+                return error!(EBADF);
+            }
+
             waiter.wait(current_task)?;
         };
         let proc = context_manager.owner.upgrade().ok_or_else(|| errno!(ENOENT))?;
@@ -2748,7 +2789,7 @@ impl BinderDriver {
         let handle = unsafe { data.transaction_data.target.handle }.into();
 
         let (object, target_proc) = match handle {
-            Handle::SpecialServiceManager => self.get_context_manager(current_task)?,
+            Handle::SpecialServiceManager => self.get_context_manager(current_task, binder_proc)?,
             Handle::Object { index } => {
                 let object =
                     binder_proc.lock().handles.get(index).ok_or(TransactionError::Failure)?;
@@ -2947,6 +2988,7 @@ impl BinderDriver {
         loop {
             {
                 let mut binder_proc_state = binder_proc.lock();
+
                 if binder_proc_state.should_request_thread(binder_thread) {
                     let bytes_written =
                         Command::SpawnLooper.write_to_memory(resource_accessor, read_buffer)?;
@@ -3008,6 +3050,13 @@ impl BinderDriver {
             thread_state.command_queue.wait_async(&waiter);
             drop(thread_state);
             drop(proc_command_queue);
+
+            // Ensure the file descriptor has not been closed, after registering for the waiters
+            // but before waiting.
+            if binder_proc.lock().closed {
+                return error!(EBADF);
+            }
+
             // Put this thread to sleep.
             waiter.wait(current_task)?;
         }
@@ -3823,8 +3872,9 @@ mod tests {
         let context_manager_proc = driver.create_local_process(1);
         let context_manager = BinderObject::new_context_manager_marker(&context_manager_proc, 0);
         driver.context_manager_and_queue.lock().context_manager = Some(context_manager.clone());
-        let (object, owner) =
-            driver.get_context_manager(&current_task).expect("failed to find handle 0");
+        let (object, owner) = driver
+            .get_context_manager(&current_task, &context_manager_proc)
+            .expect("failed to find handle 0");
         assert!(Arc::ptr_eq(&context_manager_proc, &owner));
         assert!(Arc::ptr_eq(&context_manager, &object));
     }
@@ -5603,6 +5653,37 @@ mod tests {
 
         // Verify that the process state no longer exists.
         binder_driver.find_process(0).expect_err("process was not cleaned up");
+    }
+
+    #[fuchsia::test]
+    fn close_binder() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let binder_driver = BinderDriver::new();
+        let node = FsNode::new_root(PanickingFsNode);
+
+        // Open the binder device, which creates an instance of the binder device associated with
+        // the process.
+        let binder_instance = binder_driver
+            .open(&current_task, DeviceType::NONE, &node, OpenFlags::RDWR)
+            .expect("binder dev open failed");
+        let binder_connection = binder_instance
+            .as_any()
+            .downcast_ref::<BinderConnection>()
+            .expect("must be a BinderConnection");
+
+        // Ensure that the binder driver has created process state.
+        binder_driver.find_process(0).expect("failed to find process");
+
+        // Close the file descriptor.
+        binder_connection.close();
+
+        // Verify that the process state no longer exists.
+        binder_driver.find_process(0).expect_err("process was not cleaned up");
+
+        // Verify that binder connection cannot access thr process anymore.
+        binder_connection
+            .proc(&current_task)
+            .expect_err("binder_connection still have access to the process.");
     }
 
     #[fuchsia::test]
