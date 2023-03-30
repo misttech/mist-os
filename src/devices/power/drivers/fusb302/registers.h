@@ -65,21 +65,6 @@
 
 namespace fusb302 {
 
-enum Polarity : bool {
-  CC1 = false,
-  CC2 = true,
-};
-enum PowerRole : bool {
-  sink = false,
-  source = true,
-};
-enum DataRole : uint8_t {
-  DFP,
-  UFP,
-  DRP,
-  ASS,
-};
-
 template <class RegType>
 class Fusb302Register : public hwreg::I2cRegisterBase<RegType, uint8_t, 1> {
  public:
