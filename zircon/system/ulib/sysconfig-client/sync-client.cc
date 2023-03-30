@@ -7,16 +7,11 @@
 #include <lib/sysconfig/sysconfig-header.h>
 // clang-format on
 
-#include <dirent.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/cksum.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/directory.h>
-#include <lib/fdio/watcher.h>
-#include <lib/fit/defer.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/time.h>
 #include <string.h>
@@ -62,72 +57,48 @@ constexpr size_t kAstroPageSize = 4 * kKilobyte;
 
 constexpr zx_vm_option_t kVmoRw = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
 
-zx_status_t FindSysconfigPartition(const fbl::unique_fd& devfs_root,
-                                   fidl::WireSyncClient<skipblock::SkipBlock>* out) {
-  fbl::unique_fd dir_fd(openat(devfs_root.get(), "class/skip-block/", O_RDONLY));
-  if (!dir_fd) {
-    return ZX_ERR_IO;
+zx::result<fidl::WireSyncClient<skipblock::SkipBlock>> FindSysconfigPartition(
+    fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
+  zx::result result = component::ConnectAt<fuchsia_io::Directory>(dev, "class/skip-block");
+  if (result.is_error()) {
+    return result.take_error();
   }
-  DIR* dir = fdopendir(dir_fd.release());
-  if (dir == nullptr) {
-    return ZX_ERR_IO;
+  const auto& directory = result.value();
+  zx::result watch_result = device_watcher::WatchDirectoryForItems<
+      zx::result<fidl::WireSyncClient<skipblock::SkipBlock>>>(
+      directory,
+      [&directory](std::string_view filename)
+          -> std::optional<zx::result<fidl::WireSyncClient<skipblock::SkipBlock>>> {
+        zx::result client = component::ConnectAt<skipblock::SkipBlock>(directory, filename);
+        if (client.is_error()) {
+          return client.take_error();
+        }
+        fidl::WireSyncClient skip_block(std::move(client.value()));
+        const fidl::WireResult result = skip_block->GetPartitionInfo();
+        if (zx_status_t status = result.ok() ? result.value().status : result.status();
+            status != ZX_OK) {
+          return zx::error(status);
+        }
+        const auto& response = result.value();
+        const uint8_t type[] = GUID_SYS_CONFIG_VALUE;
+        if (memcmp(response.partition_info.partition_guid.data(), type,
+                   skipblock::wire::kGuidLen) != 0) {
+          return {};
+        }
+        return zx::ok(std::move(skip_block));
+      });
+  if (watch_result.is_error()) {
+    return watch_result.take_error();
   }
-  const auto closer = fit::defer([&dir]() { closedir(dir); });
-
-  auto watch_dir_event_cb = [](int dirfd, int event, const char* filename, void* cookie) {
-    if (event != WATCH_EVENT_ADD_FILE) {
-      return ZX_OK;
-    }
-    if (std::string_view{filename} == ".") {
-      return ZX_OK;
-    }
-
-    fdio_cpp::UnownedFdioCaller caller(dirfd);
-    zx::result client = component::ConnectAt<skipblock::SkipBlock>(caller.directory(), filename);
-    if (client.is_error()) {
-      return client.error_value();
-    }
-    fidl::WireSyncClient<skipblock::SkipBlock> skip_block(std::move(client.value()));
-    const fidl::WireResult result = skip_block->GetPartitionInfo();
-    if (zx_status_t status = result.ok() ? result.value().status : result.status();
-        status != ZX_OK) {
-      return ZX_OK;
-    }
-    const auto& response = result.value();
-    const uint8_t type[] = GUID_SYS_CONFIG_VALUE;
-    if (memcmp(response.partition_info.partition_guid.data(), type, skipblock::wire::kGuidLen) !=
-        0) {
-      return ZX_OK;
-    }
-
-    auto* out = static_cast<fidl::WireSyncClient<skipblock::SkipBlock>*>(cookie);
-    *out = std::move(skip_block);
-    return ZX_ERR_STOP;
-  };
-
-  const zx::time deadline = zx::deadline_after(zx::sec(5));
-  if (fdio_watch_directory(dirfd(dir), watch_dir_event_cb, deadline.get(), out) != ZX_ERR_STOP) {
-    return ZX_ERR_NOT_FOUND;
-  }
-  return ZX_OK;
+  return std::move(watch_result.value());
 }
 
-zx_status_t CheckIfAstro(const fbl::unique_fd& devfs_root) {
-  // NOTE(brunodalbo): An older version of this routine used
-  // fdio_connect_at(borrowed_channel_from_devfs_root, ...). The problem is that borrowing a channel
-  // from a file descriptor to /dev created from a sandbox component is invalid, since /dev is not
-  // part of its flat namespace. Here we use `openat` and only borrow the channel later, when it's
-  // guaranteed to be backed by a remote service.
-  fbl::unique_fd platform_fd(openat(devfs_root.get(), "sys/platform", O_RDONLY));
-  if (!platform_fd) {
-    return ZX_ERR_IO;
+zx_status_t CheckIfAstro(fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
+  zx::result sysinfo = component::ConnectAt<fuchsia_sysinfo::SysInfo>(dev, "sys/platform");
+  if (sysinfo.is_error()) {
+    return sysinfo.error_value();
   }
-  fdio_cpp::FdioCaller caller(std::move(platform_fd));
-  if (!caller) {
-    return ZX_ERR_IO;
-  }
-  const fidl::WireResult result =
-      fidl::WireCall(caller.borrow_as<fuchsia_sysinfo::SysInfo>())->GetBoardName();
+  const fidl::WireResult result = fidl::WireCall(sysinfo.value())->GetBoardName();
   zx_status_t status = result.ok() ? result.value().status : result.status();
   if (status != ZX_OK) {
     return status;
@@ -297,32 +268,27 @@ void UpdateSysconfigLayout(void* start, size_t len, const sysconfig_header& curr
 
 }  // namespace
 
-zx_status_t SyncClient::Create(std::optional<SyncClient>* out) {
-  fbl::unique_fd devfs_root(open("/dev", O_RDONLY));
-  if (!devfs_root) {
-    return ZX_ERR_IO;
+zx::result<SyncClient> SyncClient::Create() {
+  zx::result dev = component::OpenServiceRoot("/dev");
+  if (dev.is_error()) {
+    return dev.take_error();
   }
-  return Create(devfs_root, out);
+  return Create(dev.value());
 }
 
-zx_status_t SyncClient::Create(const fbl::unique_fd& devfs_root, std::optional<SyncClient>* out) {
+zx::result<SyncClient> SyncClient::Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev) {
   // TODO(surajmalhotra): This is just a temporary measure to allow us to hardcode constants into
   // this library safely. For future products, the library should be updated to use some sort of
   // configuration file to determine partition layout.
-  auto status = CheckIfAstro(devfs_root);
-  if (status != ZX_OK) {
-    return status;
+  if (zx_status_t status = CheckIfAstro(dev); status != ZX_OK) {
+    return zx::error(status);
   }
 
-  fidl::WireSyncClient<skipblock::SkipBlock> skip_block;
-  status = FindSysconfigPartition(devfs_root, &skip_block);
-  if (status != ZX_OK) {
-    return status;
+  zx::result skip_block = FindSysconfigPartition(dev);
+  if (skip_block.is_error()) {
+    return skip_block.take_error();
   }
-
-  *out = SyncClient(std::move(skip_block));
-
-  return ZX_OK;
+  return zx::ok(SyncClient(std::move(skip_block.value())));
 }
 
 zx::result<std::reference_wrapper<const sysconfig_header>> SyncClient::GetHeader() {

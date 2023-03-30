@@ -6,13 +6,12 @@
 #define LIB_SYSCONFIG_SYNC_CLIENT_H_
 
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zx/channel.h>
 #include <zircon/types.h>
 
 #include <optional>
-
-#include <fbl/unique_fd.h>
 
 #include "abr-wear-leveling.h"
 #include "sysconfig-header.h"
@@ -41,10 +40,10 @@ class __EXPORT SyncClient {
 
   // Looks for a skip-block device of type sysconfig. If found, returns a client capable of reading
   // and writing to sub-partitions of the sysconfig device.
-  static zx_status_t Create(std::optional<SyncClient>* out);
+  static zx::result<SyncClient> Create();
 
   // Variation on `Create` with devfs (/dev) injected.
-  static zx_status_t Create(const fbl::unique_fd& devfs_root, std::optional<SyncClient>* out);
+  static zx::result<SyncClient> Create(fidl::UnownedClientEnd<fuchsia_io::Directory> dev);
 
   // Provides write access for the partition specified. Always writes full partition.
   //

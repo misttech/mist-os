@@ -27,15 +27,15 @@ zx_library("sysconfig-sync-client") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
-    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.skipblock:fuchsia.hardware.skipblock_cpp_wire",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/fdio",
+    "//sdk/lib/device-watcher/cpp",
     "//sdk/lib/fidl",
+    "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
@@ -50,6 +50,7 @@ zx_library("sysconfig-sync-client-c") {
   sources = [ "sync-client-c.cc" ]
   deps = [
     ":sysconfig-sync-client",
+    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
   ]
   configs += [ "//build/config/fuchsia:static_cpp_standard_library" ]

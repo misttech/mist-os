@@ -18,6 +18,7 @@ test("sysconfig-sync-client-test") {
     "//src/lib/storage/ramdevice_client/cpp:ramdevice-client-test",
     "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/inspector",
     "//zircon/system/ulib/sysconfig-client:sysconfig-sync-client",
     "//zircon/system/ulib/trace-engine",

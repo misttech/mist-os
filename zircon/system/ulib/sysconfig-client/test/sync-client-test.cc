@@ -8,6 +8,7 @@
 
 // clang-format on
 
+#include <lib/fdio/cpp/caller.h>
 #include <lib/zx/channel.h>
 #include <zircon/hw/gpt.h>
 
@@ -75,7 +76,10 @@ class SkipBlockDevice {
   static void Create(fuchsia_hardware_nand::wire::RamNandInfo nand_info,
                      std::optional<SkipBlockDevice>* device);
 
-  fbl::unique_fd devfs_root() { return ctl_->devfs_root().duplicate(); }
+  fidl::UnownedClientEnd<fuchsia_io::Directory> devfs_root() const {
+    fdio_cpp::UnownedFdioCaller caller(ctl_->devfs_root());
+    return caller.directory();
+  }
 
   fzl::VmoMapper& mapper() { return mapper_; }
 
@@ -183,8 +187,7 @@ class SyncClientTest : public zxtest::Test {
 };
 
 TEST_F(SyncClientTest, CreateAstro) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root()));
 }
 
 using PartitionType = sysconfig::SyncClient::PartitionType;
@@ -192,24 +195,24 @@ using PartitionType = sysconfig::SyncClient::PartitionType;
 constexpr size_t kKilobyte = 1 << 10;
 
 TEST_F(SyncClientTest, WritePartitionSysconfig) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreatePayload(60 * kKilobyte, &vmo));
-  ASSERT_OK(client->WritePartition(PartitionType::kSysconfig, vmo, 0));
+  ASSERT_OK(client.value().WritePartition(PartitionType::kSysconfig, vmo, 0));
 
   ASSERT_NO_FATAL_FAILURE(ValidateWritten(0, 60 * kKilobyte));
   ASSERT_NO_FATAL_FAILURE(ValidateUnwritten(60 * kKilobyte, 196 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, WritePartitionAbrMetadata) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreatePayload(4 * kKilobyte, &vmo));
-  ASSERT_OK(client->WritePartition(PartitionType::kABRMetadata, vmo, 0));
+  ASSERT_OK(client.value().WritePartition(PartitionType::kABRMetadata, vmo, 0));
 
   ASSERT_NO_FATAL_FAILURE(ValidateUnwritten(0, 60 * kKilobyte));
   ASSERT_NO_FATAL_FAILURE(ValidateWritten(60 * kKilobyte, 4 * kKilobyte));
@@ -217,12 +220,12 @@ TEST_F(SyncClientTest, WritePartitionAbrMetadata) {
 }
 
 TEST_F(SyncClientTest, WritePartitionVbMetaA) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreatePayload(64 * kKilobyte, &vmo));
-  ASSERT_OK(client->WritePartition(PartitionType::kVerifiedBootMetadataA, vmo, 0));
+  ASSERT_OK(client.value().WritePartition(PartitionType::kVerifiedBootMetadataA, vmo, 0));
 
   ASSERT_NO_FATAL_FAILURE(ValidateUnwritten(0, 64 * kKilobyte));
   ASSERT_NO_FATAL_FAILURE(ValidateWritten(64 * kKilobyte, 64 * kKilobyte));
@@ -230,12 +233,12 @@ TEST_F(SyncClientTest, WritePartitionVbMetaA) {
 }
 
 TEST_F(SyncClientTest, WritePartitionVbMetaB) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreatePayload(64 * kKilobyte, &vmo));
-  ASSERT_OK(client->WritePartition(PartitionType::kVerifiedBootMetadataB, vmo, 0));
+  ASSERT_OK(client.value().WritePartition(PartitionType::kVerifiedBootMetadataB, vmo, 0));
 
   ASSERT_NO_FATAL_FAILURE(ValidateUnwritten(0, 128 * kKilobyte));
   ASSERT_NO_FATAL_FAILURE(ValidateWritten(128 * kKilobyte, 64 * kKilobyte));
@@ -243,118 +246,119 @@ TEST_F(SyncClientTest, WritePartitionVbMetaB) {
 }
 
 TEST_F(SyncClientTest, WritePartitionVbMetaR) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   zx::vmo vmo;
   ASSERT_NO_FATAL_FAILURE(CreatePayload(64 * kKilobyte, &vmo));
-  ASSERT_OK(client->WritePartition(PartitionType::kVerifiedBootMetadataR, vmo, 0));
+  ASSERT_OK(client.value().WritePartition(PartitionType::kVerifiedBootMetadataR, vmo, 0));
 
   ASSERT_NO_FATAL_FAILURE(ValidateUnwritten(0, 192 * kKilobyte));
   ASSERT_NO_FATAL_FAILURE(ValidateWritten(192 * kKilobyte, 64 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, ReadPartitionSysconfig) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
   ASSERT_OK(mapper.CreateAndMap(fbl::round_up(60 * kKilobyte, zx_system_get_page_size()), "test"));
 
   ASSERT_NO_FATAL_FAILURE(WriteData(0, 60 * kKilobyte));
-  ASSERT_OK(client->ReadPartition(PartitionType::kSysconfig, mapper.vmo(), 0));
+  ASSERT_OK(client.value().ReadPartition(PartitionType::kSysconfig, mapper.vmo(), 0));
   ASSERT_NO_FATAL_FAILURE(ValidateBuffer(mapper.start(), 60 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, ReadPartitionAbrMetadata) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
   ASSERT_OK(mapper.CreateAndMap(fbl::round_up(4 * kKilobyte, zx_system_get_page_size()), "test"));
 
   ASSERT_NO_FATAL_FAILURE(WriteData(60 * kKilobyte, 4 * kKilobyte));
-  ASSERT_OK(client->ReadPartition(PartitionType::kABRMetadata, mapper.vmo(), 0));
+  ASSERT_OK(client.value().ReadPartition(PartitionType::kABRMetadata, mapper.vmo(), 0));
   ASSERT_NO_FATAL_FAILURE(ValidateBuffer(mapper.start(), 4 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, ReadPartitionVbMetaA) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
   ASSERT_OK(mapper.CreateAndMap(fbl::round_up(64 * kKilobyte, zx_system_get_page_size()), "test"));
 
   ASSERT_NO_FATAL_FAILURE(WriteData(64 * kKilobyte, 64 * kKilobyte));
-  ASSERT_OK(client->ReadPartition(PartitionType::kVerifiedBootMetadataA, mapper.vmo(), 0));
+  ASSERT_OK(client.value().ReadPartition(PartitionType::kVerifiedBootMetadataA, mapper.vmo(), 0));
   ASSERT_NO_FATAL_FAILURE(ValidateBuffer(mapper.start(), 64 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, ReadPartitionVbMetaB) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
   ASSERT_OK(mapper.CreateAndMap(fbl::round_up(64 * kKilobyte, zx_system_get_page_size()), "test"));
 
   ASSERT_NO_FATAL_FAILURE(WriteData(128 * kKilobyte, 64 * kKilobyte));
-  ASSERT_OK(client->ReadPartition(PartitionType::kVerifiedBootMetadataB, mapper.vmo(), 0));
+  ASSERT_OK(client.value().ReadPartition(PartitionType::kVerifiedBootMetadataB, mapper.vmo(), 0));
   ASSERT_NO_FATAL_FAILURE(ValidateBuffer(mapper.start(), 64 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, ReadPartitionVbMetaR) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   fzl::OwnedVmoMapper mapper;
   ASSERT_OK(mapper.CreateAndMap(fbl::round_up(64 * kKilobyte, zx_system_get_page_size()), "test"));
 
   ASSERT_NO_FATAL_FAILURE(WriteData(192 * kKilobyte, 64 * kKilobyte));
-  ASSERT_OK(client->ReadPartition(PartitionType::kVerifiedBootMetadataR, mapper.vmo(), 0));
+  ASSERT_OK(client.value().ReadPartition(PartitionType::kVerifiedBootMetadataR, mapper.vmo(), 0));
   ASSERT_NO_FATAL_FAILURE(ValidateBuffer(mapper.start(), 64 * kKilobyte));
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeSysconfig) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   size_t size;
-  ASSERT_OK(client->GetPartitionSize(PartitionType::kSysconfig, &size));
+  ASSERT_OK(client.value().GetPartitionSize(PartitionType::kSysconfig, &size));
   ASSERT_EQ(size, 60 * kKilobyte);
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeAbrMetadata) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   size_t size;
-  ASSERT_OK(client->GetPartitionSize(PartitionType::kABRMetadata, &size));
+  ASSERT_OK(client.value().GetPartitionSize(PartitionType::kABRMetadata, &size));
   ASSERT_EQ(size, 4 * kKilobyte);
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeVbMetaA) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   size_t size;
-  ASSERT_OK(client->GetPartitionSize(PartitionType::kVerifiedBootMetadataA, &size));
+  ASSERT_OK(client.value().GetPartitionSize(PartitionType::kVerifiedBootMetadataA, &size));
   ASSERT_EQ(size, 64 * kKilobyte);
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeVbMetaB) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   size_t size;
-  ASSERT_OK(client->GetPartitionSize(PartitionType::kVerifiedBootMetadataB, &size));
+  ASSERT_OK(client.value().GetPartitionSize(PartitionType::kVerifiedBootMetadataB, &size));
   ASSERT_EQ(size, 64 * kKilobyte);
 }
 
 TEST_F(SyncClientTest, GetPartitionSizeVbMetaR) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
 
   size_t size;
-  ASSERT_OK(client->GetPartitionSize(PartitionType::kVerifiedBootMetadataR, &size));
+  ASSERT_OK(client.value().GetPartitionSize(PartitionType::kVerifiedBootMetadataR, &size));
   ASSERT_EQ(size, 64 * kKilobyte);
 }
 
@@ -393,69 +397,76 @@ TEST(SysconfigHeaderTest, InvalidCrc) {
 }
 
 TEST_F(SyncClientTest, HeaderNotPageAligned) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto not_page_alinged = GetNonLegacyHeaderForTest();
   not_page_alinged.sysconfig_data.size = 55 * kKilobyte;
   update_sysconfig_header_magic_and_crc(&not_page_alinged);
   ASSERT_FALSE(sysconfig_header_valid(&not_page_alinged, kPageSize, kBlockSize));
-  ASSERT_STATUS(client->UpdateLayout(not_page_alinged), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(client.value().UpdateLayout(not_page_alinged), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(SyncClientTest, HeaderInvalidOffset) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto invalid_offset = GetNonLegacyHeaderForTest();
   invalid_offset.sysconfig_data.offset = 256 * kKilobyte;
   update_sysconfig_header_magic_and_crc(&invalid_offset);
   ASSERT_FALSE(sysconfig_header_valid(&invalid_offset, kPageSize, kBlockSize));
-  ASSERT_STATUS(client->UpdateLayout(invalid_offset), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(client.value().UpdateLayout(invalid_offset), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(SyncClientTest, HeaderInvalidSize) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto invalid_size = GetNonLegacyHeaderForTest();
   invalid_size.sysconfig_data.size = 252 * kKilobyte;
   update_sysconfig_header_magic_and_crc(&invalid_size);
   ASSERT_FALSE(sysconfig_header_valid(&invalid_size, kPageSize, kBlockSize));
-  ASSERT_STATUS(client->UpdateLayout(invalid_size), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(client.value().UpdateLayout(invalid_size), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(SyncClientTest, HeaderInvalidSizePlusOffset) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto invalid_size_offset = GetNonLegacyHeaderForTest();
   invalid_size_offset.sysconfig_data = {200 * kKilobyte, 60 * kKilobyte};
   update_sysconfig_header_magic_and_crc(&invalid_size_offset);
   ASSERT_FALSE(sysconfig_header_valid(&invalid_size_offset, kPageSize, kBlockSize));
-  ASSERT_STATUS(client->UpdateLayout(invalid_size_offset), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(client.value().UpdateLayout(invalid_size_offset), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(SyncClientTest, HeaderOverlapSubpart) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto overlap_subpart = GetNonLegacyHeaderForTest();
   overlap_subpart.sysconfig_data = {196 * kKilobyte, 56 * kKilobyte};
   update_sysconfig_header_magic_and_crc(&overlap_subpart);
   ASSERT_FALSE(sysconfig_header_valid(&overlap_subpart, kPageSize, kBlockSize));
-  ASSERT_STATUS(client->UpdateLayout(overlap_subpart), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(client.value().UpdateLayout(overlap_subpart), ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(SyncClientTest, HeaderPage0NotReserved) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto page0_not_reserved = GetNonLegacyHeaderForTest();
   page0_not_reserved.vb_metadata_a.offset = 0;
   update_sysconfig_header_magic_and_crc(&page0_not_reserved);
   ASSERT_FALSE(sysconfig_header_valid(&page0_not_reserved, kPageSize, kBlockSize));
-  ASSERT_STATUS(client->UpdateLayout(page0_not_reserved), ZX_ERR_INVALID_ARGS);
+  ASSERT_STATUS(client.value().UpdateLayout(page0_not_reserved), ZX_ERR_INVALID_ARGS);
 }
 
 void SyncClientTest::TestLayoutUpdate(const std::optional<sysconfig_header> current_header,
                                       const sysconfig_header& target_header) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   auto memory = static_cast<uint8_t*>(device_->mapper().start()) + 4 * kBlockSize;
   using PartitionType = sysconfig::SyncClient::PartitionType;
   auto init_header = current_header;
@@ -487,7 +498,7 @@ void SyncClientTest::TestLayoutUpdate(const std::optional<sysconfig_header> curr
 
   auto update_header = target_header;
   update_sysconfig_header_magic_and_crc(&update_header);
-  ASSERT_OK(client->UpdateLayout(update_header));
+  ASSERT_OK(client.value().UpdateLayout(update_header));
 
   struct PartitionRange {
     uint64_t offset;
@@ -515,16 +526,16 @@ void SyncClientTest::TestLayoutUpdate(const std::optional<sysconfig_header> curr
     auto content_size = std::min(item.old_info.size, item.new_info.size);
     ASSERT_NO_FATAL_FAILURE(ValidateWritten(item.new_info.offset, content_size, item.expected));
     size_t part_size, part_offset;
-    ASSERT_OK(client->GetPartitionSize(item.name, &part_size));
+    ASSERT_OK(client.value().GetPartitionSize(item.name, &part_size));
     ASSERT_EQ(part_size, item.new_info.size);
-    ASSERT_OK(client->GetPartitionOffset(item.name, &part_offset));
+    ASSERT_OK(client.value().GetPartitionOffset(item.name, &part_offset));
     ASSERT_EQ(part_offset, item.new_info.offset);
     fzl::OwnedVmoMapper vmo;
     // vmo::CreateAndMap does not allow creating a zero size vmo. But we are testing
     // empty sub-partition cases. Thus, give a minimum size below.
     ASSERT_OK(vmo.CreateAndMap(std::max(part_size, static_cast<size_t>(kPageSize)), "",
                                ZX_VM_PERM_READ | ZX_VM_PERM_WRITE));
-    ASSERT_OK(client->ReadPartition(item.name, vmo.vmo(), 0));
+    ASSERT_OK(client.value().ReadPartition(item.name, vmo.vmo(), 0));
     ASSERT_NO_FATAL_FAILURE(ValidateBuffer(vmo.start(), content_size, item.expected));
   }
 }
@@ -653,8 +664,9 @@ class SyncClientBufferedTest : public SyncClientTest {
 };
 
 void SyncClientBufferedTest::TestWrite(const std::vector<PartitionInfo>& parts_to_test_write) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientBuffered sync_client_buffered(*std::move(client));
 
   // Write something to cache.
@@ -717,8 +729,9 @@ TEST_F(SyncClientBufferedTest, WriteAllPartitions) {
 }
 
 void SyncClientBufferedTest::TestRead(const std::vector<PartitionInfo>& parts_to_test_read) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientBuffered sync_client_buffered(*std::move(client));
 
   // Write something to cache.
@@ -804,8 +817,9 @@ sysconfig_subpartition GetSubpartitionInfo(const sysconfig_header& header,
 
 void SyncClientBufferedTest::TestWriteWithHeader(
     const std::vector<PartitionInfo>& parts_to_test_write) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientBuffered sync_client_buffered(*std::move(client));
   // Sysconfig partition starts at the 5th block in this test environment.
   // Please refer to NandInfo() definition.
@@ -899,9 +913,10 @@ void VerifyAbrMetaDataPage(const abr_metadata_ext& abr_data, uint8_t value,
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLevelingUnsupportedLayout) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
+
   size_t partition_size;
   ASSERT_OK(astro_client.GetPartitionSize(PartitionType::kABRMetadata, &partition_size));
 
@@ -930,8 +945,9 @@ sysconfig_header WriteHeaderSupportingAbrWearLeveling(void* memory) {
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLeveling) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
   auto memory = static_cast<uint8_t*>(device_->mapper().start()) + 4 * kBlockSize;
   auto header = WriteHeaderSupportingAbrWearLeveling(memory);
@@ -992,8 +1008,9 @@ TEST_F(SyncClientBufferedTest, AbrWearLeveling) {
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLevelingMultiplePartitionsModifiedInCache) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
   auto memory = static_cast<uint8_t*>(device_->mapper().start()) + 4 * kBlockSize;
   auto header = WriteHeaderSupportingAbrWearLeveling(memory);
@@ -1060,8 +1077,9 @@ TEST_F(SyncClientBufferedTest, AbrWearLevelingMultiplePartitionsModifiedInCache)
 }
 
 TEST_F(SyncClientBufferedTest, AbrWearLevelingDefaultToFirstPage) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
   auto memory = static_cast<uint8_t*>(device_->mapper().start()) + 4 * kBlockSize;
   auto header = WriteHeaderSupportingAbrWearLeveling(memory);
@@ -1084,8 +1102,9 @@ TEST_F(SyncClientBufferedTest, AbrWearLevelingDefaultToFirstPage) {
 }
 
 TEST_F(SyncClientBufferedTest, ValidateAbrMetadataInStorageFail) {
-  std::optional<sysconfig::SyncClient> client;
-  ASSERT_OK(sysconfig::SyncClient::Create(device_->devfs_root(), &client));
+  zx::result client = sysconfig::SyncClient::Create(device_->devfs_root());
+  ASSERT_OK(client);
+
   sysconfig::SyncClientAbrWearLeveling astro_client(*std::move(client));
   auto memory = static_cast<uint8_t*>(device_->mapper().start()) + 4 * kBlockSize;
   auto header = WriteHeaderSupportingAbrWearLeveling(memory);
