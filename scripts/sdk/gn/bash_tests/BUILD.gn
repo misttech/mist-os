@@ -14,10 +14,7 @@ group("tests") {
 
 # This is the list of test scripts that should be run to
 # test the bash f* scripts.
-test_scripts = [
-  "fpave-test.sh",
-  "fuchsia-common-tests.sh",
-]
+test_scripts = [ "fuchsia-common-tests.sh" ]
 
 # Copies the files needed for the tests to the out dir
 # This stages the data and builds the metadata needed to
@@ -40,10 +37,7 @@ host_script_test_data("gn_sdk_bash_tests") {
     {
       source_base_dir = "//scripts/sdk/gn/base/bin"
       target_base_dir = "scripts/sdk/gn/base/bin"
-      files = [
-        "//scripts/sdk/gn/base/bin/fpave.sh",
-        "//scripts/sdk/gn/base/bin/fuchsia-common.sh",
-      ]
+      files = [ "//scripts/sdk/gn/base/bin/fuchsia-common.sh" ]
     },
     {
       source_base_dir = "//scripts/sdk/gn/bash_tests"

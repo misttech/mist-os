@@ -7,9 +7,6 @@
 import("//build/go/go_library.gni")
 
 go_library("host_gnsdk_test_lib") {
-  visibility = [
-    "//scripts/sdk/gn/*",
-    "//vendor/*",
-  ]
+  visibility = [ "//scripts/sdk/gn/*" ]
   sources = [ "host_test.go" ]
 }

@@ -13,10 +13,6 @@
       "type": "host_tool"
     },
     {
-      "meta": "bin/fpave-meta.json",
-      "type": "host_tool"
-    },
-    {
       "meta": "build/gn-build-files-meta.json",
       "type": "documentation"
     },

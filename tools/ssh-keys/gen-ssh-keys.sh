@@ -52,8 +52,8 @@ ERROR: You have different Fuchsia SSH credentials in HOME and in FUCHSIA_DIR.
   (fx pave), the SSH credentials in your Fuchsia tree are probably more
   relevant. In this case, backup and delete Fuchsia SSH keys in \$HOME/.ssh/fuchsia_*
 
-- If you most recently successfully paved a device outside the Fuchsia tree
-  (like the GN SDK, using fpave.sh), the SSH credentials in \$HOME/.ssh are
+- If you most recently successfully paved a device outside the Fuchsia tree,
+  the SSH credentials in \$HOME/.ssh are
   probably more relevant. In this case, backup and delete Fuchsia SSH keys in
   FUCHSIA_DIR/.ssh/pkey*
 
