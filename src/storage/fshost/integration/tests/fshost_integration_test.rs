@@ -152,7 +152,7 @@ async fn data_reformatted_when_corrupt() {
     fixture.check_fs_type("data", data_fs_type()).await;
     let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
     fixture
-        .dir("data")
+        .dir("data", fio::OpenFlags::RIGHT_READABLE)
         .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "foo", server)
         .expect("open failed");
     file.get_attr().await.expect_err("foo shouldn't exist");
@@ -267,7 +267,7 @@ async fn ramdisk_data_ignores_non_ramdisk() {
     let fixture = builder.build().await;
 
     if DATA_FILESYSTEM_VARIANT != "fxblob" {
-        let dev = fixture.dir("dev-topological/class/block");
+        let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
 
         // The filesystems won't be mounted, but make sure fvm and potentially zxcrypt are bound.
         device_watcher::wait_for_device_with(&dev, |info| {
@@ -320,7 +320,7 @@ async fn partition_max_size_set() {
     // Get the blobfs instance guid.
     // TODO(https://fxbug.dev/121274): Remove hardcoded paths
     let volume_proxy_data = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
-        &fixture.dir("dev-topological"),
+        &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/blobfs-p-1/block",
     )
     .unwrap();
@@ -335,7 +335,7 @@ async fn partition_max_size_set() {
         ..Default::default()
     };
 
-    let dev = fixture.dir("dev-topological/class/block");
+    let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
     let data_partition_controller =
         find_partition_in(&dev, data_matcher, zx::Duration::from_seconds(10))
             .await
@@ -352,7 +352,7 @@ async fn partition_max_size_set() {
 
     // TODO(https://fxbug.dev/121274): Remove hardcoded paths
     let fvm_proxy = connect_to_named_protocol_at_dir_root::<VolumeManagerMarker>(
-        &fixture.dir("dev-topological"),
+        &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
     )
     .unwrap();
@@ -388,7 +388,7 @@ async fn netboot_set() {
     let fixture = builder.build().await;
 
     if DATA_FILESYSTEM_VARIANT != "fxblob" {
-        let dev = fixture.dir("dev-topological/class/block");
+        let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
 
         // Filesystems will not be mounted but make sure that fvm is bound
         device_watcher::wait_for_device_with(&dev, |info| {
@@ -434,7 +434,7 @@ async fn fvm_within_gpt() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
     let fixture = builder.build().await;
-    let dev = fixture.dir("dev-topological/class/block");
+    let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
 
     // Ensure we bound the GPT by checking the relevant partitions exist under the ramdisk path.
     let fvm_partition_path = device_watcher::wait_for_device_with(&dev, |info| {
@@ -482,7 +482,7 @@ async fn pausing_block_watcher_ignores_devices() {
         .root
         .connect_to_protocol_at_exposed_dir::<fshost::BlockWatcherMarker>()
         .unwrap();
-    let dev = fixture.dir("dev-topological/class/block");
+    let dev = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
 
     // A block device added when the block watcher is paused doesn't do anything.
     assert_eq!(pauser.pause().await.unwrap(), zx::Status::OK.into_raw());
@@ -530,9 +530,13 @@ async fn shred_data_volume_when_mounted() {
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-    fuchsia_fs::directory::open_file(&fixture.dir("data"), "test-file", fio::OpenFlags::CREATE)
-        .await
-        .expect("open_file failed");
+    fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
+        "test-file",
+        fio::OpenFlags::CREATE,
+    )
+    .await
+    .expect("open_file failed");
 
     let admin = fixture
         .realm
@@ -554,7 +558,7 @@ async fn shred_data_volume_when_mounted() {
     // been shredded.
     assert_matches!(
         fuchsia_fs::directory::open_file(
-            &fixture.dir("data"),
+            &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
             "test-file",
             fio::OpenFlags::RIGHT_READABLE
         )
@@ -574,9 +578,13 @@ async fn shred_data_volume_from_recovery() {
 
     let vmo = fixture.ramdisk_vmo().unwrap().duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
 
-    fuchsia_fs::directory::open_file(&fixture.dir("data"), "test-file", fio::OpenFlags::CREATE)
-        .await
-        .expect("open_file failed");
+    fuchsia_fs::directory::open_file(
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE),
+        "test-file",
+        fio::OpenFlags::CREATE,
+    )
+    .await
+    .expect("open_file failed");
 
     fixture.tear_down().await;
 
@@ -608,7 +616,7 @@ async fn shred_data_volume_from_recovery() {
     // been shredded.
     assert_matches!(
         fuchsia_fs::directory::open_file(
-            &fixture.dir("data"),
+            &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
             "test-file",
             fio::OpenFlags::RIGHT_READABLE
         )
@@ -655,9 +663,9 @@ async fn reset_fvm_partitions() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let fvm_proxy = fuchsia_fs::directory::open_directory(
-        &fixture.dir("dev-topological"),
+        &fixture.dir("dev-topological", fio::OpenFlags::empty()),
         "sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm",
-        fio::OpenFlags::RIGHT_READABLE,
+        fio::OpenFlags::empty(),
     )
     .await
     .expect("Failed to open the fvm");
@@ -687,7 +695,7 @@ async fn reset_fvm_partitions() {
     // resizing and does not call resize_volume() inside format_data.
     if DATA_FILESYSTEM_FORMAT != "minfs" {
         let data_volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
-            &fixture.dir("dev-topological"),
+            &fixture.dir("dev-topological", fio::OpenFlags::empty()),
             &format!("sys/platform/00:00:2d/ramctl/ramdisk-0/block/fvm/{}/block", data_name),
         )
         .expect("Failed to connect to data VolumeProxy");

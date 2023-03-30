@@ -49,7 +49,7 @@ async fn unformatted() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data"),
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
         SECRET_FILE_NAME,
         fio::OpenFlags::RIGHT_READABLE,
     )
@@ -79,7 +79,7 @@ async fn unformatted_netboot() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data"),
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
         SECRET_FILE_NAME,
         fio::OpenFlags::RIGHT_READABLE,
     )
@@ -123,7 +123,7 @@ async fn unformatted_small_disk() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data"),
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
         SECRET_FILE_NAME,
         fio::OpenFlags::RIGHT_READABLE,
     )
@@ -161,7 +161,7 @@ async fn formatted() {
     fixture.check_test_data_file().await;
 
     let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data"),
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
         SECRET_FILE_NAME,
         fio::OpenFlags::RIGHT_READABLE,
     )
@@ -208,7 +208,7 @@ async fn formatted_file_in_root() {
     fixture.check_test_data_file().await;
 
     let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data"),
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
         "test.txt",
         fio::OpenFlags::RIGHT_READABLE,
     )
@@ -242,7 +242,7 @@ async fn formatted_netboot() {
     fixture.check_test_data_file().await;
 
     let secret = fuchsia_fs::directory::open_file(
-        &fixture.dir("data"),
+        &fixture.dir("data", fio::OpenFlags::RIGHT_READABLE),
         SECRET_FILE_NAME,
         fio::OpenFlags::RIGHT_READABLE,
     )

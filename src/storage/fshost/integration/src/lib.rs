@@ -186,23 +186,19 @@ impl TestFixture {
         assert_eq!(self.crash_reports.next().await, None);
     }
 
-    pub fn dir(&self, dir: &str) -> fio::DirectoryProxy {
+    pub fn dir(&self, dir: &str, flags: fio::OpenFlags) -> fio::DirectoryProxy {
         let (dev, server) = create_proxy::<fio::DirectoryMarker>().expect("create_proxy failed");
         self.realm
             .root
             .get_exposed_dir()
-            .open(
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                fio::ModeType::empty(),
-                dir,
-                server.into_channel().into(),
-            )
+            .open(flags, fio::ModeType::empty(), dir, server.into_channel().into())
             .expect("open failed");
         dev
     }
 
     pub async fn check_fs_type(&self, dir: &str, fs_type: u32) {
-        let (status, info) = self.dir(dir).query_filesystem().await.expect("query failed");
+        let (status, info) =
+            self.dir(dir, fio::OpenFlags::empty()).query_filesystem().await.expect("query failed");
         assert_eq!(zx::Status::from_raw(status), zx::Status::OK);
         assert!(info.is_some());
         assert_eq!(info.unwrap().fs_type, fs_type);
@@ -215,7 +211,7 @@ impl TestFixture {
 
         let (blob, server_end) = create_proxy::<fio::FileMarker>().expect("create_proxy failed");
         let path = &format!("{}", expected_blob_hash);
-        self.dir("blob")
+        self.dir("blob", fio::OpenFlags::RIGHT_READABLE)
             .open(
                 fio::OpenFlags::RIGHT_READABLE,
                 fio::ModeType::empty(),
@@ -231,12 +227,12 @@ impl TestFixture {
     /// by the disk builder if it formats the filesystem beforehand.
     pub async fn check_test_data_file(&self) {
         let (file, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        self.dir("data")
+        self.dir("data", fio::OpenFlags::RIGHT_READABLE)
             .open(fio::OpenFlags::RIGHT_READABLE, fio::ModeType::empty(), "foo", server)
             .expect("open failed");
         file.get_attr().await.expect("get_attr failed");
 
-        let data = self.dir("data");
+        let data = self.dir("data", fio::OpenFlags::RIGHT_READABLE);
         fuchsia_fs::directory::open_file(&data, "foo", fio::OpenFlags::RIGHT_READABLE)
             .await
             .unwrap();
@@ -269,7 +265,7 @@ impl TestFixture {
     }
 
     pub async fn add_ramdisk(&mut self, vmo: zx::Vmo) {
-        let dev = self.dir("dev-topological");
+        let dev = self.dir("dev-topological", fio::OpenFlags::empty());
         let ramdisk =
             RamdiskClientBuilder::new_with_vmo(vmo, Some(512)).dev_root(dev).build().await.unwrap();
         self.ramdisks.push(ramdisk);

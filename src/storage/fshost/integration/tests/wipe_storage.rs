@@ -160,7 +160,7 @@ async fn blobfs_formatted() {
             ..Default::default()
         };
         let controller = find_partition_in(
-            &fixture.dir("dev-topological/class/block"),
+            &fixture.dir("dev-topological/class/block", fio::OpenFlags::empty()),
             matcher,
             zx::Duration::INFINITE,
         )
@@ -214,7 +214,7 @@ async fn data_unformatted() {
         .await
         .expect("get topo path fidl failed")
         .expect("get topo path returned error");
-    let dev_class = fixture.dir("dev-topological/class/block");
+    let dev_class = fixture.dir("dev-topological/class/block", fio::OpenFlags::empty());
     let matcher = PartitionMatcher {
         parent_device: Some(test_disk_path),
         labels: Some(vec!["data".to_string()]),
