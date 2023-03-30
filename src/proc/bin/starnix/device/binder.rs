@@ -314,7 +314,7 @@ struct ActiveTransaction {
 
 /// State held for the duration of a transaction. When a transaction completes (or fails), this
 /// state is dropped, decrementing temporary strong references to binder objects.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct TransactionState {
     // The process whose handle table `handles` belong to.
     proc: Weak<BinderProcess>,
@@ -402,11 +402,8 @@ impl<'a> From<TransientTransactionState<'a>> for TransactionState {
     fn from(mut transient: TransientTransactionState<'a>) -> Self {
         // Clear the transient FD list, so that these FDs no longer get closed.
         transient.transient_fds.clear();
-        // We cannot move out due to the Drop impl, so drain the handles instead and create a new
-        // instance of `TransactionState`.
-        let handles = transient.state.handles.drain(..).collect();
-        let proc = std::mem::replace(&mut transient.state.proc, Weak::new());
-        TransactionState { proc, handles }
+        // We cannot move out due to the Drop impl, so replace with a default one.
+        std::mem::take(&mut transient.state)
     }
 }
 
