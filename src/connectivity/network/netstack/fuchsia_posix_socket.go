@@ -60,9 +60,6 @@ const (
 	maxTCPKeepIntvl = 32767
 	maxTCPKeepCnt   = 127
 
-	// Maximum size of a UDP payload.
-	maxUDPPayloadSize = header.UDPMaximumPacketSize - header.UDPMinimumSize
-
 	signalStreamIncoming        = zx.Signals(socket.SignalStreamIncoming)
 	signalStreamConnected       = zx.Signals(socket.SignalStreamConnected)
 	signalDatagramIncoming      = zx.Signals(socket.SignalDatagramIncoming)
@@ -1632,7 +1629,7 @@ func (eps *endpointWithSocket) handleZxSocketWriteError(err zx.Error, waitThresh
 				unsafe.Pointer(&waitThreshold),
 				uint(unsafe.Sizeof(waitThreshold)),
 			); status != zx.ErrOk {
-				panic(fmt.Sprintf("failed to set property %d with value %d on socket", zx.PropSocketTXThreshold, waitThreshold))
+				panic(fmt.Sprintf("failed to set property %d with value %d on socket: %s", zx.PropSocketTXThreshold, waitThreshold, status))
 			}
 		} else {
 			sigs |= zx.SignalSocketWritable
@@ -1952,6 +1949,8 @@ type sharedDatagramSocketState struct {
 	localEDrainedCond sync.Cond
 
 	err datagramSocketError
+
+	maxPayloadSize uint32
 }
 
 type datagramSocketImpl struct {
@@ -1984,6 +1983,20 @@ func newDatagramSocketImpl(ns *Netstack, netProto tcpip.NetworkProtocolNumber, e
 		return nil, err
 	}
 
+	// Set the TX threshold for the socket to the maximum size of a UDP datagram
+	// that could be enqueued, so that the client can wait for that signal
+	// knowing any valid datagram will be writable when it is reported.
+	const maxUDPPayloadSize uint32 = header.UDPMaximumPacketSize - header.UDPMinimumSize
+	threshold := uint(maxUDPPayloadSize + udpTxPreludeSize)
+	if status := zx.Sys_object_set_property(
+		zx.Handle(eps.peer),
+		zx.PropSocketTXThreshold,
+		unsafe.Pointer(&threshold),
+		uint(unsafe.Sizeof(threshold)),
+	); status != zx.ErrOk {
+		panic(fmt.Sprintf("failed to set property %d with value %d on socket: %s", zx.PropSocketTXThreshold, threshold, status))
+	}
+
 	// Receive all control messages that might be passed to the client.
 	eps.setTimestamp(socket.TimestampOptionNanosecond)
 	eps.setIpReceiveTypeOfService(true)
@@ -1994,7 +2007,9 @@ func newDatagramSocketImpl(ns *Netstack, netProto tcpip.NetworkProtocolNumber, e
 
 	s := &datagramSocketImpl{
 		endpointWithSocket: eps,
-		sharedState:        &sharedDatagramSocketState{},
+		sharedState: &sharedDatagramSocketState{
+			maxPayloadSize: maxUDPPayloadSize,
+		},
 	}
 	s.sharedState.err.mu.signalPeer = eps.local.Handle().SignalPeer
 
@@ -2051,7 +2066,7 @@ func (s *datagramSocketImpl) loopRead(ch chan<- struct{}) {
 	s.wq.EventRegister(&inEntry)
 	defer s.wq.EventUnregister(&inEntry)
 
-	buf := make([]byte, udpRxPreludeSize+maxUDPPayloadSize)
+	buf := make([]byte, udpRxPreludeSize+s.sharedState.maxPayloadSize)
 	for {
 		payloadBuf := buf[udpRxPreludeSize:]
 		w := tcpip.SliceWriter(payloadBuf)
@@ -2108,7 +2123,7 @@ func (s *datagramSocketImpl) loopWrite(ch chan<- struct{}) {
 	s.wq.EventRegister(&waitEntry)
 	defer s.wq.EventUnregister(&waitEntry)
 
-	buf := make([]byte, udpTxPreludeSize+maxUDPPayloadSize)
+	buf := make([]byte, udpTxPreludeSize+s.sharedState.maxPayloadSize)
 	s.sharedState.localEDrainedCond.L.Lock()
 	defer s.sharedState.localEDrainedCond.L.Unlock()
 	for {
@@ -2733,7 +2748,7 @@ func (s *datagramSocketImpl) SendMsgPreflight(_ fidl.Context, req socket.Datagra
 	}
 	response := socket.DatagramSocketSendMsgPreflightResponse{}
 	// TODO(https://fxbug.dev/93268): Compute MTU dynamically once `IP_DONTFRAG` is supported.
-	response.SetMaximumSize(maxUDPPayloadSize)
+	response.SetMaximumSize(s.sharedState.maxPayloadSize)
 
 	response.SetValidity([]zx.Handle{nsEventPair, socketEventPair})
 	if useConnectedAddr {

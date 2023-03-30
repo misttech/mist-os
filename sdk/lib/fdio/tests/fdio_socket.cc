@@ -25,9 +25,12 @@
 #include <latch>
 
 #include <fbl/unique_fd.h>
+#include <zxtest/base/parameterized-value.h>
 #include <zxtest/zxtest.h>
 
 #include "predicates.h"
+#include "src/connectivity/network/netstack/udp_serde/udp_serde.h"
+#include "src/connectivity/network/tests/socket/util.h"
 
 namespace {
 
@@ -646,6 +649,194 @@ TEST_F(TcpSocketTimeoutTest, Snd) {
   ASSERT_NO_FATAL_FAILURE(set_connected());
   server().FillPeerSocket();
   timeout<SO_SNDTIMEO>(mutable_client_fd(), mutable_server_socket());
+}
+
+// An arbitrary maximum payload size.
+constexpr size_t kUdpMaxPayloadSize = 60000;
+
+class DatagramSocketServer final
+    : public fidl::testing::WireTestBase<fuchsia_posix_socket::DatagramSocket> {
+ public:
+  explicit DatagramSocketServer(zx::socket socket) : socket_(std::move(socket)) {}
+
+ private:
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
+    ADD_FAILURE("unexpected message received: %s", name.c_str());
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void Close(CloseCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+    completer.Close(ZX_OK);
+  }
+
+  void Query(QueryCompleter::Sync& completer) final {
+    const std::string_view kProtocol = fuchsia_posix_socket::wire::kDatagramSocketProtocolName;
+    // TODO(https://fxbug.dev/101890): avoid the const cast.
+    uint8_t* data = reinterpret_cast<uint8_t*>(const_cast<char*>(kProtocol.data()));
+    completer.Reply(fidl::VectorView<uint8_t>::FromExternal(data, kProtocol.size()));
+  }
+
+  void Describe(DescribeCompleter::Sync& completer) final {
+    ASSERT_TRUE(socket_.is_valid());
+    fidl::Arena alloc;
+    completer.Reply(fuchsia_posix_socket::wire::DatagramSocketDescribeResponse::Builder(alloc)
+                        .socket(std::move(socket_))
+                        .tx_meta_buf_size(kTxUdpPreludeSize)
+                        .rx_meta_buf_size(kRxUdpPreludeSize)
+                        .metadata_encoding_protocol_version({})
+                        .Build());
+  }
+
+  void SendMsgPreflight(fuchsia_posix_socket::wire::DatagramSocketSendMsgPreflightRequest* request,
+                        SendMsgPreflightCompleter::Sync& completer) override {
+    fuchsia_net::wire::Ipv4SocketAddress fidl_addr = {
+        .port = 8080,
+    };
+    in_addr_t addr = htonl(INADDR_LOOPBACK);
+    memcpy(fidl_addr.address.addr.data(), &addr, sizeof(addr));
+    // Providing no eventpairs means that the client's cache will never be
+    // invalidated; every subsequent preflight check will succeed client-side.
+    std::array<zx::eventpair, 0> eventpairs = {};
+
+    fidl::Arena alloc;
+    fidl::WireTableBuilder response_builder =
+        fuchsia_posix_socket::wire::DatagramSocketSendMsgPreflightResponse::Builder(alloc);
+    response_builder.to(fuchsia_net::wire::SocketAddress::WithIpv4(alloc, fidl_addr))
+        .validity(fidl::VectorView<zx::eventpair>::FromExternal(eventpairs))
+        .maximum_size(kUdpMaxPayloadSize);
+    completer.ReplySuccess(response_builder.Build());
+  }
+
+  zx::socket socket_;
+};
+
+class DatagramSocketTest : public zxtest::Test {
+ public:
+  const size_t kWriteThreshold = kUdpMaxPayloadSize + kTxUdpPreludeSize;
+
+  void SetUp() final {
+    zx::socket socket;
+    ASSERT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &socket, &peer_));
+    ASSERT_OK(socket.get_info(ZX_INFO_SOCKET, &info_, sizeof(info_), nullptr, nullptr));
+    ASSERT_OK(socket.set_property(ZX_PROP_SOCKET_TX_THRESHOLD, &kWriteThreshold,
+                                  sizeof(kWriteThreshold)));
+
+    zx::result server_end = fidl::CreateEndpoints(&client_end_);
+    ASSERT_OK(server_end.status_value());
+    fidl::BindServer(control_loop_.dispatcher(), std::move(server_end.value()),
+                     &server_.emplace(std::move(socket)));
+    control_loop_.StartThread("control");
+  }
+
+  void TearDown() final { control_loop_.Shutdown(); }
+
+  const zx_info_socket_t& info() const { return info_; }
+  zx::socket TakePeer() { return std::move(peer_); }
+  fidl::ClientEnd<fsocket::DatagramSocket> TakeClientEnd() { return std::move(client_end_); }
+
+ private:
+  zx::socket peer_;
+  zx_info_socket_t info_;
+  fidl::ClientEnd<fsocket::DatagramSocket> client_end_;
+  std::optional<DatagramSocketServer> server_;
+  async::Loop control_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
+};
+
+TEST_F(DatagramSocketTest, WriteWithTxZirconSocketRemainder) {
+  // Fast datagram sockets on Fuchsia use multiple buffers to store outbound
+  // payloads, some of which are in Netstack memory and some of which are in
+  // kernel memory. Bytes are shuttled between these buffers using goroutines.
+  //
+  // One edge case arises when the kernel buffers have free space, but not so
+  // much space that they can accept the next datagram payload. In this case,
+  // the client waits until the kernel object can accept the maximum payload
+  // size to ensure that the next write will succeed, in an operation known as a
+  // threshold wait.
+  //
+  // This test exercises this scenario.
+  fbl::unique_fd fd;
+  ASSERT_OK(fdio_fd_create(TakeClientEnd().TakeChannel().release(), fd.reset_and_get_address()));
+
+  // Pick a payload size which ensures that the zircon socket will have a
+  // "remainder".
+  //
+  // In other words, choose a size by which the zircon socket's capacity is not
+  // divisible, such that even when the maximum amount of payloads are written
+  // into the socket, there will be some capacity remaining, and therefore the
+  // socket will still be considered writable.
+  size_t payload_size = std::min(kUdpMaxPayloadSize, info().tx_buf_max - kTxUdpPreludeSize);
+  size_t total_size = payload_size + kTxUdpPreludeSize;
+  {
+    for (; payload_size > 0; --payload_size) {
+      total_size = payload_size + kTxUdpPreludeSize;
+      if (info().tx_buf_max % total_size != 0) {
+        break;
+      }
+    }
+    ASSERT_GT(
+        payload_size, 0,
+        "couldn't find valid UDP payload size for which (zx_socket_info.tx_buf_max %% payload size) != 0");
+  }
+
+  // Send enough packets to fill the zircon socket.
+  std::vector<char> buf(payload_size, 'a');
+  for (size_t remaining = info().tx_buf_max; remaining > total_size; remaining -= total_size) {
+    ASSERT_EQ(send(fd.get(), buf.data(), buf.size(), /* flags */ 0), ssize_t(buf.size()),
+              "%s: %zu capacity remaining in socket", strerror(errno), remaining);
+  }
+
+  // The next write should block because the zircon socket is full.
+  std::latch send_started(1);
+  const auto send_fut = std::async(std::launch::async, [&]() {
+    send_started.count_down();
+    ASSERT_EQ(send(fd.get(), buf.data(), buf.size(), /* flags */ 0), ssize_t(buf.size()));
+  });
+  send_started.wait();
+  ASSERT_NO_FATAL_FAILURE(AssertBlocked(send_fut));
+
+  // Polling for `POLLOUT` should also time out.
+  const auto assert_no_pollout = [&]() {
+    pollfd pfd = {
+        .fd = fd.get(),
+        .events = POLLOUT,
+    };
+    int n = poll(&pfd, 1, 0);
+    ASSERT_GE(n, 0, "%s", strerror(errno));
+    ASSERT_EQ(n, 0);
+  };
+  ASSERT_NO_FATAL_FAILURE(assert_no_pollout());
+
+  // Dequeue packets from the netstack's end of the zircon socket; the pending
+  // write should continue to block and polling for `POLLOUT` should continue to
+  // time out until capacity has reached the write threshold.
+  zx::socket peer = TakePeer();
+  std::vector<char> recvbuf;
+  recvbuf.resize(buf.size() + kTxUdpPreludeSize);
+  for (size_t capacity = info().tx_buf_max % total_size; capacity < kWriteThreshold;
+       capacity += total_size) {
+    ASSERT_NO_FATAL_FAILURE(AssertBlocked(send_fut));
+    ASSERT_NO_FATAL_FAILURE(assert_no_pollout());
+
+    size_t actual;
+    ASSERT_OK(peer.read(/* options */ 0, recvbuf.data(), recvbuf.size(), &actual));
+    ASSERT_EQ(actual, recvbuf.size());
+    EXPECT_EQ(std::string_view(recvbuf.data() + kTxUdpPreludeSize, buf.size()),
+              std::string_view(buf.data(), buf.size()));
+  }
+
+  // Now that the capacity in the socket has crossed the write threshold,
+  // `POLLOUT` should be reported.
+  pollfd pfd = {
+      .fd = fd.get(),
+      .events = POLLOUT,
+  };
+  int n = poll(&pfd, 1, 0);
+  ASSERT_GE(n, 0, "%s", strerror(errno));
+  ASSERT_EQ(n, 1);
+  ASSERT_EQ(pfd.revents, POLLOUT);
+  // The pending write should also succeed.
+  send_fut.wait();
 }
 
 }  // namespace

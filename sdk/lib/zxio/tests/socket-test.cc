@@ -242,6 +242,35 @@ TEST_F(DatagramSocketTest, CreateWithType) {
   ASSERT_OK(zxio_close(&storage()->io, /*should_wait=*/true));
 }
 
+TEST_F(DatagramSocketTest, WaitBegin) {
+  Init();
+  zx_handle_t h = ZX_HANDLE_INVALID;
+  zx_signals_t signals = 0;
+
+  // `WRITABLE` should be mapped to `WRITE_THRESHOLD`.
+  zxio_wait_begin(zxio(), ZXIO_SIGNAL_WRITABLE, &h, &signals);
+  ASSERT_FALSE(signals & ZX_SOCKET_WRITABLE) << signals;
+  ASSERT_TRUE(signals & ZX_SOCKET_WRITE_THRESHOLD) << signals;
+
+  // `WRITE_THRESHOLD` should be left the same.
+  zxio_wait_begin(zxio(), ZXIO_SIGNAL_WRITE_THRESHOLD, &h, &signals);
+  ASSERT_FALSE(signals & ZX_SOCKET_WRITABLE) << signals;
+  ASSERT_TRUE(signals & ZX_SOCKET_WRITE_THRESHOLD) << signals;
+}
+
+TEST_F(DatagramSocketTest, WaitEnd) {
+  Init();
+  zxio_signals_t zxio_signals = 0;
+
+  // `WRITE_THRESHOLD` should be mapped to `WRITE_THRESHOLD` | `WRITABLE`.
+  zxio_wait_end(zxio(), ZX_SOCKET_WRITE_THRESHOLD, &zxio_signals);
+  ASSERT_TRUE(zxio_signals & ZXIO_SIGNAL_WRITE_THRESHOLD | ZXIO_SIGNAL_WRITABLE) << zxio_signals;
+
+  // `WRITABLE` should be masked out.
+  zxio_wait_end(zxio(), ZX_SOCKET_WRITABLE, &zxio_signals);
+  ASSERT_EQ(zxio_signals, 0);
+}
+
 class DatagramSocketServer final : public fidl::testing::WireTestBase<fsocket::DatagramSocket> {
  public:
   DatagramSocketServer() {
