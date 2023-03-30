@@ -271,6 +271,10 @@ void VirtualAudioControlImpl::GetNumDevices(GetNumDevicesCompleter::Sync& comple
   uint32_t num_inputs = 0;
   uint32_t num_outputs = 0;
   for (auto& d : devices_) {
+    if (!d->is_bound()) {
+      devices_.erase(d);
+      continue;
+    }
     if (d->is_input()) {
       num_inputs++;
     } else {

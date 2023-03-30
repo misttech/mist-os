@@ -58,6 +58,7 @@ class VirtualAudioDeviceImpl : public fidl::WireServer<fuchsia_virtualaudio::Dev
       zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher);
 
   bool is_input() const { return is_input_; }
+  bool is_bound() const { return is_bound_; }
 
   // Executes the given task on the FIDL channel's main dispatcher thread.
   // Used to deliver callbacks or events from the driver execution domain.

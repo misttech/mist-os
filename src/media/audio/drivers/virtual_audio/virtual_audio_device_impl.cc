@@ -80,7 +80,7 @@ void VirtualAudioDeviceImpl::ShutdownAsync(fit::closure cb) {
 // This is called when the stream is destroyed by an external entity (perhaps the device host
 // process is removing our stream driver). When this happens, drop the stream so we stop making
 // requests to the stream.
-void VirtualAudioDeviceImpl::StreamIsShuttingDown() { stream_ = nullptr; }
+void VirtualAudioDeviceImpl::StreamIsShuttingDown() { binding_->Unbind(); }
 
 //
 // virtualaudio::Device implementation
