@@ -136,14 +136,12 @@ class FvmTest : public zxtest::Test {
   void CreateRamdisk(uint64_t block_size, uint64_t block_count);
 
   zx::result<fbl::unique_fd> OpenPartition(const fs_management::PartitionMatcher& matcher) const {
-    return WaitForPartition(matcher, zx::duration(0));
+    return fs_management::OpenPartitionWithDevfs(devfs_root().get(), matcher, false, nullptr);
   }
 
   zx::result<fbl::unique_fd> WaitForPartition(
-      const fs_management::PartitionMatcher& matcher,
-      zx::duration timeout = zx::duration::infinite()) const {
-    return fs_management::OpenPartitionWithDevfs(devfs_root().get(), matcher, timeout.get(),
-                                                 nullptr);
+      const fs_management::PartitionMatcher& matcher) const {
+    return fs_management::OpenPartitionWithDevfs(devfs_root().get(), matcher, true, nullptr);
   }
 
   struct AllocatePartitionRequest {
@@ -164,8 +162,8 @@ class FvmTest : public zxtest::Test {
     memcpy(req.guid, request.guid.bytes(), sizeof(req.guid));
     req.name = fidl::StringView::FromExternal(request.name);
 
-    return fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_device().get(),
-                                                        req);
+    return fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_device().get(), req,
+                                                        nullptr);
   }
 
  private:
@@ -2036,7 +2034,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
   // Check initial slice allocation.
   {
     zx::result vp_fd_or =
-        fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, 0, nullptr);
+        fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, true, nullptr);
     ASSERT_OK(vp_fd_or);
     fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
 
@@ -2095,7 +2093,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
 
   {
     zx::result vp_fd_or =
-        fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, 0, nullptr);
+        fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, true, nullptr);
     ASSERT_OK(vp_fd_or);
     fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
 
@@ -2167,7 +2165,7 @@ void CorruptMountHelper(const fbl::unique_fd& devfs_root, const char* partition_
   }
 
   zx::result vp_fd_or =
-      fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, 0, nullptr);
+      fs_management::OpenPartitionWithDevfs(devfs_root.get(), kPartition1Matcher, true, nullptr);
   ASSERT_OK(vp_fd_or);
   fdio_cpp::FdioCaller partition_caller(std::move(vp_fd_or.value()));
 
@@ -2277,7 +2275,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   // The active partition should still exist.
   ASSERT_OK(WaitForPartition(kPartition2Matcher).status_value());
   // The inactive partition should be gone.
-  ASSERT_NE(OpenPartition(kPartition1Matcher).status_value(), ZX_OK);
+  ASSERT_STATUS(OpenPartition(kPartition1Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
   // Reallocate GUID1 as inactive.
 
@@ -2307,7 +2305,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   volume_manager.reset(fvm_device());
 
   ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
-  ASSERT_NE(OpenPartition(kPartition2Matcher).status_value(), ZX_OK);
+  ASSERT_STATUS(OpenPartition(kPartition2Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
   // Try upgrading when the "new" version doesn't exist.
   // (It should return an error and have no noticeable effect).
@@ -2319,7 +2317,7 @@ TEST_F(FvmTest, TestVPartitionUpgrade) {
   volume_manager.reset(fvm_device());
 
   ASSERT_OK(WaitForPartition(kPartition1Matcher).status_value());
-  ASSERT_NE(OpenPartition(kPartition2Matcher).status_value(), ZX_OK);
+  ASSERT_STATUS(OpenPartition(kPartition2Matcher).status_value(), ZX_ERR_NOT_FOUND);
 
   // Try upgrading when the "old" version doesn't exist.
   {

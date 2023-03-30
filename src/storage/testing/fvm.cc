@@ -41,7 +41,7 @@ zx::result<> BindFvm(fidl::UnownedClientEnd<fuchsia_device::Controller> device) 
 }
 
 zx::result<std::string> CreateFvmInstance(const std::string& device_path, size_t slice_size) {
-  zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path.c_str());
+  zx::result device = component::Connect<fuchsia_hardware_block::Block>(device_path);
   if (device.is_error()) {
     return device.take_error();
   }
@@ -74,7 +74,7 @@ zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_
   }
 
   // Open "fvm" driver
-  auto fvm_fd = fbl::unique_fd(open(fvm_disk_path_or->c_str(), O_RDONLY));
+  fbl::unique_fd fvm_fd(open(fvm_disk_path_or->c_str(), O_RDONLY));
   if (!fvm_fd) {
     FX_LOGS(ERROR) << "Could not open FVM driver: errno=" << errno;
     return zx::error(ZX_ERR_BAD_STATE);
@@ -88,20 +88,11 @@ zx::result<std::string> CreateFvmPartition(const std::string& device_path, size_
          sizeof(request.type));
   memcpy(request.guid, kTestUniqueGUID.bytes(), sizeof(request.guid));
 
-  if (auto fd_or = fs_management::FvmAllocatePartition(fvm_fd.get(), request); fd_or.is_error()) {
+  std::string partition_path;
+  if (auto fd_or = fs_management::FvmAllocatePartition(fvm_fd.get(), request, &partition_path);
+      fd_or.is_error()) {
     FX_LOGS(ERROR) << "Could not allocate FVM partition (slice count: "
                    << options.initial_fvm_slice_count << ")";
-    return fd_or.take_error();
-  }
-  fvm_fd.reset();
-
-  std::string partition_path;
-  fs_management::PartitionMatcher matcher{
-      .type_guids = {uuid::Uuid(request.type)},
-      .instance_guids = {kTestUniqueGUID},
-  };
-  if (auto fd_or = fs_management::OpenPartition(matcher, 0, &partition_path); fd_or.is_error()) {
-    FX_LOGS(ERROR) << "Could not locate FVM partition";
     return fd_or.take_error();
   }
   return zx::ok(partition_path);

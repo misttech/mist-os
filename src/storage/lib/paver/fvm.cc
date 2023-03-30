@@ -528,8 +528,8 @@ zx::result<std::vector<BoundZxcryptDevice>> AllocatePartitions(const fbl::unique
       memcpy(name, part_info.pd->name, sizeof(part_info.pd->name));
       LOG("Allocating partition %s consisting of %zu slices\n", name, alloc.slice_count);
     }
-    if (auto fd_or =
-            fs_management::FvmAllocatePartitionWithDevfs(devfs_root.get(), fvm_fd.get(), alloc);
+    if (auto fd_or = fs_management::FvmAllocatePartitionWithDevfs(devfs_root.get(), fvm_fd.get(),
+                                                                  alloc, nullptr);
         fd_or.is_error()) {
       ERROR("Couldn't allocate partition\n");
       return zx::error(ZX_ERR_NO_SPACE);
@@ -595,7 +595,6 @@ struct FvmPartition {
 // until there are none left.
 zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uint8_t type_guid[]) {
   char fvm_topo_path[PATH_MAX] = {0};
-  fbl::unique_fd old_part;
   if (zx_status_t status = GetTopoPathFromFd(fvm_fd, fvm_topo_path, sizeof(fvm_topo_path));
       status != ZX_OK) {
     ERROR("Couldn't get topological path of FVM!\n");
@@ -607,11 +606,14 @@ zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uin
       .parent_device = fvm_topo_path,
   };
   for (;;) {
-    std::string name;
-    auto old_part_or = fs_management::OpenPartition(matcher, ZX_MSEC(500), &name);
-    if (old_part_or.is_error())
-      break;
-    old_part = *std::move(old_part_or);
+    zx::result old_part_or = fs_management::OpenPartition(matcher, false, nullptr);
+    if (old_part_or.is_error()) {
+      if (old_part_or.error_value() == ZX_ERR_NOT_FOUND) {
+        return ZX_OK;
+      }
+      return old_part_or.error_value();
+    }
+    fbl::unique_fd old_part = std::move(old_part_or.value());
     bool is_vpartition;
     if (FvmIsVirtualPartition(old_part, &is_vpartition) != ZX_OK) {
       ERROR("Couldn't confirm old vpartition type\n");
@@ -637,8 +639,6 @@ zx_status_t WipeAllFvmPartitionsWithGuid(const fbl::unique_fd& fvm_fd, const uin
       return status;
     }
   }
-
-  return ZX_OK;
 }
 
 zx::result<> AllocateEmptyPartitions(const fbl::unique_fd& devfs_root,

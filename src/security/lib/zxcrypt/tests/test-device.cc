@@ -335,7 +335,7 @@ void TestDevice::CreateFvmPart(size_t device_size, size_t block_size) {
   }
   req.name = "data";
   auto fvm_part_or =
-      fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_fd.get(), req);
+      fs_management::FvmAllocatePartitionWithDevfs(devfs_root().get(), fvm_fd.get(), req, nullptr);
   ASSERT_EQ(fvm_part_or.status_value(), ZX_OK);
   parent_ = *std::move(fvm_part_or);
 

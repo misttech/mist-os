@@ -249,22 +249,11 @@ std::unique_ptr<TemporaryFvmPartition> TemporaryFvmPartition::Create(int fvm_fd,
   memcpy(request.type, kTestPartGUID.bytes(), sizeof(request.type));
 
   // Create a new partition.
-  fbl::unique_fd fd;
-  if (auto fd_or = fs_management::FvmAllocatePartition(fvm_fd, request); fd_or.is_error()) {
-    fprintf(stderr, "Error: Could not allocate and open FVM partition\n");
-    return nullptr;
-  } else {
-    fd = *std::move(fd_or);
-  }
-
   std::string partition_path;
-  fs_management::PartitionMatcher matcher{
-      .type_guids = {kTestPartGUID},
-      .instance_guids = {unique_guid},
-  };
-  if (auto fd_or = fs_management::OpenPartition(matcher, 0, &partition_path); fd_or.is_error()) {
-    fs_management::DestroyPartition(matcher);
-    fprintf(stderr, "Could not locate FVM partition\n");
+  if (auto fd_or = fs_management::FvmAllocatePartition(fvm_fd, request, &partition_path);
+      fd_or.is_error()) {
+    fprintf(stderr, "Error: Could not allocate and open FVM partition: %s\n",
+            fd_or.status_string());
     return nullptr;
   }
 
@@ -276,8 +265,13 @@ TemporaryFvmPartition::TemporaryFvmPartition(std::string partition_path, uuid::U
     : partition_path_(std::move(partition_path)), unique_guid_(unique_guid) {}
 
 TemporaryFvmPartition::~TemporaryFvmPartition() {
-  ZX_ASSERT(fs_management::DestroyPartition(
-                {.type_guids = {kTestPartGUID}, .instance_guids = {unique_guid_}}) == ZX_OK);
+  zx::result result = fs_management::DestroyPartition(
+      {
+          .type_guids = {kTestPartGUID},
+          .instance_guids = {unique_guid_},
+      },
+      true);
+  ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
 }
 
 std::string TemporaryFvmPartition::GetPartitionPath() { return partition_path_; }
@@ -409,7 +403,13 @@ bool StressFlash(StatusLine* logger, const CommandLineArgs& args, zx::duration d
 void DestroyFlashTestPartitions(StatusLine* status) {
   uint32_t count = 0;
   // Remove any partitions from previous tests
-  while (fs_management::DestroyPartition({.type_guids = {kTestPartGUID}}) == ZX_OK) {
+
+  while (true) {
+    if (zx::result result = fs_management::DestroyPartition({.type_guids = {kTestPartGUID}}, false);
+        result.is_error()) {
+      ZX_ASSERT_MSG(result.error_value() == ZX_ERR_NOT_FOUND, "%s", result.status_string());
+      break;
+    }
     count++;
   }
   status->Log("Deleted %u partitions", count);

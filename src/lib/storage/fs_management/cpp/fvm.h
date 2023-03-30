@@ -61,9 +61,13 @@ zx_status_t FvmOverwriteWithDevfs(int devfs_root_fd, std::string_view relative_p
 // accessible (by watching for a corresponding block device).
 //
 // Returns an open fd to the new partition on success, -1 on error.
-zx::result<fbl::unique_fd> FvmAllocatePartition(int fvm_fd, const alloc_req_t& request);
+//
+// TODO(https://fxbug.dev/124615): use channels rather than strings and file descriptors.
+zx::result<fbl::unique_fd> FvmAllocatePartition(int fvm_fd, const alloc_req_t& request,
+                                                std::string* out_path);
 zx::result<fbl::unique_fd> FvmAllocatePartitionWithDevfs(int devfs_root_fd, int fvm_fd,
-                                                         const alloc_req_t& request);
+                                                         const alloc_req_t& request,
+                                                         std::string* out_path_relative);
 
 // Query the volume manager for info.
 zx::result<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> FvmQuery(int fvm_fd);
@@ -92,16 +96,16 @@ struct PartitionMatcher {
 };
 
 // Waits for a partition to appear which matches |matcher|, and opens it.
-zx::result<fbl::unique_fd> OpenPartition(const PartitionMatcher& matcher, zx_duration_t timeout,
+zx::result<fbl::unique_fd> OpenPartition(const PartitionMatcher& matcher, bool wait,
                                          std::string* out_path);
 zx::result<fbl::unique_fd> OpenPartitionWithDevfs(int devfs_root_fd,
-                                                  const PartitionMatcher& matcher,
-                                                  zx_duration_t timeout,
+                                                  const PartitionMatcher& matcher, bool wait,
                                                   std::string* out_path_relative);
 
 // Finds and destroys the first partition that matches |matcher|, if any.
-zx_status_t DestroyPartition(const PartitionMatcher& matcher);
-zx_status_t DestroyPartitionWithDevfs(int devfs_root_fd, const PartitionMatcher& matcher);
+zx::result<> DestroyPartition(const PartitionMatcher& matcher, bool wait);
+zx::result<> DestroyPartitionWithDevfs(int devfs_root_fd, const PartitionMatcher& matcher,
+                                       bool wait);
 
 // Marks one partition as active and optionally another as inactive in one atomic operation.
 // If both partition GUID are the same, the partition will be activated and

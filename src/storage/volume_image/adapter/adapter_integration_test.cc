@@ -228,8 +228,7 @@ void CheckPartitionsInRamdisk(const FvmDescriptor& fvm_descriptor) {
     fs_management::PartitionMatcher matcher{
         .type_guids = {uuid::Uuid(partition.volume().type.data())},
     };
-    auto partition_fd_or =
-        fs_management::OpenPartition(matcher, zx::sec(10).get(), &partition_path);
+    auto partition_fd_or = fs_management::OpenPartition(matcher, true, &partition_path);
     ASSERT_EQ(partition_fd_or.status_value(), ZX_OK);
 
     if (partition.volume().name == "my-empty-partition") {

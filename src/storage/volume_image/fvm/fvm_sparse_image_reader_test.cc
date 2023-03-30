@@ -32,7 +32,7 @@ namespace {
 constexpr std::string_view sparse_image_path = "/pkg/data/test_fvm.sparse.blk";
 
 zx::result<std::string> AttachFvm(const std::string& device_path) {
-  zx::result device = component::Connect<fuchsia_device::Controller>(device_path.c_str());
+  zx::result device = component::Connect<fuchsia_device::Controller>(device_path);
   if (device.is_error()) {
     return device.take_error();
   }
@@ -125,16 +125,12 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
       .type_guids = {GUID_DATA_VALUE},
   };
 
-  ASSERT_EQ(
-      fs_management::OpenPartition(matcher, zx::duration::infinite().get(), nullptr).status_value(),
-      ZX_OK);
+  ASSERT_EQ(fs_management::OpenPartition(matcher, true, nullptr).status_value(), ZX_OK);
 
   // Attempt to fsck minfs.
   {
     std::string path;
-    ASSERT_EQ(
-        fs_management::OpenPartition(matcher, zx::duration::infinite().get(), &path).status_value(),
-        ZX_OK);
+    ASSERT_EQ(fs_management::OpenPartition(matcher, true, &path).status_value(), ZX_OK);
 
     // And finally run fsck on the volume.
     fs_management::FsckOptions options{
@@ -154,9 +150,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
     fs_management::PartitionMatcher matcher{
         .type_guids = {GUID_BLOB_VALUE},
     };
-    ASSERT_EQ(
-        fs_management::OpenPartition(matcher, zx::duration::infinite().get(), &path).status_value(),
-        ZX_OK);
+    ASSERT_EQ(fs_management::OpenPartition(matcher, true, &path).status_value(), ZX_OK);
 
     // And finally run fsck on the volume.
     fs_management::FsckOptions options{

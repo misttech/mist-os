@@ -255,7 +255,7 @@ zx::result<std::pair<RamDevice, std::string>> CreateRamDevice(
                    0x02, 0x03, 0x04},
           .name = "dummy",
       };
-      if (fs_management::FvmAllocatePartition(fvm_fd.get(), request).is_error()) {
+      if (fs_management::FvmAllocatePartition(fvm_fd.get(), request, nullptr).is_error()) {
         std::cout << "Could not allocate dummy FVM partition" << std::endl;
         return zx::error(ZX_ERR_BAD_STATE);
       }
@@ -545,9 +545,8 @@ class BlobfsInstance : public FilesystemInstance {
         .always_modify = false,
         .force = true,
     };
-    return zx::make_result(fs_management::Fsck(device_path_.c_str(),
-                                               fs_management::kDiskFormatBlobfs, options,
-                                               fs_management::LaunchStdioSync));
+    return zx::make_result(fs_management::Fsck(device_path_, fs_management::kDiskFormatBlobfs,
+                                               options, fs_management::LaunchStdioSync));
   }
 
   zx::result<std::string> DevicePath() const override { return zx::ok(std::string(device_path_)); }

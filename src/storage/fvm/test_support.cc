@@ -48,13 +48,26 @@ fidl::UnownedClientEnd<Protocol> GetChannel(VPartitionAdapter* device) {
 
 zx_status_t RebindBlockDevice(DeviceRef* device) {
   // We need to create a DirWatcher to wait for the block device's child to disappear.
-  std::unique_ptr<device_watcher::DirWatcher> watcher;
-  fbl::unique_fd dir_fd(
-      openat(device->devfs_root_fd().get(), device->path(), O_RDONLY | O_DIRECTORY));
-  if (zx_status_t status = device_watcher::DirWatcher::Create(dir_fd.get(), &watcher);
-      status != ZX_OK) {
-    ADD_FAILURE("DirWatcher::Create('%s'): %s", device->path(), zx_status_get_string(status));
-    return status;
+  fdio_cpp::UnownedFdioCaller caller(device->devfs_root_fd());
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  EXPECT_OK(endpoints);
+  if (endpoints.is_error()) {
+    return endpoints.error_value();
+  }
+  auto& [client_end, server_end] = endpoints.value();
+  const fidl::OneWayStatus status =
+      fidl::WireCall(caller.directory())
+          ->Open(fuchsia_io::OpenFlags::kDirectory, {},
+                 fidl::StringView::FromExternal(device->path()),
+                 fidl::ServerEnd<fuchsia_io::Node>(server_end.TakeChannel()));
+  EXPECT_OK(status);
+  if (!status.ok()) {
+    return status.status();
+  }
+  zx::result watcher = device_watcher::DirWatcher::Create(client_end);
+  EXPECT_OK(watcher);
+  if (watcher.is_error()) {
+    return watcher.error_value();
   }
 
   zx::result channel = GetChannel<fuchsia_device::Controller>(device);
@@ -72,7 +85,8 @@ zx_status_t RebindBlockDevice(DeviceRef* device) {
                 zx_status_get_string(response.error_value()));
     return response.error_value();
   }
-  if (zx_status_t status = watcher->WaitForRemoval(fbl::String() /* any file */, kDeviceWaitTime);
+  if (zx_status_t status =
+          watcher.value().WaitForRemoval(fbl::String() /* any file */, kDeviceWaitTime);
       status != ZX_OK) {
     ADD_FAILURE("Watcher('%s').WaitForRemoval: %s", device->path(), zx_status_get_string(status));
     return status;
@@ -197,8 +211,8 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
       .type_guids = {uuid::Uuid(type.data())},
       .instance_guids = {uuid::Uuid(guid.data())},
   };
-  zx::result device_fd_or = fs_management::OpenPartitionWithDevfs(devfs_root.get(), matcher,
-                                                                  kDeviceWaitTime.get(), &out_path);
+  zx::result device_fd_or =
+      fs_management::OpenPartitionWithDevfs(devfs_root.get(), matcher, true, &out_path);
   if (device_fd_or.is_error()) {
     ADD_FAILURE("Unable to obtain handle for partition.");
     return nullptr;
@@ -208,11 +222,13 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
 }
 
 VPartitionAdapter::~VPartitionAdapter() {
-  ASSERT_OK(fs_management::DestroyPartitionWithDevfs(
-      devfs_root_.get(), {
-                             .type_guids = {uuid::Uuid(type_.data())},
-                             .instance_guids = {uuid::Uuid(guid_.data())},
-                         }));
+  ASSERT_OK(
+      fs_management::DestroyPartitionWithDevfs(devfs_root_.get(),
+                                               {
+                                                   .type_guids = {uuid::Uuid(type_.data())},
+                                                   .instance_guids = {uuid::Uuid(guid_.data())},
+                                               },
+                                               false));
 }
 
 zx_status_t VPartitionAdapter::Extend(uint64_t offset, uint64_t length) {
@@ -230,8 +246,7 @@ zx_status_t VPartitionAdapter::Reconnect() {
       .type_guids = {uuid::Uuid(type_.data())},
       .instance_guids = {uuid::Uuid(guid_.data())},
   };
-  zx::result fd = fs_management::OpenPartitionWithDevfs(devfs_root_.get(), matcher,
-                                                        zx::duration::infinite().get(), &path_);
+  zx::result fd = fs_management::OpenPartitionWithDevfs(devfs_root_.get(), matcher, true, &path_);
   if (fd.is_error()) {
     return fd.status_value();
   }
