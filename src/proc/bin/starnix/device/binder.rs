@@ -44,7 +44,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct ContextManagerAndQueue {
     /// The "name server" process that is addressed via the special handle 0 and is responsible
     /// for implementing the binder protocol `IServiceManager`.
@@ -55,7 +55,7 @@ struct ContextManagerAndQueue {
 }
 
 /// Android's binder kernel driver implementation.
-#[derive(Derivative)]
+#[derive(Derivative, Debug)]
 #[derivative(Default)]
 pub struct BinderDriver {
     /// The context manager and the associate wait queue.
@@ -86,6 +86,7 @@ impl DeviceOps for Arc<BinderDriver> {
 }
 
 /// An instance of the binder driver, associated with the process that opened the binder device.
+#[derive(Debug)]
 struct BinderConnection {
     /// The process that opened the binder device.
     identifier: u64,
@@ -232,6 +233,31 @@ impl FileOps for BinderConnection {
         _data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         error!(EOPNOTSUPP)
+    }
+}
+
+/// A connection to a binder driver from a remote process.
+#[derive(Debug)]
+pub struct RemoteBinderConnection {
+    binder_connection: BinderConnection,
+    binder_process: Arc<BinderProcess>,
+}
+
+impl RemoteBinderConnection {
+    pub fn map_external_vmo(&self, vmo: fidl::Vmo, mapped_address: u64) -> Result<(), Errno> {
+        self.binder_process.map_external_vmo(vmo, mapped_address)
+    }
+
+    pub fn ioctl(
+        &self,
+        current_task: &CurrentTask,
+        request: u32,
+        user_arg: UserAddress,
+    ) -> Result<(), Errno> {
+        self.binder_connection
+            .driver
+            .ioctl(current_task, &self.binder_process, request, user_arg)
+            .map(|_| ())
     }
 }
 
@@ -2330,10 +2356,34 @@ impl BinderDriver {
     /// Creates the binder process and thread state to represent a process with `pid` and one main
     /// thread.
     #[cfg(test)]
+    /// Return a `RemoteBinderConnection` that can be used to driver a remote connection to the
+    /// binder device represented by this driver.
     fn create_process_and_thread(&self, pid: pid_t) -> (Arc<BinderProcess>, Arc<BinderThread>) {
         let binder_process = self.create_local_process(pid);
         let binder_thread = binder_process.lock().find_or_register_thread(pid);
         (binder_process, binder_thread)
+    }
+
+    /// Return a `RemoteBinderConnection` that can be used to driver a remote connection to the
+    /// binder device represented by this driver.
+    pub fn open_remote(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        process_accessor: ClientEnd<fbinder::ProcessAccessorMarker>,
+    ) -> Arc<RemoteBinderConnection> {
+        let process_accessor =
+            fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
+        let binder_process = self.create_remote_process(
+            current_task.id,
+            RemoteResourceAccessor { kernel: current_task.kernel().clone(), process_accessor },
+        );
+        Arc::new(RemoteBinderConnection {
+            binder_connection: BinderConnection {
+                identifier: binder_process.identifier,
+                driver: self.clone(),
+            },
+            binder_process,
+        })
     }
 
     pub fn open_external(
@@ -2351,16 +2401,7 @@ impl BinderDriver {
                     &kernel,
                     &CString::new("external_binder".to_string()).unwrap(),
                 )?;
-                let process_accessor =
-                    fbinder::ProcessAccessorSynchronousProxy::new(process_accessor.into_channel());
-                let binder_process = driver.create_remote_process(
-                    base_task.id,
-                    RemoteResourceAccessor { kernel: kernel.clone(), process_accessor },
-                );
-                let identifier = binder_process.identifier;
-                scopeguard::defer! {
-                    driver.procs.write().remove(&identifier);
-                }
+                let connection = driver.open_remote(&base_task, process_accessor);
                 let mut stream = fbinder::BinderRequestStream::from_channel(
                     fasync::Channel::from_channel(server_end.into_channel())?,
                 );
@@ -2368,7 +2409,7 @@ impl BinderDriver {
                 while let Some(event) = stream.try_next().await? {
                     match event {
                         fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
-                            if binder_process.map_external_vmo(vmo, mapped_address).is_err() {
+                            if connection.map_external_vmo(vmo, mapped_address).is_err() {
                                 control_handle.shutdown();
                             }
                         }
@@ -2392,18 +2433,11 @@ impl BinderDriver {
                                     .clone(),
                             };
 
-                            let driver = driver.clone();
-                            let binder_process = binder_process.clone();
+                            let connection = connection.clone();
 
                             kernel.thread_pool.dispatch(move || {
-                                let mut result = driver
-                                    .ioctl(
-                                        &current_task,
-                                        &binder_process,
-                                        request,
-                                        parameter.into(),
-                                    )
-                                    .map(|_| ())
+                                let mut result = connection
+                                    .ioctl(&current_task, request, parameter.into())
                                     .map_err(|e| {
                                         fposix::Errno::from_primitive(e.code.error_code() as i32)
                                             .unwrap_or(fposix::Errno::Einval)
