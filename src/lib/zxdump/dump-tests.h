@@ -315,9 +315,38 @@ class TestProcessForThreads : public TestProcessForPropertiesAndInfo {
 
  private:
   static constexpr const char* kChildName = "zxdump-thread-test-child";
-  std::array<zx_koid_t, kThreadCount> thread_koids_ = {};
 
   static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
+
+  std::array<zx_koid_t, kThreadCount> thread_koids_ = {};
+};
+
+class TestProcessForThreadState : public TestProcessForPropertiesAndInfo {
+ public:
+  static constexpr size_t kThreadCount = 5;
+
+  // Start a child for thread state dump testing.
+  void StartChild();
+
+  // Do the basic dump using the dumper API.
+  template <typename Writer>
+  void Dump(Writer& writer) {
+    TestProcessForPropertiesAndInfo::Dump(writer, Precollect);
+  }
+
+  // Verify a dump file for that child was inserted and looks right.
+  void CheckDump(zxdump::TaskHolder& holder);
+
+  cpp20::span<const zx_koid_t, kThreadCount> thread_koids() const { return thread_koids_; }
+
+ private:
+  static constexpr const char* kChildName = "zxdump-thread-state-test-child";
+
+  static constexpr uint64_t kRegisterValue = 0x1234d00df00d8765;
+
+  static void Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump);
+
+  std::array<zx_koid_t, kThreadCount> thread_koids_ = {};
 };
 
 class TestProcessForElfSearch : public zxdump::testing::TestProcessForPropertiesAndInfo {

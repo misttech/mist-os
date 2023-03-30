@@ -401,7 +401,7 @@ class TaskHolder::JobTree {
       child.info_.insert_or_assign(ZX_INFO_HANDLE_BASIC, data);
 
       child.live_ = std::move(live);
-      ReifyTask(child);
+      ReifyTask(child, parent);
 
       result = fit::ok(std::ref(child));
       return true;
@@ -546,7 +546,7 @@ class TaskHolder::JobTree {
     placed_child = std::forward<Child>(child);
 
     // Reify the task so parent_map_ lists all its children.
-    ReifyTask(placed_child);
+    ReifyTask(placed_child, parent_job);
 
     return fit::ok();
   }
@@ -660,12 +660,25 @@ class TaskHolder::JobTree {
   // Reify a freshly-inserted task.  This populates parent_map_ with all its
   // child KOIDs.  Threads have nothing to do.
 
-  void ReifyTask(Thread& thread) {}
+  void ReifyTask(Thread& thread, Process& parent) {
+    // This handles a new live thread.  For a thread in a dump (from ReadElf),
+    // the parent object will be moved so this pointer will become invalid.
+    // ReifyTask<Process> below will fix these up.
+    thread.process_ = &parent;
+  }
 
-  void ReifyTask(Process& process) {
+  void ReifyTask(Process& process, Job& parent) {
     ReifyChildren<ZX_INFO_PROCESS_THREADS, &Process::threads_>(process);
 
+    // Now that the Process has been moved into its final place, the
+    // Thread::process_ back-pointers can be set properly.
+    for (auto& [koid, thread] : process.threads_) {
+      thread.process_ = &process;
+    }
+
 #ifdef __Fuchsia__
+    process.dump_machine_ = elfldltl::ElfMachine::kNative;
+
     // Fix the proper page size even before any memory is actually read.
     // The dumper relies on this to do layout alignment.  When reading
     // from a previous dump to dump again, it's always set by observed
@@ -676,11 +689,9 @@ class TaskHolder::JobTree {
     // what the value is since there is no memory to contemplate anyway.
     process.dump_page_size_ = zx_system_get_page_size();
 #endif
-
-    //
   }
 
-  void ReifyTask(Job& job) {
+  void ReifyTask(Job& job, Job& parent) {
     // Reify both lists.
     ReifyChildren<ZX_INFO_JOB_CHILDREN, &Job::children_>(job);
     ReifyChildren<ZX_INFO_JOB_PROCESSES, &Job::processes_>(job);
@@ -1250,6 +1261,10 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
       }
       process.dump_page_size_ = std::max(process.dump_page_size_, page_size);
     }
+  }
+
+  if (process.dump_machine_ == elfldltl::ElfMachine::kNone) {
+    process.dump_machine_ = ehdr.machine;
   }
 
   // Looks like a valid dump.  Finish out the last pending thread.

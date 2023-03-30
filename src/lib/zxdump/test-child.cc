@@ -15,6 +15,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <locale>
+#include <optional>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -22,9 +23,12 @@
 #include <fbl/unique_fd.h>
 
 #ifdef __Fuchsia__
+#include <lib/zx/exception.h>
+#include <lib/zx/process.h>
 #include <lib/zx/thread.h>
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
+#include <zircon/syscalls/exception.h>
 #include <zircon/threads.h>
 #endif
 
@@ -34,7 +38,7 @@ namespace {
 
 constexpr std::string_view kStdinoutFilename = "-";
 
-constexpr char kOptString[] = "c:e:m:M:o:p:t:w:x:dD";
+constexpr char kOptString[] = "c:e:m:M:o:p:t:w:x:dDC:";
 constexpr option kLongOpts[] = {
     {"cat-from", required_argument, nullptr, 'c'},      //
     {"cat-to", required_argument, nullptr, 'o'},        //
@@ -47,6 +51,7 @@ constexpr option kLongOpts[] = {
     {"dladdr-main", no_argument, nullptr, 'd'},         //
     {"dladdr-dso", no_argument, nullptr, 'D'},          //
     {"exit", required_argument, nullptr, 'x'},          //
+    {"crash", required_argument, nullptr, 'C'},         //
 };
 
 int Usage() {
@@ -127,12 +132,35 @@ void PrintDladdr(T ptr) {
   printf("%p\n", info.dli_fbase);
 }
 
+// Crash with the given value in a known register.
+[[noreturn]] void CrashWithRegisterValue(uint64_t value) {
+#if defined(__aarch64__)
+  __asm__(
+      "mov x0, %0\n"
+      "udf #0"
+      :
+      : "r"(value)
+      : "x0");
+#elif defined(__riscv)
+  __asm__(
+      "mv a0, %0\n"
+      "unimp"
+      :
+      : "r"(value)
+      : "a0");
+#elif defined(__x86_64__)
+  __asm__("ud2" : : "a"(value));
+#endif
+  __builtin_trap();
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
   size_t thread_count = 0;
   std::vector<int> ints;
   std::wstring wstr;
+  std::optional<uint64_t> crash_register;
 
 #ifdef __Fuchsia__
   // This doesn't do anything, but calling it ensures that the test-child-dso
@@ -212,6 +240,10 @@ int main(int argc, char** argv) {
       case 'x':
         return atoi(optarg);
 
+      case 'C':
+        crash_register = strtoull(optarg, nullptr, 0);
+        break;
+
       default:
         return Usage();
     }
@@ -221,10 +253,78 @@ int main(int argc, char** argv) {
     return Usage();
   }
 
+#ifdef __Fuchsia__
+  // Register for process exceptions.
+  zx::channel exception_channel;
+  if (crash_register) {
+    zx_status_t status = zx::process::self()->create_exception_channel(0, &exception_channel);
+    ZX_ASSERT_MSG(status == ZX_OK, "zx_task_create_exception_channel: %s",
+                  zx_status_get_string(status));
+  }
+#endif
+
   std::vector<std::thread> threads(thread_count);
   for (std::thread& thread : threads) {
-    thread = std::thread(Hang);
+    if (crash_register) {
+      thread = std::thread(CrashWithRegisterValue, *crash_register);
+    } else {
+      thread = std::thread(Hang);
+    }
   }
+
+#ifdef __Fuchsia__
+  // Wait for all the crashing threads to start up and actually crash.  Then
+  // keep the exception handles alive so the threads stay suspended.
+  std::vector<zx::exception> thread_exceptions;
+  std::vector<zx::suspend_token> thread_suspensions;  // TODO(fxbug.dev/120928): see below
+  if (exception_channel) {
+    while (thread_exceptions.size() < threads.size()) {
+      zx_exception_info_t info;
+      zx_signals_t pending;
+      zx_status_t status =
+          exception_channel.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), &pending);
+      ZX_ASSERT_MSG(status == ZX_OK, "wait on exception channel: %s", zx_status_get_string(status));
+      uint32_t nbytes, nhandles;
+      thread_exceptions.emplace_back();
+      status = exception_channel.read(0, &info, thread_exceptions.back().reset_and_get_address(),
+                                      sizeof(info), 1, &nbytes, &nhandles);
+      ZX_ASSERT_MSG(status == ZX_OK, "read on exception channel: %s", zx_status_get_string(status));
+      ZX_ASSERT(nbytes == sizeof(info));
+      ZX_ASSERT(nhandles == 1);
+
+      // TODO(fxbug.dev/120928): That should work, but actually the kernel
+      // doesn't report a thread as suspended until after exception processing
+      // completes.  Until that is fixed in the kernel, we need to do another
+      // little dance here: we suspend each thread, then let it resume from the
+      // exception so it would retry the faulting instruction; but we then wait
+      // for it to instead report that it's now suspended, and keep it that way
+      // so that when the dumper in the parent test process comes along and
+      // suspends it, it won't be blocked waiting for the suspension to be
+      // completable. Note we don't have to synchronize with the suspension
+      // here being reported as completed, because it's enough to know that the
+      // exception resumption is in progress and the suspension will complete
+      // soon. Our suspension here doesn't interfere with the dumper's
+      // suspension like the exception does, and we've already synchronized
+      // that the thread hit the exception so it will be in the right register
+      // state when the dumper's suspension completes.
+      zx::thread thread;
+      status = thread_exceptions.back().get_thread(&thread);
+      ZX_ASSERT_MSG(status == ZX_OK, "zx_exception_get_thread: %s", zx_status_get_string(status));
+      thread_suspensions.emplace_back();
+      status = thread.suspend(&thread_suspensions.back());
+      ZX_ASSERT_MSG(status == ZX_OK, "zx_task_suspend: %s", zx_status_get_string(status));
+      constexpr uint32_t kHandled = ZX_EXCEPTION_STATE_HANDLED;
+      status = thread_exceptions.back().set_property(ZX_PROP_EXCEPTION_STATE, &kHandled,
+                                                     sizeof(kHandled));
+      ZX_ASSERT_MSG(status == ZX_OK, "zx_object_set_property on exception object: %s",
+                    zx_status_get_string(status));
+      // This lets the thread resume, and immediately process its suspension.
+      // Now the thread_suspensions.back() handle will keep it suspended.
+      thread_exceptions.back().reset();
+    }
+  }
+#endif
+
   if (thread_count > 0) {
 #ifdef __Fuchsia__
     PrintKoid(thrd_current());

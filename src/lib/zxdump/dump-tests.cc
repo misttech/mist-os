@@ -547,6 +547,109 @@ void TestProcessForThreads::CheckDump(zxdump::TaskHolder& holder) {
   }
 }
 
+void TestProcessForThreadState::StartChild() {
+  SpawnAction({
+      .action = FDIO_SPAWN_ACTION_SET_NAME,
+      .name = {kChildName},
+  });
+
+  fbl::unique_fd read_pipe;
+  {
+    int pipe_fd[2];
+    ASSERT_EQ(0, pipe(pipe_fd)) << strerror(errno);
+    read_pipe.reset(pipe_fd[STDIN_FILENO]);
+    SpawnAction({
+        .action = FDIO_SPAWN_ACTION_TRANSFER_FD,
+        .fd = {.local_fd = pipe_fd[STDOUT_FILENO], .target_fd = STDOUT_FILENO},
+    });
+  }
+
+  ASSERT_NO_FATAL_FAILURE(TestProcess::StartChild({
+      "-t",
+      std::to_string(kThreadCount - 1).c_str(),
+      "-C",
+      std::to_string(kRegisterValue).c_str(),
+  }));
+
+  // The test-child wrote the KOID for each thread.  Reading these immediately
+  // synchronizes with the child having started up and progressed far enough to
+  // have all the threads launched and crashed before the process gets dumped.
+  FILE* pipef = fdopen(read_pipe.get(), "r");
+  ASSERT_TRUE(pipef) << "fdopen: " << read_pipe.get() << strerror(errno);
+  auto close_pipef = fit::defer([pipef]() { fclose(pipef); });
+  std::ignore = read_pipe.release();
+
+  for (zx_koid_t& koid : thread_koids_) {
+    // scanf needs readahead and the child will hang after writing so don't
+    // match the trailing \n explicitly; once it terminates each line it will
+    // be implicitly skipped before the next as the leading space matches all
+    // whitespace.  But the final \n will be just seen in the readahead and not
+    // cause scanf to try to read any more from the pipe, which won't have any.
+    ASSERT_EQ(1, fscanf(pipef, " %" SCNu64, &koid));
+  }
+}
+
+void TestProcessForThreadState::Precollect(zxdump::TaskHolder& holder, zxdump::ProcessDump& dump) {
+  auto result = dump.SuspendAndCollectThreads();
+  EXPECT_TRUE(result.is_ok()) << result.error_value();
+}
+
+void TestProcessForThreadState::CheckDump(zxdump::TaskHolder& holder) {
+  auto find_result = holder.root_job().find(koid());
+  ASSERT_TRUE(find_result.is_ok()) << find_result.error_value();
+
+  ASSERT_EQ(find_result->get().type(), ZX_OBJ_TYPE_PROCESS);
+  zxdump::Process& read_process = static_cast<zxdump::Process&>(find_result->get());
+
+  auto list_result = read_process.get_info<ZX_INFO_PROCESS_THREADS>();
+  ASSERT_TRUE(list_result.is_ok()) << list_result.error_value();
+  EXPECT_THAT(*list_result, UnorderedElementsAreArray(thread_koids()));
+
+  // This has an overload for each machine's general-registers type.
+  // Checking the dump reads the right one for the dump's machine.
+  struct GetCrashRegister {
+    constexpr uint64_t operator()(const zx_arm64_thread_state_general_regs_t& regs) const {
+      return regs.r[0];
+    }
+
+    constexpr uint64_t operator()(const zx_riscv64_thread_state_general_regs_t& regs) const {
+      return regs.a0;
+    }
+
+    constexpr uint64_t operator()(const zx_x86_64_thread_state_general_regs_t& regs) const {
+      return regs.rax;
+    }
+  };
+
+  // This takes the result of zxdump::Thread::read_state<RegsType>.
+  auto check_crash_register = [](auto result) {
+    ASSERT_TRUE(result.is_ok()) << result.error_value();
+    EXPECT_EQ(GetCrashRegister{}(*result), kRegisterValue);
+  };
+
+  auto threads_result = read_process.threads();
+  ASSERT_TRUE(threads_result.is_ok()) << threads_result.error_value();
+  for (auto& [koid, thread] : threads_result->get()) {
+    // The first KOID printed is the main thread, which doesn't crash.
+    // So skip that one.
+    if (koid != thread_koids().front()) {
+      switch (read_process.dump_machine()) {
+        case elfldltl::ElfMachine::kAarch64:
+          check_crash_register(thread.read_state<zx_arm64_thread_state_general_regs_t>());
+          break;
+        case elfldltl::ElfMachine::kRiscv:
+          check_crash_register(thread.read_state<zx_riscv64_thread_state_general_regs_t>());
+          break;
+        case elfldltl::ElfMachine::kX86_64:
+          check_crash_register(thread.read_state<zx_x86_64_thread_state_general_regs_t>());
+          break;
+        default:
+          FAIL() << "unsupported machine " << static_cast<uint32_t>(read_process.dump_machine());
+      }
+    }
+  }
+}
+
 namespace {
 
 TEST(ZxdumpTests, ProcessDumpBasic) {
@@ -842,6 +945,20 @@ TEST(ZxdumpTests, ProcessDumpThreads) {
   zxdump::FdWriter writer(file.RewoundFd());
 
   TestProcessForThreads process;
+  ASSERT_NO_FATAL_FAILURE(process.StartChild());
+  ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
+
+  zxdump::TaskHolder holder;
+  auto read_result = holder.Insert(file.RewoundFd());
+  ASSERT_TRUE(read_result.is_ok()) << read_result.error_value();
+  ASSERT_NO_FATAL_FAILURE(process.CheckDump(holder));
+}
+
+TEST(ZxdumpTests, ProcessDumpThreadState) {
+  TestFile file;
+  zxdump::FdWriter writer(file.RewoundFd());
+
+  TestProcessForThreadState process;
   ASSERT_NO_FATAL_FAILURE(process.StartChild());
   ASSERT_NO_FATAL_FAILURE(process.Dump(writer));
 

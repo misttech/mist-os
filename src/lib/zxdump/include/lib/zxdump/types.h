@@ -5,9 +5,11 @@
 #ifndef SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_TYPES_H_
 #define SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_TYPES_H_
 
+#include <lib/elfldltl/constants.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls/debug.h>
 #include <zircon/syscalls/exception.h>
 #include <zircon/syscalls/object.h>
 #include <zircon/types.h>
@@ -291,6 +293,84 @@ struct RemoveSpan;
 template <typename T>
 struct RemoveSpan<cpp20::span<T>> {
   using type = T;
+};
+
+template <class StateType>
+struct ThreadStateTraits {
+  static_assert(!std::is_same_v<StateType, StateType>,
+                "invalid type specialization for zxdump::Thread::read_state<StateType>");
+};
+
+template <>
+struct ThreadStateTraits<zx_x86_64_thread_state_general_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_GENERAL_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kX86_64;
+};
+
+template <>
+struct ThreadStateTraits<zx_x86_64_thread_state_fp_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_FP_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kX86_64;
+};
+
+template <>
+struct ThreadStateTraits<zx_x86_64_thread_state_vector_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_VECTOR_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kX86_64;
+};
+
+template <>
+struct ThreadStateTraits<zx_x86_64_thread_state_debug_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_DEBUG_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kX86_64;
+};
+
+template <>
+struct ThreadStateTraits<zx_arm64_thread_state_general_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_GENERAL_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kAarch64;
+};
+
+template <>
+struct ThreadStateTraits<zx_arm64_thread_state_fp_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_FP_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kAarch64;
+};
+
+template <>
+struct ThreadStateTraits<zx_arm64_thread_state_vector_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_VECTOR_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kAarch64;
+};
+
+template <>
+struct ThreadStateTraits<zx_arm64_thread_state_debug_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_DEBUG_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kAarch64;
+};
+
+template <>
+struct ThreadStateTraits<zx_riscv64_thread_state_general_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_GENERAL_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kRiscv;
+};
+
+template <>
+struct ThreadStateTraits<zx_riscv64_thread_state_fp_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_FP_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kRiscv;
+};
+
+template <>
+struct ThreadStateTraits<zx_riscv64_thread_state_vector_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_VECTOR_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kRiscv;
+};
+
+template <>
+struct ThreadStateTraits<zx_riscv64_thread_state_debug_regs_t> {
+  static constexpr zx_thread_state_topic_t kTopic = ZX_THREAD_STATE_DEBUG_REGS;
+  static constexpr elfldltl::ElfMachine kMachine = elfldltl::ElfMachine::kRiscv;
 };
 
 // This prints "op: status" with the status string.

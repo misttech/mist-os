@@ -53,6 +53,37 @@ T GetHandleBasicInfo(const std::map<zx_object_info_topic_t, ByteView>& info) {
   return T{};
 }
 
+[[maybe_unused]] constexpr size_t ThreadStateSize(zx_thread_state_topic_t topic,
+                                                  elfldltl::ElfMachine machine) {
+  switch (machine) {
+#define MACHINE_REGS(elf_machine, zx_cpu)                         \
+  case elfldltl::ElfMachine::elf_machine:                         \
+    switch (topic) {                                              \
+      case ZX_THREAD_STATE_GENERAL_REGS:                          \
+        return sizeof(zx_##zx_cpu##_thread_state_general_regs_t); \
+      case ZX_THREAD_STATE_FP_REGS:                               \
+        return sizeof(zx_##zx_cpu##_thread_state_fp_regs_t);      \
+      case ZX_THREAD_STATE_VECTOR_REGS:                           \
+        return sizeof(zx_##zx_cpu##_thread_state_vector_regs_t);  \
+      case ZX_THREAD_STATE_DEBUG_REGS:                            \
+        return sizeof(zx_##zx_cpu##_thread_state_debug_regs_t);   \
+      case ZX_THREAD_STATE_SINGLE_STEP:                           \
+        return sizeof(zx_thread_state_single_step_t);             \
+    }                                                             \
+    break
+
+    MACHINE_REGS(kX86_64, x86_64);
+    MACHINE_REGS(kAarch64, arm64);
+    MACHINE_REGS(kRiscv, riscv64);
+
+#undef MACHINE_REGS
+
+    default:
+      break;
+  }
+  return 0;
+}
+
 }  // namespace
 
 zx_koid_t Object::koid() const {
@@ -135,9 +166,45 @@ fit::result<Error, ByteView> Object::get_property(uint32_t property) {
 fit::result<Error, ByteView> Thread::read_state(zx_thread_state_topic_t topic) {
   auto found = state_.find(topic);
   if (found == state_.end()) {
-    return fit::error(Error{"zx_thread_read_state", ZX_ERR_NOT_SUPPORTED});
+    if (!live()) {
+      return fit::error(Error{"zx_thread_read_state", ZX_ERR_NOT_SUPPORTED});
+    }
+#ifdef __Fuchsia__
+    zx::unowned_thread thread{live().get()};
+    const size_t state_size = ThreadStateSize(topic, process_->dump_machine());
+    auto buffer = GetBuffer(state_size);
+    if (zx_status_t status = thread->read_state(topic, buffer, state_size); status != ZX_OK) {
+      ZX_ASSERT_MSG(status != ZX_ERR_BUFFER_TOO_SMALL, "topic %u size %zu", topic, state_size);
+      return fit::error(Error{"zx_thread_read_state", status});
+    }
+    auto [it, unique] = state_.emplace(topic, ByteView{buffer, state_size});
+    ZX_DEBUG_ASSERT(unique);
+    found = it;
+#else
+    ZX_PANIC("unreachable");
+#endif
   }
   return fit::ok(found->second);
+}
+
+fit::result<Error, ByteView> Thread::read_state(zx_thread_state_topic_t topic,
+                                                elfldltl::ElfMachine machine, size_t size) {
+  if (process_->dump_machine() != machine) {
+    return fit::error{Error{
+        "Thread::read_state type for wrong machine",
+        ZX_ERR_INVALID_ARGS,
+    }};
+  }
+
+  auto result = read_state(topic);
+  if (result.is_ok() && result->size_bytes() != size) {
+    return fit::error{Error{
+        "thread state has wrong size",
+        ZX_ERR_IO_DATA_INTEGRITY,
+    }};
+  };
+
+  return result;
 }
 
 fit::result<Error, std::reference_wrapper<Object>> Object::get_child(zx_koid_t koid) {
