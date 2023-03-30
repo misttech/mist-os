@@ -61,25 +61,25 @@ impl<T: ReadBytes> Block<T> {
 
     /// Returns the order of the block.
     pub fn order(&self) -> u8 {
-        self.read_header().order()
+        self.header().order()
     }
 
     /// Returns the magic number in a HEADER block.
     pub fn header_magic(&self) -> Result<u32, Error> {
         self.check_type(BlockType::Header)?;
-        Ok(self.read_header().header_magic())
+        Ok(self.header().header_magic())
     }
 
     /// Returns the version of a HEADER block.
     pub fn header_version(&self) -> Result<u32, Error> {
         self.check_type(BlockType::Header)?;
-        Ok(self.read_header().header_version())
+        Ok(self.header().header_version())
     }
 
     /// Returns the generation count of a HEADER block.
     pub fn header_generation_count(&self) -> Result<u64, Error> {
         self.check_type(BlockType::Header)?;
-        Ok(self.read_payload().header_generation_count())
+        Ok(self.payload().header_generation_count())
     }
 
     /// Returns the size of the part of the VMO that is currently allocated. The size is saved in
@@ -97,50 +97,50 @@ impl<T: ReadBytes> Block<T> {
     /// True if the header is locked, false otherwise.
     pub fn header_is_locked(&self) -> Result<bool, Error> {
         self.check_type(BlockType::Header)?;
-        let payload = self.read_payload();
+        let payload = self.payload();
         Ok(payload.header_generation_count() & 1 == 1)
     }
 
     /// Gets the double value of a DOUBLE_VALUE block.
     pub fn double_value(&self) -> Result<f64, Error> {
         self.check_type(BlockType::DoubleValue)?;
-        Ok(f64::from_bits(self.read_payload().numeric_value()))
+        Ok(f64::from_bits(self.payload().numeric_value()))
     }
 
     /// Gets the value of an INT_VALUE block.
     pub fn int_value(&self) -> Result<i64, Error> {
         self.check_type(BlockType::IntValue)?;
-        Ok(i64::from_le_bytes(self.read_payload().numeric_value().to_le_bytes()))
+        Ok(i64::from_le_bytes(self.payload().numeric_value().to_le_bytes()))
     }
 
     /// Gets the unsigned value of a UINT_VALUE block.
     pub fn uint_value(&self) -> Result<u64, Error> {
         self.check_type(BlockType::UintValue)?;
-        Ok(self.read_payload().numeric_value())
+        Ok(self.payload().numeric_value())
     }
 
     /// Gets the bool values of a BOOL_VALUE block.
     pub fn bool_value(&self) -> Result<bool, Error> {
         self.check_type(BlockType::BoolValue)?;
-        Ok(self.read_payload().numeric_value() != 0)
+        Ok(self.payload().numeric_value() != 0)
     }
 
     /// Gets the index of the EXTENT of the PROPERTY block.
     pub fn property_extent_index(&self) -> Result<BlockIndex, Error> {
         self.check_type(BlockType::BufferValue)?;
-        Ok(BlockIndex::new(self.read_payload().property_extent_index()))
+        Ok(BlockIndex::new(self.payload().property_extent_index()))
     }
 
     /// Gets the total length of a PROPERTY or STRING_REFERERENCE block.
     pub fn total_length(&self) -> Result<usize, Error> {
         self.check_multi_type(&[BlockType::BufferValue, BlockType::StringReference])?;
-        Ok(self.read_payload().total_length() as usize)
+        Ok(self.payload().total_length() as usize)
     }
 
     /// Gets the flags of a PROPERTY block.
     pub fn property_format(&self) -> Result<PropertyFormat, Error> {
         self.check_type(BlockType::BufferValue)?;
-        let raw_format = self.read_payload().property_flags();
+        let raw_format = self.payload().property_flags();
         PropertyFormat::from_u8(raw_format)
             .ok_or_else(|| Error::invalid_flags("property", raw_format, self.index()))
     }
@@ -148,7 +148,7 @@ impl<T: ReadBytes> Block<T> {
     /// Returns the next EXTENT in an EXTENT chain.
     pub fn next_extent(&self) -> Result<BlockIndex, Error> {
         self.check_multi_type(&[BlockType::Extent, BlockType::StringReference])?;
-        Ok(BlockIndex::new(self.read_header().extent_next_index()))
+        Ok(BlockIndex::new(self.header().extent_next_index()))
     }
 
     /// Returns the payload bytes value of an EXTENT block.
@@ -163,13 +163,13 @@ impl<T: ReadBytes> Block<T> {
     /// Gets the NAME block index of a *_VALUE block.
     pub fn name_index(&self) -> Result<BlockIndex, Error> {
         self.check_any_value()?;
-        Ok(BlockIndex::new(self.read_header().value_name_index()))
+        Ok(BlockIndex::new(self.header().value_name_index()))
     }
 
     /// Gets the format of an ARRAY_VALUE block.
     pub fn array_format(&self) -> Result<ArrayFormat, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        let raw_flags = self.read_payload().array_flags();
+        let raw_flags = self.payload().array_flags();
         ArrayFormat::from_u8(raw_flags)
             .ok_or_else(|| Error::invalid_flags("array", raw_flags, self.index()))
     }
@@ -177,13 +177,13 @@ impl<T: ReadBytes> Block<T> {
     /// Gets the number of slots in an ARRAY_VALUE block.
     pub fn array_slots(&self) -> Result<usize, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        Ok(self.read_payload().array_slots_count() as usize)
+        Ok(self.payload().array_slots_count() as usize)
     }
 
     /// Gets the type of each slot in an ARRAY_VALUE block.
     pub fn array_entry_type(&self) -> Result<BlockType, Error> {
         self.check_type(BlockType::ArrayValue)?;
-        let array_type_raw = self.read_payload().array_entry_type();
+        let array_type_raw = self.payload().array_entry_type();
         let array_type = BlockType::from_u8(array_type_raw)
             .ok_or_else(|| Error::InvalidBlockTypeNumber(self.index(), array_type_raw))?;
         if !array_type.is_valid_for_array() {
@@ -235,14 +235,14 @@ impl<T: ReadBytes> Block<T> {
     /// Gets the index of the content of this LINK_VALUE block.
     pub fn link_content_index(&self) -> Result<BlockIndex, Error> {
         self.check_type(BlockType::LinkValue)?;
-        let payload = self.read_payload();
+        let payload = self.payload();
         Ok(BlockIndex::new(payload.content_index()))
     }
 
     /// Gets the node disposition of a LINK_VALUE block.
     pub fn link_node_disposition(&self) -> Result<LinkNodeDisposition, Error> {
         self.check_type(BlockType::LinkValue)?;
-        let payload = self.read_payload();
+        let payload = self.payload();
         let flag = payload.disposition_flags();
         LinkNodeDisposition::from_u8(flag)
             .ok_or_else(|| Error::invalid_flags("disposition type", flag, self.index()))
@@ -288,25 +288,25 @@ impl<T: ReadBytes> Block<T> {
     /// Get the parent block index of a *_VALUE block.
     pub fn parent_index(&self) -> Result<BlockIndex, Error> {
         self.check_any_value()?;
-        Ok(BlockIndex::new(self.read_header().value_parent_index()))
+        Ok(BlockIndex::new(self.header().value_parent_index()))
     }
 
     /// Get the child count of a NODE_VALUE block.
     pub fn child_count(&self) -> Result<u64, Error> {
         self.check_multi_type(&[BlockType::NodeValue, BlockType::Tombstone])?;
-        Ok(self.read_payload().numeric_value())
+        Ok(self.payload().numeric_value())
     }
 
     /// Get next free block
     pub fn free_next_index(&self) -> Result<BlockIndex, Error> {
         self.check_type(BlockType::Free)?;
-        Ok(BlockIndex::new(self.read_header().free_next_index()))
+        Ok(BlockIndex::new(self.header().free_next_index()))
     }
 
     /// Get the length of the name of a NAME block
     pub fn name_length(&self) -> Result<usize, Error> {
         self.check_type(BlockType::Name)?;
-        Ok(self.read_header().name_length() as usize)
+        Ok(self.header().name_length() as usize)
     }
 
     /// Returns the contents of a NAME block.
@@ -321,7 +321,7 @@ impl<T: ReadBytes> Block<T> {
     /// Returns the current reference count of a string reference.
     pub fn string_reference_count(&self) -> Result<u32, Error> {
         self.check_type(BlockType::StringReference)?;
-        let header = self.read_header();
+        let header = self.header();
         Ok(header.string_reference_count())
     }
 
@@ -341,13 +341,13 @@ impl<T: ReadBytes> Block<T> {
 
     /// Returns the type of a block. Panics on an invalid value.
     pub fn block_type(&self) -> BlockType {
-        let block_type = self.read_header().block_type();
+        let block_type = self.header().block_type();
         BlockType::from_u8(block_type).unwrap()
     }
 
     /// Returns the type of a block or an error if invalid.
     pub fn block_type_or(&self) -> Result<BlockType, Error> {
-        let raw_type = self.read_header().block_type();
+        let raw_type = self.header().block_type();
         BlockType::from_u8(raw_type)
             .ok_or_else(|| Error::InvalidBlockTypeNumber(self.index(), raw_type))
     }
@@ -355,7 +355,7 @@ impl<T: ReadBytes> Block<T> {
     /// Check that the block type is |block_type|
     fn check_type(&self, block_type: BlockType) -> Result<(), Error> {
         if cfg!(any(debug_assertions, test)) {
-            let self_type = self.read_header().block_type();
+            let self_type = self.header().block_type();
             return self.check_type_eq(self_type, block_type);
         }
         Ok(())
@@ -388,14 +388,14 @@ impl<T: ReadBytes> Block<T> {
     }
 
     /// Get the block header.
-    fn read_header(&self) -> BlockHeader {
+    fn header(&self) -> BlockHeader {
         let mut bytes = [0u8; 8];
         self.container.read_at(self.header_offset(), &mut bytes);
         BlockHeader(u64::from_le_bytes(bytes))
     }
 
     /// Get the block payload.
-    fn read_payload(&self) -> Payload {
+    fn payload(&self) -> Payload {
         let mut bytes = [0u8; 8];
         self.container.read_at(self.payload_offset(), &mut bytes);
         Payload(u64::from_le_bytes(bytes))
@@ -414,7 +414,7 @@ impl<T: ReadBytes> Block<T> {
     /// Check if the HEADER block is locked (when generation count is odd).
     pub fn check_locked(&self, value: bool) -> Result<(), Error> {
         if cfg!(any(debug_assertions, test)) {
-            let payload = self.read_payload();
+            let payload = self.payload();
             if (payload.header_generation_count() & 1 == 1) != value {
                 return Err(Error::ExpectedLockState(value));
             }
@@ -486,7 +486,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         if order >= constants::NUM_ORDERS {
             return Err(Error::InvalidBlockOrder(order));
         }
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_order(order);
         self.write_header(header);
         Ok(())
@@ -510,7 +510,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// NOTE: this should only be used for testing.
     pub fn set_header_magic(&mut self, value: u32) -> Result<(), Error> {
         self.check_type(BlockType::Header)?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_header_magic(value);
         self.write_header(header);
         Ok(())
@@ -533,7 +533,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Freeze the HEADER, indicating a VMO is frozen.
     pub fn freeze_header(&mut self) -> Result<u64, Error> {
         self.check_type(BlockType::Header)?;
-        let mut payload = self.read_payload();
+        let mut payload = self.payload();
         let value = payload.header_generation_count();
         payload.set_header_generation_count(constants::VMO_FROZEN);
         self.write_payload(payload);
@@ -569,7 +569,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
 
     /// Initializes a TOMBSTONE block.
     pub fn become_tombstone(&mut self) -> Result<(), Error> {
-        let header = self.read_header();
+        let header = self.header();
         self.check_type_eq(header.block_type(), BlockType::NodeValue)?;
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
@@ -580,7 +580,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
 
     /// Converts a FREE block to a RESERVED block
     pub fn become_reserved(&mut self) -> Result<(), Error> {
-        let header = self.read_header();
+        let header = self.header();
         self.check_type_eq(header.block_type(), BlockType::Free)?;
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
@@ -591,7 +591,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
 
     /// Converts a block to a FREE block
     pub fn become_free(&mut self, next: BlockIndex) {
-        let header = self.read_header();
+        let header = self.header();
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
         new_header.set_block_type(BlockType::Free as u8);
@@ -698,7 +698,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Converts a block to an EXTENT block.
     pub fn become_extent(&mut self, next_extent_index: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_block_type(BlockType::Extent as u8);
         header.set_extent_next_index(*next_extent_index);
         self.write_header(header);
@@ -708,7 +708,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Sets the index of the next EXTENT in the chain.
     pub fn set_extent_next_index(&mut self, next_extent_index: BlockIndex) -> Result<(), Error> {
         self.check_multi_type(&[BlockType::Extent, BlockType::StringReference])?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_extent_next_index(*next_extent_index);
         self.write_header(header);
         Ok(())
@@ -835,7 +835,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// the payload string and total length.
     pub fn become_string_reference(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::Reserved)?;
-        let header = self.read_header();
+        let header = self.header();
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
         new_header.set_block_type(BlockType::StringReference as u8);
@@ -848,7 +848,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Sets the total length of a BUFFER_VALUE or STRING_REFERENCE block.
     pub fn set_total_length(&mut self, length: u32) -> Result<(), Error> {
         self.check_multi_type(&[BlockType::BufferValue, BlockType::StringReference])?;
-        let mut payload = self.read_payload();
+        let mut payload = self.payload();
         payload.set_total_length(length);
         self.write_payload(payload);
         Ok(())
@@ -857,7 +857,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Sets the index of the EXTENT of a BUFFER_VALUE block.
     pub fn set_property_extent_index(&mut self, index: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::BufferValue)?;
-        let mut payload = self.read_payload();
+        let mut payload = self.payload();
         payload.set_property_extent_index(*index);
         self.write_payload(payload);
         Ok(())
@@ -873,7 +873,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Increment the reference count by 1.
     pub fn increment_string_reference_count(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::StringReference)?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         let cur = header.string_reference_count();
         let new_count = cur.checked_add(1).ok_or(Error::InvalidReferenceCount)?;
         header.set_string_reference_count(new_count);
@@ -885,7 +885,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Decrement the reference count by 1.
     pub fn decrement_string_reference_count(&mut self) -> Result<(), Error> {
         self.check_type(BlockType::StringReference)?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         let cur = header.string_reference_count();
         let new_count = cur.checked_sub(1).ok_or(Error::InvalidReferenceCount)?;
         header.set_string_reference_count(new_count);
@@ -923,7 +923,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
                 bytes = &bytes[..bytes.len() - 1];
             }
         }
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_block_type(BlockType::Name as u8);
         header.set_name_length(u16::from_usize(bytes.len()).unwrap());
         self.write_header(header);
@@ -934,7 +934,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
     /// Set the next free block.
     pub fn set_free_next_index(&mut self, next_free: BlockIndex) -> Result<(), Error> {
         self.check_type(BlockType::Free)?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_free_next_index(*next_free);
         self.write_header(header);
         Ok(())
@@ -958,7 +958,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
 
     pub fn set_parent(&mut self, new_parent_index: BlockIndex) -> Result<(), Error> {
         self.check_any_value()?;
-        let mut header = self.read_header();
+        let mut header = self.header();
         header.set_value_parent_index(*new_parent_index);
         self.write_header(header);
         Ok(())
@@ -974,7 +974,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         if !block_type.is_any_value() {
             return Err(Error::UnexpectedBlockTypeRepr("*_VALUE".to_string(), block_type));
         }
-        let header = self.read_header();
+        let header = self.header();
         self.check_type_eq(header.block_type(), BlockType::Reserved)?;
         let mut new_header = BlockHeader(0);
         new_header.set_order(header.order());
@@ -1008,7 +1008,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
 
     /// Increment generation counter in a HEADER block for locking/unlocking
     fn increment_generation_count(&mut self) {
-        let mut payload = self.read_payload();
+        let mut payload = self.payload();
         let value = payload.header_generation_count();
         let new_value = if value == u64::max_value() { 0 } else { value + 1 };
         payload.set_header_generation_count(new_value);
