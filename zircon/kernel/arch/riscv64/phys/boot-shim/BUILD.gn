@@ -46,9 +46,9 @@ phys_executable("riscv64-qemu-boot-shim") {
 }
 
 qemu_shim_phys_tests = [
-  "phys-unittests",
-  "memory-test",
-  "physload-test",
+  "physload-handoff-test",
+  "zbi-phys-unittests",
+  "zbi-memory-test",
 ]
 
 qemu_shim_tests = qemu_shim_phys_tests + [
@@ -94,7 +94,7 @@ group("boot_tests") {
 
 foreach(test, qemu_shim_phys_tests) {
   qemu_shim_test(test) {
-    deps = [ "//zircon/kernel/phys/test:zbi-$test.zbi($phys_toolchain)" ]
+    deps = [ "//zircon/kernel/phys/test:$test.zbi($phys_toolchain)" ]
   }
 }
 

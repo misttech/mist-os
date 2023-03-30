@@ -4,29 +4,28 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "../physload.h"
-
 #include <zircon/assert.h>
 
 #include <ktl/string_view.h>
 #include <phys/elf-image.h>
 #include <phys/symbolize.h>
 
+#include "physload-test-main.h"
+
 #include <ktl/enforce.h>
 
-extern "C" void PhysLoadModuleMain(UartDriver& uart, PhysBootTimes boot_times,
-                                   KernelStorage kernel_storage) {
-  constexpr const char* kTestName = "physload-test";
+int PhysLoadTestMain(KernelStorage kernel_storage) {
+  constexpr const char* kTestName = "physload-handoff-test";
 
   gSymbolize->set_name(kTestName);
 
   ktl::string_view me = gSymbolize->modules().back()->name();
-  ZX_ASSERT_MSG(me == kTestName, "symbolize->name() \"%s\", last module name \"%.*s\"",
-                gSymbolize->name(), static_cast<int>(me.size()), me.data());
+  if (me != kTestName) {
+    printf("symbolize->name() \"%s\", last module name \"%.*s\"", gSymbolize->name(),
+           static_cast<int>(me.size()), me.data());
+    return 1;
+  }
 
   Allocation::GetPool().PrintMemoryRanges(gSymbolize->name());
-
-  printf("\n*** Test succeeded ***\n%s\n\n", BOOT_TEST_SUCCESS_STRING);
-
-  abort();
+  return 0;
 }
