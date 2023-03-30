@@ -95,8 +95,8 @@ constexpr size_t kMaxPhysloadModules = 4;
     abort();
   }
 
-  // We don't support any code-patching for physboot, though we could if there
-  // were any worth doing.
+  // We don't support any code-patching for physboot - or any physload module
+  // at the moment - though we could if there were any worth doing.
   ZX_ASSERT_MSG(!next_elf.has_patches(),
                 "kernel.phys.next ELF image with code-patches not supported");
 
@@ -106,7 +106,7 @@ constexpr size_t kMaxPhysloadModules = 4;
   // Relocate the image.
   next_elf.Relocate();
 
-  next_elf.AssertInterpMatchesBuildId(symbolize.name(), symbolize.BuildId());
+  next_elf.AssertInterpMatchesBuildId(symbolize.name(), symbolize.build_id());
 
   if (gBootOptions->phys_verbose) {
     symbolize.LogHandoff(next_elf.name(), next_elf.entry());

@@ -116,7 +116,7 @@ void ZbiMain(void* zbi, arch::EarlyTicks boot_ticks) {
   ZbiInitMemory(zbi, GetZbiMemoryRanges(input_zbi));
 
   Shim shim(symbolize.name());
-  shim.set_build_id(symbolize.BuildId());
+  shim.set_build_id(symbolize.build_id());
 
   // The pool knows all the memory details, so populate the new ZBI item that
   // way.  The incoming ZBI items in whatever format have been discarded.

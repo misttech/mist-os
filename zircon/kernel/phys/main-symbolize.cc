@@ -66,6 +66,7 @@ void InitSelf(MainSymbolize& main) {}
 void MainSymbolize::set_self(const ElfImage* self) {
   ReplaceModulesStorage(ModuleList{cpp20::span{&self_, 1}});
   OnLoad(*self);
+  set_main_module(*self);
 }
 
 MainSymbolize::MainSymbolize(const char* name) : Symbolize(name) {

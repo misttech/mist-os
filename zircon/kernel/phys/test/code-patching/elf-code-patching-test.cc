@@ -6,7 +6,6 @@
 
 #include <inttypes.h>
 #include <lib/zbitl/error-stdio.h>
-#include <lib/zbitl/view.h>
 #include <stdio.h>
 
 #include <ktl/array.h>
@@ -17,40 +16,28 @@
 #include <phys/kernel-package.h>
 #include <phys/symbolize.h>
 
-#include "../test-main.h"
+#include "../physload-test-main.h"
 #include "test.h"
 
 #include <ktl/enforce.h>
 
 namespace {
 
-// The package prefix under which the test images to be loaded live.
-constexpr ktl::string_view kPackage = "elf-code-patching-test-data";
-
 constexpr ktl::string_view kAddOne = "add-one";
 constexpr ktl::string_view kMultiply = "multiply_by_factor";
 
 }  // namespace
 
-int TestMain(void* zbi_ptr, arch::EarlyTicks) {
-  MainSymbolize symbolize("elf-code-patching-test");
-  InitMemory(zbi_ptr);
+int PhysLoadTestMain(KernelStorage kernelfs) {
+  constexpr const char* kTestName = "elf-code-patching-test";
+  gSymbolize->set_name(kTestName);
 
-  KernelStorage kernelfs;
-  kernelfs.Init(static_cast<zbi_header_t*>(zbi_ptr));
+  gSymbolize->Context();
 
-  KernelStorage::Bootfs bootfs;
-  if (auto result = kernelfs.root().subdir(kPackage); result.is_error()) {
-    zbitl::PrintBootfsError(result.error_value());
-    return 1;
-  } else {
-    bootfs = ktl::move(result).value();
-  }
-
-  symbolize.Context();
-
-  ktl::array<const ElfImage*, 5> modules;
-  symbolize.ReplaceModulesStorage(Symbolize::ModuleList(ktl::span(modules)));
+  // We need space for 6 modules: physload, this module, and the patched and
+  // unpatched versions of kAddOne and kMultiply.
+  ktl::array<const ElfImage*, 6> modules;
+  gSymbolize->ReplaceModulesStorage(Symbolize::ModuleList(ktl::span(modules)));
 
   constexpr uint64_t kValue = 42;
 
@@ -59,19 +46,19 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
   // pages won't be reused for the second test, since that could
   // require cache flushing operations.
   Allocation unpatched;
-  printf("%s: Testing unpatched add-one...", symbolize.name());
+  printf("%s: Testing unpatched add-one...\n", gSymbolize->name());
   {
     ElfImage add_one;
-    if (auto result = add_one.Init(bootfs, kAddOne, true); result.is_error()) {
+    if (auto result = add_one.Init(kernelfs.root(), kAddOne, true); result.is_error()) {
       zbitl::PrintBootfsError(result.error_value());
       return 1;
     }
 
-    add_one.AssertInterpMatchesBuildId(kAddOne, symbolize.BuildId());
+    add_one.AssertInterpMatchesBuildId(kAddOne, gSymbolize->build_id());
     unpatched = add_one.Load({}, false);
     add_one.Relocate();
 
-    printf("Calling %#" PRIx64 "...", add_one.entry());
+    printf("%s: Calling %#" PRIx64 "...", gSymbolize->name(), add_one.entry());
     uint64_t value = add_one.Call<TestFn>(kValue);
     ZX_ASSERT_MSG(value == kValue + 1, "unpatched add-one: got %" PRIu64 " != expected %" PRIu64,
                   value, kValue + 1);
@@ -80,15 +67,15 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   // Now test it with nop patching: AddOne becomes the identity function.
   Allocation patched;
-  printf("%s: Testing patched add-one...", symbolize.name());
+  printf("%s: Testing patched add-one...\n", gSymbolize->name());
   {
     ElfImage add_one;
-    if (auto result = add_one.Init(bootfs, kAddOne, true); result.is_error()) {
+    if (auto result = add_one.Init(kernelfs.root(), kAddOne, true); result.is_error()) {
       zbitl::PrintBootfsError(result.error_value());
       return 1;
     }
 
-    add_one.AssertInterpMatchesBuildId(kAddOne, symbolize.BuildId());
+    add_one.AssertInterpMatchesBuildId(kAddOne, gSymbolize->build_id());
     patched = add_one.Load({}, false);
     add_one.Relocate();
 
@@ -108,7 +95,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     auto result = add_one.ForEachPatch<ExpectedCase>(patch);
     ZX_ASSERT(result.is_ok());
 
-    printf("Calling %#" PRIx64 "...", add_one.entry());
+    printf("%s: Calling %#" PRIx64 "...", gSymbolize->name(), add_one.entry());
     uint64_t value = add_one.Call<TestFn>(kValue);
     ZX_ASSERT_MSG(value == kValue, "nop-patched add-one: got %" PRIu64 " != expected %" PRIu64,
                   value, kValue);
@@ -117,15 +104,15 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   // Now test the hermetic blob stub case.
   Allocation patched_stub2;
-  printf("%s: Testing hermetic blob (alternative 1)...", symbolize.name());
+  printf("%s: Testing hermetic blob (alternative 1)...\n", gSymbolize->name());
   {
     ElfImage multiply;
-    if (auto result = multiply.Init(bootfs, kMultiply, true); result.is_error()) {
+    if (auto result = multiply.Init(kernelfs.root(), kMultiply, true); result.is_error()) {
       zbitl::PrintBootfsError(result.error_value());
       return 1;
     }
 
-    multiply.AssertInterpMatchesBuildId(kMultiply, symbolize.BuildId());
+    multiply.AssertInterpMatchesBuildId(kMultiply, gSymbolize->build_id());
     patched_stub2 = multiply.Load({}, false);
     multiply.Relocate();
 
@@ -146,7 +133,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     ZX_ASSERT_MSG(result.is_ok(), "%.*s", static_cast<int>(result.error_value().reason.size()),
                   result.error_value().reason.data());
 
-    printf("Calling %#" PRIx64 "...", multiply.entry());
+    printf("%s: Calling %#" PRIx64 "...", gSymbolize->name(), multiply.entry());
     uint64_t value = multiply.Call<TestFn>(kValue);
     ZX_ASSERT_MSG(value == kValue * 2, "multiply_by_two got %" PRIu64 " != expected %" PRIu64,
                   value, kValue * 2);
@@ -155,15 +142,15 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   // Now test the hermetic blob stub case.
   Allocation patched_stub10;
-  printf("%s: Testing hermetic blob (alternative 2)...", symbolize.name());
+  printf("%s: Testing hermetic blob (alternative 2)...\n", gSymbolize->name());
   {
     ElfImage multiply;
-    if (auto result = multiply.Init(bootfs, kMultiply, true); result.is_error()) {
+    if (auto result = multiply.Init(kernelfs.root(), kMultiply, true); result.is_error()) {
       zbitl::PrintBootfsError(result.error_value());
       return 1;
     }
 
-    multiply.AssertInterpMatchesBuildId(kMultiply, symbolize.BuildId());
+    multiply.AssertInterpMatchesBuildId(kMultiply, gSymbolize->build_id());
     patched_stub10 = multiply.Load({}, false);
     multiply.Relocate();
 
@@ -184,7 +171,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
     ZX_ASSERT_MSG(result.is_ok(), "%.*s", static_cast<int>(result.error_value().reason.size()),
                   result.error_value().reason.data());
 
-    printf("Calling %#" PRIx64 "...", multiply.entry());
+    printf("%s: Calling %#" PRIx64 "...", gSymbolize->name(), multiply.entry());
     uint64_t value = multiply.Call<TestFn>(kValue);
     ZX_ASSERT_MSG(value == kValue * 10, "multiply_by_ten got %" PRIu64 " != expected %" PRIu64,
                   value, kValue * 10);

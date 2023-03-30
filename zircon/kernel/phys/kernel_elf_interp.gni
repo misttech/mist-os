@@ -92,8 +92,9 @@ template("kernel_elf_interp") {
     args = rebase_path(sources + outputs + [ depfile ], root_build_dir)
 
     metadata = {
-      # Don't propagate from zbi_input()-compatible targets.
+      # Don't propagate from zbi_input()-compatible or resource() targets.
       zbi_input_barrier = []
+      distribution_entries_barrier = []
     }
   }
 

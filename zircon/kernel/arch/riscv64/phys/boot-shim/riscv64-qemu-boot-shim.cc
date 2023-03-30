@@ -151,7 +151,7 @@ void PhysMain(void* ptr, arch::EarlyTicks boot_ticks) {
   gBootOptions = &boot_opts;
 
   Shim shim(symbolize.name());
-  shim.set_build_id(symbolize.BuildId());
+  shim.set_build_id(symbolize.build_id());
   shim.set_info("QEMU -kernel argument");
   shim.Get<boot_shim::UartItem>().Init(GetUartDriver().uart());
 

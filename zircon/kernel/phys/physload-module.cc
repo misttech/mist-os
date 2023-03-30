@@ -41,8 +41,7 @@ ArchPhysInfo* gArchPhysInfo;
   Allocation::InitWithPool(allocation_pool);
 
   ArchOnPhysLoadHandoff();
-
-  self.OnHandoff();
+  gSymbolize->OnHandoff(self);
 
   PhysLoadModuleMain(uart, boot_times, ktl::move(kernel_storage));
 }

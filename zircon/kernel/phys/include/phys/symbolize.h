@@ -23,6 +23,8 @@
 #include <phys/main.h>
 #include <phys/stack.h>
 
+#include "zircon/assert.h"
+
 class ElfImage;
 struct PhysExceptionState;
 class Symbolize;
@@ -59,7 +61,11 @@ class Symbolize {
 
   auto modules() const { return modules_.as_span(); }
 
-  // This readds the existing modules to the new storage and then
+  // Return the ELF build ID note for the currently executing module (i.e., the
+  // first module to call OnLoad or the last module to call OnHandoff).
+  elfldltl::ElfNote build_id() const;
+
+  // This reads the existing modules to the new storage and then
   // replaces it as the storage to be used by future OnLoad calls.
   void ReplaceModulesStorage(ModuleList modules);
 
@@ -79,9 +85,6 @@ class Symbolize {
     return FramePointerBacktrace::BackTrace(fp);
   }
 
-  // Return the ELF build ID note for the main executable.
-  elfldltl::ElfNote BuildId() const;
-
   // Print the contextual markup elements describing each loaded module.
   void ContextAlways(FILE* log = nullptr);
 
@@ -91,6 +94,10 @@ class Symbolize {
   // Adds the new module to the list.  If Context() has run, then emit context
   // for the new module.
   void OnLoad(const ElfImage& loaded);
+
+  // Registers the next, just-handed-of-to module as the currently executing
+  // one.
+  void OnHandoff(ElfImage& next);
 
   void LogHandoff(ktl::string_view name, uintptr_t entry_pc);
 
@@ -127,6 +134,12 @@ class Symbolize {
   PHYS_SINGLETHREAD void PrintException(uint64_t vector, const char* vector_name,
                                         const PhysExceptionState& regs);
 
+ protected:
+  void set_main_module(const ElfImage& main) {
+    ZX_DEBUG_ASSERT(!main_module_);
+    main_module_ = &main;
+  }
+
  private:
   struct Sink {
     FILE* f;
@@ -144,6 +157,9 @@ class Symbolize {
   ktl::span<const Stack<BootStack>> stacks_;
   ktl::span<const Stack<BootShadowCallStack>> shadow_call_stacks_;
   symbolizer_markup::Writer<Sink> writer_;
+  // The currently executing module, set on the first call to LoadModule() or
+  // the last to call OnHandoff().
+  const ElfImage* main_module_ = nullptr;
   bool context_done_ = false;
 };
 

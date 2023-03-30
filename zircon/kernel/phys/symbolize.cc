@@ -14,6 +14,7 @@
 #include <zircon/assert.h>
 
 #include <ktl/algorithm.h>
+#include <ktl/iterator.h>
 #include <ktl/string_view.h>
 #include <phys/elf-image.h>
 #include <phys/main.h>
@@ -51,10 +52,10 @@ const char* ProgramName() {
   return "early-init";
 }
 
-elfldltl::ElfNote Symbolize::BuildId() const {
-  ZX_DEBUG_ASSERT(!modules_.empty());
-  ZX_DEBUG_ASSERT(modules_.front()->build_id());
-  return *modules_.front()->build_id();
+elfldltl::ElfNote Symbolize::build_id() const {
+  ZX_DEBUG_ASSERT(main_module_);
+  ZX_DEBUG_ASSERT(main_module_->build_id());
+  return main_module_->build_id().value();
 }
 
 void Symbolize::Printf(const char* fmt, ...) {
@@ -85,6 +86,16 @@ void Symbolize::OnLoad(const ElfImage& loaded) {
     loaded.SymbolizerContext(writer_, static_cast<unsigned int>(modules_.size()), name_);
   }
   AddModule(&loaded);
+}
+
+void Symbolize::OnHandoff(ElfImage& next) {
+  // The module will usually be the among the latest added, so search in
+  // reverse.
+  auto it = ktl::find(modules().rbegin(), modules().rend(), &next);
+  ZX_ASSERT_MSG(it != modules().rend(), "Module %.*s has not been loaded",
+                static_cast<int>(next.name().size()), next.name().data());
+  next.OnHandoff();
+  main_module_ = &next;
 }
 
 void Symbolize::LogHandoff(ktl::string_view name, uintptr_t entry_pc) {

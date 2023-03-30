@@ -33,6 +33,12 @@ import("//zircon/kernel/phys/phys_executable.gni")
 #       dependencies are added automatically.
 #     - Type: list of labels
 #
+#   * data_deps
+#     - Optional: data dependencies of the underlying binary target. Any
+#       resources() specified here are ultimately aggregated in the associated
+#       kernel package.
+#     - Type: list of labels
+#
 # For all other parameters see kernel_elf_binary().
 template("physload_binary_test") {
   binary_target = "$target_name.binary"
@@ -46,10 +52,11 @@ template("physload_binary_test") {
       visibility = [ ":*" ]
       testonly = true
 
-      deps = []
+      # Data deps are aggregated separately by the kernel package.
       forward_variables_from(invoker,
                              "*",
                              [
+                               "data_deps",
                                "testonly",
                                "visibility",
                              ])
@@ -61,6 +68,9 @@ template("physload_binary_test") {
       testonly = true
       prefix = ""
       deps = [ ":$binary_target" ]
+      if (defined(invoker.data_deps)) {
+        deps += invoker.data_deps
+      }
     }
   } else {
     group(binary_target) {
@@ -70,7 +80,7 @@ template("physload_binary_test") {
         visibility = []
       }
       visibility += [ ":*" ]
-      deps = [ ":module_target($phys_toolchain)" ]
+      deps = [ ":$binary_target($phys_toolchain)" ]
     }
 
     not_needed(invoker, "*")

@@ -36,7 +36,7 @@ constexpr ktl::string_view kLog = "test log text\nsecond line of log";
 
 int TurduckenTest::Main(Zbi::iterator kernel_item) {
   Shim shim(gSymbolize->name());
-  shim.set_build_id(gSymbolize->BuildId());
+  shim.set_build_id(gSymbolize->build_id());
 
   LogBootZbiItems(kernel_item);
 

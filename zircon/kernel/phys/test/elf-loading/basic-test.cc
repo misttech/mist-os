@@ -73,7 +73,7 @@ int TestMain(void* zbi_ptr, arch::EarlyTicks) {
 
   // The GN target for get-int uses kernel_elf_interp() on this test binary.
   printf("Verifying PT_INTERP matches test build ID...\n");
-  elf.AssertInterpMatchesBuildId(kGetInt, symbolize.BuildId());
+  elf.AssertInterpMatchesBuildId(kGetInt, symbolize.build_id());
 
   // Since Context() was called above ContextOnLoad() should have printed
   // inside elf.Load() above.  Now that the new module list is in place,
