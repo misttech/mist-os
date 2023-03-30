@@ -60,7 +60,7 @@ TEST(FactoryFs, ExportedFilesystemIsMountable) {
   ASSERT_EQ(status, ZX_OK);
 
   // Now try and mount Factoryfs.
-  ASSERT_EQ(ramdisk_set_flags(ram_disk_or.value().client(), BLOCK_FLAG_READONLY), ZX_OK);
+  ASSERT_EQ(ramdisk_set_flags(ram_disk_or.value().client(), FLAG_READONLY), ZX_OK);
 
   zx::result device = ram_disk_or.value().channel();
   ASSERT_EQ(device.status_value(), ZX_OK);

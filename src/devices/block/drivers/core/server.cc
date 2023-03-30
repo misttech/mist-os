@@ -394,7 +394,7 @@ zx_status_t Server::ProcessReadWriteRequestWithFlush(block_fifo_request_t* reque
     need_preflush = true;
   }
 
-  if ((request->opcode & BLOCK_FL_FORCE_ACCESS) && !(info_.flags & BLOCK_FLAG_FUA_SUPPORT)) {
+  if ((request->opcode & BLOCK_FL_FORCE_ACCESS) && !(info_.flags & FLAG_FUA_SUPPORT)) {
     // If the device does not support the FUA command, clear the BLOCK_FL_FORCE_ACCESS flag and
     // send the (Post)Flush command. A completion for the request must be sent after the last
     // (Post)Flush is completed.

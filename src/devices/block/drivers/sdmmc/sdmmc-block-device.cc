@@ -283,7 +283,7 @@ zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition 
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  if (!(block_info_.flags & BLOCK_FLAG_TRIM_SUPPORT)) {
+  if (!(block_info_.flags & FLAG_TRIM_SUPPORT)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

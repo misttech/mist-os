@@ -251,9 +251,9 @@ static void ramdisk_get_info(void* ctx, block_info_t* info) {
 In this simplified driver, the `block_size`, `block_count`, and `max_transfer_size`
 fields are hardcoded numbers.
 
-The `flags` member is used to identify if the device is read-only (`BLOCK_FLAG_READONLY`,
-otherwise it's read/write), removable (`BLOCK_FLAG_REMOVABLE`, otherwise it's not
-removable) or has a bootable partition (`BLOCK_FLAG_BOOTPART`, otherwise it doesn't).
+The `flags` member is used to identify if the device is read-only (`FLAG_READONLY`,
+otherwise it's read/write), removable (`FLAG_REMOVABLE`, otherwise it's not
+removable) or has a bootable partition (`FLAG_BOOTPART`, otherwise it doesn't).
 
 The final value that **ramdisk_query()** returns is the "block operation size" value
 through the pointer to `bopsz`.

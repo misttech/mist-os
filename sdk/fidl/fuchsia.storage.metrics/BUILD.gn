@@ -6,5 +6,6 @@ import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.storage.metrics") {
   sources = [ "storage-metrics.fidl" ]
+  enable_banjo = true
   enable_hlcpp = true
 }

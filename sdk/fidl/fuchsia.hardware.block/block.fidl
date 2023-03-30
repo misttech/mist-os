@@ -46,6 +46,36 @@ protocol Session {
     }) error zx.status;
 };
 
+type BlockInfo = struct {
+    /// The number of blocks in this block device.
+    block_count uint64;
+
+    /// The size of a single block.
+    block_size uint32;
+
+    /// The maximum size, in bytes, of a transfer.
+    /// Set to MAX_TRANSFER_UNBOUNDED if no such maximum exists.
+    max_transfer_size uint32;
+
+    /// Identifiers about the device.
+    flags @generated_name("Flag") strict bits : uint32 {
+        /// All writes to the block device will fail.
+        READONLY = 0x00000001;
+
+        /// The block device may be removed from the device during operation.
+        REMOVABLE = 0x00000002;
+
+        /// The device has a bootdata partition map.
+        BOOTPART = 0x00000004;
+
+        /// The device provides trim support.
+        TRIM_SUPPORT = 0x00000008;
+
+        /// The device provides fua support.
+        FUA_SUPPORT = 0x00000010;
+    };
+};
+
 /// Defines access to a device which is accessible in block-granularity chunks
 /// for reading and writing.
 protocol Block {
@@ -53,35 +83,7 @@ protocol Block {
     GetInfo() -> (struct {
         // TODO(https://fxbug.dev/103484): consider removing the outer struct when the issue is
         // resolved.
-        info @generated_name("BlockInfo") struct {
-            /// The number of blocks in this block device.
-            block_count uint64;
-
-            /// The size of a single block.
-            block_size uint32;
-
-            /// The maximum size, in bytes, of a transfer.
-            /// Set to MAX_TRANSFER_UNBOUNDED if no such maximum exists.
-            max_transfer_size uint32;
-
-            /// Identifiers about the device.
-            flags @generated_name("Flag") strict bits : uint32 {
-                /// All writes to the block device will fail.
-                READONLY = 0x00000001;
-
-                /// The block device may be removed from the device during operation.
-                REMOVABLE = 0x00000002;
-
-                /// The device has a bootdata partition map.
-                BOOTPART = 0x00000004;
-
-                /// The device provides trim support.
-                TRIM_SUPPORT = 0x00000008;
-
-                /// The device provides fua support.
-                FUA_SUPPORT = 0x00000010;
-            };
-        };
+        info BlockInfo;
     }) error zx.status;
 
     /// Returns stats about the block device on the provided buffer and optionally

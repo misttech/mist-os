@@ -15,5 +15,6 @@ fidl("fuchsia.hardware.block") {
     "//sdk/fidl/fuchsia.unknown",
     "//zircon/vdso/zx",
   ]
+  enable_banjo = true
   enable_hlcpp = true
 }

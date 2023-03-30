@@ -138,7 +138,7 @@ TEST_F(NvmeTest, NamespaceBlockInfo) {
   client.Query(&info, &op_size);
   EXPECT_EQ(512, info.block_size);
   EXPECT_EQ(1024, info.block_count);
-  EXPECT_TRUE(info.flags & BLOCK_FLAG_FUA_SUPPORT);
+  EXPECT_TRUE(info.flags & FLAG_FUA_SUPPORT);
 }
 
 TEST_F(NvmeTest, NamespaceReadTest) {

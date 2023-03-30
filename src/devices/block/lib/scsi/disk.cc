@@ -108,9 +108,8 @@ void Disk::BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out) {
   info_out->block_size = block_size_bytes_;
   info_out->block_count = block_count_;
   info_out->max_transfer_size = max_transfer_bytes_;
-  info_out->flags = (write_protected_ ? BLOCK_FLAG_READONLY : 0) |
-                    (removable_ ? BLOCK_FLAG_REMOVABLE : 0) |
-                    (dpo_fua_available_ ? BLOCK_FLAG_FUA_SUPPORT : 0);
+  info_out->flags = (write_protected_ ? FLAG_READONLY : 0) | (removable_ ? FLAG_REMOVABLE : 0) |
+                    (dpo_fua_available_ ? FLAG_FUA_SUPPORT : 0);
   *block_op_size_out = controller_->BlockOpSize();
 }
 

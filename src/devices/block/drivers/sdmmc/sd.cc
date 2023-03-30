@@ -161,7 +161,7 @@ zx_status_t SdmmcBlockDevice::ProbeSd() {
   // TODO(bradenkell): Read SD_STATUS to see if the card supports discard (trim).
 
   // Since the cache is never enabled, report FUA as being supported.
-  block_info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
+  block_info_.flags |= FLAG_FUA_SUPPORT;
 
   // If this card supports 4 bit mode, then put it into 4 bit mode.
   const uint32_t supported_bus_widths = scr[1] & 0xf;

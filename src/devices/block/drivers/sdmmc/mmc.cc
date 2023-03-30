@@ -420,7 +420,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
 
   // The discard command was added in eMMC 4.5.
   if (raw_ext_csd_[MMC_EXT_CSD_EXT_CSD_REV] >= MMC_EXT_CSD_EXT_CSD_REV_1_6 && config.enable_trim) {
-    block_info_.flags |= BLOCK_FLAG_TRIM_SUPPORT;
+    block_info_.flags |= FLAG_TRIM_SUPPORT;
   }
 
   // The cache should be off by default upon device power-on. Check that this is the case.
@@ -428,7 +428,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmc() {
     return ZX_ERR_BAD_STATE;
   }
   // Since the cache is never enabled, report FUA as being supported.
-  block_info_.flags |= BLOCK_FLAG_FUA_SUPPORT;
+  block_info_.flags |= FLAG_FUA_SUPPORT;
 
   return ZX_OK;
 }
