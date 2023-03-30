@@ -617,14 +617,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     fidl::ServerEnd<fuchsia_io::Directory> server_end;
   };
 
-  std::array<Directory, 3> directories_ = {
-      Directory{
-          .name = "dev",
-          .flags =
-              static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                    fio::OpenFlags::kRightWritable | fio::OpenFlags::kDirectory),
-          .server_end = {},
-      },
+  std::array<Directory, 2> directories_ = {
       Directory{
           .name = "dev-class",
           .flags =
@@ -634,8 +627,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       Directory{
           .name = "dev-topological",
           .flags =
-              static_cast<uint32_t>(fio::OpenFlags::kRightReadable |
-                                    fio::OpenFlags::kRightWritable | fio::OpenFlags::kDirectory),
+              static_cast<uint32_t>(fio::OpenFlags::kRightReadable | fio::OpenFlags::kDirectory),
           .server_end = {},
       },
   };

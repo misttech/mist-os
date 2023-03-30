@@ -279,13 +279,7 @@ mod tests {
         realm.driver_test_realm_start(args).await.expect("driver test realm start");
 
         {
-            let dev_dir = fuchsia_fs::directory::open_directory(
-                realm.root.get_exposed_dir(),
-                DEV_DIR,
-                fuchsia_fs::OpenFlags::empty(),
-            )
-            .await
-            .unwrap();
+            let dev_dir = realm.driver_test_realm_connect_to_dev().unwrap();
             let mut fake_dev =
                 Emulator::create(dev_dir).await.expect("Failed to construct Emulator");
             let Emulator { dev, hci_emulator: _ } = &fake_dev;

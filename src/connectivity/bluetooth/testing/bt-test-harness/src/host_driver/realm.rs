@@ -4,7 +4,7 @@
 
 use {
     anyhow::Error,
-    fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
     fuchsia_component_test::{RealmBuilder, RealmInstance, ScopedInstance},
     fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance},
 };
@@ -38,5 +38,9 @@ impl HostDriverRealm {
 
     pub fn instance(&self) -> &ScopedInstance {
         &self.realm.root
+    }
+
+    pub fn dev(&self) -> Result<fio::DirectoryProxy, Error> {
+        self.realm.driver_test_realm_connect_to_dev()
     }
 }

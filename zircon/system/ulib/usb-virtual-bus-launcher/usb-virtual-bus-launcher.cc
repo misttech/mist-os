@@ -4,14 +4,11 @@
 
 #include "lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h"
 
-#include <fcntl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/watcher.h>
 #include <lib/usb-peripheral-utils/event-watcher.h>
 #include <lib/usb-virtual-bus-launcher-helper/usb-virtual-bus-launcher-helper.h>
 #include <lib/zx/channel.h>
@@ -63,19 +60,25 @@ zx::result<BusLauncher> BusLauncher::Create(IsolatedDevmgr::Args args) {
     return zx::error(status);
   }
 
-  const fbl::unique_fd fd{
-      openat(launcher.devmgr_.devfs_root().get(), "class/usb-peripheral", O_RDONLY)};
-  fbl::String devpath;
-  if (zx_status_t status = fdio_watch_directory(fd.get(), usb_virtual_bus::WaitForAnyFile,
-                                                ZX_TIME_INFINITE, &devpath);
-      status != ZX_ERR_STOP) {
-    std::cout << "fdio_watch_directory(): " << zx_status_get_string(status) << std::endl;
-    return zx::error(status);
-  }
-  fdio_cpp::UnownedFdioCaller caller(fd);
+  fdio_cpp::UnownedFdioCaller caller(launcher.devmgr_.devfs_root());
 
-  zx::result peripheral =
-      component::ConnectAt<fuchsia_hardware_usb_peripheral::Device>(caller.directory(), devpath);
+  zx::result directory_result =
+      component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/usb-peripheral");
+  if (directory_result.is_error()) {
+    std::cout << "component::ConnectAt(): " << directory_result.status_string() << std::endl;
+    return directory_result.take_error();
+  }
+  auto& directory = directory_result.value();
+  zx::result watch_result = device_watcher::WatchDirectoryForItems<
+      zx::result<fidl::ClientEnd<fuchsia_hardware_usb_peripheral::Device>>>(
+      directory, [&directory](std::string_view devpath) {
+        return component::ConnectAt<fuchsia_hardware_usb_peripheral::Device>(directory, devpath);
+      });
+  if (watch_result.is_error()) {
+    std::cout << "WatchDirectoryForItems(): " << watch_result.status_string() << std::endl;
+    return watch_result.take_error();
+  }
+  auto& peripheral = watch_result.value();
   if (peripheral.is_error()) {
     std::cout << "Failed to get USB peripheral service: " << peripheral.status_string()
               << std::endl;

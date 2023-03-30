@@ -4,7 +4,6 @@
 
 #include <dirent.h>
 #include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
@@ -12,6 +11,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fit/defer.h>
@@ -104,12 +104,13 @@ class BlockDeviceController {
         fidl::VectorView<usb_peripheral::wire::FunctionDescriptor>::FromExternal(function_descs));
     ASSERT_OK(bus_->SetupPeripheralDevice(GetDeviceDescriptor(), std::move(config_descs)));
 
-    fbl::unique_fd fd{openat(bus_->GetRootFd(), "class/usb-cache-test", O_RDONLY)};
+    fbl::unique_fd fd;
+    ASSERT_OK(
+        fdio_open_fd_at(bus_->GetRootFd(), "class/usb-cache-test", 0, fd.reset_and_get_address()));
 
     fbl::String devpath;
-    while (fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath) !=
-           ZX_ERR_STOP) {
-    }
+    ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath),
+                  ZX_ERR_STOP);
     fdio_cpp::UnownedFdioCaller caller(fd);
 
     zx::result client_end =
@@ -145,7 +146,7 @@ class UmsTest : public zxtest::Test {
     auto bus = BusLauncher::Create();
     ASSERT_OK(bus.status_value());
     bus_ = std::move(bus.value());
-    ASSERT_NO_FATAL_FAILURE(InitUMS(&devpath_));
+    ASSERT_NO_FATAL_FAILURE(InitUMS(devpath_));
   }
 
   void TearDown() override {
@@ -156,7 +157,7 @@ class UmsTest : public zxtest::Test {
 
  protected:
   // Initialize UMS. Asserts on failure.
-  void InitUMS(fbl::String* devpath) {
+  void InitUMS(fbl::String& devpath) {
     using ConfigurationDescriptor =
         ::fidl::VectorView<fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor>;
     usb_peripheral::wire::FunctionDescriptor ums_function_desc = {
@@ -173,11 +174,11 @@ class UmsTest : public zxtest::Test {
 
     ASSERT_OK(bus_->SetupPeripheralDevice(GetDeviceDescriptor(), std::move(config_descs)));
 
-    fbl::unique_fd fd(openat(bus_->GetRootFd(), "class/block", O_RDONLY));
-    while (fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, devpath) !=
-           ZX_ERR_STOP) {
-    }
-    *devpath = fbl::String::Concat({fbl::String("class/block/"), *devpath});
+    fbl::unique_fd fd;
+    ASSERT_OK(fdio_open_fd_at(bus_->GetRootFd(), "class/block", 0, fd.reset_and_get_address()));
+    ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath),
+                  ZX_ERR_STOP);
+    devpath = fbl::String::Concat({fbl::String("class/block/"), devpath});
   }
 
   std::optional<BusLauncher> bus_;
@@ -191,7 +192,8 @@ class UmsTest : public zxtest::Test {
     // the block-watcher deadlock. Changing the timing even slightly
     // makes this test invalid.
     while (true) {
-      fbl::unique_fd fd(openat(bus_->GetRootFd(), "class/block", O_RDONLY));
+      fbl::unique_fd fd;
+      EXPECT_OK(fdio_open_fd_at(bus_->GetRootFd(), "class/block", 0, fd.reset_and_get_address()));
       DIR* dir_handle = fdopendir(fd.get());
       auto release_dir = fit::defer([=]() { closedir(dir_handle); });
       for (dirent* ent = readdir(dir_handle); ent; ent = readdir(dir_handle)) {

@@ -158,8 +158,7 @@ IntegrationTest::Promise<void> IntegrationTest::DoOpen(
     completer.complete_ok();
     client->events().OnOpen = nullptr;
   };
-  devfs_->Open(fuchsia::io::OpenFlags::RIGHT_READABLE | fuchsia::io::OpenFlags::DESCRIBE, {}, path,
-               std::move(server));
+  devfs_->Open(fuchsia::io::OpenFlags::DESCRIBE, {}, path, std::move(server));
   return bridge.consumer.promise_or(::fpromise::error("devfs open abandoned"));
 }
 
@@ -310,9 +309,8 @@ void WaitForPath(const fidl::InterfacePtr<fuchsia::io::Directory>& dir,
                             });
               };
 
-              dir->Open(fuchsia::io::OpenFlags::DIRECTORY | fuchsia::io::OpenFlags::DESCRIBE |
-                            fuchsia::io::OpenFlags::RIGHT_READABLE,
-                        {}, std::move(dirname), std::move(request));
+              dir->Open(fuchsia::io::OpenFlags::DIRECTORY | fuchsia::io::OpenFlags::DESCRIBE, {},
+                        std::move(dirname), std::move(request));
             });
       });
 }

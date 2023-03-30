@@ -15,7 +15,6 @@
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/fd.h>
-#include <lib/fdio/watcher.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <stdio.h>
@@ -52,8 +51,7 @@ class HidDriverTest : public zxtest::Test {
 
     // Connect to dev.
     fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    ASSERT_OK(realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {}, "dev",
-                                                  dev.NewRequest()));
+    ASSERT_OK(realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel()));
     ASSERT_OK(fdio_fd_create(dev.TakeChannel().release(), dev_fd_.reset_and_get_address()));
 
     // Wait for HidCtl to be created.
@@ -67,30 +65,22 @@ class HidDriverTest : public zxtest::Test {
 
   template <typename Protocol>
   zx::result<fidl::ClientEnd<Protocol>> WaitForFirstDevice(const std::string& path) {
-    fbl::unique_fd fd(openat(dev_fd_.get(), path.c_str(), O_RDONLY));
-    if (!fd) {
-      return zx::error(ZX_ERR_BAD_STATE);
+    fdio_cpp::UnownedFdioCaller caller(dev_fd_);
+    zx::result directory_result =
+        component::ConnectAt<fuchsia_io::Directory>(caller.directory(), path);
+    if (directory_result.is_error()) {
+      return directory_result.take_error();
     }
-
-    auto watch_func = [](int dirfd, int event, const char* fn, void* cookie) {
-      if (event != WATCH_EVENT_ADD_FILE) {
-        return ZX_OK;
-      }
-      if (std::string_view{fn} == ".") {
-        return ZX_OK;
-      }
-      fdio_cpp::UnownedFdioCaller caller(dirfd);
-      *static_cast<zx::result<fidl::ClientEnd<Protocol>>*>(cookie) =
-          component::ConnectAt<Protocol>(caller.directory(), fn);
-      return ZX_ERR_STOP;
-    };
-    zx::result<fidl::ClientEnd<Protocol>> result;
-    if (zx_status_t status =
-            fdio_watch_directory(fd.get(), watch_func, zx::time::infinite().get(), &result);
-        status != ZX_ERR_STOP) {
-      return zx::error(status);
+    auto& directory = directory_result.value();
+    zx::result watch_result =
+        device_watcher::WatchDirectoryForItems<zx::result<fidl::ClientEnd<Protocol>>>(
+            directory, [&directory](std::string_view devpath) {
+              return component::ConnectAt<Protocol>(directory, devpath);
+            });
+    if (watch_result.is_error()) {
+      return watch_result.take_error();
     }
-    return std::move(result);
+    return std::move(watch_result.value());
   }
 
   async::Loop loop_ = async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread);

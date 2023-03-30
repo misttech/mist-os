@@ -16,6 +16,7 @@
 #include <lib/async/default.h>
 #include <lib/async/dispatcher.h>
 #include <lib/async_patterns/cpp/dispatcher_bound.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fastboot/fastboot.h>
 #include <lib/fastboot/test/test-transport.h>
@@ -1053,17 +1054,14 @@ class FastbootRebootTest : public zxtest::Test {
   FastbootRebootTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fastboot-reboot-test-loop");
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(endpoints.is_ok());
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
 
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints->client, "svc");
+    ASSERT_OK(svc_local);
+
+    svc_local_ = std::move(svc_local.value());
     mock_.emplace(std::move(endpoints->server), state_);
-
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(svc_endpoints.is_ok());
-    ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open({}, {}, "svc",
-                         fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
-    svc_local_ = std::move(svc_endpoints->client);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory>& svc_chan() { return svc_local_; }
@@ -1225,16 +1223,13 @@ class FastbootFshostTest : public FastbootDownloadTest {
 
   FastbootFshostTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fastboot-fshost-test-loop");
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(endpoints.is_ok());
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
 
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(svc_endpoints.is_ok());
-    ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open({}, {}, "svc",
-                         fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
-    svc_local_ = std::move(svc_endpoints->client);
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints->client, "svc");
+    ASSERT_OK(svc_local);
 
+    svc_local_ = std::move(svc_local.value());
     mock_.emplace(std::move(endpoints->server), state_);
   }
 
@@ -1453,17 +1448,13 @@ class FastbootBuildInfoTest : public FastbootDownloadTest {
 
   FastbootBuildInfoTest() : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     loop_.StartThread("fastboot-build-info-test-loop");
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
 
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(endpoints.is_ok());
+    zx::result svc_local = component::ConnectAt<fuchsia_io::Directory>(endpoints->client, "svc");
+    ASSERT_OK(svc_local);
 
-    auto svc_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_TRUE(svc_endpoints.is_ok());
-    ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open({}, {}, "svc",
-                         fidl::ServerEnd<fuchsia_io::Node>(svc_endpoints->server.TakeChannel())));
-    svc_local_ = std::move(svc_endpoints->client);
-
+    svc_local_ = std::move(svc_local.value());
     mock_.emplace(std::move(endpoints->server));
   }
 

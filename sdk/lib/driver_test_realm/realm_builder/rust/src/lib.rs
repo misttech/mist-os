@@ -53,8 +53,6 @@ impl DriverTestRealmBuilder for RealmBuilder {
                     "fuchsia.driver.registrar.DriverRegistrar",
                 ))
                 .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
-                // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
-                .capability(Capability::directory("dev-topological").as_("dev"))
                 .capability(Capability::directory("dev-topological"))
                 .capability(Capability::directory("dev-class"))
                 .from(&driver_realm)
@@ -142,7 +140,7 @@ impl DriverTestRealmInstance for RealmInstance {
     fn driver_test_realm_connect_to_dev(&self) -> Result<fio::DirectoryProxy> {
         fuchsia_fs::directory::open_directory_no_describe(
             self.root.get_exposed_dir(),
-            "dev",
+            "dev-topological",
             fio::OpenFlags::empty(),
         )
         .map_err(Into::into)

@@ -4,9 +4,8 @@
 
 #include "ftl_test_observer.h"
 
-#include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.nand/cpp/wire.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
 
 #include <fbl/unique_fd.h>
@@ -16,16 +15,18 @@ FtlTestObserver::FtlTestObserver() = default;
 
 void FtlTestObserver::OnProgramStart() {
   CreateDevice();
-  if (WaitForBlockDevice() != ZX_OK) {
+  if (zx_status_t status = WaitForBlockDevice(); status != ZX_OK) {
+    printf("Unable to wait for block device. Error: %s\n", zx_status_get_string(status));
     return;
   }
 
-  fbl::unique_fd block(open(kTestDevice, O_RDONLY));
-  if (block) {
-    ok_ = true;
-  } else {
-    printf("Unable to open remapped device. Error: %s\n", strerror(errno));
+  fbl::unique_fd fd;
+  if (zx_status_t status = fdio_open_fd(kTestDevice, 0, fd.reset_and_get_address());
+      status != ZX_OK) {
+    printf("Unable to open remapped device. Error: %s\n", zx_status_get_string(status));
+    return;
   }
+  ok_ = true;
 }
 
 void FtlTestObserver::CreateDevice() {

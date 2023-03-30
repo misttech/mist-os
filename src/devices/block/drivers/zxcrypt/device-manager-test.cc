@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <inttypes.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/io.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -43,11 +43,16 @@ std::string GetInspectInstanceGuid(const zx::vmo& inspect_vmo) {
   return property->value();
 }
 
-void GetInspectVMOHandle(const fbl::unique_fd& devfs_root, zx::vmo& out_vmo) {
-  constexpr char path[] = "diagnostics/class/zxcrypt/000.inspect";
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(devfs_root.get(), path));
+void GetInspectVMOHandle(const fidl::ClientEnd<fuchsia_io::Directory>& svc, zx::vmo& out_vmo) {
+  constexpr char path[] = "dev-topological/diagnostics/class/zxcrypt/000.inspect";
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+  ASSERT_OK(endpoints);
+  auto& [client_end, server_end] = endpoints.value();
+  ASSERT_OK(fdio_open_at(svc.channel().get(), path,
+                         static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
+                         server_end.TakeChannel().release()));
   fbl::unique_fd fd;
-  ASSERT_TRUE(fd.reset(openat(devfs_root.get(), path, O_RDONLY)), "%s", strerror(errno));
+  ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), fd.reset_and_get_address()));
   ASSERT_OK(fdio_get_vmo_clone(fd.get(), out_vmo.reset_and_get_address()));
 }
 
@@ -92,13 +97,17 @@ TEST(ZxcryptInspect, ExportsGuid) {
   ASSERT_OK(crypto::digest::GetDigestLen(crypto::digest::kSHA256, &digest_len));
   ASSERT_OK(key.Generate(digest_len));
 
+  // Use a new connection rather than using devfs_root because devfs_root has the empty set of
+  // rights.
+  const fidl::ClientEnd svc = devmgr.fshost_svc_dir();
+
   // Unsealing should fail right now until we format. It'll look like a bad key error, but really we
   // haven't even got a formatted device yet.
   zxcrypt::EncryptedVolumeClient volume_client(std::move(zxc_client_chan));
   ASSERT_EQ(volume_client.Unseal(key.get(), key.len(), 0), ZX_ERR_ACCESS_DENIED);
   {
     zx::vmo vmo;
-    ASSERT_NO_FATAL_FAILURE(GetInspectVMOHandle(devmgr.devfs_root(), vmo));
+    ASSERT_NO_FATAL_FAILURE(GetInspectVMOHandle(svc, vmo));
     ASSERT_TRUE(GetInspectInstanceGuid(vmo).empty());
   }
 
@@ -108,7 +117,7 @@ TEST(ZxcryptInspect, ExportsGuid) {
   ASSERT_OK(volume_client.Unseal(key.get(), key.len(), 0));
   {
     zx::vmo vmo;
-    ASSERT_NO_FATAL_FAILURE(GetInspectVMOHandle(devmgr.devfs_root(), vmo));
+    ASSERT_NO_FATAL_FAILURE(GetInspectVMOHandle(svc, vmo));
     std::string guid = GetInspectInstanceGuid(vmo);
     ASSERT_FALSE(guid.empty());
   }

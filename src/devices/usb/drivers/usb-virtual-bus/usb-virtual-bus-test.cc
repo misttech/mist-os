@@ -4,14 +4,13 @@
 
 #include <dirent.h>
 #include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtualbustest/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>
@@ -61,7 +60,7 @@ class VirtualBusTest : public zxtest::Test {
     auto bus = BusLauncher::Create();
     ASSERT_OK(bus.status_value());
     bus_ = std::move(bus.value());
-    ASSERT_NO_FATAL_FAILURE(InitUsbVirtualBus(&test_));
+    ASSERT_NO_FATAL_FAILURE(InitUsbVirtualBus(test_));
   }
 
   void TearDown() override {
@@ -70,13 +69,13 @@ class VirtualBusTest : public zxtest::Test {
   }
 
  protected:
-  void InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusTest>* test);
+  void InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusTest>& test);
 
   std::optional<BusLauncher> bus_;
   fidl::WireSyncClient<virtualbustest::BusTest> test_;
 };
 
-void VirtualBusTest::InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusTest>* test) {
+void VirtualBusTest::InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusTest>& test) {
   namespace usb_peripheral = fuchsia_hardware_usb_peripheral;
   using ConfigurationDescriptor =
       ::fidl::VectorView<fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor>;
@@ -111,16 +110,11 @@ void VirtualBusTest::InitUsbVirtualBus(fidl::WireSyncClient<virtualbustest::BusT
 
   ASSERT_OK(bus_->SetupPeripheralDevice(std::move(device_desc), std::move(config_descs)));
 
-  fbl::unique_fd fd(openat(bus_->GetRootFd(), "class/virtual-bus-test", O_RDONLY));
-
-  while (true) {
-    auto result = fdio_watch_directory(fd.get(), WaitForDevice, ZX_TIME_INFINITE, test);
-    if (result == ZX_ERR_STOP) {
-      break;
-    }
-    // If we see ZX_ERR_INTERNAL, something wrong happens while waiting for devices.
-    ASSERT_NE(result, ZX_ERR_INTERNAL);
-  }
+  fbl::unique_fd fd;
+  ASSERT_OK(
+      fdio_open_fd_at(bus_->GetRootFd(), "class/virtual-bus-test", 0, fd.reset_and_get_address()));
+  ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForDevice, ZX_TIME_INFINITE, &test),
+                ZX_ERR_STOP);
 }
 
 TEST_F(VirtualBusTest, ShortTransfer) {

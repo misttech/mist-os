@@ -22,7 +22,7 @@ use {
     fidl_fuchsia_bluetooth_test::{EmulatorSettings, HciError, PeerProxy},
     fuchsia_async::TimeoutExt as _,
     fuchsia_bluetooth::{
-        constants::{DEV_DIR, INTEGRATION_TIMEOUT},
+        constants::INTEGRATION_TIMEOUT,
         expectation::{
             self,
             asynchronous::{ExpectableExt, ExpectableStateExt},
@@ -48,12 +48,7 @@ async fn test_lifecycle(_: ()) {
         ..EmulatorSettings::EMPTY
     };
 
-    let dev_dir = fuchsia_fs::directory::open_directory_no_describe(
-        realm.instance().get_exposed_dir(),
-        DEV_DIR,
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .unwrap();
+    let dev_dir = realm.dev().unwrap();
     let mut emulator = Emulator::create(dev_dir).await.unwrap();
     let host = emulator.publish_and_wait_for_host(settings).await.unwrap();
     let (proxy, server_end) = fidl::endpoints::create_proxy::<fhost::HostMarker>().unwrap();

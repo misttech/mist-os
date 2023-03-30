@@ -158,12 +158,6 @@
         },
     ],
     expose: [
-        // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
-        {
-            directory: "dev-topological",
-            from: "#devfs",
-            as: "dev",
-        },
         {
             directory: [
                 "dev-class",

@@ -9,7 +9,7 @@ use {
     fidl_fuchsia_bluetooth_snoop::SnoopMarker,
     fidl_fuchsia_bluetooth_sys as fbsys,
     fidl_fuchsia_device::NameProviderMarker,
-    fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_driver_test as fdt, fidl_fuchsia_io as fio,
     fidl_fuchsia_logger::LogSinkMarker,
     fidl_fuchsia_stash::SecureStoreMarker,
     fuchsia_component_test::{
@@ -182,5 +182,9 @@ impl CoreRealm {
 
     pub fn instance(&self) -> &ScopedInstance {
         &self.realm.root
+    }
+
+    pub fn dev(&self) -> Result<fio::DirectoryProxy, Error> {
+        self.realm.driver_test_realm_connect_to_dev()
     }
 }

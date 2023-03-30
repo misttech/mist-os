@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_bluetooth_host::{HostMarker, HostProxy},
     fidl_fuchsia_bluetooth_test::HciEmulatorProxy,
     fuchsia_bluetooth::{
-        constants::DEV_DIR,
         expectation::{
             asynchronous::{
                 expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
@@ -143,12 +142,7 @@ impl TestHarness for HostDriverHarness {
 async fn new_host_harness(
     realm: Arc<HostDriverRealm>,
 ) -> Result<(HostDriverHarness, Emulator), Error> {
-    let dev_dir = fuchsia_fs::directory::open_directory_no_describe(
-        realm.instance().get_exposed_dir(),
-        DEV_DIR,
-        fuchsia_fs::OpenFlags::empty(),
-    )
-    .with_context(|| format!("failed to open {}", DEV_DIR))?;
+    let dev_dir = realm.dev().context("failed to open dev directory")?;
     let emulator =
         Emulator::create(dev_dir).await.context("Error creating emulator root device")?;
     let host_dev = emulator

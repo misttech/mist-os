@@ -12,6 +12,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/devmgr-integration-test/fixture.h>
 #include <lib/fdio/fd.h>
@@ -61,11 +62,10 @@ class FakeFshost : public fidl::testing::WireTestBase<fuchsia_fshost::Admin> {
 class FakeSvc {
  public:
   explicit FakeSvc(async_dispatcher_t* dispatcher) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
+    zx::result server_end = fidl::CreateEndpoints(&root_);
+    ASSERT_OK(server_end);
     async::PostTask(dispatcher, [dispatcher, &fake_paver = fake_paver_, &fake_fshost = fake_fshost_,
-                                 server_end = std::move(server_end)]() mutable {
+                                 server_end = std::move(server_end.value())]() mutable {
       component::OutgoingDirectory outgoing{dispatcher};
       ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_paver::Paver>(
           [&fake_paver, dispatcher](fidl::ServerEnd<fuchsia_paver::Paver> server_end) mutable {
@@ -82,28 +82,20 @@ class FakeSvc {
       async::PostDelayedTask(
           dispatcher, [outgoing = std::move(outgoing)]() {}, zx::duration::infinite());
     });
-    root_.Bind(std::move(client_end));
   }
 
   paver_test::FakePaver& fake_paver() { return fake_paver_; }
   FakeFshost& fake_fshost() { return fake_fshost_; }
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto& [client_end, server_end] = endpoints.value();
-    const fidl::OneWayStatus status =
-        root_->Open({}, {}, component::OutgoingDirectory::kServiceDirectory,
-                    fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
-    return zx::make_result(status.status(), std::move(client_end));
+    return component::ConnectAt<fuchsia_io::Directory>(
+        root_, component::OutgoingDirectory::kServiceDirectory);
   }
 
  private:
   paver_test::FakePaver fake_paver_;
   FakeFshost fake_fshost_;
-  fidl::WireSyncClient<fuchsia_io::Directory> root_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_;
 };
 
 class FakeDev {

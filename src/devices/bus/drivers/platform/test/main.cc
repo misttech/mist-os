@@ -4,12 +4,11 @@
 
 #include <dirent.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/devmgr-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
 #include <lib/zx/vmo.h>
 #include <limits.h>
@@ -96,9 +95,10 @@ TEST(PbusTest, Enumeration) {
 
   // Check that we see multiple entries that begin with "fragment-" for a device that is a
   // fragment of multiple composites
-  const fbl::unique_fd clock_dir(
-      openat(dirfd, "sys/platform/11:01:7/test-clock/clock-1", O_DIRECTORY | O_RDONLY));
-  ASSERT_TRUE(clock_dir.is_valid(), "%s", strerror(errno));
+  fbl::unique_fd clock_dir;
+  ASSERT_OK(fdio_open_fd_at(dirfd, "sys/platform/11:01:7/test-clock/clock-1",
+                            static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                            clock_dir.reset_and_get_address()));
   size_t devices_seen = 0;
   ASSERT_EQ(
       fdio_watch_directory(

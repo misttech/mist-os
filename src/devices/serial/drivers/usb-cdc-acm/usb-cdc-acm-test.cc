@@ -4,13 +4,13 @@
 
 #include <dirent.h>
 #include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>
 #include <lib/zx/clock.h>
@@ -37,7 +37,7 @@ class UsbCdcAcmTest : public zxtest::Test {
     auto bus = BusLauncher::Create();
     ASSERT_OK(bus.status_value());
     bus_ = std::move(bus.value());
-    ASSERT_NO_FATAL_FAILURE(InitUsbCdcAcm(&devpath_));
+    ASSERT_NO_FATAL_FAILURE(InitUsbCdcAcm(devpath_));
   }
 
   void TearDown() override {
@@ -48,7 +48,7 @@ class UsbCdcAcmTest : public zxtest::Test {
 
  protected:
   // Initialize a USB CDC ACM device. Asserts on failure.
-  void InitUsbCdcAcm(fbl::String* devpath) {
+  void InitUsbCdcAcm(fbl::String& devpath) {
     namespace usb_peripheral = fuchsia_hardware_usb_peripheral;
     using ConfigurationDescriptor =
         ::fidl::VectorView<fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor>;
@@ -72,11 +72,11 @@ class UsbCdcAcmTest : public zxtest::Test {
 
     ASSERT_OK(bus_->SetupPeripheralDevice(std::move(device_desc), std::move(config_descs)));
 
-    fbl::unique_fd fd(openat(bus_->GetRootFd(), "class/serial", O_RDONLY));
-    while (fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, devpath) !=
-           ZX_ERR_STOP) {
-    }
-    *devpath = fbl::String::Concat({fbl::String("class/serial/"), *devpath});
+    fbl::unique_fd fd;
+    ASSERT_OK(fdio_open_fd_at(bus_->GetRootFd(), "class/serial", 0, fd.reset_and_get_address()));
+    ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath),
+                  ZX_ERR_STOP);
+    devpath = fbl::String::Concat({fbl::String("class/serial/"), devpath});
   }
 
   std::optional<BusLauncher> bus_;

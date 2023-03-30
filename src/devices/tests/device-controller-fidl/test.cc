@@ -35,8 +35,7 @@ TEST_F(DeviceControllerFidl, ControllerTest) {
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {},
-                                                         "dev", dev.NewRequest());
+  zx_status_t status = realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel());
   ASSERT_EQ(status, ZX_OK);
 
   fbl::unique_fd root_fd;
@@ -107,8 +106,7 @@ TEST_F(DeviceControllerFidl, ControllerTestDfv2) {
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = realm.component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE, {},
-                                                         "dev", dev.NewRequest());
+  zx_status_t status = realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel());
   ASSERT_EQ(status, ZX_OK);
 
   fbl::unique_fd root_fd;

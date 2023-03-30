@@ -9,6 +9,7 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
@@ -41,11 +42,10 @@ TEST(ArgsTest, NetsvcNodenamePrintsAndExits) {
 class FakeSvc {
  public:
   explicit FakeSvc(async_dispatcher_t* dispatcher) {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints);
-    auto& [client_end, server_end] = endpoints.value();
+    zx::result server_end = fidl::CreateEndpoints(&root_);
+    ASSERT_OK(server_end);
     async::PostTask(dispatcher, [dispatcher, &mock_boot = mock_boot_,
-                                 server_end = std::move(server_end)]() mutable {
+                                 server_end = std::move(server_end.value())]() mutable {
       component::OutgoingDirectory outgoing{dispatcher};
       ASSERT_OK(outgoing.AddUnmanagedProtocol<fuchsia_boot::Arguments>(
           [&mock_boot, dispatcher](fidl::ServerEnd<fuchsia_boot::Arguments> server_end) {
@@ -58,26 +58,18 @@ class FakeSvc {
       async::PostDelayedTask(
           dispatcher, [outgoing = std::move(outgoing)]() {}, zx::duration::infinite());
     });
-    root_.Bind(std::move(client_end));
   }
 
   mock_boot_arguments::Server& mock_boot() { return mock_boot_; }
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc() {
-    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.take_error();
-    }
-    auto& [client_end, server_end] = endpoints.value();
-    const fidl::OneWayStatus status =
-        root_->Open({}, {}, component::OutgoingDirectory::kServiceDirectory,
-                    fidl::ServerEnd<fuchsia_io::Node>{server_end.TakeChannel()});
-    return zx::make_result(status.status(), std::move(client_end));
+    return component::ConnectAt<fuchsia_io::Directory>(
+        root_, component::OutgoingDirectory::kServiceDirectory);
   }
 
  private:
   mock_boot_arguments::Server mock_boot_;
-  fidl::WireSyncClient<fuchsia_io::Directory> root_;
+  fidl::ClientEnd<fuchsia_io::Directory> root_;
 };
 
 class ArgsTest : public zxtest::Test {

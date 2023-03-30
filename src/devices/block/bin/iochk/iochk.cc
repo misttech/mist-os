@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 #include <assert.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zircon-internal/xorshiftrand.h>
 #include <lib/zx/fifo.h>
@@ -506,10 +506,10 @@ int Usage() {
 
 int iochk(int argc, char** argv) {
   const char* device = argv[argc - 1];
-  fbl::unique_fd fd(open(device, O_RDONLY));
-  if (fd.get() < 0) {
-    printf("cannot open '%s'\n", device);
-    return Usage();
+  fbl::unique_fd fd;
+  if (zx_status_t status = fdio_open_fd(device, 0, fd.reset_and_get_address()); status != ZX_OK) {
+    printf("cannot open '%s': %s\n", device, zx_status_get_string(status));
+    return -1;
   }
 
   bool seed_set = false;

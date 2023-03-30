@@ -43,10 +43,10 @@ extern "C" {
 pub fn get_dev_root(realm_instance: &RealmInstance) -> fio::DirectoryProxy {
     fuchsia_fs::directory::open_directory_no_describe(
         realm_instance.root.get_exposed_dir(),
-        "/dev",
-        fio::OpenFlags::RIGHT_READABLE,
+        "dev-topological",
+        fio::OpenFlags::empty(),
     )
-    .expect("Get /dev from isolated_devmgr")
+    .expect("get dev root")
 }
 
 /// Given a realm instance, return a File which is /dev, taken as a handle.

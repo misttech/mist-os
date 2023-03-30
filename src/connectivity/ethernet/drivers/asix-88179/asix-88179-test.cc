@@ -8,8 +8,6 @@
 #include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/watcher.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>
 #include <lib/zx/clock.h>
@@ -71,18 +69,29 @@ class UsbAx88179Test : public zxtest::Test, loop_fixture::RealLoop {
     config_descs.push_back(std::move(config_desc));
     ASSERT_OK(bus_->SetupPeripheralDevice(std::move(device_desc), std::move(config_descs)));
 
-    fbl::unique_fd fd(openat(bus_->GetRootFd(), "class/network", O_RDONLY));
-    while (fdio_watch_directory(fd.get(), usb_virtual_bus::WaitForAnyFile, ZX_TIME_INFINITE,
-                                dev_path) != ZX_ERR_STOP) {
+    fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
+    {
+      zx::result directory =
+          component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/network");
+      ASSERT_OK(directory);
+      zx::result watch_result = device_watcher::WatchDirectoryForItems(
+          directory.value(), [&dev_path](std::string_view devpath) {
+            *dev_path = fbl::String::Concat({"class/network/", devpath});
+            return std::monostate{};
+          });
+      ASSERT_OK(watch_result);
     }
-    *dev_path = fbl::String::Concat({fbl::String("class/network/"), *dev_path});
-
-    fd.reset(openat(bus_->GetRootFd(), "class/test-asix-function", O_RDONLY));
-    while (fdio_watch_directory(fd.get(), usb_virtual_bus::WaitForAnyFile, ZX_TIME_INFINITE,
-                                test_function_path) != ZX_ERR_STOP) {
+    {
+      zx::result directory = component::ConnectAt<fuchsia_io::Directory>(
+          caller.directory(), "class/test-asix-function");
+      ASSERT_OK(directory);
+      zx::result watch_result = device_watcher::WatchDirectoryForItems(
+          directory.value(), [&test_function_path](std::string_view devpath) {
+            *test_function_path = fbl::String::Concat({"class/test-asix-function/", devpath});
+            return std::monostate{};
+          });
+      ASSERT_OK(watch_result);
     }
-    *test_function_path =
-        fbl::String::Concat({fbl::String("class/test-asix-function/"), *test_function_path});
   }
 
   void ConnectNetdeviceClient() {

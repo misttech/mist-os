@@ -36,8 +36,8 @@ class RuntimeTest : public gtest::TestLoopFixture {
 
     // Connect to dev.
     fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    zx_status_t status = realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE,
-                                                             {}, "dev", dev.NewRequest());
+    zx_status_t status =
+        realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
     ASSERT_EQ(status, ZX_OK);
 
     fbl::unique_fd root_fd;

@@ -171,7 +171,7 @@ async fn create_realm(
     builder
         .add_route(
             Route::new()
-                .capability(Capability::directory("dev-topological").as_("dev"))
+                .capability(Capability::directory("dev-topological"))
                 .capability(Capability::protocol_by_name("fuchsia.device.manager.Administrator"))
                 .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
                 .from(&driver_manager)
@@ -254,7 +254,7 @@ async fn load_package_firmware_test() -> Result<(), Error> {
     let out_dir = instance.root.get_exposed_dir();
     let driver_proxy = device_watcher::recursive_wait_and_open::<
         fidl_fuchsia_device_firmware_test::TestDeviceMarker,
-    >(&out_dir, "dev/sys/test/ddk-firmware-test-device-0")
+    >(&out_dir, "dev-topological/sys/test/ddk-firmware-test-device-0")
     .await?;
 
     // Check that we can load firmware out of /boot.

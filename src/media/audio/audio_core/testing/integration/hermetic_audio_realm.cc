@@ -28,13 +28,10 @@ void ConnectToVirtualAudio(component_testing::RealmRoot& root,
                            fidl::SynchronousInterfacePtr<fuchsia::virtualaudio::Control>& out) {
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  zx_status_t status = fdio_service_connect_at(root.component().exposed().unowned_channel()->get(),
-                                               "dev", dev.NewRequest().TakeChannel().release());
-  ASSERT_EQ(status, ZX_OK);
+  ASSERT_EQ(root.component().Connect("dev-topological", dev.NewRequest().TakeChannel()), ZX_OK);
 
   fbl::unique_fd dev_fd;
-  status = fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address());
-  ASSERT_EQ(status, ZX_OK);
+  ASSERT_EQ(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()), ZX_OK);
 
   // This file hosts a fuchsia.virtualaudio.Control channel.
   //

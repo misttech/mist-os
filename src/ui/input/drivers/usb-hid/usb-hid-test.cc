@@ -11,9 +11,9 @@
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/watcher.h>
+#include <lib/fdio/directory.h>
 #include <lib/fit/function.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>
 #include <sys/stat.h>
@@ -67,7 +67,7 @@ class UsbHidTest : public zxtest::Test {
   virtual fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor GetConfigDescriptor() = 0;
 
   // Initialize a Usb HID device. Asserts on failure.
-  void InitUsbHid(fbl::String* devpath,
+  void InitUsbHid(fbl::String* dev_path,
                   fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor desc) {
     namespace usb_peripheral = fuchsia_hardware_usb_peripheral;
     std::vector<usb_peripheral::wire::FunctionDescriptor> function_descs = {desc};
@@ -82,12 +82,18 @@ class UsbHidTest : public zxtest::Test {
         },
         {fidl::VectorView<usb_peripheral::wire::FunctionDescriptor>::FromExternal(
             function_descs)}));
-
-    fbl::unique_fd fd(openat(bus_->GetRootFd(), "class/input", O_RDONLY));
-    while (fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, devpath) !=
-           ZX_ERR_STOP) {
+    fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
+    {
+      zx::result directory =
+          component::ConnectAt<fuchsia_io::Directory>(caller.directory(), "class/input");
+      ASSERT_OK(directory);
+      zx::result watch_result = device_watcher::WatchDirectoryForItems(
+          directory.value(), [&dev_path](std::string_view devpath) {
+            *dev_path = fbl::String::Concat({"class/input/", devpath});
+            return std::monostate{};
+          });
+      ASSERT_OK(watch_result);
     }
-    *devpath = fbl::String::Concat({fbl::String("class/input/"), *devpath});
   }
 
   // Unbinds Usb HID driver from host.
@@ -114,12 +120,14 @@ class UsbHidTest : public zxtest::Test {
     const size_t last_slash = usb_hid_relpath.find_last_of('/');
     const std::string_view suffix = usb_hid_relpath.substr(last_slash + 1);
     std::string ifc_path{usb_hid_relpath.substr(0, last_slash)};
-    fbl::unique_fd fd_usb_hid_parent(
-        openat(bus_->GetRootFd(), ifc_path.c_str(), O_DIRECTORY | O_RDONLY));
-    ASSERT_TRUE(fd_usb_hid_parent, "openat(_, %s, _): %s", ifc_path.c_str(), strerror(errno));
-    std::unique_ptr<device_watcher::DirWatcher> watcher;
-
-    ASSERT_OK(device_watcher::DirWatcher::Create(fd_usb_hid_parent.get(), &watcher));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    auto& [client_end, server_end] = endpoints.value();
+    ASSERT_OK(fdio_open_at(caller.directory().channel()->get(), ifc_path.c_str(),
+                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                           server_end.TakeChannel().release()));
+    zx::result watcher = device_watcher::DirWatcher::Create(client_end);
+    ASSERT_OK(watcher);
     {
       const fidl::WireResult result = fidl::WireCall(usb_hid_controller.value())->ScheduleUnbind();
       ASSERT_OK(result.status());

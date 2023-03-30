@@ -35,8 +35,8 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     ASSERT_FALSE(realm_result.is_err());
 
     fidl::InterfaceHandle<fuchsia::io::Node> dev;
-    zx_status_t status = realm_->component().exposed()->Open(fuchsia::io::OpenFlags::RIGHT_READABLE,
-                                                             {}, "dev", dev.NewRequest());
+    zx_status_t status =
+        realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
     ASSERT_EQ(status, ZX_OK);
 
     fbl::unique_fd root_fd;

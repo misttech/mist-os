@@ -26,11 +26,6 @@
             ],
         },
         {
-            directory: "dev",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
-        {
             directory: "dev-topological",
             rights: [ "r*" ],
             path: "/dev-topological",
@@ -85,9 +80,6 @@
     expose: [
         {
             directory: [
-                // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this
-                //affects OOT.
-                "dev",
                 "dev-class",
                 "dev-topological",
             ],

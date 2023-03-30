@@ -34,7 +34,7 @@ TEST_F(DriverTestRealmTest, DriversExist) {
 
   // Connect to dev.
   fidl::InterfaceHandle<fuchsia::io::Node> dev;
-  ASSERT_EQ(ZX_OK, realm.component().exposed()->Open({}, {}, "dev", dev.NewRequest()));
+  ASSERT_EQ(ZX_OK, realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel()));
 
   fbl::unique_fd root_fd;
   ASSERT_EQ(ZX_OK, fdio_fd_create(dev.TakeChannel().release(), root_fd.reset_and_get_address()));

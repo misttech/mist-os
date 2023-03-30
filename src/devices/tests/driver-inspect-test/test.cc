@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device.inspect.test/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <lib/async/cpp/executor.h>
@@ -59,13 +58,22 @@ TEST_F(InspectTestCase, InspectDevfs) {
 }
 
 TEST_F(InspectTestCase, ReadInspectData) {
-  constexpr char path[] = "diagnostics/class/test/000.inspect";
+  constexpr char path[] = "dev-topological/diagnostics/class/test/000.inspect";
 
-  // Wait for inspect data to appear
-  ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr().devfs_root().get(), path));
+  // Use a new connection rather than using devfs_root because devfs_root has the empty set of
+  // rights.
+  const fidl::ClientEnd svc = devmgr().fshost_svc_dir();
 
   fbl::unique_fd fd;
-  ASSERT_TRUE(fd.reset(openat(devmgr().devfs_root().get(), path, O_RDONLY)), "%s", strerror(errno));
+  {
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
+    ASSERT_OK(endpoints);
+    auto& [client_end, server_end] = endpoints.value();
+    ASSERT_OK(fdio_open_at(svc.channel().get(), path,
+                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kRightReadable),
+                           server_end.TakeChannel().release()));
+    ASSERT_OK(fdio_fd_create(client_end.TakeChannel().release(), fd.reset_and_get_address()));
+  }
   {
     zx::vmo vmo;
     ASSERT_OK(fdio_get_vmo_clone(fd.get(), vmo.reset_and_get_address()));

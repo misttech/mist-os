@@ -48,13 +48,6 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .source = {ChildRef{"driver_test_realm"}},
       .targets = {ParentRef()},
   });
-  // TODO(https://fxbug.dev/107961): Remove this. Include RELNOTES because this affects OOT.
-  realm_builder.AddRoute(Route{
-      .capabilities = {Directory{
-          .name = "dev-topological", .as = "dev", .rights = fuchsia::io::R_STAR_DIR}},
-      .source = {ChildRef{"driver_test_realm"}},
-      .targets = {ParentRef()},
-  });
   realm_builder.AddRoute(Route{
       .capabilities = {Directory{.name = "dev-topological", .rights = fuchsia::io::R_STAR_DIR}},
       .source = {ChildRef{"driver_test_realm"}},

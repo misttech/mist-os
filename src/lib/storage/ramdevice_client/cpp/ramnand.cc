@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.nand/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
+#include <lib/fdio/directory.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,10 +42,13 @@ zx_status_t RamNand::Create(fuchsia_hardware_nand::wire::RamNandInfo config,
   }
   const std::string name(response.name.get());
 
-  fbl::unique_fd ram_nand_ctl(open(kBasePath, O_RDONLY | O_DIRECTORY));
-  if (!ram_nand_ctl) {
-    fprintf(stderr, "Could not open ram_nand_ctl: %s\n", strerror(errno));
-    return ZX_ERR_INTERNAL;
+  fbl::unique_fd ram_nand_ctl;
+  if (zx_status_t status =
+          fdio_open_fd(kBasePath, static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
+                       ram_nand_ctl.reset_and_get_address());
+      status != ZX_OK) {
+    fprintf(stderr, "Could not open ram_nand_ctl: %s\n", zx_status_get_string(status));
+    return status;
   }
 
   zx::result channel = device_watcher::RecursiveWaitForFile(ram_nand_ctl.get(), name.c_str());

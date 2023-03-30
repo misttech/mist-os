@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 #include <endian.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
@@ -15,7 +14,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/cpp/caller.h>
-#include <lib/fdio/fdio.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/watcher.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/usb-virtual-bus-launcher/usb-virtual-bus-launcher.h>
@@ -84,9 +83,10 @@ zx_status_t WaitForDevice(int dirfd, int event, const char* name, void* cookie) 
   if (event != WATCH_EVENT_ADD_FILE) {
     return ZX_OK;
   }
-  fbl::unique_fd fd(openat(dirfd, name, O_RDONLY));
-  if (!fd.is_valid()) {
-    return ZX_ERR_BAD_HANDLE;
+  fbl::unique_fd fd;
+  if (zx_status_t status = fdio_open_fd_at(dirfd, name, 0, fd.reset_and_get_address());
+      status != ZX_OK) {
+    return status;
   }
   std::string topological_path;
   zx_status_t status = GetTopologicalPath(fd.get(), &topological_path);
@@ -104,7 +104,7 @@ zx_status_t WaitForDevice(int dirfd, int event, const char* name, void* cookie) 
 class NetworkDeviceInterface {
  public:
   explicit NetworkDeviceInterface(fidl::UnownedClientEnd<fuchsia_io::Directory> directory,
-                                  fbl::String path, const std::string& session_name)
+                                  const fbl::String& path, const std::string& session_name)
       : loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
     zx::result controller =
         component::ConnectAt<fuchsia_hardware_network::DeviceInstance>(directory, path);
@@ -250,7 +250,6 @@ class NetworkDeviceInterface {
       loop_.Run(zx::deadline_after(zx::msec(1)), true);
     }
     loop_.ResetQuit();
-    return;
   }
 
   void RunLoopUntilIdle() {
@@ -329,8 +328,9 @@ class UsbCdcEcmTest : public zxtest::Test {
     ASSERT_OK(bus_->SetupPeripheralDevice(std::move(device_desc), std::move(config_descs)));
 
     const auto wait_for_device = [this](DevicePaths& paths) {
-      fbl::unique_fd fd(openat(bus_->GetRootFd(), paths.subdir.c_str(), O_RDONLY));
-      ASSERT_TRUE(fd.is_valid());
+      fbl::unique_fd fd;
+      ASSERT_OK(
+          fdio_open_fd_at(bus_->GetRootFd(), paths.subdir.c_str(), 0, fd.reset_and_get_address()));
       ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForDevice, ZX_TIME_INFINITE, &paths),
                     ZX_ERR_STOP);
     };

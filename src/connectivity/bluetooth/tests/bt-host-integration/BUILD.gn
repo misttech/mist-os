@@ -19,7 +19,6 @@ rustc_test("bt_host_integration_tests") {
     "//src/connectivity/bluetooth/testing/test-harness",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
   ]

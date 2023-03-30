@@ -10,6 +10,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async-loop/testing/cpp/real_loop.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -108,25 +109,21 @@ class AdbShellTest : public zxtest::Test, public loop_fixture::RealLoop {
   }
 
   void SetupIncomingServices(fidl::ServerEnd<fuchsia_io::Directory> svc) {
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_EQ(ZX_OK, endpoints.status_value());
-    ASSERT_EQ(ZX_OK, incoming_
-                         ->AddUnmanagedProtocol<fuchsia_dash::Launcher>(
-                             [this](fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
-                               fake_dash_launcher_.BindServer(dispatcher(), std::move(server_end));
-                             })
-                         .status_value());
-    ASSERT_EQ(ZX_OK, incoming_
-                         ->AddUnmanagedProtocol<fuchsia_sys2::LifecycleController>(
-                             [this](fidl::ServerEnd<fuchsia_sys2::LifecycleController> server_end) {
-                               fake_lifecycle_controller_.BindServer(dispatcher(),
-                                                                     std::move(server_end));
-                             },
-                             "fuchsia.sys2.LifecycleController.root")
-                         .status_value());
-    ASSERT_EQ(ZX_OK, incoming_->Serve(std::move(endpoints->server)).status_value());
-    ASSERT_OK(fidl::WireCall(endpoints->client)
-                  ->Open({}, {}, "svc", fidl::ServerEnd<fuchsia_io::Node>(svc.TakeChannel())));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    auto& [client_end, server_end] = endpoints.value();
+    ASSERT_OK(incoming_->AddUnmanagedProtocol<fuchsia_dash::Launcher>(
+        [this](fidl::ServerEnd<fuchsia_dash::Launcher> server_end) {
+          fake_dash_launcher_.BindServer(dispatcher(), std::move(server_end));
+        }));
+    ASSERT_OK(incoming_->AddUnmanagedProtocol<fuchsia_sys2::LifecycleController>(
+        [this](fidl::ServerEnd<fuchsia_sys2::LifecycleController> server_end) {
+          fake_lifecycle_controller_.BindServer(dispatcher(), std::move(server_end));
+        },
+        "fuchsia.sys2.LifecycleController.root"));
+    ASSERT_OK(incoming_->Serve(std::move(server_end)));
+    ASSERT_OK(component::ConnectAt<fuchsia_io::Directory>(
+        client_end, std::move(svc), component::OutgoingDirectory::kServiceDirectory));
   }
 
  protected:
