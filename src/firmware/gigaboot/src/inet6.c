@@ -292,11 +292,11 @@ void udp6_recv(ip6_hdr* ip, void* _data, size_t len) {
   uint16_t sport = ntohs(udp->src_port);
 
   switch (dport) {
-    case NB_SERVER_PORT:
+    case NETBOOT_SERVER_PORT:
       netboot_recv((uint8_t*)_data + UDP_HDR_LEN, len, (void*)ip->src, sport);
       break;
-    case NB_TFTP_INCOMING_PORT:
-    case NB_TFTP_OUTGOING_PORT:
+    case NETBOOT_TFTP_INCOMING_PORT:
+    case NETBOOT_TFTP_OUTGOING_PORT:
       tftp_recv((uint8_t*)_data + UDP_HDR_LEN, len, (void*)ip->dst, dport, (void*)ip->src, sport);
       break;
     case FB_SERVER_PORT:

@@ -42,9 +42,9 @@ LogListener::LogListener(async_dispatcher_t* dispatcher, SendFn send, bool retra
         }
         MaybeSendLog();
       }) {
-  ZX_ASSERT_MSG(max_msg_size <= MAX_LOG_DATA,
+  ZX_ASSERT_MSG(max_msg_size <= NETBOOT_DEBUGLOG_MAX_DATA,
                 "maximum message size %ld greater than max log data %d", max_msg_size,
-                MAX_LOG_DATA);
+                NETBOOT_DEBUGLOG_MAX_DATA);
 }
 
 void LogListener::Bind(fidl::ServerEnd<_EnclosingProtocol> server_end) {
@@ -59,7 +59,7 @@ void LogListener::Bind(fidl::ServerEnd<_EnclosingProtocol> server_end) {
 
 LogListener::StagedPacket::StagedPacket(uint32_t seqno, const char* nodename,
                                         LogListener::PendingMessage&& msg)
-    : contents({.magic = NB_DEBUGLOG_MAGIC, .seqno = seqno}),
+    : contents({.magic = NETBOOT_DEBUGLOG_MAGIC, .seqno = seqno}),
       len(sizeof(contents) - (sizeof(contents.data) - msg.log_message.size())),
       message(std::move(msg)) {
   ZX_ASSERT_MSG(message.log_message.size() <= sizeof(contents.data), "invalid message size %lu",
@@ -225,14 +225,14 @@ zx_status_t debuglog_init(async_dispatcher_t* dispatcher) {
 
   auto& listener = gListener.emplace(
       dispatcher,
-      [](const logpacket_t& pkt, size_t len) {
-        zx_status_t status =
-            udp6_send(&pkt, len, &ip6_ll_all_nodes, DEBUGLOG_PORT, DEBUGLOG_ACK_PORT, false);
+      [](const netboot_debuglog_packet_t& pkt, size_t len) {
+        zx_status_t status = udp6_send(&pkt, len, &ip6_ll_all_nodes, NETBOOT_DEBUGLOG_PORT,
+                                       NETBOOT_DEBUGLOG_ACK_PORT, false);
         if (status != ZX_OK) {
           printf("netsvc: failed to send debuglog: %s\n", zx_status_get_string(status));
         }
       },
-      /* retransmit */ true, MAX_LOG_DATA);
+      /* retransmit */ true, NETBOOT_DEBUGLOG_MAX_DATA);
   listener.Bind(std::move(server_end));
 
   return ZX_OK;
@@ -245,9 +245,9 @@ void debuglog_recv(async_dispatcher_t* dispatcher, void* data, size_t len, bool 
   }
   // Copied not cast in-place to satisfy alignment requirements flagged by ubsan (see
   // fxbug.dev/45798).
-  logpacket_t pkt;
-  memcpy(&pkt, data, sizeof(logpacket_t));
-  if ((pkt.magic != NB_DEBUGLOG_MAGIC)) {
+  netboot_debuglog_packet_t pkt;
+  memcpy(&pkt, data, sizeof(netboot_debuglog_packet_t));
+  if ((pkt.magic != NETBOOT_DEBUGLOG_MAGIC)) {
     return;
   }
 

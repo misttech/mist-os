@@ -17,7 +17,7 @@
 #define TFTP_DEFAULT_WINDOW_SZ 256
 
 typedef struct {
-  struct nbmsg_t hdr;
+  netboot_message_t hdr;
   uint8_t data[MAXSIZE];
 } msg;
 
@@ -29,7 +29,7 @@ typedef enum device_state {
 } device_state_t;
 
 typedef struct device_info {
-  char nodename[MAX_NODENAME_LENGTH];
+  char nodename[NETBOOT_MAX_NODENAME_LENGTH];
   char inet6_addr_s[INET6_ADDRSTRLEN];
   struct sockaddr_in6 inet6_addr;
   device_state_t state;

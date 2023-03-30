@@ -95,11 +95,11 @@ zx::result<> ReadBoardInfo(fidl::UnownedClientEnd<fuchsia_sysinfo::SysInfo> sysi
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
 
-  if (*length < sizeof(board_info_t) || offset != 0) {
+  if (*length < sizeof(netboot_board_info_t) || offset != 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  auto* board_info = static_cast<board_info_t*>(data);
+  auto* board_info = static_cast<netboot_board_info_t*>(data);
   memset(board_info, 0, sizeof(*board_info));
 
   if (zx::result<> status = GetBoardName(sysinfo, board_info->board_name); status.is_error()) {
@@ -117,8 +117,8 @@ zx::result<> ReadBoardInfo(fidl::UnownedClientEnd<fuchsia_sysinfo::SysInfo> sysi
     memcpy(&board_info->board_revision, &status.value(), sizeof(board_info->board_revision));
   }
 
-  *length = sizeof(board_info_t);
+  *length = sizeof(netboot_board_info_t);
   return zx::ok();
 }
 
-size_t BoardInfoSize() { return sizeof(board_info_t); }
+size_t BoardInfoSize() { return sizeof(netboot_board_info_t); }

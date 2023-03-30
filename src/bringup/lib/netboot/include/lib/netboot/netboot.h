@@ -11,136 +11,136 @@
 
 // clang-format off
 
-#define BOOTLOADER_VERSION "0.7.22"
+#define NETBOOT_BOOTLOADER_VERSION "0.7.22"
 
-#define NB_MAGIC              0xAA774217
-#define NB_DEBUGLOG_MAGIC     0xAEAE1123
+#define NETBOOT_MAGIC              0xAA774217
+#define NETBOOT_DEBUGLOG_MAGIC     0xAEAE1123
 
-#define NB_SERVER_PORT        33330
-#define NB_ADVERT_PORT        33331
-#define NB_CMD_PORT_START     33332
-#define NB_CMD_PORT_END       33339
-#define NB_TFTP_OUTGOING_PORT 33340
-#define NB_TFTP_INCOMING_PORT 33341
+#define NETBOOT_SERVER_PORT        33330
+#define NETBOOT_ADVERT_PORT        33331
+#define NETBOOT_CMD_PORT_START     33332
+#define NETBOOT_CMD_PORT_END       33339
+#define NETBOOT_TFTP_OUTGOING_PORT 33340
+#define NETBOOT_TFTP_INCOMING_PORT 33341
 
 
-#define NB_COMMAND           1   // arg=0, data=command
-#define NB_SEND_FILE         2   // arg=size, data=filename
-#define NB_DATA              3   // arg=offset, data=data
-#define NB_BOOT              4   // arg=0
-#define NB_QUERY             5   // arg=0, data=hostname (or "*")
-#define NB_SHELL_CMD         6   // arg=0, data=command string
-#define NB_OPEN              7   // arg=O_RDONLY|O_WRONLY, data=filename
-#define NB_READ              8   // arg=blocknum
-#define NB_WRITE             9   // arg=blocknum, data=data
-#define NB_CLOSE             10  // arg=0
-#define NB_LAST_DATA         11  // arg=offset, data=data
-#define NB_REBOOT            12  // arg=0
-#define NB_GET_ADVERT        13  // arg=0
+#define NETBOOT_COMMAND           1   // arg=0, data=command
+#define NETBOOT_SEND_FILE         2   // arg=size, data=filename
+#define NETBOOT_DATA              3   // arg=offset, data=data
+#define NETBOOT_BOOT              4   // arg=0
+#define NETBOOT_QUERY             5   // arg=0, data=hostname (or "*")
+#define NETBOOT_SHELL_CMD         6   // arg=0, data=command string
+#define NETBOOT_OPEN              7   // arg=O_RDONLY|O_WRONLY, data=filename
+#define NETBOOT_READ              8   // arg=blocknum
+#define NETBOOT_WRITE             9   // arg=blocknum, data=data
+#define NETBOOT_CLOSE             10  // arg=0
+#define NETBOOT_LAST_DATA         11  // arg=offset, data=data
+#define NETBOOT_REBOOT            12  // arg=0
+#define NETBOOT_GET_ADVERT        13  // arg=0
 
-#define NB_ACK                0 // arg=0 or -err, NB_READ: data=data
-#define NB_FILE_RECEIVED      0x70000001 // arg=size
+#define NETBOOT_ACK                0 // arg=0 or -err, NETBOOT_READ: data=data
+#define NETBOOT_FILE_RECEIVED      0x70000001 // arg=size
 
-#define NB_ADVERTISE          0x77777777
+#define NETBOOT_ADVERTISE          0x77777777
 
-#define NB_ERROR              0x80000000
-#define NB_ERROR_BAD_CMD      0x80000001
-#define NB_ERROR_BAD_PARAM    0x80000002
-#define NB_ERROR_TOO_LARGE    0x80000003
-#define NB_ERROR_BAD_FILE     0x80000004
+#define NETBOOT_ERROR              0x80000000
+#define NETBOOT_ERROR_BAD_CMD      0x80000001
+#define NETBOOT_ERROR_BAD_PARAM    0x80000002
+#define NETBOOT_ERROR_TOO_LARGE    0x80000003
+#define NETBOOT_ERROR_BAD_FILE     0x80000004
 
-#define NB_VERSION_1_0  0x0001000
-#define NB_VERSION_1_1  0x0001010
-#define NB_VERSION_1_2  0x0001020
-#define NB_VERSION_1_3  0x0001030
-#define NB_VERSION_CURRENT NB_VERSION_1_3
+#define NETBOOT_VERSION_1_0  0x0001000
+#define NETBOOT_VERSION_1_1  0x0001010
+#define NETBOOT_VERSION_1_2  0x0001020
+#define NETBOOT_VERSION_1_3  0x0001030
+#define NETBOOT_VERSION_CURRENT NETBOOT_VERSION_1_3
 
-#define NB_FILENAME_PREFIX "<<netboot>>"
-#define NB_KERNEL_FILENAME NB_FILENAME_PREFIX "kernel.bin"
-#define NB_CMDLINE_FILENAME NB_FILENAME_PREFIX "cmdline"
+#define NETBOOT_MAX_NODENAME_LENGTH 64
 
-#define NB_IMAGE_PREFIX "<<image>>"
-#define NB_FVM_HOST_FILENAME "sparse.fvm"
-#define NB_FVM_FILENAME NB_IMAGE_PREFIX NB_FVM_HOST_FILENAME
-#define NB_BOOTLOADER_HOST_FILENAME "bootloader.img"
-#define NB_BOOTLOADER_FILENAME NB_IMAGE_PREFIX NB_BOOTLOADER_HOST_FILENAME
+#define NETBOOT_FILENAME_PREFIX "<<netboot>>"
+#define NETBOOT_KERNEL_FILENAME NETBOOT_FILENAME_PREFIX "kernel.bin"
+#define NETBOOT_CMDLINE_FILENAME NETBOOT_FILENAME_PREFIX "cmdline"
+
+#define NETBOOT_IMAGE_PREFIX "<<image>>"
+#define NETBOOT_FVM_HOST_FILENAME "sparse.fvm"
+#define NETBOOT_FVM_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_FVM_HOST_FILENAME
+#define NETBOOT_BOOTLOADER_HOST_FILENAME "bootloader.img"
+#define NETBOOT_BOOTLOADER_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_BOOTLOADER_HOST_FILENAME
 // Firmware images are slightly different, as they have an optional type suffix:
 //   firmware_     <- type = "" (the default)
 //   firmware_foo  <- type = "foo"
-#define NB_FIRMWARE_HOST_FILENAME_PREFIX "firmware_"
-#define NB_FIRMWARE_FILENAME_PREFIX NB_IMAGE_PREFIX NB_FIRMWARE_HOST_FILENAME_PREFIX
-#define NB_FIRMWAREA_HOST_FILENAME_PREFIX "firmwarea_"
-#define NB_FIRMWAREA_FILENAME_PREFIX NB_IMAGE_PREFIX NB_FIRMWAREA_HOST_FILENAME_PREFIX
-#define NB_FIRMWAREB_HOST_FILENAME_PREFIX "firmwareb_"
-#define NB_FIRMWAREB_FILENAME_PREFIX NB_IMAGE_PREFIX NB_FIRMWAREB_HOST_FILENAME_PREFIX
-#define NB_FIRMWARER_HOST_FILENAME_PREFIX "firmwarer_"
-#define NB_FIRMWARER_FILENAME_PREFIX NB_IMAGE_PREFIX NB_FIRMWARER_HOST_FILENAME_PREFIX
-#define NB_ZIRCONA_HOST_FILENAME "zircona.img"
-#define NB_ZIRCONA_FILENAME NB_IMAGE_PREFIX NB_ZIRCONA_HOST_FILENAME
-#define NB_ZIRCONB_HOST_FILENAME "zirconb.img"
-#define NB_ZIRCONB_FILENAME NB_IMAGE_PREFIX NB_ZIRCONB_HOST_FILENAME
-#define NB_ZIRCONR_HOST_FILENAME "zirconr.img"
-#define NB_ZIRCONR_FILENAME NB_IMAGE_PREFIX NB_ZIRCONR_HOST_FILENAME
-#define NB_VBMETAA_HOST_FILENAME "vbmetaa.img"
-#define NB_VBMETAA_FILENAME NB_IMAGE_PREFIX NB_VBMETAA_HOST_FILENAME
-#define NB_VBMETAB_HOST_FILENAME "vbmetab.img"
-#define NB_VBMETAB_FILENAME NB_IMAGE_PREFIX NB_VBMETAB_HOST_FILENAME
-#define NB_VBMETAR_HOST_FILENAME "vbmetar.img"
-#define NB_VBMETAR_FILENAME NB_IMAGE_PREFIX NB_VBMETAR_HOST_FILENAME
-#define NB_SSHAUTH_HOST_FILENAME "authorized_keys"
-#define NB_SSHAUTH_FILENAME NB_IMAGE_PREFIX NB_SSHAUTH_HOST_FILENAME
-#define NB_BOARD_NAME_HOST_FILENAME "board_name"
-#define NB_BOARD_NAME_FILENAME NB_IMAGE_PREFIX NB_BOARD_NAME_HOST_FILENAME
-#define NB_BOARD_REVISION_HOST_FILENAME "board_revision"
-#define NB_BOARD_REVISION_FILENAME NB_IMAGE_PREFIX NB_BOARD_REVISION_HOST_FILENAME
-#define NB_BOARD_INFO_HOST_FILENAME "board_info"
-#define NB_BOARD_INFO_FILENAME NB_IMAGE_PREFIX NB_BOARD_INFO_HOST_FILENAME
-#define NB_INIT_PARTITION_TABLES_HOST_FILENAME "init_partition_tables"
-#define NB_INIT_PARTITION_TABLES_FILENAME NB_IMAGE_PREFIX NB_INIT_PARTITION_TABLES_HOST_FILENAME
-#define NB_WIPE_PARTITION_TABLES_HOST_FILENAME "wipe_partition_tables"
-#define NB_WIPE_PARTITION_TABLES_FILENAME NB_IMAGE_PREFIX NB_WIPE_PARTITION_TABLES_HOST_FILENAME
+#define NETBOOT_FIRMWARE_HOST_FILENAME_PREFIX "firmware_"
+#define NETBOOT_FIRMWARE_FILENAME_PREFIX NETBOOT_IMAGE_PREFIX NETBOOT_FIRMWARE_HOST_FILENAME_PREFIX
+#define NETBOOT_FIRMWAREA_HOST_FILENAME_PREFIX "firmwarea_"
+#define NETBOOT_FIRMWAREA_FILENAME_PREFIX NETBOOT_IMAGE_PREFIX NETBOOT_FIRMWAREA_HOST_FILENAME_PREFIX
+#define NETBOOT_FIRMWAREB_HOST_FILENAME_PREFIX "firmwareb_"
+#define NETBOOT_FIRMWAREB_FILENAME_PREFIX NETBOOT_IMAGE_PREFIX NETBOOT_FIRMWAREB_HOST_FILENAME_PREFIX
+#define NETBOOT_FIRMWARER_HOST_FILENAME_PREFIX "firmwarer_"
+#define NETBOOT_FIRMWARER_FILENAME_PREFIX NETBOOT_IMAGE_PREFIX NETBOOT_FIRMWARER_HOST_FILENAME_PREFIX
+#define NETBOOT_ZIRCONA_HOST_FILENAME "zircona.img"
+#define NETBOOT_ZIRCONA_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_ZIRCONA_HOST_FILENAME
+#define NETBOOT_ZIRCONB_HOST_FILENAME "zirconb.img"
+#define NETBOOT_ZIRCONB_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_ZIRCONB_HOST_FILENAME
+#define NETBOOT_ZIRCONR_HOST_FILENAME "zirconr.img"
+#define NETBOOT_ZIRCONR_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_ZIRCONR_HOST_FILENAME
+#define NETBOOT_VBMETAA_HOST_FILENAME "vbmetaa.img"
+#define NETBOOT_VBMETAA_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_VBMETAA_HOST_FILENAME
+#define NETBOOT_VBMETAB_HOST_FILENAME "vbmetab.img"
+#define NETBOOT_VBMETAB_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_VBMETAB_HOST_FILENAME
+#define NETBOOT_VBMETAR_HOST_FILENAME "vbmetar.img"
+#define NETBOOT_VBMETAR_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_VBMETAR_HOST_FILENAME
+#define NETBOOT_SSHAUTH_HOST_FILENAME "authorized_keys"
+#define NETBOOT_SSHAUTH_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_SSHAUTH_HOST_FILENAME
+#define NETBOOT_BOARD_NAME_HOST_FILENAME "board_name"
+#define NETBOOT_BOARD_NAME_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_BOARD_NAME_HOST_FILENAME
+#define NETBOOT_BOARD_REVISION_HOST_FILENAME "board_revision"
+#define NETBOOT_BOARD_REVISION_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_BOARD_REVISION_HOST_FILENAME
+#define NETBOOT_BOARD_INFO_HOST_FILENAME "board_info"
+#define NETBOOT_BOARD_INFO_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_BOARD_INFO_HOST_FILENAME
+#define NETBOOT_INIT_PARTITION_TABLES_HOST_FILENAME "init_partition_tables"
+#define NETBOOT_INIT_PARTITION_TABLES_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_INIT_PARTITION_TABLES_HOST_FILENAME
+#define NETBOOT_WIPE_PARTITION_TABLES_HOST_FILENAME "wipe_partition_tables"
+#define NETBOOT_WIPE_PARTITION_TABLES_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_WIPE_PARTITION_TABLES_HOST_FILENAME
 
 // Should match paver FIDL definition.
 // Length does not include the '\0' terminator, so when allocating a character
-// buffer to hold the type use (NB_FIRMWARE_TYPE_MAX_LENGTH  + 1).
-#define NB_FIRMWARE_TYPE_MAX_LENGTH 256
+// buffer to hold the type use (NETBOOT_FIRMWARE_TYPE_MAX_LENGTH  + 1).
+#define NETBOOT_FIRMWARE_TYPE_MAX_LENGTH 256
 
 // Historically equal to ZX_MAX_NAME_LEN.
-#define NB_MAX_BOARD_NAME_LEN ((size_t)32u)
+#define NETBOOT_MAX_BOARD_NAME_LEN ((size_t)32u)
 
-typedef struct board_info {
-  char board_name[NB_MAX_BOARD_NAME_LEN];
+typedef struct {
+  char board_name[NETBOOT_MAX_BOARD_NAME_LEN];
   uint32_t board_revision;
   uint8_t mac_address[6];
   uint8_t _padding[2];
-} board_info_t;
+} netboot_board_info_t;
 
-#define NB_PATH_MAX 4096
+#define NETBOOT_PATH_MAX 4096
 
-typedef struct modify_partition_table_info {
-  // Path of block device to initialize or wipe.
-  char block_device_path[NB_PATH_MAX + 1];
-} modify_partition_table_info_t;
+typedef struct {
+  char block_device_path[NETBOOT_PATH_MAX + 1];
+} netboot_block_device_t;
 
-typedef struct nbmsg_t {
+typedef struct {
     uint32_t magic;
     uint32_t cookie;
     uint32_t cmd;
     uint32_t arg;
     uint8_t  data[0];
-} nbmsg;
+} netboot_message_t;
 
-#define DEBUGLOG_PORT         33337
-#define DEBUGLOG_ACK_PORT     33338
+#define NETBOOT_DEBUGLOG_PORT         33337
+#define NETBOOT_DEBUGLOG_ACK_PORT     33338
 
-#define MAX_LOG_DATA 1216
-#define MAX_NODENAME_LENGTH 64
+#define NETBOOT_DEBUGLOG_MAX_DATA 1216
 
-typedef struct logpacket {
+typedef struct {
     uint32_t magic;
     uint32_t seqno;
-    char nodename[MAX_NODENAME_LENGTH];
-    char data[MAX_LOG_DATA];
-} logpacket_t;
+    char nodename[NETBOOT_MAX_NODENAME_LENGTH];
+    char data[NETBOOT_DEBUGLOG_MAX_DATA];
+} netboot_debuglog_packet_t;
 
 #endif  // SRC_BRINGUP_LIB_NETBOOT_INCLUDE_LIB_NETBOOT_NETBOOT_H_

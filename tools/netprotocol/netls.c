@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
     return -1;
   }
 
-  if (netboot_discover(NB_SERVER_PORT, NULL, on_device, NULL)) {
+  if (netboot_discover(NETBOOT_SERVER_PORT, NULL, on_device, NULL)) {
     fprintf(stderr, "Failed to discover\n");
     return 1;
   }

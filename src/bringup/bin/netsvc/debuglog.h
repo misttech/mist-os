@@ -29,7 +29,7 @@ void debuglog_recv(async_dispatcher_t* dispatcher, void* data, size_t len, bool 
 // flow loop with the fuchsia.logger.LogListenerSafe protocol.
 class LogListener : public fidl::WireServer<fuchsia_logger::LogListenerSafe> {
  public:
-  using SendFn = fit::function<void(const logpacket_t&, size_t)>;
+  using SendFn = fit::function<void(const netboot_debuglog_packet_t&, size_t)>;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(LogListener);
   LogListener(async_dispatcher_t* dispatcher, SendFn send, bool retransmit, size_t max_msg_size);
@@ -61,7 +61,7 @@ class LogListener : public fidl::WireServer<fuchsia_logger::LogListenerSafe> {
   };
 
   struct StagedPacket {
-    logpacket_t contents;
+    netboot_debuglog_packet_t contents;
     size_t len;
     PendingMessage message;
 

@@ -125,7 +125,7 @@ class Paver final : public PaverInterface {
   // Only meaningful when command == Command::kDataFile.
   char path_[PATH_MAX];
   // Only meaningful when command == Command::kFirmware.
-  char firmware_type_[NB_FIRMWARE_TYPE_MAX_LENGTH + 1];
+  char firmware_type_[NETBOOT_FIRMWARE_TYPE_MAX_LENGTH + 1];
 
   // Buffer used for stashing data from tftp until it can be written out to the paver.
   fzl::ResizeableVmoMapper buffer_mapper_;

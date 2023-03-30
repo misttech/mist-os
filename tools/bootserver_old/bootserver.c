@@ -288,17 +288,17 @@ void drain(int fd) {
 
 int send_boot_command(struct sockaddr_in6* ra) {
   // Construct message
-  nbmsg msg;
+  netboot_message_t msg;
   static int cookie = 0;
-  msg.magic = NB_MAGIC;
+  msg.magic = NETBOOT_MAGIC;
   msg.cookie = cookie++;
-  msg.cmd = NB_BOOT;
+  msg.cmd = NETBOOT_BOOT;
   msg.arg = 0;
 
-  // Send to NB_SERVER_PORT
+  // Send to NETBOOT_SERVER_PORT
   struct sockaddr_in6 target_addr;
   memcpy(&target_addr, ra, sizeof(struct sockaddr_in6));
-  target_addr.sin6_port = htons(NB_SERVER_PORT);
+  target_addr.sin6_port = htons(NETBOOT_SERVER_PORT);
   int s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   if (s < 0) {
     log("cannot create socket %d", s);
@@ -318,17 +318,17 @@ int send_boot_command(struct sockaddr_in6* ra) {
 
 int send_reboot_command(struct sockaddr_in6* ra) {
   // Construct message
-  nbmsg msg;
+  netboot_message_t msg;
   static int cookie = 0;
-  msg.magic = NB_MAGIC;
+  msg.magic = NETBOOT_MAGIC;
   msg.cookie = cookie++;
-  msg.cmd = NB_REBOOT;
+  msg.cmd = NETBOOT_REBOOT;
   msg.arg = 0;
 
-  // Send to NB_SERVER_PORT
+  // Send to NETBOOT_SERVER_PORT
   struct sockaddr_in6 target_addr;
   memcpy(&target_addr, ra, sizeof(struct sockaddr_in6));
-  target_addr.sin6_port = htons(NB_SERVER_PORT);
+  target_addr.sin6_port = htons(NETBOOT_SERVER_PORT);
   int s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   if (s < 0) {
     log("cannot create socket %d", s);
@@ -354,7 +354,7 @@ static int validate_board_name(const char* board_name, const char* board_info_fi
     return -1;
   }
 
-  board_info_t board_info = {};
+  netboot_board_info_t board_info = {};
   if (read(fd, &board_info, sizeof(board_info)) < (ssize_t)sizeof(board_info)) {
     log("Unable to read the board info file [%s]", board_info_file);
     goto err;
@@ -386,7 +386,7 @@ int main(int argc, char** argv) {
   size_t num_fvms = 0;
   size_t num_firmware = 0;
   const char* tmpdir = getenv("TMPDIR");
-  char board_info_template[] = "%s/board_info.XXXXXX";
+  char netboot_board_info_template[] = "%s/board_info.XXXXXX";
   char board_info_file[PATH_MAX];
   const char block_device_path_template[] = "%s/block_device_path.XXXXXX";
   char block_device_path[PATH_MAX];
@@ -469,9 +469,9 @@ int main(int argc, char** argv) {
         // Skip the '-' delimiter and use the remainder as the type.
         type++;
 
-        if (strlen(type) > NB_FIRMWARE_TYPE_MAX_LENGTH) {
+        if (strlen(type) > NETBOOT_FIRMWARE_TYPE_MAX_LENGTH) {
           fprintf(stderr, "firmware type '%s' is too long (max %d characters)\n", type,
-                  NB_FIRMWARE_TYPE_MAX_LENGTH);
+                  NETBOOT_FIRMWARE_TYPE_MAX_LENGTH);
           return -1;
         }
       } else {
@@ -728,11 +728,11 @@ int main(int argc, char** argv) {
       return -1;
     }
     memcpy(&addr.sin6_addr, &allowed_addr, sizeof(struct in6_addr));
-    addr.sin6_port = htons(NB_SERVER_PORT);
+    addr.sin6_port = htons(NETBOOT_SERVER_PORT);
     addr.sin6_scope_id = allowed_scope_id;
     log("Sending request to %s", sockaddr_str(&addr));
   } else {
-    addr.sin6_port = htons(NB_ADVERT_PORT);
+    addr.sin6_port = htons(NETBOOT_ADVERT_PORT);
     if (bind(sock, (void*)&addr, sizeof(addr)) < 0) {
       log("cannot bind to %s %d: %s\nthere may be another bootserver running\n",
           sockaddr_str(&addr), errno, strerror(errno));
@@ -746,18 +746,18 @@ int main(int argc, char** argv) {
     struct sockaddr_in6 ra;
     socklen_t rlen;
     char buf[4096];
-    nbmsg* msg = (void*)buf;
+    netboot_message_t* msg = (void*)buf;
     rlen = sizeof(ra);
 
     if (no_bind) {
       // Send request to device to get the advertisement instead of waiting for the
       // broadcasted advertisement.
-      msg->magic = NB_MAGIC;
-      msg->cmd = NB_GET_ADVERT;
+      msg->magic = NETBOOT_MAGIC;
+      msg->cmd = NETBOOT_GET_ADVERT;
 
       ssize_t send_result =
-          sendto(sock, buf, sizeof(nbmsg), 0, (struct sockaddr*)&addr, sizeof(addr));
-      if (send_result != sizeof(nbmsg)) {
+          sendto(sock, buf, sizeof(netboot_message_t), 0, (struct sockaddr*)&addr, sizeof(addr));
+      if (send_result != sizeof(netboot_message_t)) {
         if (fail_fast) {
           close(sock);
           return -1;
@@ -788,7 +788,7 @@ int main(int argc, char** argv) {
       close(sock);
       return -1;
     }
-    if ((size_t)r < sizeof(nbmsg)) {
+    if ((size_t)r < sizeof(netboot_message_t)) {
       continue;
     }
     if (!IN6_IS_ADDR_LINKLOCAL(&ra.sin6_addr)) {
@@ -801,11 +801,12 @@ int main(int argc, char** argv) {
           inet_ntop(AF_INET6, &allowed_addr, tmp, sizeof(tmp)));
       continue;
     }
-    if (msg->magic != NB_MAGIC)
+    if (msg->magic != NETBOOT_MAGIC)
       continue;
-    if (msg->cmd != NB_ADVERTISE)
+    if (msg->cmd != NETBOOT_ADVERTISE)
       continue;
-    if ((use_tftp && (msg->arg < NB_VERSION_1_3)) || (!use_tftp && (msg->arg < NB_VERSION_1_1))) {
+    if ((use_tftp && (msg->arg < NETBOOT_VERSION_1_3)) ||
+        (!use_tftp && (msg->arg < NETBOOT_VERSION_1_1))) {
       log("%sIncompatible version 0x%08X of bootloader "
           "detected from %s, please upgrade your bootloader%s",
           ANSI(RED), msg->arg, sockaddr_str(&ra), ANSI(RESET));
@@ -842,15 +843,15 @@ int main(int argc, char** argv) {
       }
     }
 
-    if (strcmp(BOOTLOADER_VERSION, adv_version)) {
+    if (strcmp(NETBOOT_BOOTLOADER_VERSION, adv_version)) {
       if (allow_zedboot_version_mismatch) {
         log("%sWARNING: Bootserver version '%s' != remote Zedboot version '%s'."
             " Paving may fail.%s",
-            ANSI(RED), BOOTLOADER_VERSION, adv_version, ANSI(RESET));
+            ANSI(RED), NETBOOT_BOOTLOADER_VERSION, adv_version, ANSI(RESET));
       } else {
         log("%sWARNING: Bootserver version '%s' != remote Zedboot version '%s'."
             " Device will not be serviced. Please upgrade Zedboot.%s",
-            ANSI(RED), BOOTLOADER_VERSION, adv_version, ANSI(RESET));
+            ANSI(RED), NETBOOT_BOOTLOADER_VERSION, adv_version, ANSI(RESET));
         if (fail_fast || fail_fast_if_version_mismatch) {
           close(sock);
           return -1;
@@ -868,9 +869,9 @@ int main(int argc, char** argv) {
     // This needs to be first as it validates that the other images are
     // correct.
     if (status == 0 && board_name) {
-      snprintf(board_info_file, sizeof(board_info_file), board_info_template, tmpdir);
+      snprintf(board_info_file, sizeof(board_info_file), netboot_board_info_template, tmpdir);
       const char* tmpfile = mktemp(board_info_file);
-      status = xfer2(&ra, tmpfile, NB_BOARD_INFO_FILENAME);
+      status = xfer2(&ra, tmpfile, NETBOOT_BOARD_INFO_FILENAME);
       if (status == 0) {
         status = validate_board_name(board_name, tmpfile);
       }
@@ -883,13 +884,13 @@ int main(int argc, char** argv) {
     if (status == 0 && wipe_partition_tables_device_path) {
       snprintf(block_device_path, sizeof(block_device_path), block_device_path_template, tmpdir);
       int fd = mkstemp(block_device_path);
-      modify_partition_table_info_t info = {};
+      netboot_block_device_t info = {};
       strncpy(info.block_device_path, wipe_partition_tables_device_path,
               sizeof(info.block_device_path) - 1);
       int written = write(fd, &info, sizeof(info));
       status = written == sizeof(info) ? 0 : -1;
       if (status == 0) {
-        status = xfer(&ra, block_device_path, NB_WIPE_PARTITION_TABLES_FILENAME);
+        status = xfer(&ra, block_device_path, NETBOOT_WIPE_PARTITION_TABLES_FILENAME);
       }
       unlink(block_device_path);
       close(fd);
@@ -898,29 +899,30 @@ int main(int argc, char** argv) {
     if (status == 0 && init_partition_tables_device_path) {
       snprintf(block_device_path, sizeof(block_device_path), block_device_path_template, tmpdir);
       int fd = mkstemp(block_device_path);
-      modify_partition_table_info_t info = {};
+      netboot_block_device_t info = {};
       strncpy(info.block_device_path, init_partition_tables_device_path,
               sizeof(info.block_device_path) - 1);
       int written = write(fd, &info, sizeof(info));
       status = written == sizeof(info) ? 0 : -1;
       if (status == 0) {
-        status = xfer(&ra, block_device_path, NB_INIT_PARTITION_TABLES_FILENAME);
+        status = xfer(&ra, block_device_path, NETBOOT_INIT_PARTITION_TABLES_FILENAME);
       }
       unlink(block_device_path);
       close(fd);
     }
     for (size_t i = 0; i < num_fvms; i++) {
       if (status == 0 && fvm_images[i]) {
-        status = xfer(&ra, fvm_images[i], NB_FVM_FILENAME);
+        status = xfer(&ra, fvm_images[i], NETBOOT_FVM_FILENAME);
       }
     }
     if (status == 0 && bootloader_image) {
-      status = xfer(&ra, bootloader_image, NB_BOOTLOADER_FILENAME);
+      status = xfer(&ra, bootloader_image, NETBOOT_BOOTLOADER_FILENAME);
     }
     for (size_t i = 0; i < num_firmware; i++) {
       if (status == 0) {
-        char filename[strlen(NB_FIRMWARE_FILENAME_PREFIX) + NB_FIRMWARE_TYPE_MAX_LENGTH + 1];
-        int result = snprintf(filename, sizeof(filename), "%s%s", NB_FIRMWARE_FILENAME_PREFIX,
+        char filename[strlen(NETBOOT_FIRMWARE_FILENAME_PREFIX) + NETBOOT_FIRMWARE_TYPE_MAX_LENGTH +
+                      1];
+        int result = snprintf(filename, sizeof(filename), "%s%s", NETBOOT_FIRMWARE_FILENAME_PREFIX,
                               firmware_images[i].type);
         if (result < 0 || (size_t)result >= sizeof(filename)) {
           fprintf(stderr, "error creating firmware filename for type '%s'\n",
@@ -932,28 +934,28 @@ int main(int argc, char** argv) {
       }
     }
     if (status == 0 && zircona_image) {
-      status = xfer(&ra, zircona_image, NB_ZIRCONA_FILENAME);
+      status = xfer(&ra, zircona_image, NETBOOT_ZIRCONA_FILENAME);
     }
     if (status == 0 && zirconb_image) {
-      status = xfer(&ra, zirconb_image, NB_ZIRCONB_FILENAME);
+      status = xfer(&ra, zirconb_image, NETBOOT_ZIRCONB_FILENAME);
     }
     if (status == 0 && zirconr_image) {
-      status = xfer(&ra, zirconr_image, NB_ZIRCONR_FILENAME);
+      status = xfer(&ra, zirconr_image, NETBOOT_ZIRCONR_FILENAME);
     }
     if (status == 0 && vbmetaa_image) {
-      status = xfer(&ra, vbmetaa_image, NB_VBMETAA_FILENAME);
+      status = xfer(&ra, vbmetaa_image, NETBOOT_VBMETAA_FILENAME);
     }
     if (status == 0 && vbmetab_image) {
-      status = xfer(&ra, vbmetab_image, NB_VBMETAB_FILENAME);
+      status = xfer(&ra, vbmetab_image, NETBOOT_VBMETAB_FILENAME);
     }
     if (status == 0 && vbmetar_image) {
-      status = xfer(&ra, vbmetar_image, NB_VBMETAR_FILENAME);
+      status = xfer(&ra, vbmetar_image, NETBOOT_VBMETAR_FILENAME);
     }
     if (status == 0 && authorized_keys) {
-      status = xfer(&ra, authorized_keys, NB_SSHAUTH_FILENAME);
+      status = xfer(&ra, authorized_keys, NETBOOT_SSHAUTH_FILENAME);
     }
     if (status == 0 && kernel_fn) {
-      status = xfer(&ra, kernel_fn, NB_KERNEL_FILENAME);
+      status = xfer(&ra, kernel_fn, NETBOOT_KERNEL_FILENAME);
     }
     if (status == 0) {
       log("Transfer ends successfully.");

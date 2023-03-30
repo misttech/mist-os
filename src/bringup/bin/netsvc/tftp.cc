@@ -136,7 +136,7 @@ tftp_status transport_send(void* data, size_t len, void* transport_cookie) {
   debug_print_packet("tx", cpp20::span(reinterpret_cast<uint8_t*>(data), len));
   transport_info_t& transport_info = *reinterpret_cast<transport_info_t*>(transport_cookie);
   zx_status_t status = udp6_send(data, len, &transport_info.dest_addr, transport_info.dest_port,
-                                 NB_TFTP_OUTGOING_PORT, true);
+                                 NETBOOT_TFTP_OUTGOING_PORT, true);
   if (status != ZX_OK) {
     return TFTP_ERR_IO;
   }
@@ -222,7 +222,7 @@ void tftp_send_next() {
 void tftp_recv(async_dispatcher_t* dispatcher, void* data, size_t len, const ip6_addr_t* daddr,
                uint16_t dport, const ip6_addr_t* saddr, uint16_t sport) {
   debug_print_packet("rx", cpp20::span(reinterpret_cast<uint8_t*>(data), len));
-  if (dport == NB_TFTP_INCOMING_PORT) {
+  if (dport == NETBOOT_TFTP_INCOMING_PORT) {
     if (session != NULL) {
       printf("netsvc: only one simultaneous tftp session allowed\n");
       // ignore attempts to connect when a session is in progress

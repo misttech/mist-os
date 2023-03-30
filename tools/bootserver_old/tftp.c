@@ -144,7 +144,7 @@ tftp_status transport_send(void* data, size_t len, void* cookie) {
       return TFTP_ERR_IO;
     }
     if (!state->connected) {
-      state->target_addr.sin6_port = htons(NB_TFTP_INCOMING_PORT);
+      state->target_addr.sin6_port = htons(NETBOOT_TFTP_INCOMING_PORT);
       send_result = sendto(state->socket, data, len, 0, (struct sockaddr*)&state->target_addr,
                            sizeof(state->target_addr));
     } else {
@@ -249,7 +249,7 @@ int tftp_xfer(struct sockaddr_in6* addr, const char* fn, const char* name, bool 
   if (!strcmp(fn, "(cmdline)")) {
     xd.data = name;
     xd.datalen = strlen(name) + 1;
-    name = NB_CMDLINE_FILENAME;
+    name = NETBOOT_CMDLINE_FILENAME;
   }
 
   void* session_data = NULL;

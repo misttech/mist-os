@@ -110,7 +110,7 @@ static tftp_status transport_send(void* data, size_t len, void* transport_cookie
       return TFTP_ERR_IO;
     }
     if (!transport_info->connected) {
-      transport_info->target_addr.sin6_port = htons(NB_TFTP_INCOMING_PORT);
+      transport_info->target_addr.sin6_port = htons(NETBOOT_TFTP_INCOMING_PORT);
       send_result = sendto(transport_info->socket, data, len, 0,
                            (struct sockaddr*)&transport_info->target_addr,
                            sizeof(transport_info->target_addr));

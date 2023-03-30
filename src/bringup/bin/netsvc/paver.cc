@@ -325,13 +325,13 @@ zx_status_t Paver::ClearSysconfig() {
 
 zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
                                 fidl::WireSyncClient<fuchsia_paver::DynamicDataSink>* data_sink) {
-  modify_partition_table_info_t partition_info = {};
+  netboot_block_device_t partition_info = {};
   auto status = buffer.vmo.read(&partition_info, 0, sizeof(partition_info));
   if (status != ZX_OK) {
     fprintf(stderr, "netsvc: Unable to read from vmo\n");
     return status;
   }
-  if (partition_info.block_device_path[NB_PATH_MAX] != '\0') {
+  if (partition_info.block_device_path[NETBOOT_PATH_MAX] != '\0') {
     fprintf(stderr, "netsvc: Invalid block device path specified\n");
     return ZX_ERR_INVALID_ARGS;
   }
@@ -513,10 +513,10 @@ tftp_status Paver::ProcessAsFirmwareImage(std::string_view host_filename) {
     const char* config_suffix;
     fuchsia_paver::wire::Configuration config;
   } matches[] = {
-      {NB_FIRMWARE_HOST_FILENAME_PREFIX, "", fuchsia_paver::wire::Configuration::kA},
-      {NB_FIRMWAREA_HOST_FILENAME_PREFIX, "-A", fuchsia_paver::wire::Configuration::kA},
-      {NB_FIRMWAREB_HOST_FILENAME_PREFIX, "-B", fuchsia_paver::wire::Configuration::kB},
-      {NB_FIRMWARER_HOST_FILENAME_PREFIX, "-R", fuchsia_paver::wire::Configuration::kRecovery},
+      {NETBOOT_FIRMWARE_HOST_FILENAME_PREFIX, "", fuchsia_paver::wire::Configuration::kA},
+      {NETBOOT_FIRMWAREA_HOST_FILENAME_PREFIX, "-A", fuchsia_paver::wire::Configuration::kA},
+      {NETBOOT_FIRMWAREB_HOST_FILENAME_PREFIX, "-B", fuchsia_paver::wire::Configuration::kB},
+      {NETBOOT_FIRMWARER_HOST_FILENAME_PREFIX, "-R", fuchsia_paver::wire::Configuration::kRecovery},
   };
 
   for (auto& match : matches) {
@@ -558,21 +558,22 @@ zx::result<fidl::ClientEnd<Protocol>> ConnectAt(
 }  // namespace
 
 tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duration timeout) {
-  // Skip past the NB_IMAGE_PREFIX prefix.
+  // Skip past the NETBOOT_IMAGE_PREFIX prefix.
   std::string_view host_filename;
-  if (auto without_prefix = WithoutPrefix(filename, NB_IMAGE_PREFIX); without_prefix.has_value()) {
+  if (auto without_prefix = WithoutPrefix(filename, NETBOOT_IMAGE_PREFIX);
+      without_prefix.has_value()) {
     host_filename = without_prefix.value();
   } else {
-    fprintf(stderr, "netsvc: Missing '%s' prefix in '%.*s'\n", NB_IMAGE_PREFIX,
+    fprintf(stderr, "netsvc: Missing '%s' prefix in '%.*s'\n", NETBOOT_IMAGE_PREFIX,
             static_cast<int>(filename.size()), filename.data());
     return TFTP_ERR_IO;
   }
 
   // Paving an image to disk.
-  if (host_filename == NB_FVM_HOST_FILENAME) {
+  if (host_filename == NETBOOT_FVM_HOST_FILENAME) {
     printf("netsvc: Running FVM Paver\n");
     command_ = Command::kFvm;
-  } else if (host_filename == NB_BOOTLOADER_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_BOOTLOADER_HOST_FILENAME) {
     // WriteBootloader() has been replaced by WriteFirmware() with an empty
     // firmware type, but keep this function around for backwards-compatibility
     // until we don't use it anymore.
@@ -584,48 +585,48 @@ tftp_status Paver::OpenWrite(std::string_view filename, size_t size, zx::duratio
     if (status != TFTP_NO_ERROR) {
       return status;
     }
-  } else if (host_filename == NB_ZIRCONA_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_ZIRCONA_HOST_FILENAME) {
     printf("netsvc: Running ZIRCON-A Paver\n");
     command_ = Command::kAsset;
     configuration_ = fuchsia_paver::wire::Configuration::kA;
     asset_ = fuchsia_paver::wire::Asset::kKernel;
-  } else if (host_filename == NB_ZIRCONB_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_ZIRCONB_HOST_FILENAME) {
     printf("netsvc: Running ZIRCON-B Paver\n");
     command_ = Command::kAsset;
     configuration_ = fuchsia_paver::wire::Configuration::kB;
     asset_ = fuchsia_paver::wire::Asset::kKernel;
-  } else if (host_filename == NB_ZIRCONR_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_ZIRCONR_HOST_FILENAME) {
     printf("netsvc: Running ZIRCON-R Paver\n");
     command_ = Command::kAsset;
     configuration_ = fuchsia_paver::wire::Configuration::kRecovery;
     asset_ = fuchsia_paver::wire::Asset::kKernel;
-  } else if (host_filename == NB_VBMETAA_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_VBMETAA_HOST_FILENAME) {
     printf("netsvc: Running VBMETA-A Paver\n");
     command_ = Command::kAsset;
     configuration_ = fuchsia_paver::wire::Configuration::kA;
     asset_ = fuchsia_paver::wire::Asset::kVerifiedBootMetadata;
-  } else if (host_filename == NB_VBMETAB_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_VBMETAB_HOST_FILENAME) {
     printf("netsvc: Running VBMETA-B Paver\n");
     command_ = Command::kAsset;
     configuration_ = fuchsia_paver::wire::Configuration::kB;
     asset_ = fuchsia_paver::wire::Asset::kVerifiedBootMetadata;
-  } else if (host_filename == NB_VBMETAR_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_VBMETAR_HOST_FILENAME) {
     printf("netsvc: Running VBMETA-R Paver\n");
     command_ = Command::kAsset;
     configuration_ = fuchsia_paver::wire::Configuration::kRecovery;
     asset_ = fuchsia_paver::wire::Asset::kVerifiedBootMetadata;
-  } else if (host_filename == NB_SSHAUTH_HOST_FILENAME) {
+  } else if (host_filename == NETBOOT_SSHAUTH_HOST_FILENAME) {
     printf("netsvc: Installing SSH authorized_keys\n");
     command_ = Command::kDataFile;
     strncpy(path_, "ssh/authorized_keys", PATH_MAX);
-  } else if (host_filename == NB_INIT_PARTITION_TABLES_HOST_FILENAME) {
-    if (size < sizeof(modify_partition_table_info_t)) {
+  } else if (host_filename == NETBOOT_INIT_PARTITION_TABLES_HOST_FILENAME) {
+    if (size < sizeof(netboot_block_device_t)) {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
     printf("netsvc: Initializing partition tables\n");
     command_ = Command::kInitPartitionTables;
-  } else if (host_filename == NB_WIPE_PARTITION_TABLES_HOST_FILENAME) {
-    if (size < sizeof(modify_partition_table_info_t)) {
+  } else if (host_filename == NETBOOT_WIPE_PARTITION_TABLES_HOST_FILENAME) {
+    if (size < sizeof(netboot_block_device_t)) {
       return ZX_ERR_BUFFER_TOO_SMALL;
     }
     printf("netsvc: Wiping partition tables\n");

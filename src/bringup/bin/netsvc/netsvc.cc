@@ -39,7 +39,7 @@ namespace {
 bool g_netbootloader = false;
 
 // When false (default), will only respond to a limited number of commands.
-// Currently, NB_QUERY (to support netls and netaddr), as well as responding to
+// Currently, NETBOOT_QUERY (to support netls and netaddr), as well as responding to
 // ICMP as usual.
 bool g_all_features = false;
 bool g_log_packets = false;
@@ -57,21 +57,21 @@ void udp6_recv(async_dispatcher_t* dispatcher, void* data, size_t len, const ip6
   bool mcast = (memcmp(daddr, &ip6_ll_all_nodes, sizeof(ip6_addr_t)) == 0);
 
   if (!all_features()) {
-    if (dport != NB_SERVER_PORT) {
+    if (dport != NETBOOT_SERVER_PORT) {
       // Only some netboot commands allowed in limited mode.
       return;
     }
   }
 
   switch (dport) {
-    case NB_SERVER_PORT:
+    case NETBOOT_SERVER_PORT:
       netboot_recv(data, len, mcast, daddr, dport, saddr, sport);
       break;
-    case DEBUGLOG_ACK_PORT:
+    case NETBOOT_DEBUGLOG_ACK_PORT:
       debuglog_recv(dispatcher, data, len, mcast);
       break;
-    case NB_TFTP_INCOMING_PORT:
-    case NB_TFTP_OUTGOING_PORT:
+    case NETBOOT_TFTP_INCOMING_PORT:
+    case NETBOOT_TFTP_OUTGOING_PORT:
       tftp_recv(dispatcher, data, len, daddr, dport, saddr, sport);
       break;
   }
@@ -189,7 +189,7 @@ int main(int argc, char** argv) {
   }
 
   if (g_netbootloader) {
-    printf("%szedboot: version: %s\n\n", zedboot_banner, BOOTLOADER_VERSION);
+    printf("%szedboot: version: %s\n\n", zedboot_banner, NETBOOT_BOOTLOADER_VERSION);
   }
 
   for (;;) {

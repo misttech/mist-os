@@ -109,9 +109,9 @@ nbfile_t* netboot_get_buffer(const char* name, size_t size) {
   zx_status_t st = ZX_OK;
   nbfilecontainer_t* result;
 
-  if (!strcmp(name, NB_KERNEL_FILENAME)) {
+  if (!strcmp(name, NETBOOT_KERNEL_FILENAME)) {
     result = &nbzbi;
-  } else if (!strcmp(name, NB_CMDLINE_FILENAME)) {
+  } else if (!strcmp(name, NETBOOT_CMDLINE_FILENAME)) {
     result = &nbcmdline;
   } else {
     return nullptr;
@@ -135,36 +135,36 @@ void netboot_advertise(const char* nodename) {
     return;
 
   struct {
-    nbmsg msg;
+    netboot_message_t msg;
     char data[MAX_ADVERTISE_DATA_LEN];
   } packet_data;
-  nbmsg* msg = &packet_data.msg;
-  msg->magic = NB_MAGIC;
+  netboot_message_t* msg = &packet_data.msg;
+  msg->magic = NETBOOT_MAGIC;
   msg->cookie = 0;
-  msg->cmd = NB_ADVERTISE;
-  msg->arg = NB_VERSION_CURRENT;
+  msg->cmd = NETBOOT_ADVERTISE;
+  msg->arg = NETBOOT_VERSION_CURRENT;
 
-  snprintf(packet_data.data, MAX_ADVERTISE_DATA_LEN, "version=%s;nodename=%s", BOOTLOADER_VERSION,
-           nodename);
+  snprintf(packet_data.data, MAX_ADVERTISE_DATA_LEN, "version=%s;nodename=%s",
+           NETBOOT_BOOTLOADER_VERSION, nodename);
   const size_t data_len = strlen(packet_data.data) + 1;
-  udp6_send(&packet_data, sizeof(nbmsg) + data_len, &ip6_ll_all_nodes, NB_ADVERT_PORT,
-            NB_SERVER_PORT, false);
+  udp6_send(&packet_data, sizeof(netboot_message_t) + data_len, &ip6_ll_all_nodes,
+            NETBOOT_ADVERT_PORT, NETBOOT_SERVER_PORT, false);
 }
 
 namespace {
 
 void nb_open(const char* filename, uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr,
              uint16_t sport, uint16_t dport) {
-  nbmsg m;
-  m.magic = NB_MAGIC;
+  netboot_message_t m;
+  m.magic = NETBOOT_MAGIC;
   m.cookie = cookie;
-  m.cmd = NB_ACK;
+  m.cmd = NETBOOT_ACK;
   m.arg = netcp_open(filename, arg, nullptr);
   udp6_send(&m, sizeof(m), saddr, sport, dport, false);
 }
 
 struct netfilemsg {
-  nbmsg hdr;
+  netboot_message_t hdr;
   uint8_t data[1024];
 };
 
@@ -173,9 +173,9 @@ void nb_read(uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr, uint16_t sp
   static netfilemsg m = {
       .hdr =
           {
-              .magic = NB_MAGIC,
+              .magic = NETBOOT_MAGIC,
               .cookie = 0,
-              .cmd = NB_ACK,
+              .cmd = NETBOOT_ACK,
               .arg = 0,
               .data = {},
           },
@@ -213,10 +213,10 @@ void nb_read(uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr, uint16_t sp
 
 void nb_write(const char* data, size_t len, uint32_t cookie, uint32_t arg, const ip6_addr_t* saddr,
               uint16_t sport, uint16_t dport) {
-  static nbmsg m = {
-      .magic = NB_MAGIC,
+  static netboot_message_t m = {
+      .magic = NETBOOT_MAGIC,
       .cookie = 0,
-      .cmd = NB_ACK,
+      .cmd = NETBOOT_ACK,
       .arg = 0,
       .data = {},
   };
@@ -236,10 +236,10 @@ void nb_write(const char* data, size_t len, uint32_t cookie, uint32_t arg, const
 }
 
 void nb_close(uint32_t cookie, const ip6_addr_t* saddr, uint16_t sport, uint16_t dport) {
-  nbmsg m;
-  m.magic = NB_MAGIC;
+  netboot_message_t m;
+  m.magic = NETBOOT_MAGIC;
   m.cookie = cookie;
-  m.cmd = NB_ACK;
+  m.cmd = NETBOOT_ACK;
   m.arg = netcp_close();
   udp6_send(&m, sizeof(m), saddr, sport, dport, false);
 }
@@ -292,18 +292,18 @@ zx_status_t reboot() {
 
 void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t dport,
                      const ip6_addr_t* saddr, uint16_t sport) {
-  nbmsg msg_header;
-  nbmsg ack;
+  netboot_message_t msg_header;
+  netboot_message_t ack;
 
   bool do_transmit = true;
   bool do_boot = false;
   bool do_reboot = false;
 
-  if (dport != NB_SERVER_PORT)
+  if (dport != NETBOOT_SERVER_PORT)
     return;
 
   // Not enough bytes to be a message
-  if (len < sizeof(nbmsg))
+  if (len < sizeof(netboot_message_t))
     return;
 
   // Must be copied to stack structure rather than interpreted in place for
@@ -311,28 +311,28 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
   memcpy(&msg_header, data, sizeof(msg_header));
   char* msg_data = reinterpret_cast<char*>(data) + sizeof(msg_header);
 
-  len -= sizeof(nbmsg);
+  len -= sizeof(netboot_message_t);
 
   if ((last_cookie == msg_header.cookie) && (last_cmd == msg_header.cmd) &&
       (last_arg == msg_header.arg)) {
     // host must have missed the ack. resend
-    ack.magic = NB_MAGIC;
+    ack.magic = NETBOOT_MAGIC;
     ack.cookie = last_cookie;
     ack.cmd = last_ack_cmd;
     ack.arg = last_ack_arg;
     goto transmit;
   }
 
-  ack.cmd = NB_ACK;
+  ack.cmd = NETBOOT_ACK;
   ack.arg = 0;
 
   switch (msg_header.cmd) {
-    case NB_COMMAND:
+    case NETBOOT_COMMAND:
       if (len == 0)
         return;
       msg_data[len - 1] = 0;
       break;
-    case NB_SEND_FILE:
+    case NETBOOT_SEND_FILE:
       xfer_active = true;
       if (len == 0)
         return;
@@ -346,9 +346,9 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
       if (active) {
         active->offset = 0;
         ack.arg = msg_header.arg;
-        size_t prefix_len = strlen(NB_FILENAME_PREFIX);
+        size_t prefix_len = strlen(NETBOOT_FILENAME_PREFIX);
         const char* filename;
-        if (!strncmp(msg_data, NB_FILENAME_PREFIX, prefix_len)) {
+        if (!strncmp(msg_data, NETBOOT_FILENAME_PREFIX, prefix_len)) {
           filename = &(reinterpret_cast<const char*>(msg_data))[prefix_len];
         } else {
           filename = reinterpret_cast<const char*>(msg_data);
@@ -356,37 +356,37 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
         printf("netboot: Receive File '%s'...\n", filename);
       } else {
         printf("netboot: Rejected File '%s'...\n", msg_data);
-        ack.cmd = NB_ERROR_BAD_FILE;
+        ack.cmd = NETBOOT_ERROR_BAD_FILE;
       }
       break;
 
-    case NB_DATA:
-    case NB_LAST_DATA:
+    case NETBOOT_DATA:
+    case NETBOOT_LAST_DATA:
       xfer_active = true;
       if (active == nullptr) {
-        printf("netboot: > received chunk before NB_FILE\n");
+        printf("netboot: > received chunk before NETBOOT_FILE\n");
         return;
       }
       if (msg_header.arg != active->offset) {
         // printf("netboot: < received chunk at offset %d but current offset is %zu\n",
         // msg_header.arg, active->offset);
         ack.arg = static_cast<uint32_t>(active->offset);
-        ack.cmd = NB_ACK;
+        ack.cmd = NETBOOT_ACK;
       } else if ((active->offset + len) > active->size) {
-        ack.cmd = NB_ERROR_TOO_LARGE;
+        ack.cmd = NETBOOT_ERROR_TOO_LARGE;
         ack.arg = msg_header.arg;
       } else {
         memcpy(active->data + active->offset, msg_data, len);
         active->offset += len;
-        ack.cmd = msg_header.cmd == NB_LAST_DATA ? NB_FILE_RECEIVED : NB_ACK;
-        if (msg_header.cmd != NB_LAST_DATA) {
+        ack.cmd = msg_header.cmd == NETBOOT_LAST_DATA ? NETBOOT_FILE_RECEIVED : NETBOOT_ACK;
+        if (msg_header.cmd != NETBOOT_LAST_DATA) {
           do_transmit = false;
         } else {
           xfer_active = false;
         }
       }
       break;
-    case NB_BOOT:
+    case NETBOOT_BOOT:
       // Wait for the paver to complete if it is running.
       if (zx_status_t exit_code = netsvc::Paver::Get().exit_code().get(); exit_code != ZX_OK) {
         printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
@@ -395,7 +395,7 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
       do_boot = true;
       printf("netboot: Boot Kernel...\n");
       break;
-    case NB_REBOOT:
+    case NETBOOT_REBOOT:
       // Wait for the paver to complete if it is running.
       if (zx_status_t exit_code = netsvc::Paver::Get().exit_code().get(); exit_code != ZX_OK) {
         printf("netboot: detected paver error: %s\n", zx_status_get_string(exit_code));
@@ -416,10 +416,10 @@ void bootloader_recv(void* data, size_t len, const ip6_addr_t* daddr, uint16_t d
   last_ack_arg = ack.arg;
 
   ack.cookie = msg_header.cookie;
-  ack.magic = NB_MAGIC;
+  ack.magic = NETBOOT_MAGIC;
 transmit:
   if (do_transmit) {
-    udp6_send(&ack, sizeof(ack), saddr, sport, NB_SERVER_PORT, false);
+    udp6_send(&ack, sizeof(ack), saddr, sport, NETBOOT_SERVER_PORT, false);
   }
 
   if (do_boot) {
@@ -445,7 +445,7 @@ transmit:
 
 void netboot_recv(void* data, size_t len, bool is_mcast, const ip6_addr_t* daddr, uint16_t dport,
                   const ip6_addr_t* saddr, uint16_t sport) {
-  nbmsg msg_header;
+  netboot_message_t msg_header;
   // Not enough bytes to be a message
   if (len < sizeof(msg_header)) {
     return;
@@ -455,41 +455,41 @@ void netboot_recv(void* data, size_t len, bool is_mcast, const ip6_addr_t* daddr
   memcpy(&msg_header, data, sizeof(msg_header));
   char* msg_data = reinterpret_cast<char*>(data) + sizeof(msg_header);
 
-  if (msg_header.magic != NB_MAGIC) {
+  if (msg_header.magic != NETBOOT_MAGIC) {
     return;
   }
   len -= sizeof(msg_header);
 
-  if (len && msg_header.cmd != NB_DATA && msg_header.cmd != NB_LAST_DATA) {
+  if (len && msg_header.cmd != NETBOOT_DATA && msg_header.cmd != NETBOOT_LAST_DATA) {
     msg_data[len - 1] = '\0';
   }
 
   if (!all_features()) {
     assert(!netbootloader());  // This is checked in netsvc's main().
-    if (msg_header.cmd != NB_QUERY) {
+    if (msg_header.cmd != NETBOOT_QUERY) {
       // Only QUERY is allowed in minimal mode.
       return;
     }
   }
 
   switch (msg_header.cmd) {
-    case NB_QUERY: {
+    case NETBOOT_QUERY: {
       std::string_view msg_data_view{msg_data};
       if (msg_data_view != "*" && msg_data_view != nodename()) {
         break;
       }
       size_t dlen = strlen(nodename()) + 1;
-      char buf[1024 + sizeof(nbmsg)];
-      if ((dlen + sizeof(nbmsg)) > sizeof(buf)) {
+      char buf[1024 + sizeof(netboot_message_t)];
+      if ((dlen + sizeof(netboot_message_t)) > sizeof(buf)) {
         return;
       }
-      msg_header.cmd = NB_ACK;
-      memcpy(buf, &msg_header, sizeof(nbmsg));
-      memcpy(buf + sizeof(nbmsg), nodename(), dlen);
-      udp6_send(buf, sizeof(nbmsg) + dlen, saddr, sport, dport, false);
+      msg_header.cmd = NETBOOT_ACK;
+      memcpy(buf, &msg_header, sizeof(netboot_message_t));
+      memcpy(buf + sizeof(netboot_message_t), nodename(), dlen);
+      udp6_send(buf, sizeof(netboot_message_t) + dlen, saddr, sport, dport, false);
       break;
     }
-    case NB_GET_ADVERT: {
+    case NETBOOT_GET_ADVERT: {
       // Only respond when netbootloader is enabled, so that paving behavior is same as the
       // broadcasted advertisement.
       if (!netbootloader()) {
@@ -497,45 +497,45 @@ void netboot_recv(void* data, size_t len, bool is_mcast, const ip6_addr_t* daddr
       }
 
       struct {
-        nbmsg msg;
+        netboot_message_t msg;
         char data[MAX_ADVERTISE_DATA_LEN];
       } packet_data;
-      nbmsg* msg = &packet_data.msg;
-      msg->magic = NB_MAGIC;
+      netboot_message_t* msg = &packet_data.msg;
+      msg->magic = NETBOOT_MAGIC;
       msg->cookie = 0;
-      msg->cmd = NB_ADVERTISE;
-      msg->arg = NB_VERSION_CURRENT;
+      msg->cmd = NETBOOT_ADVERTISE;
+      msg->arg = NETBOOT_VERSION_CURRENT;
 
       snprintf(packet_data.data, MAX_ADVERTISE_DATA_LEN, "version=%s;nodename=%s",
-               BOOTLOADER_VERSION, nodename());
+               NETBOOT_BOOTLOADER_VERSION, nodename());
       const size_t data_len = strlen(packet_data.data) + 1;
-      udp6_send(&packet_data, sizeof(nbmsg) + data_len, saddr, sport, dport, false);
+      udp6_send(&packet_data, sizeof(netboot_message_t) + data_len, saddr, sport, dport, false);
       break;
     }
-    case NB_SHELL_CMD:
+    case NETBOOT_SHELL_CMD:
       if (!is_mcast) {
         netboot_run_cmd(msg_data);
         return;
       }
       break;
-    case NB_OPEN:
+    case NETBOOT_OPEN:
       nb_open(msg_data, msg_header.cookie, msg_header.arg, saddr, sport, dport);
       break;
-    case NB_READ:
+    case NETBOOT_READ:
       nb_read(msg_header.cookie, msg_header.arg, saddr, sport, dport);
       break;
-    case NB_WRITE:
+    case NETBOOT_WRITE:
       len--;  // NB NUL-terminator is not part of the data
       nb_write(msg_data, len, msg_header.cookie, msg_header.arg, saddr, sport, dport);
       break;
-    case NB_CLOSE:
+    case NETBOOT_CLOSE:
       nb_close(msg_header.cookie, saddr, sport, dport);
       break;
     default:
       // If the bootloader is enabled, then let it have a crack at the
       // incoming packets as well.
       if (netbootloader()) {
-        bootloader_recv(data, len + sizeof(nbmsg), daddr, dport, saddr, sport);
+        bootloader_recv(data, len + sizeof(netboot_message_t), daddr, dport, saddr, sport);
       }
   }
 }

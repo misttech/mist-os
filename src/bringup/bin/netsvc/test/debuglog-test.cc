@@ -77,8 +77,8 @@ class LogListenerTest : public zxtest::Test {
     LogListenerTestHelper::Unbind(listener_);
   }
 
-  void OnData(const logpacket_t& pkt, size_t len) {
-    EXPECT_EQ(pkt.magic, NB_DEBUGLOG_MAGIC);
+  void OnData(const netboot_debuglog_packet_t& pkt, size_t len) {
+    EXPECT_EQ(pkt.magic, NETBOOT_DEBUGLOG_MAGIC);
     EXPECT_EQ(pkt.seqno, seqno_++);
     EXPECT_STREQ(pkt.nodename, nodename());
     ASSERT_FALSE(log_message_.has_value());

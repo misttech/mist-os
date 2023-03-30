@@ -59,10 +59,10 @@ void print_cmdline(void) {
 }
 
 nbfile_t* netboot_get_buffer(const char* name, size_t size) {
-  if (!strcmp(name, NB_KERNEL_FILENAME)) {
+  if (!strcmp(name, NETBOOT_KERNEL_FILENAME)) {
     return &nbzbi;
   }
-  if (!strcmp(name, NB_CMDLINE_FILENAME)) {
+  if (!strcmp(name, NETBOOT_CMDLINE_FILENAME)) {
     return &nbcmdline;
   }
   return NULL;
@@ -701,7 +701,7 @@ efi_status efi_main(efi_handle img, efi_system_table* sys) {
 
   int32_t prev_attr = gConOut->Mode->Attribute;
   gConOut->SetAttribute(gConOut, EFI_LIGHTZIRCON | EFI_BACKGROUND_BLACK);
-  draw_version(BOOTLOADER_VERSION);
+  draw_version(NETBOOT_BOOTLOADER_VERSION);
   gConOut->SetAttribute(gConOut, prev_attr);
 
   if (have_fb) {

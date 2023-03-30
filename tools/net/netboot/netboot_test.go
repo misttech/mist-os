@@ -226,10 +226,10 @@ func TestParseBeacon(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			nbmsg := netbootMessage{}
-			copy(nbmsg.Data[:], test.data)
+			netboot_message_t := netbootMessage{}
+			copy(netboot_message_t.Data[:], test.data)
 			var buf bytes.Buffer
-			if err := binary.Write(&buf, binary.LittleEndian, nbmsg); err != nil {
+			if err := binary.Write(&buf, binary.LittleEndian, netboot_message_t); err != nil {
 				t.Fatalf("binary write: %v", err)
 			}
 			msg, err := c.parseBeacon(buf.Bytes())

@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
     struct sockaddr_in6 ra;
     socklen_t rlen;
     char buf[4096 + 1];
-    logpacket_t* pkt = (void*)buf;
+    netboot_debuglog_packet_t* pkt = (void*)buf;
     rlen = sizeof(ra);
     ssize_t r = recvfrom(s, buf, 4096, 0, (void*)&ra, &rlen);
     if (r < 0) {
@@ -92,7 +92,7 @@ int main(int argc, char** argv) {
       fprintf(stderr, "ignoring non-link-local message\n");
       continue;
     }
-    if (pkt->magic != NB_DEBUGLOG_MAGIC)
+    if (pkt->magic != NETBOOT_DEBUGLOG_MAGIC)
       continue;
     if (strncmp(nodename, "*", 1) && strncmp(pkt->nodename, nodename, sizeof(pkt->nodename)))
       continue;

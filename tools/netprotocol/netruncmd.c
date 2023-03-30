@@ -66,13 +66,13 @@ int main(int argc, char** argv) {
   }
 
   msg m;
-  m.hdr.magic = NB_MAGIC;
+  m.hdr.magic = NETBOOT_MAGIC;
   m.hdr.cookie = 0x11224455;
-  m.hdr.cmd = NB_SHELL_CMD;
+  m.hdr.cmd = NETBOOT_SHELL_CMD;
   m.hdr.arg = 0;
   memcpy(m.data, cmd, cmd_len);
 
-  write(s, &m, sizeof(nbmsg) + cmd_len);
+  write(s, &m, sizeof(netboot_message_t) + cmd_len);
   close(s);
 
   return 0;

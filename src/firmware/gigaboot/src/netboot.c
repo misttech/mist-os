@@ -48,58 +48,60 @@ static char advertise_data[256] = "nodename=zircon";
 
 static void send_query_ack(const ip6_addr* addr, uint16_t port, uint32_t cookie) {
   uint8_t buffer[256];
-  nbmsg* msg = (void*)buffer;
-  msg->magic = NB_MAGIC;
+  netboot_message_t* msg = (void*)buffer;
+  msg->magic = NETBOOT_MAGIC;
   msg->cookie = cookie;
-  msg->cmd = NB_ACK;
-  msg->arg = NB_VERSION_CURRENT;
+  msg->cmd = NETBOOT_ACK;
+  msg->arg = NETBOOT_VERSION_CURRENT;
   memcpy(msg->data, advertise_nodename, sizeof(advertise_nodename));
-  udp6_send(buffer, sizeof(nbmsg) + strlen(advertise_nodename) + 1, addr, port, NB_SERVER_PORT);
+  udp6_send(buffer, sizeof(netboot_message_t) + strlen(advertise_nodename) + 1, addr, port,
+            NETBOOT_SERVER_PORT);
 }
 
 static void advertise(void) {
-  uint8_t buffer[sizeof(nbmsg) + sizeof(advertise_data)];
-  nbmsg* msg = (void*)buffer;
-  msg->magic = NB_MAGIC;
+  uint8_t buffer[sizeof(netboot_message_t) + sizeof(advertise_data)];
+  netboot_message_t* msg = (void*)buffer;
+  msg->magic = NETBOOT_MAGIC;
   msg->cookie = 0;
-  msg->cmd = NB_ADVERTISE;
-  msg->arg = NB_VERSION_CURRENT;
+  msg->cmd = NETBOOT_ADVERTISE;
+  msg->arg = NETBOOT_VERSION_CURRENT;
   size_t data_len = strlen(advertise_data) + 1;
   memcpy(msg->data, advertise_data, data_len);
-  udp6_send(buffer, sizeof(nbmsg) + data_len, &ip6_ll_all_nodes, NB_ADVERT_PORT, NB_SERVER_PORT);
+  udp6_send(buffer, sizeof(netboot_message_t) + data_len, &ip6_ll_all_nodes, NETBOOT_ADVERT_PORT,
+            NETBOOT_SERVER_PORT);
 }
 
 void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport) {
-  nbmsg* msg = data;
-  nbmsg ack;
+  netboot_message_t* msg = data;
+  netboot_message_t ack;
   int do_transmit = 1;
 
-  if (len < sizeof(nbmsg))
+  if (len < sizeof(netboot_message_t))
     return;
-  len -= sizeof(nbmsg);
+  len -= sizeof(netboot_message_t);
 
   // printf("netboot: MSG %08x %08x %08x %08x datalen %zu\n",
   //        msg->magic, msg->cookie, msg->cmd, msg->arg, len);
 
   if ((last_cookie == msg->cookie) && (last_cmd == msg->cmd) && (last_arg == msg->arg)) {
     // host must have missed the ack. resend
-    ack.magic = NB_MAGIC;
+    ack.magic = NETBOOT_MAGIC;
     ack.cookie = last_cookie;
     ack.cmd = last_ack_cmd;
     ack.arg = last_ack_arg;
     goto transmit;
   }
 
-  ack.cmd = NB_ACK;
+  ack.cmd = NETBOOT_ACK;
   ack.arg = 0;
 
   switch (msg->cmd) {
-    case NB_COMMAND:
+    case NETBOOT_COMMAND:
       if (len == 0)
         return;
       msg->data[len - 1] = 0;
       break;
-    case NB_SEND_FILE:
+    case NETBOOT_SEND_FILE:
       if (len == 0)
         return;
       msg->data[len - 1] = 0;
@@ -112,9 +114,9 @@ void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport)
       if (item) {
         item->offset = 0;
         ack.arg = msg->arg;
-        size_t prefix_len = strlen(NB_FILENAME_PREFIX);
+        size_t prefix_len = strlen(NETBOOT_FILENAME_PREFIX);
         const char* filename;
-        if (!strncmp((char*)msg->data, NB_FILENAME_PREFIX, prefix_len)) {
+        if (!strncmp((char*)msg->data, NETBOOT_FILENAME_PREFIX, prefix_len)) {
           filename = &((const char*)msg->data)[prefix_len];
         } else {
           filename = (const char*)msg->data;
@@ -122,43 +124,43 @@ void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport)
         printf("netboot: Receive File '%s'...\n", filename);
       } else {
         printf("netboot: Rejected File '%s'...\n", (char*)msg->data);
-        ack.cmd = NB_ERROR_BAD_FILE;
+        ack.cmd = NETBOOT_ERROR_BAD_FILE;
       }
       break;
 
-    case NB_DATA:
-    case NB_LAST_DATA:
+    case NETBOOT_DATA:
+    case NETBOOT_LAST_DATA:
       if (item == 0) {
-        printf("netboot: > received chunk before NB_FILE\n");
+        printf("netboot: > received chunk before NETBOOT_FILE\n");
         return;
       }
       if (msg->arg != item->offset) {
         // printf("netboot: < received chunk at offset %d but current offset is %zu\n", msg->arg,
         // item->offset);
         ack.arg = item->offset;
-        ack.cmd = NB_ACK;
+        ack.cmd = NETBOOT_ACK;
       } else if ((item->offset + len) > item->size) {
-        ack.cmd = NB_ERROR_TOO_LARGE;
+        ack.cmd = NETBOOT_ERROR_TOO_LARGE;
         ack.arg = msg->arg;
       } else {
         memcpy(item->data + item->offset, msg->data, len);
         item->offset += len;
-        ack.cmd = msg->cmd == NB_LAST_DATA ? NB_FILE_RECEIVED : NB_ACK;
-        if (msg->cmd != NB_LAST_DATA) {
+        ack.cmd = msg->cmd == NETBOOT_LAST_DATA ? NETBOOT_FILE_RECEIVED : NETBOOT_ACK;
+        if (msg->cmd != NETBOOT_LAST_DATA) {
           do_transmit = 0;
         }
       }
       break;
-    case NB_BOOT:
+    case NETBOOT_BOOT:
       nb_boot_now = 1;
       printf("netboot: Boot Kernel...\n");
       break;
-    case NB_QUERY:
+    case NETBOOT_QUERY:
       // Send reply and return w/o getting the netboot state out of sync.
       send_query_ack(saddr, sport, msg->cookie);
       return;
     default:
-      ack.cmd = NB_ERROR_BAD_CMD;
+      ack.cmd = NETBOOT_ERROR_BAD_CMD;
       ack.arg = 0;
   }
 
@@ -169,14 +171,14 @@ void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport)
   last_ack_arg = ack.arg;
 
   ack.cookie = msg->cookie;
-  ack.magic = NB_MAGIC;
+  ack.magic = NETBOOT_MAGIC;
 transmit:
   nb_active = 1;
   if (do_transmit) {
     // printf("netboot: MSG %08x %08x %08x %08x\n",
     //   ack.magic, ack.cookie, ack.cmd, ack.arg);
 
-    udp6_send(&ack, sizeof(ack), saddr, sport, NB_SERVER_PORT);
+    udp6_send(&ack, sizeof(ack), saddr, sport, NETBOOT_SERVER_PORT);
   }
 }
 
@@ -190,8 +192,8 @@ static tftp_status buffer_open(const char* filename, size_t size, uint8_t sessio
   }
   file_info->netboot_file_data->offset = 0;
   const char* base_filename;
-  size_t prefix_len = strlen(NB_FILENAME_PREFIX);
-  if (!strncmp(filename, NB_FILENAME_PREFIX, prefix_len)) {
+  size_t prefix_len = strlen(NETBOOT_FILENAME_PREFIX);
+  if (!strncmp(filename, NETBOOT_FILENAME_PREFIX, prefix_len)) {
     base_filename = &filename[prefix_len];
   } else {
     base_filename = filename;
@@ -231,7 +233,7 @@ static void buffer_close(void* cookie) {
 static tftp_status udp_send(void* data, size_t len, void* cookie) {
   transport_info_t* transport_info = cookie;
   int bytes_sent = udp6_send(data, len, &transport_info->dest_addr, transport_info->dest_port,
-                             NB_TFTP_OUTGOING_PORT);
+                             NETBOOT_TFTP_OUTGOING_PORT);
   return bytes_sent < 0 ? TFTP_ERR_IO : TFTP_NO_ERROR;
 }
 
@@ -254,7 +256,7 @@ void tftp_recv(void* data, size_t len, const ip6_addr* daddr, uint16_t dport, co
   static file_info_t file_info = {.netboot_file_data = NULL};
   static transport_info_t transport_info = {};
 
-  if (dport == NB_TFTP_INCOMING_PORT) {
+  if (dport == NETBOOT_TFTP_INCOMING_PORT) {
     if (session != NULL) {
       printf("Aborting to service new connection\n");
     }
@@ -319,8 +321,8 @@ int netboot_init(const char* nodename, uint32_t namegen) {
   }
   if (nodename) {
     strncpy(advertise_nodename, nodename, sizeof(advertise_nodename) - 1);
-    snprintf(advertise_data, sizeof(advertise_data), "version=%s;nodename=%s", BOOTLOADER_VERSION,
-             nodename);
+    snprintf(advertise_data, sizeof(advertise_data), "version=%s;nodename=%s",
+             NETBOOT_BOOTLOADER_VERSION, nodename);
   }
   return 0;
 }

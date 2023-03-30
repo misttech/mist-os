@@ -27,7 +27,7 @@ static uint32_t cookie = 1;
 static const int MAX_READ_RETRIES = 10;
 static const int MAX_SEND_RETRIES = 10000;
 
-static int io_rcv(int s, nbmsg* msg, nbmsg* ack) {
+static int io_rcv(int s, netboot_message_t* msg, netboot_message_t* ack) {
   for (int i = 0; i < MAX_READ_RETRIES; i++) {
     bool retry_allowed = i + 1 < MAX_READ_RETRIES;
 
@@ -39,7 +39,7 @@ static int io_rcv(int s, nbmsg* msg, nbmsg* ack) {
       fprintf(stderr, "\n%s: error: Socket read error %d\n", appname, errno);
       return -1;
     }
-    if ((size_t)r < sizeof(nbmsg)) {
+    if ((size_t)r < sizeof(netboot_message_t)) {
       fprintf(stderr, "\n%s: error: Read too short\n", appname);
       return -1;
     }
@@ -48,7 +48,7 @@ static int io_rcv(int s, nbmsg* msg, nbmsg* ack) {
             ack->cookie, ack->cmd, ack->arg);
 #endif
 
-    if (ack->magic != NB_MAGIC) {
+    if (ack->magic != NETBOOT_MAGIC) {
       fprintf(stderr, "\n%s: error: Bad magic\n", appname);
       return 0;
     }
@@ -59,24 +59,24 @@ static int io_rcv(int s, nbmsg* msg, nbmsg* ack) {
       }
     }
 
-    if (ack->cmd == NB_ACK || ack->cmd == NB_FILE_RECEIVED) {
+    if (ack->cmd == NETBOOT_ACK || ack->cmd == NETBOOT_FILE_RECEIVED) {
       return 0;
     }
 
     switch (ack->cmd) {
-      case NB_ERROR:
+      case NETBOOT_ERROR:
         fprintf(stderr, "\n%s: error: Generic error\n", appname);
         break;
-      case NB_ERROR_BAD_CMD:
+      case NETBOOT_ERROR_BAD_CMD:
         fprintf(stderr, "\n%s: error: Bad command\n", appname);
         break;
-      case NB_ERROR_BAD_PARAM:
+      case NETBOOT_ERROR_BAD_PARAM:
         fprintf(stderr, "\n%s: error: Bad parameter\n", appname);
         break;
-      case NB_ERROR_TOO_LARGE:
+      case NETBOOT_ERROR_TOO_LARGE:
         fprintf(stderr, "\n%s: error: File too large\n", appname);
         break;
-      case NB_ERROR_BAD_FILE:
+      case NETBOOT_ERROR_BAD_FILE:
         fprintf(stderr, "\n%s: error: Bad file\n", appname);
         break;
       default:
@@ -88,7 +88,7 @@ static int io_rcv(int s, nbmsg* msg, nbmsg* ack) {
   return -1;
 }
 
-static int io_send(int s, nbmsg* msg, size_t len) {
+static int io_send(int s, netboot_message_t* msg, size_t len) {
   for (int i = 0; i < MAX_SEND_RETRIES; i++) {
 #if defined(__APPLE__)
     bool retry_allowed = i + 1 < MAX_SEND_RETRIES;
@@ -115,7 +115,7 @@ static int io_send(int s, nbmsg* msg, size_t len) {
   return -1;
 }
 
-static int io(int s, nbmsg* msg, size_t len, nbmsg* ack, bool wait_reply) {
+static int io(int s, netboot_message_t* msg, size_t len, netboot_message_t* ack, bool wait_reply) {
   int r, n;
   struct timeval tv;
   fd_set reads, writes;
@@ -134,7 +134,7 @@ static int io(int s, nbmsg* msg, size_t len, nbmsg* ack, bool wait_reply) {
 
   FD_ZERO(&writes);
   if (msg && len > 0) {
-    msg->magic = NB_MAGIC;
+    msg->magic = NETBOOT_MAGIC;
     msg->cookie = cookie++;
 
     FD_SET(s, &writes);
@@ -160,7 +160,7 @@ static int io(int s, nbmsg* msg, size_t len, nbmsg* ack, bool wait_reply) {
       }
 
       // If we got an ack, don't bother sending anything - go handle the ack first
-      if (!r && FD_ISSET(s, &writes) && (ack->cookie == 0 || ack->cmd != NB_ACK)) {
+      if (!r && FD_ISSET(s, &writes) && (ack->cookie == 0 || ack->cmd != NETBOOT_ACK)) {
         r = io_send(s, msg, len);
       }
 
@@ -231,8 +231,8 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
   char ackbuf[2048];
   char tmp[INET6_ADDRSTRLEN];
   struct timeval tv;
-  nbmsg* msg = (void*)msgbuf;
-  nbmsg* ack = (void*)ackbuf;
+  netboot_message_t* msg = (void*)msgbuf;
+  netboot_message_t* ack = (void*)ackbuf;
   int s;
   int status = -1;
   size_t current_pos = 0;
@@ -244,7 +244,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     xd.datalen = strlen(name) + 1;
     xd.ptr = xd.data;
     xd.avail = xd.datalen;
-    name = NB_CMDLINE_FILENAME;
+    name = NETBOOT_CMDLINE_FILENAME;
     sz = xd.datalen;
   } else {
     if ((xd.fp = fopen(fn, "rb")) == NULL) {
@@ -279,15 +279,15 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     goto done;
   }
 
-  msg->cmd = NB_SEND_FILE;
+  msg->cmd = NETBOOT_SEND_FILE;
   msg->arg = sz;
   strcpy((void*)msg->data, name);
-  if (io(s, msg, sizeof(nbmsg) + strlen(name) + 1, ack, true)) {
+  if (io(s, msg, sizeof(netboot_message_t) + strlen(name) + 1, ack, true)) {
     fprintf(stderr, "%s: error: Failed to start transfer\n", appname);
     goto done;
   }
 
-  msg->cmd = NB_DATA;
+  msg->cmd = NETBOOT_DATA;
   msg->arg = 0;
 
   bool completed = false;
@@ -311,12 +311,12 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
       }
     } else {
       if (current_pos + (size_t)r >= sz) {
-        msg->cmd = NB_LAST_DATA;
+        msg->cmd = NETBOOT_LAST_DATA;
       } else {
-        msg->cmd = NB_DATA;
+        msg->cmd = NETBOOT_DATA;
       }
 
-      if (io(s, msg, sizeof(nbmsg) + r, ack, false)) {
+      if (io(s, msg, sizeof(netboot_message_t) + r, ack, false)) {
         goto done;
       }
 
@@ -337,7 +337,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     }
 
     // ACKs really are NACKs
-    if (ack->cookie > 0 && ack->cmd == NB_ACK) {
+    if (ack->cookie > 0 && ack->cmd == NETBOOT_ACK) {
       // ACKs tend to be generated in groups, since a dropped packet will cause ACKs for all
       // outstanding packets. Therefore briefly sleep when we receive an ACK with a different
       // position, to let things settle and prevent ourselves from fighting subsequent acks.
@@ -352,7 +352,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
         fprintf(stderr, "\n%s: error: Failed to rewind '%s' to %zu\n", appname, fn, current_pos);
         goto done;
       }
-    } else if (ack->cmd == NB_FILE_RECEIVED) {
+    } else if (ack->cmd == NETBOOT_FILE_RECEIVED) {
       current_pos += r;
       completed = true;
     } else {

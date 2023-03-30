@@ -17,8 +17,8 @@
 namespace netsvc {
 namespace {
 
-size_t NB_IMAGE_PREFIX_LEN() { return strlen(NB_IMAGE_PREFIX); }
-size_t NB_FILENAME_PREFIX_LEN() { return strlen(NB_FILENAME_PREFIX); }
+size_t NETBOOT_IMAGE_PREFIX_LEN() { return strlen(NETBOOT_IMAGE_PREFIX); }
+size_t NETBOOT_FILENAME_PREFIX_LEN() { return strlen(NETBOOT_FILENAME_PREFIX); }
 
 }  // namespace
 
@@ -53,7 +53,7 @@ ssize_t FileApi::OpenRead(const char* filename, zx::duration) {
   netboot_file_ = nullptr;
   size_t file_size;
 
-  if (is_zedboot_ && !strcmp(filename_, NB_BOARD_INFO_FILENAME)) {
+  if (is_zedboot_ && !strcmp(filename_, NETBOOT_BOARD_INFO_FILENAME)) {
     type_ = NetfileType::kBoardInfo;
     return BoardInfoSize();
   }
@@ -80,17 +80,17 @@ tftp_status FileApi::OpenWrite(const char* filename, size_t size, zx::duration t
   is_write_ = true;
   strlcpy(filename_, filename, sizeof(filename_));
 
-  if (is_zedboot_ && !strncmp(filename_, NB_FILENAME_PREFIX, NB_FILENAME_PREFIX_LEN())) {
+  if (is_zedboot_ && !strncmp(filename_, NETBOOT_FILENAME_PREFIX, NETBOOT_FILENAME_PREFIX_LEN())) {
     type_ = NetfileType::kNetboot;
     netboot_file_ = netboot_get_buffer(filename_, size);
     if (netboot_file_ != nullptr) {
       return TFTP_NO_ERROR;
     }
-  } else if (is_zedboot_ && !strcmp(filename_, NB_BOARD_NAME_FILENAME)) {
+  } else if (is_zedboot_ && !strcmp(filename_, NETBOOT_BOARD_NAME_FILENAME)) {
     printf("netsvc: Running board name validation\n");
     type_ = NetfileType::kBoardInfo;
     return TFTP_NO_ERROR;
-  } else if (is_zedboot_ && !strncmp(filename_, NB_IMAGE_PREFIX, NB_IMAGE_PREFIX_LEN())) {
+  } else if (is_zedboot_ && !strncmp(filename_, NETBOOT_IMAGE_PREFIX, NETBOOT_IMAGE_PREFIX_LEN())) {
     type_ = NetfileType::kPaver;
     tftp_status status = paver_.OpenWrite(filename_, size, timeout);
     if (status != TFTP_NO_ERROR) {

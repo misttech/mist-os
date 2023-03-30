@@ -144,24 +144,24 @@ TEST_F(FileApiTest, OpenWriteNetCopy) {
 }
 
 TEST_F(FileApiTest, OpenWriteBoardName) {
-  ASSERT_EQ(file_api_.OpenWrite(NB_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
             TFTP_NO_ERROR);
   file_api_.Close();
 }
 
 TEST_F(FileApiTest, OpenWritePaver) {
-  ASSERT_EQ(file_api_.OpenWrite(NB_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
   file_api_.Close();
 }
 
 TEST_F(FileApiTest, OpenWriteWhilePaving) {
-  ASSERT_EQ(file_api_.OpenWrite(NB_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
-  ASSERT_NE(file_api_.OpenWrite(NB_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_NE(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
   file_api_.Close();
 }
 
 TEST_F(FileApiTest, OpenReadWhilePaving) {
-  ASSERT_EQ(file_api_.OpenWrite(NB_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
   ASSERT_LT(file_api_.OpenRead("file", zx::duration::infinite()), 0);
   file_api_.Close();
 }
@@ -181,7 +181,7 @@ TEST_F(FileApiTest, WriteNetCopy) {
 
 TEST_F(FileApiTest, WriteBoardName) {
   fake_sysinfo_.set_board_name(kFakeData);
-  ASSERT_EQ(file_api_.OpenWrite(NB_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
             TFTP_NO_ERROR);
 #if __x86_64__
   // We hardcode x64 to return "x64" no matter what sysinfo returns.
@@ -199,7 +199,7 @@ TEST_F(FileApiTest, WriteBoardName) {
 
 TEST_F(FileApiTest, WriteWrongBoardName) {
   fake_sysinfo_.set_board_name("other");
-  ASSERT_EQ(file_api_.OpenWrite(NB_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_BOARD_NAME_FILENAME, 10, zx::duration::infinite()),
             TFTP_NO_ERROR);
   size_t len = sizeof(kFakeData);
   ASSERT_NE(file_api_.Write(kFakeData, &len, 0), TFTP_NO_ERROR);
@@ -208,9 +208,9 @@ TEST_F(FileApiTest, WriteWrongBoardName) {
 
 TEST_F(FileApiTest, ReadBoardInfo) {
   fake_sysinfo_.set_board_name(kFakeData);
-  board_info_t board_info = {};
+  netboot_board_info_t board_info = {};
   size_t len = sizeof(board_info);
-  ASSERT_EQ(file_api_.OpenRead(NB_BOARD_INFO_FILENAME, zx::duration::infinite()), len);
+  ASSERT_EQ(file_api_.OpenRead(NETBOOT_BOARD_INFO_FILENAME, zx::duration::infinite()), len);
   ASSERT_EQ(file_api_.Read(&board_info, &len, 0), TFTP_NO_ERROR);
   ASSERT_EQ(len, sizeof(board_info));
 #if __x86_64__
@@ -224,7 +224,7 @@ TEST_F(FileApiTest, ReadBoardInfo) {
 }
 
 TEST_F(FileApiTest, WritePaver) {
-  ASSERT_EQ(file_api_.OpenWrite(NB_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
   size_t len = sizeof(kFakeData);
   ASSERT_EQ(file_api_.Write(kFakeData, &len, 0), TFTP_NO_ERROR);
   ASSERT_EQ(len, sizeof(kFakeData));
@@ -239,7 +239,7 @@ TEST_F(FileApiTest, WriteAfterClose) {
 }
 
 TEST_F(FileApiTest, WriteNoLength) {
-  ASSERT_EQ(file_api_.OpenWrite(NB_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
+  ASSERT_EQ(file_api_.OpenWrite(NETBOOT_IMAGE_PREFIX, 10, zx::duration::infinite()), TFTP_NO_ERROR);
   ASSERT_NE(file_api_.Write(kFakeData, nullptr, 0), TFTP_NO_ERROR);
   file_api_.Close();
 }
