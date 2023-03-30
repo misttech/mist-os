@@ -1,0 +1,14 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_library.gni")
+
+python_library("fuchsia_base_test") {
+  library_name = "fuchsia_base_test"
+  sources = [
+    "__init__.py",
+    "fuchsia_base_test.py",
+  ]
+  library_deps = [ "//third_party/mobly" ]
+}
