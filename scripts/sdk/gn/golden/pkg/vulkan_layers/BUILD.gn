@@ -59,23 +59,10 @@ group("VkLayer_khronos_validation") {
   ]
 }
 
-copy("VkLayer_standard_validation_config") {
-  sources = [ "data/vulkan/explicit_layer.d/VkLayer_standard_validation.json" ]
-  outputs = [ "${root_gen_dir}/data/vulkan/explicit_layer.d/VkLayer_standard_validation.json" ]
-}
-
-group("VkLayer_standard_validation") {
-  data_deps = [
-    ":VkLayer_khronos_validation",
-    ":VkLayer_standard_validation_config",
-  ]
-}
-
 group("all") {
   data_deps = [
     ":VkLayer_core_validation",
     ":VkLayer_image_pipe_swapchain",
     ":VkLayer_khronos_validation",
-    ":VkLayer_standard_validation",
   ]
 }

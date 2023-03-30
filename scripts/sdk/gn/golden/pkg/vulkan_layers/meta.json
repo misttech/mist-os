@@ -16,7 +16,6 @@
     "pkg/vulkan_layers/data/vulkan/explicit_layer.d/VkLayer_core_validation.json",
     "pkg/vulkan_layers/data/vulkan/explicit_layer.d/VkLayer_image_pipe_swapchain.json",
     "pkg/vulkan_layers/data/vulkan/explicit_layer.d/VkLayer_khronos_validation.json",
-    "pkg/vulkan_layers/data/vulkan/explicit_layer.d/VkLayer_standard_validation.json",
     "pkg/vulkan_layers/data/vulkan/explicit_layer.d/test_missing_binary.json"
   ],
   "type": "loadable_module"
