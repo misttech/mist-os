@@ -4,6 +4,7 @@
 
 #include "src/storage/fvm/sparse_reader.h"
 
+#include <fcntl.h>
 #include <zircon/assert.h>
 
 #include <algorithm>

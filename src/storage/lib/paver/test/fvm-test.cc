@@ -4,6 +4,7 @@
 
 #include "src/storage/lib/paver/fvm.h"
 
+#include <fcntl.h>
 #include <lib/component/incoming/cpp/clone.h>
 #include <lib/driver-integration-test/fixture.h>
 #include <lib/fdio/fd.h>

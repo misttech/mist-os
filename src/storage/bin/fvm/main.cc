@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <inttypes.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
@@ -18,10 +19,10 @@
 #include <string_view>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/unique_fd.h>
+#include <range/interval-tree.h>
 #include <safemath/checked_math.h>
 
-#include "fbl/unique_fd.h"
-#include "range/interval-tree.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/fvm/sparse_reader.h"
 #include "src/storage/minfs/format.h"
@@ -53,7 +54,7 @@ const char* kDiskTypeStr[] = {
 };
 #pragma GCC diagnostic pop
 
-int usage(void) {
+int usage() {
   fprintf(stderr, "usage: fvm [ output_path ] [ command ] [ <flags>* ] [ <input_paths>* ]\n");
   fprintf(stderr, "fvm performs host-side FVM and sparse file creation\n");
   fprintf(stderr, "Commands:\n");
@@ -250,10 +251,12 @@ zx_status_t ParseDiskType(const char* type_str, DiskType* out) {
   if (!strcmp(type_str, kDiskTypeStr[DiskType::File])) {
     *out = DiskType::File;
     return ZX_OK;
-  } else if (!strcmp(type_str, kDiskTypeStr[DiskType::Mtd])) {
+  }
+  if (!strcmp(type_str, kDiskTypeStr[DiskType::Mtd])) {
     *out = DiskType::Mtd;
     return ZX_OK;
-  } else if (!strcmp(type_str, kDiskTypeStr[DiskType::BlockDevice])) {
+  }
+  if (!strcmp(type_str, kDiskTypeStr[DiskType::BlockDevice])) {
     *out = DiskType::BlockDevice;
     return ZX_OK;
   }
@@ -282,7 +285,8 @@ zx_status_t CopyFile(const char* dst, const char* src) {
     if (read_bytes < 0) {
       fprintf(stderr, "Failed to read data from image file\n");
       return ZX_ERR_IO;
-    } else if (read_bytes == 0) {
+    }
+    if (read_bytes == 0) {
       break;
     }
 
@@ -629,7 +633,7 @@ int main(int argc, char** argv) {
   }
 
   if (disk_type == DiskType::Mtd || disk_type == DiskType::BlockDevice) {
-    if (strcmp(command, "pave")) {
+    if (strcmp(command, "pave") != 0) {
       fprintf(stderr, "Only the pave command is supported for disk type %s.\n",
               kDiskTypeStr[disk_type]);
       return EXIT_FAILURE;

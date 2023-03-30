@@ -5,7 +5,6 @@
 #include "src/storage/fvm/test_support.h"
 
 #include <errno.h>
-#include <fcntl.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
@@ -25,6 +24,7 @@
 #include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
+#include "lib/fdio/directory.h"
 #include "src/lib/storage/block_client/cpp/remote_block_device.h"
 #include "src/lib/storage/fs_management/cpp/fvm.h"
 
@@ -400,7 +400,11 @@ zx_status_t FvmAdapter::Rebind(fbl::Vector<VPartitionAdapter*> vpartitions) {
 }
 
 zx_status_t FvmAdapter::Query(VolumeManagerInfo* out_info) const {
-  fbl::unique_fd fd(openat(devfs_root_.get(), path(), O_RDONLY));
+  fbl::unique_fd fd;
+  if (zx_status_t status =
+          fdio_open_fd_at(devfs_root_.get(), path(), 0, fd.reset_and_get_address())) {
+    return status;
+  }
   zx::result info = fs_management::FvmQuery(fd.get());
   if (info.is_error()) {
     return info.error_value();
