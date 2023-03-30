@@ -2366,16 +2366,6 @@ struct datagram_socket
 
   void wait_begin(zxio_signals_t zxio_signals, zx_handle_t* handle, zx_signals_t* out_signals) {
     zxio_signals |= ZXIO_SIGNAL_PEER_CLOSED;
-    // Translate the `WRITABLE` signal to `WRITE_THRESHOLD`, so that any caller
-    // waiting for the socket to become writable will actually wait for capacity
-    // to reach the socket's write threshold, which is set by the netstack to
-    // the maximum size of a payload. This allows callers to avoid spuriously
-    // retrying writes when the outgoing payload is larger than the remaining
-    // capacity in the socket.
-    if (zxio_signals & ZXIO_SIGNAL_WRITABLE) {
-      zxio_signals &= ~ZXIO_SIGNAL_WRITABLE;
-      zxio_signals |= ZXIO_SIGNAL_WRITE_THRESHOLD;
-    }
     zxio_wait_begin(&datagram_socket_.pipe.io, zxio_signals, handle, out_signals);
     *out_signals |= fsocket::wire::kSignalDatagramError;
   }
@@ -2383,26 +2373,6 @@ struct datagram_socket
   void wait_end(zx_signals_t zx_signals, zxio_signals_t* out_zxio_signals) {
     zxio_signals_t zxio_signals;
     zxio_wait_end(&datagram_socket_.pipe.io, zx_signals, &zxio_signals);
-    // Translate the `WRITE_THRESHOLD` signal to `WRITABLE`. See `wait_begin`
-    // for why we do this.
-    //
-    // We don't mask out the `WRITE_THRESHOLD` signal because it's possible that
-    // the client actually waited on `WRITE_THRESHOLD` directly rather than
-    // `WRITABLE`, and there is no way to know here if that was the case. Note
-    // that this means that a client may see `WRITE_THRESHOLD` reported even if
-    // it did not provide it in `wait_begin`.
-    if (zxio_signals & ZXIO_SIGNAL_WRITE_THRESHOLD) {
-      zxio_signals |= ZXIO_SIGNAL_WRITABLE;
-    } else {
-      // Unconditionally mask out `WRITABLE` to avoid signaling it to the
-      // client.
-      //
-      // If `WRITABLE` (but not `WRITE_THRESHOLD`) is asserted on the underlying
-      // object and the wait completes for some other reason, and this signal is
-      // propagated to the client, they may attempt a write that will not
-      // succeed.
-      zxio_signals &= ~ZXIO_SIGNAL_WRITABLE;
-    }
     if (zx_signals & fsocket::wire::kSignalDatagramError) {
       zxio_signals |= ZXIO_SIGNAL_ERROR;
     }
