@@ -1162,9 +1162,7 @@ mod tests {
         device::{set_routing_enabled, DeviceId},
         error::{ExistsError, NotFoundError},
         ip::{
-            device::{
-                is_ip_routing_enabled, nud::DynamicNeighborUpdateSource, state::AssignedAddress,
-            },
+            device::{nud::DynamicNeighborUpdateSource, state::AssignedAddress},
             dispatch_receive_ip_packet_name, receive_ip_packet,
             testutil::{is_in_ip_multicast, FakeDeviceId},
         },
@@ -1362,21 +1360,21 @@ mod tests {
     }
 
     fn contains_addr<A: IpAddress>(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        sync_ctx: &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: SpecifiedAddr<A>,
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
                 crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
-                    sync_ctx,
+                    &mut Locked::new(sync_ctx),
                     device,
                     |state| state.ip_state.iter_addrs().any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                    sync_ctx,
+                    &mut Locked::new(sync_ctx),
                     device,
                     |state| state.ip_state.iter_addrs().any(|a| a.addr() == addr),
                 )
@@ -1500,7 +1498,7 @@ mod tests {
                 .expect("insert static ARP entry");
 
                 crate::ip::device::send_ip_frame::<Ipv4, _, _, _, _>(
-                    &mut sync_ctx,
+                    &mut Locked::new(sync_ctx),
                     &mut non_sync_ctx,
                     &device,
                     addr,
@@ -1520,7 +1518,7 @@ mod tests {
                 )
                 .expect("insert static NDP entry");
                 crate::ip::device::send_ip_frame::<Ipv6, _, _, _, _>(
-                    &mut sync_ctx,
+                    &mut Locked::new(sync_ctx),
                     &mut non_sync_ctx,
                     &device,
                     addr.into_specified(),
@@ -1552,8 +1550,8 @@ mod tests {
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> bool {
         match I::VERSION {
-            IpVersion::V4 => is_ip_routing_enabled::<Ipv4, _, _>(sync_ctx, device),
-            IpVersion::V6 => is_ip_routing_enabled::<Ipv6, _, _>(sync_ctx, device),
+            IpVersion::V4 => crate::device::is_routing_enabled::<_, Ipv4>(sync_ctx, device),
+            IpVersion::V6 => crate::device::is_routing_enabled::<_, Ipv6>(sync_ctx, device),
         }
     }
 
@@ -2013,20 +2011,20 @@ mod tests {
     }
 
     fn join_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
-        mut sync_ctx: &SyncCtx<NonSyncCtx>,
+        sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 ctx,
                 device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 ctx,
                 device,
                 multicast_addr,
@@ -2035,20 +2033,20 @@ mod tests {
     }
 
     fn leave_ip_multicast<A: IpAddress, NonSyncCtx: NonSyncContext>(
-        mut sync_ctx: &SyncCtx<NonSyncCtx>,
+        sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         multicast_addr: MulticastAddr<A>,
     ) {
         match multicast_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 ctx,
                 device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 ctx,
                 device,
                 multicast_addr,

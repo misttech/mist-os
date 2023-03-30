@@ -1556,6 +1556,7 @@ mod tests {
     use core::convert::TryFrom as _;
 
     use assert_matches::assert_matches;
+    use lock_order::Locked;
     use net_declare::net::ip_v6;
     use net_types::{ethernet::Mac, LinkLocalAddress as _};
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
@@ -2718,9 +2719,10 @@ mod tests {
         let stable_addr_sub =
             calculate_addr_sub(SUBNET, local_mac.to_eui64_with_magic(Mac::DEFAULT_EUI_MAGIC));
 
-        let addrs = with_assigned_ipv6_addr_subnets(&mut sync_ctx, &device_id, |addrs| {
-            addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
-        });
+        let addrs =
+            with_assigned_ipv6_addr_subnets(&mut Locked::new(sync_ctx), &device_id, |addrs| {
+                addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
+            });
         let (stable_addr_sub, temp_addr_sub) = assert_matches!(
             addrs[..],
             [a1, a2] => {
@@ -2802,9 +2804,10 @@ mod tests {
 
         // Disabling IP should remove all the SLAAC addresses.
         set_ip_enabled(&mut sync_ctx, &mut non_sync_ctx, false /* enabled */);
-        let addrs = with_assigned_ipv6_addr_subnets(&mut sync_ctx, &device_id, |addrs| {
-            addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
-        });
+        let addrs =
+            with_assigned_ipv6_addr_subnets(&mut Locked::new(sync_ctx), &device_id, |addrs| {
+                addrs.filter(|a| !a.addr().is_link_local()).collect::<Vec<_>>()
+            });
         assert_matches!(addrs[..], []);
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }

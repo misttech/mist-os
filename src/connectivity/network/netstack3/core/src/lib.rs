@@ -491,10 +491,10 @@ pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync {
 
 /// Get all IPv4 and IPv6 address/subnet pairs configured on a device
 pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
-    ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> Vec<AddrSubnetEither> {
-    DualStackDeviceHandler::get_all_ip_addr_subnets(&ctx, device)
+    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut Locked::new(sync_ctx), device)
 }
 
 /// Set the IP address and subnet for a device.

@@ -289,7 +289,7 @@ pub(crate) trait DualStackDeviceContext<C: DualStackDeviceNonSyncContext>:
     /// Calls the function with an immutable view into the dual-stack device's
     /// state.
     fn with_dual_stack_device_state<O, F: FnOnce(DualStackDeviceStateRef<'_, C::Instant>) -> O>(
-        &self,
+        &mut self,
         device_id: &Self::DualStackDeviceId,
         cb: F,
     ) -> O;
@@ -298,15 +298,17 @@ pub(crate) trait DualStackDeviceContext<C: DualStackDeviceNonSyncContext>:
 /// An implementation of dual-stack devices.
 pub(crate) trait DualStackDeviceHandler<C>: DualStackDeviceIdContext {
     /// Get all IPv4 and IPv6 address/subnet pairs configured on a device.
-    fn get_all_ip_addr_subnets(&self, device_id: &Self::DualStackDeviceId)
-        -> Vec<AddrSubnetEither>;
+    fn get_all_ip_addr_subnets(
+        &mut self,
+        device_id: &Self::DualStackDeviceId,
+    ) -> Vec<AddrSubnetEither>;
 }
 
 impl<C: DualStackDeviceNonSyncContext, SC: DualStackDeviceContext<C>> DualStackDeviceHandler<C>
     for SC
 {
     fn get_all_ip_addr_subnets(
-        &self,
+        &mut self,
         device_id: &Self::DualStackDeviceId,
     ) -> Vec<AddrSubnetEither> {
         self.with_dual_stack_device_state(device_id, |DualStackDeviceStateRef { ipv4, ipv6 }| {
@@ -1390,32 +1392,36 @@ pub(crate) fn clear_ipv6_device_state<
 pub(crate) mod testutil {
     use super::*;
 
+    use lock_order::Locked;
     use net_types::{ip::Ipv6Scope, ScopeableAddress as _};
 
-    pub(crate) fn get_global_ipv6_addrs<
-        C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-        SC: IpDeviceContext<Ipv6, C>,
-    >(
-        sync_ctx: &mut SC,
-        device_id: &SC::DeviceId,
+    use crate::{device::DeviceId, NonSyncContext, SyncCtx};
+
+    pub(crate) fn get_global_ipv6_addrs<C: NonSyncContext>(
+        sync_ctx: &SyncCtx<C>,
+        device_id: &DeviceId<C>,
     ) -> Vec<Ipv6AddressEntry<C::Instant>> {
-        sync_ctx.with_ip_device_state(device_id, |state| {
-            state
-                .ip_state
-                .iter_addrs()
-                .filter(|entry| match entry.addr_sub.addr().scope() {
-                    Ipv6Scope::Global => true,
-                    Ipv6Scope::InterfaceLocal
-                    | Ipv6Scope::LinkLocal
-                    | Ipv6Scope::AdminLocal
-                    | Ipv6Scope::SiteLocal
-                    | Ipv6Scope::OrganizationLocal
-                    | Ipv6Scope::Reserved(_)
-                    | Ipv6Scope::Unassigned(_) => false,
-                })
-                .cloned()
-                .collect()
-        })
+        IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+            &mut Locked::new(sync_ctx),
+            device_id,
+            |state| {
+                state
+                    .ip_state
+                    .iter_addrs()
+                    .filter(|entry| match entry.addr_sub.addr().scope() {
+                        Ipv6Scope::Global => true,
+                        Ipv6Scope::InterfaceLocal
+                        | Ipv6Scope::LinkLocal
+                        | Ipv6Scope::AdminLocal
+                        | Ipv6Scope::SiteLocal
+                        | Ipv6Scope::OrganizationLocal
+                        | Ipv6Scope::Reserved(_)
+                        | Ipv6Scope::Unassigned(_) => false,
+                    })
+                    .cloned()
+                    .collect()
+            },
+        )
     }
 
     /// Gets the IPv6 address and subnet pairs associated with this device which are
@@ -1506,7 +1512,7 @@ mod tests {
 
         let ipv4_addr_subnet = AddrSubnet::new(Ipv4Addr::new([192, 168, 0, 1]), 24).unwrap();
         add_ipv4_addr_subnet(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &device_id,
             ipv4_addr_subnet.clone(),

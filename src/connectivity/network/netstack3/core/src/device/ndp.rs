@@ -68,13 +68,13 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr, ethernet, link::LinkAddress, set_routing_enabled,
-            testutil::receive_frame, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
-            FrameDestination, Mtu,
+            add_ip_addr_subnet, del_ip_addr, ethernet, is_routing_enabled, link::LinkAddress,
+            set_routing_enabled, testutil::receive_frame, DeviceId, EthernetDeviceId,
+            EthernetWeakDeviceId, FrameDestination, Mtu,
         },
         ip::{
             device::{
-                get_ipv6_hop_limit, is_ip_routing_enabled,
+                get_ipv6_hop_limit,
                 router_solicitation::{MAX_RTR_SOLICITATION_DELAY, RTR_SOLICITATION_INTERVAL},
                 slaac::{SlaacConfiguration, SlaacTimerId, TemporarySlaacAddressConfiguration},
                 state::{
@@ -229,7 +229,7 @@ mod tests {
             assert_empty(non_sync_ctx.frames_sent());
 
             crate::ip::send_ipv6_packet_from_device(
-                &mut &*sync_ctx,
+                &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 SendIpPacketMeta {
                     device: &local_device_id,
@@ -358,11 +358,13 @@ mod tests {
 
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
-        with_assigned_ipv6_addr_subnets(&mut &*net.sync_ctx("local"), &local_device_id, |addrs| {
-            assert_empty(addrs)
-        });
         with_assigned_ipv6_addr_subnets(
-            &mut &*net.sync_ctx("remote"),
+            &mut Locked::new(&*net.sync_ctx("local")),
+            &local_device_id,
+            |addrs| assert_empty(addrs),
+        );
+        with_assigned_ipv6_addr_subnets(
+            &mut Locked::new(&*net.sync_ctx("remote")),
             &remote_device_id,
             |addrs| assert_empty(addrs),
         );
@@ -454,7 +456,7 @@ mod tests {
 
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut &*net.sync_ctx("remote"),
+                &mut Locked::new(&*net.sync_ctx("remote")),
                 &remote_device_id,
                 |addrs| addrs.count()
             ),
@@ -641,13 +643,16 @@ mod tests {
         // They should now realize the address they intend to use has a
         // duplicate in the local network.
         assert_eq!(
-            with_assigned_ipv6_addr_subnets(&mut &*net.sync_ctx("local"), &local_device_id, |a| a
-                .count()),
+            with_assigned_ipv6_addr_subnets(
+                &mut Locked::new(&*net.sync_ctx("local")),
+                &local_device_id,
+                |a| a.count()
+            ),
             1
         );
         assert_eq!(
             with_assigned_ipv6_addr_subnets(
-                &mut &*net.sync_ctx("remote"),
+                &mut Locked::new(&*net.sync_ctx("remote")),
                 &remote_device_id,
                 |a| a.count()
             ),
@@ -656,12 +661,12 @@ mod tests {
     }
 
     fn get_address_state(
-        sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+        sync_ctx: &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<AddressState> {
         crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-            sync_ctx,
+            &mut Locked::new(sync_ctx),
             device,
             |state| state.ip_state.find_addr(&addr).map(|a| a.state),
         )
@@ -1022,7 +1027,7 @@ mod tests {
         // Sets the hop limit with a router advertisement and sends a packet to
         // make sure the packet uses the new hop limit.
         fn inner_test(
-            sync_ctx: &mut &crate::testutil::FakeSyncCtx,
+            sync_ctx: &crate::testutil::FakeSyncCtx,
             ctx: &mut crate::testutil::FakeNonSyncCtx,
             device_id: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             hop_limit: u8,
@@ -1055,9 +1060,9 @@ mod tests {
                 FrameDestination::Multicast,
                 icmpv6_packet_buf,
             );
-            assert_eq!(get_ipv6_hop_limit(sync_ctx, device_id).get(), hop_limit);
+            assert_eq!(get_ipv6_hop_limit(&mut Locked::new(sync_ctx), device_id).get(), hop_limit);
             crate::ip::send_ipv6_packet_from_device(
-                sync_ctx,
+                &mut Locked::new(sync_ctx),
                 ctx,
                 SendIpPacketMeta {
                     device: device_id,
@@ -1140,7 +1145,10 @@ mod tests {
             icmpv6_packet_buf,
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 1);
-        assert_eq!(crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device), hw_mtu);
+        assert_eq!(
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
+            hw_mtu
+        );
 
         // Receive a new RA with an invalid MTU option (value is lower than IPv6
         // min MTU).
@@ -1158,7 +1166,10 @@ mod tests {
             icmpv6_packet_buf,
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 2);
-        assert_eq!(crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device), hw_mtu);
+        assert_eq!(
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
+            hw_mtu
+        );
 
         // Receive a new RA with a valid MTU option (value is exactly IPv6 min
         // MTU).
@@ -1177,7 +1188,7 @@ mod tests {
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 3);
         assert_eq!(
-            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device),
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             Ipv6::MINIMUM_LINK_MTU,
         );
     }
@@ -1428,7 +1439,7 @@ mod tests {
         // Enable routing on device.
         set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
-        assert!(is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, &device));
+        assert!(is_routing_enabled::<_, Ipv6>(&mut sync_ctx, &device));
 
         // Should have not sent any new packets, but unset the router
         // solicitation timer.
@@ -1438,7 +1449,7 @@ mod tests {
         // Unsetting routing should succeed.
         set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting routing enabled");
-        assert!(!is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, &device));
+        assert!(!is_routing_enabled::<_, Ipv6>(&mut sync_ctx, &device));
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 

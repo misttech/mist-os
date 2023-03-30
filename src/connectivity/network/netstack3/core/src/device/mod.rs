@@ -23,7 +23,7 @@ use derivative::Derivative;
 use lock_order::{
     lock::{RwLockFor, UnlockedAccess},
     relation::LockBefore,
-    Locked, Unlocked,
+    Locked,
 };
 use log::{debug, trace};
 use net_types::{
@@ -375,16 +375,18 @@ fn leave_link_multicast_group<
     }
 }
 
-impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
+impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx>
+    for Locked<'_, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>
+{
     fn with_dual_stack_device_state<
         O,
         F: FnOnce(DualStackDeviceStateRef<'_, NonSyncCtx::Instant>) -> O,
     >(
-        &self,
+        &mut self,
         device_id: &Self::DualStackDeviceId,
         cb: F,
     ) -> O {
-        with_ip_device_state(&mut Locked::new(self), device_id, |mut state| {
+        with_ip_device_state(self, device_id, |mut state| {
             let (ipv4, mut locked) =
                 state.read_lock_and::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
             let ipv6 = locked.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
@@ -420,94 +422,6 @@ impl<'s, C: DeviceLayerEventDispatcher> Iterator for DevicesIter<'s, C> {
                 DeviceId::Loopback(LoopbackDeviceId(PrimaryRc::clone_strong(state))).into()
             }))
             .next()
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv4, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    type DevicesIter<'s> = <Locked<'s, SyncCtx<NonSyncCtx>, Unlocked> as IpDeviceContext<
-        Ipv4,
-        NonSyncCtx,
-    >>::DevicesIter<'s>;
-
-    type DeviceStateAccessor<'s> = <Locked<'s, SyncCtx<NonSyncCtx>, Unlocked> as IpDeviceContext<
-        Ipv4,
-        NonSyncCtx,
-    >>::DeviceStateAccessor<'s>;
-
-    fn with_ip_device_state_mut<O, F: FnOnce(&mut Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        IpDeviceContext::<Ipv4, _>::with_ip_device_state_mut(&mut Locked::new(*self), device, cb)
-    }
-
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
-        IpDeviceContext::<Ipv4, _>::with_devices(&mut Locked::new(*self), cb)
-    }
-
-    fn with_devices_and_state<
-        O,
-        F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        IpDeviceContext::<Ipv4, _>::with_devices_and_state(&mut Locked::new(*self), cb)
-    }
-
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        IpDeviceContext::<Ipv4, _>::get_routing_metric(&mut Locked::new(*self), device_id)
-    }
-
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(*self), device_id)
-    }
-
-    fn join_link_multicast_group(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv4Addr>,
-    ) {
-        IpDeviceContext::<Ipv4, _>::join_link_multicast_group(
-            &mut Locked::new(*self),
-            ctx,
-            device_id,
-            multicast_addr,
-        )
-    }
-
-    fn leave_link_multicast_group(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv4Addr>,
-    ) {
-        IpDeviceContext::<Ipv4, _>::leave_link_multicast_group(
-            &mut Locked::new(*self),
-            ctx,
-            device_id,
-            multicast_addr,
-        )
-    }
-
-    fn loopback_id(&mut self) -> Option<Self::DeviceId> {
-        IpDeviceContext::<Ipv4, _>::loopback_id(&mut Locked::new(*self))
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv4, NonSyncCtx::Instant>
-    for &'_ SyncCtx<NonSyncCtx>
-{
-    fn with_ip_device_state<O, F: FnOnce(&Ipv4DeviceState<NonSyncCtx::Instant>) -> O>(
-        &mut self,
-        device: &DeviceId<NonSyncCtx>,
-        cb: F,
-    ) -> O {
-        IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(&mut Locked::new(*self), device, cb)
     }
 }
 
@@ -714,27 +628,6 @@ where
     }
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>> BufferIpDeviceContext<Ipv4, NonSyncCtx, B>
-    for &'_ SyncCtx<NonSyncCtx>
-{
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
-        local_addr: SpecifiedAddr<Ipv4Addr>,
-        body: S,
-    ) -> Result<(), S> {
-        BufferIpDeviceContext::<Ipv4, _, _>::send_ip_frame(
-            &mut Locked::new(*self),
-            ctx,
-            device,
-            local_addr,
-            body,
-        )
-    }
-}
-
 impl<
         B: BufferMut,
         NonSyncCtx: BufferNonSyncContext<B>,
@@ -749,81 +642,6 @@ impl<
         body: S,
     ) -> Result<(), S> {
         send_ip_frame(self, ctx, device, local_addr, body)
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpDeviceContext<Ipv6, NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    type DevicesIter<'s> = <Locked<'s, SyncCtx<NonSyncCtx>, Unlocked> as IpDeviceContext<
-        Ipv6,
-        NonSyncCtx,
-    >>::DevicesIter<'s>;
-
-    type DeviceStateAccessor<'s> = <Locked<'s, SyncCtx<NonSyncCtx>, Unlocked> as IpDeviceContext<
-        Ipv6,
-        NonSyncCtx,
-    >>::DeviceStateAccessor<'s>;
-
-    fn with_ip_device_state_mut<O, F: FnOnce(&mut Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        IpDeviceContext::<Ipv6, _>::with_ip_device_state_mut(&mut Locked::new(*self), device, cb)
-    }
-
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
-        IpDeviceContext::<Ipv6, _>::with_devices(&mut Locked::new(*self), cb)
-    }
-
-    fn with_devices_and_state<
-        O,
-        F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        IpDeviceContext::<Ipv6, _>::with_devices_and_state(&mut Locked::new(*self), cb)
-    }
-
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        IpDeviceContext::<Ipv6, _>::get_routing_metric(&mut Locked::new(*self), device_id)
-    }
-
-    fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(*self), device_id)
-    }
-
-    fn join_link_multicast_group(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv6Addr>,
-    ) {
-        IpDeviceContext::<Ipv6, _>::join_link_multicast_group(
-            &mut Locked::new(*self),
-            ctx,
-            device_id,
-            multicast_addr,
-        )
-    }
-
-    fn leave_link_multicast_group(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device_id: &Self::DeviceId,
-        multicast_addr: MulticastAddr<Ipv6Addr>,
-    ) {
-        IpDeviceContext::<Ipv6, _>::leave_link_multicast_group(
-            &mut Locked::new(*self),
-            ctx,
-            device_id,
-            multicast_addr,
-        )
-    }
-
-    fn loopback_id(&mut self) -> Option<Self::DeviceId> {
-        IpDeviceContext::<Ipv6, _>::loopback_id(&mut Locked::new(*self))
     }
 }
 
@@ -901,19 +719,6 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayer
     }
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> IpDeviceStateAccessor<Ipv6, NonSyncCtx::Instant>
-    for &'_ SyncCtx<NonSyncCtx>
-{
-    fn with_ip_device_state<O, F: FnOnce(&Ipv6DeviceState<NonSyncCtx::Instant>) -> O>(
-        &mut self,
-        device: &DeviceId<NonSyncCtx>,
-        cb: F,
-    ) -> O {
-        IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(&mut Locked::new(*self), device, cb)
-    }
-}
-
 impl<
         NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>,
@@ -941,26 +746,6 @@ impl AsRef<[u8]> for Ipv6DeviceLinkLayerAddr {
         match self {
             Ipv6DeviceLinkLayerAddr::Mac(a) => a.as_ref(),
         }
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> Ipv6DeviceContext<NonSyncCtx> for &'_ SyncCtx<NonSyncCtx> {
-    type LinkLayerAddr = Ipv6DeviceLinkLayerAddr;
-
-    fn get_link_layer_addr_bytes(
-        &mut self,
-        device_id: &Self::DeviceId,
-    ) -> Option<Ipv6DeviceLinkLayerAddr> {
-        Locked::new(*self).get_link_layer_addr_bytes(device_id)
-    }
-
-    fn get_eui64_iid(&mut self, device_id: &Self::DeviceId) -> Option<[u8; 8]> {
-        Locked::new(*self).get_eui64_iid(device_id)
-    }
-
-    fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu) {
-        Locked::new(*self).set_link_mtu(device_id, mtu)
     }
 }
 
@@ -999,27 +784,6 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayer
             DeviceId::Ethernet(id) => ethernet::set_mtu(self, &id, mtu),
             DeviceId::Loopback(LoopbackDeviceId(_)) => {}
         }
-    }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>> BufferIpDeviceContext<Ipv6, NonSyncCtx, B>
-    for &'_ SyncCtx<NonSyncCtx>
-{
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut NonSyncCtx,
-        device: &DeviceId<NonSyncCtx>,
-        local_addr: SpecifiedAddr<Ipv6Addr>,
-        body: S,
-    ) -> Result<(), S> {
-        BufferIpDeviceContext::<Ipv6, _, _>::send_ip_frame(
-            &mut Locked::new(*self),
-            ctx,
-            device,
-            local_addr,
-            body,
-        )
     }
 }
 
@@ -1174,11 +938,6 @@ impl<C: DeviceLayerEventDispatcher>
     ) -> DeviceLayerTimerId<C> {
         DeviceLayerTimerId(DeviceLayerTimerIdInner::Ethernet(id))
     }
-}
-
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> DeviceIdContext<EthernetLinkDevice> for &'_ SyncCtx<NonSyncCtx> {
-    type DeviceId = EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState>;
 }
 
 impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
@@ -1831,9 +1590,10 @@ pub fn set_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
 
 /// Returns whether IP packet routing is enabled on `device`.
 pub fn is_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> bool {
+    let mut sync_ctx = Locked::new(sync_ctx);
     match I::VERSION {
         IpVersion::V4 => {
             crate::ip::device::is_ip_routing_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
@@ -1895,46 +1655,17 @@ pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
     }
 }
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> DualStackDeviceIdContext for &'_ SyncCtx<NonSyncCtx> {
-    type DualStackDeviceId = DeviceId<NonSyncCtx>;
-}
-
 impl<'a, NonSyncCtx: NonSyncContext, L> DualStackDeviceIdContext
     for Locked<'a, SyncCtx<NonSyncCtx>, L>
 {
-    type DualStackDeviceId =
-        <&'a SyncCtx<NonSyncCtx> as DualStackDeviceIdContext>::DualStackDeviceId;
-}
-
-// Temporary blanket impl until we switch over entirely to the traits defined in
-// the `context` module.
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext, I: Ip> IpDeviceIdContext<I> for &'_ SyncCtx<NonSyncCtx> {
-    type DeviceId = DeviceId<NonSyncCtx>;
-    type WeakDeviceId = WeakDeviceId<NonSyncCtx>;
-
-    fn downgrade_device_id(&self, device_id: &DeviceId<NonSyncCtx>) -> WeakDeviceId<NonSyncCtx> {
-        device_id.downgrade()
-    }
-
-    fn upgrade_weak_device_id(
-        &self,
-        weak_device_id: &WeakDeviceId<NonSyncCtx>,
-    ) -> Option<DeviceId<NonSyncCtx>> {
-        weak_device_id.upgrade()
-    }
-
-    fn is_device_installed(&self, device_id: &DeviceId<NonSyncCtx>) -> bool {
-        !device_id.removed()
-    }
+    type DualStackDeviceId = DeviceId<NonSyncCtx>;
 }
 
 impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
     for Locked<'a, SyncCtx<NonSyncCtx>, L>
 {
-    type DeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::DeviceId;
-    type WeakDeviceId = <&'a SyncCtx<NonSyncCtx> as IpDeviceIdContext<I>>::WeakDeviceId;
+    type DeviceId = DeviceId<NonSyncCtx>;
+    type WeakDeviceId = WeakDeviceId<NonSyncCtx>;
 
     fn downgrade_device_id(&self, device_id: &DeviceId<NonSyncCtx>) -> WeakDeviceId<NonSyncCtx> {
         device_id.downgrade()
@@ -2006,18 +1737,18 @@ pub(crate) fn insert_ndp_table_entry<NonSyncCtx: NonSyncContext>(
 
 /// Gets the IPv4 Configuration for a `device`.
 pub fn get_ipv4_configuration<NonSyncCtx: NonSyncContext>(
-    mut ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> Ipv4DeviceConfiguration {
-    crate::ip::device::get_ipv4_configuration(&mut ctx, device)
+    crate::ip::device::get_ipv4_configuration(&mut Locked::new(sync_ctx), device)
 }
 
 /// Gets the IPv6 Configuration for a `device`.
 pub fn get_ipv6_configuration<NonSyncCtx: NonSyncContext>(
-    mut ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     device: &DeviceId<NonSyncCtx>,
 ) -> Ipv6DeviceConfiguration {
-    crate::ip::device::get_ipv6_configuration(&mut ctx, device)
+    crate::ip::device::get_ipv6_configuration(&mut Locked::new(sync_ctx), device)
 }
 
 /// Updates the IPv4 Configuration for a `device`.
@@ -2107,22 +1838,20 @@ mod tests {
         let Ctx { sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
 
-        fn check(
-            sync_ctx: &mut &FakeSyncCtx,
-            expected: &[DeviceId<crate::testutil::FakeNonSyncCtx>],
-        ) {
+        fn check(sync_ctx: &FakeSyncCtx, expected: &[DeviceId<crate::testutil::FakeNonSyncCtx>]) {
+            let mut sync_ctx = Locked::new(sync_ctx);
             assert_eq!(
-                IpDeviceContext::<Ipv4, _>::with_devices(sync_ctx, |devices| devices
+                IpDeviceContext::<Ipv4, _>::with_devices(&mut sync_ctx, |devices| devices
                     .collect::<Vec<_>>()),
                 expected
             );
             assert_eq!(
-                IpDeviceContext::<Ipv6, _>::with_devices(sync_ctx, |devices| devices
+                IpDeviceContext::<Ipv6, _>::with_devices(&mut sync_ctx, |devices| devices
                     .collect::<Vec<_>>()),
                 expected
             );
         }
-        check(&mut sync_ctx, &[][..]);
+        check(sync_ctx, &[][..]);
 
         let loopback_device: DeviceId<_> = crate::device::add_loopback_device(
             &mut sync_ctx,
@@ -2131,7 +1860,7 @@ mod tests {
         )
         .expect("error adding loopback device")
         .into();
-        check(&mut sync_ctx, &[loopback_device.clone()][..]);
+        check(sync_ctx, &[loopback_device.clone()][..]);
 
         let FakeEventDispatcherConfig {
             subnet: _,
@@ -2147,7 +1876,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
-        check(&mut sync_ctx, &[ethernet_device, loopback_device][..]);
+        check(sync_ctx, &[ethernet_device, loopback_device][..]);
     }
 
     #[test]

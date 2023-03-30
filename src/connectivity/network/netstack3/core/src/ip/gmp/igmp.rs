@@ -1256,7 +1256,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();
-        crate::ip::device::add_ipv4_addr_subnet(
+        crate::device::add_ip_addr_subnet(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,

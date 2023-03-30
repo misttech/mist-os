@@ -3032,10 +3032,11 @@ pub(crate) mod testutil {
     }
 
     pub(crate) fn is_in_ip_multicast<A: IpAddress>(
-        mut sync_ctx: &FakeSyncCtx,
+        sync_ctx: &FakeSyncCtx,
         device: &DeviceId<FakeNonSyncCtx>,
         addr: MulticastAddr<A>,
     ) -> bool {
+        let mut sync_ctx = Locked::new(sync_ctx);
         match addr.into() {
             IpAddr::V4(addr) => {
                 match IpDeviceContext::<Ipv4, _>::address_status_for_device(
@@ -4403,13 +4404,13 @@ mod tests {
         // it.
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::join_ip_multicast::<Ipv6, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &device,
                 multicast_addr,
@@ -4423,13 +4424,13 @@ mod tests {
         // dispatch it.
         match multi_addr.into() {
             IpAddr::V4(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv4, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &device,
                 multicast_addr,
             ),
             IpAddr::V6(multicast_addr) => crate::ip::device::leave_ip_multicast::<Ipv6, _, _>(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &device,
                 multicast_addr,

@@ -151,15 +151,10 @@ pub(super) enum LoopbackDevice {}
 
 impl Device for LoopbackDevice {}
 
-// TODO(https://fxbug.dev/121448): Remove this when it is unused.
-impl<NonSyncCtx: NonSyncContext> DeviceIdContext<LoopbackDevice> for &'_ SyncCtx<NonSyncCtx> {
-    type DeviceId = LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>;
-}
-
-impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
-    for Locked<'a, SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
+    for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
-    type DeviceId = <&'a SyncCtx<NonSyncCtx> as DeviceIdContext<LoopbackDevice>>::DeviceId;
+    type DeviceId = LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>;
 }
 
 pub(super) struct LoopbackDeviceState {
@@ -462,6 +457,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
 mod tests {
     use alloc::vec::Vec;
 
+    use lock_order::Locked;
     use net_types::{
         ip::{AddrSubnet, Ipv4, Ipv6},
         SpecifiedAddr,
@@ -486,8 +482,14 @@ mod tests {
                 .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
-        assert_eq!(crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut sync_ctx, &device), MTU);
-        assert_eq!(crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut sync_ctx, &device), MTU);
+        assert_eq!(
+            crate::ip::IpDeviceContext::<Ipv4, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
+            MTU
+        );
+        assert_eq!(
+            crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
+            MTU
+        );
 
         fn test<I: TestIpExt + IpDeviceStateIpExt, NonSyncCtx: NonSyncContext>(
             sync_ctx: &mut &SyncCtx<NonSyncCtx>,
@@ -524,14 +526,14 @@ mod tests {
 
         test::<Ipv4, _>(&mut sync_ctx, &mut non_sync_ctx, &device, |sync_ctx, device| {
             crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
-                sync_ctx,
+                &mut Locked::new(*sync_ctx),
                 device,
                 |state| state.ip_state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>(),
             )
         });
         test::<Ipv6, _>(&mut sync_ctx, &mut non_sync_ctx, &device, |sync_ctx, device| {
             crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                sync_ctx,
+                &mut Locked::new(*sync_ctx),
                 device,
                 |state| state.ip_state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>(),
             )

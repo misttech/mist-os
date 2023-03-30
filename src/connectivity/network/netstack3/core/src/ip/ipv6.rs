@@ -202,6 +202,7 @@ fn handle_destination_options_ext_hdr<
 mod tests {
     use alloc::vec;
 
+    use lock_order::Locked;
     use packet::{
         serialize::{Buf, Serializer},
         ParseBuffer,
@@ -224,7 +225,6 @@ mod tests {
 
         let (Ctx { sync_ctx, non_sync_ctx: _ }, device_ids) =
             FakeEventDispatcherBuilder::from_config(FAKE_CONFIG_V6).build();
-        let mut sync_ctx = &sync_ctx;
         let builder = Ipv6PacketBuilder::new(
             FAKE_CONFIG_V6.remote_ip,
             FAKE_CONFIG_V6.local_ip,
@@ -238,7 +238,13 @@ mod tests {
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
 
         assert_eq!(
-            handle_extension_headers(&mut sync_ctx, &device_id, frame_dst, &packet, false),
+            handle_extension_headers(
+                &mut Locked::new(&sync_ctx),
+                &device_id,
+                frame_dst,
+                &packet,
+                false
+            ),
             Ipv6PacketAction::Continue
         );
     }
