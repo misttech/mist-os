@@ -18,6 +18,8 @@ constexpr BlockIndex Buddy(BlockIndex block, BlockOrder block_order) {
   return block ^ IndexForOffset(OrderToSize(block_order));
 }
 
+const size_t kPageSize = 4096;
+
 }  // namespace
 
 Heap::Heap(zx::vmo vmo) : vmo_(std::move(vmo)) {
@@ -62,7 +64,7 @@ zx_status_t Heap::Allocate(size_t min_size, BlockIndex* out_block) {
   // created free blocks.
   if (next_order == kNumOrders) {
     zx_status_t status;
-    status = Extend(cur_size_ * 2);
+    status = Extend(cur_size_ + kPageSize);
     if (status != ZX_OK) {
       return status;
     }

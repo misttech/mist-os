@@ -259,9 +259,7 @@ TEST(Heap, Extend) {
                           {256, BlockType::kFree, 7},
                           {384, BlockType::kFree, 7},
                           {512, BlockType::kFree, 7},
-                          {640, BlockType::kFree, 7},
-                          {768, BlockType::kFree, 7},
-                          {896, BlockType::kFree, 7}},
+                          {640, BlockType::kFree, 7}},
                          dump(heap));
 }
 
