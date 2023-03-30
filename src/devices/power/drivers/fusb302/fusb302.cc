@@ -5,116 +5,79 @@
 #include "src/devices/power/drivers/fusb302/fusb302.h"
 
 #include <fuchsia/hardware/gpio/cpp/banjo.h>
+#include <lib/ddk/debug.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zx/profile.h>
 #include <lib/zx/result.h>
 #include <lib/zx/timer.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/threads.h>
+#include <zircon/types.h>
+
+#include <cinttypes>
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
 #include <fbl/alloc_checker.h>
+#include <fbl/string_buffer.h>
 
 #include "src/devices/power/drivers/fusb302/fusb302-bind.h"
+#include "src/devices/power/drivers/fusb302/fusb302-controls.h"
+#include "src/devices/power/drivers/fusb302/pd-sink-state-machine.h"
 #include "src/devices/power/drivers/fusb302/registers.h"
-#include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
+#include "src/devices/power/drivers/fusb302/state-machine-base.h"
+#include "src/devices/power/drivers/fusb302/typec-port-state-machine.h"
 
 namespace fusb302 {
 
-using usb::pd::Header;
-using usb::pd::kMaxLen;
-using PdMessageType = usb::pd::PdMessage::PdMessageType;
-using ControlMessageType = usb::pd::ControlPdMessage::ControlMessageType;
-using PowerType = usb::pd::DataPdMessage::PowerType;
-using FixedSupplyPDO = usb::pd::DataPdMessage::FixedSupplyPDO;
-
 namespace {
 
-// Sleep after setting measure bits and before taking measurements to give time to hardware to
-// react.
-auto constexpr tMeasureSleep = zx::usec(300);
+constexpr uint64_t kPortPacketKeyInterrupt = 1;
+constexpr uint64_t kPortPacketKeyTimer = 2;
 
 }  // namespace
 
-zx::result<Event> Fusb302::GetInterrupt() {
-  Event event(0);
-  zx_status_t status;
-
-  //  Read interrupts
-  auto interrupt = InterruptReg::ReadFrom(i2c_);
-  auto interrupt_a = InterruptAReg::ReadFrom(i2c_);
-  auto interrupt_b = InterruptBReg::ReadFrom(i2c_);
-  zxlogf(DEBUG, "Received interrupt: Interrupt 0x%x, InterruptA 0x%x, InterruptB 0x%x",
-         interrupt.reg_value(), interrupt_a.reg_value(), interrupt_b.reg_value());
-
-  if (interrupt.i_bc_lvl() || interrupt.i_vbusok()) {
-    if (is_cc_connected_) {
-      event.set_cc(true);
-    }
+zx::result<> Fusb302::PumpIrqPort() {
+  zx_port_packet_t packet;
+  zx_status_t status = port_.wait(zx::time(ZX_TIME_INFINITE), &packet);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "zx::port::wait() failed: %s", zx_status_get_string(status));
+    return zx::error_result(status);
   }
 
-  if (interrupt_a.i_togdone()) {
-    const PowerRoleDetectionState detection_state = Status1AReg::ReadFrom(i2c_).togss();
-    const usb_pd::ConfigChannelPinSwitch cc_pin_switch =
-        WiredCcPinFromPowerRoleDetectionState(detection_state);
+  HardwareStateChanges changes;
+  switch (packet.key) {
+    case kPortPacketKeyInterrupt:
+      changes = signals_.ServiceInterrupts();
+      break;
 
-    if (cc_pin_switch != usb_pd::ConfigChannelPinSwitch::kNone) {
-      event.set_cc(true);
+    case kPortPacketKeyTimer:
+      zxlogf(TRACE, "State machine timer fired off");
+      changes.timer_signaled = true;
+      break;
 
-      polarity_.set(cc_pin_switch == usb_pd::ConfigChannelPinSwitch::kCc1 ? CC1 : CC2);
-
-      const usb_pd::PowerRole power_role = PowerRoleFromDetectionState(detection_state);
-      power_role_.set(power_role == usb_pd::PowerRole::kSink ? sink : source);
-
-      status = Control2Reg::ReadFrom(i2c_).set_toggle(0).WriteTo(i2c_);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-        return zx::error(status);
-      }
-
-      status = Switches0Reg::ReadFrom(i2c_)
-                   .set_pu_en1(power_role_.get() == source)
-                   .set_pu_en2(power_role_.get() == source)
-                   .set_pdwn1(power_role_.get() == sink)
-                   .set_pdwn2(power_role_.get() == sink)
-                   .WriteTo(i2c_);
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-        return zx::error(status);
-      }
-    }
+    default:
+      zxlogf(ERROR, "Unrecognized packet key: %" PRIu64, packet.key);
+      return zx::error_result(ZX_ERR_INTERNAL);
   }
 
-  if (interrupt_b.i_gcrcsent()) {
-    event.set_rx(true);
-  }
+  ProcessStateChanges(changes);
 
-  if (interrupt_a.i_txsent()) {
-    // First treat this as an rx event. After receiving the message and checking if it's a GOOD_CRC,
-    // we will modify the event correspondingly.
-    event.set_rx(true);
-  }
-
-  if (interrupt_a.i_hardrst()) {
-    status = ResetReg::Get().FromValue(0x0).set_pd_reset(1).WriteTo(i2c_);
+  if (packet.key == kPortPacketKeyInterrupt) {
+    status = irq_.ack();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Could not reset. %d", status);
-      return zx::error(status);
+      zxlogf(ERROR, "IRQ ack() failed: %s", zx_status_get_string(status));
+      return zx::error_result(status);
     }
-    event.set_rec_reset(true);
   }
 
-  if (interrupt_a.i_retryfail()) {
-    event.set_tx(true);
-    tx_state_.set(failed);
-  }
-
-  if (interrupt_a.i_hardsent()) {
-    tx_state_.set(success);
-    event.set_tx(true);
-  }
-
-  return zx::ok(event);
+  return zx::ok();
 }
 
-zx_status_t Fusb302::IrqThread() {
+zx_status_t Fusb302::IrqThreadEntryPoint() {
   zx_status_t status = ZX_OK;
 
   {
@@ -126,420 +89,62 @@ zx_status_t Fusb302::IrqThread() {
     }
   }
 
-  while (true) {
-    zx_port_packet_t packet;
-    status = port_.wait(zx::time(ZX_TIME_INFINITE), &packet);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Port wait failed");
-      break;
-    }
-
-    Event event(0);
-    std::shared_ptr<PdMessage> message;
-    switch (packet.key) {
-      case kInterrupt: {
-        auto val = GetInterrupt();
-        if (val.is_error()) {
-          zxlogf(ERROR, "Couldn't handle interrupt %s", val.status_string());
-          status = val.status_value();
-          break;
-        }
-        event = val.value();
-        zxlogf(DEBUG, "event %x", event.value);
-
-        if (is_cc_connected_ && (event.cc())) {
-          if (power_role_.get() == sink) {
-            if (!Status0Reg::ReadFrom(i2c_).vbusok()) {
-              InitHw();
-              state_machine_.Restart();
-            }
-          } else {
-            FixedComparatorResult cc1, cc2;
-            status = GetCC(&cc1, &cc2);
-            if (status != ZX_OK) {
-              zxlogf(ERROR, "Failed to get CC. %d", status);
-              break;
-            }
-            if (polarity_.get() == CC2) {
-              cc1 = cc2;
-            }
-            if (cc1 == FixedComparatorResult::kRa) {
-              InitHw();
-              state_machine_.Restart();
-            }
-          }
-        }
-
-        if (event.rx()) {
-          auto val = FifoReceive();
-          if (val.is_error()) {
-            zxlogf(ERROR, "Could not receive message. %s", val.status_string());
-            status = val.status_value();
-            break;
-          }
-          // Because RX and TX events could be received out of order, check here and modify event
-          // flags instead.
-          if ((val.value().GetPdMessageType() == PdMessageType::CONTROL) &&
-              (val.value().header().message_type() == ControlMessageType::GOOD_CRC)) {
-            // Received GOOD_CRC message. Should be a TX event.
-            event.set_tx(true);
-            event.set_rx(false);
-            tx_state_.set(success);
-          } else {
-            message = std::make_shared<PdMessage>(std::move(val.value()));
-          }
-        }
-
-        if ((event.tx()) && (tx_state_.get() == success)) {
-          message_id_++;
-        }
-        break;
-      }
-      case kTimer: {
-        break;
-      }
-      default:
-        zxlogf(ERROR, "Unrecognized packet key: %lu", packet.key);
-        status = ZX_ERR_INTERNAL;
-        break;
-    }
-
-    status = state_machine_.Run(event, std::move(message));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "State machine failed with %d", status);
-      break;
-    }
-
-    if (packet.key == kInterrupt) {
-      status = irq_.ack();
-      if (status != ZX_OK) {
-        zxlogf(ERROR, "Ack IRQ failed with %d", status);
-        break;
-      }
-    }
+  zx::result<> last_pump_result = zx::ok();
+  while (last_pump_result.is_ok()) {
+    last_pump_result = PumpIrqPort();
   }
+
   is_thread_running_ = false;
-  zxlogf(ERROR, "IRQ thread failed with %d", status);
+  zxlogf(ERROR, "IRQ thread failed: %s", zx_status_get_string(status));
   return status;
 }
 
-zx_status_t Fusb302::FifoTransmit(const PdMessage& message) {
-  if (tx_state_.get() == busy) {
-    return ZX_ERR_SHOULD_WAIT;
+void Fusb302::ProcessStateChanges(HardwareStateChanges changes) {
+  if (changes.received_reset) {
+    pd_state_machine_.DidReceiveSoftReset();
+    pd_state_machine_.Run(SinkPolicyEngineInput::kInitialized);
   }
 
-  uint8_t buf[11 + message.header().num_data_objects() * 4];
-  buf[0] = TransmitToken::kSync1;
-  buf[1] = TransmitToken::kSync1;
-  buf[2] = TransmitToken::kSync1;
-  buf[3] = TransmitToken::kSync2;  // SOP
-  buf[4] =
-      TransmitToken::PacketData(static_cast<int8_t>(message.header().num_data_objects() * 4 + 2));
+  while (protocol_.HasUnreadMessage()) {
+    pd_state_machine_.Run(SinkPolicyEngineInput::kMessageReceived);
 
-  buf[5] = message.header().value & 0xFF;
-  buf[6] = (message.header().value >> 8) & 0xFF;
-
-  // Data
-  memcpy(&buf[7], message.payload().data(), message.header().num_data_objects() * 4);
-
-  buf[7 + message.header().num_data_objects() * 4] = TransmitToken::kInsertCrc;
-  buf[8 + message.header().num_data_objects() * 4] = TransmitToken::kEop;
-  buf[9 + message.header().num_data_objects() * 4] = TransmitToken::kTxOff;
-  buf[10 + message.header().num_data_objects() * 4] = TransmitToken::kTxOn;
-
-  // Specs say WriteSync is supported, but it doesn't work.
-  for (size_t i = 0; i < sizeof(buf); i++) {
-    auto status = FifosReg::Get().FromValue(buf[i]).WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Could not transmit %zu", i);
-      return status;
+    if (protocol_.HasUnreadMessage()) {
+      pd_state_machine_.ProcessUnexpectedMessage();
+      pd_state_machine_.Run(SinkPolicyEngineInput::kInitialized);
     }
   }
-  tx_state_.set(busy);
-  return ZX_OK;
-}
 
-zx::result<PdMessage> Fusb302::FifoReceive() {
-  const uint8_t start_token = FifosReg::ReadFrom(i2c_).reg_value();
-  const ReceiveTokenType start_token_type = FifosReg::AsReceiveTokenType(start_token);
-  if (start_token_type != ReceiveTokenType::kSop) {
-    zxlogf(ERROR, "Unexpected packet start token 0x%02x", start_token);
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  // header
-  uint16_t header_val = FifosReg::ReadFrom(i2c_).reg_value() & 0xFF;
-  header_val |= (FifosReg::ReadFrom(i2c_).reg_value() & 0xFF) << 8;
-  Header header(header_val);
-  // read message
-  if (header.num_data_objects() * 4 > kMaxLen) {
-    zxlogf(ERROR, "Buffer not large enough");
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  uint8_t data[header.num_data_objects() * 4];
-  // Specs say ReadSync is supported, but it doesn't work.
-  for (size_t i = 0; i < header.num_data_objects() * 4; i++) {
-    data[i] = FifosReg::ReadFrom(i2c_).reg_value();
-  }
-  // CRC
-  uint32_t crc = FifosReg::ReadFrom(i2c_).reg_value();
-  crc |= FifosReg::ReadFrom(i2c_).reg_value() << (8 * 1);
-  crc |= FifosReg::ReadFrom(i2c_).reg_value() << (8 * 2);
-  crc |= FifosReg::ReadFrom(i2c_).reg_value() << (8 * 3);
+  if (changes.port_state_changed) {
+    port_state_machine_.Run(TypeCPortInput::kPortStateChanged);
 
-  // Update message id
-  message_id_ = header.message_id();
-  return zx::ok(PdMessage(header_val, &data[0]));
-}
-
-zx_status_t Fusb302::GetCC(FixedComparatorResult* cc1, FixedComparatorResult* cc2) {
-  auto save = Switches0Reg::ReadFrom(i2c_).reg_value();  // save
-  *cc1 = MeasureCC(CC1);
-  *cc2 = MeasureCC(CC2);
-  return Switches0Reg::Get().FromValue(save).WriteTo(i2c_);  // restore
-}
-
-FixedComparatorResult Fusb302::MeasureCC(Polarity polarity) {
-  if (power_role_.get() != sink) {
-    // Only sink operations allowed for now. Implement source when the need arises.
-    zxlogf(ERROR, "Can't measure for source!");
-    return FixedComparatorResult::kRa;
-  }
-
-  auto status = Switches0Reg::ReadFrom(i2c_)
-                    .set_meas_cc1(polarity == CC1)
-                    .set_meas_cc2(polarity == CC2)
-                    .set_pu_en1(0)
-                    .set_pu_en2(0)
-                    .set_pdwn1(1)
-                    .set_pdwn2(1)
-                    .WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-    return FixedComparatorResult::kRa;
-  }
-  zx::nanosleep(zx::deadline_after(tMeasureSleep));
-
-  return Status0Reg::ReadFrom(i2c_).bc_lvl();
-}
-
-zx_status_t Fusb302::Debounce() {
-  uint32_t count = 10, debounce_count = 0;
-  FixedComparatorResult old_cc1, old_cc2;
-  auto status = GetCC(&old_cc1, &old_cc2);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get CC. %d", status);
-    return status;
-  }
-
-  while (count--) {
-    FixedComparatorResult cc1, cc2;
-    status = GetCC(&cc1, &cc2);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to get CC. %d", status);
-      return status;
-    }
-
-    if ((cc1 == old_cc1) && (cc2 == old_cc2)) {
-      debounce_count++;
+    if (port_state_machine_.current_state() == TypeCPortState::kSinkAttached) {
+      pd_state_machine_.Run(SinkPolicyEngineInput::kInitialized);
     } else {
-      old_cc1 = cc1;
-      old_cc2 = cc2;
-      debounce_count = 0;
-    }
-
-    zx::nanosleep(zx::deadline_after(zx::usec(2000)));
-    if (debounce_count > 9) {
-      if ((old_cc1 != old_cc2) &&
-          ((old_cc1 == FixedComparatorResult::kRa) || (old_cc2 == FixedComparatorResult::kRa))) {
-        return ZX_OK;
-      }
+      pd_state_machine_.Reset();
     }
   }
-  return ZX_ERR_INTERNAL;
+
+  if (changes.timer_signaled &&
+      port_state_machine_.current_state() == TypeCPortState::kSinkAttached) {
+    pd_state_machine_.Run(SinkPolicyEngineInput::kTimerFired);
+  }
 }
 
-zx_status_t Fusb302::SetPolarity(Polarity polarity) {
-  auto status = Switches0Reg::ReadFrom(i2c_)
-                    .set_meas_cc1(polarity == CC1)
-                    .set_meas_cc2(polarity == CC2)
-                    .set_vconn_cc1(0)
-                    .set_vconn_cc2(0)
-                    .WriteTo(i2c_);
+zx_status_t Fusb302::ResetHardwareAndStartPowerRoleDetection() {
+  auto status = ResetReg::Get().FromValue(0).set_sw_res(true).WriteTo(i2c_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
+    zxlogf(ERROR, "Failed to write Reset register: %s", zx_status_get_string(status));
     return status;
   }
 
-  status = Switches1Reg::ReadFrom(i2c_)
-               .set_txcc1(polarity == CC1)
-               .set_txcc2(polarity == CC2)
-               .WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
+  zx::result<> result = signals_.InitInterruptUnit();
+  if (!result.is_ok()) {
+    return result.error_value();
   }
 
-  polarity_.set(polarity);
-  return ZX_OK;
-}
-
-zx_status_t Fusb302::SetCC(DataRole mode) {
-  auto switches0 =
-      Switches0Reg::ReadFrom(i2c_).set_pdwn1(0).set_pdwn2(0).set_pu_en1(0).set_pu_en2(0);
-  switch (mode) {
-    // Only sink operations allowed for now. Implement source when the need arises.
-    case UFP:
-    case DRP:
-      switches0.set_pdwn1(1).set_pdwn2(1);
-      break;
-    default:
-      zxlogf(ERROR, "Unsupported mode %u", mode);
-      return ZX_ERR_INTERNAL;
-  }
-  auto status = switches0.WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-  return ZX_OK;
-}
-
-zx_status_t Fusb302::RxEnable(bool enable) {
-  zx_status_t status;
-  if (enable) {
-    status = Switches0Reg::ReadFrom(i2c_)
-                 .set_meas_cc1(polarity_.get() == CC1)
-                 .set_meas_cc2(polarity_.get() == CC2)
-                 .WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-      return status;
-    }
-
-    status = Control1Reg::ReadFrom(i2c_).set_rx_flush(1).WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to flush. %d", status);
-      return status;
-    }
-  } else {
-    status = SetCC(DRP);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to Set CC to DRP %d", status);
-      return status;
-    }
-
-    status = Control2Reg::ReadFrom(i2c_).set_tog_rd_only(1).WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-      return status;
-    }
-
-    status = Switches0Reg::ReadFrom(i2c_).set_meas_cc1(0).set_meas_cc2(0).WriteTo(i2c_);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-      return status;
-    }
-  }
-
-  status = Switches1Reg::ReadFrom(i2c_).set_auto_crc(enable).WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-
-  return ZX_OK;
-}
-
-zx_status_t Fusb302::InitHw() {
-  // Reset
-  auto status = ResetReg::ReadFrom(i2c_).set_sw_res(1).set_pd_reset(1).WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-
-  // Enable TX Auto retries
-  status = Control3Reg::ReadFrom(i2c_).set_n_retries(3).set_auto_retry(1).WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-
-  // Init Interrupt
-  status = MaskReg::Get()
-               .FromValue(0xFF)
-               .set_m_bc_lvl(0)
-               .set_m_collision(0)
-               .set_m_alert(0)
-               .set_m_vbusok(0)
-               .WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-  status = MaskAReg::Get()
-               .FromValue(0xFF)
-               .set_m_togdone(0)
-               .set_m_retryfail(0)
-               .set_m_hardsent(0)
-               .set_m_txsent(0)
-               .set_m_hardrst(0)
-               .WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-  status = MaskBReg::Get().FromValue(0xFF).set_m_gcrcsent(0).WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-
-  // Start DRP toggling
-  status = Control2Reg::ReadFrom(i2c_)
-               .set_mode(Fusb302RoleDetectionMode::kDualPowerRole)
-               .set_toggle(1)
-               .set_tog_rd_only(1)
-               .WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-    return status;
-  }
-
-  // Set Host Current and Enable Interrupts
-  status = Control0Reg::ReadFrom(i2c_)
-               .set_host_cur(Control0Reg::PullUpCurrent::kUsb1500mA_180uA)
-               .set_int_mask(0)
-               .WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to read from power delivery unit. %d", status);
-    return status;
-  }
-
-  // Set polarity
-  status = SetPolarity(CC1);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to set polarity. %d", status);
-    return status;
-  }
-
-  // Set Power Mode
-  status = PowerReg::Get().FromValue(0x0F).WriteTo(i2c_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to write to power delivery unit. %d", status);
-    return status;
-  }
-
-  status = RxEnable(false);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't disable RX. %d", status);
-    return status;
-  }
-
-  status = SetCC(DRP);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Couldn't set CC as DRP. %d", status);
-    return status;
+  result = controls_.ResetIntoPowerRoleDiscovery();
+  if (!result.is_ok()) {
+    return result.error_value();
   }
 
   return ZX_OK;
@@ -548,25 +153,27 @@ zx_status_t Fusb302::InitHw() {
 zx_status_t Fusb302::Init() {
   zx::result<> result = identity_.ReadIdentity();
   if (result.is_error()) {
+    zxlogf(ERROR, "Failed to initialize inspect: %s", result.status_string());
     return result.error_value();
   }
 
-  // InitHw also initializes variables for state machine and DRP
-  auto status = InitHw();
+  zx_status_t status = ResetHardwareAndStartPowerRoleDetection();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "InitHw failed. %d", status);
+    zxlogf(ERROR, "ResetHardwareAndStartPowerRoleDetection() failed: %s",
+           zx_status_get_string(status));
     return status;
   }
 
   status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &port_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "%s port_create failed: %d", __FILE__, status);
+    zxlogf(ERROR, "zx::port::create() failed: %s", zx_status_get_string(status));
     return status;
   }
-  irq_.bind(port_, kInterrupt, 0);
+  irq_.bind(port_, kPortPacketKeyInterrupt, /*options=*/0);
   status = thrd_status_to_zx_status(thrd_create_with_name(
-      &irq_thread_, [](void* ctx) -> int { return reinterpret_cast<Fusb302*>(ctx)->IrqThread(); },
-      this, "fusb302_thread"));
+      &irq_thread_,
+      [](void* ctx) -> int { return reinterpret_cast<Fusb302*>(ctx)->IrqThreadEntryPoint(); }, this,
+      "fusb302-irq-thread"));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to start thread: %s", zx_status_get_string(status));
     return status;
@@ -576,70 +183,75 @@ zx_status_t Fusb302::Init() {
   return ZX_OK;
 }
 
+// static
 zx_status_t Fusb302::Create(void* context, zx_device_t* parent) {
   auto client_end =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_i2c::Service::Device>(parent, "i2c");
   if (client_end.is_error()) {
-    zxlogf(ERROR, "Failed to get I2C %s", client_end.status_string());
+    zxlogf(ERROR, "Failed to get I2C bus for registers: %s", client_end.status_string());
     return client_end.status_value();
   }
 
   ddk::GpioProtocolClient gpio(parent, "gpio");
   if (!gpio.is_valid()) {
-    zxlogf(ERROR, "Failed to get GPIO");
+    zxlogf(ERROR, "Failed to get GPIO for interrupt pin");
     return ZX_ERR_INTERNAL;
   }
   zx_status_t status = gpio.ConfigIn(GPIO_PULL_UP);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "ConfigIn failed, status = %d", status);
+    zxlogf(ERROR, "GPIO ConfigIn() failed: %s", zx_status_get_string(status));
   }
   zx::interrupt irq;
   status = gpio.GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_LOW, &irq);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "GetInterrupt failed, status = %d", status);
+    zxlogf(ERROR, "GPIO GetInterrupt() failed: %s", zx_status_get_string(status));
   }
 
-  fbl::AllocChecker ac;
-  std::unique_ptr<Fusb302> device(new (&ac)
-                                      Fusb302(parent, std::move(*client_end), std::move(irq)));
-  if (!ac.check()) {
+  fbl::AllocChecker alloc_checker;
+  auto device = fbl::make_unique_checked<Fusb302>(&alloc_checker, parent, std::move(*client_end),
+                                                  std::move(irq));
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
   status = device->Init();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Init failed, status = %d", status);
+    zxlogf(ERROR, "Init() failed: %s", zx_status_get_string(status));
+    return status;
   }
 
   status = device->DdkAdd(
       ddk::DeviceAddArgs("fusb302").set_inspect_vmo(device->inspect_.DuplicateVmo()));
   if (status != ZX_OK) {
-    zxlogf(ERROR, "DdkAdd failed, status = %d", status);
+    zxlogf(ERROR, "DdkAdd() failed: %s", zx_status_get_string(status));
+    return status;
   }
 
-  // Let device runner take ownership of this object.
-  [[maybe_unused]] auto* dummy = device.release();
-
+  // The device manager now owns `device`.
+  [[maybe_unused]] auto* dropped_ptr = device.release();
   return ZX_OK;
 }
 
+void Fusb302::DdkRelease() { delete this; }
+
 zx::result<> Fusb302::WaitAsyncForTimer(zx::timer& timer) {
   const zx_status_t status =
-      timer.wait_async(port_, PortPacketType::kTimer, ZX_TIMER_SIGNALED, /*options=*/0);
+      timer.wait_async(port_, kPortPacketKeyTimer, ZX_TIMER_SIGNALED, /*options=*/0);
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to wait on timer: %s", zx_status_get_string(status));
   }
   return zx::make_result(status);
 }
 
+namespace {
+
+constexpr zx_driver_ops_t kDriverOps = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = fusb302::Fusb302::Create,
+};
+
+}  // namespace
+
 }  // namespace fusb302
 
-static constexpr zx_driver_ops_t fusb302_driver_ops = []() {
-  zx_driver_ops_t result = {};
-  result.version = DRIVER_OPS_VERSION;
-  result.bind = fusb302::Fusb302::Create;
-  return result;
-}();
-
-// clang-format off
-ZIRCON_DRIVER(fusb302, fusb302_driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(fusb302, fusb302::kDriverOps, "zircon", "0.1");
