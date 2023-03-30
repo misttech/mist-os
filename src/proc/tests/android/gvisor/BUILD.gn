@@ -5,6 +5,7 @@
 import("//build/dist/zip_resource.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/proc/bin/starnix/starnix.gni")
 
 group("gvisor") {
   testonly = true
@@ -279,7 +280,7 @@ expect_includes("gvisor_test_with_expectations") {
 }
 
 zip_resource("gvisor_runfiles") {
-  file = "//prebuilt/starnix/tests/syscalls/linux-amd64/gvisor_runfiles"
+  file = "${gvisor_prebuilt_directory}/gvisor_runfiles"
   dest_prefix = "data/tests"
 }
 
@@ -301,9 +302,7 @@ template("gvisor_test_component") {
   test_name = target_name
 
   resource("${test_name}_bin") {
-    sources = [
-      "//prebuilt/starnix/tests/syscalls/linux-amd64/stripped/${test_name}",
-    ]
+    sources = [ "${gvisor_prebuilt_directory}/stripped/${test_name}" ]
     outputs = [ "data/tests/${test_name}" ]
   }
 
