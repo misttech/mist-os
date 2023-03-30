@@ -208,11 +208,11 @@ std::unique_ptr<VPartitionAdapter> VPartitionAdapter::Create(const fbl::unique_f
 }
 
 VPartitionAdapter::~VPartitionAdapter() {
-  fs_management::DestroyPartitionWithDevfs(devfs_root_.get(),
-                                           {
-                                               .type_guids = {uuid::Uuid(type_.data())},
-                                               .instance_guids = {uuid::Uuid(guid_.data())},
-                                           });
+  ASSERT_OK(fs_management::DestroyPartitionWithDevfs(
+      devfs_root_.get(), {
+                             .type_guids = {uuid::Uuid(type_.data())},
+                             .instance_guids = {uuid::Uuid(guid_.data())},
+                         }));
 }
 
 zx_status_t VPartitionAdapter::Extend(uint64_t offset, uint64_t length) {

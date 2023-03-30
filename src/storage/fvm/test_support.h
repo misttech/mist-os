@@ -182,6 +182,8 @@ class VPartitionAdapter final : public BlockDeviceAdapter {
 
   zx_status_t Reconnect();
 
+  Guid& guid() { return guid_; }
+
  private:
   fbl::unique_fd fd_;
   fbl::StringBuffer<fvm::kMaxVPartitionNameLength> name_;

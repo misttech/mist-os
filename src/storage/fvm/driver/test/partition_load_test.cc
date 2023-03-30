@@ -61,15 +61,24 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
                               static_cast<fvm::Guid>(fvm::kPlaceHolderInstanceGuid.data()),
                               static_cast<fvm::Guid>(fvm::kPlaceHolderInstanceGuid.data()), 1,
                               &vpartition));
-  // Get the device topological path
+
+  // Save the topological path for rebinding.  The topological path will be
+  // consistent after rebinding the ramdisk, whereas the
+  // /dev/class/block/[NNN] will issue a new number.
   fdio_cpp::UnownedFdioCaller caller(vpartition->fd());
-  auto topo_result =
+  const fidl::WireResult result =
       fidl::WireCall(caller.borrow_as<fuchsia_device::Controller>())->GetTopologicalPath();
-  ASSERT_TRUE(topo_result.ok());
-  ASSERT_TRUE(topo_result->is_ok());
-  auto partition_path = std::string(topo_result->value()->path.begin() + strlen("/dev/"),
-                                    topo_result->value()->path.end());
-  std::vector<uint8_t> partition_guid(kGuidSize, 0);
+  ASSERT_OK(result.status());
+  const fit::result response = result.value();
+  ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
+  std::string_view topological_path = response.value()->path.get();
+  // Strip off the leading /dev/; because we use an isolated devmgr, we need
+  // relative paths, but ControllerGetTopologicalPath returns an absolute path
+  // with the assumption that devfs is rooted at /dev.
+  constexpr std::string_view kHeader = "/dev/";
+  ASSERT_TRUE(cpp20::starts_with(topological_path, kHeader));
+  std::string partition_path(topological_path.substr(kHeader.size()));
+
   {
     // After rebind the instance guid should not be kPlaceHolderGUID.
     ASSERT_OK(fvm->Rebind({}));
@@ -83,9 +92,12 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
     auto result = fidl::WireCall(client_end)->GetInstanceGuid();
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
-    EXPECT_FALSE(memcmp(result.value().guid.get(), kPlaceHolderInstanceGuid.data(),
-                        kPlaceHolderInstanceGuid.size()) == 0);
-    memcpy(partition_guid.data(), result.value().guid.get(), kGuidSize);
+    fidl::Array fidl = result.value().guid.get()->value;
+    decltype(fidl)::value_type bytes[decltype(fidl)::size()];
+    std::copy(fidl.begin(), fidl.end(), std::begin(bytes));
+    Guid guid(bytes);
+    EXPECT_NE(vpartition->guid(), guid);
+    vpartition->guid() = guid;
   }
   {
     // One more time to check that the UUID persisted, so it doesn't change between 'reboot'.
@@ -100,8 +112,11 @@ TEST_F(FvmVPartitionLoadTest, LoadPartitionWithPlaceHolderGuidIsUpdated) {
     auto result = fidl::WireCall(client_end)->GetInstanceGuid();
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
-    EXPECT_TRUE(memcmp(result.value().guid.get(), partition_guid.data(),
-                       kPlaceHolderInstanceGuid.size()) == 0);
+    fidl::Array fidl = result.value().guid.get()->value;
+    decltype(fidl)::value_type bytes[decltype(fidl)::size()];
+    std::copy(fidl.begin(), fidl.end(), std::begin(bytes));
+    Guid guid(bytes);
+    EXPECT_EQ(vpartition->guid(), guid);
   }
 }
 
