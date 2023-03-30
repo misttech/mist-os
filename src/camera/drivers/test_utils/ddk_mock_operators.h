@@ -27,10 +27,11 @@ static bool operator==(const min_max_constraints_t& lhs, const min_max_constrain
 }
 
 static bool operator==(const extension_value_data_type& lhs, const extension_value_data_type& rhs) {
-  return lhs.byte_array_value == rhs.byte_array_value &&
+  return +lhs.byte_array_value == +rhs.byte_array_value &&
          lhs.constraints_value == rhs.constraints_value &&
-         lhs.frame_rate_info_value == rhs.frame_rate_info_value && lhs.int_value == rhs.int_value &&
-         lhs.dimension_value == rhs.dimension_value && lhs.uint_value == rhs.uint_value;
+         +lhs.frame_rate_info_value == +rhs.frame_rate_info_value &&
+         lhs.int_value == rhs.int_value && lhs.dimension_value == rhs.dimension_value &&
+         lhs.uint_value == rhs.uint_value;
 }
 
 #endif  // SRC_CAMERA_DRIVERS_TEST_UTILS_DDK_MOCK_OPERATORS_H_
