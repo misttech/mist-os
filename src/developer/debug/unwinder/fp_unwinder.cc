@@ -45,13 +45,13 @@ Error FramePointerUnwinder::Step(Memory* stack, const Registers& current, Regist
   }
 
   uint64_t next_fp;
-  if (auto err = stack->Read(fp, next_fp); err.has_err()) {
+  if (auto err = stack->ReadAndAdvance(fp, next_fp); err.has_err()) {
     return err;
   }
   // Don't check the range of next_fp, because it may not be used as the frame pointer.
 
   uint64_t next_pc;
-  if (auto err = stack->Read(fp, next_pc); err.has_err()) {
+  if (auto err = stack->ReadAndAdvance(fp, next_pc); err.has_err()) {
     return err;
   }
   if (!cfi_unwinder_->IsValidPC(next_pc)) {

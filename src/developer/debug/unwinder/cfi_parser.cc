@@ -22,9 +22,9 @@ namespace {
 // Unwind tables could encode rules for registers that we don't support, e.g. float point or vector
 // registers. It's safe to just set them to some invalid RegisterID (but don't overflow them),
 // as Registers::Set will deny any unknown registers.
-Error ReadRegisterID(Memory* elf, uint64_t& addr, RegisterID& reg) {
+Error ReadRegisterIDAndAdvance(Memory* elf, uint64_t& addr, RegisterID& reg) {
   uint64_t reg_id;
-  if (auto err = elf->ReadULEB128(addr, reg_id); err.has_err()) {
+  if (auto err = elf->ReadULEB128AndAdvance(addr, reg_id); err.has_err()) {
     return err;
   }
   if (reg_id > static_cast<uint64_t>(RegisterID::kInvalid)) {
@@ -138,7 +138,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
   while (instructions_begin < instructions_end && pc <= pc_limit) {
     uint8_t opcode;
     LOG_DEBUG("%#" PRIx64 "   ", instructions_begin);
-    if (auto err = elf->Read(instructions_begin, opcode); err.has_err()) {
+    if (auto err = elf->ReadAndAdvance(instructions_begin, opcode); err.has_err()) {
       return err;
     }
     switch (opcode >> 6) {
@@ -149,7 +149,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x2: {  // DW_CFA_offset
         uint64_t offset;
-        if (auto err = elf->ReadULEB128(instructions_begin, offset); err.has_err()) {
+        if (auto err = elf->ReadULEB128AndAdvance(instructions_begin, offset); err.has_err()) {
           return err;
         }
         RegisterID reg = static_cast<RegisterID>(opcode & 0x3F);
@@ -174,7 +174,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       // case 0x1:  // DW_CFA_set_loc  address
       case 0x2: {  // DW_CFA_advance_loc1  1-byte delta
         uint8_t delta;
-        if (auto err = elf->Read(instructions_begin, delta); err.has_err()) {
+        if (auto err = elf->ReadAndAdvance(instructions_begin, delta); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_advance_loc1 %" PRId64 "\n", delta * code_alignment_factor_);
@@ -183,7 +183,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x3: {  // DW_CFA_advance_loc2  2-byte delta
         uint16_t delta;
-        if (auto err = elf->Read(instructions_begin, delta); err.has_err()) {
+        if (auto err = elf->ReadAndAdvance(instructions_begin, delta); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_advance_loc2 %" PRId64 "\n", delta * code_alignment_factor_);
@@ -192,7 +192,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x4: {  // DW_CFA_advance_loc4  4-byte delta
         uint32_t delta;
-        if (auto err = elf->Read(instructions_begin, delta); err.has_err()) {
+        if (auto err = elf->ReadAndAdvance(instructions_begin, delta); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_advance_loc4 %" PRId64 "\n", delta * code_alignment_factor_);
@@ -201,11 +201,11 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x5: {  // DW_CFA_offset_extended  ULEB128 register  ULEB128 offset
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         uint64_t offset;
-        if (auto err = elf->ReadULEB128(instructions_begin, offset); err.has_err()) {
+        if (auto err = elf->ReadULEB128AndAdvance(instructions_begin, offset); err.has_err()) {
           return err;
         }
         int64_t real_offset = static_cast<int64_t>(offset) * data_alignment_factor_;
@@ -216,7 +216,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x6: {  // DW_CFA_restore_extended  ULEB128 register
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_restore_extended %hhu\n", reg);
@@ -225,7 +225,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x7: {  // DW_CFA_undefined  ULEB128 register
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_undefined %hhu\n", reg);
@@ -234,7 +234,7 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x8: {  // DW_CFA_same_value  ULEB128 register
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_same_value %hhu\n", reg);
@@ -243,11 +243,11 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x9: {  // DW_CFA_register  ULEB128 register  ULEB128 register
         RegisterID reg1;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg1); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg1); err.has_err()) {
           return err;
         }
         RegisterID reg2;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg2); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg2); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_register %hhu %hhu\n", reg1, reg2);
@@ -270,24 +270,28 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
         continue;
       }
       case 0xC: {  // DW_CFA_def_cfa  ULEB128 register  ULEB128 offset
-        if (auto err = ReadRegisterID(elf, instructions_begin, cfa_location_.reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, cfa_location_.reg);
+            err.has_err()) {
           return err;
         }
-        if (auto err = elf->ReadULEB128(instructions_begin, cfa_location_.offset); err.has_err()) {
+        if (auto err = elf->ReadULEB128AndAdvance(instructions_begin, cfa_location_.offset);
+            err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_def_cfa %hhu %" PRIu64 "\n", cfa_location_.reg, cfa_location_.offset);
         continue;
       }
       case 0xD: {  // DW_CFA_def_cfa_register  ULEB128 register
-        if (auto err = ReadRegisterID(elf, instructions_begin, cfa_location_.reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, cfa_location_.reg);
+            err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_def_cfa_register %hhu\n", cfa_location_.reg);
         continue;
       }
       case 0xE: {  // DW_CFA_def_cfa_offset  ULEB128 offset
-        if (auto err = elf->ReadULEB128(instructions_begin, cfa_location_.offset); err.has_err()) {
+        if (auto err = elf->ReadULEB128AndAdvance(instructions_begin, cfa_location_.offset);
+            err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_def_cfa_offset %" PRIu64 "\n", cfa_location_.offset);
@@ -296,11 +300,11 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       // case 0xF:  // DW_CFA_def_cfa_expression  BLOCK
       case 0x10: {  // DW_CFA_expression  ULEB128 register  BLOCK
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         uint64_t length;
-        if (auto err = elf->ReadULEB128(instructions_begin, length); err.has_err()) {
+        if (auto err = elf->ReadULEB128AndAdvance(instructions_begin, length); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_expression %hhu length=%" PRIu64 "\n", reg, length);
@@ -311,11 +315,11 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       }
       case 0x11: {  // DW_CFA_offset_extended_sf  ULEB128 register  SLEB128 offset
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         int64_t offset;
-        if (auto err = elf->ReadSLEB128(instructions_begin, offset); err.has_err()) {
+        if (auto err = elf->ReadSLEB128AndAdvance(instructions_begin, offset); err.has_err()) {
           return err;
         }
         int64_t real_offset = offset * data_alignment_factor_;
@@ -330,11 +334,11 @@ Error CfiParser::ParseInstructions(Memory* elf, uint64_t instructions_begin,
       // case 0x15:  // DW_CFA_val_offset_sf       ULEB128 register  SLEB128 offset
       case 0x16: {  // DW_CFA_val_expression  ULEB128 register  BLOCK
         RegisterID reg;
-        if (auto err = ReadRegisterID(elf, instructions_begin, reg); err.has_err()) {
+        if (auto err = ReadRegisterIDAndAdvance(elf, instructions_begin, reg); err.has_err()) {
           return err;
         }
         uint64_t length;
-        if (auto err = elf->ReadULEB128(instructions_begin, length); err.has_err()) {
+        if (auto err = elf->ReadULEB128AndAdvance(instructions_begin, length); err.has_err()) {
           return err;
         }
         LOG_DEBUG("DW_CFA_val_expression %hhu length=%" PRIu64 "\n", reg, length);

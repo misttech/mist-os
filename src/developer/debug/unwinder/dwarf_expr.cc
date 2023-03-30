@@ -22,21 +22,21 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
   uint64_t p = expr_begin_;
   while (p < expr_end_) {
     uint8_t op;
-    if (auto err = expr_->Read(p, op); err.has_err()) {
+    if (auto err = expr_->ReadAndAdvance(p, op); err.has_err()) {
       return err;
     }
     switch (op) {
 //
 // Push const values
 //
-#define READ_EXPR_AND_PUSH(type)                         \
-  {                                                      \
-    type val;                                            \
-    if (auto err = expr_->Read(p, val); err.has_err()) { \
-      return err;                                        \
-    }                                                    \
-    stack.push_back(val);                                \
-    continue;                                            \
+#define READ_EXPR_AND_PUSH(type)                                   \
+  {                                                                \
+    type val;                                                      \
+    if (auto err = expr_->ReadAndAdvance(p, val); err.has_err()) { \
+      return err;                                                  \
+    }                                                              \
+    stack.push_back(val);                                          \
+    continue;                                                      \
   }
       case DW_OP_addr:
         READ_EXPR_AND_PUSH(uint64_t)
@@ -58,7 +58,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
         READ_EXPR_AND_PUSH(int64_t)
       case DW_OP_constu: {
         uint64_t val;
-        if (auto err = expr_->ReadULEB128(p, val); err.has_err()) {
+        if (auto err = expr_->ReadULEB128AndAdvance(p, val); err.has_err()) {
           return err;
         }
         stack.push_back(val);
@@ -66,7 +66,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       }
       case DW_OP_consts: {
         int64_t val;
-        if (auto err = expr_->ReadSLEB128(p, val); err.has_err()) {
+        if (auto err = expr_->ReadSLEB128AndAdvance(p, val); err.has_err()) {
           return err;
         }
         stack.push_back(val);
@@ -93,7 +93,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       }
       case DW_OP_pick: {
         uint8_t idx;
-        if (auto err = expr_->Read(p, idx); err.has_err()) {
+        if (auto err = expr_->ReadAndAdvance(p, idx); err.has_err()) {
           return err;
         }
         VALIDATE_STATE(stack.size() >= idx);
@@ -113,7 +113,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       case DW_OP_deref: {
         VALIDATE_STATE(!stack.empty());
         uint64_t val;
-        if (auto err = mem->Read(stack.back(), val); err.has_err()) {
+        if (auto err = mem->ReadAndAdvance(stack.back(), val); err.has_err()) {
           return err;
         }
         stack.back() = val;
@@ -164,7 +164,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       // Control flows.
       case DW_OP_skip: {
         int16_t skip;
-        if (auto err = expr_->Read(p, skip); err.has_err()) {
+        if (auto err = expr_->ReadAndAdvance(p, skip); err.has_err()) {
           return err;
         }
         p += skip;
@@ -173,7 +173,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       case DW_OP_bra: {
         VALIDATE_STATE(!stack.empty());
         int16_t skip;
-        if (auto err = expr_->Read(p, skip); err.has_err()) {
+        if (auto err = expr_->ReadAndAdvance(p, skip); err.has_err()) {
           return err;
         }
         if (stack.back()) {
@@ -190,7 +190,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       case DW_OP_plus_uconst: {
         VALIDATE_STATE(!stack.empty());
         uint64_t val;
-        if (auto err = expr_->ReadULEB128(p, val); err.has_err()) {
+        if (auto err = expr_->ReadULEB128AndAdvance(p, val); err.has_err()) {
           return err;
         }
         stack.back() += val;
@@ -206,7 +206,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
       RegisterID reg_id;
       if (op == DW_OP_bregx) {
         uint64_t reg;
-        if (auto err = expr_->ReadULEB128(p, reg); err.has_err()) {
+        if (auto err = expr_->ReadULEB128AndAdvance(p, reg); err.has_err()) {
           return err;
         }
         reg_id = static_cast<RegisterID>(reg);
@@ -214,7 +214,7 @@ Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value
         reg_id = static_cast<RegisterID>(op - DW_OP_breg0);
       }
       int64_t offset;
-      if (auto err = expr_->ReadSLEB128(p, offset); err.has_err()) {
+      if (auto err = expr_->ReadSLEB128AndAdvance(p, offset); err.has_err()) {
         return err;
       }
       uint64_t val;

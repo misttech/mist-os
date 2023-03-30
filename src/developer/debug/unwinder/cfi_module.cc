@@ -56,10 +56,13 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
 
 // Decode the length and cie_ptr field in CIE/FDE. It's awkward because we want to support both
 // .eh_frame format and .debug_frame format.
-[[nodiscard]] Error DecodeCieFdeHdr(Memory* elf, uint8_t version, uint64_t& ptr, uint64_t& end,
-                                    uint64_t& cie_id) {
+//
+// When returned, |ptr| will point to the beginning of the body, and |end| will point to the end
+// of the entry.
+[[nodiscard]] Error DecodeCieFdeHdrAndAdvance(Memory* elf, uint8_t version, uint64_t& ptr,
+                                              uint64_t& end, uint64_t& cie_id) {
   uint32_t short_length;
-  if (auto err = elf->Read(ptr, short_length); err.has_err()) {
+  if (auto err = elf->ReadAndAdvance(ptr, short_length); err.has_err()) {
     return err;
   }
   if (short_length == 0) {
@@ -69,19 +72,19 @@ const constexpr uint64_t kDwarf64CieId = std::numeric_limits<uint64_t>::max();
     end = ptr + short_length;
   } else {
     uint64_t length;
-    if (auto err = elf->Read(ptr, length); err.has_err()) {
+    if (auto err = elf->ReadAndAdvance(ptr, length); err.has_err()) {
       return err;
     }
     end = ptr + length;
   }
   // The cie_id is 8-bytes only when the version is 4 and it's a 64-bit DWARF format.
   if (version == 4 && short_length == 0xFFFFFFFF) {
-    if (auto err = elf->Read(ptr, cie_id); err.has_err()) {
+    if (auto err = elf->ReadAndAdvance(ptr, cie_id); err.has_err()) {
       return err;
     }
   } else {
     uint32_t short_cie_id;
-    if (auto err = elf->Read(ptr, short_cie_id); err.has_err()) {
+    if (auto err = elf->ReadAndAdvance(ptr, short_cie_id); err.has_err()) {
       return err;
     }
     // Special handling for cie_id in .debug_frame so that the callers don't need to distinguish
@@ -110,8 +113,7 @@ Error CfiModule::Load() {
   }
 
   Elf64_Ehdr ehdr;
-  // Do not modify elf_ptr_.
-  if (auto err = elf_->Read(+elf_ptr_, ehdr); err.has_err()) {
+  if (auto err = elf_->Read(elf_ptr_, ehdr); err.has_err()) {
     return err;
   }
 
@@ -149,7 +151,7 @@ Error CfiModule::Load() {
 
   auto p = eh_frame_hdr_ptr_;
   uint8_t version;
-  if (auto err = elf_->Read(p, version); err.has_err()) {
+  if (auto err = elf_->ReadAndAdvance(p, version); err.has_err()) {
     return err;
   }
   if (version != 1) {
@@ -159,23 +161,23 @@ Error CfiModule::Load() {
   uint8_t eh_frame_ptr_enc;
   uint8_t fde_count_enc;
   uint64_t eh_frame_ptr;  // not used
-  if (auto err = elf_->Read<uint8_t>(p, eh_frame_ptr_enc); err.has_err()) {
+  if (auto err = elf_->ReadAndAdvance(p, eh_frame_ptr_enc); err.has_err()) {
     return err;
   }
-  if (auto err = elf_->Read<uint8_t>(p, fde_count_enc); err.has_err()) {
+  if (auto err = elf_->ReadAndAdvance(p, fde_count_enc); err.has_err()) {
     return err;
   }
-  if (auto err = elf_->Read<uint8_t>(p, table_enc_); err.has_err()) {
+  if (auto err = elf_->ReadAndAdvance(p, table_enc_); err.has_err()) {
     return err;
   }
   if (auto err = DecodeTableEntrySize(table_enc_, table_entry_size_); err.has_err()) {
     return err;
   }
-  if (auto err = elf_->ReadEncoded(p, eh_frame_ptr, eh_frame_ptr_enc, eh_frame_hdr_ptr_);
+  if (auto err = elf_->ReadEncodedAndAdvance(p, eh_frame_ptr, eh_frame_ptr_enc, eh_frame_hdr_ptr_);
       err.has_err()) {
     return err;
   }
-  if (auto err = elf_->ReadEncoded(p, fde_count_, fde_count_enc, eh_frame_hdr_ptr_);
+  if (auto err = elf_->ReadEncodedAndAdvance(p, fde_count_, fde_count_enc, eh_frame_hdr_ptr_);
       err.has_err()) {
     return err;
   }
@@ -333,34 +335,36 @@ Error CfiModule::SearchDebugFrame(uint64_t pc, DwarfCie& cie, DwarfFde& fde) {
   return Success();
 }
 
-// In order to read less memory, this function assumes the address_size of all CIEs is the same,
+// In order to read less memory, this function assumes the address encoding of all CIEs is the same,
 // so that it only needs to decode the first CIE.
 Error CfiModule::BuildDebugFrameMap() {
   debug_frame_map_.clear();
   uint8_t fde_address_encoding = 0;
   for (uint64_t p = debug_frame_ptr_, next_p; p < debug_frame_end_; p = next_p) {
-    uint64_t this_p = p;
+    uint64_t hdr_p = p;
     uint64_t cie_id;
-    if (auto err = DecodeCieFdeHdr(elf_, 4, p, next_p, cie_id); err.has_err()) {
+    if (auto err = DecodeCieFdeHdrAndAdvance(elf_, 4, p, next_p, cie_id); err.has_err()) {
       return err;
     }
     if (cie_id == kDwarf64CieId) {
       if (fde_address_encoding) {
-        // Assume address_size is the same for all CIEs. Skip all other CIEs to accelerate.
+        // Assume address encoding is the same for all CIEs. Skip all other CIEs to accelerate.
         continue;
       }
       DwarfCie cie;
-      if (auto err = DecodeCie(4, this_p, cie); err.has_err()) {
+      // This will only be called once, so it's fine that |DecodeCie| decodes the header again.
+      if (auto err = DecodeCie(4, hdr_p, cie); err.has_err()) {
         return err;
       }
       fde_address_encoding = cie.fde_address_encoding;
     } else {  // is FDE
+      // We only need pc_begin, so don't go through |DecodeFde|.
       uint64_t pc_begin;
       if (auto err = elf_->ReadEncoded(p, pc_begin, fde_address_encoding, elf_ptr_);
           err.has_err()) {
         return err;
       }
-      debug_frame_map_.emplace(pc_begin, this_p);
+      debug_frame_map_.emplace(pc_begin, hdr_p);
     }
   }
   if (debug_frame_map_.empty()) {
@@ -374,7 +378,7 @@ Error CfiModule::BuildDebugFrameMap() {
 // When version == 4, check the spec at http://www.dwarfstd.org/doc/DWARF5.pdf
 Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   uint64_t cie_id;
-  if (auto err = DecodeCieFdeHdr(elf_, version, cie_ptr, cie.instructions_end, cie_id);
+  if (auto err = DecodeCieFdeHdrAndAdvance(elf_, version, cie_ptr, cie.instructions_end, cie_id);
       err.has_err()) {
     return err;
   }
@@ -384,7 +388,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
 
   // Versions should match.
   uint8_t this_version;
-  if (auto err = elf_->Read(cie_ptr, this_version); err.has_err()) {
+  if (auto err = elf_->ReadAndAdvance(cie_ptr, this_version); err.has_err()) {
     return err;
   }
   if (this_version != version) {
@@ -394,7 +398,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   std::string augmentation_string;
   while (true) {
     char ch;
-    if (auto err = elf_->Read(cie_ptr, ch); err.has_err()) {
+    if (auto err = elf_->ReadAndAdvance(cie_ptr, ch); err.has_err()) {
       return err;
     }
     if (ch) {
@@ -407,7 +411,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
   if (version == 4) {
     // Read the address_size.
     uint8_t address_size;
-    if (auto err = elf_->Read(cie_ptr, address_size); err.has_err()) {
+    if (auto err = elf_->ReadAndAdvance(cie_ptr, address_size); err.has_err()) {
       return err;
     }
     // Set fde_address_encoding to DW_EH_PE_datarel so that we can set the base to elf_ptr_.
@@ -428,20 +432,20 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
     cie_ptr++;
   }
 
-  if (auto err = elf_->ReadULEB128(cie_ptr, cie.code_alignment_factor); err.has_err()) {
+  if (auto err = elf_->ReadULEB128AndAdvance(cie_ptr, cie.code_alignment_factor); err.has_err()) {
     return err;
   }
-  if (auto err = elf_->ReadSLEB128(cie_ptr, cie.data_alignment_factor); err.has_err()) {
+  if (auto err = elf_->ReadSLEB128AndAdvance(cie_ptr, cie.data_alignment_factor); err.has_err()) {
     return err;
   }
   if (version == 4) {
     uint64_t return_address_register;
-    if (auto err = elf_->ReadULEB128(cie_ptr, return_address_register); err.has_err()) {
+    if (auto err = elf_->ReadULEB128AndAdvance(cie_ptr, return_address_register); err.has_err()) {
       return err;
     }
     cie.return_address_register = static_cast<RegisterID>(return_address_register);
   } else {
-    if (auto err = elf_->Read(cie_ptr, cie.return_address_register); err.has_err()) {
+    if (auto err = elf_->ReadAndAdvance(cie_ptr, cie.return_address_register); err.has_err()) {
       return err;
     }
   }
@@ -462,7 +466,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
       return Error("invalid augmentation string: %s", augmentation_string.c_str());
     }
     uint64_t augmentation_length;
-    if (auto err = elf_->ReadULEB128(cie_ptr, augmentation_length); err.has_err()) {
+    if (auto err = elf_->ReadULEB128AndAdvance(cie_ptr, augmentation_length); err.has_err()) {
       return err;
     }
     cie.instructions_begin = cie_ptr + augmentation_length;
@@ -474,7 +478,7 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
           // LSDA (language-specific data area) is used by some languages such as C++ to ensure
           // the correct destruction of objects on stack. We don't need to handle it.
           uint8_t lsda_encoding;
-          if (auto err = elf_->Read(cie_ptr, lsda_encoding); err.has_err()) {
+          if (auto err = elf_->ReadAndAdvance(cie_ptr, lsda_encoding); err.has_err()) {
             return err;
           }
           break;
@@ -482,16 +486,16 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
           // The personality routine is used to handle language and vendor-specific tasks to ensure
           // the correct unwinding. We don't need to handle it.
           uint8_t enc;
-          if (auto err = elf_->Read(cie_ptr, enc); err.has_err()) {
+          if (auto err = elf_->ReadAndAdvance(cie_ptr, enc); err.has_err()) {
             return err;
           }
           uint64_t personality;
-          if (auto err = elf_->ReadEncoded(cie_ptr, personality, enc, 0); err.has_err()) {
+          if (auto err = elf_->ReadEncodedAndAdvance(cie_ptr, personality, enc, 0); err.has_err()) {
             return err;
           }
           break;
         case 'R':
-          if (auto err = elf_->Read(cie_ptr, cie.fde_address_encoding); err.has_err()) {
+          if (auto err = elf_->ReadAndAdvance(cie_ptr, cie.fde_address_encoding); err.has_err()) {
             return err;
           }
           break;
@@ -504,7 +508,8 @@ Error CfiModule::DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie) {
 
 Error CfiModule::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde) {
   uint64_t cie_offset;
-  if (auto err = DecodeCieFdeHdr(elf_, version, fde_ptr, fde.instructions_end, cie_offset);
+  if (auto err =
+          DecodeCieFdeHdrAndAdvance(elf_, version, fde_ptr, fde.instructions_end, cie_offset);
       err.has_err()) {
     return err;
   }
@@ -519,11 +524,12 @@ Error CfiModule::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, Dwa
     return err;
   }
 
-  if (auto err = elf_->ReadEncoded(fde_ptr, fde.pc_begin, cie.fde_address_encoding, elf_ptr_);
+  if (auto err =
+          elf_->ReadEncodedAndAdvance(fde_ptr, fde.pc_begin, cie.fde_address_encoding, elf_ptr_);
       err.has_err()) {
     return err;
   }
-  if (auto err = elf_->ReadEncoded(fde_ptr, fde.pc_end, cie.fde_address_encoding & 0x0F);
+  if (auto err = elf_->ReadEncodedAndAdvance(fde_ptr, fde.pc_end, cie.fde_address_encoding & 0x0F);
       err.has_err()) {
     return err;
   }
@@ -531,7 +537,7 @@ Error CfiModule::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, Dwa
 
   if (cie.fde_have_augmentation_data) {
     uint64_t augmentation_length;
-    if (auto err = elf_->ReadULEB128(fde_ptr, augmentation_length); err.has_err()) {
+    if (auto err = elf_->ReadULEB128AndAdvance(fde_ptr, augmentation_length); err.has_err()) {
       return err;
     }
     // We don't really care about the augmentation data.

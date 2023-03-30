@@ -19,28 +19,31 @@ class Memory {
   virtual ~Memory() = default;
   virtual Error ReadBytes(uint64_t addr, uint64_t size, void* dst) = 0;
 
-  // Read an object and advance the addr by the read size. Do not advance if failed.
-  // TODO(dangyi): rename this to ReadAndAdvance to indicate that |addr| will change.
   template <class Type>
-  [[nodiscard]] Error Read(uint64_t& addr, Type& res) {
-    if (auto err = ReadBytes(addr, sizeof(res), &res); err.has_err()) {
+  [[nodiscard]] Error Read(uint64_t addr, Type& res) {
+    return ReadBytes(addr, sizeof(res), &res);
+  }
+
+  // Read an object and advance the addr by the read size. Do not advance if failed.
+  template <class Type>
+  [[nodiscard]] Error ReadAndAdvance(uint64_t& addr, Type& res) {
+    if (auto err = Read(addr, res); err.has_err()) {
       return err;
     }
     addr += sizeof(res);
     return Success();
   }
 
-  template <class Type>
-  [[nodiscard]] Error Read(const uint64_t& addr, Type& res) {
-    return ReadBytes(addr, sizeof(res), &res);
-  }
-
-  [[nodiscard]] Error ReadSLEB128(uint64_t& addr, int64_t& res);
-  [[nodiscard]] Error ReadULEB128(uint64_t& addr, uint64_t& res);
+  [[nodiscard]] Error ReadSLEB128AndAdvance(uint64_t& addr, int64_t& res);
+  [[nodiscard]] Error ReadULEB128AndAdvance(uint64_t& addr, uint64_t& res);
 
   // Read the data in DWARF encoding. data_rel_base is only used in .eh_frame_hdr.
-  [[nodiscard]] Error ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc,
-                                  uint64_t data_rel_base = 0);
+  [[nodiscard]] Error ReadEncodedAndAdvance(uint64_t& addr, uint64_t& res, uint8_t enc,
+                                            uint64_t data_rel_base = 0);
+  [[nodiscard]] Error ReadEncoded(uint64_t addr, uint64_t& res, uint8_t enc,
+                                  uint64_t data_rel_base = 0) {
+    return ReadEncodedAndAdvance(addr, res, enc, data_rel_base);
+  }
 };
 
 class LocalMemory : public Memory {

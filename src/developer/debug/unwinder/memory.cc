@@ -10,12 +10,12 @@
 
 namespace unwinder {
 
-Error Memory::ReadULEB128(uint64_t& addr, uint64_t& res) {
+Error Memory::ReadULEB128AndAdvance(uint64_t& addr, uint64_t& res) {
   res = 0;
   uint64_t shift = 0;
   uint8_t byte;
   do {
-    if (auto err = Read(addr, byte); err.has_err()) {
+    if (auto err = ReadAndAdvance(addr, byte); err.has_err()) {
       return err;
     }
     res |= (byte & 0x7F) << shift;
@@ -24,14 +24,14 @@ Error Memory::ReadULEB128(uint64_t& addr, uint64_t& res) {
   return Success();
 }
 
-Error Memory::ReadSLEB128(uint64_t& addr, int64_t& res) {
+Error Memory::ReadSLEB128AndAdvance(uint64_t& addr, int64_t& res) {
   // Use unsigned number for bit operations.
   uint64_t& res_u = reinterpret_cast<uint64_t&>(res);
   res_u = 0;
   uint64_t shift = 0;
   uint8_t byte;
   do {
-    if (auto err = Read(addr, byte); err.has_err()) {
+    if (auto err = ReadAndAdvance(addr, byte); err.has_err()) {
       return err;
     }
     res_u |= (byte & 0x7F) << shift;
@@ -45,7 +45,8 @@ Error Memory::ReadSLEB128(uint64_t& addr, int64_t& res) {
 }
 
 // https://refspecs.linuxfoundation.org/LSB_5.0.0/LSB-Core-generic/LSB-Core-generic/dwarfext.html#DWARFEHENCODING
-Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t data_rel_base) {
+Error Memory::ReadEncodedAndAdvance(uint64_t& addr, uint64_t& res, uint8_t enc,
+                                    uint64_t data_rel_base) {
   if (enc == 0xFF) {  // DW_EH_PE_omit
     return Error("no value");
   }
@@ -74,14 +75,14 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
   switch (enc & 0x0F) {
     case 0x00: {  // DW_EH_PE_absptr  The Value is a literal pointer whose size is determined by the
                   // architecture.
-      if (auto err = Read(addr, res); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, res); err.has_err()) {
         return err;
       }
       break;
     }
     case 0x01: {  // DW_EH_PE_uleb128  Unsigned value is encoded using the Little Endian Base 128
       uint64_t val;
-      if (auto err = ReadULEB128(addr, val); err.has_err()) {
+      if (auto err = ReadULEB128AndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -89,7 +90,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x02: {  // DW_EH_PE_udata2  A 2 bytes unsigned value.
       uint16_t val;
-      if (auto err = Read(addr, val); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -97,7 +98,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x03: {  // DW_EH_PE_udata4  A 4 bytes unsigned value.
       uint32_t val;
-      if (auto err = Read(addr, val); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -105,7 +106,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x04: {  // DW_EH_PE_udata8  An 8 bytes unsigned value.
       uint64_t val;
-      if (auto err = Read(addr, val); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -113,7 +114,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x09: {  // DW_EH_PE_sleb128  Signed value is encoded using the Little Endian Base 128
       int64_t val;
-      if (auto err = ReadSLEB128(addr, val); err.has_err()) {
+      if (auto err = ReadSLEB128AndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -121,7 +122,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x0A: {  // DW_EH_PE_sdata2  A 2 bytes signed value.
       int16_t val;
-      if (auto err = Read(addr, val); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -129,7 +130,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x0B: {  // DW_EH_PE_sdata4  A 4 bytes signed value.
       int32_t val;
-      if (auto err = Read(addr, val); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
@@ -137,7 +138,7 @@ Error Memory::ReadEncoded(uint64_t& addr, uint64_t& res, uint8_t enc, uint64_t d
     }
     case 0x0C: {  // DW_EH_PE_sdata8  An 8 bytes signed value.
       int64_t val;
-      if (auto err = Read(addr, val); err.has_err()) {
+      if (auto err = ReadAndAdvance(addr, val); err.has_err()) {
         return err;
       }
       res += val;
