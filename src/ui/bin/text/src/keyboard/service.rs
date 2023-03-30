@@ -6,7 +6,6 @@ use {
     anyhow::{Context as _, Error},
     fidl_fuchsia_ui_input as ui_input,
     fidl_fuchsia_ui_input3::{self as ui_input3, KeyMeaning, NonPrintableKey},
-    fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_warn},
     fuchsia_zircon as zx,
     futures::{TryFutureExt, TryStreamExt},
 };
@@ -51,7 +50,7 @@ impl Service {
                             let now = clock
                                 .read()
                                 .map_err(|e| {
-                                    fx_log_err!("couldn't read clock: {:?}", e);
+                                    tracing::error!("couldn't read clock: {:?}", e);
                                     e
                                 })
                                 .unwrap_or(zx::Time::ZERO);
@@ -62,7 +61,7 @@ impl Service {
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| fx_log_err!("couldn't run: {:?}", e)),
+            .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -104,7 +103,7 @@ impl Service {
                                     // field, but no such field is currently in focus.  Therefore
                                     // increasing the verbosity of the message, so that it's only
                                     // printed when you *really* need it for debugging.
-                                    fx_log_debug!(
+                                    tracing::debug!(
                                         concat!(
                                             "keyboard::Service::spawn_key_event_injector: ",
                                             "error injecting input into IME: {:?}"
@@ -130,7 +129,7 @@ impl Service {
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| fx_log_err!("couldn't run: {:?}", e)),
+            .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -149,7 +148,7 @@ impl Service {
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| fx_log_err!("couldn't run: {:?}", e)),
+            .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -158,7 +157,7 @@ impl Service {
         let keyboard3 = self.keyboard3.clone();
         fuchsia_async::Task::spawn(
             async move { keyboard3.spawn_service(stream).await }
-                .unwrap_or_else(|e: anyhow::Error| fx_log_err!("couldn't run: {:?}", e)),
+                .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
         )
         .detach();
     }
@@ -172,7 +171,7 @@ fn key_from_non_printable_key(
         NonPrintableKey::Tab => Some(fidl_fuchsia_input::Key::Tab),
         NonPrintableKey::Backspace => Some(fidl_fuchsia_input::Key::Backspace),
         unrecognized => {
-            fx_log_warn!("received unrecognized NonPrintableKey {:?}", unrecognized);
+            tracing::warn!("received unrecognized NonPrintableKey {:?}", unrecognized);
             None
         }
     }

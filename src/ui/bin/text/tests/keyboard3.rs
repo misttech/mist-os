@@ -14,9 +14,7 @@ use {
     fuchsia_component_test::{
         Capability, ChildOptions, ChildRef, RealmBuilder, RealmInstance, Ref, Route,
     },
-    fuchsia_scenic as scenic,
-    fuchsia_syslog::*,
-    fuchsia_zircon as zx,
+    fuchsia_scenic as scenic, fuchsia_zircon as zx,
     futures::FutureExt,
     futures::{
         future,
@@ -82,7 +80,7 @@ impl TestEnvironment {
             self.realm.root.connect_to_protocol_at_exposed_dir::<P::Protocol>().with_context(
                 || format!("Failed to connect to test realm's {}", P::Protocol::DEBUG_NAME),
             );
-        fx_log_debug!("Connected to test realm's {}", P::Protocol::DEBUG_NAME);
+        tracing::debug!("Connected to test realm's {}", P::Protocol::DEBUG_NAME);
         conn
     }
 
@@ -163,7 +161,7 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
     keyboard_service_client: ui_input3::KeyboardProxy,
     keyboard_service_other_client: &ui_input3::KeyboardProxy,
 ) -> Result<()> {
-    fx_log_debug!("test_disconnecting_keyboard_client_disconnects_listener_with_connections");
+    tracing::debug!("test_disconnecting_keyboard_client_disconnects_listener_with_connections");
 
     // Create fake client.
     let (listener_client_end, mut listener) =
@@ -218,13 +216,10 @@ async fn test_disconnecting_keyboard_client_disconnects_listener_with_connection
     Ok(())
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test(logging_tags = ["keyboard3_integration_test"])]
 async fn test_disconnecting_keyboard_client_disconnects_listener_via_key_event_injector(
 ) -> Result<()> {
     let test_env = TestEnvironment::new().await?;
-
-    fuchsia_syslog::init_with_tags(&["keyboard3_integration_test"])
-        .expect("syslog init should not fail");
 
     let key_event_injector = test_env.connect_to_key_event_injector()?;
 
@@ -343,12 +338,9 @@ async fn test_sync_cancel_with_connections(
     Ok(())
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test(logging_tags = ["keyboard3_integration_test"])]
 async fn test_sync_cancel_via_key_event_injector() -> Result<()> {
     let test_env = TestEnvironment::new().await?;
-
-    fuchsia_syslog::init_with_tags(&["keyboard3_integration_test"])
-        .expect("syslog init should not fail");
 
     // This test dispatches keys via KeyEventInjector.
     let key_event_injector = test_env.connect_to_key_event_injector()?;

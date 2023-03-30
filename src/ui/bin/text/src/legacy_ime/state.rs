@@ -8,7 +8,6 @@ use {
     anyhow::{Context as _, Error},
     core::convert::TryInto,
     fidl_fuchsia_input as input, fidl_fuchsia_ui_input as uii,
-    fuchsia_syslog::fx_log_warn,
     std::{
         char,
         collections::{HashMap, HashSet},
@@ -89,7 +88,7 @@ impl ImeState {
         if call_did_update_state {
             let mut state = idx::text_state_byte_to_codeunit(self.text_state.clone());
             self.client.did_update_state(&mut state, None).unwrap_or_else(|e| {
-                fx_log_warn!(
+                tracing::warn!(
                     "ImeState::increment_revision: error sending state update to ImeClient: {:?}",
                     e
                 )

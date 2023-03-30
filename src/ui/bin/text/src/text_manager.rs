@@ -6,7 +6,6 @@ use {
     anyhow::Error,
     fidl::endpoints::{ClientEnd, ServerEnd},
     fidl_fuchsia_ui_input as uii,
-    fuchsia_syslog::*,
     futures::lock::Mutex,
     std::sync::{Arc, Weak},
 };
@@ -83,7 +82,7 @@ impl TextManager {
         let editor_stream = match editor.into_stream() {
             Ok(v) => v,
             Err(e) => {
-                fx_log_err!("Failed to create stream: {}", e);
+                tracing::error!("Failed to create stream: {}", e);
                 return;
             }
         };

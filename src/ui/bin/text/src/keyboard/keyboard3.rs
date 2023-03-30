@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_ui_views as ui_views,
     fuchsia_async::{self as fasync, TimeoutExt},
     fuchsia_scenic as scenic,
-    fuchsia_syslog::{fx_log_debug, fx_log_info, fx_log_warn},
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::{future, lock::Mutex, TryStreamExt},
     std::{
@@ -161,7 +160,7 @@ impl KeyboardService {
             });
 
             if let Err(e) = future::try_join_all(dispatches).await {
-                fx_log_warn!("Error sending cancel events {:?} to {:?}", e, subscriber.view_ref);
+                tracing::warn!("Error sending cancel events {:?} to {:?}", e, subscriber.view_ref);
             };
         };
         store.focused_view = None;
@@ -199,7 +198,7 @@ impl KeyboardService {
         });
 
         if let Err(e) = future::try_join_all(dispatches).await {
-            fx_log_warn!("Error sending sync events {:?} to {:?}", e, subscriber.view_ref);
+            tracing::warn!("Error sending sync events {:?} to {:?}", e, subscriber.view_ref);
         };
     }
 
@@ -214,7 +213,11 @@ impl KeyboardService {
     /// * `focused_view`: a `ViewRef` of the newly-focused view.
     /// * `event_time`: the timestamp at which the focus change was registered.
     pub(crate) async fn handle_focus_change(&self, focused_view: ViewRef, event_time: zx::Time) {
-        fx_log_debug!("focus change to view: {:?}, at timestamp: {:?}", &focused_view, &event_time);
+        tracing::debug!(
+            "focus change to view: {:?}, at timestamp: {:?}",
+            &focused_view,
+            &event_time
+        );
         self.handle_focus_lost(event_time).await;
         self.update_focused_view(focused_view.clone()).await;
         self.handle_client_focused(focused_view, event_time).await;
@@ -387,12 +390,12 @@ impl KeyListenerStore {
                         .listener
                         .on_key_event(forwarded_event)
                         .on_timeout(fasync::Time::after(DEFAULT_LISTENER_TIMEOUT), || {
-                            fx_log_info!("Key listener timeout! {:?}", subscriber.view_ref);
+                            tracing::info!("Key listener timeout! {:?}", subscriber.view_ref);
                             Ok(ui_input3::KeyEventStatus::NotHandled)
                         })
                         .await
                         .unwrap_or_else(|e| {
-                            fx_log_info!("key listener handle error: {:?}", e);
+                            tracing::info!("key listener handle error: {:?}", e);
                             ui_input3::KeyEventStatus::NotHandled
                         });
                     if handled == ui_input3::KeyEventStatus::Handled {
@@ -416,7 +419,6 @@ mod tests {
     use {
         super::*,
         fidl_fuchsia_input as input, fuchsia_async as fasync,
-        fuchsia_syslog::fx_log_err,
         futures::{future, StreamExt, TryFutureExt},
         maplit::hashset,
         std::iter::FromIterator,
@@ -443,7 +445,7 @@ mod tests {
             let service_clone = service.clone();
             fuchsia_async::Task::spawn(
                 async move { service_clone.spawn_service(keyboard_request_stream).await }
-                    .unwrap_or_else(|e: anyhow::Error| fx_log_err!("couldn't run: {:?}", e)),
+                    .unwrap_or_else(|e: anyhow::Error| tracing::error!("couldn't run: {:?}", e)),
             )
             .detach();
             Helper { service, keyboard_proxy, fake_now }

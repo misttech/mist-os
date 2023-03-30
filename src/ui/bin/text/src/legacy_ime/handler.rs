@@ -8,7 +8,6 @@ use {
     anyhow::{format_err, Context, Error, Result},
     fidl_fuchsia_ui_input::{self as uii, InputMethodEditorRequest as ImeReq},
     fidl_fuchsia_ui_input3 as ui_input3,
-    fuchsia_syslog::{fx_log_err, fx_log_warn},
     futures::{lock::Mutex, prelude::*},
     std::{
         collections::{HashMap, HashSet},
@@ -83,11 +82,11 @@ impl LegacyIme {
                     self_clone
                         .handle_ime_message(msg)
                         .await
-                        .unwrap_or_else(|e| fx_log_warn!("error handling ime message: {:?}", e));
+                        .unwrap_or_else(|e| tracing::warn!("error handling ime message: {:?}", e));
                 }
                 Ok(())
             }
-            .unwrap_or_else(|e: anyhow::Error| fx_log_err!("{:?}", e))
+            .unwrap_or_else(|e: anyhow::Error| tracing::error!("{:?}", e))
             .then(|()| {
                 async move {
                     // this runs when IME stream closes

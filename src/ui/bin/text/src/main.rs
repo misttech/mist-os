@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
 
@@ -14,10 +13,8 @@ pub mod text_manager;
 
 mod keyboard;
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["text_manager"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["text_manager"]).expect("syslog init should not fail");
-
     let text_manager = text_manager::TextManager::new();
     let keyboard_service = keyboard::Service::new(text_manager.clone())
         .await
