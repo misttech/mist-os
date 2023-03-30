@@ -13,6 +13,7 @@ use serde_json::Value;
 use std::{
     collections::HashMap,
     fs::File,
+    os::unix::process::CommandExt,
     path::{Path, PathBuf},
     process::ExitStatus,
 };
@@ -50,14 +51,19 @@ impl ToolRunner for ExternalSubTool {
     }
 
     async fn run(self: Box<Self>, _metrics: MetricsSession) -> Result<ExitStatus> {
-        // fho v0: Run the exact same command, just with the first argument replaced with the 'real' tool
-        // location.
-        std::process::Command::new(&self.path)
+        // fho v0: Run the exact same command, just with the first argument
+        // replaced with the 'real' tool location. We will also exec() it so
+        // we don't have to do signal management, but later versions of fho
+        // will likely need to do more here.
+        let exec_err = std::process::Command::new(&self.path)
             .env(EnvironmentContext::FFX_BIN_ENV, self.context.rerun_bin().await?)
             .args(self.cmd_line.ffx_args_iter().chain(self.cmd_line.subcmd_iter()))
-            .spawn()
-            .and_then(|mut child| child.wait())
-            .bug_context("Running external subtool")
+            .exec();
+
+        // Because we use exec above, we are only ever here if something went
+        // wrong with the exec. We will never return Ok() for this function with
+        // fho v0.
+        Err(exec_err).bug_context("Running external subtool")
         // note: we specifically do not want to report metrics here, as we're running the command externally.
         // The final command is the one that knows how to redact its own args, so it will do it itself.
     }
