@@ -16,6 +16,28 @@
 #include <type_traits>
 #include <variant>
 
+// Internal macros for generating a unique name for the internal bookkeeping
+// member associated with a given field. Beyond its definition, the member is
+// never referenced again, within or outside of the macro: accordingly, we use
+// __LINE__ as a simple way to satisfy the desired uniqueness. We do not make
+// the name a function of the bit range as that would otherwise preclude the
+// use of constexpr arithmetic expressions for bits values; moreover, we cannot
+// rely on field name alone, as their an a priori unique one for each reserved
+// field, and so would still need an alternate source of uniqueness to cover
+// that case.
+#define HWREG_INTERNAL_PASTE_IMPL(a, b) a##b
+#define HWREG_INTERNAL_PASTE(a, b) HWREG_INTERNAL_PASTE_IMPL(a, b)
+#define HWREG_INTERNAL_MEMBER_NAME(NAME) \
+  HWREG_INTERNAL_PASTE(field_, HWREG_INTERNAL_PASTE(NAME##_, __LINE__))
+
+// Internal macro for checking the type and range of a subfield definition.
+#define HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                    \
+  static_assert(hwreg::internal::IsSupportedInt<                                   \
+                    typename std::remove_reference<decltype(FIELD)>::type>::value, \
+                #FIELD " has unsupported type");                                   \
+  static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");       \
+  static_assert((BIT_HIGH) < sizeof(decltype(FIELD)) * CHAR_BIT, "Upper bit is out of range");
+
 namespace hwreg {
 
 struct EnablePrinter;
@@ -120,13 +142,14 @@ class Field {
 // This, combined with __NO_UNIQUE_ADDRESS, allows the compiler to use no
 // storage for the RsvdZField members.
 template <class RegType, typename UnusedMarker>
-class RsvdZField {
+class RsvdZField : public Field<RegType, UnusedMarker> {
  private:
   using IntType = typename RegType::ValueType;
 
  public:
   RsvdZField(FieldParameters<RegType::PrinterEnabled::value, IntType>* reg, uint32_t bit_high_incl,
-             uint32_t bit_low) {
+             uint32_t bit_low)
+      : Field<RegType, UnusedMarker>(reg, "RsvdZ", bit_high_incl, bit_low) {
     IntType mask = static_cast<IntType>(internal::ComputeMask<IntType>(bit_high_incl - bit_low + 1)
                                         << bit_low);
     reg->rsvdz_mask = static_cast<IntType>(reg->rsvdz_mask | mask);

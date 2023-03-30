@@ -701,6 +701,26 @@ TEST(RegisterTestCase, UnshiftedField) {
   }
 }
 
+TEST(RegisterTestCase, BitsAsConstexprArithmeticExpressions) {
+  constexpr unsigned int kTen = 10;
+
+  struct TestReg : public hwreg::RegisterBase<TestReg, uint32_t> {
+    DEF_FIELD(kTen + 2 * kTen, kTen, field2);
+    DEF_RSVDZ_FIELD(kTen - 1, 2);
+    DEF_BIT(2 + 3 - 4, field1);
+
+    static auto Get() { return hwreg::RegisterAddr<TestReg>(0); }
+  };
+
+  volatile uint32_t fake_reg = 1ul << 31;
+  hwreg::RegisterMmio mmio(&fake_reg);
+
+  auto reg = TestReg::Get().ReadFrom(&mmio);
+  reg.set_field1(1);
+  reg.set_field2(0xabcd);
+  reg.WriteTo(&mmio);
+}
+
 template <unsigned int N>
 struct TemplatedReg : public hwreg::RegisterBase<TemplatedReg<N>, uint32_t> {
   using SelfType = TemplatedReg<N>;

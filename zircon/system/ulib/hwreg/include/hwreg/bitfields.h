@@ -308,9 +308,8 @@ class BitfieldRef {
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
                 "Upper bit is out of range");                                                      \
   struct NAME##Marker {};                                                                          \
-  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> Field##BIT_HIGH##_##BIT_LOW = \
-      hwreg::internal::Field<SelfType, NAME##Marker>(&this->params(), #NAME, (BIT_HIGH),           \
-                                                     (BIT_LOW));                                   \
+  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> HWREG_INTERNAL_MEMBER_NAME(   \
+      NAME) = {&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)};                                     \
   typename SelfType::ValueType NAME() const {                                                      \
     return hwreg::BitfieldRef<const typename SelfType::ValueType>(this->reg_value_ptr(),           \
                                                                   (BIT_HIGH), (BIT_LOW))           \
@@ -328,9 +327,8 @@ class BitfieldRef {
   static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                      \
                 "Upper bit is out of range");                                                      \
   struct NAME##Marker {};                                                                          \
-  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> Field##BIT_HIGH##_##BIT_LOW = \
-      hwreg::internal::Field<SelfType, NAME##Marker>(&this->params(), #NAME, (BIT_HIGH),           \
-                                                     (BIT_LOW));                                   \
+  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> HWREG_INTERNAL_MEMBER_NAME(   \
+      NAME) = {&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)};                                     \
   typename SelfType::ValueType NAME() const {                                                      \
     return hwreg::BitfieldRef<const typename SelfType::ValueType>(this->reg_value_ptr(),           \
                                                                   (BIT_HIGH), (BIT_LOW), true)     \
@@ -350,9 +348,8 @@ class BitfieldRef {
                 "Upper bit is out of range");                                                      \
   static_assert(std::is_enum<TYPE>::value, "Field type is not an enum");                           \
   struct NAME##Marker {};                                                                          \
-  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> Field##BIT_HIGH##_##BIT_LOW = \
-      hwreg::internal::Field<SelfType, NAME##Marker>(&this->params(), #NAME, (BIT_HIGH),           \
-                                                     (BIT_LOW));                                   \
+  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, NAME##Marker> HWREG_INTERNAL_MEMBER_NAME(   \
+      NAME) = {&this->params(), #NAME, (BIT_HIGH), (BIT_LOW)};                                     \
   TYPE NAME() const {                                                                              \
     return static_cast<TYPE>(hwreg::BitfieldRef<const typename SelfType::ValueType>(               \
                                  this->reg_value_ptr(), (BIT_HIGH), (BIT_LOW))                     \
@@ -372,32 +369,19 @@ class BitfieldRef {
 // Declares multi-bit reserved-zero fields in a derived class of RegisterBase<D, T>.
 // This will ensure that on RegisterBase<T>::WriteTo(), reserved-zero bits are
 // automatically zeroed.  Both bit indices are inclusive.
-#define DEF_RSVDZ_FIELD(BIT_HIGH, BIT_LOW)                                                       \
-  static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");                     \
-  static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,                    \
-                "Upper bit is out of range");                                                    \
-  struct Field##BIT_HIGH##_##BIT_LOW##Marker {};                                                 \
-  __NO_UNIQUE_ADDRESS hwreg::internal::Field<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker>      \
-      Field##BIT_HIGH##_##BIT_LOW =                                                              \
-          hwreg::internal::Field<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker>(                 \
-              &this->params(), "RsvdZ", (BIT_HIGH), (BIT_LOW));                                  \
-  __NO_UNIQUE_ADDRESS hwreg::internal::RsvdZField<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker> \
-      RsvdZ##BIT_HIGH##_##BIT_LOW =                                                              \
-          hwreg::internal::RsvdZField<SelfType, Field##BIT_HIGH##_##BIT_LOW##Marker>(            \
-              &this->params(), (BIT_HIGH), (BIT_LOW))
+#define DEF_RSVDZ_FIELD(BIT_HIGH, BIT_LOW)                                        \
+  static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");      \
+  static_assert((BIT_HIGH) < sizeof(typename SelfType::ValueType) * CHAR_BIT,     \
+                "Upper bit is out of range");                                     \
+  __NO_UNIQUE_ADDRESS struct {                                                    \
+    struct RsvdZMarker {};                                                        \
+    __NO_UNIQUE_ADDRESS hwreg::internal::RsvdZField<SelfType, RsvdZMarker> field; \
+  } HWREG_INTERNAL_MEMBER_NAME(RsvdZ) = {{&this->params(), (BIT_HIGH), (BIT_LOW)}}
 
 // Declares single-bit reserved-zero fields in a derived class of RegisterBase<D, T>.
 // This will ensure that on RegisterBase<T>::WriteTo(), reserved-zero bits are
 // automatically zeroed.
 #define DEF_RSVDZ_BIT(BIT) DEF_RSVDZ_FIELD(BIT, BIT)
-
-// Internal function: check the type and range of a subfield definition.
-#define HWREG_INTERNAL_CHECK_SUBFIELD(FIELD, BIT_HIGH, BIT_LOW)                    \
-  static_assert(hwreg::internal::IsSupportedInt<                                   \
-                    typename std::remove_reference<decltype(FIELD)>::type>::value, \
-                #FIELD " has unsupported type");                                   \
-  static_assert((BIT_HIGH) >= (BIT_LOW), "Upper bit goes before lower bit");       \
-  static_assert((BIT_HIGH) < sizeof(decltype(FIELD)) * CHAR_BIT, "Upper bit is out of range");
 
 // Declares "decltype(FIELD) NAME() const" and "void set_NAME(decltype(FIELD))" that
 // reads/modifies the declared bitrange.  Both bit indices are inclusive.
