@@ -127,8 +127,10 @@
         },
         {
             protocol: [
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.input.injection.InputDeviceRegistry", // test-only
                 "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.composition.Screenshot",
                 "fuchsia.ui.scenic.Scenic",
             ],

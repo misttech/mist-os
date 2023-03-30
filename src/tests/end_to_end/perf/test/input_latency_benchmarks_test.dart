@@ -16,15 +16,18 @@ const String _catapultConverterPath = 'runtime_deps/catapult_converter';
 const String _trace2jsonPath = 'runtime_deps/trace2json';
 
 Future<void> _killProcesses(PerfTestHelper helper) async {
+  print('Killing processes for input_latency_benchmarks_test');
   await helper.sl4fDriver.ssh.run('killall "input-pipeline*"');
   await helper.sl4fDriver.ssh.run('killall "root_presenter*"');
   await helper.sl4fDriver.ssh.run('killall "cursor*"');
   await helper.sl4fDriver.ssh.run('killall "scene_manager*"');
   await helper.sl4fDriver.ssh.run('killall "scenic*"');
   await helper.sl4fDriver.ssh.run('killall "basemgr*"');
-  await helper.sl4fDriver.ssh.run('killall "flutter*"');
+  await helper.sl4fDriver.ssh.run('killall "*flutter*"');
   await helper.sl4fDriver.ssh.run('killall "tiles*"');
-  await helper.sl4fDriver.ssh.run('killall "simplest_app*"');
+  await helper.sl4fDriver.ssh.run('killall "flatland-view-provider*"');
+  await helper.sl4fDriver.ssh.run('component destroy "simplest-app-flatland"');
+  print('Finished killing processes for input_latency_benchmarks_test');
 }
 
 void main() {
@@ -36,10 +39,8 @@ void main() {
 
     await _killProcesses(helper);
 
-    // TODO(https://fxbug.dev/108167) use session protocols to re-enable
-    // TODO launch //src/ui/examples/simplest-app-flatland instead
-    // await helper.component.launch(
-    //     'fuchsia-pkg://fuchsia.com/simplest_app#meta/simplest_app.cmx', null);
+    await helper.component.launchAndDetach(
+        'fuchsia-pkg://fuchsia.com/flatland-examples#meta/simplest-app-flatland.cm');
 
     // Wait for the application to start.
     await Future.delayed(Duration(seconds: 3));

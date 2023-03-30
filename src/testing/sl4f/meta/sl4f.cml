@@ -49,6 +49,7 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.feedback.DataProvider",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.hwinfo.Board",
@@ -79,6 +80,7 @@
                 "fuchsia.tracing.controller.Controller",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.composition.Screenshot",
                 "fuchsia.ui.scenic.Scenic",
                 "fuchsia.wlan.device.service.DeviceMonitor",
@@ -147,6 +149,19 @@
         {
             event_stream: "stopped_v2",
             from: "parent",
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.element.GraphicalPresenter",
+                "fuchsia.sysmem.Allocator",
+                "fuchsia.tracing.provider.Registry",
+                "fuchsia.ui.composition.Allocator",
+                "fuchsia.ui.composition.Flatland",
+            ],
+            from: "parent",
+            to: "#launched_components",
         },
     ],
     expose: [

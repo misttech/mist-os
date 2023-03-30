@@ -102,6 +102,10 @@ impl<'a> AppModel<'a> {
             )
             .expect("fidl error");
 
+        // TODO(fxbug.dev/104411): `flatland.present()` is required before
+        // calling `present_view()` to avoid scenic deadlock.
+        self.flatland.present(fland::PresentArgs::EMPTY).expect("flatland present");
+
         // Connect to graphical presenter to get the view displayed.
         let (view_controller_proxy, view_controller_request) =
             create_proxy::<ViewControllerMarker>().unwrap();
@@ -216,8 +220,6 @@ async fn main() {
     app.init_scene().await;
     app.create_view().await;
 
-    // Call present once here and then continuously during the OnNextFrameBegin event.
-    flatland.present(fland::PresentArgs::EMPTY).expect("Present call failed");
     let mut present_count = 1;
 
     // Vec for tracking touch event trace flow ids.
