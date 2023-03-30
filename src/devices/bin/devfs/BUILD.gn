@@ -25,7 +25,7 @@ executable("bin") {
 
 fuchsia_component("component") {
   component_name = "devfs"
-  manifest = "meta/devfs.cml"
+  manifest = "meta/devfs-base.shard.cml"
   deps = [ ":bin" ]
 }
 
