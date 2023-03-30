@@ -31,7 +31,7 @@ use std::{
     fmt,
     fmt::Debug,
     hash::{Hash, Hasher},
-    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    net::{IpAddr, Ipv6Addr, SocketAddr},
     rc::{Rc, Weak},
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -512,6 +512,14 @@ impl Target {
     }
 
     pub fn set_nodename(&self, nodename: String) {
+        if let Some(current_name) = self.nodename() {
+            if nodename != current_name {
+                tracing::debug!(
+                    "Changing target {} nodename from {current_name} to {nodename}",
+                    self.id()
+                );
+            }
+        }
         self.nodename.borrow_mut().replace(nodename);
     }
 
@@ -541,11 +549,18 @@ impl Target {
         // enforce state transition control, such as ensuring that
         // manual targets do not enter the disconnected state. It must
         // only be used in tests.
+        tracing::debug!(
+            "Setting state directly for {name}@{id} from {old:?} to {new:?}",
+            name = self.nodename_str(),
+            id = self.id(),
+            old = self.state(),
+            new = state
+        );
         self.state.replace(state);
     }
 
     pub fn get_connection_state(&self) -> TargetConnectionState {
-        self.state.borrow().clone()
+        self.state()
     }
 
     /// Propose a target connection state transition from the state passed to the provided FnOnce to
@@ -607,9 +622,21 @@ impl Target {
         }
 
         if former_state == new_state {
+            tracing::debug!(
+                "State unchanged for {}@{} from {:?}",
+                self.nodename_str(),
+                self.id(),
+                former_state
+            );
             return;
         }
-
+        tracing::debug!(
+            "Updating state for {}@{} from {:?} to {:?}",
+            self.nodename_str(),
+            self.id(),
+            former_state,
+            new_state
+        );
         self.state.replace(new_state);
 
         if self.get_connection_state().is_rcs() {
@@ -722,7 +749,15 @@ impl Target {
     }
 
     pub fn set_ssh_port(&self, port: Option<u16>) {
-        self.ssh_port.replace(port);
+        if *self.ssh_port.borrow() != port {
+            tracing::debug!(
+                "Setting ssh port for {} from {:?} to {:?}",
+                self.nodename_str(),
+                self.ssh_port.borrow(),
+                port
+            );
+            self.ssh_port.replace(port);
+        }
     }
 
     pub fn manual_addrs(&self) -> Vec<TargetAddr> {
@@ -766,9 +801,9 @@ impl Target {
             // Do not add localhost to the collection during extend.
             // Note: localhost addresses are added sometimes by direct
             // insertion, in the manual add case.
-            let localhost_v4 = IpAddr::V4(Ipv4Addr::LOCALHOST);
+            // IPv4 is allowed so that emulators and tunneled devices are handled correctly.
             let localhost_v6 = IpAddr::V6(Ipv6Addr::LOCALHOST);
-            if addr.addr.ip() == localhost_v4 || addr.addr.ip() == localhost_v6 {
+            if addr.addr.ip() == localhost_v6 {
                 continue;
             }
 
@@ -892,6 +927,7 @@ impl Target {
     pub fn maybe_reconnect(self: &Rc<Self>) {
         if self.host_pipe.borrow().is_some() {
             drop(self.host_pipe.take());
+            tracing::debug!("Reconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
             self.run_host_pipe();
         }
     }
@@ -903,34 +939,56 @@ impl Target {
     #[tracing::instrument]
     pub fn run_host_pipe(self: &Rc<Self>) {
         if self.host_pipe.borrow().is_some() {
+            tracing::debug!("Host pipe is already set for {}@{}.", self.nodename_str(), self.id());
             return;
         }
 
         let weak_target = Rc::downgrade(self);
+        let target_name_str = format!("{}@{}", self.nodename_str(), self.id());
         self.host_pipe.borrow_mut().replace(Task::local(async move {
             let modes = ffx_config::get_connection_modes().await;
             let legacy = async {
                 if modes.use_legacy() {
                     let nr = spawn(weak_target.clone()).await;
-                    if let Ok(mut hp) = nr {
-                        let r = hp.wait().await;
-                        // XXX(raggi): decide what to do with this log data:
-                        tracing::info!("HostPipeConnection returned: {:?}", r);
+                    match nr {
+                        Ok(mut hp) => {
+                            tracing::debug!(
+                                "Legacy host pipe spawn returned OK for {target_name_str}"
+                            );
+                            let r = hp.wait().await;
+                            // XXX(raggi): decide what to do with this log data:
+                            tracing::info!("HostPipeConnection returned: {:?}", r);
+                        }
+                        Err(e) => {
+                            tracing::warn!("HostPipeBuilderConnection returned: {:?}", e);
+                        }
                     }
                 }
             };
             let circuit = async {
                 if modes.use_cso() {
                     let nr = spawn_circuit(weak_target.clone()).await;
-                    if let Ok(mut hp) = nr {
-                        let r = hp.wait().await;
-                        // XXX(raggi): decide what to do with this log data:
-                        tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
+                    match nr {
+                        Ok(mut hp) => {
+                            tracing::debug!(
+                                "Circuit host pipe spawn_circuit returned OK for {target_name_str}"
+                            );
+                            let r = hp.wait().await;
+                            // XXX(raggi): decide what to do with this log data:
+                            tracing::info!("Circuit HostPipeConnection returned: {:?}", r);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Circuit host pipe spawn_circuit {:?}", e);
+                        }
                     }
                 }
             };
+
             futures::future::join(legacy, circuit).await;
-            weak_target.upgrade().and_then(|target| target.host_pipe.borrow_mut().take());
+            weak_target.upgrade().and_then(|target| {
+                tracing::debug!("Exiting run_host_pipe for {target_name_str}");
+                target.host_pipe.borrow_mut().take()
+            });
         }));
     }
 
@@ -1046,6 +1104,7 @@ impl Target {
 
     pub fn disconnect(&self) {
         drop(self.host_pipe.take());
+        tracing::debug!("Disconnecting host_pipe for {}@{}", self.nodename_str(), self.id());
         self.update_connection_state(|_| TargetConnectionState::Disconnected);
     }
 }

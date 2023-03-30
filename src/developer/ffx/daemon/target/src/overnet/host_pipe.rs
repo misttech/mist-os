@@ -414,6 +414,12 @@ where
             })?;
 
         *target.ssh_host_address.borrow_mut() = host_addr;
+        tracing::debug!(
+            "Set ssh_host_address to {:?} for {}@{}",
+            target.ssh_host_address,
+            target.nodename_str(),
+            target.id()
+        );
         let hpc = Arc::new(cmd);
         Ok(hpc)
     }
@@ -447,7 +453,13 @@ where
 
             tracing::debug!("host-pipe command res: {:?}", res);
 
-            self.target.ssh_host_address.borrow_mut().take();
+            // Keep the ssh_host address in the target. This is the address of the host as seen from
+            // the target. It is primarily used when configuring the package server address.
+            tracing::debug!(
+                "Skipped clearing ssh_host_address for {}@{}",
+                self.target.nodename_str(),
+                self.target.id()
+            );
 
             match res {
                 Ok(_) => {
@@ -459,6 +471,10 @@ where
             // TODO(fxbug.dev/52038): Want an exponential backoff that
             // is sync'd with an explicit "try to start this again
             // anyway" channel using a select! between the two of them.
+            tracing::debug!(
+                "waiting {} before restarting child_pipe",
+                self.relaunch_command_delay.as_secs()
+            );
             Timer::new(self.relaunch_command_delay).await;
 
             let hpc =

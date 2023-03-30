@@ -79,9 +79,10 @@ impl TargetCollection {
         self.targets.borrow_mut().remove(&target.id()).is_some()
     }
 
-    fn find_matching_target(&self, new_target: &Target) -> Option<Rc<Target>> {
+    fn find_matching_target(&self, new_target: &Target) -> (Option<Rc<Target>>, bool) {
         // Look for a target by primary ID first
         let new_ids = new_target.ids();
+        let mut network_changed = false;
         let mut to_update =
             new_ids.iter().find_map(|id| self.targets.borrow().get(id).map(|t| t.clone()));
 
@@ -105,20 +106,59 @@ impl TargetCollection {
                     _ => false,
                 };
 
+                // If there is a port and addr in both the new and target,
+                // they must match if the nodename or the serial match.
+                //
+                // WARNING (wilkinsonclay): This matching is only considering
+                // the separate ssh_port and the IP addresses. This may not
+                // be correct when considering fastboot or other connections
+                // where the port field in the address should be considered.
+                let address_match = || {
+                    target.addrs().iter().any(|addr| new_ips.contains(&addr.ip()))
+                        && match target.ssh_port() {
+                            Some(port) => {
+                                if let Some(new) = new_port {
+                                    port == new
+                                } else {
+                                    false
+                                }
+                            }
+                            None if new_port.is_none() => true,
+                            None => false,
+                        }
+                };
+
+                // If we get here, there was no match on id, so perform a loose
+                // match if the serial or the nodename or the address are the same.
+                // At somepoint it might be a good idea to prioritize these matches
+                // for example, a match on ip and port might be more authoritative
+                // than matching on nodename, more analysis is needed.
                 if target.has_id(new_ids.iter())
                     || serials_match()
                     || nodenames_match()
-                    // Only match against addresses if the ports are the same
-                    || (target.ssh_port() == new_port
-                        && target.addrs().iter().any(|addr| new_ips.contains(&addr.ip())))
+                    || address_match()
                 {
+                    tracing::debug!(
+                        "Matched target has_id: {id} serials:\
+                     {serial} name: {name} address: {addr}\
+                     for {new_nodename:?} {new_ips:?}\
+                     ssh: {new_port:?}",
+                        id = target.has_id(new_ids.iter()),
+                        serial = serials_match(),
+                        name = nodenames_match(),
+                        addr = address_match()
+                    );
                     to_update.replace(target.clone());
+                    network_changed = !address_match();
                     break;
                 }
             }
+        } else {
+            tracing::debug!("Matched target by id: {to_update:?}");
+            network_changed = false
         }
 
-        to_update
+        (to_update, network_changed)
     }
 
     #[tracing::instrument(skip(self))]
@@ -127,7 +167,7 @@ impl TargetCollection {
         // them could otherwise match every target in the collection.
         new_target.drop_loopback_addrs();
 
-        let to_update = self.find_matching_target(&new_target);
+        let (to_update, network_changed) = self.find_matching_target(&new_target);
 
         tracing::trace!("Merging target {:?} into {:?}", new_target, to_update);
 
@@ -138,6 +178,8 @@ impl TargetCollection {
         new_target.drop_unscoped_link_local_addrs();
 
         let Some(to_update) = to_update else {
+            // The target was not matched in the collection, so insert it and return.
+
             tracing::info!("adding new target: {:?}", new_target);
             self.targets.borrow_mut().insert(new_target.id(), new_target.clone());
 
@@ -159,10 +201,7 @@ impl TargetCollection {
             to_update.set_nodename(new_name);
         }
         if let Some(ssh_port) = new_target.ssh_port() {
-            // Ony set the updated ssh port if it is None.
-            if to_update.ssh_port().is_none() {
-                to_update.set_ssh_port(Some(ssh_port));
-            }
+            to_update.set_ssh_port(Some(ssh_port));
         }
         to_update.update_last_response(new_target.last_response());
         let mut addrs = new_target.addrs.borrow().iter().cloned().collect::<Vec<_>>();
@@ -176,6 +215,33 @@ impl TargetCollection {
         });
         to_update.update_boot_timestamp(new_target.boot_timestamp_nanos());
 
+        // The network changed flag indicates the target being merged matched an
+        // existing target in the collection, but the network address did not match.
+        // One example of this happening is matching an emulator by name, but the
+        // emulator has been stopped, and restarted, causing the ssh port to change.
+        //
+        // When this happens, clean up the host_pipe and reconnect, and clear
+        // the ssh host_address.
+        if network_changed {
+            tracing::warn!("Network address changed for {to_update:?}");
+            if to_update.is_connected() {
+                to_update.disconnect();
+                to_update.maybe_reconnect();
+                *to_update.ssh_host_address.borrow_mut() = None;
+            }
+        } else {
+            if to_update.ssh_host_address.borrow().is_none() {
+                tracing::debug!(
+                    "Setting ssh_host_address to {:?} for {}@{}",
+                    new_target.ssh_host_address,
+                    to_update.nodename_str(),
+                    to_update.id()
+                );
+                *to_update.ssh_host_address.borrow_mut() =
+                    new_target.ssh_host_address.borrow().clone();
+            }
+        }
+
         to_update.update_connection_state(|_| new_target.get_connection_state());
 
         to_update.events.push(TargetEvent::Rediscovered).unwrap_or_else(|err| {
@@ -185,7 +251,10 @@ impl TargetCollection {
             event_queue
                 .push(DaemonEvent::UpdatedTarget(new_target.target_info()))
                 .unwrap_or_else(|e| tracing::warn!("unable to push target update event: {}", e));
+        } else {
+            tracing::debug!("No event queue for this target collection.");
         }
+
         to_update
     }
 
@@ -246,7 +315,9 @@ impl TargetCollection {
         // lifetime tracking is implemented). If a name isn't specified it's
         // possible a secondary/tertiary target showed up, and those cases are
         // handled here.
-        self.get_connected(matcher).ok_or(DaemonError::TargetNotFound)
+        let matched_target = self.get_connected(matcher).ok_or(DaemonError::TargetNotFound);
+        tracing::debug!("Matched {matched_target:?}");
+        matched_target
     }
 
     #[tracing::instrument(skip(self, tq))]

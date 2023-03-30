@@ -228,6 +228,8 @@ impl DaemonProtocolProvider for Daemon {
             .context("FIDL connection")?
             .map_err(|e| anyhow!("{:#?}", e))
             .context("proxy connect")?;
+
+        tracing::debug!("Returning target and proxy for {}@{}", target.nodename_str(), target.id());
         Ok((target.as_ref().into(), client))
     }
 
@@ -412,6 +414,7 @@ impl Daemon {
             .wait_for(None, |e| e == TargetEvent::RcsActivated)
             .await
             .context("waiting for RCS activation")?;
+        tracing::debug!("RCS activated for {}@{}", target.nodename_str(), target.id());
         Ok(target)
     }
 
