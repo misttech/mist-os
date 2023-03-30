@@ -14,6 +14,7 @@ if (is_host) {
       "config_schema:host_tests",
       "driver_manifest:host_tests",
       "fvm:host_tests",
+      "fxfs:host_tests",
       "images_config:host_tests",
       "package_list:host_tests",
       "package_utils:host_tests",

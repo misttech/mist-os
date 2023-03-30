@@ -40,6 +40,7 @@ const VBMETA_R_GUID: PartType = part_type("6A2460C3-CD11-4E8B-80A8-12CCE268ED0A"
 const MISC_GUID: PartType = part_type("1D75395D-F2C6-476B-A8B7-45CC1C97B476");
 const INSTALLER_GUID: PartType = part_type("4DCE98CE-E77E-45C1-A863-CAF92F1330C1");
 const FVM_GUID: PartType = part_type("41D0E340-57E3-954E-8C1E-17ECAC44CFF5");
+const DATA_GUID: PartType = part_type("08185F0C-892D-428A-A789-DBEEC8F55E6A");
 
 /// make-fuchsia-vol
 #[derive(FromArgs, Debug)]
@@ -161,6 +162,14 @@ struct TopLevel {
     /// extension.
     #[argh(switch)]
     depfile: bool,
+
+    /// whether to use Fxfs instead of FVM to store the base system
+    #[argh(switch)]
+    use_fxfs: bool,
+
+    /// path to Fxfs partition image (if --use_fxfs is set)
+    #[argh(option)]
+    fxfs: Option<Utf8PathBuf>,
 }
 
 #[derive(Debug)]
@@ -283,7 +292,7 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
 
     let block_size: u64 = gpt_disk.logical_block_size().clone().into();
 
-    let fvm_part = if !args.ramdisk_only {
+    let fvm_part = if !args.ramdisk_only && !args.use_fxfs {
         let size = args.fvm_size.unwrap_or_else(|| {
             gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
                 * block_size
@@ -293,6 +302,16 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
         } else {
             Some(add_partition(&mut gpt_disk, "fvm", size, FVM_GUID)?)
         }
+    } else {
+        None
+    };
+    let fxfs_part = if args.fxfs.is_some() {
+        assert!(fvm_part.is_none(), "Can't have both FVM and Fxfs");
+        let size = args.fvm_size.unwrap_or_else(|| {
+            gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
+                * block_size
+        });
+        Some(add_partition(&mut gpt_disk, "fuchsia-data", size, DATA_GUID)?)
     } else {
         None
     };
@@ -426,6 +445,10 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
         }
     }
 
+    if let Some(fxfs_part) = fxfs_part {
+        copy_partition(&mut disk, fxfs_part, &args.fxfs.unwrap())?;
+    }
+
     Ok(())
 }
 
@@ -490,6 +513,10 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
                 if args.sparse_fvm.is_none() {
                     args.sparse_fvm = Some(images["blk_storage-sparse"].clone());
                 }
+            } else if args.use_fxfs {
+                if args.fxfs.is_none() {
+                    args.fxfs = Some(images["fxfs-blk_storage-full"].clone())
+                }
             } else {
                 if args.blob.is_none() {
                     args.blob = Some(images["blk_blob"].clone())
@@ -546,6 +573,9 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
         if args.use_sparse_fvm {
             ensure!(args.sparse_fvm.is_some(), "Missing --sparse-fvm");
             dependencies.push(args.sparse_fvm.as_ref().unwrap());
+        } else if args.use_fxfs {
+            ensure!(args.fxfs.is_some(), "Missing --fxfs");
+            dependencies.push(args.fxfs.as_ref().unwrap());
         } else {
             ensure!(args.blob.is_some(), "Missing --blob");
             dependencies.push(args.blob.as_ref().unwrap());

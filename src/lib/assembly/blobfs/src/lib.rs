@@ -10,3 +10,4 @@ mod blobfs;
 mod manifest;
 
 pub use blobfs::BlobFSBuilder;
+pub use manifest::BlobManifest;

@@ -198,6 +198,9 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #   generate_fvm (optional; default: true)
 #     [bool] Whether to generate a FVM image.
 #
+#   generate_fxfs (optional; default: false)
+#     [bool] Whether to generate an Fxfs image.  Exclusive with generate_fvm.  EXPERIMENTAL.
+#
 #   assembly_include_account_in_fvm (optional; default: false)
 #     [bool] Whether to include an account partition in the FVM image.
 #
@@ -237,6 +240,13 @@ template("assembled_system") {
   if (defined(invoker.generate_fvm)) {
     generate_fvm = invoker.generate_fvm
   }
+  generate_fxfs = false
+  if (defined(invoker.generate_fxfs)) {
+    generate_fxfs = invoker.generate_fxfs
+  }
+  assert(!generate_fvm || !generate_fxfs,
+         "Only one of Fxfs and FVM can host blobs")
+  _supports_blobs = generate_fvm || generate_fxfs
 
   generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
@@ -262,6 +272,11 @@ template("assembled_system") {
       assert(!defined(image_metadata_overrides.fvm_blob_sparse), error_msg)
       assert(!defined(image_metadata_overrides.fvm_fastboot), error_msg)
       not_needed([ "error_msg" ])
+    }
+    if (!generate_fxfs) {
+      assert(
+          !defined(image_metadata_overrides.fxfs),
+          "No Fxfs image will be built: no metadata override should be provided")
     }
   }
 
@@ -403,6 +418,7 @@ template("assembled_system") {
     fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
     fvm_fastboot_tmp = "${outdir}/fvm.fastboot.tmp.blk"
     fvm_fastboot = "${outdir}/fvm.fastboot.blk"
+    fxfs = "${outdir}/fxfs.blk"
 
     base_package = "${outdir}/base/meta.far"
     base_package_manifest = "${outdir}/base/package_manifest.json"
@@ -465,12 +481,12 @@ template("assembled_system") {
   # can generate a driver-manager-base-config package.
   # We do not generate the package when there is no fvm and drivers
   # go directly into bootfs.
-  if (defined(invoker.base_driver_packages) && generate_fvm) {
+  if (defined(invoker.base_driver_packages) && _supports_blobs) {
     _base_driver_packages = invoker.base_driver_packages
   }
 
   system_image_deps = []
-  if (defined(invoker.system_image_deps) && generate_fvm) {
+  if (defined(invoker.system_image_deps) && _supports_blobs) {
     system_image_deps += invoker.system_image_deps
   } else {
     not_needed(invoker, [ "system_image_deps" ])
@@ -478,7 +494,7 @@ template("assembled_system") {
 
   embed_fvm_in_zbi = false
   if (defined(invoker.ramdisk_fvm_in_zbi)) {
-    embed_fvm_in_zbi = invoker.ramdisk_fvm_in_zbi && generate_fvm
+    embed_fvm_in_zbi = invoker.ramdisk_fvm_in_zbi && _supports_blobs
   }
 
   devmgr_config = []
@@ -500,11 +516,11 @@ template("assembled_system") {
   }
 
   # Defaults to true if the invoker doesn't pass "include_shell_commands"
-  include_shell_commands = generate_fvm
+  include_shell_commands = _supports_blobs
   if (defined(invoker.include_shell_commands)) {
     if (invoker.include_shell_commands) {
       assert(
-          generate_fvm,
+          _supports_blobs,
           "Shell command package generation is only valid if the fvm is being created.")
     }
     include_shell_commands = invoker.include_shell_commands
@@ -582,7 +598,7 @@ template("assembled_system") {
     kernel_image_name = kernel_name
 
     base_packages = []
-    if (generate_fvm) {
+    if (_supports_blobs) {
       base_packages = _base_packages
       base_packages += _meta_packages
       cache_packages = _cache_packages
@@ -606,8 +622,8 @@ template("assembled_system") {
       bootfs_labels += [ ":${labels.fshost}" ]
     }
 
-    # Only builds with an FVM need base-resolver.
-    if (generate_fvm) {
+    # Only builds which support blobs need base-resolver.
+    if (_supports_blobs) {
       bootfs_labels += [ "//src/sys/base-resolver:bootfs" ]
     }
 
@@ -749,6 +765,9 @@ template("assembled_system") {
         }
       }
     }
+    if (generate_fxfs) {
+      fxfs = true
+    }
   }
 
   if (defined(_must_exist)) {
@@ -832,7 +851,7 @@ template("assembled_system") {
                            ])
     image_assembly_label = ":${labels.generated_config_for_legacy_bundle}"
     bundles_dir = files.outdir
-    include_config_data = generate_fvm
+    include_config_data = _supports_blobs
     create_package = defined(invoker.create_legacy_aib_package) &&
                      invoker.create_legacy_aib_package
     create_package_archive = defined(invoker.create_legacy_aib_archive) &&
@@ -840,7 +859,7 @@ template("assembled_system") {
 
     # The core realm is part of the base packages. Do not generate
     # the core realm if we are not generating an FVM
-    if (defined(invoker.core_realm_definition) && generate_fvm) {
+    if (defined(invoker.core_realm_definition) && _supports_blobs) {
       core_realm_definition = invoker.core_realm_definition
     } else {
       not_needed(invoker, [ "core_realm_definition" ])
@@ -902,10 +921,10 @@ template("assembled_system") {
 
     outputs = [ files.regenerated_image_assembly_config ]
 
-    # If there isn't an FVM, there won't be a config-data package, and so it
+    # If there aren't blobs, there won't be a config-data package, and so it
     # won't be created by product assembly (it won't have any config data in
     # the legacy or common configs.)
-    if (generate_fvm) {
+    if (_supports_blobs) {
       outputs += [ files.config_data_manifest ]
     }
   }
@@ -969,7 +988,7 @@ template("assembled_system") {
         "--mode",
         "fvm-in-zbi",
       ]
-    } else if (!generate_fvm) {
+    } else if (!_supports_blobs) {
       args += [
         "--mode",
         "bootfs",
@@ -1018,7 +1037,7 @@ template("assembled_system") {
     }
 
     # Base package dependencies and outputs, if this configuration uses them.
-    if (generate_fvm) {
+    if (_supports_blobs) {
       deps += [
         blobfs_tool_target,
         fvm_tool_target,
@@ -1034,10 +1053,6 @@ template("assembled_system") {
         files.base_package,
         files.base_package_manifest,
         files.base_package_merkle,
-        files.blobfs,
-        files.fvm,
-        files.fvm_sparse,
-        files.fvm_blob_sparse,
 
         # In the gendir.
         files.blobfs_manifest,
@@ -1047,13 +1062,23 @@ template("assembled_system") {
         files.base_meta_package,
         files.base_pkg_abi_revision,
       ]
-
-      if (fvm_emmc_partition_size != false ||
-          fvm_ftl_nand_block_count != false) {
-        outputs += [ files.fvm_fastboot ]
-        if (fvm_ftl_nand_block_count != false) {
-          outputs += [ files.fvm_fastboot_tmp ]
+      if (generate_fvm) {
+        outputs += [
+          files.fvm,
+          files.fvm_sparse,
+          files.blobfs,
+          files.fvm_blob_sparse,
+        ]
+        if (fvm_emmc_partition_size != false ||
+            fvm_ftl_nand_block_count != false) {
+          outputs += [ files.fvm_fastboot ]
+          if (fvm_ftl_nand_block_count != false) {
+            outputs += [ files.fvm_fastboot_tmp ]
+          }
         }
+      }
+      if (generate_fxfs) {
+        outputs += [ files.fxfs ]
       }
     }
 
@@ -1085,6 +1110,8 @@ template("assembled_system") {
           fvm_blob_sparse = {
           }
           fvm_fastboot = {
+          }
+          fxfs = {
           }
 
           if (defined(image_metadata_overrides)) {
@@ -1145,6 +1172,15 @@ template("assembled_system") {
               type = "blk"
               forward_variables_from(_common_metadata, "*")
               forward_variables_from(_image_overrides["fvm_sparse"], "*")
+            },
+          ]
+        } else if (generate_fxfs) {
+          images += [
+            {
+              name = "${image_name}.fxfs"
+              path = rebase_path(files.fxfs, root_build_dir)
+              type = "blk"
+              forward_variables_from(_image_overrides["fxfs"], "*")
             },
           ]
         }

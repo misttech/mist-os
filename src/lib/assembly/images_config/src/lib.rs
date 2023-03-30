@@ -10,6 +10,7 @@
 mod images_config;
 
 pub use images_config::Fvm;
+pub use images_config::Fxfs;
 pub use images_config::{BlobFS, BlobFSLayout, EmptyData, FvmFilesystem, Reserved};
 pub use images_config::{FvmOutput, NandFvm, SparseFvm, StandardFvm};
 pub use images_config::{Image, ImagesConfig};

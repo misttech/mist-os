@@ -75,9 +75,9 @@ function fx-fvm-find-raw-source {
   # Look for source FVM formats in this order. Every build that uses an FVM
   # should produce at least one of these.
   source_fvms=(
-    "$(fx-command-run list-build-artifacts --name storage-full --allow-empty images)"
-    "$(fx-command-run list-build-artifacts --name storage-sparse --allow-empty images)"
-    "$(fx-command-run list-build-artifacts --name fvm.fastboot --allow-empty images)"
+    "$(fx-command-run list-build-artifacts --name storage-full --type blk --allow-empty images)"
+    "$(fx-command-run list-build-artifacts --name storage-sparse --type blk --allow-empty images)"
+    "$(fx-command-run list-build-artifacts --name fvm.fastboot --type blk --allow-empty images)"
   )
 
   for source_fvm in "${source_fvms[@]}"; do

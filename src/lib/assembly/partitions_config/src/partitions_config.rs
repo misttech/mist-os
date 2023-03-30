@@ -111,6 +111,12 @@ pub enum Partition {
         /// The partition name.
         name: String,
     },
+
+    /// A partition prepared for Fxfs.
+    Fxfs {
+        /// The partition name.
+        name: String,
+    },
 }
 
 /// The slots available for flashing or OTAing.
@@ -156,6 +162,10 @@ mod tests {
                         type: "FVM",
                         name: "fvm",
                     },
+                    {
+                        type: "Fxfs",
+                        name: "fxfs",
+                    },
                 ],
                 hardware_revision: "hw",
                 unlock_credentials: [
@@ -165,7 +175,7 @@ mod tests {
         "#;
         let mut cursor = std::io::Cursor::new(json);
         let config: PartitionsConfig = PartitionsConfig::from_reader(&mut cursor).unwrap();
-        assert_eq!(config.partitions.len(), 3);
+        assert_eq!(config.partitions.len(), 4);
         assert_eq!(config.hardware_revision, "hw");
     }
 

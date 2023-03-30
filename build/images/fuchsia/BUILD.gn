@@ -63,6 +63,7 @@ if (is_fuchsia) {
     fvm_sparse = "${outdir}/fvm.sparse.blk"
     fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
     fvm_fastboot = "${outdir}/fvm.fastboot.blk"
+    fxfs = "${outdir}/fxfs.blk"
     packages_json = "${outdir}/packages.json"
     images_json = "${outdir}/images.json"
 
@@ -96,6 +97,7 @@ if (is_fuchsia) {
     recovery_fvm_sparse = "${recovery_outdir}/fvm.sparse.blk"
     recovery_fvm_blob_sparse = "${recovery_outdir}/fvm.blob.sparse.blk"
     recovery_fvm_fastboot = "${recovery_outdir}/fvm.fastboot.blk"
+    recovery_fxfs = "${recovery_outdir}/fxfs.blk"
     recovery_images_json = "${recovery_outdir}/images.json"
 
     esp_image_path = "${root_build_dir}/fuchsia.esp.blk"
@@ -133,7 +135,8 @@ if (is_fuchsia) {
 
   fuchsia_base = {
     testonly = fuchsia_zbi_testonly
-    generate_fvm = true
+    generate_fvm = !fxfs_blob
+    generate_fxfs = fxfs_blob
     board_name = board_name
 
     check_production_tag = check_production_eligibility
@@ -265,11 +268,14 @@ if (is_fuchsia) {
 
   # Copy the fvm.blob.sparse.blk to the old location for assembled images.
   # TODO(fxbug.dev/82077): Delete this once clients do not depend on the old path.
-  copy("copy_fvm_blob_sparse") {
-    testonly = fuchsia_zbi_testonly
-    sources = [ "${target_out_dir}/fuchsia/fvm.blob.sparse.blk" ]
-    outputs = [ old_fvm_blob_sparse_path ]
-    deps = [ ":fuchsia_assembly" ]
+
+  if (!fxfs_blob) {
+    copy("copy_fvm_blob_sparse") {
+      testonly = fuchsia_zbi_testonly
+      sources = [ "${target_out_dir}/fuchsia/fvm.blob.sparse.blk" ]
+      outputs = [ old_fvm_blob_sparse_path ]
+      deps = [ ":fuchsia_assembly" ]
+    }
   }
 
   # The `:fuchsia` target assembles the main Fuchsia image, for all non-bringup
@@ -291,7 +297,7 @@ if (is_fuchsia) {
       ":update",
     ]
 
-    if (include_fvm_blob_sparse) {
+    if (!fxfs_blob && include_fvm_blob_sparse) {
       public_deps += [ ":copy_fvm_blob_sparse" ]
     }
 
@@ -379,23 +385,32 @@ if (is_fuchsia) {
     }
 
     # Create lists of the files that are referenced by the assembly manifests.
-    _assembly_contents = [
-      files.blobfs,
-      files.fvm,
-      files.fvm_sparse,
-      files.fvm_blob_sparse,
-      files.qemu_kernel,
-    ]
-    _recovery_contents = [ files.qemu_kernel ]
-    if (files.recovery_name != "zedboot") {
-      _recovery_contents += [
-        files.recovery_blobfs,
-        files.recovery_fvm,
-        files.recovery_fvm_sparse,
-        files.recovery_fvm_blob_sparse,
+    _assembly_contents = [ files.qemu_kernel ]
+    if (fxfs_blob) {
+      _assembly_contents += [ files.fxfs ]
+    } else {
+      _assembly_contents += [
+        files.blobfs,
+        files.fvm,
+        files.fvm_sparse,
+        files.fvm_blob_sparse,
       ]
     }
-    if (fvm_emmc_partition_size != false || fvm_ftl_nand_block_count != false) {
+    _recovery_contents = [ files.qemu_kernel ]
+    if (files.recovery_name != "zedboot") {
+      if (fxfs_blob) {
+        _recovery_contents += [ files.recovery_fxfs ]
+      } else {
+        _recovery_contents += [
+          files.blobfs,
+          files.fvm,
+          files.fvm_sparse,
+          files.fvm_blob_sparse,
+        ]
+      }
+    }
+    if (!fxfs_blob && (fvm_emmc_partition_size != false ||
+                       fvm_ftl_nand_block_count != false)) {
       _assembly_contents += [ files.fvm_fastboot ]
       if (files.recovery_name != "zedboot") {
         _recovery_contents += [ files.recovery_fvm_fastboot ]

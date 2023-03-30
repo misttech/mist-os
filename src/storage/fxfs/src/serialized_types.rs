@@ -55,6 +55,8 @@
 
 mod traits;
 
+use serde::{Deserialize, Serialize};
+
 pub const DEFAULT_MAX_SERIALIZED_RECORD_SIZE: u64 = 4096;
 
 // Re-export the traits we need.
@@ -71,3 +73,13 @@ mod tests;
 // Re-export all Fxfs types.
 mod types;
 pub use types::{EARLIEST_SUPPORTED_VERSION, JOURNAL_BLOCK_SIZE_CHANGE_VERSION, LATEST_VERSION};
+
+// TODO(fxbug.dev/122125): This should be versioned.  Whether we reused serialized_types is up for
+// debate (since this version might be better off as independent from the journal version).
+// TODO(fxbug.dev/122125): Is this the best home for this?
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BlobMetadata {
+    pub hashes: Vec<[u8; 32]>,
+    pub compressed_offsets: Vec<u64>,
+    pub uncompressed_size: u64,
+}

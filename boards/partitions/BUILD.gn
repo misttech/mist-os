@@ -54,6 +54,14 @@ generated_partitions_config("x64") {
   fvm = "fvm"
 }
 
+generated_partitions_config("x64-fxfs") {
+  forward_variables_from(_gigaboot, "*")
+  hw_revision = "x64"
+
+  forward_variables_from(_standard_names, "*", [ "fvm" ])
+  fxfs = "fxfs"
+}
+
 generated_partitions_config("arm64") {
   forward_variables_from(_gigaboot, "*")
   hw_revision = "arm64"
@@ -117,5 +125,6 @@ group("partitions") {
     ":qemu-x64",
     ":vim3",
     ":x64",
+    ":x64-fxfs",
   ]
 }

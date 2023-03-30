@@ -11,9 +11,11 @@ import("//build/rust/rustc_fuzzer.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_macro.gni")
 import("//src/storage/fs_test/suite.gni")
+
+# For fxfs_blob
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/storage/testing/driver_test_realm.gni")
 import("//tools/cmc/build/cmc.gni")
-
 fxfs_deps = [
   ":fxfs_macros",
   "//src/lib/async-utils",
@@ -157,6 +159,13 @@ fuchsia_unittest_component("fxfs-crypto-test") {
   deps = [ "crypto:crypto_test" ]
 }
 
+fuchsia_unittest_component("fxfs-make-blob-image-test") {
+  deps = [
+    "make-blob-image:make-blob-image_test",
+    "//src/sys/test_runners:tmp_storage",
+  ]
+}
+
 storage_driver_test_realm_v2_component("fxfs-platform-test") {
   deps = [ "platform:platform_test" ]
   manifest = "platform/meta/fxfs-platform-test.cml"
@@ -166,6 +175,7 @@ fuchsia_test_package("fxfs-tests") {
   test_components = [
     ":fxfs-test",
     ":fxfs-crypto-test",
+    ":fxfs-make-blob-image-test",
     ":fxfs-platform-test",
   ]
   test_specs = {
@@ -213,26 +223,24 @@ cmc_merge("fxfs_with_vmex.cml") {
 }
 
 fuchsia_component_manifest("fxfs_with_vmex_manifest") {
-  component_name = "fxfs_with_vmex"
+  component_name = "fxfs"
   deps = [ ":fxfs_with_vmex.cml" ]
   _target_outputs = get_target_outputs(":fxfs_with_vmex.cml")
   manifest = _target_outputs[0]
   visibility = [ ":*" ]
 }
 
-# TODO(fxbug.dev/122055): Don't give vmex to Fxfs
-fuchsia_component("fxfs_with_vmex_component") {
-  cm_label = ":fxfs_with_vmex_manifest"
-  deps = [
-    ":fxfs",
-    ":fxfs_with_vmex_manifest",
-  ]
-}
-
 fuchsia_component("fxfs_component") {
   component_name = "fxfs"
-  manifest = "meta/fxfs.cml"
   deps = [ ":fxfs" ]
+
+  # TODO(fxbug.dev/122055): Don't give vmex to Fxfs
+  if (fxfs_blob) {
+    cm_label = ":fxfs_with_vmex_manifest"
+    deps += [ ":fxfs_with_vmex_manifest" ]
+  } else {
+    manifest = "meta/fxfs.cml"
+  }
 }
 
 fuchsia_shell_package("fxfs-bin") {

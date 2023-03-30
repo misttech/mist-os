@@ -13,6 +13,7 @@ import("//build/python/python_binary.gni")
 import("//build/sdk/product_bundle.gni")
 import("//build/testing/host_test.gni")
 import("//src/developer/ffx/config.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//src/sys/core/build/core.gni")
 import("//src/sys/core/build/core_shard.gni")
 
@@ -160,7 +161,13 @@ if (is_fuchsia) {
 if (is_host) {
   group("host_tests") {
     testonly = true
-    deps = [ ":test_route_verification" ]
+
+    # TODO(fxbug.dev/122056): Support Fxblob in scrutiny
+    if (fxfs_blob) {
+      deps = []
+    } else {
+      deps = [ ":test_route_verification" ]
+    }
   }
 
   labels = {

@@ -4,12 +4,13 @@
 
 use crate::base_package::{construct_base_package, BasePackage};
 use crate::fvm::construct_fvm;
+use crate::fxfs::construct_fxfs;
 use crate::vbmeta;
 use crate::zbi;
 
 use anyhow::{anyhow, Context, Result};
 use assembly_config_schema::ImageAssemblyConfig;
-use assembly_images_config::{Fvm, Image, ImagesConfig, VBMeta, Zbi};
+use assembly_images_config::{Fvm, Fxfs, Image, ImagesConfig, VBMeta, Zbi};
 use assembly_manifest::AssemblyManifest;
 use assembly_tool::{SdkToolProvider, ToolProvider};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
@@ -22,7 +23,7 @@ use std::collections::BTreeSet;
 use std::fs::File;
 use tracing::info;
 
-pub fn create_system(args: CreateSystemArgs) -> Result<()> {
+pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let CreateSystemArgs {
         image_assembly_config,
         include_account,
@@ -68,6 +69,10 @@ pub fn create_system(args: CreateSystemArgs) -> Result<()> {
         Image::Fvm(fvm) => Some(fvm),
         _ => None,
     });
+    let fxfs_config: Option<&Fxfs> = images_config.images.iter().find_map(|i| match i {
+        Image::Fxfs(fxfs) => Some(fxfs),
+        _ => None,
+    });
 
     // Determine whether blobfs should be compressed.
     // We refrain from compressing blobfs if the FVM is destined for the ZBI,
@@ -89,6 +94,13 @@ pub fn create_system(args: CreateSystemArgs) -> Result<()> {
                 include_account,
                 base_package,
             )?;
+        }
+    } else if fxfs_config.is_some() {
+        info!("Constructing Fxfs image <EXPERIMENTAL!>");
+        if let Some(base_package) = &base_package {
+            let (path, contents) =
+                construct_fxfs(&outdir, &gendir, &image_assembly_config, base_package).await?;
+            assembly_manifest.images.push(assembly_manifest::Image::Fxfs { path, contents });
         }
     } else {
         info!("Skipping fvm creation");

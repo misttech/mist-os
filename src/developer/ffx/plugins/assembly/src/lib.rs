@@ -16,6 +16,7 @@ mod blobfs;
 mod compiled_package;
 mod extra_hash_descriptor;
 mod fvm;
+mod fxfs;
 mod operations;
 mod zbi;
 use assembly_components as _;
@@ -41,7 +42,7 @@ impl FfxMain for AssemblyTool {
         // an error.
         match self.cmd.op_class {
             OperationClass::CreateSystem(args) => {
-                operations::create_system::create_system(args).context("Create System")
+                operations::create_system::create_system(args).await.context("Create System")
             }
             OperationClass::CreateUpdate(args) => {
                 operations::create_update::create_update(args).context("Create Update Package")

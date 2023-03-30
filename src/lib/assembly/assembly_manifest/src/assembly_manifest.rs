@@ -83,6 +83,14 @@ pub enum Image {
     /// Fastboot FVM.
     FVMFastboot(Utf8PathBuf),
 
+    /// Fxfs.
+    Fxfs {
+        /// Path to the Fxfs image.
+        path: Utf8PathBuf,
+        /// Blob contents metadata.
+        contents: BlobfsContents,
+    },
+
     /// Qemu Kernel.
     QemuKernel(Utf8PathBuf),
 }
@@ -99,6 +107,7 @@ impl Image {
             Image::FVMSparse(s) => s.as_path(),
             Image::FVMSparseBlob(s) => s.as_path(),
             Image::FVMFastboot(s) => s.as_path(),
+            Image::Fxfs { path, .. } => path.as_path(),
             Image::QemuKernel(s) => s.as_path(),
         }
     }
@@ -115,6 +124,7 @@ impl Image {
             Image::FVMSparse(s) => *s = source,
             Image::FVMSparseBlob(s) => *s = source,
             Image::FVMFastboot(s) => *s = source,
+            Image::Fxfs { path, .. } => *path = source,
             Image::QemuKernel(s) => *s = source,
         }
     }
@@ -155,6 +165,10 @@ impl AssemblyManifest {
                     path: path_relative_from(path, &base_path)?,
                     contents: contents.relativize(&base_path)?,
                 }),
+                Image::Fxfs { path, contents } => images.push(Image::Fxfs {
+                    path: path_relative_from(path, &base_path)?,
+                    contents: contents.relativize(&base_path)?,
+                }),
             }
         }
         self.images = images;
@@ -191,6 +205,10 @@ impl AssemblyManifest {
                     images.push(Image::ZBI { path: manifest_dir.as_ref().join(path), signed })
                 }
                 Image::BlobFS { path, contents } => images.push(Image::BlobFS {
+                    path: manifest_dir.as_ref().join(path),
+                    contents: contents.derelativize(&manifest_dir)?,
+                }),
+                Image::Fxfs { path, contents } => images.push(Image::Fxfs {
                     path: manifest_dir.as_ref().join(path),
                     contents: contents.derelativize(&manifest_dir)?,
                 }),
@@ -311,6 +329,13 @@ impl Serialize for Image {
                 signed: None,
                 contents: None,
             },
+            Image::Fxfs { path, contents } => ImageSerializeHelper {
+                partition_type: "fxfs-blk",
+                name: "storage-full",
+                path,
+                signed: None,
+                contents: Some(ImageContentsSerializeHelper::Blobfs(contents)),
+            },
             Image::QemuKernel(path) => ImageSerializeHelper {
                 partition_type: "kernel",
                 name: "qemu-kernel",
@@ -400,7 +425,7 @@ impl BlobfsContents {
     }
 
     /// Relativize all manifest locations in the BlobFsContents to the output file's location
-    fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
+    pub fn relativize(mut self, base_path: impl AsRef<Utf8Path>) -> Result<BlobfsContents> {
         // Modify in-place so we can add fields to the struct without updating this code
         for mut package in self.packages.base.0.iter_mut() {
             package.manifest = path_relative_from(&package.manifest, &base_path)?
@@ -496,6 +521,14 @@ impl<'de> Deserialize<'de> for Image {
                 }
             }
             ("blk", "storage-full", None) => Ok(Image::FVM(helper.path)),
+            ("fxfs-blk", "storage-full", None) => {
+                if let Some(contents) = helper.contents {
+                    let ImageContentsDeserializeHelper::Blobfs(contents) = contents;
+                    Ok(Image::Fxfs { path: helper.path, contents })
+                } else {
+                    Err(de::Error::missing_field("contents"))
+                }
+            }
             ("blk", "storage-sparse", None) => Ok(Image::FVMSparse(helper.path)),
             ("blk", "storage-sparse-blob", None) => Ok(Image::FVMSparseBlob(helper.path)),
             ("blk", "fvm.fastboot", None) => Ok(Image::FVMFastboot(helper.path)),
@@ -555,6 +588,23 @@ mod tests {
     }
 
     #[test]
+    fn relativize_fxfs() {
+        let manifest = AssemblyManifest {
+            images: vec![
+                Image::BasePackage("base.far".into()),
+                Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
+                Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
+                Image::QemuKernel("qemu/kernel".into()),
+            ],
+        };
+
+        let relativized_manifest =
+            generate_test_manifest_fxfs().relativize(Utf8PathBuf::from("path/to")).unwrap();
+        assert_eq!(relativized_manifest, manifest);
+    }
+
+    #[test]
     fn derelativize() {
         let manifest = AssemblyManifest {
             images: vec![
@@ -576,6 +626,23 @@ mod tests {
     }
 
     #[test]
+    fn derelativize_fxfs() {
+        let manifest = AssemblyManifest {
+            images: vec![
+                Image::BasePackage("base.far".into()),
+                Image::ZBI { path: "fuchsia.zbi".into(), signed: true },
+                Image::VBMeta("fuchsia.vbmeta".into()),
+                Image::Fxfs { path: "fxfs.blk".into(), contents: Default::default() },
+                Image::QemuKernel("qemu/kernel".into()),
+            ],
+        };
+
+        let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
+        let manifest = generate_test_manifest_fxfs();
+        assert_eq!(manifest, derelativized_manifest);
+    }
+
+    #[test]
     fn serialize() {
         let manifest = AssemblyManifest {
             images: vec![
@@ -593,6 +660,24 @@ mod tests {
 
         assert_eq!(
             generate_test_value(),
+            serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
+        );
+    }
+
+    #[test]
+    fn serialize_fxfs() {
+        let manifest = AssemblyManifest {
+            images: vec![
+                Image::BasePackage("path/to/base.far".into()),
+                Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: true },
+                Image::VBMeta("path/to/fuchsia.vbmeta".into()),
+                Image::Fxfs { path: "path/to/fxfs.blk".into(), contents: Default::default() },
+                Image::QemuKernel("path/to/qemu/kernel".into()),
+            ],
+        };
+
+        assert_eq!(
+            generate_test_value_fxfs(),
             serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
         );
     }
@@ -652,6 +737,31 @@ mod tests {
                 Image::FVMSparseBlob(path) => ("path/to/fvm.blob.sparse.blk", path),
                 Image::FVMFastboot(path) => ("path/to/fvm.fastboot.blk", path),
                 Image::QemuKernel(path) => ("path/to/qemu/kernel", path),
+                _ => panic!("Unexpected item {:?}", image),
+            };
+            assert_eq!(&Utf8PathBuf::from(expected), actual);
+        }
+    }
+
+    #[test]
+    fn deserialize_fxfs() {
+        let manifest: AssemblyManifest = generate_test_manifest_fxfs();
+        assert_eq!(manifest.images.len(), 5);
+
+        for image in &manifest.images {
+            let (expected, actual) = match image {
+                Image::BasePackage(path) => ("path/to/base.far", path),
+                Image::ZBI { path, signed } => {
+                    assert!(signed);
+                    ("path/to/fuchsia.zbi", path)
+                }
+                Image::VBMeta(path) => ("path/to/fuchsia.vbmeta", path),
+                Image::Fxfs { path, contents } => {
+                    assert_eq!(contents, &BlobfsContents::default());
+                    ("path/to/fxfs.blk", path)
+                }
+                Image::QemuKernel(path) => ("path/to/qemu/kernel", path),
+                _ => panic!("Unexpected item {:?}", image),
             };
             assert_eq!(&Utf8PathBuf::from(expected), actual);
         }
@@ -770,6 +880,14 @@ mod tests {
         }
     }
 
+    fn generate_test_manifest_fxfs() -> AssemblyManifest {
+        AssemblyManifest {
+            images: serde_json::from_value::<SerializationHelper>(generate_test_value_fxfs())
+                .unwrap()
+                .images,
+        }
+    }
+
     fn generate_test_value() -> Value {
         json!([
             {
@@ -819,6 +937,44 @@ mod tests {
                 "type": "blk",
                 "name": "fvm.fastboot",
                 "path": "path/to/fvm.fastboot.blk",
+            },
+            {
+                "type": "kernel",
+                "name": "qemu-kernel",
+                "path": "path/to/qemu/kernel",
+            },
+        ])
+    }
+
+    fn generate_test_value_fxfs() -> Value {
+        json!([
+            {
+                "type": "far",
+                "name": "base-package",
+                "path": "path/to/base.far",
+            },
+            {
+                "type": "zbi",
+                "name": "zircon-a",
+                "path": "path/to/fuchsia.zbi",
+                "signed": true,
+            },
+            {
+                "type": "vbmeta",
+                "name": "zircon-a",
+                "path": "path/to/fuchsia.vbmeta",
+            },
+            {
+                "type": "fxfs-blk",
+                "name": "storage-full",
+                "path": "path/to/fxfs.blk",
+                "contents": {
+                    "packages": {
+                        "base": [],
+                        "cache": [],
+                    },
+                    "maximum_contents_size": None::<u64>
+                },
             },
             {
                 "type": "kernel",

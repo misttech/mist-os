@@ -58,6 +58,9 @@
 #   fvm (optional)
 #     [string] The name of the fvm partition.
 #
+#   fxfs (optional)
+#     [string] The name of the fxfs partition.
+#
 template("generated_partitions_config") {
   assert(defined(invoker.hw_revision), "Need to define hw_revision")
 
@@ -185,6 +188,14 @@ template("generated_partitions_config") {
         {
           name = invoker.fvm
           type = "FVM"
+        },
+      ]
+    }
+    if (defined(invoker.fxfs) && invoker.fxfs != "") {
+      _partitions += [
+        {
+          name = invoker.fxfs
+          type = "Fxfs"
         },
       ]
     }

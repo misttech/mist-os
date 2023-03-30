@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/images/args.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 # TODO(fxbug.dev/81569): Burn this down.
 
@@ -72,34 +73,42 @@ legacy_fuchsia_image_metadata_overrides = {
     name = "blob"
   }
 
-  fvm = {
-    name = "storage-full"
-    archive = add_qemu_to_build_archives
-  }
+  if (fxfs_blob) {
+    fxfs = {
+      name = "storage-full"
+      type = "fxfs-blk"
+      archive = add_qemu_to_build_archives
+    }
+  } else {
+    fvm = {
+      name = "storage-full"
+      archive = add_qemu_to_build_archives
+    }
 
-  fvm_sparse = {
-    name = "storage-sparse"
-    archive = true
-    bootserver_pave = [ "--fvm" ]
-  }
+    fvm_sparse = {
+      name = "storage-sparse"
+      archive = true
+      bootserver_pave = [ "--fvm" ]
+    }
 
-  fvm_blob_sparse = {
-    name = "fvm.blob.sparse"
+    fvm_blob_sparse = {
+      name = "fvm.blob.sparse"
 
-    # Hack: Infra expects bootserver_pave to be present
-    # in the GN graph for this image to be built.
-    bootserver_pave = []
+      # Hack: Infra expects bootserver_pave to be present
+      # in the GN graph for this image to be built.
+      bootserver_pave = []
 
-    # TODO(fxbug.dev/82077): Remove these overrides once clients do not
-    # depend on the old path.
-    label = "//build/images/fuchsia:copy_fvm_blobf_sparse($default_toolchain)"
-    path = rebase_path(old_fvm_blob_sparse_path, root_build_dir)
-  }
+      # TODO(fxbug.dev/82077): Remove these overrides once clients do not
+      # depend on the old path.
+      label = "//build/images/fuchsia:copy_fvm_blobf_sparse($default_toolchain)"
+      path = rebase_path(old_fvm_blob_sparse_path, root_build_dir)
+    }
 
-  fvm_fastboot = {
-    name = "fvm.fastboot"
-    archive = true
-    fastboot_flash = [ fvm_partition ]
+    fvm_fastboot = {
+      name = "fvm.fastboot"
+      archive = true
+      fastboot_flash = [ fvm_partition ]
+    }
   }
 }
 

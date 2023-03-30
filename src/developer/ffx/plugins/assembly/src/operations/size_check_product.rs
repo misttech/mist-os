@@ -62,7 +62,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
     let assembly_manifest: AssemblyManifest =
         AssemblyManifest::try_load_from(&args.assembly_manifest)?;
 
-    let blobfs_contents = match extract_blobfs_contents(&assembly_manifest) {
+    let blobfs_contents = match extract_blob_contents(&assembly_manifest) {
         Some(contents) => contents,
         None => {
             tracing::info!("No blobfs image was found in {}", args.assembly_manifest);
@@ -101,7 +101,7 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
         };
 
         let other_blobfs_contents =
-            extract_blobfs_contents(&other_assembly_manifest).ok_or_else(|| {
+            extract_blob_contents(&other_assembly_manifest).ok_or_else(|| {
                 format_err!(
                     "Attempted to diff with {} which does not contain a blobfs image",
                     base_assembly_manifest
@@ -245,11 +245,17 @@ fn generate_visualization_tree(package_sizes: &Vec<PackageSizeInfo>) -> Visualiz
     }
 }
 
-/// Extracts the blobfs contents from the images manifest.
-fn extract_blobfs_contents(assembly_manifest: &AssemblyManifest) -> Option<&BlobfsContents> {
+/// Extracts the blob contents from the images manifest.
+fn extract_blob_contents(assembly_manifest: &AssemblyManifest) -> Option<&BlobfsContents> {
     for image in &assembly_manifest.images {
-        if let Image::BlobFS { contents, .. } = image {
-            return Some(contents);
+        match image {
+            Image::BlobFS { contents, .. } => {
+                return Some(contents);
+            }
+            Image::Fxfs { contents, .. } => {
+                return Some(contents);
+            }
+            _ => {}
         }
     }
     None
@@ -678,7 +684,7 @@ mod tests {
     use crate::operations::size_check_product::{
         build_blob_share_counts, calculate_package_diff, calculate_package_sizes,
         calculate_proportional_size, calculate_total_blobfs_size, create_gerrit_report,
-        extract_blobfs_contents, generate_package_level_diff_output,
+        extract_blob_contents, generate_package_level_diff_output,
         generate_product_level_diff_output, generate_visualization_tree,
         merge_package_and_product_diffs, PackageBlobSizeInfo, PackageLevelDiff, PackageSizeInfo,
         PackageSizeInfos, ProductLevelDiff, TOTAL_BLOBFS_GERRIT_COMPONENT_NAME,
@@ -725,7 +731,7 @@ mod tests {
     }
 
     #[test]
-    fn extract_blobfs_contents_test() -> Result<()> {
+    fn extract_blob_contents_test() -> Result<()> {
         let blobfs_contents = BlobfsContents {
             packages: PackagesMetadata {
                 base: PackageSetMetadata(vec![PackageMetadata {
@@ -740,12 +746,12 @@ mod tests {
         let mut assembly_manifest = AssemblyManifest {
             images: vec![Image::VBMeta("a/b/c".into()), Image::FVM("x/y/z".into())],
         };
-        assert_eq!(extract_blobfs_contents(&assembly_manifest), None);
+        assert_eq!(extract_blob_contents(&assembly_manifest), None);
         assembly_manifest
             .images
             .push(Image::BlobFS { path: "path/to/blob.blk".into(), contents: blobfs_contents });
         let blobfs_contents =
-            extract_blobfs_contents(&assembly_manifest).expect("blobfs contents is found");
+            extract_blob_contents(&assembly_manifest).expect("blobfs contents is found");
         assert_eq!(blobfs_contents.maximum_contents_size, Some(1234));
         Ok(())
     }

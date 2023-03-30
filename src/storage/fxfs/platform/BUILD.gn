@@ -68,7 +68,6 @@ rustc_library("platform") {
       "//third_party/rust_crates:linked-hash-map",
       "//third_party/rust_crates:once_cell",
       "//third_party/rust_crates:scopeguard",
-      "//third_party/rust_crates:serde",
       "//third_party/rust_crates:tracing",
       "//third_party/rust_crates:zstd",
       "//third_party/zstd",

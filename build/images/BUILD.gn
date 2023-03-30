@@ -22,6 +22,7 @@ import("//build/sdk/config.gni")
 import("//build/security.gni")
 import("//build/zbi/zbi_input.gni")
 import("//build/zircon/tools.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
@@ -167,7 +168,7 @@ mkfs_label = "//zircon/third_party/uapp/mkfs-msdosfs($host_toolchain)"
 mkfs_out_dir = get_label_info(mkfs_label, "root_out_dir")
 mkfs_bin = "$mkfs_out_dir/mkfs-msdosfs"
 
-if (!use_bringup_assembly) {
+if (!use_bringup_assembly && !fxfs_blob) {
   fvm_tool_target = "//src/storage/bin/fvm($host_toolchain)"
   fvm_tool_path = get_label_info(fvm_tool_target, "root_out_dir") + "/fvm"
 }
@@ -201,12 +202,15 @@ compiled_action("uefi-disk") {
     "--host-arch",
     host_cpu,
   ]
+  if (fxfs_blob) {
+    args += [ "--use-fxfs" ]
+  }
 
   depfile = "$uefi_disk_path.d"
 
   if (use_bringup_assembly) {
     args += [ "--ramdisk-only" ]
-  } else {
+  } else if (!fxfs_blob) {
     inputs += [ fvm_tool_path ]
     deps += [ "//src/storage/bin/fvm:fvm($host_toolchain)" ]
   }

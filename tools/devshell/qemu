@@ -28,7 +28,7 @@
 ## 2) fuchsia-ssh.zbi
 ##    This file is the image to be used as the initial ramdisk for the VM. When using QEMU,
 ##    pass this file to the VM instance using the -initrd option.
-## 3) fvm_raw.blk
+## 3) raw.blk
 ##    This file is the initial raw image of the block device for the VM.  It is
 ##    not present in a "bringup" build configuration, but should be present for
 ##    "core" builds and beyond.  When using QEMU, this file is provided to the
@@ -113,9 +113,14 @@ qemu_dir="${PREBUILT_QEMU_DIR}/bin"
 
 build_targets=()
 
-# Not all builds use an FVM so failing to find a source FVM is OK.
-fvm_source="$(fx-fvm-find-raw-source)"
-[[ -n "${fvm_source}" ]] && build_targets+=( "${fvm_source}" )
+# Not all builds use an FVM or Fxfs image so failing to find a source image is OK.
+is_fvm=1
+image_source="$(fx-fvm-find-raw-source)"
+if [[ -z "${image_source}" ]]; then
+  is_fvm=0
+  image_source="$(fx-command-run list-build-artifacts --name storage-full --type fxfs-blk --allow-empty images)"
+fi
+[[ -n "${image_source}" ]] && build_targets+=( "${image_source}" )
 
 args=(
   -a "${FUCHSIA_ARCH}"
@@ -165,12 +170,16 @@ else
   fi
 fi
 
-fvm_raw=
-if [[ -n "${fvm_source}" ]]; then
-  fvm_tool="$(fx-command-run host-tool --print fvm)"
-  fvm_raw="${imgdir}/fvm_raw.blk"
-  fx-fvm-extend-image "${fvm_tool}" "${FUCHSIA_BUILD_DIR}/${fvm_source}" "${fvm_raw}" "${IMAGE_SIZE}"
-  args+=(-D "${fvm_raw}" --diskfmt=raw)
+if [[ -n "${image_source}" ]]; then
+  img_raw="${imgdir}/raw.blk"
+  if (( $is_fvm )); then
+    fvm_tool="$(fx-command-run host-tool --print fvm)"
+    fx-fvm-extend-image "${fvm_tool}" "${FUCHSIA_BUILD_DIR}/${image_source}" "${img_raw}" "${IMAGE_SIZE}"
+  else
+    # TODO(fxbug.dev/122056): Support expanding Fxfs images.
+    cp "${FUCHSIA_BUILD_DIR}/${image_source}" "${img_raw}"
+  fi
+  args+=(-D "${img_raw}" --diskfmt=raw)
 fi
 
 if [[ -z "${PKG_TARGET}" ]]; then
@@ -180,7 +189,7 @@ else
   # that our tar file is just a archive of individual files with no paths.
   SYMLINK_PATH="$(mktemp -d)"
   CLEANUP_LIST+=("${SYMLINK_PATH}")
-  for i in "${kernelzbi}" "${fvm_raw}" "${FUCHSIA_BUILD_DIR}/${KERNEL_IMAGE}"; do
+  for i in "${kernelzbi}" "${img_raw}" "${FUCHSIA_BUILD_DIR}/${KERNEL_IMAGE}"; do
     if [[ ! $i ]]; then
       continue
     fi

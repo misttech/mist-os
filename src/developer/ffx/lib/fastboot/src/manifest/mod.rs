@@ -69,6 +69,7 @@ enum ImageType {
     ZBI,
     VBMeta,
     FVM,
+    Fxfs,
 }
 
 /// A map from a slot to the image paths assigned to that slot.
@@ -272,6 +273,15 @@ fn add_images_to_map(
                     slot_entry.insert(ImageType::FVM, path.to_string())
                 }
             }
+            assembly_manifest::Image::Fxfs { path, .. } => {
+                if let Slot::R = slot {
+                    // Recovery should not include fxfs, because it is embedded into the ZBI as a
+                    // ramdisk.
+                    None
+                } else {
+                    slot_entry.insert(ImageType::Fxfs, path.to_string())
+                }
+            }
             _ => None,
         };
     }
@@ -296,6 +306,9 @@ fn get_mapped_partitions(
 
             // Arbitrarily, take the fvm from the slot A system.
             Partition::FVM { name } => (name, ImageType::FVM, &Slot::A),
+
+            // Arbitrarily, take Fxfs from the slot A system.
+            Partition::Fxfs { name } => (name, ImageType::Fxfs, &Slot::A),
         };
 
         if let Some(slot) = match is_recovery {

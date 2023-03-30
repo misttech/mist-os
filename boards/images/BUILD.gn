@@ -44,6 +44,10 @@ _default_fvm = {
   }
 }
 
+_default_fxfs = {
+  fxfs = true
+}
+
 _default_fvm_with_size_limits = {
   fvm = {
     slice_size = 8388608
@@ -78,6 +82,12 @@ generated_images_config("x64") {
     compress = false
     truncate_to_length = 17179869184
   }
+}
+
+generated_images_config("x64-fxfs") {
+  forward_variables_from(_default_zbi, "*")
+  forward_variables_from(_default_vbmeta, "*")
+  forward_variables_from(_default_fxfs, "*")
 }
 
 generated_images_config("qemu-x64") {
@@ -214,6 +224,7 @@ group("images") {
     ":qemu-x64",
     ":vim3",
     ":x64",
+    ":x64-fxfs",
 
     # zedboot images configs
     ":zedboot_chromebook-x64",

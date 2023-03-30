@@ -265,6 +265,10 @@
                 target_monikers: [
                     "/bootstrap",
                     "/bootstrap/fshost/blobfs",
+
+                    // TODO(fxbug.dev/122055): Remove once merkle verification happens
+                    // out-of-process.
+                    "/bootstrap/fshost/fxfs",
                     "/core",
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
@@ -296,6 +300,7 @@
                     "/core",
                     "/core/appmgr",
                     "/core/pkg-cache",
+                    "/core/sshd-host",
                 ],
             },
             {

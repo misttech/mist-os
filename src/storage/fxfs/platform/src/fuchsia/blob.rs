@@ -40,10 +40,10 @@ use {
             BLOB_MERKLE_ATTRIBUTE_ID,
         },
         round::{round_down, round_up},
+        serialized_types::BlobMetadata,
     },
     once_cell::sync::Lazy,
     once_cell::sync::OnceCell,
-    serde::{Deserialize, Serialize},
     std::{
         io::Read,
         ops::Range,
@@ -79,15 +79,6 @@ use {
 pub(crate) const BLOCK_SIZE: u64 = 8192;
 
 pub(crate) const READ_AHEAD_SIZE: u64 = 131_072;
-
-// TODO(fxbug.dev/122125): This should be versioned.  Whether we reused serialized_types is up for
-// debate (since this version might be better off as independent from the journal version).
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BlobMetadata {
-    pub hashes: Vec<[u8; 32]>,
-    pub compressed_offsets: Vec<u64>,
-    pub uncompressed_size: u64,
-}
 
 /// A flat directory containing content-addressable blobs (names are their hashes).
 /// It is not possible to create sub-directories.
@@ -611,7 +602,7 @@ impl File for FxBlob {
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
         // We do not support exact/duplicate sharing mode.
         if flags.contains(VmoFlags::SHARED_BUFFER) {
-            error!("get_buffer does not support exact sharing mode!");
+            error!("get_backing_memory does not support exact sharing mode!");
             return Err(Status::NOT_SUPPORTED);
         }
         // We only support the combination of WRITE when a private COW clone is explicitly
@@ -753,9 +744,9 @@ impl PagerBackedVmo for FxBlob {
             Err(e) => {
                 error!(
                     ?range,
-                    oid = self.handle.object_id(),
+                    merkle_root = %self.merkle_tree.root(),
                     error = e.as_value(),
-                    "Failed to page-in range"
+                    "Failed to load range"
                 );
                 // TODO(fxbug.dev/122125): Should we fuse further reads shut?  This would match
                 // blobfs' behaviour.
@@ -1071,6 +1062,7 @@ impl FileIo for FxUnsealedBlob {
         Ok(read as u64)
     }
 
+    // TODO(fxbug.dev/122125): Support receiving blobs in the Delivery Format (RFC-0207).
     async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
         {
             let mut inner = self.inner.lock().unwrap();

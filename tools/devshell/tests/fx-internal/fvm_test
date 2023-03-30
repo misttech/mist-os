@@ -33,11 +33,11 @@ TEST_fx-fvm-find-raw-source() {
   # If all FVM files are present, we should use raw by default.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo "fvm.blk"
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo "fvm.sparse.blk"
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo "fvm.fastboot.blk"
 fi
 EOF
@@ -48,11 +48,11 @@ TEST_fx-fvm-find-raw-source_no_raw_path() {
   # If the raw FVM path is missing, fall back to sparse FVM.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo ""
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo "fvm.sparse.blk"
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo "fvm.fastboot.blk"
 fi
 EOF
@@ -64,11 +64,11 @@ TEST_fx-fvm-find-raw-source_no_raw_or_sparse_path() {
   # If the raw and sparse FVM paths are missing, fall back to fastboot FVM.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo ""
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo ""
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo "fvm.fastboot.blk"
 fi
 EOF
@@ -80,11 +80,11 @@ TEST_fx-fvm-find-raw-source_no_paths() {
   # If all FVM paths are missing, output should be empty.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo ""
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo ""
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo ""
 fi
 EOF
@@ -96,11 +96,11 @@ TEST_fx-fvm-find-raw-source_no_raw_file() {
   # If the raw FVM file is missing, fall back to sparse FVM.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo "fvm.blk"
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo "fvm.sparse.blk"
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo "fvm.fastboot.blk"
 fi
 EOF
@@ -112,11 +112,11 @@ TEST_fx-fvm-find-raw-source_no_raw_or_sparse_files() {
   # If the raw and sparse FVM files are missing, fall back to fastboot FVM.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo "fvm.blk"
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo "fvm.sparse.blk"
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo "fvm.fastboot.blk"
 fi
 EOF
@@ -129,11 +129,11 @@ TEST_fx-fvm-find-raw-source_no_files() {
   # If all FVM files are missing, output should be empty.
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts"
   cat > "${BT_TEMP_DIR}/tools/devshell/list-build-artifacts.mock_side_effects" << "EOF"
-if [[ "$@" == "--name storage-full --allow-empty images" ]] ; then
+if [[ "$@" == "--name storage-full --type blk --allow-empty images" ]] ; then
   echo "fvm.blk"
-elif [[ "$@" == "--name storage-sparse --allow-empty images" ]] ; then
+elif [[ "$@" == "--name storage-sparse --type blk --allow-empty images" ]] ; then
   echo "fvm.sparse.blk"
-elif [[ "$@" == "--name fvm.fastboot --allow-empty images" ]] ; then
+elif [[ "$@" == "--name fvm.fastboot --type blk --allow-empty images" ]] ; then
   echo "fvm.fastboot.blk"
 fi
 EOF

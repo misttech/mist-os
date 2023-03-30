@@ -34,6 +34,10 @@ pub enum Image {
     /// A VBMeta image.
     #[serde(rename = "vbmeta")]
     VBMeta(VBMeta),
+
+    /// An Fxfs image.
+    #[serde(rename = "fxfs")]
+    Fxfs(Fxfs),
 }
 
 /// Parameters describing how to generate the ZBI.
@@ -408,6 +412,10 @@ pub struct NandFvm {
     pub pages_per_block: u64,
 }
 
+/// The parameters describing how to create an Fxfs image.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Fxfs;
+
 impl ImagesConfig {
     /// Parse the config from a reader.
     pub fn from_reader<R>(reader: &mut R) -> Result<Self>
@@ -567,6 +575,7 @@ mod tests {
         let mut found_zbi = false;
         let mut found_vbmeta = false;
         let mut found_standard_fvm = false;
+        let mut found_fxfs = false;
         for image in config.images {
             match image {
                 Image::Zbi(zbi) => {
@@ -593,11 +602,15 @@ mod tests {
                         }
                     }
                 }
+                Image::Fxfs(_) => {
+                    found_fxfs = true;
+                }
             }
         }
         assert!(found_zbi);
         assert!(found_vbmeta);
         assert!(found_standard_fvm);
+        assert!(!found_fxfs);
     }
 
     #[test]
