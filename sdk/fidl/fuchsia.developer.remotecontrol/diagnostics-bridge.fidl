@@ -7,7 +7,7 @@ using fuchsia.logger as logger;
 using fuchsia.diagnostics as diagnostics;
 using zx;
 
-const MAX_ENTRIES int32 = 1;
+const MAX_ENTRIES int32 = 3;
 
 type StreamError = strict enum : uint32 {
     // Indicates an error that doesn't fall into any of the below types.
