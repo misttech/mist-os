@@ -328,10 +328,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        ip::{
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
-            IpExt,
-        },
+        device::testutil::{FakeDeviceId, FakeWeakDeviceId},
+        ip::IpExt,
         socket::{BoundSocketMap, InsertError},
     };
 

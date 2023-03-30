@@ -1752,7 +1752,7 @@ pub(crate) mod testutil {
     }
 
     mod tests {
-        use crate::ip::testutil::FakeDeviceId;
+        use crate::device::testutil::FakeDeviceId;
 
         use super::*;
 

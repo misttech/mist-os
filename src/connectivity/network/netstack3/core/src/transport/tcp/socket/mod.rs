@@ -56,7 +56,7 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
-    device::{DeviceId, WeakDeviceId},
+    device::{DeviceId, WeakDeviceId, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         socket::{
@@ -64,7 +64,7 @@ use crate::{
             IpSockCreationError, IpSocketHandler as _, Mms,
         },
         BufferTransportIpContext, EitherDeviceId, IpDeviceId, IpDeviceIdContext, IpExt,
-        IpLayerIpExt, TransportIpContext as _, WeakIpDeviceId,
+        IpLayerIpExt, TransportIpContext as _,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -411,7 +411,7 @@ impl<I: Ip> SocketMapAddrStateSpec for ListenerAddrState<I> {
     }
 }
 
-impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
+impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapUpdateSharingPolicy<
         ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState,
@@ -618,7 +618,7 @@ impl Default for SharingState {
     }
 }
 
-impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
+impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapConflictPolicy<
         ListenerAddr<I::Addr, D, NonZeroU16>,
         ListenerSharingState,
@@ -674,7 +674,7 @@ impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
     }
 }
 
-impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext>
+impl<I: IpExt, D: WeakId, C: NonSyncContext>
     SocketMapConflictPolicy<
         ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>,
         SharingState,
@@ -780,13 +780,13 @@ struct Unbound<D> {
 }
 
 /// Holds all the TCP socket states.
-pub(crate) struct Sockets<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> {
+pub(crate) struct Sockets<I: IpExt, D: WeakId, C: NonSyncContext> {
     port_alloc: PortAlloc<BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>>,
     inactive: IdMap<Unbound<D>>,
     socketmap: BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
 }
 
-impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> PortAllocImpl
+impl<I: IpExt, D: WeakId, C: NonSyncContext> PortAllocImpl
     for BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>
 {
     const TABLE_SIZE: NonZeroUsize = nonzero!(20usize);
@@ -814,7 +814,7 @@ impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> PortAllocImpl
     }
 }
 
-impl<I: IpExt, D: WeakIpDeviceId, C: NonSyncContext> Sockets<I, D, C> {
+impl<I: IpExt, D: WeakId, C: NonSyncContext> Sockets<I, D, C> {
     fn get_listener_by_id_mut(
         &mut self,
         id: ListenerId<I>,
@@ -963,7 +963,7 @@ impl<I: Ip> IdMapCollectionKey for ListenerId<I> {
 }
 
 impl<I: IpExt> ConnectionId<I> {
-    fn get_from_socketmap<D: WeakIpDeviceId, C: NonSyncContext>(
+    fn get_from_socketmap<D: WeakId, C: NonSyncContext>(
         self,
         socketmap: &BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     ) -> (
@@ -977,7 +977,7 @@ impl<I: IpExt> ConnectionId<I> {
         (conn, *sharing, addr)
     }
 
-    fn get_from_socketmap_mut<D: WeakIpDeviceId, C: NonSyncContext>(
+    fn get_from_socketmap_mut<D: WeakId, C: NonSyncContext>(
         self,
         socketmap: &mut BoundSocketMap<IpPortSpec<I, D>, TcpSocketSpec<I, D, C>>,
     ) -> (
@@ -3017,6 +3017,7 @@ mod tests {
             FakeNonSyncCtx, FakeSyncCtx, InstantAndData, PendingFrameData, StepResult,
             WrappedFakeSyncCtx,
         },
+        device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
             device::state::{
                 AddrConfig, AddressState, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry,
@@ -3025,7 +3026,6 @@ mod tests {
                 testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
                 MmsError, SendOptions,
             },
-            testutil::{FakeDeviceId, FakeStrongIpDeviceId, FakeWeakDeviceId, MultipleDevicesId},
             BufferIpTransportContext as _, SendIpPacketMeta,
         },
         testutil::{new_rng, run_with_many_seeds, set_logger_for_test, FakeCryptoRng, TestIpExt},
@@ -3060,12 +3060,12 @@ mod tests {
         D,
     >;
 
-    struct FakeTcpState<I: TcpTestIpExt, D: FakeStrongIpDeviceId> {
+    struct FakeTcpState<I: TcpTestIpExt, D: FakeStrongDeviceId> {
         isn_generator: IsnGenerator<FakeInstant>,
         sockets: Sockets<I, FakeWeakDeviceId<D>, TcpNonSyncCtx>,
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId> Default for FakeTcpState<I, D> {
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId> Default for FakeTcpState<I, D> {
         fn default() -> Self {
             Self {
                 isn_generator: Default::default(),
@@ -3087,7 +3087,7 @@ mod tests {
 
     type TcpCtx<I, D> = FakeCtxWithSyncCtx<TcpSyncCtx<I, D>, TimerId, (), NonSyncState>;
 
-    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId>
         AsMut<FakeFrameCtx<SendIpPacketMeta<I, D, SpecifiedAddr<<I as Ip>::Addr>>>>
         for TcpCtx<I, D>
     {
@@ -3098,7 +3098,7 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId> FakeNetworkContext for TcpCtx<I, D> {
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId> FakeNetworkContext for TcpCtx<I, D> {
         type TimerId = TimerId;
         type SendMeta = SendIpPacketMeta<I, FakeDeviceId, SpecifiedAddr<<I as Ip>::Addr>>;
     }
@@ -3297,7 +3297,7 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId + 'static> DeviceIpSocketHandler<I, TcpNonSyncCtx>
         for FakeBufferIpTransportCtx<I, D>
     {
         fn get_mms<O: SendOptions<I>>(
@@ -3309,7 +3309,7 @@ mod tests {
         }
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId + 'static> SyncContext<I, TcpNonSyncCtx>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId + 'static> SyncContext<I, TcpNonSyncCtx>
         for TcpSyncCtx<I, D>
     {
         type IpTransportCtx<'a> = FakeBufferIpTransportCtx<I, D>;
@@ -3475,13 +3475,13 @@ mod tests {
         .expect("failed to deliver bytes");
     }
 
-    impl<I: TcpTestIpExt, D: FakeStrongIpDeviceId, NewIp: TcpTestIpExt> GenericOverIp<NewIp>
+    impl<I: TcpTestIpExt, D: FakeStrongDeviceId, NewIp: TcpTestIpExt> GenericOverIp<NewIp>
         for TcpCtx<I, D>
     {
         type Type = TcpCtx<NewIp, D>;
     }
 
-    fn handle_timer<I: Ip + TcpTestIpExt, D: FakeStrongIpDeviceId + 'static>(
+    fn handle_timer<I: Ip + TcpTestIpExt, D: FakeStrongDeviceId + 'static>(
         ctx: &mut TcpCtx<I, D>,
         _: &mut (),
         timer_id: TimerId,

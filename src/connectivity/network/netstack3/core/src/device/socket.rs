@@ -478,8 +478,10 @@ mod tests {
     use nonzero_ext::nonzero;
     use test_case::test_case;
 
-    use crate::ip::testutil::FakeWeakDeviceId;
-    use crate::{context::testutil::FakeSyncCtx, ip::testutil::MultipleDevicesId};
+    use crate::{
+        context::testutil::FakeSyncCtx,
+        device::testutil::{FakeWeakDeviceId, MultipleDevicesId},
+    };
 
     use super::*;
 

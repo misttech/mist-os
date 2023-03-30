@@ -3013,7 +3013,11 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
-        device::{set_routing_enabled, DeviceId, FrameDestination},
+        device::{
+            set_routing_enabled,
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
+            DeviceId, FrameDestination,
+        },
         ip::{
             device::{
                 route_discovery::Ipv6DiscoveredRoute,
@@ -3024,7 +3028,7 @@ mod tests {
             path_mtu::testutil::FakePmtuState,
             receive_ip_packet,
             socket::testutil::FakeIpSocketCtx,
-            testutil::{FakeDeviceId, FakeIpDeviceIdCtx, FakeWeakDeviceId},
+            testutil::FakeIpDeviceIdCtx,
             SendIpPacketMeta,
         },
         testutil::{

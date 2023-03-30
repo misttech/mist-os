@@ -1579,12 +1579,10 @@ mod tests {
             FakeCtx, FakeInstant, FakeInstantRange as _, FakeNonSyncCtx, FakeSyncCtx,
             FakeTimerCtxExt as _,
         },
-        device::FrameDestination,
+        device::{testutil::FakeDeviceId, FrameDestination},
         ip::{
             device::testutil::with_assigned_ipv6_addr_subnets,
-            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
-            receive_ip_packet,
-            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
+            icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT, receive_ip_packet, testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
             assert_empty, FakeCryptoRng, FakeEventDispatcherConfig, TestIpExt as _,

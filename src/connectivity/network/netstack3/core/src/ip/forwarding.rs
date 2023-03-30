@@ -334,8 +334,9 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::FakeSyncCtx,
+        device::testutil::MultipleDevicesId,
         ip::{
-            testutil::{FakeIpDeviceIdCtx, MultipleDevicesId},
+            testutil::FakeIpDeviceIdCtx,
             types::{Metric, RawMetric},
         },
         testutil::FakeEventDispatcherConfig,

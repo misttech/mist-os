@@ -13,7 +13,8 @@ use net_types::{
 };
 
 use crate::{
-    ip::{IpExt, WeakIpDeviceId},
+    device::WeakId,
+    ip::IpExt,
     socket::{AddrVec, SocketMapAddrSpec},
 };
 
@@ -51,7 +52,7 @@ pub(crate) struct ConnAddr<A: IpAddress, D, LI, RI> {
 /// with IP addresses and 16-bit local and remote port identifiers.
 pub(crate) struct IpPortSpec<I, D>(PhantomData<(I, D)>, Never);
 
-impl<I: Ip + IpExt, D: WeakIpDeviceId> SocketMapAddrSpec for IpPortSpec<I, D> {
+impl<I: Ip + IpExt, D: WeakId> SocketMapAddrSpec for IpPortSpec<I, D> {
     type IpVersion = I;
     type IpAddr = I::Addr;
     type WeakDeviceId = D;

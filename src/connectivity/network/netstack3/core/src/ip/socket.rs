@@ -895,10 +895,11 @@ pub(crate) mod testutil {
             testutil::{FakeCounterCtx, FakeInstant, FakeInstantCtx, FakeNonSyncCtx, FakeSyncCtx},
             RngContext, SendFrameContext,
         },
+        device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
             device::state::{AddrConfig, AddressState, AssignedAddress as _, IpDeviceState},
             forwarding::ForwardingTable,
-            testutil::{FakeDeviceId, FakeIpDeviceIdCtx, FakeStrongIpDeviceId, FakeWeakDeviceId},
+            testutil::FakeIpDeviceIdCtx,
             types::{Metric, RawMetric},
             HopLimits, MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext,
             DEFAULT_HOP_LIMITS,
@@ -935,7 +936,7 @@ pub(crate) mod testutil {
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
-            DeviceId: FakeStrongIpDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId + 'static,
         > TransportIpContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
@@ -955,7 +956,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongIpDeviceId + 'static> IpDeviceIdContext<I>
+    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId + 'static> IpDeviceIdContext<I>
         for FakeIpSocketCtx<I, DeviceId>
     {
         type DeviceId = <FakeIpDeviceIdCtx<I, DeviceId> as IpDeviceIdContext<I>>::DeviceId;
@@ -980,7 +981,7 @@ pub(crate) mod testutil {
     impl<
             I: IpDeviceStateIpExt,
             C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
-            DeviceId: FakeStrongIpDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId + 'static,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
     {
         fn lookup_route(
@@ -1029,7 +1030,7 @@ pub(crate) mod testutil {
             Id,
             Meta,
             Event: Debug,
-            DeviceId: FakeStrongIpDeviceId + 'static,
+            DeviceId: FakeStrongDeviceId + 'static,
             NonSyncCtxState,
         > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
         for FakeSyncCtx<S, Meta, DeviceId>
@@ -1084,7 +1085,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D: FakeStrongIpDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         pub(crate) fn with_devices_state(
             devices: impl IntoIterator<
                 Item = (D, IpDeviceState<FakeInstant, I>, Vec<SpecifiedAddr<I::Addr>>),
@@ -1157,7 +1158,7 @@ pub(crate) mod testutil {
 
     impl<
             I: IpDeviceStateIpExt,
-            D: FakeStrongIpDeviceId + 'static,
+            D: FakeStrongDeviceId + 'static,
             C: RngContext + InstantContext<Instant = FakeInstant>,
         > MulticastMembershipHandler<I, C> for FakeIpSocketCtx<I, D>
     {
@@ -1225,7 +1226,7 @@ pub(crate) mod testutil {
     impl<
             I: IpExt + IpDeviceStateIpExt,
             C: AsMut<FakeCounterCtx> + AsRef<FakeInstantCtx>,
-            D: FakeStrongIpDeviceId + 'static,
+            D: FakeStrongDeviceId + 'static,
             Meta,
         > TransportIpContext<I, C> for FakeSyncCtx<FakeBufferIpSocketCtx<I, D>, Meta, D>
     where
@@ -1256,7 +1257,7 @@ pub(crate) mod testutil {
         pub(crate) remote_ips: Vec<SpecifiedAddr<A>>,
     }
 
-    impl<I: IpDeviceStateIpExt, D: FakeStrongIpDeviceId> FakeIpSocketCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D: FakeStrongDeviceId> FakeIpSocketCtx<I, D> {
         /// Creates a new `FakeIpSocketCtx<Ipv6>` with the given device
         /// configs.
         pub(crate) fn new(devices: impl IntoIterator<Item = FakeDeviceConfig<D, I::Addr>>) -> Self {
@@ -1323,7 +1324,7 @@ mod tests {
     use super::*;
     use crate::{
         context::{testutil::FakeInstant, EventContext},
-        device::DeviceId,
+        device::{testutil::FakeDeviceId, DeviceId},
         ip::{
             device::{
                 IpDeviceContext as DeviceIpDeviceContext, IpDeviceEvent, IpDeviceIpExt,
@@ -1991,7 +1992,7 @@ mod tests {
         const START_OPTION: usize = 23;
         const DEFAULT_OPTION: usize = 0;
         const NEW_OPTION: usize = 55;
-        let mut socket = IpSock::<Ipv4, crate::ip::testutil::FakeDeviceId, _> {
+        let mut socket = IpSock::<Ipv4, FakeDeviceId, _> {
             definition: IpSockDefinition {
                 remote_ip: Ipv4::LOOPBACK_ADDRESS,
                 local_ip: Ipv4::LOOPBACK_ADDRESS,

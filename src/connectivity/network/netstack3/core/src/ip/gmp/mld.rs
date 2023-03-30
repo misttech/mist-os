@@ -430,14 +430,14 @@ mod tests {
             testutil::{FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
-        device::DeviceId,
+        device::{testutil::FakeDeviceId, DeviceId},
         ip::{
             device::Ipv6DeviceTimerId,
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, QueryReceivedGenericAction,
             },
-            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
+            testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,

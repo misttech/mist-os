@@ -26,6 +26,7 @@ use crate::{
         id_map::{Entry as IdMapEntry, IdMap, OccupiedEntry as IdMapOccupied},
         socketmap::Tagged,
     },
+    device::WeakId,
     error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
         socket::{
@@ -33,7 +34,7 @@ use crate::{
             IpSockSendError, IpSocketHandler as _, SendOptions,
         },
         BufferTransportIpContext, EitherDeviceId, HopLimits, IpDeviceId, IpDeviceIdContext, IpExt,
-        MulticastMembershipHandler, TransportIpContext, WeakIpDeviceId,
+        MulticastMembershipHandler, TransportIpContext,
     },
     socket::{
         self,
@@ -222,7 +223,7 @@ where
     type IpSocketsCtx<'a>: TransportIpContext<
             A::IpVersion,
             C,
-            DeviceId = <A::WeakDeviceId as WeakIpDeviceId>::Strong,
+            DeviceId = <A::WeakDeviceId as WeakId>::Strong,
             WeakDeviceId = A::WeakDeviceId,
         > + MulticastMembershipHandler<A::IpVersion, C>;
 
@@ -274,7 +275,7 @@ pub(crate) trait BufferDatagramStateContext<
         A::IpVersion,
         C,
         B,
-        DeviceId = <A::WeakDeviceId as WeakIpDeviceId>::Strong,
+        DeviceId = <A::WeakDeviceId as WeakId>::Strong,
         WeakDeviceId = A::WeakDeviceId,
     >;
 
@@ -314,7 +315,7 @@ where
         A::IpVersion,
         C,
         B,
-        DeviceId = <A::WeakDeviceId as WeakIpDeviceId>::Strong,
+        DeviceId = <A::WeakDeviceId as WeakId>::Strong,
         WeakDeviceId = A::WeakDeviceId,
     >,
 {
@@ -1064,7 +1065,7 @@ fn send_oneshot<
         A::IpVersion,
         C,
         B,
-        DeviceId = <A::WeakDeviceId as WeakIpDeviceId>::Strong,
+        DeviceId = <A::WeakDeviceId as WeakId>::Strong,
         WeakDeviceId = A::WeakDeviceId,
     >,
     C,
@@ -1625,14 +1626,15 @@ mod test {
 
     use crate::{
         data_structures::socketmap::SocketMap,
+        device::{
+            testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+            WeakId,
+        },
         ip::{
             device::state::IpDeviceStateIpExt,
             socket::testutil::{FakeDeviceConfig, FakeIpSocketCtx},
-            testutil::{
-                FakeDeviceId, FakeIpDeviceIdCtx, FakeStrongIpDeviceId, FakeWeakDeviceId,
-                MultipleDevicesId,
-            },
-            IpLayerIpExt, WeakIpDeviceId, DEFAULT_HOP_LIMITS,
+            testutil::FakeIpDeviceIdCtx,
+            IpLayerIpExt, DEFAULT_HOP_LIMITS,
         },
         socket::{IncompatibleError, InsertError, RemoveResult},
         testutil::{FakeNonSyncCtx, TestIpExt},
@@ -1647,7 +1649,7 @@ mod test {
 
     struct FakeAddrSpec<I, D>(Never, PhantomData<(I, D)>);
 
-    impl<I: IpExt, D: WeakIpDeviceId> SocketMapAddrSpec for FakeAddrSpec<I, D> {
+    impl<I: IpExt, D: WeakId> SocketMapAddrSpec for FakeAddrSpec<I, D> {
         type WeakDeviceId = D;
         type IpAddr = I::Addr;
         type IpVersion = I;
@@ -1735,7 +1737,7 @@ mod test {
         type UnboundSharingState = Sharing;
     }
 
-    impl<A, I: DatagramIpExt, D: FakeStrongIpDeviceId>
+    impl<A, I: DatagramIpExt, D: FakeStrongDeviceId>
         SocketMapConflictPolicy<A, Sharing, FakeAddrSpec<I, FakeWeakDeviceId<D>>>
         for FakeStateSpec<I, FakeWeakDeviceId<D>>
     {
@@ -1753,7 +1755,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: FakeStrongIpDeviceId>
+    impl<I: DatagramIpExt, D: FakeStrongDeviceId>
         DatagramSocketSpec<FakeAddrSpec<I, FakeWeakDeviceId<D>>>
         for FakeStateSpec<I, FakeWeakDeviceId<D>>
     {
@@ -1797,7 +1799,7 @@ mod test {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    struct FakeDatagramState<I: DatagramIpExt, D: FakeStrongIpDeviceId> {
+    struct FakeDatagramState<I: DatagramIpExt, D: FakeStrongDeviceId> {
         sockets: DatagramSockets<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
             FakeStateSpec<I, FakeWeakDeviceId<D>>,
@@ -1805,7 +1807,7 @@ mod test {
         state: FakeIpSocketCtx<I, D>,
     }
 
-    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongIpDeviceId + 'static>
+    impl<I: DatagramIpExt + IpLayerIpExt, D: FakeStrongDeviceId + 'static>
         DatagramStateContext<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
             FakeNonSyncCtx,
@@ -1864,7 +1866,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: FakeStrongIpDeviceId + 'static>
+    impl<I: DatagramIpExt, D: FakeStrongDeviceId + 'static>
         LocalIdentifierAllocator<
             FakeAddrSpec<I, FakeWeakDeviceId<D>>,
             FakeNonSyncCtx,

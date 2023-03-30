@@ -27,6 +27,7 @@ use crate::{
     context::{
         CounterContext, EventContext, InstantContext, RngContext, TimerContext, TimerHandler,
     },
+    device::Id as _,
     error::{ExistsError, NotFoundError, NotSupportedError},
     ip::{
         device::{
@@ -46,7 +47,7 @@ use crate::{
             GroupLeaveResult,
         },
         types::RawMetric,
-        DualStackDeviceIdContext, IpDeviceId as _, IpDeviceIdContext,
+        DualStackDeviceIdContext, IpDeviceIdContext,
     },
     Instant,
 };

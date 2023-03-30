@@ -442,13 +442,12 @@ mod tests {
             testutil::{FakeCtx, FakeNetwork, FakeNonSyncCtx, FakeSyncCtx},
             TimerHandler,
         },
-        device::{ethernet::EthernetLinkDevice, link::testutil::FakeLinkDeviceId},
-        ip::{
-            device::nud::{
-                testutil::{assert_dynamic_neighbor_with_addr, assert_neighbor_unknown},
-                BufferNudHandler,
-            },
-            testutil::FakeDeviceId,
+        device::{
+            ethernet::EthernetLinkDevice, link::testutil::FakeLinkDeviceId, testutil::FakeDeviceId,
+        },
+        ip::device::nud::{
+            testutil::{assert_dynamic_neighbor_with_addr, assert_neighbor_unknown},
+            BufferNudHandler,
         },
         testutil::assert_empty,
     };

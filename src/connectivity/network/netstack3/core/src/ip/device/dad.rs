@@ -228,7 +228,8 @@ mod tests {
             testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _},
             InstantContext as _, SendFrameContext as _,
         },
-        ip::testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
+        device::testutil::FakeDeviceId,
+        ip::testutil::FakeIpDeviceIdCtx,
     };
 
     struct FakeDadContext {

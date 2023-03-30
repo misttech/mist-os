@@ -513,13 +513,13 @@ mod tests {
             testutil::{handle_timer_helper_with_sc_ref_mut, FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
-        device::{ethernet, DeviceId},
+        device::{ethernet, testutil::FakeDeviceId, DeviceId},
         ip::{
             gmp::{
                 GmpHandler as _, GroupJoinResult, GroupLeaveResult, MemberState, MulticastGroupSet,
                 QueryReceivedActions, ReportReceivedActions, ReportTimerExpiredActions,
             },
-            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
+            testutil::FakeIpDeviceIdCtx,
         },
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, FakeEventDispatcherConfig, TestIpExt as _,

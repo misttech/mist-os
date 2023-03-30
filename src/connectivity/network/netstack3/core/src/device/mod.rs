@@ -16,6 +16,7 @@ mod state;
 use alloc::vec::Vec;
 use core::{
     fmt::{self, Debug, Display, Formatter},
+    hash::Hash,
     marker::PhantomData,
 };
 
@@ -68,7 +69,7 @@ use crate::{
             IpDeviceContext, IpDeviceStateAccessor, Ipv6DeviceContext,
         },
         types::RawMetric,
-        DualStackDeviceIdContext, IpDeviceId, IpDeviceIdContext, StrongIpDeviceId, WeakIpDeviceId,
+        DualStackDeviceIdContext, IpDeviceIdContext,
     },
     sync::{PrimaryRc, RwLock, StrongRc, WeakRc},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -80,10 +81,24 @@ use crate::{
 /// is only intended to exist at the type level, never instantiated at runtime.
 pub(crate) trait Device: 'static {}
 
-/// An execution context which provides a `DeviceId` type for various device
-/// layer internals to share.
+/// An execution context which provides a `DeviceId` type for various netstack
+/// internals to share.
 pub(crate) trait DeviceIdContext<D: Device> {
     type DeviceId: Clone + Display + Debug + Eq + Send + Sync + 'static;
+}
+
+// An identifier for a device.
+pub(crate) trait Id: Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync {
+    /// Returns true if the device is a loopback device.
+    fn is_loopback(&self) -> bool;
+}
+
+pub(crate) trait StrongId: Id {
+    type Weak: WeakId<Strong = Self>;
+}
+
+pub(crate) trait WeakId: Id + PartialEq<Self::Strong> {
+    type Strong: StrongId<Weak = Self>;
 }
 
 struct RecvIpFrameMeta<D, I: Ip> {
@@ -1015,7 +1030,7 @@ impl<C: DeviceLayerEventDispatcher> WeakDeviceId<C> {
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> IpDeviceId for WeakDeviceId<C> {
+impl<C: DeviceLayerEventDispatcher> Id for WeakDeviceId<C> {
     fn is_loopback(&self) -> bool {
         match self {
             WeakDeviceId::Loopback(LoopbackWeakDeviceId(_)) => true,
@@ -1024,7 +1039,7 @@ impl<C: DeviceLayerEventDispatcher> IpDeviceId for WeakDeviceId<C> {
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> WeakIpDeviceId for WeakDeviceId<C> {
+impl<C: DeviceLayerEventDispatcher> WeakId for WeakDeviceId<C> {
     type Strong = DeviceId<C>;
 }
 
@@ -1101,7 +1116,7 @@ impl<C: DeviceLayerEventDispatcher> DeviceId<C> {
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> IpDeviceId for DeviceId<C> {
+impl<C: DeviceLayerEventDispatcher> Id for DeviceId<C> {
     fn is_loopback(&self) -> bool {
         match self {
             DeviceId::Loopback(LoopbackDeviceId(_)) => true,
@@ -1110,7 +1125,7 @@ impl<C: DeviceLayerEventDispatcher> IpDeviceId for DeviceId<C> {
     }
 }
 
-impl<C: DeviceLayerEventDispatcher> StrongIpDeviceId for DeviceId<C> {
+impl<C: DeviceLayerEventDispatcher> StrongId for DeviceId<C> {
     type Weak = WeakDeviceId<C>;
 }
 
@@ -1782,6 +1797,57 @@ pub(crate) mod testutil {
     use super::*;
     use crate::Ctx;
 
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
+
+    impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {
+        fn eq(&self, other: &D) -> bool {
+            let Self(this) = self;
+            this == other
+        }
+    }
+
+    impl<D: Debug> core::fmt::Display for FakeWeakDeviceId<D> {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            core::fmt::Debug::fmt(self, f)
+        }
+    }
+
+    impl<D: StrongId<Weak = Self>> WeakId for FakeWeakDeviceId<D> {
+        type Strong = D;
+    }
+
+    impl<D: Id> Id for FakeWeakDeviceId<D> {
+        fn is_loopback(&self) -> bool {
+            let Self(inner) = self;
+            inner.is_loopback()
+        }
+    }
+
+    /// A fake device ID for use in testing.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    pub(crate) struct FakeDeviceId;
+
+    impl StrongId for FakeDeviceId {
+        type Weak = FakeWeakDeviceId<Self>;
+    }
+
+    impl Id for FakeDeviceId {
+        fn is_loopback(&self) -> bool {
+            false
+        }
+    }
+
+    impl Display for FakeDeviceId {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(f, "FakeDeviceId")
+        }
+    }
+
+    pub(crate) trait FakeStrongDeviceId: StrongId<Weak = FakeWeakDeviceId<Self>> {}
+
+    impl<D: StrongId<Weak = FakeWeakDeviceId<Self>>> FakeStrongDeviceId for D {}
+
     /// Calls [`receive_frame`], with a [`Ctx`].
     pub(crate) fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
         Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<NonSyncCtx>,
@@ -1802,6 +1868,36 @@ pub(crate) mod testutil {
         update_ipv6_configuration(sync_ctx, ctx, device, |config| {
             config.ip_config.ip_enabled = true;
         });
+    }
+
+    /// A device ID type that supports identifying more than one distinct
+    /// device.
+    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
+    pub(crate) enum MultipleDevicesId {
+        A,
+        B,
+    }
+
+    impl MultipleDevicesId {
+        pub(crate) fn all() -> [Self; 2] {
+            [Self::A, Self::B]
+        }
+    }
+
+    impl core::fmt::Display for MultipleDevicesId {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            core::fmt::Debug::fmt(self, f)
+        }
+    }
+
+    impl Id for MultipleDevicesId {
+        fn is_loopback(&self) -> bool {
+            false
+        }
+    }
+
+    impl StrongId for MultipleDevicesId {
+        type Weak = FakeWeakDeviceId<Self>;
     }
 }
 

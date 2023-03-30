@@ -20,7 +20,8 @@ use packet_formats::utils::NonZeroDuration;
 use rand::RngCore;
 
 use crate::{
-    ip::{socket::Mms, IpExt, WeakIpDeviceId},
+    device::WeakId,
+    ip::{socket::Mms, IpExt},
     sync::Mutex,
     transport::tcp::{
         self,
@@ -60,12 +61,12 @@ pub(crate) enum UserError {
     ConnectionClosed,
 }
 
-pub(crate) struct TcpState<I: IpExt, D: WeakIpDeviceId, C: tcp::socket::NonSyncContext> {
+pub(crate) struct TcpState<I: IpExt, D: WeakId, C: tcp::socket::NonSyncContext> {
     pub(crate) isn_generator: IsnGenerator<C::Instant>,
     pub(crate) sockets: Mutex<Sockets<I, D, C>>,
 }
 
-impl<I: IpExt, D: WeakIpDeviceId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {
+impl<I: IpExt, D: WeakId, C: tcp::socket::NonSyncContext> TcpState<I, D, C> {
     pub(crate) fn new(now: C::Instant, rng: &mut impl RngCore) -> Self {
         Self { isn_generator: IsnGenerator::new(now, rng), sockets: Mutex::new(Sockets::new(rng)) }
     }

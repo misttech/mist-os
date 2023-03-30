@@ -55,7 +55,7 @@ use packet_formats::{
 use crate::{
     context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},
     data_structures::token_bucket::TokenBucket,
-    device::{DeviceId, FrameDestination, WeakDeviceId},
+    device::{DeviceId, FrameDestination, Id, StrongId, WeakDeviceId, WeakId},
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
@@ -456,20 +456,8 @@ impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<S, W> {
 }
 
 /// An IP device ID.
-pub(crate) trait IpDeviceId:
-    Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync
-{
-    /// Returns true if the device is a loopback device.
-    fn is_loopback(&self) -> bool;
-}
-
-pub(crate) trait StrongIpDeviceId: IpDeviceId {
-    type Weak: WeakIpDeviceId<Strong = Self>;
-}
-
-pub(crate) trait WeakIpDeviceId: IpDeviceId + PartialEq<Self::Strong> {
-    type Strong: StrongIpDeviceId<Weak = Self>;
-}
+pub(crate) trait IpDeviceId: Id {}
+impl<D: Id> IpDeviceId for D {}
 
 pub(crate) trait DualStackDeviceIdContext {
     type DualStackDeviceId: IpDeviceId;
@@ -485,10 +473,10 @@ pub(crate) trait DualStackDeviceIdContext {
 /// as when ICMP delivers an MLD packet to the `mld` module for processing).
 pub(crate) trait IpDeviceIdContext<I: Ip> {
     /// The type of device IDs.
-    type DeviceId: StrongIpDeviceId<Weak = Self::WeakDeviceId> + 'static;
+    type DeviceId: StrongId<Weak = Self::WeakDeviceId> + 'static;
 
     /// The type of weakly referenced device IDs.
-    type WeakDeviceId: WeakIpDeviceId<Strong = Self::DeviceId> + 'static;
+    type WeakDeviceId: WeakId<Strong = Self::DeviceId> + 'static;
 
     /// Returns a weak ID for the strong ID.
     fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId;
@@ -540,19 +528,17 @@ pub(crate) enum Ipv6PresentAddressStatus {
 /// An extension trait providing IP layer properties.
 pub(crate) trait IpLayerIpExt: IpExt {
     type AddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongIpDeviceId>: AsRef<
-        IpStateInner<Self, I, StrongDeviceId>,
-    >;
+    type State<I: Instant, StrongDeviceId: StrongId>: AsRef<IpStateInner<Self, I, StrongDeviceId>>;
 }
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongIpDeviceId> = Ipv4State<I, StrongDeviceId>;
+    type State<I: Instant, StrongDeviceId: StrongId> = Ipv4State<I, StrongDeviceId>;
 }
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
-    type State<I: Instant, StrongDeviceId: StrongIpDeviceId> = Ipv6State<I, StrongDeviceId>;
+    type State<I: Instant, StrongDeviceId: StrongId> = Ipv6State<I, StrongDeviceId>;
 }
 
 /// The state context provided to the IP layer.
@@ -1064,7 +1050,7 @@ impl Ipv4StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId>(
+    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId>(
         self,
     ) -> Ipv4State<Instant, StrongDeviceId> {
         let Ipv4StateBuilder { icmp } = self;
@@ -1089,7 +1075,7 @@ impl Ipv6StateBuilder {
         &mut self.icmp
     }
 
-    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId>(
+    pub(crate) fn build<Instant: crate::Instant, StrongDeviceId: StrongId>(
         self,
     ) -> Ipv6State<Instant, StrongDeviceId> {
         let Ipv6StateBuilder { icmp } = self;
@@ -1098,13 +1084,13 @@ impl Ipv6StateBuilder {
     }
 }
 
-pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId> {
+pub(crate) struct Ipv4State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv4, Instant, StrongDeviceId>,
     icmp: Icmpv4State<Instant, IpSock<Ipv4, StrongDeviceId::Weak, DefaultSendOptions>>,
     next_packet_id: AtomicU16,
 }
 
-impl<I: Instant, StrongDeviceId: StrongIpDeviceId> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
+impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDeviceId>>
     for Ipv4State<I, StrongDeviceId>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv4, I, StrongDeviceId> {
@@ -1123,12 +1109,12 @@ fn gen_ipv4_packet_id<C, SC: Ipv4StateContext<C>>(sync_ctx: &mut SC) -> u16 {
     })
 }
 
-pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongIpDeviceId> {
+pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
     inner: IpStateInner<Ipv6, Instant, StrongDeviceId>,
     icmp: Icmpv6State<Instant, IpSock<Ipv6, StrongDeviceId::Weak, DefaultSendOptions>>,
 }
 
-impl<I: Instant, StrongDeviceId: StrongIpDeviceId> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
+impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv6, I, StrongDeviceId>>
     for Ipv6State<I, StrongDeviceId>
 {
     fn as_ref(&self) -> &IpStateInner<Ipv6, I, StrongDeviceId> {
@@ -2854,44 +2840,12 @@ pub(crate) mod testutil {
 
     use crate::{
         context::{testutil::FakeInstant, RngContext},
+        device::testutil::{FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{device::state::IpDeviceStateIpExt, socket::testutil::FakeIpSocketCtx},
         testutil::{FakeNonSyncCtx, FakeSyncCtx},
     };
 
-    pub(crate) trait FakeStrongIpDeviceId:
-        StrongIpDeviceId<Weak = FakeWeakDeviceId<Self>>
-    {
-    }
-    impl<D: StrongIpDeviceId<Weak = FakeWeakDeviceId<Self>>> FakeStrongIpDeviceId for D {}
-
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-    pub(crate) struct FakeWeakDeviceId<D>(pub(crate) D);
-
-    impl<D: PartialEq> PartialEq<D> for FakeWeakDeviceId<D> {
-        fn eq(&self, other: &D) -> bool {
-            let Self(this) = self;
-            this == other
-        }
-    }
-
-    impl<D: Debug> core::fmt::Display for FakeWeakDeviceId<D> {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            core::fmt::Debug::fmt(self, f)
-        }
-    }
-
-    impl<D: IpDeviceId> IpDeviceId for FakeWeakDeviceId<D> {
-        fn is_loopback(&self) -> bool {
-            let Self(inner) = self;
-            inner.is_loopback()
-        }
-    }
-
-    impl<D: FakeStrongIpDeviceId> WeakIpDeviceId for FakeWeakDeviceId<D> {
-        type Strong = D;
-    }
-
-    impl<I: Ip, S: AsRef<FakeIpDeviceIdCtx<I, D>>, Meta, D: FakeStrongIpDeviceId + 'static>
+    impl<I: Ip, S: AsRef<FakeIpDeviceIdCtx<I, D>>, Meta, D: FakeStrongDeviceId + 'static>
         IpDeviceIdContext<I> for crate::context::testutil::FakeSyncCtx<S, Meta, D>
     {
         type DeviceId = <FakeIpDeviceIdCtx<I, D> as IpDeviceIdContext<I>>::DeviceId;
@@ -2915,7 +2869,7 @@ pub(crate) mod testutil {
             Outer,
             S: AsRef<FakeIpDeviceIdCtx<I, D>>,
             Meta,
-            D: FakeStrongIpDeviceId + 'static,
+            D: FakeStrongDeviceId + 'static,
         > IpDeviceIdContext<I> for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
     {
         type DeviceId =
@@ -2933,60 +2887,6 @@ pub(crate) mod testutil {
         fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
             self.inner.is_device_installed(device_id)
         }
-    }
-
-    /// A fake device ID for use in testing.
-    ///
-    /// `FakeDeviceId` is provided for use in implementing
-    /// `IpDeviceIdContext::DeviceId` in tests. Unlike `()`, it implements the
-    /// `Display` trait, which is a requirement of `IpDeviceIdContext::DeviceId`.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
-    pub(crate) struct FakeDeviceId;
-
-    impl IpDeviceId for FakeDeviceId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    impl StrongIpDeviceId for FakeDeviceId {
-        type Weak = FakeWeakDeviceId<Self>;
-    }
-
-    impl Display for FakeDeviceId {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write!(f, "FakeDeviceId")
-        }
-    }
-
-    /// A device ID type that supports identifying more than one distinct
-    /// device.
-    #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Ord, PartialOrd)]
-    pub(crate) enum MultipleDevicesId {
-        A,
-        B,
-    }
-
-    impl MultipleDevicesId {
-        pub(crate) fn all() -> [Self; 2] {
-            [Self::A, Self::B]
-        }
-    }
-
-    impl core::fmt::Display for MultipleDevicesId {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            core::fmt::Debug::fmt(self, f)
-        }
-    }
-
-    impl IpDeviceId for MultipleDevicesId {
-        fn is_loopback(&self) -> bool {
-            false
-        }
-    }
-
-    impl StrongIpDeviceId for MultipleDevicesId {
-        type Weak = FakeWeakDeviceId<Self>;
     }
 
     #[derive(Derivative)]
@@ -3007,7 +2907,7 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: Ip, DeviceId: FakeStrongIpDeviceId + 'static> IpDeviceIdContext<I>
+    impl<I: Ip, DeviceId: FakeStrongDeviceId + 'static> IpDeviceIdContext<I>
         for FakeIpDeviceIdCtx<I, DeviceId>
     {
         type DeviceId = DeviceId;
@@ -3073,7 +2973,7 @@ pub(crate) mod testutil {
     impl<
             I: Ip + IpDeviceStateIpExt,
             C: RngContext + InstantContext<Instant = FakeInstant>,
-            D: FakeStrongIpDeviceId + 'static,
+            D: FakeStrongDeviceId + 'static,
             State: AsMut<FakeIpSocketCtx<I, D>> + AsRef<FakeIpDeviceIdCtx<I, D>>,
             Meta,
         > MulticastMembershipHandler<I, C>

@@ -238,11 +238,9 @@ mod tests {
         context::testutil::{
             FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx, FakeTimerCtxExt as _,
         },
-        device::{FrameDestination, WeakDeviceId},
+        device::{testutil::FakeDeviceId, FrameDestination, WeakDeviceId},
         ip::{
-            device::Ipv6DeviceTimerId,
-            receive_ip_packet,
-            testutil::{FakeDeviceId, FakeIpDeviceIdCtx},
+            device::Ipv6DeviceTimerId, receive_ip_packet, testutil::FakeIpDeviceIdCtx,
             IPV6_DEFAULT_SUBNET,
         },
         testutil::{

@@ -25,8 +25,9 @@ use crate::{
             Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
         },
     },
+    device::{StrongId, WeakId},
     error::ExistsError,
-    ip::{IpExt, StrongIpDeviceId, WeakIpDeviceId},
+    ip::IpExt,
     socket::address::{ConnAddr, ListenerAddr, ListenerIpAddr},
 };
 
@@ -41,11 +42,7 @@ pub(crate) fn must_have_zone<A: IpAddress>(addr: &SpecifiedAddr<A>) -> bool {
 
 /// Determines where a change in device is allowed given the local and remote
 /// addresses.
-pub(crate) fn can_device_change<
-    A: IpAddress,
-    W: WeakIpDeviceId<Strong = S>,
-    S: StrongIpDeviceId,
->(
+pub(crate) fn can_device_change<A: IpAddress, W: WeakId<Strong = S>, S: StrongId>(
     local_ip: Option<&SpecifiedAddr<A>>,
     remote_ip: Option<&SpecifiedAddr<A>>,
     old_device: Option<&W>,
@@ -124,7 +121,7 @@ pub(crate) trait SocketMapAddrSpec {
     /// The type of IP addresses in the socket address.
     type IpAddr: IpAddress<Version = Self::IpVersion>;
     /// The type of the device component of a socket address.
-    type WeakDeviceId: WeakIpDeviceId;
+    type WeakDeviceId: WeakId;
     /// The local identifier portion of a socket address.
     type LocalIdentifier: Clone + Debug + Hash + Eq;
     /// The remote identifier portion of a socket address.
@@ -938,7 +935,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        ip::testutil::{FakeDeviceId, FakeWeakDeviceId},
+        device::testutil::{FakeDeviceId, FakeWeakDeviceId},
         socket::address::{ConnIpAddr, ListenerIpAddr},
         testutil::set_logger_for_test,
     };
