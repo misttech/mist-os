@@ -354,7 +354,7 @@ impl<T: ReadBytes> Block<T> {
 
     /// Check that the block type is |block_type|
     fn check_type(&self, block_type: BlockType) -> Result<(), Error> {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let self_type = self.read_header().block_type();
             return self.check_type_eq(self_type, block_type);
         }
@@ -366,7 +366,7 @@ impl<T: ReadBytes> Block<T> {
         index_to_check: BlockIndex,
         block_type: BlockType,
     ) -> Result<(), Error> {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let mut fill = [0u8; constants::MIN_ORDER_SIZE];
             self.container.read_at(index_to_check.offset(), &mut fill);
             let block = Block::new(&fill[..], 0.into());
@@ -377,7 +377,7 @@ impl<T: ReadBytes> Block<T> {
     }
 
     fn check_type_eq(&self, actual_num: u8, expected: BlockType) -> Result<(), Error> {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let actual = BlockType::from_u8(actual_num)
                 .ok_or(Error::InvalidBlockTypeNumber(self.index(), actual_num.into()))?;
             if actual != expected {
@@ -424,7 +424,7 @@ impl<T: ReadBytes> Block<T> {
 
     /// Check if the block is one of the given types.
     fn check_multi_type(&self, options: &[BlockType]) -> Result<(), Error> {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let mut wanted = "".to_string();
             for b in options {
                 match self.check_type(*b) {
@@ -441,7 +441,7 @@ impl<T: ReadBytes> Block<T> {
 
     /// Check if the block is of *_VALUE.
     fn check_any_value(&self) -> Result<(), Error> {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let block_type = self.block_type();
             if block_type.is_any_value() {
                 return Ok(());
@@ -1048,7 +1048,7 @@ mod tests {
         f: fn(Block<Container>) -> Result<T, Error>,
         error_types: &BTreeSet<BlockType>,
     ) {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let (container, _storage) =
                 Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
             for block_type in BlockType::all().iter() {
@@ -1067,7 +1067,7 @@ mod tests {
         mut f: F,
         ok_types: &BTreeSet<BlockType>,
     ) {
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             let (container, _storage) =
                 Container::read_and_write(constants::MIN_ORDER_SIZE * 3).unwrap();
             for block_type in BlockType::all().iter() {
@@ -1141,7 +1141,7 @@ mod tests {
         assert_eq!(*block1.index(), 1);
         assert_eq!(block1.order(), 1);
         assert_eq!(block1.block_type(), BlockType::Reserved);
-        if cfg!(debug_assertions) {
+        if cfg!(any(debug_assertions, test)) {
             assert!(block1.free_next_index().is_err());
         }
         assert_eq!(*block2.index(), 0);
