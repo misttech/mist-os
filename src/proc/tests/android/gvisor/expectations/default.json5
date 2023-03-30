@@ -49,9 +49,7 @@
 
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
-                "Sleepers/WallClockNanosleepTest.SleepOneSecond/0",
                 "Sleepers/WallClockNanosleepTest.InterruptedNanosleep/*",
-                "Sleepers/WallClockNanosleepTest.UninterruptedNanosleep/0",
                 "Sleepers/WallClockNanosleepTest.SleepUntil/0",
 
                 // close_range_test

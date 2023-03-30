@@ -81,7 +81,14 @@ pub fn sys_clock_nanosleep(
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
-    if which_clock != CLOCK_MONOTONIC || flags & !TIMER_ABSTIME != 0 {
+    let is_absolute = flags == TIMER_ABSTIME;
+    // TODO(https://fxrev.dev/117507): For now, Starnix pretends that the monotonic and realtime
+    // clocks advance at the same rate and so we can treat relative realtime offsets the same way
+    // that we treat relative monotonic clock offsets. At some point we'll need to monitor changes
+    // to the realtime clock and adjust timers accordingly.
+    let use_monotonic_clock =
+        which_clock == CLOCK_MONOTONIC || (which_clock == CLOCK_REALTIME && !is_absolute);
+    if !use_monotonic_clock || flags & !TIMER_ABSTIME != 0 {
         not_implemented!(
             current_task,
             "clock_nanosleep, clock {:?}, flags {:?}",
@@ -94,18 +101,17 @@ pub fn sys_clock_nanosleep(
     let request = current_task.mm.read_object(user_request)?;
     log_trace!(current_task, "clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
-    let deadline = if flags & TIMER_ABSTIME != 0 {
+    let deadline = if is_absolute {
         time_from_timespec(request)?
     } else {
         zx::Time::after(duration_from_timespec(request)?)
     };
 
-    clock_nanosleep_with_deadline(current_task, which_clock, flags, deadline, user_remaining)
+    clock_nanosleep_monotonic_with_deadline(current_task, flags, deadline, user_remaining)
 }
 
-fn clock_nanosleep_with_deadline(
+fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
-    _which_clock: u32,
     flags: u32,
     deadline: zx::Time,
     user_remaining: UserRef<timespec>,
@@ -123,9 +129,8 @@ fn clock_nanosleep_with_deadline(
                 current_task.mm.write_object(user_remaining, &remaining)?;
             }
             current_task.set_syscall_restart_func(move |current_task| {
-                clock_nanosleep_with_deadline(
+                clock_nanosleep_monotonic_with_deadline(
                     current_task,
-                    _which_clock,
                     flags,
                     deadline,
                     user_remaining,
@@ -142,7 +147,7 @@ pub fn sys_nanosleep(
     user_request: UserRef<timespec>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
-    sys_clock_nanosleep(current_task, CLOCK_MONOTONIC, 0, user_request, user_remaining)
+    sys_clock_nanosleep(current_task, CLOCK_REALTIME, 0, user_request, user_remaining)
 }
 
 #[cfg(target_arch = "x86_64")]
