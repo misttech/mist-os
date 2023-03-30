@@ -23,6 +23,7 @@ namespace {
 
 constexpr std::string_view kFuchsiaDeviceAddr = "FUCHSIA_DEVICE_ADDR";
 constexpr std::string_view kFuchsiaSshKey = "FUCHSIA_SSH_KEY";
+constexpr std::string_view kTestOutDir = "FUCHSIA_TEST_OUTDIR";
 
 FfxDebugAgentBridge* global_instance = nullptr;
 
@@ -44,7 +45,9 @@ Err KillProcessWithSignal(pid_t pid, int signal) {
   if (WIFEXITED(status)) {
     return Err();
   } else if (WIFSIGNALED(status)) {
-    FX_LOGS(WARNING) << "Child forced to terminate.";
+    int sig = WTERMSIG(status);
+    FX_LOGS(WARNING) << "Child forced to terminate (with signal " << sig << ": "
+                     << std::string{strsignal(sig)} << ").";
     return Err();
   }
 
@@ -52,7 +55,7 @@ Err KillProcessWithSignal(pid_t pid, int signal) {
              "), this is likely a bug.");
 }
 
-std::vector<char*> GetFfxArgV() {
+std::vector<char*> GetFfxArgV(const std::filesystem::path& ffx_test_data_path) {
   std::vector<char*> ffx_args = {const_cast<char*>("ffx")};
 
   // In infra, this environment variable is populated with the device that's been assigned to the
@@ -63,6 +66,15 @@ std::vector<char*> GetFfxArgV() {
     ffx_args.push_back(const_cast<char*>("--target"));
     ffx_args.push_back(device_addr);
   }
+  ffx_args.push_back(const_cast<char*>("--config"));
+  std::string ffx_config_arg{"log.level=debug,ffx.subtool-search-paths="};
+  ffx_config_arg.append(ffx_test_data_path);
+  char* test_outdir = std::getenv(kTestOutDir.data());
+  if (test_outdir) {
+    ffx_config_arg.append(const_cast<char*>(",log.dir="));
+    ffx_config_arg.append(test_outdir);
+  }
+  ffx_args.push_back(const_cast<char*>(strdup(ffx_config_arg.data())));
 
   ffx_args.push_back(const_cast<char*>("debug"));
   ffx_args.push_back(const_cast<char*>("connect"));
@@ -169,7 +181,9 @@ Err FfxDebugAgentBridge::SetupPipeAndFork() {
     // In variant builds that put the test executable in a different directory (potentially
     // something like out/default/host_x64-asan/...), ffx could be in a different directory than the
     // test executable.
-    const std::filesystem::path ffx_path = me.parent_path().parent_path() / "host_x64" / "ffx";
+    const std::filesystem::path ffx_test_data =
+        me.parent_path().parent_path() / "host_x64" / ZXDB_E2E_TESTS_FFX_TEST_DATA;
+    const std::filesystem::path ffx_path = ffx_test_data / "ffx";
 
     if (!std::filesystem::exists(ffx_path)) {
       FX_LOGS(ERROR) << "Could not locate ffx binary at " << std::filesystem::absolute(ffx_path);
@@ -185,7 +199,7 @@ Err FfxDebugAgentBridge::SetupPipeAndFork() {
     }
 
     std::vector<char*> env = GetFfxEnv();
-    execve(ffx_path.c_str(), GetFfxArgV().data(), env.data());
+    execve(ffx_path.c_str(), GetFfxArgV(ffx_test_data).data(), env.data());
 
     FX_NOTREACHED();
   } else {
