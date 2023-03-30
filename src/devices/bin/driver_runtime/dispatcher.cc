@@ -4,16 +4,19 @@
 
 #include "dispatcher.h"
 
+#include <fidl/fuchsia.scheduler/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 #include <lib/async/irq.h>
 #include <lib/async/receiver.h>
 #include <lib/async/sequence_id.h>
 #include <lib/async/task.h>
 #include <lib/async/trap.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fit/defer.h>
 #include <lib/zx/clock.h>
+#include <lib/zx/thread.h>
 #include <stdlib.h>
 #include <threads.h>
 #include <zircon/assert.h>
@@ -318,7 +321,11 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
   if (!owner) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (allow_sync_calls) {
+
+  // If there is a scheduler role specified, we would have already started a thread
+  // when creating the thraed pool, and currently we are creating a thread pool per
+  // scheduler role.
+  if (allow_sync_calls && (scheduler_role == Dispatcher::ThreadPool::kNoSchedulerRole)) {
     zx_status_t status = adder();
     if (status != ZX_OK) {
       return status;
@@ -347,6 +354,22 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
   if (status == ZX_ERR_BAD_STATE) {
     dispatcher->SetEventWaiter(nullptr);
     return status;
+  }
+  if (scheduler_role != ThreadPool::kNoSchedulerRole) {
+    // We need to set the scheduler role on the thread pool's thread.
+    status = async::PostTask(thread_pool->loop()->dispatcher(), [dispatcher]() mutable {
+      fbl::AutoLock lock(&dispatcher->callback_lock_);
+      zx_status_t status = dispatcher->thread_pool_->SetRoleProfile();
+      if (status != ZX_OK) {
+        // Failing to set the role profile is not a fatal error.
+        LOGF(ERROR, "Failed to set scheduler role: %d\n", status);
+      }
+    });
+    if (status != ZX_OK) {
+      // Posting a task would only fail if global loop (and probably process) was shutting down.
+      LOGF(ERROR, "Failed to post task to set scheduler role");
+      return status;
+    }
   }
 
   // This may fail if the entire driver is being shut down by the driver host.
@@ -383,6 +406,13 @@ zx_status_t Dispatcher::Create(uint32_t options, std::string_view name,
                                fdf_dispatcher_shutdown_observer_t* observer,
                                Dispatcher** out_dispatcher) {
   auto thread_pool = GetDispatcherCoordinator().default_thread_pool();
+  if (scheduler_role != ThreadPool::kNoSchedulerRole) {
+    auto result = GetDispatcherCoordinator().CreateThreadPool(scheduler_role);
+    if (result.is_error()) {
+      return result.status_value();
+    }
+    thread_pool = *result;
+  }
   return CreateWithAdder(
       options, name, scheduler_role, driver_context::GetCurrentDriver(), thread_pool,
       thread_pool->loop()->dispatcher(), [thread_pool]() { return thread_pool->AddThread(); },
@@ -1551,6 +1581,10 @@ void DispatcherCoordinator::RemoveDispatcher(Dispatcher& dispatcher) {
   if (!driver_state->HasDispatchers() && !driver_state->IsShuttingDown()) {
     drivers_.erase(driver_state);
   }
+  if (thread_pool != default_thread_pool()) {
+    GetDispatcherCoordinator().RemoveThreadPool(thread_pool);
+  }
+
   if (drivers_.size() == 0) {
     drivers_destroyed_event_.Broadcast();
   }
@@ -1579,6 +1613,58 @@ void DispatcherCoordinator::Reset() {
   }
 
   default_thread_pool()->Reset();
+}
+
+zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::CreateThreadPool(
+    std::string_view scheduler_role) {
+  auto thread_pool = std::make_unique<Dispatcher::ThreadPool>(scheduler_role);
+  zx_status_t status = thread_pool->AddThread();
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  auto* thread_pool_ptr = thread_pool.get();
+  role_thread_pools_.push_back(std::move(thread_pool));
+  return zx::ok(thread_pool_ptr);
+}
+
+void DispatcherCoordinator::RemoveThreadPool(Dispatcher::ThreadPool* thread_pool) {
+  async::PostTask(default_thread_pool()->loop()->dispatcher(), [thread_pool]() {
+    auto& coordinator = GetDispatcherCoordinator();
+    fbl::AutoLock al(&coordinator.lock_);
+    // This will destruct the thread pool and join with its threads.
+    ZX_ASSERT(coordinator.role_thread_pools_.erase(*thread_pool) != nullptr);
+  });
+}
+
+zx_status_t Dispatcher::ThreadPool::SetRoleProfile() {
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  zx::result client_end = component::Connect<fuchsia_scheduler::ProfileProvider>();
+  if (client_end.is_error()) {
+    return client_end.status_value();
+  }
+  auto provider = *std::move(client_end);
+
+  const zx_rights_t kRights = ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD;
+  zx::thread duplicate;
+
+  zx_status_t status = zx::thread::self()->duplicate(kRights, &duplicate);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  auto result = fidl::WireCall(provider)->SetProfileByRole(
+      std::move(duplicate), fidl::StringView::FromExternal(scheduler_role()));
+  if (result.status() != ZX_OK) {
+    return result.status();
+  }
+  if (result.value().status != ZX_OK) {
+    return result.value().status;
+  }
+  fbl::AutoLock lock(&lock_);
+  applied_scheduler_role_ = true;
+  return ZX_OK;
+#endif  // #if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  return ZX_ERR_NOT_SUPPORTED;
 }
 
 zx_status_t Dispatcher::ThreadPool::AddThread() {

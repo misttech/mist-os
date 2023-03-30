@@ -11,6 +11,7 @@ group("tests") {
   testonly = true
   deps = [
     ":driver_runtime_death_tests",
+    ":driver_runtime_scheduler_role_tests",
     ":driver_runtime_sdk_tests",
     ":driver_runtime_tests",
     "microbenchmarks",
@@ -39,6 +40,8 @@ source_set("driver_runtime_impl") {
     "//zircon/system/ulib/async-loop:async-loop-cpp",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp_wire",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/driver/runtime:testing",
     "//sdk/lib/fidl/cpp/wire",
@@ -94,6 +97,22 @@ test("driver_runtime_test") {
   ]
 }
 
+test("driver_runtime_scheduler_role_test") {
+  sources = [ "scheduler_role_test.cc" ]
+  deps = [
+    ":driver_runtime_impl",
+    "//sdk/lib/driver/runtime:driver_runtime",
+    "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//sdk/lib/driver/runtime:driver_runtime_env_cpp",
+    "//sdk/lib/driver/runtime:testing",
+    "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/sync:sync-cpp",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
 test("driver_runtime_death_test") {
   sources = [ "channel_death_test.cc" ]
   deps = [
@@ -123,6 +142,16 @@ fuchsia_unittest_package("driver_runtime_sdk_tests") {
 
 fuchsia_unittest_package("driver_runtime_tests") {
   deps = [ ":driver_runtime_test" ]
+}
+
+fuchsia_unittest_package("driver_runtime_scheduler_role_tests") {
+  manifest = "meta/driver_runtime_scheduler_role_test.cml"
+  deps = [ ":driver_runtime_scheduler_role_test" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_unittest_package("driver_runtime_death_tests") {

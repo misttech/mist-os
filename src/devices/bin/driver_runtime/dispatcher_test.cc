@@ -203,8 +203,7 @@ TEST_F(DispatcherTest, SyncDispatcherDirectCall) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", local_driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", local_driver, &dispatcher));
 
   sync_completion_t read_completion;
   ASSERT_NO_FATAL_FAILURE(SignalOnChannelReadable(local_ch_, dispatcher, &read_completion));
@@ -229,7 +228,7 @@ TEST_F(DispatcherTest, SyncDispatcherCallOnLoop) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
   sync_completion_t read_completion;
   ASSERT_NO_FATAL_FAILURE(SignalOnChannelReadable(local_ch_, dispatcher, &read_completion));
@@ -256,7 +255,7 @@ TEST_F(DispatcherTest, SyncDispatcherCallOnLoop) {
 TEST_F(DispatcherTest, SyncDispatcherDisallowsParallelCallbacks) {
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
   // We shouldn't actually block on a dispatcher that doesn't have ALLOW_SYNC_CALLS set,
   // but this is just for synchronizing the test.
@@ -308,7 +307,7 @@ TEST_F(DispatcherTest, SyncDispatcherDisallowsParallelCallbacksReentrant) {
 
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
   struct ReadClient {
     fdf_handle_t channel;
@@ -341,7 +340,7 @@ TEST_F(DispatcherTest, SyncDispatcherDisallowsParallelCallbacksReentrant) {
   // Check that we aren't blocking the second thread by posting a task to another
   // dispatcher.
   fdf_dispatcher_t* dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher2));
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher2);
   ASSERT_NOT_NULL(async_dispatcher);
 
@@ -378,8 +377,8 @@ TEST_F(DispatcherTest, SyncDispatcherDisallowsParallelCallbacksReentrant) {
 TEST_F(DispatcherTest, UnsyncDispatcherAllowsParallelCallbacks) {
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__,
-                                           "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__, "", driver, &dispatcher));
 
   constexpr uint32_t kNumClients = 10;
 
@@ -450,8 +449,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherAllowsParallelCallbacksReentrant) {
 
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__,
-                                           "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__, "", driver, &dispatcher));
 
   std::vector<fdf_handle_t> local(kNumClients);
   std::vector<fdf_handle_t> remote(kNumClients);
@@ -510,9 +509,8 @@ TEST_F(DispatcherTest, UnsyncDispatcherAllowsParallelCallbacksReentrant) {
 TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCall) {
   const void* blocking_driver = CreateFakeDriver();
   fdf_dispatcher_t* blocking_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                           "scheduler_role", blocking_driver,
-                                           &blocking_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           blocking_driver, &blocking_dispatcher));
 
   // Queue a blocking request.
   libsync::Completion entered_callback;
@@ -544,13 +542,12 @@ TEST_F(DispatcherTest, AllowSyncCallsDoesNotDirectlyCall) {
 TEST_F(DispatcherTest, AllowSyncCallsDoesNotBlockGlobalLoop) {
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
   const void* blocking_driver = CreateFakeDriver();
   fdf_dispatcher_t* blocking_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                           "scheduler_role", blocking_driver,
-                                           &blocking_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           blocking_driver, &blocking_dispatcher));
 
   fdf_handle_t blocking_local_ch, blocking_remote_ch;
   ASSERT_EQ(ZX_OK, fdf_channel_create(0, &blocking_local_ch, &blocking_remote_ch));
@@ -603,11 +600,11 @@ TEST_F(DispatcherTest, ReentrancySimpleSendAndReply) {
   // Create a dispatcher for each end of the channel.
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, "", "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, "", "", driver, &dispatcher));
 
   const void* driver2 = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, "", "scheduler_role", driver2, &dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, "", "", driver2, &dispatcher2));
 
   // Lock that is acquired by the first driver whenever it writes or reads from |local_ch_|.
   // We shouldn't need to lock in a synchronous dispatcher, but this is just for testing
@@ -643,12 +640,12 @@ TEST_F(DispatcherTest, ReentrancyMultipleDriversAndDispatchers) {
   // Driver will own |local_ch_| and |local_ch2_|.
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
   // Driver2 will own |remote_ch_| and |remote_ch2_|.
   const void* driver2 = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver2, &dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver2, &dispatcher2));
 
   // Lock that is acquired by the driver whenever it writes or reads from its channels.
   // We shouldn't need to lock in a synchronous dispatcher, but this is just for testing
@@ -682,7 +679,7 @@ TEST_F(DispatcherTest, ReentrancyMultipleDriversAndDispatchers) {
 TEST_F(DispatcherTest, ReentrancyOneDriverMultipleChannels) {
   const void* driver = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
   // Lock that is acquired by the driver whenever it writes or reads from its channels.
   // We shouldn't need to lock in a synchronous dispatcher, but this is just for testing
@@ -726,7 +723,7 @@ TEST_F(DispatcherTest, ReentrancyManyDrivers) {
   for (uint32_t i = 0; i < kNumDrivers; i++) {
     const void* driver = CreateFakeDriver();
     fdf_dispatcher_t* dispatcher;
-    ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver, &dispatcher));
+    ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver, &dispatcher));
 
     // Get the next driver's channel which is connected to the current driver's channel.
     // The last driver will be connected to the first driver.
@@ -774,8 +771,7 @@ TEST_F(DispatcherTest, EmptyCallStack) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   sync_completion_t read_completion;
   ASSERT_NO_FATAL_FAILURE(SignalOnChannelReadable(local_ch_, dispatcher, &read_completion));
@@ -803,7 +799,7 @@ TEST_F(DispatcherTest, SyncDispatcherShutdownBeforeWrite) {
   DispatcherShutdownObserver observer;
 
   const void* driver = CreateFakeDriver();
-  constexpr std::string_view scheduler_role = "scheduler_role";
+  constexpr std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK,
@@ -841,7 +837,7 @@ TEST_F(DispatcherTest, SyncDispatcherShutdownBeforeSignaled) {
   async::WaitOnce wait(event.get(), ZX_USER_SIGNAL_0);
 
   const void* driver = CreateFakeDriver();
-  constexpr std::string_view scheduler_role = "scheduler_role";
+  constexpr std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK,
@@ -876,7 +872,7 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdown) {
   DispatcherShutdownObserver observer;
 
   const void* driver = CreateFakeDriver();
-  const std::string_view scheduler_role = "scheduler_role";
+  const std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
@@ -929,7 +925,7 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdonwBeforeWrite) {
   DispatcherShutdownObserver observer;
 
   const void* driver = CreateFakeDriver();
-  constexpr std::string_view scheduler_role = "scheduler_role";
+  constexpr std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
@@ -967,7 +963,7 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdownBeforeSignaled) {
   async::WaitOnce wait(event.get(), ZX_USER_SIGNAL_0);
 
   const void* driver = CreateFakeDriver();
-  constexpr std::string_view scheduler_role = "scheduler_role";
+  constexpr std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
@@ -998,7 +994,7 @@ TEST_F(DispatcherTest, UnsyncDispatcherShutdownBeforeSignaled) {
 // on the async loop.
 TEST_F(DispatcherTest, ShutdownDispatcherInAsyncLoopCallback) {
   const void* driver = CreateFakeDriver();
-  std::string_view scheduler_role = "scheduler_role";
+  std::string_view scheduler_role = "";
 
   DispatcherShutdownObserver dispatcher_observer;
 
@@ -1043,7 +1039,7 @@ TEST_F(DispatcherTest, ShutdownDispatcherFromTwoCallbacks) {
 
   DispatcherShutdownObserver observer;
   const void* driver = CreateFakeDriver();
-  std::string_view scheduler_role = "scheduler_role";
+  std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
@@ -1099,7 +1095,7 @@ TEST_F(DispatcherTest, ShutdownDispatcherQueueChannelReadCallback) {
   DispatcherShutdownObserver observer;
 
   const void* driver = CreateFakeDriver();
-  std::string_view scheduler_role = "scheduler_role";
+  std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
@@ -1210,8 +1206,7 @@ TEST_F(DispatcherTest, ChannelPeerWriteDuringShutdown) {
 // Tests that we can use the fdf_dispatcher_t as an async_dispatcher_t.
 TEST_F(DispatcherTest, AsyncDispatcher) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1224,8 +1219,7 @@ TEST_F(DispatcherTest, AsyncDispatcher) {
 
 TEST_F(DispatcherTest, DelayedTask) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1239,8 +1233,7 @@ TEST_F(DispatcherTest, DelayedTask) {
 
 TEST_F(DispatcherTest, TasksDoNotCallDirectly) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1262,8 +1255,7 @@ TEST_F(DispatcherTest, TasksDoNotCallDirectly) {
 
 TEST_F(DispatcherTest, DowncastAsyncDispatcher) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1277,8 +1269,7 @@ TEST_F(DispatcherTest, CancelTask) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1296,8 +1287,7 @@ TEST_F(DispatcherTest, CancelDelayedTask) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1315,8 +1305,7 @@ TEST_F(DispatcherTest, CancelTaskNotYetPosted) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1329,8 +1318,7 @@ TEST_F(DispatcherTest, CancelTaskNotYetPosted) {
 
 TEST_F(DispatcherTest, CancelTaskAlreadyRunning) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1347,8 +1335,7 @@ TEST_F(DispatcherTest, CancelTaskAlreadyRunning) {
 
 TEST_F(DispatcherTest, AsyncWaitOnce) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1371,8 +1358,7 @@ TEST_F(DispatcherTest, AsyncWaitOnce) {
 
 TEST_F(DispatcherTest, CancelWait) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1430,8 +1416,7 @@ TEST_F(DispatcherTest, CancelWaitFromWithinCanceledWait) {
 TEST_F(DispatcherTest, CancelWaitRaceCondition) {
   // Regression test for fxbug.dev/109988, a tricky race condition when cancelling a wait.
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1478,8 +1463,7 @@ TEST_F(DispatcherTest, CancelWaitRaceCondition) {
 
 TEST_F(DispatcherTest, GetCurrentDispatcherInWait) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1503,14 +1487,12 @@ TEST_F(DispatcherTest, GetCurrentDispatcherInWait) {
 
 TEST_F(DispatcherTest, WaitSynchronized) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   // Create a second dispatcher which allows sync calls to force multiple threads.
   fdf_dispatcher_t* unused_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                           "scheduler_role", CreateFakeDriver(),
-                                           &unused_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           CreateFakeDriver(), &unused_dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -1562,8 +1544,7 @@ TEST_F(DispatcherTest, Irq) {
   static constexpr uint32_t kNumCallbacks = 10;
 
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher));
 
   async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
   ASSERT_NOT_NULL(dispatcher);
@@ -1602,8 +1583,7 @@ TEST_F(DispatcherTest, Irq) {
 // Tests that the client will stop receiving callbacks after unbinding the irq.
 TEST_F(DispatcherTest, UnbindIrq) {
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher));
 
   async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
   ASSERT_NOT_NULL(dispatcher);
@@ -1758,16 +1738,15 @@ TEST_F(DispatcherTest, UnbindIrqAfterDispatcherShutdown) {
 TEST_F(DispatcherTest, IrqSynchronized) {
   // Create a dispatcher that we will bind 2 irqs to.
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher));
 
   async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
   ASSERT_NOT_NULL(dispatcher);
 
   // Create a second dispatcher which allows sync calls to force multiple threads.
   fdf_dispatcher_t* fdf_dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                           "scheduler_role", CreateFakeDriver(), &fdf_dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           CreateFakeDriver(), &fdf_dispatcher2));
 
   zx::interrupt irq_object1;
   ASSERT_EQ(ZX_OK, zx::interrupt::create(zx::resource(0), 0, ZX_INTERRUPT_VIRTUAL, &irq_object1));
@@ -1865,16 +1844,15 @@ TEST_F(DispatcherTest, UnbindIrqRemovesPacketFromPort) {
 TEST_F(DispatcherTest, UnbindIrqRemovesQueuedIrqs) {
   // Create a dispatcher that we will bind 2 irqs to.
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher));
 
   async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
   ASSERT_NOT_NULL(dispatcher);
 
   // Create a second dispatcher which allows sync calls to force multiple threads.
   fdf_dispatcher_t* fdf_dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                           "scheduler_role", CreateFakeDriver(), &fdf_dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                           CreateFakeDriver(), &fdf_dispatcher2));
 
   zx::interrupt irq_object;
   ASSERT_EQ(ZX_OK, zx::interrupt::create(zx::resource(0), 0, ZX_INTERRUPT_VIRTUAL, &irq_object));
@@ -1988,8 +1966,8 @@ TEST_F(DispatcherTest, UnbindIrqImmediatelyAfterTriggering) {
 // Tests that binding irqs to an unsynchronized dispatcher is not allowed.
 TEST_F(DispatcherTest, IrqUnsynchronized) {
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__,
-                                           "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__, "",
+                                           CreateFakeDriver(), &fdf_dispatcher));
 
   async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
   ASSERT_NOT_NULL(dispatcher);
@@ -2011,15 +1989,13 @@ void IrqNotCalledHandler(async_dispatcher_t* async, async_irq_t* irq, zx_status_
 // Tests that you cannot unbind an irq from a different dispatcher from which it was bound to.
 TEST_F(DispatcherTest, UnbindIrqFromWrongDispatcher) {
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher));
 
   async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
   ASSERT_NOT_NULL(dispatcher);
 
   fdf_dispatcher_t* fdf_dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher2));
 
   async_dispatcher_t* dispatcher2 = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2);
   ASSERT_NOT_NULL(dispatcher2);
@@ -2054,8 +2030,7 @@ TEST_F(DispatcherTest, UnbindIrqFromWrongDispatcher) {
 
 TEST_F(DispatcherTest, WaitUntilIdle) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   ASSERT_TRUE(dispatcher->IsIdle());
   WaitUntilIdle(dispatcher);
@@ -2064,8 +2039,7 @@ TEST_F(DispatcherTest, WaitUntilIdle) {
 
 TEST_F(DispatcherTest, WaitUntilIdleWithDirectCall) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   // We shouldn't actually block on a dispatcher that doesn't have ALLOW_SYNC_CALLS set,
   // but this is just for synchronizing the test.
@@ -2111,8 +2085,7 @@ TEST_F(DispatcherTest, WaitUntilIdleWithDirectCall) {
 
 TEST_F(DispatcherTest, WaitUntilIdleWithAsyncLoop) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   // We shouldn't actually block on a dispatcher that doesn't have ALLOW_SYNC_CALLS set,
   // but this is just for synchronizing the test.
@@ -2141,8 +2114,7 @@ TEST_F(DispatcherTest, WaitUntilIdleCanceledRead) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   auto channel_read = std::make_unique<fdf::ChannelRead>(
       local_ch_, 0,
@@ -2164,8 +2136,7 @@ TEST_F(DispatcherTest, WaitUntilIdleCanceledRead) {
 
 TEST_F(DispatcherTest, WaitUntilIdlePendingWait) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -2188,8 +2159,7 @@ TEST_F(DispatcherTest, WaitUntilIdleDelayedTask) {
   loop_.ResetQuit();
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(dispatcher);
   ASSERT_NOT_NULL(async_dispatcher);
@@ -2213,8 +2183,8 @@ TEST_F(DispatcherTest, WaitUntilIdleWithAsyncLoopMultipleThreads) {
   constexpr uint32_t kNumClients = 22;
 
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__,
-                                           "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__, "",
+                                           CreateFakeDriver(), &dispatcher));
 
   struct ReadClient {
     fdf::Channel channel;
@@ -2265,12 +2235,10 @@ TEST_F(DispatcherTest, WaitUntilIdleWithAsyncLoopMultipleThreads) {
 
 TEST_F(DispatcherTest, WaitUntilIdleMultipleDispatchers) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   fdf_dispatcher_t* dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher2));
 
   // We shouldn't actually block on a dispatcher that doesn't have ALLOW_SYNC_CALLS set,
   // but this is just for synchronizing the test.
@@ -2300,7 +2268,7 @@ TEST_F(DispatcherTest, ShutdownProcessAsyncLoop) {
   DispatcherShutdownObserver observer;
 
   const void* driver = CreateFakeDriver();
-  constexpr std::string_view scheduler_role = "scheduler_role";
+  constexpr std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
@@ -2335,7 +2303,7 @@ TEST_F(DispatcherTest, SyncDispatcherCancelRequestDuringShutdown) {
   DispatcherShutdownObserver observer;
 
   const void* driver = CreateFakeDriver();
-  constexpr std::string_view scheduler_role = "scheduler_role";
+  constexpr std::string_view scheduler_role = "";
 
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK,
@@ -2380,11 +2348,11 @@ TEST_F(DispatcherTest, GetCurrentDispatcherNone) {
 TEST_F(DispatcherTest, GetCurrentDispatcher) {
   const void* driver1 = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher1;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver1, &dispatcher1));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver1, &dispatcher1));
 
   const void* driver2 = CreateFakeDriver();
   fdf_dispatcher_t* dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "scheduler_role", driver2, &dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", driver2, &dispatcher2));
 
   // driver1 will wait on a message from driver2, then reply back.
   auto channel_read1 = std::make_unique<fdf::ChannelRead>(
@@ -2463,8 +2431,7 @@ TEST_F(DispatcherTest, GetCurrentDispatcherShutdownCallback) {
 
 TEST_F(DispatcherTest, HasQueuedTasks) {
   fdf_dispatcher_t* dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &dispatcher));
 
   ASSERT_FALSE(dispatcher->HasQueuedTasks());
 
@@ -2499,7 +2466,7 @@ TEST_F(DispatcherTest, HasQueuedTasks) {
 TEST_F(DispatcherTest, ShutdownAllDriverDispatchers) {
   const void* fake_driver = CreateFakeDriver();
   const void* fake_driver2 = CreateFakeDriver();
-  const std::string_view scheduler_role = "scheduler_role";
+  const std::string_view scheduler_role = "";
 
   constexpr uint32_t kNumDispatchers = 3;
   DispatcherShutdownObserver observers[kNumDispatchers];
@@ -2818,13 +2785,11 @@ TEST_F(DispatcherTest, WaitUntilDispatchersDestroyedDuringDriverShutdownHandler)
 
 TEST_F(DispatcherTest, GetSequenceIdSynchronizedDispatcher) {
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher));
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
 
   fdf_dispatcher_t* fdf_dispatcher2;
-  ASSERT_NO_FATAL_FAILURE(
-      CreateDispatcher(0, __func__, "scheduler_role", CreateFakeDriver(), &fdf_dispatcher2));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(0, __func__, "", CreateFakeDriver(), &fdf_dispatcher2));
   async_dispatcher_t* async_dispatcher2 = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher2);
 
   async_sequence_id_t dispatcher_id;
@@ -2892,8 +2857,8 @@ TEST_F(DispatcherTest, GetSequenceIdSynchronizedDispatcher) {
 
 TEST_F(DispatcherTest, GetSequenceIdUnsynchronizedDispatcher) {
   fdf_dispatcher_t* fdf_dispatcher;
-  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__,
-                                           "scheduler_role", CreateFakeDriver(), &fdf_dispatcher));
+  ASSERT_NO_FATAL_FAILURE(CreateDispatcher(FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, __func__, "",
+                                           CreateFakeDriver(), &fdf_dispatcher));
   async_dispatcher_t* async_dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
 
   // Get the sequence id for the unsynchronized dispatcher.
@@ -2928,16 +2893,15 @@ TEST_F(DispatcherTest, CreateUnsynchronizedAllowSyncCallsFails) {
   DispatcherShutdownObserver observer(false /* require_callback */);
   driver_runtime::Dispatcher* dispatcher;
   uint32_t options = FDF_DISPATCHER_OPTION_UNSYNCHRONIZED | FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS;
-  ASSERT_NE(ZX_OK, fdf_dispatcher::Create(options, __func__, "scheduler_role",
-                                          observer.fdf_observer(), &dispatcher));
+  ASSERT_NE(ZX_OK,
+            fdf_dispatcher::Create(options, __func__, "", observer.fdf_observer(), &dispatcher));
 }
 
 // Tests that you cannot create a dispatcher on a thread not managed by the driver runtime.
 TEST_F(DispatcherTest, CreateDispatcherOnNonRuntimeThreadFails) {
   DispatcherShutdownObserver observer(false /* require_callback */);
   driver_runtime::Dispatcher* dispatcher;
-  ASSERT_NE(ZX_OK, fdf_dispatcher::Create(0, __func__, "scheduler_role", observer.fdf_observer(),
-                                          &dispatcher));
+  ASSERT_NE(ZX_OK, fdf_dispatcher::Create(0, __func__, "", observer.fdf_observer(), &dispatcher));
 }
 
 // Tests that we don't spawn more threads than we need.
@@ -2952,8 +2916,8 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
     // Create first dispatcher
     driver_runtime::Dispatcher* dispatcher;
     DispatcherShutdownObserver observer;
-    ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                     "scheduler_role", observer.fdf_observer(), &dispatcher));
+    ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                     observer.fdf_observer(), &dispatcher));
     ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 2);
 
     dispatcher->ShutdownAsync();
@@ -2962,8 +2926,8 @@ TEST_F(DispatcherTest, ExtraThreadIsReused) {
 
     // Create second dispatcher
     DispatcherShutdownObserver observer2;
-    ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                     "scheduler_role", observer2.fdf_observer(), &dispatcher));
+    ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                     observer2.fdf_observer(), &dispatcher));
     // Note that we are still at 2 threads.
     ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(), 2);
 
@@ -2993,9 +2957,8 @@ TEST_F(DispatcherTest, MaximumTenThreads) {
     std::array<driver_runtime::Dispatcher*, kNumDispatchers> dispatchers;
     std::array<DispatcherShutdownObserver, kNumDispatchers> observers;
     for (uint32_t i = 0; i < kNumDispatchers; i++) {
-      ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__,
-                                       "scheduler_role", observers[i].fdf_observer(),
-                                       &dispatchers[i]));
+      ASSERT_OK(fdf_dispatcher::Create(FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS, __func__, "",
+                                       observers[i].fdf_observer(), &dispatchers[i]));
       ASSERT_EQ(driver_runtime::GetDispatcherCoordinator().default_thread_pool()->num_threads(),
                 std::min(i + 2, 10u));
     }

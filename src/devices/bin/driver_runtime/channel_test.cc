@@ -62,10 +62,9 @@ void ChannelTest::SetUp() {
   arena_ = fdf::Arena(tag);
 
   driver_runtime::Dispatcher* dispatcher;
-  ASSERT_EQ(ZX_OK,
-            driver_runtime::Dispatcher::CreateWithLoop(
-                FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "scheduler_role", "", CreateFakeDriver(),
-                &loop_, dispatcher_observer_.fdf_observer(), &dispatcher));
+  ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
+                       FDF_DISPATCHER_OPTION_UNSYNCHRONIZED, "", "", CreateFakeDriver(), &loop_,
+                       dispatcher_observer_.fdf_observer(), &dispatcher));
 
   fdf_dispatcher_ = static_cast<fdf_dispatcher_t*>(dispatcher);
 
@@ -1007,7 +1006,7 @@ void ReplyAndWait(const Message& request, uint32_t message_count, fdf::Channel s
   auto observer = std::make_unique<ChannelTest::DispatcherShutdownObserver>();
   driver_runtime::Dispatcher* dispatcher;
   ASSERT_EQ(ZX_OK, driver_runtime::Dispatcher::CreateWithLoop(
-                       0, "scheduler_role", "", reinterpret_cast<void*>(&fake_driver), process_loop,
+                       0, "", "", reinterpret_cast<void*>(&fake_driver), process_loop,
                        observer->fdf_observer(), &dispatcher));
   auto fdf_dispatcher = static_cast<fdf_dispatcher_t*>(dispatcher);
 
