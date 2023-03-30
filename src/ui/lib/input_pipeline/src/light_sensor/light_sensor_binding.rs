@@ -8,7 +8,6 @@ use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use fidl_fuchsia_input_report::{InputDeviceProxy, InputReport, SensorDescriptor, SensorType};
 use fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest;
-use fuchsia_syslog::{fx_log_err, fx_log_warn};
 use fuchsia_zircon as zx;
 use futures::channel::mpsc::Sender;
 
@@ -127,7 +126,7 @@ impl LightSensorBinding {
         let device_info = descriptor.device_info.ok_or_else(|| {
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
-            fx_log_err!("DRIVER BUG: empty device_info for device_id: {}", device_id);
+            tracing::error!("DRIVER BUG: empty device_info for device_id: {}", device_id);
             format_err!("empty device info for device_id: {}", device_id)
         })?;
         match descriptor.sensor {
@@ -162,7 +161,7 @@ impl LightSensorBinding {
                                             std::mem::replace(&mut clear_value, Some(i))
                                         }
                                         type_ => {
-                                            fx_log_warn!(
+                                            tracing::warn!(
                                                 "unexpected sensor type {type_:?} found on light \
                                                 sensor device"
                                             );
@@ -170,7 +169,7 @@ impl LightSensorBinding {
                                         }
                                     };
                                     if old.is_some() {
-                                        fx_log_warn!(
+                                        tracing::warn!(
                                             "existing index for light sensor {:?} replaced",
                                             value.type_
                                         );
@@ -274,7 +273,7 @@ impl LightSensorBinding {
             handled: Handled::No,
             trace_id: None,
         }) {
-            fx_log_err!("Failed to send LightSensorEvent with error: {e:?}");
+            tracing::error!("Failed to send LightSensorEvent with error: {e:?}");
         }
 
         Some(report)

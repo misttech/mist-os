@@ -6,7 +6,6 @@ use crate::input_device::{Handled, InputDeviceEvent, InputEvent, UnhandledInputE
 use crate::input_handler::UnhandledInputHandler;
 use async_trait::async_trait;
 use fidl_fuchsia_ui_input3::{KeyMeaning, Modifiers, NonPrintableKey};
-use fuchsia_syslog::fx_log_debug;
 use keymaps::{LockStateKeys, ModifierState};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -47,7 +46,7 @@ impl UnhandledInputHandler for ModifierHandler {
                 event = event
                     .into_with_lock_state(Some(self.lock_state.borrow().get_state()))
                     .into_with_modifiers(Some(self.modifier_state.borrow().get_state()));
-                fx_log_debug!("modifiers and lock state applied: {:?}", &event);
+                tracing::debug!("modifiers and lock state applied: {:?}", &event);
                 vec![InputEvent {
                     device_event: InputDeviceEvent::Keyboard(event),
                     device_descriptor,
@@ -108,11 +107,10 @@ impl UnhandledInputHandler for ModifierMeaningHandler {
                     self.modifier_state
                         .borrow_mut()
                         .update_with_key_meaning(event.get_event_type(), key_meaning);
-                    let new_modifier =
-                        event.get_modifiers().unwrap_or(Modifiers::empty())
-                            | self.modifier_state.borrow().get_state();
+                    let new_modifier = event.get_modifiers().unwrap_or(Modifiers::empty())
+                        | self.modifier_state.borrow().get_state();
                     event = event.into_with_modifiers(Some(new_modifier));
-                    fx_log_debug!("additinal modifiers and lock state applied: {:?}", &event);
+                    tracing::debug!("additinal modifiers and lock state applied: {:?}", &event);
                 }
                 vec![InputEvent {
                     device_event: InputDeviceEvent::Keyboard(event),

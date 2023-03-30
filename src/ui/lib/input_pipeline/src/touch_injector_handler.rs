@@ -16,7 +16,6 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_syslog::{fx_log_err, fx_log_info},
     fuchsia_zircon as zx,
     futures::stream::StreamExt,
     std::{cell::RefCell, collections::HashMap, option::Option, rc::Rc},
@@ -81,7 +80,7 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                 fuchsia_trace::flow_end!("input", "report-to-event", trace_id.unwrap_or(0.into()));
                 // Create a new injector if this is the first time seeing device_id.
                 if let Err(e) = self.ensure_injector_registered(&touch_device_descriptor).await {
-                    fx_log_err!("{}", e);
+                    tracing::error!("{}", e);
                 }
 
                 // Handle the event.
@@ -89,12 +88,12 @@ impl UnhandledInputHandler for TouchInjectorHandler {
                     .send_event_to_scenic(&touch_event, &touch_device_descriptor, event_time)
                     .await
                 {
-                    fx_log_err!("{}", e);
+                    tracing::error!("{}", e);
                 }
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_touch_activity(event_time).await {
-                    fx_log_err!("report_touch_activity failed: {}", e);
+                    tracing::error!("report_touch_activity failed: {}", e);
                 }
 
                 // Consume the input event.
@@ -247,7 +246,7 @@ impl TouchInjectorHandler {
             .register(config, device_server)
             .await
             .context("Failed to register injector.")?;
-        fx_log_info!("Registered injector with device id {:?}", touch_descriptor.device_id);
+        tracing::info!("Registered injector with device id {:?}", touch_descriptor.device_id);
 
         Ok(())
     }
@@ -424,11 +423,11 @@ impl TouchInjectorHandler {
                     }
                 }
                 Some(Err(e)) => {
-                    fx_log_err!("Error while reading viewport update: {}", e);
+                    tracing::error!("Error while reading viewport update: {}", e);
                     return;
                 }
                 None => {
-                    fx_log_err!("Viewport update stream terminated unexpectedly");
+                    tracing::error!("Viewport update stream terminated unexpectedly");
                     return;
                 }
             }

@@ -14,7 +14,6 @@ use {
     fuchsia_async as fasync,
     fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_inspect::{NumericProperty, Property},
-    fuchsia_syslog::{fx_log_err, fx_log_info, fx_log_warn},
     fuchsia_zircon as zx,
     futures::channel::mpsc::{self, Receiver, Sender, UnboundedReceiver, UnboundedSender},
     futures::lock::Mutex,
@@ -92,7 +91,7 @@ impl InputPipelineAssembly {
                 };
                 for out_event in out_events.into_iter() {
                     if let Err(e) = next_sender.unbounded_send(out_event) {
-                        fx_log_err!(
+                        tracing::error!(
                             "could not forward event output from handler: {:?}: {:?}",
                             handler_name,
                             &e
@@ -128,7 +127,7 @@ impl InputPipelineAssembly {
         tasks.push(fasync::Task::local(async move {
             h.handle_input_events(autorepeat_receiver, autorepeat_sender)
                 .await
-                .map_err(|e| fx_log_err!("display ownership is not supposed to terminate - this is likely a problem: {:?}", &e)).unwrap();
+                .map_err(|e| tracing::error!("display ownership is not supposed to terminate - this is likely a problem: {:?}", &e)).unwrap();
         }));
         InputPipelineAssembly { sender, receiver, tasks }
     }
@@ -143,7 +142,7 @@ impl InputPipelineAssembly {
         tasks.push(fasync::Task::local(async move {
             a.run(autorepeat_sender)
                 .await
-                .map_err(|e| fx_log_err!("error while running autorepeater: {:?}", &e))
+                .map_err(|e| tracing::error!("error while running autorepeater: {:?}", &e))
                 .expect("autorepeater should never error out");
         }));
         InputPipelineAssembly { sender, receiver, tasks }
@@ -180,7 +179,7 @@ impl InputPipelineAssembly {
         let (sender, receiver, mut tasks) = self.into_components();
         tasks.push(fasync::Task::local(async move {
             if let Ok(mut focus_listener) = FocusListener::new(focus_chain_publisher).map_err(|e| {
-                fx_log_warn!(
+                tracing::warn!(
                     "could not create focus listener, focus will not be dispatched: {:?}",
                     e
                 )
@@ -191,7 +190,7 @@ impl InputPipelineAssembly {
                     .dispatch_focus_changes()
                     .await
                     .map(|_| {
-                        fx_log_warn!(
+                        tracing::warn!(
                             "dispatch focus loop ended, focus will no longer be dispatched"
                         )
                     })
@@ -356,7 +355,7 @@ impl InputPipeline {
                     // This error is usually benign in tests: it means that the setup does not
                     // support dynamic device discovery. Almost no tests support dynamic
                     // device discovery, and they also do not need those.
-                    fx_log_err!(
+                    tracing::error!(
                         "Input pipeline is unable to watch for new input devices: {:?}",
                         err
                     )
@@ -388,11 +387,11 @@ impl InputPipeline {
     pub async fn handle_input_events(mut self) {
         while let Some(input_event) = self.device_event_receiver.next().await {
             if let Err(e) = self.pipeline_sender.unbounded_send(input_event) {
-                fx_log_err!("could not forward event from driver: {:?}", &e);
+                tracing::error!("could not forward event from driver: {:?}", &e);
             }
         }
 
-        fx_log_err!("Input pipeline stopped handling input events.");
+        tracing::error!("Input pipeline stopped handling input events.");
     }
 
     /// Watches the input report directory for new input devices. Creates InputDeviceBindings
@@ -427,7 +426,7 @@ impl InputPipeline {
                 let pathbuf = PathBuf::from(filename.clone());
                 match msg.event {
                     WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
-                        fx_log_info!("found input device {}", filename);
+                        tracing::info!("found input device {}", filename);
                         devices_discovered.add(1);
                         let device_proxy =
                             input_device::get_device_from_dir_entry_path(&dir_proxy, &pathbuf)?;
@@ -525,7 +524,7 @@ impl InputPipeline {
                 for binding in v.iter() {
                     match binding.handle_input_config_request(&request).await {
                         Ok(()) => (),
-                        Err(e) => fx_log_err!("Error handling input config request {:?}", e),
+                        Err(e) => tracing::error!("Error handling input config request {:?}", e),
                     }
                 }
             }
@@ -549,7 +548,7 @@ impl InputPipeline {
         fasync::Task::local(async move {
             while let Some(event) = receiver.next().await {
                 if event.handled == input_device::Handled::No {
-                    fx_log_warn!("unhandled input event: {:?}", &event);
+                    tracing::warn!("unhandled input event: {:?}", &event);
                 }
             }
             panic!("unhandled event catcher is not supposed to terminate.");
@@ -593,7 +592,7 @@ async fn add_device_bindings(
             }
         }
         if matched_device_types.is_empty() {
-            fx_log_info!(
+            tracing::info!(
                 "device {} did not match any supported device types: {:?}",
                 filename,
                 device_types
@@ -601,11 +600,11 @@ async fn add_device_bindings(
             return;
         }
     } else {
-        fx_log_err!("cannot bind device {} without a device descriptor", filename);
+        tracing::error!("cannot bind device {} without a device descriptor", filename);
         return;
     }
 
-    fx_log_info!(
+    tracing::info!(
         "binding {} to device types: {}",
         filename,
         matched_device_types
@@ -646,7 +645,7 @@ async fn add_device_bindings(
         .await
         {
             Ok(binding) => new_bindings.push(binding),
-            Err(e) => fx_log_err!("failed to bind {} as {:?}: {}", filename, device_type, e),
+            Err(e) => tracing::error!("failed to bind {} as {:?}: {}", filename, device_type, e),
         }
     }
 

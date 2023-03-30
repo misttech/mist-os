@@ -10,10 +10,7 @@ use {
     fidl::endpoints::Proxy,
     fidl_fuchsia_input_interaction_observation as interaction_observation,
     fidl_fuchsia_input_report as fidl_input_report, fidl_fuchsia_ui_input as fidl_ui_input,
-    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync,
-    fuchsia_syslog::fx_log_err,
-    fuchsia_syslog::fx_log_info,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_ui_policy as fidl_ui_policy, fuchsia_async as fasync, fuchsia_zircon as zx,
     fuchsia_zircon::AsHandleRef,
     futures::{channel::mpsc, StreamExt, TryStreamExt},
     std::cell::RefCell,
@@ -68,7 +65,7 @@ impl UnhandledInputHandler for MediaButtonsHandler {
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_media_buttons_activity(event_time).await {
-                    fx_log_err!("report_media_buttons_activity failed: {}", e);
+                    tracing::error!("report_media_buttons_activity failed: {}", e);
                 }
 
                 // Consume the input event.
@@ -87,7 +84,7 @@ impl MediaButtonsHandler {
         >() {
             Ok(proxy) => Some(proxy),
             Err(e) => {
-                fx_log_err!("MedaButtonsHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
+                tracing::error!("MedaButtonsHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
                 None
             }
         };
@@ -145,7 +142,7 @@ impl MediaButtonsHandler {
                                 match proxy_clone.on_event(event_to_send).await {
                                     Ok(_) => {}
                                     Err(e) => {
-                                        fx_log_info!(
+                                        tracing::info!(
                                             "Failed to send media buttons event to listener {:?}",
                                             e
                                         )
@@ -223,7 +220,7 @@ impl MediaButtonsHandler {
                     Err(e) => {
                         if let Some(handler) = weak_handler.upgrade() {
                             handler.inner.borrow_mut().listeners.remove(&handle_clone);
-                            fx_log_info!(
+                            tracing::info!(
                                 "Unregistering listener; unable to send MediaButtonsEvent: {:?}",
                                 e
                             )

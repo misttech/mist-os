@@ -11,7 +11,6 @@ use {
     fidl_fuchsia_input_report as fidl_input_report,
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fuchsia_syslog::fx_log_err,
     fuchsia_zircon as zx,
     futures::channel::mpsc::Sender,
     std::collections::HashSet,
@@ -332,7 +331,7 @@ impl MouseBinding {
         let counts_per_mm = match device_descriptor {
             input_device::InputDeviceDescriptor::Mouse(ds) => ds.counts_per_mm,
             _ => {
-                fx_log_err!("mouse_binding::process_reports got device_descriptor not mouse");
+                tracing::error!("mouse_binding::process_reports got device_descriptor not mouse");
                 mouse_model_database::db::DEFAULT_COUNTS_PER_MM
             }
         };
@@ -475,7 +474,7 @@ fn send_mouse_event(
         handled: Handled::No,
         trace_id: None,
     }) {
-        Err(e) => fx_log_err!("Failed to send MouseEvent with error: {:?}", e),
+        Err(e) => tracing::error!("Failed to send MouseEvent with error: {:?}", e),
         _ => {}
     }
 }

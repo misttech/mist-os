@@ -10,7 +10,6 @@ use async_trait::async_trait;
 use fidl_fuchsia_input as finput;
 use fidl_fuchsia_settings as fsettings;
 use fuchsia_async as fasync;
-use fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_info};
 use futures::{TryFutureExt, TryStreamExt};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -45,7 +44,7 @@ impl UnhandledInputHandler for TextSettingsHandler {
                 trace_id: _,
             } => {
                 let keymap_id = self.get_keymap_name();
-                fx_log_debug!(
+                tracing::debug!(
                     "text_settings_handler::Instance::handle_unhandled_input_event: keymap_id = {:?}",
                     &keymap_id
                 );
@@ -96,10 +95,10 @@ impl TextSettingsHandler {
                 Some(fsettings::KeyboardSettings { keymap, autorepeat, .. }) => {
                     self.set_keymap_id(keymap);
                     self.set_autorepeat_settings(autorepeat.map(|e| e.into()));
-                    fx_log_info!("keymap ID set to: {:?}", self.get_keymap_id());
+                    tracing::info!("keymap ID set to: {:?}", self.get_keymap_id());
                 }
                 e => {
-                    fx_log_err!("exiting - unexpected response: {:?}", &e);
+                    tracing::error!("exiting - unexpected response: {:?}", &e);
                     break;
                 }
             }
@@ -115,7 +114,7 @@ impl TextSettingsHandler {
                 // settings won't run, but that only means you can't configure keyboard
                 // settings. If your tests does not need to change keymaps, or adjust
                 // key autorepeat rates, these are not relevant.
-                .unwrap_or_else(|e: anyhow::Error| fx_log_err!("can't run: {:?}", e)),
+                .unwrap_or_else(|e: anyhow::Error| tracing::error!("can't run: {:?}", e)),
         )
         .detach();
     }

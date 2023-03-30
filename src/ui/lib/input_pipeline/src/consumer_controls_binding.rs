@@ -9,7 +9,6 @@ use {
     fidl_fuchsia_input_report as fidl_input_report,
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fuchsia_syslog::fx_log_err,
     fuchsia_zircon as zx,
     futures::channel::mpsc::Sender,
 };
@@ -207,7 +206,7 @@ fn send_consumer_controls_event(
         handled: Handled::No,
         trace_id: None,
     }) {
-        fx_log_err!("Failed to send ConsumerControlsEvent with error: {:?}", e);
+        tracing::error!("Failed to send ConsumerControlsEvent with error: {:?}", e);
     }
 }
 

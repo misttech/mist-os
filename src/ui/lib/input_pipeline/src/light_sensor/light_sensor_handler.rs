@@ -17,7 +17,6 @@ use fidl_fuchsia_lightsensor::{
 };
 use fidl_fuchsia_settings::LightProxy;
 use fidl_fuchsia_ui_brightness::ControlProxy as BrightnessControlProxy;
-use fuchsia_syslog::{fx_log_info, fx_log_warn};
 use fuchsia_zircon as zx;
 use futures::channel::oneshot;
 use futures::TryStreamExt;
@@ -81,7 +80,7 @@ impl ActiveSetting {
 
         if saturated(reading) {
             if self.adjust_down() {
-                fuchsia_syslog::fx_log_info!("adjusting down due to saturation sentinel");
+                tracing::info!("adjusting down due to saturation sentinel");
                 self.update_device(device_proxy).await.context("updating light sensor device")?;
             }
             return Err(SaturatedError::Saturated);
@@ -91,7 +90,7 @@ impl ActiveSetting {
             let value = value as u32;
             if value >= saturation_point {
                 if self.adjust_down() {
-                    fuchsia_syslog::fx_log_info!("adjusting down due to saturation point");
+                    tracing::info!("adjusting down due to saturation point");
                     self.update_device(device_proxy)
                         .await
                         .context("updating light sensor device")?;
@@ -104,7 +103,7 @@ impl ActiveSetting {
 
         if pull_up {
             if self.adjust_up() {
-                fuchsia_syslog::fx_log_info!("adjusting up");
+                tracing::info!("adjusting up");
                 self.update_device(device_proxy).await.context("updating light sensor device")?;
             }
         }
@@ -155,7 +154,7 @@ impl ActiveSetting {
         if self.idx == 0 {
             false
         } else {
-            fx_log_info!("adjusting down");
+            tracing::info!("adjusting down");
             self.idx -= 1;
             true
         }
@@ -178,7 +177,7 @@ impl ActiveSetting {
         if self.idx == self.settings.len() - 1 {
             false
         } else {
-            fx_log_info!("adjusting up");
+            tracing::info!("adjusting up");
             self.idx += 1;
             true
         }
@@ -241,7 +240,7 @@ impl<T> LightSensorHandler<T> {
             },
             Box::new(|sensor_data: &LightSensorData, responder: SensorWatchResponder| -> bool {
                 if let Err(e) = responder.send(FidlLightSensorData::from(*sensor_data)) {
-                    fx_log_warn!("Failed to send updated data to client: {e:?}",);
+                    tracing::warn!("Failed to send updated data to client: {e:?}",);
                 }
                 true
             }) as NotifyFn,
@@ -434,7 +433,7 @@ where
                 && light_sensor_descriptor.product_id == self.product_id)
             {
                 // Don't handle the event.
-                fx_log_warn!(
+                tracing::warn!(
                     "Unexpected device in light sensor handler: {:?}",
                     light_sensor_descriptor,
                 );
@@ -456,7 +455,7 @@ where
                     return vec![input_event];
                 }
                 Err(SaturatedError::Anyhow(e)) => {
-                    fx_log_warn!("Failed to get light sensor readings: {e:?}");
+                    tracing::warn!("Failed to get light sensor readings: {e:?}");
                     // Don't handle the event.
                     return vec![input_event];
                 }

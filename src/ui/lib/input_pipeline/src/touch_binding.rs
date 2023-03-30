@@ -12,9 +12,7 @@ use {
     fidl_fuchsia_input_report::{InputDeviceProxy, InputReport},
     fidl_fuchsia_ui_input as fidl_ui_input,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fidl_fuchsia_ui_pointerinjector as pointerinjector,
-    fuchsia_syslog::{fx_log_err, fx_log_info},
-    fuchsia_zircon as zx,
+    fidl_fuchsia_ui_pointerinjector as pointerinjector, fuchsia_zircon as zx,
     futures::channel::mpsc::Sender,
     maplit::hashmap,
     std::collections::HashMap,
@@ -348,7 +346,7 @@ impl TouchBinding {
                 match self.device_proxy.set_feature_report(report).await? {
                     Ok(()) => {
                         // TODO(https://fxbug.dev/105092): Remove log message.
-                        fx_log_info!("touchpad: set touchpad_enabled to {}", enable);
+                        tracing::info!("touchpad: set touchpad_enabled to {}", enable);
                         Ok(())
                     }
                     Err(e) => Err(format_err!("set_feature_report failed: {}", e)),
@@ -594,7 +592,7 @@ fn send_touch_screen_event(
         handled: Handled::No,
         trace_id: Some(trace_id),
     }) {
-        Err(e) => fx_log_err!("Failed to send TouchScreenEvent with error: {:?}", e),
+        Err(e) => tracing::error!("Failed to send TouchScreenEvent with error: {:?}", e),
         _ => {}
     }
 }
@@ -625,7 +623,7 @@ fn send_touchpad_event(
         handled: Handled::No,
         trace_id: Some(trace_id),
     }) {
-        Err(e) => fx_log_err!("Failed to send TouchpadEvent with error: {:?}", e),
+        Err(e) => tracing::error!("Failed to send TouchpadEvent with error: {:?}", e),
         _ => {}
     }
 }

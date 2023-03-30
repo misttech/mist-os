@@ -18,7 +18,6 @@ use {
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
     fuchsia_async as fasync,
     fuchsia_inspect::health::Reporter,
-    fuchsia_syslog::{fx_log_err, fx_log_warn},
     fuchsia_trace as ftrace, fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, stream::StreamExt},
     std::path::PathBuf,
@@ -235,13 +234,13 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
         let (report_reader, server_end) = match fidl::endpoints::create_proxy() {
             Ok(res) => res,
             Err(e) => {
-                fx_log_err!("error creating InputReport proxy: {:?}", &e);
+                tracing::error!("error creating InputReport proxy: {:?}", &e);
                 return; // TODO(fxbug.dev/54445): signal error
             }
         };
         let result = device_proxy.get_input_reports_reader(server_end);
         if result.is_err() {
-            fx_log_err!("error on GetInputReportsReader: {:?}", &result);
+            tracing::error!("error on GetInputReportsReader: {:?}", &result);
             return; // TODO(fxbug.dev/54445): signal error
         }
         let mut report_stream = HangingGetStream::new(
@@ -268,7 +267,7 @@ pub fn initialize_report_stream<InputDeviceProcessReportsFn>(
         }
         // TODO(fxbug.dev/54445): Add signaling for when this loop exits, since it means the device
         // binding is no longer functional.
-        fx_log_warn!("initialize_report_stream exited - device binding no longer works");
+        tracing::warn!("initialize_report_stream exited - device binding no longer works");
     })
     .detach();
 }

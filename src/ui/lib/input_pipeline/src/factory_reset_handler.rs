@@ -21,7 +21,6 @@ use {
     },
     fuchsia_async::{Duration, Task, Time, TimeoutExt, Timer},
     fuchsia_component,
-    fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_info, fx_log_warn},
     fuchsia_zircon::Channel,
     futures::StreamExt,
     std::{
@@ -191,7 +190,7 @@ impl FactoryResetHandler {
     async fn handle_allowed_event(self: &Rc<Self>, event: &ConsumerControlsEvent) {
         if is_reset_requested(event) {
             if let Err(error) = self.start_button_countdown().await {
-                fx_log_err!("Failed to factory reset device: {:?}", error);
+                tracing::error!("Failed to factory reset device: {:?}", error);
             }
         }
     }
@@ -200,7 +199,7 @@ impl FactoryResetHandler {
     /// `FactoryResetState::Disallowed` state
     fn handle_disallowed_event(self: &Rc<Self>, event: &ConsumerControlsEvent) {
         if is_reset_requested(event) {
-            fx_log_err!("Attempted to factory reset a device that is not allowed to reset");
+            tracing::error!("Attempted to factory reset a device that is not allowed to reset");
         }
     }
 
@@ -237,7 +236,7 @@ impl FactoryResetHandler {
             };
 
             if responder.send(countdown_state).is_err() {
-                fx_log_err!("Failed to send factory reset countdown state");
+                tracing::error!("Failed to send factory reset countdown state");
             }
 
             true
@@ -274,7 +273,7 @@ impl FactoryResetHandler {
                 self.start_reset_countdown().await?;
             }
             _ => {
-                fx_log_info!("Factory reset request cancelled");
+                tracing::info!("Factory reset request cancelled");
             }
         }
 
@@ -299,7 +298,7 @@ impl FactoryResetHandler {
                 self.reset().await?;
             }
             _ => {
-                fx_log_info!("Factory reset request cancelled");
+                tracing::info!("Factory reset request cancelled");
             }
         }
 
@@ -308,50 +307,50 @@ impl FactoryResetHandler {
 
     /// Retrieves and plays the sound associated with factory resetting the device.
     async fn play_reset_sound(self: &Rc<Self>) -> Result<(), Error> {
-        fx_log_debug!("Getting sound");
+        tracing::debug!("Getting sound");
         // Get sound
         let sound_file = File::open(FACTORY_RESET_SOUND_PATH)
             .context("Failed to open factory reset sound file")?;
         let sound_channel = Channel::from(fdio::transfer_fd(sound_file)?);
         let sound_endpoint = fidl::endpoints::ClientEnd::<fio::FileMarker>::new(sound_channel);
 
-        fx_log_debug!("Playing sound");
+        tracing::debug!("Playing sound");
         // Play sound
         let sound_player = fuchsia_component::client::connect_to_protocol::<PlayerMarker>()
             .with_context(|| format!("failed to connect to {}", PlayerMarker::DEBUG_NAME))?;
 
-        fx_log_debug!("Connected to player");
+        tracing::debug!("Connected to player");
         let sound_id = 0;
         let _duration = sound_player
             .add_sound_from_file(sound_id, sound_endpoint)
             .await?
             .map_err(|status| format_err!("AddSoundFromFile failed {}", status))?;
-        fx_log_debug!("Added sound from file");
+        tracing::debug!("Added sound from file");
 
         sound_player
             .play_sound(sound_id, AudioRenderUsage::Media)
             .await?
             .map_err(|err| format_err!("PlaySound failed: {:?}", err))?;
 
-        fx_log_debug!("Played sound");
+        tracing::debug!("Played sound");
 
         Ok(())
     }
 
     /// Performs the actual factory reset.
     async fn reset(self: &Rc<Self>) -> Result<(), Error> {
-        fx_log_info!("Beginning reset sequence");
+        tracing::info!("Beginning reset sequence");
         if let Err(error) = self
             .play_reset_sound()
             .on_timeout(EARCON_TIMEOUT, || Err(format_err!("play_reset_sound took too long")))
             .await
         {
-            fx_log_warn!("Failed to play reset sound: {:?}", error);
+            tracing::warn!("Failed to play reset sound: {:?}", error);
         }
 
         // Trigger reset
         self.set_factory_reset_state(FactoryResetState::Resetting);
-        fx_log_info!("Calling {}.Reset", FactoryResetMarker::DEBUG_NAME);
+        tracing::info!("Calling {}.Reset", FactoryResetMarker::DEBUG_NAME);
         let factory_reset = fuchsia_component::client::connect_to_protocol::<FactoryResetMarker>()
             .with_context(|| format!("failed to connect to {}", FactoryResetMarker::DEBUG_NAME))?;
         factory_reset.reset().await.context("failed while calling Reset")?;
@@ -389,7 +388,7 @@ impl UnhandledInputHandler for FactoryResetHandler {
                         self.handle_reset_countdown_event(event)
                     }
                     FactoryResetState::Resetting => {
-                        fx_log_warn!("Recieved an input event while factory resetting the device")
+                        tracing::warn!("Recieved an input event while factory resetting the device")
                     }
                 };
             }
@@ -428,7 +427,7 @@ mod tests {
 
         Task::local(async move {
             if stream_fut.await.is_err() {
-                fx_log_warn!("Failed to handle factory reset countdown request stream");
+                tracing::warn!("Failed to handle factory reset countdown request stream");
             }
         })
         .detach();
@@ -446,7 +445,7 @@ mod tests {
                 .await
                 .is_err()
             {
-                fx_log_warn!("Failed to handle recovery policy device request stream");
+                tracing::warn!("Failed to handle recovery policy device request stream");
             }
         })
         .detach();

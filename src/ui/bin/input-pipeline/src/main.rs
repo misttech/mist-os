@@ -17,7 +17,6 @@ use {
     fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_component::server::ServiceFs,
-    fuchsia_syslog::{fx_log_err, fx_log_warn},
     fuchsia_zircon::Duration,
     futures::StreamExt,
     input_config_lib::Config,
@@ -94,7 +93,7 @@ async fn main() -> Result<(), Error> {
         let calibration = Calibration::new(configuration.calibration, &factory_file_loader)
             .await
             .map_err(|e| {
-                fx_log_warn!(
+                tracing::warn!(
                     "Calculations will use uncalibrated data. No light sensor calibration: {e:?}"
                 )
             })
@@ -232,7 +231,7 @@ async fn handle_factory_reset_countdown_request_stream(
     if let Err(error) =
         factory_reset_handler.handle_factory_reset_countdown_request_stream(stream).await
     {
-        fx_log_warn!("failure while serving FactoryResetCountdown: {}", error);
+        tracing::warn!("failure while serving FactoryResetCountdown: {}", error);
     }
 }
 
@@ -256,7 +255,7 @@ async fn handle_input_device_registry_request_stream(
     {
         Ok(()) => (),
         Err(e) => {
-            fx_log_warn!(
+            tracing::warn!(
                 "failure while serving InputDeviceRegistry: {}; \
                      will continue serving other clients",
                 e
@@ -270,7 +269,7 @@ async fn handle_light_sensor_request_stream(
     stream: SensorRequestStream,
 ) {
     if let Err(e) = light_sensor_handler.handle_light_sensor_request_stream(stream).await {
-        fx_log_warn!("failure while serving LightSensor: {e:?}");
+        tracing::warn!("failure while serving LightSensor: {e:?}");
     }
 }
 
@@ -281,7 +280,7 @@ async fn handle_media_buttons_listener_registry(
     match media_buttons_handler.handle_device_listener_registry_request_stream(stream).await {
         Ok(()) => (),
         Err(e) => {
-            fx_log_warn!("failure while serving DeviceListenerRegistry: {}", e);
+            tracing::warn!("failure while serving DeviceListenerRegistry: {}", e);
         }
     }
 }
@@ -293,7 +292,7 @@ async fn handle_recovery_policy_device_request_stream(
     match factory_reset_handler.handle_recovery_policy_device_request_stream(stream).await {
         Ok(()) => (),
         Err(e) => {
-            fx_log_warn!("failure while serving fuchsia.recovery.policy.Device: {}", e);
+            tracing::warn!("failure while serving fuchsia.recovery.policy.Device: {}", e);
         }
     }
 }
@@ -304,7 +303,7 @@ async fn handle_interaction_aggregator_request_stream(
 ) {
     if let Err(error) = activity_manager.handle_interaction_aggregator_request_stream(stream).await
     {
-        fx_log_warn!(
+        tracing::warn!(
             "failure while serving fuchsia.input.interaction.observation.Aggregator: {}; \
    will continue serving other clients",
             error
@@ -317,7 +316,7 @@ async fn handle_interaction_notifier_request_stream(
     stream: NotifierRequestStream,
 ) {
     if let Err(error) = activity_manager.handle_interaction_notifier_request_stream(stream).await {
-        fx_log_warn!(
+        tracing::warn!(
             "failure while serving fuchsia.input.interaction.Notifier: {}; \
  will continue serving other clients",
             error
@@ -333,7 +332,7 @@ async fn make_touch_injector_handler(
     let display_info = match scenic.get_display_info().await {
         Ok(display_info) => display_info,
         Err(e) => {
-            fx_log_err!("Failed to get display info: {}", e);
+            tracing::error!("Failed to get display info: {}", e);
             std::process::exit(-1);
         }
     };

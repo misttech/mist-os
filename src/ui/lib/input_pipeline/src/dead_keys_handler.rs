@@ -43,7 +43,6 @@ use crate::keyboard_binding::KeyboardEvent;
 use async_trait::async_trait;
 use core::fmt;
 use fidl_fuchsia_ui_input3::{KeyEventType, KeyMeaning};
-use fuchsia_syslog::fx_log_debug;
 use fuchsia_zircon as zx;
 use rust_icu_sys as usys;
 use rust_icu_unorm2 as unorm;
@@ -334,10 +333,10 @@ impl DeadKeysHandler {
             } => {
                 let event = StoredEvent { event, device_descriptor, event_time };
                 // Separated into two statements to ensure the logs are not truncated.
-                fx_log_debug!("state: {:?}", self.state.borrow());
-                fx_log_debug!("event: {}", &event);
+                tracing::debug!("state: {:?}", self.state.borrow());
+                tracing::debug!("event: {}", &event);
                 let result = self.process_keyboard_event(event);
-                fx_log_debug!("result: {:?}", &result);
+                tracing::debug!("result: {:?}", &result);
                 result
             }
 
@@ -523,7 +522,7 @@ impl DeadKeysHandler {
                             });
                             return composed_event.into();
                         } else {
-                            fx_log_debug!("compose failed for: {}\n", &event);
+                            tracing::debug!("compose failed for: {}\n", &event);
                             // FAIL!
                             // Composition failed, what now?  We would need to
                             // emit TWO characters - one for the now-defunct

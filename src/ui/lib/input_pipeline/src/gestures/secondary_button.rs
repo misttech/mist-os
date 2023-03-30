@@ -11,7 +11,6 @@ use {
     super::utils::{movement_from_events, MovementDetail},
     crate::mouse_binding::{MouseButton, MouseEvent, MouseLocation, MousePhase, RelativeLocation},
     crate::utils::{euclidean_distance, Position},
-    fuchsia_syslog::fx_log_err,
     fuchsia_zircon as zx,
     maplit::hashset,
     std::collections::HashSet,
@@ -375,7 +374,7 @@ impl gesture_arena::MatchedContender for MatchedContender {
         // This verify_event expected not call because all other recognizers
         // should exit on 2 finger button down.
 
-        fx_log_err!("Unexpected MatchedContender::verify_event() called");
+        tracing::error!("Unexpected MatchedContender::verify_event() called");
 
         VerifyEventResult::MatchedContender(self)
     }

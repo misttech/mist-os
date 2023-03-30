@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_syslog::fx_log_err;
-
 use {
     crate::{input_device, input_handler::UnhandledInputHandler, mouse_binding, utils::Position},
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    fuchsia_syslog::fx_log_debug,
     std::{convert::From, rc::Rc},
 };
 
@@ -116,7 +113,7 @@ impl PointerDisplayScaleHandler {
     /// * `Ok(Rc<Self>)` if `scale_factor` is finite and >= 1.0, and
     /// * `Err(Error)` otherwise.
     pub fn new(scale_factor: f32) -> Result<Rc<Self>, Error> {
-        fx_log_debug!("scale_factor={}", scale_factor);
+        tracing::debug!("scale_factor={}", scale_factor);
         use std::num::FpCategory;
         match scale_factor.classify() {
             FpCategory::Nan | FpCategory::Infinite | FpCategory::Zero | FpCategory::Subnormal => {
@@ -155,7 +152,7 @@ impl PointerDisplayScaleHandler {
                     None => {
                         // this should never reach as pointer_sensor_scale_handler should
                         // fill this field.
-                        fx_log_err!("physical_pixel is none");
+                        tracing::error!("physical_pixel is none");
                         None
                     }
                     Some(pixel) => Some(self.scale_factor * pixel),

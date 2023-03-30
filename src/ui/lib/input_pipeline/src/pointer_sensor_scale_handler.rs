@@ -6,7 +6,6 @@
 use {
     crate::{input_device, input_handler::UnhandledInputHandler, mouse_binding, utils::Position},
     async_trait::async_trait,
-    fuchsia_syslog::fx_log_err,
     fuchsia_zircon as zx,
     std::{cell::RefCell, convert::From, num::FpCategory, option::Option, rc::Rc},
 };
@@ -321,7 +320,7 @@ impl PointerSensorScaleHandler {
                 //
                 // TODO(https://fxbug.dev/98995) Add a triage rule to highlight the
                 // implications of this message.
-                fx_log_err!(
+                tracing::error!(
                     "skipped motion; scaled movement of {:?} is infinite or NaN; x is {:?}, and y is {:?}",
                     scaled_movement_mm,
                     scaled_movement_mm.x.classify(),
@@ -381,7 +380,7 @@ impl PointerSensorScaleHandler {
                 let scaled_scroll_mm = SCALE_SCROLL * scale_factor * mm;
 
                 if scaled_scroll_mm.is_infinite() || scaled_scroll_mm.is_nan() {
-                    fx_log_err!(
+                    tracing::error!(
                         "skipped scroll; scaled scroll of {:?} is infinite or NaN.",
                         scaled_scroll_mm,
                     );
@@ -503,7 +502,7 @@ mod tests {
                     duration,
                 )
                 .await;
-                fx_log_err!("{}, {}", count, scaled_count.x);
+                tracing::error!("{}, {}", count, scaled_count.x);
             }
         }
 

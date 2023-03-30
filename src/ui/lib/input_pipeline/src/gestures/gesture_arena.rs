@@ -13,7 +13,6 @@ use {
     fidl_fuchsia_input_report as fidl_input_report,
     fuchsia_inspect::{ArrayProperty, Node as InspectNode},
     fuchsia_inspect_contrib::nodes::BoundedListNode,
-    fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_info},
     fuchsia_zircon as zx,
     std::any::Any,
     std::fmt::Debug,
@@ -65,7 +64,7 @@ pub fn make_input_handler(
     inspect_node: &InspectNode,
 ) -> std::rc::Rc<dyn crate::input_handler::InputHandler> {
     // TODO(https://fxbug.dev/105092): Remove log message.
-    fx_log_info!("touchpad: created input handler");
+    tracing::info!("touchpad: created input handler");
     std::rc::Rc::new(GestureArena::new_internal(
         Box::new(GestureArenaInitialContenders {}),
         inspect_node,
@@ -617,7 +616,7 @@ impl GestureArena {
                 unreachable!();
             }
         };
-        fx_log_debug!("gesture_arena: {:?} -> {:?}", old_state_name, new_state.get_state_name());
+        tracing::debug!("gesture_arena: {:?} -> {:?}", old_state_name, new_state.get_state_name());
         self.mutable_state.replace(new_state);
         // self.log_mutable_state();  // uncomment to log contender set
         Ok(generated_events.into_iter().map(input_device::InputEvent::from).collect())
@@ -883,7 +882,7 @@ impl GestureArena {
                 EndGestureEvent::GeneratedEvent(generated_event),
                 reason,
             ) => {
-                fx_log_debug!("touchpad: {} ended: {:?}", type_name, reason);
+                tracing::debug!("touchpad: {} ended: {:?}", type_name, reason);
                 log_gesture_end(
                     self.inspect_log.borrow_mut().create_entry(),
                     type_name,
@@ -902,7 +901,7 @@ impl GestureArena {
                 EndGestureEvent::UnconsumedEvent(unconsumed_event),
                 reason,
             ) => {
-                fx_log_debug!("touchpad: {} ended: {:?}", type_name, reason);
+                tracing::debug!("touchpad: {} ended: {:?}", type_name, reason);
                 log_gesture_end(
                     self.inspect_log.borrow_mut().create_entry(),
                     type_name,
@@ -918,7 +917,7 @@ impl GestureArena {
                 }
             }
             ProcessNewEventResult::EndGesture(EndGestureEvent::NoEvent, reason) => {
-                fx_log_debug!("touchpad: {} ended: {:?}", type_name, reason);
+                tracing::debug!("touchpad: {} ended: {:?}", type_name, reason);
                 log_gesture_end(
                     self.inspect_log.borrow_mut().create_entry(),
                     type_name,
@@ -989,7 +988,7 @@ impl GestureArena {
 
     #[allow(dead_code)] // only called in developer debug builds
     fn log_mutable_state(&self) {
-        fx_log_info!("{}", self.mutable_state_to_str());
+        tracing::info!("{}", self.mutable_state_to_str());
     }
 }
 
@@ -1015,7 +1014,7 @@ impl InputHandler for GestureArena {
                 match self.handle_touchpad_event(event_time, touchpad_event, touchpad_descriptor) {
                     Ok(r) => r,
                     Err(e) => {
-                        fx_log_err!("{}", e);
+                        tracing::error!("{}", e);
                         vec![input_event]
                     }
                 }
@@ -1193,7 +1192,7 @@ fn log_reason(reason_node: &InspectNode, contender_name: &'static str, reason: R
 }
 
 fn log_mismatch_reason(log_entry_node: &InspectNode, contender_name: &'static str, reason: Reason) {
-    fx_log_debug!("touchpad: {} mismatched: {:?}", contender_name, reason);
+    tracing::debug!("touchpad: {} mismatched: {:?}", contender_name, reason);
     log_entry_node.atomic_update(|log_entry_node| {
         log_entry_node.record_child("mismatch_event", |mismatch_event_node| {
             log_reason(mismatch_event_node, contender_name, reason);
@@ -1207,7 +1206,7 @@ fn log_gesture_start(
     num_previous_events: usize,
     elapsed_from_first_event: zx::Duration,
 ) {
-    fx_log_debug!("touchpad: recognized start {:?}", recognized_gesture);
+    tracing::debug!("touchpad: recognized start {:?}", recognized_gesture);
     log_entry_node.atomic_update(|log_entry_node| {
         log_entry_node.record_child("gesture_start", |gesture_start_node| {
             gesture_start_node.record_string("gesture_name", recognized_gesture.to_str());
@@ -1232,7 +1231,7 @@ fn log_gesture_end(
     num_events: usize,
     elapsed_from_gesture_start: zx::Duration,
 ) {
-    fx_log_debug!("touchpad: recognized end {:?}", current_gesture);
+    tracing::debug!("touchpad: recognized end {:?}", current_gesture);
     log_entry_node.atomic_update(|log_entry_node| {
         log_entry_node.record_child("gesture_end", |gesture_end_node| {
             gesture_end_node.record_string("gesture_name", current_gesture.to_str());

@@ -10,7 +10,6 @@ use {
     async_trait::async_trait,
     fidl_fuchsia_ui_input3::{self as fidl_ui_input3, LockState, Modifiers},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_syslog::{fx_log_debug, fx_log_err},
     fuchsia_zircon as zx,
     keymaps::{self, LockStateChecker, ModifierChecker},
     std::rc::Rc,
@@ -117,7 +116,7 @@ impl ImeHandler {
             &key_event
         );
         match self.key_event_injector.inject(key_event).await {
-            Err(err) => fx_log_err!("Failed to dispatch key to IME: {:?}", err),
+            Err(err) => tracing::error!("Failed to dispatch key to IME: {:?}", err),
             _ => {}
         };
     }
@@ -136,7 +135,7 @@ fn create_key_event(
         event.get_modifiers().unwrap_or(Modifiers::from_bits_allow_unknown(0)).into();
     let lock_state: FrozenLockState =
         event.get_lock_state().unwrap_or(LockState::from_bits_allow_unknown(0)).into();
-    fx_log_debug!(
+    tracing::debug!(
         "ImeHandler::create_key_event: key:{:?}, modifier_state: {:?}, lock_state: {:?}, event_type: {:?}",
         event.get_key(),
         modifier_state,

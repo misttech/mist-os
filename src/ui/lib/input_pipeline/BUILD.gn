@@ -48,7 +48,6 @@ icu_rustc_library("input_pipeline") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/icu_data/rust/icu_data",
-    "//src/lib/syslog/rust:syslog",
     "//src/lib/trace/rust:trace",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/ui/keymaps",

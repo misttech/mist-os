@@ -10,7 +10,6 @@ use {
     },
     fidl_fuchsia_input_interaction_observation::{AggregatorRequest, AggregatorRequestStream},
     fuchsia_async::{Task, Timer},
-    fuchsia_syslog::fx_log_info,
     fuchsia_zircon as zx,
     futures::StreamExt,
     std::{
@@ -133,7 +132,7 @@ impl ActivityManager {
     fn init_hanging_get(initial_state: State) -> InteractionHangingGet {
         let notify_fn: NotifyFn = Box::new(|state, responder| {
             if responder.send(*state).is_err() {
-                fx_log_info!("Failed to send user input interaction state");
+                tracing::info!("Failed to send user input interaction state");
             }
 
             true

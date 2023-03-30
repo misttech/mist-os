@@ -19,7 +19,6 @@ use {
     fidl_fuchsia_ui_pointerinjector as pointerinjector,
     fidl_fuchsia_ui_pointerinjector_configuration as pointerinjector_config,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_syslog::{fx_log_err, fx_log_info},
     fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, stream::StreamExt, SinkExt},
     std::iter::FromIterator,
@@ -108,11 +107,11 @@ impl InputHandler for MouseInjectorHandler {
                 if let Err(e) =
                     self.update_cursor_renderer(mouse_event, &mouse_device_descriptor).await
                 {
-                    fx_log_err!("update_cursor_renderer failed: {}", e);
+                    tracing::error!("update_cursor_renderer failed: {}", e);
                 }
                 let immersive_mode = self.inner().immersive_mode;
                 if let Err(e) = self.update_cursor_visibility(!immersive_mode).await {
-                    fx_log_err!("update_cursor_visibility failed: {}", e);
+                    tracing::error!("update_cursor_visibility failed: {}", e);
                 }
 
                 // Create a new injector if this is the first time seeing device_id.
@@ -120,7 +119,7 @@ impl InputHandler for MouseInjectorHandler {
                     .ensure_injector_registered(&mouse_event, &mouse_device_descriptor, event_time)
                     .await
                 {
-                    fx_log_err!("ensure_injector_registered failed: {}", e);
+                    tracing::error!("ensure_injector_registered failed: {}", e);
                 }
 
                 // Handle the event.
@@ -128,12 +127,12 @@ impl InputHandler for MouseInjectorHandler {
                     .send_event_to_scenic(&mouse_event, &mouse_device_descriptor, event_time)
                     .await
                 {
-                    fx_log_err!("send_event_to_scenic failed: {}", e);
+                    tracing::error!("send_event_to_scenic failed: {}", e);
                 }
 
                 // Report the event to the Activity Service.
                 if let Err(e) = self.report_mouse_activity(event_time).await {
-                    fx_log_err!("report_mouse_activity failed: {}", e);
+                    tracing::error!("report_mouse_activity failed: {}", e);
                 }
 
                 // Consume the input event.
@@ -152,7 +151,7 @@ impl InputHandler for MouseInjectorHandler {
                 // proper cursor API.
                 let visible = false;
                 if let Err(e) = self.update_cursor_visibility(visible).await {
-                    fx_log_err!("update_cursor_visibility failed: {}", e);
+                    tracing::error!("update_cursor_visibility failed: {}", e);
                 }
             }
             input_device::InputEvent {
@@ -172,7 +171,7 @@ impl InputHandler for MouseInjectorHandler {
                 // TODO(fxbug.dev/90290): Remove this workaround when we have a
                 // proper cursor API.
                 if let Err(e) = self.toggle_immersive_mode().await {
-                    fx_log_err!("update_cursor_visibility failed: {}", e);
+                    tracing::error!("update_cursor_visibility failed: {}", e);
                 }
                 input_event.handled = input_device::Handled::Yes
             }
@@ -346,7 +345,7 @@ impl MouseInjectorHandler {
             .register(config, device_server)
             .await
             .context("Failed to register injector.")?;
-        fx_log_info!("Registered injector with device id {:?}", mouse_descriptor.device_id);
+        tracing::info!("Registered injector with device id {:?}", mouse_descriptor.device_id);
 
         // Keep track of the injector.
         self.inner_mut().injectors.insert(mouse_descriptor.device_id, device_proxy.clone());
@@ -480,7 +479,7 @@ impl MouseInjectorHandler {
         let immersive_mode = {
             let mut inner = self.inner_mut();
             inner.immersive_mode = !inner.immersive_mode;
-            fx_log_info!("Toggled immersive mode: {}", inner.immersive_mode);
+            tracing::info!("Toggled immersive mode: {}", inner.immersive_mode);
             inner.immersive_mode
         };
 
@@ -600,7 +599,7 @@ impl MouseInjectorHandler {
                     Some(mouse_binding::PrecisionScroll::Yes) => Some(true),
                     Some(mouse_binding::PrecisionScroll::No) => Some(false),
                     None => {
-                        fx_log_err!(
+                        tracing::error!(
                             "mouse wheel event does not have value in is_precision_scroll."
                         );
                         None
@@ -652,11 +651,11 @@ impl MouseInjectorHandler {
                     }
                 }
                 Some(Err(e)) => {
-                    fx_log_err!("Error while reading viewport update: {}", e);
+                    tracing::error!("Error while reading viewport update: {}", e);
                     return;
                 }
                 None => {
-                    fx_log_err!("Viewport update stream terminated unexpectedly");
+                    tracing::error!("Viewport update stream terminated unexpectedly");
                     return;
                 }
             }

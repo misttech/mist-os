@@ -4,8 +4,8 @@
 
 use {
     crate::input_device, crate::input_handler::UnhandledInputHandler, async_trait::async_trait,
-    fidl_fuchsia_input_interaction_observation as interaction_observation,
-    fuchsia_syslog::fx_log_err, fuchsia_zircon as zx, std::rc::Rc,
+    fidl_fuchsia_input_interaction_observation as interaction_observation, fuchsia_zircon as zx,
+    std::rc::Rc,
 };
 
 /// A `KeyboardHandler` reports keyboard activity to the activity service.
@@ -33,7 +33,7 @@ impl UnhandledInputHandler for KeyboardHandler {
         {
             // Report the event to the Activity Service.
             if let Err(e) = self.report_keyboard_activity(event_time).await {
-                fx_log_err!("report_key_activity failed: {}", e);
+                tracing::error!("report_key_activity failed: {}", e);
             }
         }
 
@@ -50,7 +50,7 @@ impl KeyboardHandler {
         >() {
             Ok(proxy) => Some(proxy),
             Err(e) => {
-                fx_log_err!("KeyboardHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
+                tracing::error!("KeyboardHandler failed to connect to fuchsia.input.interaction.observation.Aggregator: {}", e);
                 None
             }
         };

@@ -12,9 +12,7 @@ use {
     fidl_fuchsia_ui_input3 as fidl_ui_input3,
     fidl_fuchsia_ui_input3::KeyEventType,
     fidl_fuchsia_ui_input_config::FeaturesRequest as InputConfigFeaturesRequest,
-    fuchsia_async as fasync,
-    fuchsia_syslog::fx_log_err,
-    fuchsia_zircon as zx,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc::Sender, SinkExt},
 };
 
@@ -365,7 +363,7 @@ impl KeyboardBinding {
         let device_info = descriptor.device_info.ok_or({
             // Logging in addition to returning an error, as in some test
             // setups the error may never be displayed to the user.
-            fx_log_err!("DRIVER BUG: empty device_info for device_id: {}", device_id);
+            tracing::error!("DRIVER BUG: empty device_info for device_id: {}", device_id);
             format_err!("empty device info for device_id: {}", device_id)
         })?;
         match descriptor.keyboard {
@@ -424,7 +422,7 @@ impl KeyboardBinding {
                 //
                 // In this case the report is treated as malformed, and the previous report is not
                 // updated.
-                fx_log_err!("Failed to parse keyboard keys: {:?}", report);
+                tracing::error!("Failed to parse keyboard keys: {:?}", report);
                 return previous_report;
             }
         };
@@ -504,7 +502,7 @@ impl KeyboardBinding {
                         .await
                     {
                         Err(error) => {
-                            fx_log_err!(
+                            tracing::error!(
                             "Failed to send KeyboardEvent for key: {:?}, event_type: {:?}: {:?}",
                             &key,
                             &event_type,

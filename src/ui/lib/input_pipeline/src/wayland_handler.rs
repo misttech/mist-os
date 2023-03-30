@@ -12,7 +12,6 @@ use async_trait::async_trait;
 use async_utils::hanging_get::server::HangingGet;
 use fidl_fuchsia_input::KeymapId;
 use fidl_fuchsia_input_wayland::{KeymapRequestStream, KeymapWatchResponder};
-use fuchsia_syslog::{fx_log_debug, fx_log_err};
 use fuchsia_trace;
 use fuchsia_zircon as zx;
 use futures::StreamExt;
@@ -85,18 +84,18 @@ fn default_vmo_factory() -> VmoFactory {
 
 fn keymap_update_fn(vmo_factory: VmoFactory) -> NotifyFn {
     Box::new(move |state: &KeymapId, responder: KeymapWatchResponder| {
-        fx_log_debug!("new_state: {:?}", state);
+        tracing::debug!("new_state: {:?}", state);
 
         let vmo = match vmo_factory(state) {
             Err(e) => {
-                fx_log_err!("could not load keymap: {:?}", &e);
+                tracing::error!("could not load keymap: {:?}", &e);
                 return false;
             }
             Ok(vmo) => vmo,
         };
 
         if let Err(e) = responder.send(vmo) {
-            fx_log_err!(
+            tracing::error!(
                 "fuchsia.input.wayland/Keymap.Watch: can not send update: {:?}, {:?}",
                 state,
                 &e

@@ -10,7 +10,6 @@ use crate::input_device;
 use crate::input_handler::UnhandledInputHandler;
 use crate::keyboard_binding;
 use async_trait::async_trait;
-use fuchsia_syslog::fx_log_debug;
 use fuchsia_zircon as zx;
 use keymaps;
 use std::cell::RefCell;
@@ -70,7 +69,7 @@ impl KeymapHandler {
         event_time: zx::Time,
     ) -> input_device::UnhandledInputEvent {
         let (key, event_type) = (event.get_key(), event.get_event_type());
-        fx_log_debug!(
+        tracing::debug!(
             concat!(
                 "Keymap::process_keyboard_event: key:{:?}, ",
                 "modifier_state:{:?}, lock_state: {:?}, event_type: {:?}"

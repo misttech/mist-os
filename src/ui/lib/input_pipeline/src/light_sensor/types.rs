@@ -242,8 +242,8 @@ impl Calibration {
             {
                 Ok(config) => config,
                 Err(e) => {
-                    fuchsia_syslog::fx_log_err!("Failed to map {name:?}'s rgbc field: {e:?}");
-                    fuchsia_syslog::fx_log_err!("Will not account for {name:?} in calibration");
+                    tracing::error!("Failed to map {name:?}'s rgbc field: {e:?}");
+                    tracing::error!("Will not account for {name:?} in calibration");
                     continue;
                 }
             };

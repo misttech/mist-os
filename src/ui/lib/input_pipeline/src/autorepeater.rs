@@ -24,7 +24,6 @@ use anyhow::{anyhow, Context, Result};
 use fidl_fuchsia_settings as fsettings;
 use fidl_fuchsia_ui_input3::{self as finput3, KeyEventType, KeyMeaning};
 use fuchsia_async::{Task, Time, Timer};
-use fuchsia_syslog::{fx_log_debug, fx_log_err, fx_log_info, fx_log_warn};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::Duration;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -159,7 +158,7 @@ where
     for<'a> &'a T: std::fmt::Debug,
     T: 'static + Sync + Send,
 {
-    fx_log_debug!("unbounded_send_logged: {:?}", &event);
+    tracing::debug!("unbounded_send_logged: {:?}", &event);
     sink.unbounded_send(event)?;
     Ok(())
 }
@@ -171,9 +170,9 @@ where
 fn new_autorepeat_timer(sink: UnboundedSender<AnyEvent>, delay: Duration) -> Rc<Task<()>> {
     let task = Task::local(async move {
         Timer::new(Time::after(delay)).await;
-        fx_log_debug!("autorepeat timeout");
+        tracing::debug!("autorepeat timeout");
         unbounded_send_logged(&sink, AnyEvent::Timeout)
-            .unwrap_or_else(|e| fx_log_err!("could not fire autorepeat timer: {:?}", e));
+            .unwrap_or_else(|e| tracing::error!("could not fire autorepeat timer: {:?}", e));
     });
     Rc::new(task)
 }
@@ -245,7 +244,7 @@ impl Autorepeater {
                         } => unbounded_send_logged(&event_sink, AnyEvent::NonKeyboard(event))
                             .context("while forwarding a non-keyboard event"),
                     }
-                    .unwrap_or_else(|e| fx_log_err!("could not run autorepeat: {:?}", e));
+                    .unwrap_or_else(|e| tracing::error!("could not run autorepeat: {:?}", e));
                 }
                 event_sink.close_channel();
             })
@@ -263,7 +262,7 @@ impl Autorepeater {
     /// Run this function in an executor to start processing events. The
     /// transformed event stream is available in `output`.
     pub async fn run(self: &Rc<Self>, output: UnboundedSender<InputEvent>) -> Result<()> {
-        fx_log_info!("key autorepeater installed");
+        tracing::info!("key autorepeater installed");
         let src = &mut *(self.event_source.borrow_mut());
         while let Some(event) = src.next().await {
             match event {
@@ -289,7 +288,7 @@ impl Autorepeater {
 
     // Replace the autorepeater state with a new one.
     fn set_state(self: &Rc<Self>, state: State) {
-        fx_log_debug!("set state: {:?}", &state);
+        tracing::debug!("set state: {:?}", &state);
         self.state.replace(state);
     }
 
@@ -306,8 +305,8 @@ impl Autorepeater {
         output: &UnboundedSender<InputEvent>,
     ) -> Result<()> {
         let old_state = self.get_state();
-        fx_log_debug!("process_event: current state: {:?}", &old_state);
-        fx_log_debug!("process_event: inbound event: {:?}", &event);
+        tracing::debug!("process_event: current state: {:?}", &old_state);
+        tracing::debug!("process_event: inbound event: {:?}", &event);
         match (old_state, event.clone()) {
             // This is the initial state.  We wait for a key event with a printable
             // character, since those are autorepeatable.
@@ -339,7 +338,7 @@ impl Autorepeater {
                 // This is unexpected, but not fatal.  If you see this in the
                 // logs, we probably need to revisit the fuchsia_async::Task
                 // semantics.
-                fx_log_warn!("spurious timeout in the autorepeater");
+                tracing::warn!("spurious timeout in the autorepeater");
             }
 
             // A keyboard event comes in while autorepeat is armed.

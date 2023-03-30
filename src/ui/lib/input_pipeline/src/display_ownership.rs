@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use fidl_fuchsia_ui_input3::KeyEventType;
 use fidl_fuchsia_ui_scenic as fscenic;
 use fuchsia_async::{OnSignals, Task};
-use fuchsia_syslog::{fx_log_debug, fx_log_info, fx_log_warn};
 use fuchsia_zircon::{AsHandleRef, Duration, Signals, Status, Time};
 use futures::{
     channel::mpsc::{self, UnboundedReceiver, UnboundedSender},
@@ -133,7 +132,7 @@ impl DisplayOwnership {
             // not, this will fail with a timeout error.
             .wait_handle(*ANY_DISPLAY_EVENT, Time::INFINITE_PAST)
             .expect("unable to set the initial display state");
-        fx_log_debug!("setting initial display ownership to: {:?}", &initial_state);
+        tracing::debug!("setting initial display ownership to: {:?}", &initial_state);
         let initial_ownership: Ownership = initial_state.into();
         let ownership = Rc::new(RefCell::new(initial_ownership.clone()));
 
@@ -144,19 +143,19 @@ impl DisplayOwnership {
                 let signals = ownership_clone.wait_ownership_change(&display_ownership_event).await;
                 match signals {
                     Err(e) => {
-                        fx_log_warn!("could not read display state: {:?}", e);
+                        tracing::warn!("could not read display state: {:?}", e);
                         break;
                     }
                     Ok(signals) => {
-                        fx_log_debug!("setting display ownership to: {:?}", &signals);
+                        tracing::debug!("setting display ownership to: {:?}", &signals);
                         ownership_sender.unbounded_send(signals.into()).unwrap();
                         ownership_clone = signals.into();
                     }
                 }
             }
-            fx_log_warn!("display loop exiting and will no longer monitor display changes - this is not expected");
+            tracing::warn!("display loop exiting and will no longer monitor display changes - this is not expected");
         });
-        fx_log_info!("Display ownership handler installed");
+        tracing::info!("Display ownership handler installed");
         Rc::new(Self {
             ownership,
             key_state: RefCell::new(KeyState::new()),

@@ -7,7 +7,6 @@ use {
     fidl_fuchsia_ui_focus as focus, fidl_fuchsia_ui_keyboard_focus as kbd_focus,
     focus_chain_provider::FocusChainProviderPublisher,
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_syslog::{fx_log_err, fx_log_warn},
     futures::StreamExt,
 };
 
@@ -110,10 +109,10 @@ impl FocusListener {
 
                     responder.send().context("while sending focus chain listener response")?;
                 }
-                Err(e) => fx_log_err!("FocusChainListenerRequest has error: {}.", e),
+                Err(e) => tracing::error!("FocusChainListenerRequest has error: {}.", e),
             }
         }
-        fx_log_warn!("Stopped dispatching focus changes.");
+        tracing::warn!("Stopped dispatching focus changes.");
         Ok(())
     }
 }
