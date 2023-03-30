@@ -85,6 +85,18 @@ pub struct Repository {
     /// The path to the blobs directory, relative to the product bundle
     /// directory.
     pub blobs_path: Utf8PathBuf,
+
+    /// The path to the file containing all the root metadata private keys.
+    pub root_private_key_path: Option<Utf8PathBuf>,
+
+    /// The path to the file containing all the targets metadata private keys.
+    pub targets_private_key_path: Option<Utf8PathBuf>,
+
+    /// The path to the file containing all the snapshot metadata private keys.
+    pub snapshot_private_key_path: Option<Utf8PathBuf>,
+
+    /// The path to the file containing all the timestamp metadata private keys.
+    pub timestamp_private_key_path: Option<Utf8PathBuf>,
 }
 
 impl Repository {
@@ -157,13 +169,27 @@ impl ProductBundleV2 {
             let canonicalize_dir = |path: &Utf8PathBuf| -> Result<Utf8PathBuf> {
                 let dir = product_bundle_dir.join(path);
                 // Create the directory to ensure that canonicalize will work.
-                std::fs::create_dir_all(&dir)
-                    .with_context(|| format!("Creating the directory: {}", dir))?;
+                if !dir.exists() {
+                    std::fs::create_dir_all(&dir)
+                        .with_context(|| format!("Creating the directory: {}", dir))?;
+                }
                 let path = dir.canonicalize_utf8()?;
                 Ok(path)
             };
             repository.metadata_path = canonicalize_dir(&repository.metadata_path)?;
             repository.blobs_path = canonicalize_dir(&repository.blobs_path)?;
+            if let Some(path) = &repository.root_private_key_path {
+                repository.root_private_key_path = Some(canonicalize_dir(path)?);
+            }
+            if let Some(path) = &repository.targets_private_key_path {
+                repository.targets_private_key_path = Some(canonicalize_dir(path)?);
+            }
+            if let Some(path) = &repository.snapshot_private_key_path {
+                repository.snapshot_private_key_path = Some(canonicalize_dir(path)?);
+            }
+            if let Some(path) = &repository.timestamp_private_key_path {
+                repository.timestamp_private_key_path = Some(canonicalize_dir(path)?);
+            }
         }
 
         // Canonicalize the virtual device specifications path.
@@ -225,6 +251,18 @@ impl ProductBundleV2 {
             };
             repository.metadata_path = relativize_dir(&repository.metadata_path)?;
             repository.blobs_path = relativize_dir(&repository.blobs_path)?;
+            if let Some(path) = &repository.root_private_key_path {
+                repository.root_private_key_path = Some(relativize_dir(path)?);
+            }
+            if let Some(path) = &repository.targets_private_key_path {
+                repository.targets_private_key_path = Some(relativize_dir(path)?);
+            }
+            if let Some(path) = &repository.snapshot_private_key_path {
+                repository.snapshot_private_key_path = Some(relativize_dir(path)?);
+            }
+            if let Some(path) = &repository.timestamp_private_key_path {
+                repository.timestamp_private_key_path = Some(relativize_dir(path)?);
+            }
         }
 
         // Relativize the virtual device specifications.
@@ -422,6 +460,10 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: dir.join("repository"),
                 blobs_path: dir.join("repository").join("blobs"),
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
             }],
             update_package_hash: None,
             virtual_devices_path: None,
@@ -454,6 +496,10 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: "repository".into(),
                 blobs_path: "blobs".into(),
+                root_private_key_path: None,
+                targets_private_key_path: None,
+                snapshot_private_key_path: None,
+                timestamp_private_key_path: None,
             }],
             update_package_hash: None,
             virtual_devices_path: None,

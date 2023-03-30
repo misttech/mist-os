@@ -116,7 +116,7 @@ impl GenerateTransferManifest {
                 for image in system.iter() {
                     product_bundle_entries.push(ArtifactEntry {
                         name: diff_utf8_paths(image.source(), &canonical_product_bundle_path)
-                            .context("rebasing system image")?,
+                            .context("rebasing systemp image")?,
                     });
                 }
             }
@@ -173,6 +173,19 @@ impl GenerateTransferManifest {
                     });
                 }
             }
+            let mut key = |private_key_path: &Option<Utf8PathBuf>| -> Result<()> {
+                if let Some(path) = private_key_path {
+                    product_bundle_entries.push(ArtifactEntry {
+                        name: diff_utf8_paths(path, canonical_product_bundle_path)
+                            .context("rebasing tuf private key")?,
+                    });
+                }
+                Ok(())
+            };
+            key(&repository.root_private_key_path)?;
+            key(&repository.targets_private_key_path)?;
+            key(&repository.snapshot_private_key_path)?;
+            key(&repository.timestamp_private_key_path)?;
         }
         product_bundle_entries.sort();
 
@@ -312,6 +325,10 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: pb_path.join("repository"),
                 blobs_path: pb_path.join("blobs"),
+                root_private_key_path: None,
+                targets_private_key_path: Some(pb_path.join("keys/targets.json")),
+                snapshot_private_key_path: Some(pb_path.join("keys/snapshot.json")),
+                timestamp_private_key_path: Some(pb_path.join("keys/timestamp.json")),
             }],
             update_package_hash: None,
             virtual_devices_path: Some(vd_manifest_path),
@@ -352,6 +369,9 @@ mod tests {
                         entries: vec![
                             ArtifactEntry { name: "fvm".into() },
                             ArtifactEntry { name: "kernel".into() },
+                            ArtifactEntry { name: "keys/snapshot.json".into() },
+                            ArtifactEntry { name: "keys/targets.json".into() },
+                            ArtifactEntry { name: "keys/timestamp.json".into() },
                             ArtifactEntry { name: "product_bundle.json".into() },
                             ArtifactEntry { name: "repository/1.root.json".into() },
                             ArtifactEntry { name: "repository/1.snapshot.json".into() },

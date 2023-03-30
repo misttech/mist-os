@@ -335,16 +335,28 @@ mod tests {
             name: pbt::V2_SDK_A_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
             metadata_path: a_metadata_directory.try_into().unwrap(),
             blobs_path: a_blobs_directory.try_into().unwrap(),
+            root_private_key_path: None,
+            targets_private_key_path: None,
+            snapshot_private_key_path: None,
+            timestamp_private_key_path: None,
         };
         let b_repository = Repository {
             name: pbt::V2_SDK_B_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
             metadata_path: b_metadata_directory.try_into().unwrap(),
             blobs_path: b_blobs_directory.try_into().unwrap(),
+            root_private_key_path: None,
+            targets_private_key_path: None,
+            snapshot_private_key_path: None,
+            timestamp_private_key_path: None,
         };
         let r_repository = Repository {
             name: pbt::V2_SDK_R_PRODUCT_BUNDLE_REPOSITORY_NAME.to_string(),
             metadata_path: r_metadata_directory.try_into().unwrap(),
             blobs_path: r_blobs_directory.try_into().unwrap(),
+            root_private_key_path: None,
+            targets_private_key_path: None,
+            snapshot_private_key_path: None,
+            timestamp_private_key_path: None,
         };
 
         let data_source = |product_bundle: &ProductBundle,

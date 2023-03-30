@@ -122,6 +122,7 @@ pub async fn pb_create_with_tools(
         let repo_path = &cmd.out_dir;
         let metadata_path = repo_path.join("repository");
         let blobs_path = repo_path.join("blobs");
+        let keys_path = repo_path.join("keys");
         let repo = FileSystemRepository::new(metadata_path.to_path_buf(), blobs_path.to_path_buf());
         let repo_keys =
             RepoKeys::from_dir(tuf_keys.as_std_path()).context("Gathering repo keys")?;
@@ -136,8 +137,17 @@ pub async fn pb_create_with_tools(
             .commit()
             .await
             .context("Building the repo")?;
-        let name = "fuchsia.com".to_string();
-        vec![Repository { name, metadata_path, blobs_path }]
+
+        std::fs::create_dir_all(&keys_path).context("Creating keys directory")?;
+        vec![Repository {
+            name: "fuchsia.com".into(),
+            metadata_path: metadata_path,
+            blobs_path: blobs_path,
+            root_private_key_path: copy_file(tuf_keys.join("root.json"), &keys_path).ok(),
+            targets_private_key_path: copy_file(tuf_keys.join("targets.json"), &keys_path).ok(),
+            snapshot_private_key_path: copy_file(tuf_keys.join("snapshot.json"), &keys_path).ok(),
+            timestamp_private_key_path: copy_file(tuf_keys.join("timestamp.json"), &keys_path).ok(),
+        }]
     } else {
         vec![]
     };
@@ -553,6 +563,10 @@ mod test {
                     name: "fuchsia.com".into(),
                     metadata_path: pb_dir.join("repository"),
                     blobs_path: pb_dir.join("blobs"),
+                    root_private_key_path: Some(pb_dir.join("keys/root.json")),
+                    targets_private_key_path: Some(pb_dir.join("keys/targets.json")),
+                    snapshot_private_key_path: Some(pb_dir.join("keys/snapshot.json")),
+                    timestamp_private_key_path: Some(pb_dir.join("keys/timestamp.json")),
                 }],
                 update_package_hash: None,
                 virtual_devices_path: None,
@@ -620,6 +634,10 @@ mod test {
                 name: "fuchsia.com".into(),
                 metadata_path: pb_dir.join("repository"),
                 blobs_path: pb_dir.join("blobs"),
+                root_private_key_path: Some(pb_dir.join("keys/root.json")),
+                targets_private_key_path: Some(pb_dir.join("keys/targets.json")),
+                snapshot_private_key_path: Some(pb_dir.join("keys/snapshot.json")),
+                timestamp_private_key_path: Some(pb_dir.join("keys/timestamp.json")),
             }]
         );
     }

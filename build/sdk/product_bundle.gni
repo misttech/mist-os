@@ -264,6 +264,12 @@ template("product_bundle") {
       "${files.tuf_keys}/targets.json",
       "${files.tuf_keys}/timestamp.json",
     ]
+    outputs += [
+      "${files.outdir}/keys/root.json",
+      "${files.outdir}/keys/targets.json",
+      "${files.outdir}/keys/snapshot.json",
+      "${files.outdir}/keys/timestamp.json",
+    ]
 
     if (defined(invoker.update)) {
       update = invoker.update
