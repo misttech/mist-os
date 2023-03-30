@@ -7,6 +7,7 @@ package project
 import (
 	"context"
 	"fmt"
+	"log"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -19,16 +20,31 @@ import (
 // filter out all projects that don't appear in the dependency tree of
 // Config.Target.
 func FilterProjects() error {
-	// Acquire a handle to the "gn" binary on the local workstation.
-	gn, err := util.NewGn(Config.GnPath, Config.BuildDir)
-	if err != nil {
-		return err
-	}
+	var gen *util.Gen
+	var err error
 
-	// Run "fx gn <>" command, and retrieve the output data.
-	gen, err := gn.Gen(context.Background(), Config.Target, Config.PruneTargets)
-	if err != nil {
-		return err
+	if Config.GenIntermediateFile != "" {
+		log.Printf("-> Loading gen file from %s...\n", Config.GenIntermediateFile)
+		gen, err = util.LoadGen(Config.GenIntermediateFile)
+	} else {
+		// Acquire a handle to the "gn" binary on the local workstation.
+		gn, err := util.NewGn(Config.GnPath, Config.BuildDir)
+		if err != nil {
+			return err
+		}
+		log.Printf(" -> Generating project.json file...\n")
+		// Run "fx gn <>" command, and retrieve the output data.
+		err = gn.GenerateProjectFile(context.Background())
+		if err != nil {
+			return err
+		}
+		gen, err = util.LoadGen(Config.GenProjectFile)
+		if err != nil {
+			return err
+		}
+		if err = gen.FilterTargetsInDependencyTree(Config.Target, Config.PruneTargets); err != nil {
+			return err
+		}
 	}
 
 	// Generate a map:
@@ -74,7 +90,7 @@ func FilterProjects() error {
 }
 
 func processGenOutput(gen *util.Gen, fileMap map[string]*Project) (*Project, error) {
-	for _, t := range gen.FilteredTargets {
+	for _, t := range gen.Targets {
 		var project *Project
 		var ok bool
 		for _, possibleProjectName := range t.CleanNames {

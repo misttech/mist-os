@@ -146,6 +146,11 @@ group("non_hermetic_deps") {
     "//src/media/codec/codecs/vaapi:codec_runner_intel_gen",
     "//src/ui/backlight/drivers:chromebook-keyboard-backlight",
   ]
+
+  # TODO(fxbug.dev/84924): License analysis uses the output of 'fx gn gen', which
+  # can potentially touch every file in the repository. Remove this entry when license
+  # management becomes a hermetic process.
+  visibility += [ "//tools/check-licenses/util/cmd/gn/*" ]
 }
 
 # Build targets that use the legacy zx_library and zx_host_tool templates

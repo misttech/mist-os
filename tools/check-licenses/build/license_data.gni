@@ -83,10 +83,78 @@ template("license_data") {
   product_board = "${build_info_product}.${build_info_board}"
   path_prefix = "${build_info_version}/${product_board}"
 
+  license_outdir = "$target_out_dir/license/gen"
+
+  # Step 1: Generate $root_build_dir/project.json by running "fx gn gen".
+  # Copy the resulting project.json file to $root_build_dir/license/gen/project.json.
+  # This is done in //tools/check-licenses/util/cmd/gn/generate_project_json
+  generate_project_json =
+      "//tools/check-licenses/util/cmd/gn/generate_project_json"
+  generate_project_json_output = "$root_build_dir/license/gen/project.json"
+
+  generate_intermediate_json = "${target_name}_generate_intermediate_json"
+  generate_intermediate_json_output = "$license_outdir/${target_name}_all.json"
+
+  generate_target_json = "${target_name}_generate_target_json"
+  generate_target_json_output = "$license_outdir/${target_name}.json"
+
+  # Step 2: Generate intermediate data file.
+  # project.json is extremely large, and includes a lot of unrelated information.
+  # This step filters out all targets that are not in the build graph of //:default,
+  # and saves the resulting json file to a different location.
+  compiled_action(generate_intermediate_json) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    tool = "//tools/check-licenses/util/cmd/gn/generate_intermediate_json:generate_intermediate_json_cmd"
+    deps = [ generate_project_json ]
+    sources = [ generate_project_json_output ]
+    outputs = [ generate_intermediate_json_output ]
+
+    args = [
+      "--gen_input",
+      rebase_path(generate_project_json_output, root_build_dir),
+      "--gen_output",
+      rebase_path(outputs[0], root_build_dir),
+    ]
+  }
+
+  # Step 3: Generate target data file.
+  # Load the step 2 output file, and filter out all targets that are not in the
+  # build graph of --gen_filter_target.
+  compiled_action(generate_target_json) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    tool = "//tools/check-licenses/util/cmd/gn/generate_intermediate_json:generate_intermediate_json_cmd"
+    deps = [ ":$generate_intermediate_json" ]
+    sources = [ generate_intermediate_json_output ]
+    outputs = [ generate_target_json_output ]
+
+    args = [
+      "--gen_input",
+      rebase_path(generate_intermediate_json_output, root_build_dir),
+      "--gen_output",
+      rebase_path(outputs[0], root_build_dir),
+      "--gen_filter_target",
+      target,
+    ]
+
+    if (defined(invoker.prune_targets)) {
+      args += [
+        "--targets_to_remove",
+        string_join(",", invoker.prune_targets),
+      ]
+    }
+  }
+
   compiled_action(check_licenses_target) {
     forward_variables_from(invoker,
                            [
-                             "fuchsia_dir",
                              "testonly",
                              "visibility",
                            ])
@@ -96,10 +164,12 @@ template("license_data") {
     # TODO(fxbug.dev/84924): Improve the way notice files are generated.
     hermetic_deps = false
 
-    license_tool = "//tools/check-licenses($host_toolchain)"
-    deps = [ license_tool ]
+    deps = [ ":$generate_target_json" ]
 
-    sources = [ "//tools/check-licenses/cmd/_config.json" ]
+    sources = [
+      "//tools/check-licenses/cmd/_config.json",
+      generate_target_json_output,
+    ]
 
     outputs = [
       "$temp_out_dir/$path_prefix/out/$txt_notices_output",
@@ -119,12 +189,9 @@ template("license_data") {
       rebase_path(temp_out_dir, root_build_dir),
       "--licenses_out_dir",
       rebase_path(temp_out_licenses_dir, root_build_dir),
-      "--gn_path",
-      rebase_path("//prebuilt/third_party/gn/${host_os}-${host_cpu}/gn",
-                  root_build_dir),
-      "--build_dir",
-      rebase_path(root_out_dir, root_build_dir),
       "--run_analysis=$run_analysis",
+      "--gen_intermediate_file",
+      rebase_path(generate_target_json_output, root_build_dir),
     ]
 
     if (defined(invoker.prune_targets)) {

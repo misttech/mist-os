@@ -13,24 +13,21 @@ import (
 )
 
 type Gen struct {
-	BuildSettings   map[string]interface{} `json:"build_settings"`
-	Targets         map[string]*Target     `json:"targets"`
-	FilteredTargets map[string]*Target
+	Targets   map[string]*Target `json:"targets"`
+	IsCleaned bool               `json:"cleaned"`
 
-	re *regexp.Regexp
+	re *regexp.Regexp `json:"-"`
 }
 
-func NewGen(projectFile string) (*Gen, error) {
-	// Read in the projects.json file.
-	//
-	// This file can be really large (554MB on my machine), so we may
-	// need to investigate streaming this data if it becomes a problem.
-	b, err := os.ReadFile(projectFile)
+func LoadGen(path string) (*Gen, error) {
+	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read project.json file [%v]: %v\n", projectFile, err)
+		return nil, fmt.Errorf("Failed to read [%s] gen file: %w\n", path, err)
 	}
 
 	gen := Gen{
+		Targets: make(map[string]*Target),
+
 		// Many rust_crate projects have a suffix in the label name that
 		// doesn't map to a directory. We use a regular expression to
 		// strip that part of the label text away. We store the regexp
@@ -40,14 +37,20 @@ func NewGen(projectFile string) (*Gen, error) {
 	}
 	d := json.NewDecoder(strings.NewReader(string(b)))
 	if err := d.Decode(&gen); err != nil {
-		return nil, fmt.Errorf("Failed to decode project.json into struct object: %v", err)
+		return nil, fmt.Errorf("Failed to decode [%s] into struct object: %w", path, err)
+	}
+	return &gen, nil
+}
+func (g *Gen) clean() error {
+	if g.IsCleaned {
+		return fmt.Errorf("gen file is already cleaned.")
 	}
 
 	toAdd := make(map[string]*Target, 0)
-	for name, t := range gen.Targets {
+	for name, t := range g.Targets {
 		t.Name = name
-		if err := t.Clean(gen.re); err != nil {
-			return nil, fmt.Errorf("Failed to clean target %v: %v", t, err)
+		if err := t.Clean(g.re); err != nil {
+			return fmt.Errorf("Failed to clean target %v: %w", t, err)
 		}
 		for _, n := range t.CleanNames {
 			toAdd[n] = t
@@ -55,17 +58,18 @@ func NewGen(projectFile string) (*Gen, error) {
 	}
 
 	for k, v := range toAdd {
-		if _, ok := gen.Targets[k]; !ok {
-			gen.Targets[k] = v
+		if _, ok := g.Targets[k]; !ok {
+			g.Targets[k] = v
 		}
 	}
 
-	return &gen, nil
+	g.IsCleaned = true
+	return nil
 }
 
-// Process returns a list of paths that the rootTarget requires.
-// The results may include GN labels or paths to files in the repository.
-func (g *Gen) FilterTargets(rootTarget string, pruneTargets map[string]bool) error {
+func (g *Gen) FilterTargetsInDependencyTree(rootTarget string, excludeTargets map[string]bool) error {
+	g.clean()
+
 	root := g.Targets[rootTarget]
 	if root == nil {
 		return fmt.Errorf("Failed to find %v target in the Gen target map", rootTarget)
@@ -80,28 +84,30 @@ func (g *Gen) FilterTargets(rootTarget string, pruneTargets map[string]bool) err
 	OUTER:
 		for _, t := range toProcess {
 
-			// If this target matches any entry in our pruneTargets list,
+			// If this target matches any entry in our excludeTargets map,
 			// skip processing this target.
 			for _, cleanName := range t.CleanNames {
-				if _, ok := pruneTargets[cleanName]; ok {
+				if _, ok := excludeTargets[cleanName]; ok {
 					continue OUTER
 				}
 			}
+			for _, cleanName := range t.CleanNames {
+				seenTargets[cleanName] = t
+			}
 
-			seenTargets[t.Name] = t
-			toProcessNextCandidates := t.Deps
-			for _, candidateName := range toProcessNextCandidates {
-				t.Children = append(t.Children, g.Targets[candidateName])
-				candidate := g.Targets[candidateName]
-				if _, ok := seenTargets[candidateName]; !ok {
-					toProcessNext = append(toProcessNext, candidate)
-					seenTargets[candidateName] = candidate
+			for _, d := range t.Deps {
+				depTarget := g.Targets[d]
+				if depTarget == nil {
+					return fmt.Errorf("couldn't find target %v in g.Targets\n", d)
+				}
+				if _, ok := seenTargets[d]; !ok {
+					toProcessNext = append(toProcessNext, depTarget)
 				}
 			}
 		}
 		toProcess = toProcessNext
 	}
 
-	g.FilteredTargets = seenTargets
+	g.Targets = seenTargets
 	return nil
 }

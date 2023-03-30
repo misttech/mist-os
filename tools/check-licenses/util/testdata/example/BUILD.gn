@@ -5,7 +5,7 @@
 import("//build/testing/host_test_data.gni")
 
 group("example") {
-  deps = [ "depA:depAAA" ]
+  deps = [ "depA" ]
 }
 
 if (is_host) {

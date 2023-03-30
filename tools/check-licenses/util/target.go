@@ -5,6 +5,7 @@
 package util
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -23,11 +24,16 @@ type Target struct {
 
 	CleanNames []string `json:"cleanNames"`
 	CleanDeps  []string `json:"cleanDeps"`
+	IsClean    bool     `json:"is_clean"`
 
-	Children []*Target
+	Children []*Target `json:"-"`
 }
 
 func (t *Target) Clean(re *regexp.Regexp) error {
+	if t.IsClean {
+		return fmt.Errorf("Target '%s' is already clean", t.Name)
+	}
+
 	paths := make([]string, 0)
 	paths = append(paths, t.Deps...)
 	paths = append(paths, t.Inputs...)
@@ -44,6 +50,8 @@ func (t *Target) Clean(re *regexp.Regexp) error {
 	if err != nil {
 		return err
 	}
+
+	t.IsClean = true
 	return nil
 }
 

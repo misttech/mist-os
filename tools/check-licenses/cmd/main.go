@@ -17,6 +17,8 @@ import (
 
 const (
 	defaultTarget = "//:default"
+
+	PERMISSIONS_ALLRW_OWNERX = 0755
 )
 
 var (
@@ -36,9 +38,10 @@ var (
 	buildInfoProduct = flag.String("build_info_product", "product", "Version of fuchsia being built. Used for uploading results.")
 	buildInfoBoard   = flag.String("build_info_board", "board", "Version of fuchsia being built. Used for uploading results.")
 
-	gnPath       = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/linux-x64/gn", "Path to GN executable. Required when target is specified.")
-	gnGenFile    = flag.String("gn_gen_file", "{BUILD_DIR}/project.json", "Path to 'project.json' output file.")
-	pruneTargets = flag.String("prune_targets", "", "Flag for filtering out targets from the dependency tree. Targets separated by comma.")
+	gnPath              = flag.String("gn_path", "{FUCHSIA_DIR}/prebuilt/third_party/gn/linux-x64/gn", "Path to GN executable. Required when gen_filter_target is specified.")
+	genProjectFile      = flag.String("gen_project_file", "{BUILD_DIR}/project.json", "Path to 'project.json' output file.")
+	genIntermediateFile = flag.String("gen_intermediate_file", "", "Path to intermediate serialized gen struct.")
+	pruneTargets        = flag.String("prune_targets", "", "Flag for filtering out targets from the dependency tree. Targets separated by comma.")
 
 	checkURLs = flag.Bool("check_urls", false, "Flag for enabling checks for license URLs.")
 
@@ -75,40 +78,39 @@ func mainImpl() error {
 		*fuchsiaDir = "."
 	}
 	if *fuchsiaDir, err = filepath.Abs(*fuchsiaDir); err != nil {
-		return fmt.Errorf("Failed to get absolute directory for *fuchsiaDir %v: %v", *fuchsiaDir, err)
+		return fmt.Errorf("Failed to get absolute directory for *fuchsiaDir %s: %w", *fuchsiaDir, err)
 	}
 	ConfigVars["{FUCHSIA_DIR}"] = *fuchsiaDir
 
 	// buildDir
-	if *buildDir == "" && *outputLicenseFile {
-		return fmt.Errorf("--build_dir cannot be empty.")
-	}
-	if *buildDir, err = filepath.Abs(*buildDir); err != nil {
-		return fmt.Errorf("Failed to get absolute directory for *buildDir%v: %v", *buildDir, err)
+	if len(*buildDir) > 0 {
+		if *buildDir, err = filepath.Abs(*buildDir); err != nil {
+			return fmt.Errorf("Failed to get absolute directory for *buildDir %s: %w", *buildDir, err)
+		}
 	}
 	ConfigVars["{BUILD_DIR}"] = *buildDir
 
 	// outDir
 	rootOutDir := *outDir
 	productBoard := ""
-	if *outDir != "" {
+	if len(*outDir) > 0 {
 		*outDir, err = filepath.Abs(*outDir)
 		if err != nil {
-			return fmt.Errorf("Failed to get absolute directory for *outDir %v: %v", *outDir, err)
+			return fmt.Errorf("Failed to get absolute directory for *outDir %s: %w", *outDir, err)
 		}
 		rootOutDir = *outDir
 
 		if *outputLicenseFile {
-			productBoard = fmt.Sprintf("%v.%v", *buildInfoProduct, *buildInfoBoard)
+			productBoard = fmt.Sprintf("%s.%s", *buildInfoProduct, *buildInfoBoard)
 			*outDir = filepath.Join(*outDir, *buildInfoVersion, productBoard)
 		} else {
 			*outDir = filepath.Join(*outDir, *buildInfoVersion, "everything")
 		}
 	}
 	if _, err := os.Stat(*outDir); os.IsNotExist(err) {
-		err := os.MkdirAll(*outDir, 0755)
+		err := os.MkdirAll(*outDir, PERMISSIONS_ALLRW_OWNERX)
 		if err != nil {
-			return fmt.Errorf("Failed to create out directory [%v]: %v\n", outDir, err)
+			return fmt.Errorf("Failed to create out directory [%s]: %w\n", outDir, err)
 		}
 	}
 	ConfigVars["{OUT_DIR}"] = *outDir
@@ -119,31 +121,37 @@ func mainImpl() error {
 	if *licensesOutDir != "" {
 		*licensesOutDir, err = filepath.Abs(*licensesOutDir)
 		if err != nil {
-			return fmt.Errorf("Failed to get absolute directory for *licensesOutDir %v: %v", *licensesOutDir, err)
+			return fmt.Errorf("Failed to get absolute directory for *licensesOutDir %s: %w", *licensesOutDir, err)
 		}
 		if _, err := os.Stat(*licensesOutDir); os.IsNotExist(err) {
-			err := os.MkdirAll(*licensesOutDir, 0755)
+			err := os.MkdirAll(*licensesOutDir, PERMISSIONS_ALLRW_OWNERX)
 			if err != nil {
-				return fmt.Errorf("Failed to create licenses out directory [%v]: %v\n", licensesOutDir, err)
+				return fmt.Errorf("Failed to create licenses out directory [%s]: %w\n", licensesOutDir, err)
 			}
 		}
 	}
 	ConfigVars["{LICENSES_OUT_DIR}"] = *licensesOutDir
 
 	// gnPath
-	if *gnPath == "" && *outputLicenseFile {
-		return fmt.Errorf("--gn_path cannot be empty.")
-	}
-	*gnPath = strings.ReplaceAll(*gnPath, "{FUCHSIA_DIR}", *fuchsiaDir)
-	*gnPath, err = filepath.Abs(*gnPath)
-	if err != nil {
-		return fmt.Errorf("Failed to get absolute directory for *gnPath %v: %v", *gnPath, err)
+	if len(*gnPath) > 0 {
+		*gnPath = strings.ReplaceAll(*gnPath, "{FUCHSIA_DIR}", *fuchsiaDir)
+		*gnPath, err = filepath.Abs(*gnPath)
+		if err != nil {
+			return fmt.Errorf("Failed to get absolute directory for *gnPath %s: %w", *gnPath, err)
+		}
 	}
 
-	*gnGenFile = strings.ReplaceAll(*gnGenFile, "{BUILD_DIR}", *buildDir)
-	*gnGenFile, err = filepath.Abs(*gnGenFile)
+	if len(*genIntermediateFile) > 0 {
+		*genIntermediateFile = strings.ReplaceAll(*genIntermediateFile, "{BUILD_DIR}", *buildDir)
+		*genIntermediateFile, err = filepath.Abs(*genIntermediateFile)
+		if err != nil {
+			return fmt.Errorf("Failed to get absolute directory for *genIntermediateFile %s: %w", *genIntermediateFile, err)
+		}
+	}
+	*genProjectFile = strings.ReplaceAll(*genProjectFile, "{BUILD_DIR}", *buildDir)
+	*genProjectFile, err = filepath.Abs(*genProjectFile)
 	if err != nil {
-		return fmt.Errorf("Failed to get absolute directory for *gnGenFile %v: %v", *gnGenFile, err)
+		return fmt.Errorf("Failed to get absolute directory for *genProjectFile %s: %w", *genProjectFile, err)
 	}
 
 	pruneTargetsList := strings.Split(*pruneTargets, ",")
@@ -159,7 +167,8 @@ func mainImpl() error {
 	}
 
 	ConfigVars["{GN_PATH}"] = *gnPath
-	ConfigVars["{GN_GEN_FILE}"] = *gnPath
+	ConfigVars["{GEN_INTERMEDIATE_FILE}"] = *genIntermediateFile
+	ConfigVars["{GEN_PROJECT_FILE}"] = *genProjectFile
 	ConfigVars["{OUTPUT_LICENSE_FILE}"] = strconv.FormatBool(*outputLicenseFile)
 	ConfigVars["{RUN_ANALYSIS}"] = strconv.FormatBool(*runAnalysis)
 	ConfigVars["{PRUNE_TARGETS}"] = string(pruneTargetsJSON)
@@ -193,7 +202,7 @@ func mainImpl() error {
 	}
 
 	if err := Execute(context.Background()); err != nil {
-		return fmt.Errorf("failed to analyze the given directory: %v", err)
+		return fmt.Errorf("failed to analyze the given directory: %w", err)
 	}
 	return nil
 }

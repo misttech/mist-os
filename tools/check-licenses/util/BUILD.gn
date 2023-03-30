@@ -29,11 +29,6 @@ if (is_host) {
   go_test("check-licenses_util_tests") {
     library = ":util"
     args = [
-      "--gn_path",
-      rebase_path("//prebuilt/third_party/gn/${host_os}-${host_cpu}/gn",
-                  root_build_dir),
-      "--build_dir",
-      rebase_path(root_out_dir, root_build_dir),
       "--test_data_dir",
       rebase_path("$target_gen_dir/testdata", root_build_dir),
     ]

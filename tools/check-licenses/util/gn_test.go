@@ -18,21 +18,19 @@ import (
 
 var (
 	testDataDir = flag.String("test_data_dir", "", "Path to test data directory")
-	gnPath      = flag.String("gn_path", "", "Path to gn executable")
-	buildDir    = flag.String("build_dir", "", "Path to out directory")
 )
 
 func TestFilterTargetsEmpty(t *testing.T) {
 	root := filepath.Join(*testDataDir, "empty")
 	zippedProjectJson := filepath.Join(root, "project.json.gz")
 	projectJson := unzipProjectJson(t, zippedProjectJson)
-	gen, err := NewGen(projectJson)
+	gen, err := LoadGen(projectJson)
 	if err != nil {
-		t.Errorf("%v: expected no error, got: %v.", t.Name(), err)
+		t.Errorf("%s: expected no error, got: %v.", t.Name(), err)
 	}
 
 	if len(gen.Targets) > 0 {
-		t.Errorf("%v: expected to find no targets, found %d: %v.", t.Name(), len(gen.Targets), gen.Targets)
+		t.Errorf("%s: expected to find no targets, found %d: %v.", t.Name(), len(gen.Targets), gen.Targets)
 	}
 }
 
@@ -40,39 +38,42 @@ func TestFilterTargets(t *testing.T) {
 	root := filepath.Join(*testDataDir, "example")
 	zippedProjectJson := filepath.Join(root, "project.json.gz")
 	projectJson := unzipProjectJson(t, zippedProjectJson)
-	gen, err := NewGen(projectJson)
+	gen, err := LoadGen(projectJson)
 	if err != nil {
-		t.Fatalf("%v: expected no error, (project.json: %v) got %v.", t.Name(), projectJson, err)
+		t.Fatalf("%s: expected no error, (project.json: %s) got %v.", t.Name(), projectJson, err)
 	}
 
+	pruneTargets := make(map[string]bool, 0)
+	pruneTargets["//tools/check-licenses/util/testdata/example/depD:depD"] = true
+
 	target := "//tools/check-licenses/util/testdata/example:example"
-	err = gen.FilterTargets(target, make(map[string]bool, 0))
+	err = gen.FilterTargetsInDependencyTree(target, pruneTargets)
 	if err != nil {
-		t.Fatalf("%v: expected no error, (target: %v) got %v.", t.Name(), target, err)
+		t.Fatalf("%s: expected no error, (target: %s) got %v.", t.Name(), target, err)
 	}
 
 	want := loadWantJSON(filepath.Join(root, "want.json"), t)
 
 	// No need to verify target.Children fields.
-	for _, ft := range gen.FilteredTargets {
+	for _, ft := range gen.Targets {
 		ft.Children = nil
 	}
 
-	if d := cmp.Diff(want, gen.FilteredTargets); d != "" {
-		t.Errorf("%v: compare Gens mismatch: (-want +got):\n%s", t.Name(), d)
+	if d := cmp.Diff(want, gen.Targets); d != "" {
+		t.Errorf("%s: compare Gens mismatch: (-want +got):\n%s", t.Name(), d)
 	}
 }
 
 func loadWantJSON(wantFile string, t *testing.T) map[string]*Target {
 	wantFileContent, err := os.ReadFile(wantFile)
 	if err != nil {
-		t.Fatalf("%v: failed to read in want.json file [%v]: %v\n", t.Name(), wantFile, err)
+		t.Fatalf("%s: failed to read in want.json file [%s]: %v\n", t.Name(), wantFile, err)
 	}
 
 	var want map[string]*Target
 	err = json.Unmarshal(wantFileContent, &want)
 	if err != nil {
-		t.Fatalf("%v: failed to unmarshal want.json data [%v]: %v\n", t.Name(), wantFile, err)
+		t.Fatalf("%s: failed to unmarshal want.json data [%s]: %v\n", t.Name(), wantFile, err)
 	}
 	return want
 }

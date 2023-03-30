@@ -8,7 +8,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,39 +51,25 @@ func NewGn(gnPath, buildDir string) (*Gn, error) {
 	return gn, nil
 }
 
-func (gn *Gn) Gen(ctx context.Context, target string, pruneTargets map[string]bool) (*Gen, error) {
-	projectFile := filepath.Join(gn.outDir, "project.json")
-
-	if _, err := os.Stat(projectFile); err != nil {
-		args := []string{
-			"gen",
-			gn.outDir,
-			"--all",
-			"--ide=json",
-		}
-
-		cmd := exec.CommandContext(ctx, gn.gnPath, args...)
-		var output bytes.Buffer
-		cmd.Stdout = &output
-		cmd.Stderr = os.Stderr
-		err := cmd.Run()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		log.Println(" -> project.json already exists.")
+func (gn *Gn) GenerateProjectFile(ctx context.Context) error {
+	args := []string{
+		"gen",
+		gn.outDir,
+		"--all",
+		"--ide=json",
 	}
-	log.Printf(" -> Filtering targets to dependencies of %v ...\n", target)
 
-	gen, err := NewGen(projectFile)
+	cmd := exec.CommandContext(ctx, gn.gnPath, args...)
+	var output bytes.Buffer
+	cmd.Stdout = &output
+	cmd.Stderr = os.Stderr
+	err := cmd.Run()
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("util.GenerateProjectFile: error running command %v: %w", cmd, err)
 	}
-
-	err = gen.FilterTargets(target, pruneTargets)
-	if err != nil {
-		return nil, err
+	projectJsonFile := filepath.Join(gn.outDir, "project.json")
+	if _, err := os.Stat(projectJsonFile); os.IsNotExist(err) {
+		return fmt.Errorf("util.GenerateProjectFile: project.json file was not generated: %w", err)
 	}
-
-	return gen, nil
+	return nil
 }

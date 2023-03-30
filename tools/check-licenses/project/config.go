@@ -18,8 +18,10 @@ type ProjectConfig struct {
 	FuchsiaDir string `json:"fuchsiaDir"`
 	BuildDir   string `json:"buildDir"`
 
-	GnPath string `json:"gnPath"`
-	Target string `json:"target"`
+	GnPath              string `json:"gnPath"`
+	GenProjectFile      string `json:"genProjectFile"`
+	GenIntermediateFile string `json:"genIntermediateFile"`
+	Target              string `json:"target"`
 
 	OutputLicenseFile bool `json:"outputLicenseFile"`
 
@@ -79,6 +81,12 @@ func (c *ProjectConfig) Merge(other *ProjectConfig) {
 	}
 	if c.GnPath == "" {
 		c.GnPath = other.GnPath
+	}
+	if c.GenIntermediateFile == "" {
+		c.GenIntermediateFile = other.GenIntermediateFile
+	}
+	if c.GenProjectFile == "" {
+		c.GenProjectFile = other.GenProjectFile
 	}
 	if c.Target == "" {
 		c.Target = other.Target

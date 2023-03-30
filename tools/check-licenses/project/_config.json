@@ -1,6 +1,8 @@
 {
     "project": {
         "gnPath": "{GN_PATH}",
+        "genProjectFile": "{GEN_PROJECT_FILE}",
+        "genIntermediateFile": "{GEN_INTERMEDIATE_FILE}",
         "target": "{TARGET}",
         "buildDir": "{BUILD_DIR}",
         "fuchsiaDir": "{FUCHSIA_DIR}",
