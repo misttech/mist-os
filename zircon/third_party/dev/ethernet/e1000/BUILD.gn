@@ -54,6 +54,7 @@ fuchsia_driver("e1000-driver") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/pci/lib/pci",
     "//src/lib/ddk",
+    "//src/lib/ddk:ddk-deprecated-mmio-headers",
     "//src/lib/listnode",
   ]
   configs += [ "//build/config:Wno-conversion" ]

@@ -66,6 +66,7 @@ zx_library("virtio") {
     "//src/devices/lib/mmio",
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/lib/ddk",
+    "//src/lib/ddk:ddk-deprecated-mmio-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hid",

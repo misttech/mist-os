@@ -31,7 +31,6 @@ sdk_static_library("ddk") {
     "include/lib/ddk/fragment-device.h",
     "include/lib/ddk/hw/arch_ops.h",
     "include/lib/ddk/hw/inout.h",
-    "include/lib/ddk/hw/reg.h",
     "include/lib/ddk/io-buffer.h",
     "include/lib/ddk/metadata.h",
     "include/lib/ddk/phys-iter.h",
@@ -136,4 +135,13 @@ library_headers("ddk-deprecated-binding-headers") {
 library_headers("ddk-device-headers") {
   headers = [ "lib/ddk/device.h" ]
   public_deps = [ "//sdk/lib/driver/runtime:driver_runtime" ]
+}
+
+# Drivers should use //sdk/lib/mmio-ptr instead.
+library_headers("ddk-deprecated-mmio-headers") {
+  headers = [ "lib/ddk/hw/reg.h" ]
+  visibility = [
+    "//src/devices/bus/lib/virtio:*",
+    "//zircon/third_party/dev/ethernet/e1000:*",
+  ]
 }
