@@ -34,6 +34,7 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 		"Imports":                  Imports,
 		"ConstType":                ConstType,
 		"ConstValue":               ConstValue,
+		"BitsAttributes":           BitsAttributes,
 		"EnumAttributes":           EnumAttributes,
 		"StructAttributes":         StructAttributes,
 		"DescribeType": func(desc zither.TypeDescriptor) string {
@@ -44,6 +45,90 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 }
 
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrder }
+
+// The basic, derived traits that unconditionally figure into each declaration.
+var defaultTraits = []string{"Copy", "Clone", "Debug", "Eq", "PartialEq"}
+
+// Some additional traits that require more computation to determine their
+// support.
+type traits struct {
+	// Whether zerocopy::AsBytes is supported (effectively whether instances
+	// are convertible to byte slices).
+	//
+	// https://docs.rs/zerocopy/latest/zerocopy/trait.AsBytes.html
+	asBytes bool
+
+	// Whether zerocopy::FromBytes is supported (effectively whether each
+	// byte slice (of the same size and alignment) is uniquely converible to an
+	// instance.
+	//
+	// https://docs.rs/zerocopy/latest/zerocopy/trait.FromBytes.html
+	fromBytes bool
+}
+
+func (t traits) supported() []string {
+	var supported []string
+	if t.asBytes {
+		supported = append(supported, "AsBytes")
+	}
+	if t.fromBytes {
+		supported = append(supported, "FromBytes")
+	}
+	return supported
+}
+
+// Additional traits by FIDL element name, this map is built up on each call to
+// DeclCallback() within zither.Summarize().
+var extraTraits = map[string]*traits{}
+
+func (gen Generator) DeclCallback(decl zither.Decl) {
+	name := decl.GetName().String()
+	if _, ok := extraTraits[name]; ok {
+		return // Already processed
+	}
+	t := &traits{asBytes: false, fromBytes: false}
+	switch decl.(type) {
+	case *zither.Enum:
+		t.asBytes = true
+	case *zither.Bits, *zither.Handle:
+		t.asBytes = true
+		t.fromBytes = true
+	case *zither.Struct:
+		s := decl.(*zither.Struct)
+		if s.HasPadding {
+			break
+		}
+		t.asBytes = true
+		t.fromBytes = true
+		for _, m := range s.Members {
+			mt := getExtraTraitsOfDependency(m.Type, name)
+			t.asBytes = t.asBytes && mt.asBytes
+			t.fromBytes = t.fromBytes && mt.fromBytes
+		}
+	case *zither.Alias:
+		a := decl.(*zither.Alias)
+		t = getExtraTraitsOfDependency(a.Value, name)
+	}
+	extraTraits[name] = t
+}
+
+func getExtraTraitsOfDependency(dep zither.TypeDescriptor, dependent string) *traits {
+	t := &traits{asBytes: false, fromBytes: false}
+	switch dep.Kind {
+	case zither.TypeKindBool, zither.TypeKindInteger, zither.TypeKindSize, zither.TypeKindStringArray:
+		t.asBytes = true
+		t.fromBytes = true
+	case zither.TypeKindEnum, zither.TypeKindBits, zither.TypeKindStruct, zither.TypeKindAlias:
+		var ok bool
+		t, ok = extraTraits[dep.Type]
+		if !ok {
+			panic(fmt.Sprintf("Processing %s: unprocessed dependency: %s", dependent, dep.Type))
+		}
+	case zither.TypeKindArray:
+		t = getExtraTraitsOfDependency(*dep.ElementType, dependent)
+	}
+	return t
+}
 
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	lib := summaries[0].Library
@@ -126,6 +211,27 @@ func Imports(summary zither.FileSummary) []string {
 			imports = append(imports, "bitflags::bitflags")
 		}
 	}
+
+	asBytes := false
+	fromBytes := false
+	for _, decl := range summary.Decls {
+		t := extraTraits[decl.Name().String()]
+		asBytes = asBytes || t.asBytes
+		fromBytes = fromBytes || t.fromBytes
+		if asBytes && fromBytes {
+			break
+		}
+	}
+	if asBytes || fromBytes {
+		var zerocopyImports []string
+		if asBytes {
+			zerocopyImports = append(zerocopyImports, "AsBytes")
+		}
+		if fromBytes {
+			zerocopyImports = append(zerocopyImports, "FromBytes")
+		}
+		imports = append(imports, fmt.Sprintf("zerocopy::{%s}", strings.Join(zerocopyImports, ", ")))
+	}
 	return imports
 }
 
@@ -174,14 +280,33 @@ func ConstValue(c zither.Const) string {
 	}
 }
 
-// TODO(joshuaseaton): Add more.
 func EnumAttributes(e zither.Enum) []string {
-	return []string{fmt.Sprintf("#[repr(%s)]", ScalarTypeName(e.Subtype))}
+	t := extraTraits[e.Name.String()]
+	supported := append(defaultTraits, t.supported()...)
+	sort.Strings(supported)
+	return []string{
+		fmt.Sprintf("#[repr(%s)]", ScalarTypeName(e.Subtype)),
+		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
+	}
 }
 
-// TODO(joshuaseaton): Add more.
-func StructAttributes() []string {
-	return []string{"#[repr(C)]"}
+func BitsAttributes() []string {
+	// The default traits are already implicitly derived via the bitflags!
+	// macro.
+	return []string{
+		"#[repr(C)]",
+		"#[derive(AsBytes, FromBytes)]",
+	}
+}
+
+func StructAttributes(s zither.Struct) []string {
+	t := extraTraits[s.Name.String()]
+	supported := append(defaultTraits, t.supported()...)
+	sort.Strings(supported)
+	return []string{
+		"#[repr(C)]",
+		fmt.Sprintf("#[derive(%s)]", strings.Join(supported, ", ")),
+	}
 }
 
 // CaseStyle represents a style of casing Rust type names.

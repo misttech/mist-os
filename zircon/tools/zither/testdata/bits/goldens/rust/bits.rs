@@ -8,84 +8,91 @@
 #![allow(unused_imports)]
 
 use bitflags::bitflags;
+use zerocopy::{AsBytes, FromBytes};
 
 bitflags! {
-
+    #[repr(C)]
+    #[derive(AsBytes, FromBytes)]
     pub struct Uint8Bits : u8 {
-    const ONE = 1 << 0;
-    const TWO = 1 << 1;
-    const FOUR = 1 << 2;
-    const EIGHT = 1 << 3;
-    const SIXTEEN = 1 << 4;
-    const THIRTY_TWO = 1 << 5;
-    const SIXTY_FOUR = 1 << 6;
-    const ONE_HUNDRED_TWENTY_EIGHT = 1 << 7;
+        const ONE = 1 << 0;
+        const TWO = 1 << 1;
+        const FOUR = 1 << 2;
+        const EIGHT = 1 << 3;
+        const SIXTEEN = 1 << 4;
+        const THIRTY_TWO = 1 << 5;
+        const SIXTY_FOUR = 1 << 6;
+        const ONE_HUNDRED_TWENTY_EIGHT = 1 << 7;
   }
 }
 
 bitflags! {
-
+    #[repr(C)]
+    #[derive(AsBytes, FromBytes)]
     pub struct Uint16Bits : u16 {
-    const ZEROTH = 1 << 0;
-    const FIRST = 1 << 1;
-    const SECOND = 1 << 2;
-    const THIRD = 1 << 3;
-    const FOURTH = 1 << 4;
-    const FIFTH = 1 << 5;
-    const SIXTH = 1 << 6;
-    const SEVENTH = 1 << 7;
-    const EIGHT = 1 << 8;
-    const NINTH = 1 << 9;
-    const TENTH = 1 << 10;
-    const ELEVENTH = 1 << 11;
-    const TWELFTH = 1 << 12;
-    const THIRTEENTH = 1 << 13;
-    const FOURTEENTH = 1 << 14;
-    const FIFTHTEENTH = 1 << 15;
+        const ZEROTH = 1 << 0;
+        const FIRST = 1 << 1;
+        const SECOND = 1 << 2;
+        const THIRD = 1 << 3;
+        const FOURTH = 1 << 4;
+        const FIFTH = 1 << 5;
+        const SIXTH = 1 << 6;
+        const SEVENTH = 1 << 7;
+        const EIGHT = 1 << 8;
+        const NINTH = 1 << 9;
+        const TENTH = 1 << 10;
+        const ELEVENTH = 1 << 11;
+        const TWELFTH = 1 << 12;
+        const THIRTEENTH = 1 << 13;
+        const FOURTEENTH = 1 << 14;
+        const FIFTHTEENTH = 1 << 15;
   }
 }
 
 bitflags! {
-
+    #[repr(C)]
+    #[derive(AsBytes, FromBytes)]
     pub struct Uint32Bits : u32 {
-    const POW_0 = 1 << 0;
-    const POW_31 = 1 << 31;
+        const POW_0 = 1 << 0;
+        const POW_31 = 1 << 31;
   }
 }
 
 bitflags! {
-
+    #[repr(C)]
+    #[derive(AsBytes, FromBytes)]
     pub struct Uint64Bits : u64 {
-    const POW_0 = 1 << 0;
-    const POW_63 = 1 << 63;
+        const POW_0 = 1 << 0;
+        const POW_63 = 1 << 63;
   }
 }
 
 bitflags! {
-
     /// Bits with a one-line comment.
+    #[repr(C)]
+    #[derive(AsBytes, FromBytes)]
     pub struct BitsWithOneLineComment : u8 {
 
-    /// Bits member with one-line comment.
-    const MEMBER_WITH_ONE_LINE_COMMENT = 1 << 0;
+        /// Bits member with one-line comment.
+        const MEMBER_WITH_ONE_LINE_COMMENT = 1 << 0;
 
-    /// Bits member
-    ///     with a
-    ///         many-line
-    ///           comment.
-    const MEMBER_WITH_MANY_LINE_COMMENT = 1 << 6;
+        /// Bits member
+        ///     with a
+        ///         many-line
+        ///           comment.
+        const MEMBER_WITH_MANY_LINE_COMMENT = 1 << 6;
   }
 }
 
 bitflags! {
-
     /// Bits
     ///
     ///     with a
     ///         many-line
     ///           comment.
+    #[repr(C)]
+    #[derive(AsBytes, FromBytes)]
     pub struct BitsWithManyLineComment : u16 {
-    const MEMBER = 1 << 0;
+        const MEMBER = 1 << 0;
   }
 }
 

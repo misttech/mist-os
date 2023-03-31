@@ -29,6 +29,8 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrder }
 
+func (gen Generator) DeclCallback(zither.Decl) {}
+
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	symbols := []symbol{
 		// TODO(fxbug.dev/49971): These are not syscalls, but are a part of the

@@ -28,6 +28,12 @@ type generator interface {
   // DeclOrder gives the declaration order desired by the backend.
   DeclOrder() zither.DeclOrder
 
+  // DeclCallback is a callback intended to be passed to zither.Summarize()
+  // which will be called on each Decl in topological 'dependency' order. This
+  // can be used to build up additional, backend-specific information during
+  // the main phase of FIDL declaration processing.
+  DeclCallback() func(zither.Decl)
+
   // Generate generates bindings into the provided output directory, returning
   // the list of outputs emitted.
   Generate(summaries []zither.FileSummary, outputDir string) ([]string, error)

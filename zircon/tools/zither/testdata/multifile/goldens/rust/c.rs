@@ -7,10 +7,13 @@
 
 #![allow(unused_imports)]
 
+use zerocopy::AsBytes;
+
 use crate::a::*;
 use crate::b::*;
 
 #[repr(C)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub struct C {
     pub a: A,
     pub b2: B2,

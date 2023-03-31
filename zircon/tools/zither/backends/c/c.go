@@ -42,9 +42,9 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 	return &Generator{*gen}
 }
 
-func (gen Generator) DeclOrder() zither.DeclOrder {
-	return zither.DependencyDeclOrder
-}
+func (gen Generator) DeclOrder() zither.DeclOrder { return zither.DependencyDeclOrder }
+
+func (gen Generator) DeclCallback(zither.Decl) {}
 
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	var outputs []string

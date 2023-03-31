@@ -63,6 +63,8 @@ func NewGenerator(formatter fidlgen.Formatter) *Generator {
 
 func (gen Generator) DeclOrder() zither.DeclOrder { return zither.SourceDeclOrder }
 
+func (gen Generator) DeclCallback(zither.Decl) {}
+
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	var syscalls []zither.Syscall
 	for _, summary := range summaries {

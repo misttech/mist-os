@@ -5,10 +5,11 @@
 // DO NOT EDIT.
 // Generated from FIDL library `zither.experimental.zx.types` by zither, a Fuchsia platform tool.
 
-// This crate takes an unconditional dependency on the bitflags crate.
-// This declaration satisfies any unused-crate-dependencies error that would
-// otherwise arise in cases where this crate goes unused.
+// This crate takes an unconditional dependency on several crates. These
+// declarations satisfy any unused-crate-dependencies error that would
+// otherwise arise in cases where these crates goes unused.
 use bitflags as _;
+use zerocopy as _;
 
 mod experimental_zx_types;
 pub use experimental_zx_types::*;

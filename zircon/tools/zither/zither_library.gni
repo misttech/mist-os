@@ -464,7 +464,10 @@ if (support_rust) {
       }
       crate_name = output_subdir
       crate_root = "${_output_dir}/${output_subdir}/src/lib.rs"
-      crate_deps = [ "//third_party/rust_crates:bitflags" ]
+      crate_deps = [
+        "//third_party/rust_crates:bitflags",
+        "//third_party/rust_crates:zerocopy",
+      ]
     }
     generated_files += [ crate_root ]
 

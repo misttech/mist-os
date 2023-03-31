@@ -41,6 +41,8 @@ func (gen Generator) DeclOrder() zither.DeclOrder {
 	return zither.SourceDeclOrder
 }
 
+func (gen Generator) DeclCallback(zither.Decl) {}
+
 func (gen *Generator) Generate(summaries []zither.FileSummary, outputDir string) ([]string, error) {
 	pkgPath := filepath.Join(summaries[0].Library.Parts()...)
 	outputDir = filepath.Join(outputDir, pkgPath)

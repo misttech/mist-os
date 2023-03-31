@@ -41,7 +41,7 @@ func TestGeneratedFileCount(t *testing.T) {
 	const A bool = true;
 	`)
 
-		summaries, err := Summarize(ir, wd, SourceDeclOrder)
+		summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,7 +70,7 @@ func TestGeneratedFileCount(t *testing.T) {
 	`,
 		})
 
-		summaries, err := Summarize(ir, wd, SourceDeclOrder)
+		summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -89,7 +89,7 @@ func TestCanSummarizeLibraryName(t *testing.T) {
 	const A bool = true;
 	`, name))
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,8 +112,22 @@ const F int32 = B;
 const G int32 = 2;
 `)
 
+	expectedDepOrder := []string{
+		"example/A",
+		"example/C",
+		"example/D", // C and D have no interdependencies, and D follows C in source.
+		"example/E",
+		"example/B",
+		"example/F",
+		"example/G",
+	}
+
 	{
-		summaries, err := Summarize(ir, wd, SourceDeclOrder)
+		var seenByCallback []string
+
+		summaries, err := Summarize(ir, wd, SourceDeclOrder, func(decl Decl) {
+			seenByCallback = append(seenByCallback, decl.GetName().String())
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -122,7 +136,7 @@ const G int32 = 2;
 		for _, decl := range summaries[0].Decls {
 			actual = append(actual, decl.Name().String())
 		}
-		expected := []string{
+		expectedSourceOrder := []string{
 			"example/A",
 			"example/B",
 			"example/C",
@@ -131,13 +145,21 @@ const G int32 = 2;
 			"example/F",
 			"example/G",
 		}
-		if diff := cmp.Diff(expected, actual); diff != "" {
+		if diff := cmp.Diff(expectedSourceOrder, actual); diff != "" {
 			t.Error(diff)
+		}
+
+		if diff := cmp.Diff(expectedDepOrder, seenByCallback); diff != "" {
+			t.Errorf(diff)
 		}
 	}
 
 	{
-		summaries, err := Summarize(ir, wd, DependencyDeclOrder)
+		var seenByCallback []string
+
+		summaries, err := Summarize(ir, wd, DependencyDeclOrder, func(decl Decl) {
+			seenByCallback = append(seenByCallback, decl.GetName().String())
+		})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -146,17 +168,12 @@ const G int32 = 2;
 		for _, decl := range summaries[0].Decls {
 			actual = append(actual, decl.Name().String())
 		}
-		expected := []string{
-			"example/A",
-			"example/C",
-			"example/D", // C and D have no interdependencies, and D follows C in source.
-			"example/E",
-			"example/B",
-			"example/F",
-			"example/G",
-		}
-		if diff := cmp.Diff(expected, actual); diff != "" {
+		if diff := cmp.Diff(expectedDepOrder, actual); diff != "" {
 			t.Error(diff)
+		}
+
+		if diff := cmp.Diff(expectedDepOrder, seenByCallback); diff != "" {
+			t.Errorf(diff)
 		}
 	}
 }
@@ -175,7 +192,7 @@ library example;
 %s
 `, decl))
 
-		_, err := Summarize(ir, wd, SourceDeclOrder)
+		_, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 		if err == nil {
 			t.Fatal("expected an error")
 		}
@@ -233,7 +250,7 @@ const COMMENTED_BOOL bool = true;
 /// comment.
 const COMMENTED_STRING string = "YYY";
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,7 +426,7 @@ type Int64Enum = enum : int64 {
   HEX_DEADBEEF = 0xdeadbeef;
 };
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,7 +515,7 @@ type Uint64Bits = bits : uint64 {
   MEMBER = 0x1000;
 };
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -597,7 +614,7 @@ type StructWithArrayMembers = struct {
     nested array<array<bool, 2>, 4>;
 };
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -648,7 +665,8 @@ type StructWithArrayMembers = struct {
 			decl: decl{
 				Name: fidlgen.MustReadName("example/BasicStruct"),
 			},
-			Size: 40,
+			Size:       40,
+			HasPadding: true,
 			Members: []StructMember{
 				{
 					member: member{
@@ -861,7 +879,7 @@ alias NestedArrayAlias = array<array<Struct, 8>, 4>;
 // Exercise more complicated aliases (e.g., aliases of aliases) when fixed.
 
 `)
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1111,7 +1129,7 @@ protocol SyscallWithParameters {
 		},
 	}
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1378,7 +1396,7 @@ protocol Foo {
 };
 `)
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1478,7 +1496,7 @@ protocol Syscall {
 		Size: 1,
 	}
 
-	summaries, err := Summarize(ir, wd, SourceDeclOrder)
+	summaries, err := Summarize(ir, wd, SourceDeclOrder, func(Decl) {})
 	if err != nil {
 		t.Fatal(err)
 	}

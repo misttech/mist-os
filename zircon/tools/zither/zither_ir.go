@@ -283,8 +283,11 @@ type declMap map[string]Decl
 type memberMap map[string]Member
 
 // Summarize creates FIDL file summaries from FIDL IR. Within each file
-// summary, declarations are ordered according to `order`.
-func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder) ([]FileSummary, error) {
+// summary, declarations are ordered according to `order`. Further, a callback
+// may be provided for extra bookkeeping, which will be called on each
+// zither-summarized Decl in topological 'dependency' order (à la
+// DependencyDeclOrder), irrespective of the provided `order`.
+func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder, cb func(Decl)) ([]FileSummary, error) {
 	libName, err := fidlgen.ReadLibraryName(string(ir.Name))
 	if err != nil {
 		return nil, err
@@ -404,6 +407,8 @@ func Summarize(ir fidlgen.Root, sourceDir string, order DeclOrder) ([]FileSummar
 		for _, m := range constMembers {
 			processedConstMembers[declName+"."+m.GetName()] = m
 		}
+
+		cb(decl)
 	}
 
 	var files []FileSummary
@@ -855,6 +860,9 @@ type Struct struct {
 	// Members is the list of the members of the layout.
 	Members []StructMember
 
+	// HasPadding gives whether the struct has any implicit padding on the wire.
+	HasPadding bool
+
 	// Whether the struct was formally declared; if false, it was synthesized
 	// or implicitly declared (as is in the case of a protocol method
 	// request/response payload).
@@ -896,6 +904,7 @@ func newStruct(strct fidlgen.Struct, decls declMap, typeKinds map[TypeKind]struc
 	s := &Struct{
 		decl:          newDecl(strct),
 		Size:          strct.TypeShapeV2.InlineSize,
+		HasPadding:    strct.TypeShapeV2.HasPadding,
 		synthesized:   strct.IsAnonymous(),
 		wrappedReturn: strct.GetAttributes().HasAttribute("wrapped_return"),
 	}

@@ -7,6 +7,8 @@
 
 #![allow(unused_imports)]
 
+use zerocopy::{AsBytes, FromBytes};
+
 /// 'a'
 pub const CHAR_CONST: u8 = 97;
 
@@ -15,6 +17,7 @@ pub const SIZE_CONST: usize = 100;
 pub const UINTPTR_CONST: usize = 0x1234abcd5678ffff;
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StructWithPrimitives {
     pub char_field: u8,
     pub size_field: usize,
@@ -24,6 +27,7 @@ pub struct StructWithPrimitives {
 pub type Uint8Alias = u8;
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StructWithPointers {
     pub u64ptr: *const u64,
     pub charptr: *const u8,
@@ -34,6 +38,7 @@ pub struct StructWithPointers {
 }
 
 #[repr(C)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, FromBytes, PartialEq)]
 pub struct StructWithStringArrays {
     pub str: [u8; 10],
     pub strs: [[u8; 6]; 4],

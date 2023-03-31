@@ -7,7 +7,10 @@
 
 #![allow(unused_imports)]
 
+use zerocopy::{AsBytes, FromBytes};
+
 #[repr(u32)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Subtype {
     A = 0,
     B = 1,
@@ -17,6 +20,7 @@ pub enum Subtype {
 pub type Handle = u32;
 
 #[repr(C)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct StructWithHandleMembers {
     pub untyped_handle: Handle,
     pub handle_a: Handle,

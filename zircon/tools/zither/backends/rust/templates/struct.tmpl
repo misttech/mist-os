@@ -8,7 +8,7 @@
 {{ range .Comments }}
 ///{{ . }}
 {{- end }}
-{{- range StructAttributes }}
+{{- range StructAttributes . }}
 {{ . }}
 {{- end }}
 pub struct {{ UpperCamelCase . }} {

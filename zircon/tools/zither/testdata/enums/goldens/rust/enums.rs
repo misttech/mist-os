@@ -7,7 +7,10 @@
 
 #![allow(unused_imports)]
 
+use zerocopy::AsBytes;
+
 #[repr(u8)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Color {
     Red = 0,
     Orange = 1,
@@ -19,48 +22,56 @@ pub enum Color {
 }
 
 #[repr(u8)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Uint8Limits {
     Min = 0,
     Max = 0b11111111,
 }
 
 #[repr(u16)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Uint16Limits {
     Min = 0,
     Max = 0xffff,
 }
 
 #[repr(u32)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Uint32Limits {
     Min = 0,
     Max = 0xffffffff,
 }
 
 #[repr(u64)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Uint64Limits {
     Min = 0,
     Max = 0xffffffffffffffff,
 }
 
 #[repr(i8)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Int8Limits {
     Min = -0x80,
     Max = 0x7f,
 }
 
 #[repr(i16)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Int16Limits {
     Min = -0x8000,
     Max = 0x7fff,
 }
 
 #[repr(i32)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Int32Limits {
     Min = -0x80000000,
     Max = 0x7fffffff,
 }
 
 #[repr(i64)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Int64Limits {
     Min = -0x8000000000000000,
     Max = 0x7fffffffffffffff,
@@ -68,6 +79,7 @@ pub enum Int64Limits {
 
 /// Enum with a one-line comment.
 #[repr(u8)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EnumWithOneLineComment {
     /// Enum member with one-line comment.
     MemberWithOneLineComment = 0,
@@ -85,6 +97,7 @@ pub enum EnumWithOneLineComment {
 ///         many-line
 ///           comment.
 #[repr(u16)]
+#[derive(AsBytes, Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EnumWithManyLineComment {
     Member = 0,
 }
