@@ -88,7 +88,7 @@ void NetworkDevice::NotifyThread(zx::unowned_thread thread, ThreadType type) {
   }
 
   if (zx_status_t status =
-          device_set_profile_by_role(zxdev(), thread->get(), role.data(), role.size());
+          device_set_profile_by_role(parent(), thread->get(), role.data(), role.size());
       status != ZX_OK) {
     zxlogf(WARNING, "failed to set scheduler role '%.*s': %s", static_cast<int>(role.size()),
            role.data(), zx_status_get_string(status));
