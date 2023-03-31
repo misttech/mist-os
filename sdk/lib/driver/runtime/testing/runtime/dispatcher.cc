@@ -32,6 +32,18 @@ zx::result<> WaitFor(libsync::Completion& completion) {
   return zx::ok();
 }
 
+DefaultDispatcherSetting::DefaultDispatcherSetting(fdf_dispatcher_t* dispatcher) {
+  zx_status_t status = fdf_testing_set_default_dispatcher(dispatcher);
+  ZX_ASSERT_MSG(ZX_OK == status, "Failed to set default dispatcher setting: %s",
+                zx_status_get_string(status));
+}
+
+DefaultDispatcherSetting::~DefaultDispatcherSetting() {
+  zx_status_t status = fdf_testing_set_default_dispatcher(nullptr);
+  ZX_ASSERT_MSG(ZX_OK == status, "Failed to remove default dispatcher setting: %s",
+                zx_status_get_string(status));
+}
+
 TestSynchronizedDispatcher::TestSynchronizedDispatcher(const DispatcherStartArgs& args) {
   if (args.is_default_dispatcher) {
     zx::result result = StartAsDefault(args.options, args.dispatcher_name);
@@ -73,12 +85,15 @@ zx::result<> TestSynchronizedDispatcher::StartAsDefault(
     return result.take_error();
   }
 
-  return zx::make_result(fdf_testing_set_default_dispatcher(dispatcher_.get()));
+  default_dispatcher_setting_.emplace(dispatcher_.get());
+  return zx::ok();
 }
 
 zx::result<> TestSynchronizedDispatcher::Stop() {
   dispatcher_.ShutdownAsync();
-  return WaitFor(dispatcher_shutdown_);
+  zx::result<> stop_result = WaitFor(dispatcher_shutdown_);
+  default_dispatcher_setting_.reset();
+  return stop_result;
 }
 
 const TestSynchronizedDispatcher::DispatcherStartArgs kDispatcherDefault = {

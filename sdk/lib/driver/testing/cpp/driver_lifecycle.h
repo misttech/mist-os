@@ -40,8 +40,7 @@ zx::result<Driver*> StartDriver(
 }
 
 // Initiates the teardown of the driver and the driver dispatcher. Teardown consist of using the
-// prepare_stop hook, waiting for the completion, shutting down the driver dispatcher, and calling
-// the stop lifecycle hook. It takes in the test dispatcher object to shutdown during this call.
+// prepare_stop hook, waiting for the completion, and calling the stop lifecycle hook.
 //
 // This MUST be called from the main test thread.
 zx::result<> TeardownDriver(

@@ -38,6 +38,12 @@ zx::result<T> WaitFor(std::future<T> future) {
   return zx::ok(future.get());
 }
 
+class DefaultDispatcherSetting {
+ public:
+  explicit DefaultDispatcherSetting(fdf_dispatcher_t* dispatcher);
+  ~DefaultDispatcherSetting();
+};
+
 // A wrapper around an fdf::SynchronizedDispatcher that is meant for testing.
 class TestSynchronizedDispatcher {
  public:
@@ -91,6 +97,7 @@ class TestSynchronizedDispatcher {
   async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
 
  private:
+  std::optional<DefaultDispatcherSetting> default_dispatcher_setting_;
   fdf::SynchronizedDispatcher dispatcher_;
   libsync::Completion dispatcher_shutdown_;
 };

@@ -275,9 +275,6 @@ class FakeDdkOptee : public zxtest::Test {
   void TearDown() override {
     device_async_remove(parent_->GetLatestChild());
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(parent_.get()));
-
-    zx::result result = driver_dispatcher_.Stop();
-    EXPECT_EQ(ZX_OK, result.status_value());
   }
 
  protected:

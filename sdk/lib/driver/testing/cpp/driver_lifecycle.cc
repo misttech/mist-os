@@ -83,15 +83,8 @@ zx::result<> TeardownDriver(OpaqueDriverPtr driver,
     }
   }
 
-  zx::result result = fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(),
-                                               [&]() { driver_lifecycle_symbol.v1.stop(driver); });
-
-  if (result.is_error()) {
-    return result.take_error();
-  }
-
-  result = driver_dispatcher.Stop();
-  return result;
+  return fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(),
+                                  [&]() { driver_lifecycle_symbol.v1.stop(driver); });
 }
 
 }  // namespace fdf_testing
