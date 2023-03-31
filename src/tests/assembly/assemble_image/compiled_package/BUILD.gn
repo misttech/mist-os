@@ -21,7 +21,7 @@ if (is_fuchsia) {
 test_assembly_config("compiled_package") {
   platform = {
     feature_set_level = "minimal"
-    build_type = "eng"
+    build_type = "user"
     example_config = {
       include_example_aib = true
     }
