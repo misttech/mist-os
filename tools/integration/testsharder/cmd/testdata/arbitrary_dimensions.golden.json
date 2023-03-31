@@ -1,0 +1,53 @@
+[
+    {
+        "name": "Linux",
+        "tests": [
+            {
+                "name": "host_x64/bar.sh",
+                "path": "host_x64/bar.sh",
+                "label": "//tools/other:bar(//build/toolchain/host_x64)",
+                "os": "linux",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ]
+            },
+            {
+                "name": "host_x64/foo.sh",
+                "path": "host_x64/foo.sh",
+                "label": "//tools/other:foo(//build/toolchain/host_x64)",
+                "os": "linux",
+                "cpu": "x64",
+                "log_settings": {},
+                "runs": 1,
+                "tags": [
+                    {
+                        "key": "expected_duration_milliseconds",
+                        "value": "0"
+                    }
+                ]
+            }
+        ],
+        "environment": {
+            "dimensions": {
+                "cpu": "x64",
+                "os": "Linux",
+                "other_dimension": "foo"
+            },
+            "image_overrides": {}
+        },
+        "deps": [
+            "host_x64/bar.sh",
+            "host_x64/foo.sh"
+        ],
+        "timeout_secs": 0,
+        "summary": {
+            "tests": null
+        }
+    }
+]

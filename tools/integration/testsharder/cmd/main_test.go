@@ -75,6 +75,51 @@ func TestExecute(t *testing.T) {
 			},
 		},
 		{
+			// Two tests whose dimensions differ only by some random dimension
+			// ("other_dimension") should still be sharded separately.
+			// TODO(http://b/276316631): This is not the case currently and
+			// should be fixed.
+			name: "arbitrary dimensions",
+			testSpecs: []build.TestSpec{
+				{
+					Test: build.Test{
+						Name:  "host_x64/foo.sh",
+						Path:  "host_x64/foo.sh",
+						OS:    "linux",
+						CPU:   "x64",
+						Label: "//tools/other:foo(//build/toolchain/host_x64)",
+					},
+					Envs: []build.Environment{
+						{
+							Dimensions: build.DimensionSet{
+								"cpu":             "x64",
+								"os":              "Linux",
+								"other_dimension": "foo",
+							},
+						},
+					},
+				},
+				{
+					Test: build.Test{
+						Name:  "host_x64/bar.sh",
+						Path:  "host_x64/bar.sh",
+						OS:    "linux",
+						CPU:   "x64",
+						Label: "//tools/other:bar(//build/toolchain/host_x64)",
+					},
+					Envs: []build.Environment{
+						{
+							Dimensions: build.DimensionSet{
+								"cpu":             "x64",
+								"os":              "Linux",
+								"other_dimension": "bar",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name: "multiply",
 			flags: testsharderFlags{
 				targetDurationSecs: 5,
@@ -496,6 +541,16 @@ func (m *fakeModules) Platforms() []build.DimensionSet {
 		{
 			"cpu": "x64",
 			"os":  "Linux",
+		},
+		{
+			"cpu":             "x64",
+			"os":              "Linux",
+			"other_dimension": "foo",
+		},
+		{
+			"cpu":             "x64",
+			"os":              "Linux",
+			"other_dimension": "bar",
 		},
 	}
 }

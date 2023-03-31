@@ -64,6 +64,7 @@ if (is_host) {
   _golden_tests = [
     "affected nonhermetic tests",
     "affected tests",
+    "arbitrary dimensions",
     "ffx_deps",
     "hermetic deps",
     "max shards per env",
