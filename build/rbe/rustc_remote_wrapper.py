@@ -70,8 +70,14 @@ def _tool_is_executable(tool: str) -> bool:
     return os.access(tool, os.X_OK)
 
 
+# Defined for convenient mocking.
 def _libcxx_isfile(libcxx: str) -> bool:
     return os.path.isfile(libcxx)
+
+
+# Defined for convenient mocking.
+def _env_file_exists(path: str) -> bool:
+    return os.path.exists(path)
 
 
 def _main_arg_parser() -> argparse.ArgumentParser:
@@ -108,7 +114,7 @@ def relativize_paths(paths: Iterable[str], start: str) -> Iterable[str]:
         if os.path.isabs(p):
             yield os.path.relpath(p, start=start)
         else:
-            yield p
+            yield os.path.normpath(p)
 
 
 def accompany_rlib_with_so(deps: Iterable[str]) -> Iterable[str]:
@@ -136,13 +142,16 @@ def accompany_rlib_with_so(deps: Iterable[str]) -> Iterable[str]:
 class RustRemoteAction(object):
 
     def __init__(
-            self,
-            argv: Sequence[str],
-            exec_root: str = None,
-            working_dir: str = None):
+        self,
+        argv: Sequence[str],
+        exec_root: str = None,
+        working_dir: str = None,
+        host_platform: str = None,
+    ):
         self._working_dir = os.path.abspath(working_dir or os.curdir)
         self._exec_root = os.path.abspath(
             exec_root or remote_action.PROJECT_ROOT)
+        self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
         ddash = argv.index('--')
         if ddash is None:
@@ -154,16 +163,15 @@ class RustRemoteAction(object):
 
         # Propagate --remote-flag=... options to the remote prefix,
         # as if they appeared before '--'.
+        # Forwarded rewrapper options with values must be written as '--flag=value',
+        # not '--flag value' because argparse doesn't know what unhandled flags
+        # expect values.
         self._forwarded_remote_args, filtered_command = remote_action.REMOTE_FLAG_ARG_PARSER.parse_known_args(
             unfiltered_command)
 
-        # forward all unknown flags to rewrapper
+        # Forward all unknown flags to rewrapper
         self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
             remote_prefix + self._forwarded_remote_args.flags)
-
-        # forwarded rewrapper options with values must be written as '--flag=value',
-        # not '--flag value' because argparse doesn't know what unhandled flags
-        # expect values.
 
         self._rust_action = rustc.RustAction(command=filtered_command)
 
@@ -210,6 +218,10 @@ class RustRemoteAction(object):
         return self._exec_root
 
     @property
+    def host_platform(self) -> str:
+        return self._host_platform
+
+    @property
     def exec_root_rel(self) -> str:
         return os.path.relpath(self.exec_root, start=self.working_dir)
 
@@ -239,7 +251,8 @@ class RustRemoteAction(object):
 
     def _cleanup(self):
         for f in self._cleanup_files:
-            os.remove(f)
+            if os.path.exists(f):
+                os.remove(f)
 
     def _local_depfile_inputs(self) -> Iterable[str]:
         # Generate a local depfile for the purposes of discovering
@@ -283,7 +296,7 @@ class RustRemoteAction(object):
         Yields:
           shared library paths relative to current working dir.
         """
-        if fuchsia.HOST_PREBUILT_PLATFORM_SUBDIR == 'linux-x64':
+        if self.host_platform == fuchsia.REMOTE_PLATFORM:
             # remote and host execution environments match
             yield from self.yield_verbose(
                 'remote compiler shlibs (detected)',
@@ -301,7 +314,7 @@ class RustRemoteAction(object):
                 'remote compiler shlibs (guessed)',
                 glob.glob(os.path.join(self.exec_root_rel, d)))
 
-    def _rust_stdlib_linunwind_inputs(self) -> Iterable[str]:
+    def _rust_stdlib_libunwind_inputs(self) -> Iterable[str]:
         # The majority of stdlibs already appear in dep-info and are uploaded
         # as needed.  However, libunwind.a is not listed, but is directly
         # needed by code emitted by rustc.  Listing this here works around a
@@ -313,6 +326,18 @@ class RustRemoteAction(object):
         if os.path.exists(libunwind_a):
             yield self.value_verbose('libunwind', libunwind_a)
 
+    def _inputs_from_env(self) -> Iterable[str]:
+        """Scan command environment variables for references to inputs files.
+
+        If a variable value looks like a path and it points to something
+        that exists, assume it is needed for remote execution.
+        """
+        for e in self._rust_action.env:
+            key, sep, value = e.partition('=')
+            if sep == '=':
+                if _env_file_exists(value):
+                    yield os.path.relpath(value, start=self.working_dir)
+
     def _remote_inputs(self) -> Iterable[str]:
         """Remote inputs are relative to current working dir."""
         yield self.value_verbose(
@@ -321,11 +346,15 @@ class RustRemoteAction(object):
 
         yield from self._remote_compiler_inputs()
 
-        yield from self._rust_stdlib_linunwind_inputs()
+        yield from self._rust_stdlib_libunwind_inputs()
 
         # Indirect dependencies (libraries)
         yield from self.yield_verbose(
             'extern libs', self._rust_action.extern_paths())
+
+        # Prefer to have the build system's command specify additional
+        # --remote-inputs instead of trying to infer them.
+        # yield from self.yield_verbose('env var files', self._inputs_from_env())
 
         # Link arguments like static libs are checked for existence
         # but not necessarily used until linking a binary.
@@ -375,7 +404,9 @@ class RustRemoteAction(object):
             "--canonicalize_working_dir=true",
         ]
 
-        return self._main_remote_options + fixed_remote_options
+        # _main_remote_options should be allowed to override the
+        # fixed_remote_options
+        return fixed_remote_options + self._main_remote_options
 
     def prepare(self) -> int:
         """Setup the remote action, but do not execute it.
@@ -472,6 +503,31 @@ class RustRemoteAction(object):
 
         yield from self._sysroot_files()
 
+    def _depfile_exists(self) -> bool:
+        # Defined for easy mocking.
+        return os.path.isfile(self.depfile)
+
+    def _rewrite_depfile(self):
+        """Rewrite depfile without working dir absolute paths.
+
+        TEMPORARY WORKAROUND until upstream fix lands:
+          https://github.com/pest-parser/pest/pull/522
+        Rewrite the depfile if it contains any absolute paths from the remote
+        build; paths should be relative to the root_build_dir.
+
+        Assume that the output dir is two levels down from the exec_root.
+
+        When using the `canonicalize_working_dir` rewrapper option,
+        the output directory is coerced to a predictable 'set_by_reclient' constant.
+        See https://source.corp.google.com/foundry-x-re-client/internal/pkg/reproxy/action.go;l=131
+        It is still possible for a tool to leak absolute paths, which could
+        expose that constant in returned artifacts.
+        We forgive this for depfiles, but other artifacts should be verified
+        separately.
+        """
+        remote_action.remove_working_dir_abspaths_from_depfile_in_place(
+            self.depfile, self.remote_action.build_subdir)
+
     def run(self) -> int:
         prepare_status = self.prepare()
         if prepare_status != 0:
@@ -481,6 +537,8 @@ class RustRemoteAction(object):
             return self.remote_action.run_with_main_args(self._main_args)
 
         finally:
+            if self._depfile_exists():
+                self._rewrite_depfile()
             self._cleanup()
 
 
@@ -489,6 +547,7 @@ def main(argv: Sequence[str]) -> int:
         argv,  # [remote options] -- rustc-compile-command...
         exec_root=remote_action.PROJECT_ROOT,
         working_dir=os.curdir,
+        host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
     )
     return rust_remote_action.run()
 

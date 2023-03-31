@@ -109,6 +109,63 @@ def relativize_to_exec_root(path: str, start=None) -> str:
     return os.path.relpath(path, start=start or PROJECT_ROOT)
 
 
+def _reclient_canonical_working_dir_components(
+        subdir_components: Iterable[str]) -> Iterable[str]:
+    """Computes the path used by rewrapper --canonicalize_working_dir=true.
+
+    The exact values returned are an implementation detail of reclient
+    that is not reliable, so this should only be used as a last resort
+    in workarounds.
+
+    https://team.git.corp.google.com/foundry-x/re-client/+/refs/heads/master/internal/pkg/reproxy/action.go#177
+
+    Args:
+      subdir_components: a relative path like ('out', 'default', ...)
+
+    Yields:
+      Replacement path components like ('set_by_reclient', 'a', ...)
+    """
+    first = next(subdir_components, None)
+    if first is None or first == '':
+        return  # no components
+    yield 'set_by_reclient'
+    for _ in subdir_components:
+        yield 'a'
+
+
+def reclient_canonical_working_dir(build_subdir: str) -> str:
+    new_components = list(
+        _reclient_canonical_working_dir_components(
+            iter(build_subdir.split(os.sep))))
+    return os.path.join(*new_components) if new_components else ''
+
+
+def remove_working_dir_abspaths(line: str, build_subdir: str) -> str:
+    # Two substutions are necesssary to accommodate both cases
+    # of rewrapper --canonicalize_working_dir={true,false}.
+    # TODO: if the caller knows whether which case applies, then
+    # you only need to apply one of the following substitutions.
+    local_working_dir_abs = os.path.join(_REMOTE_PROJECT_ROOT, build_subdir)
+    canonical_working_dir = os.path.join(
+        _REMOTE_PROJECT_ROOT, reclient_canonical_working_dir(build_subdir))
+    return line.replace(local_working_dir_abs + os.path.sep,
+                        '').replace(canonical_working_dir + os.path.sep, '')
+
+
+def remove_working_dir_abspaths_from_depfile_in_place(
+        depfile: str, build_subdir: str):
+    # TODO(http://fxbug.dev/124714): This transformation would be more robust
+    # if we properly lexed a depfile and operated on tokens instead of lines.
+    with open(depfile) as f:
+        new_lines = [
+            remove_working_dir_abspaths(line, build_subdir) for line in f
+        ]
+
+    with open(depfile, 'w') as f:  # overwrite
+        for line in new_lines:
+            f.write(line)
+
+
 class RemoteAction(object):
     """RemoteAction represents a command that is to be executed remotely."""
 

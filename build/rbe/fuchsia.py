@@ -73,11 +73,13 @@ def _prebuilt_platform_subdir() -> str:
     return f"{os_name}-{arch}"
 
 
-HOST_PREBUILT_PLATFORM_SUBDIR = _prebuilt_platform_subdir()
+HOST_PREBUILT_PLATFORM = _prebuilt_platform_subdir()
+HOST_PREBUILT_PLATFORM_SUBDIR = HOST_PREBUILT_PLATFORM
 
 # RBE workers are only linux-x64 at this time, so all binaries uploaded
 # for remote execution should use this platform.
-REMOTE_PLATFORM_SUBDIR = 'linux-x64'
+# This is also used as a subdir component of prebuilt tool paths.
+REMOTE_PLATFORM = 'linux-x64'
 
 
 def _path_components(path: str) -> Iterable[str]:
@@ -94,7 +96,7 @@ def _remote_executable_components(host_tool: str) -> Iterable[str]:
     """Change the path component that correpsonds to the platform."""
     for d in _path_components(host_tool):
         if _path_component_is_platform_subdir(d):
-            yield REMOTE_PLATFORM_SUBDIR
+            yield REMOTE_PLATFORM
         else:
             yield d
 
@@ -120,9 +122,9 @@ RECLIENT_BINDIR = os.path.join(
     HOST_PREBUILT_PLATFORM_SUBDIR)
 
 REMOTE_RUSTC_SUBDIR = os.path.join(
-    'prebuilt', 'third_party', 'rust', REMOTE_PLATFORM_SUBDIR)
+    'prebuilt', 'third_party', 'rust', REMOTE_PLATFORM)
 REMOTE_CLANG_SUBDIR = os.path.join(
-    'prebuilt', 'third_party', 'clang', REMOTE_PLATFORM_SUBDIR)
+    'prebuilt', 'third_party', 'clang', REMOTE_PLATFORM)
 
 # On platforms where ELF utils are unavailable, hardcode rustc's shlibs.
 REMOTE_RUSTC_SHLIB_GLOBS = [

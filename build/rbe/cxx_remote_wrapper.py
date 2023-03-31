@@ -83,31 +83,54 @@ class CxxRemoteAction(object):
         argv: Sequence[str],
         exec_root: str = None,
         working_dir: str = None,
+        host_platform: str = None,
     ):
         self._working_dir = os.path.abspath(working_dir or os.curdir)
         self._exec_root = os.path.abspath(
             exec_root or remote_action.PROJECT_ROOT)
-        # forward all unknown flags to rewrapper
-        self._main_args, main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
-            argv)
-        # forwarded rewrapper options with values must be written as '--flag=value',
+        self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
+
+        ddash = argv.index('--')
+        if ddash is None:
+            raise argparse.ArgumentError(
+                "Missing '--'.  A '--' is required for separating remote options from the command to be remotely executed."
+            )
+        remote_prefix = argv[:ddash]
+        unfiltered_command = argv[ddash + 1:]
+
+        # Propagate --remote-flag=... options to the remote prefix,
+        # as if they appeared before '--'.
+        # Forwarded rewrapper options with values must be written as '--flag=value',
         # not '--flag value' because argparse doesn't know what unhandled flags
         # expect values.
         self._forwarded_remote_args, filtered_command = remote_action.REMOTE_FLAG_ARG_PARSER.parse_known_args(
-            self._main_args.command)
+            unfiltered_command)
+
+        # forward all unknown flags to rewrapper
+        self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
+            remote_prefix + self._forwarded_remote_args.flags)
 
         self._cxx_action = cxx.CxxAction(command=filtered_command)
-
-        if not self._cxx_action.target and self._cxx_action.compiler_is_clang:
-            raise Exception(
-                "For remote compiling with clang, an explicit --target is required, but is missing."
-            )
 
         # Determine whether this action can be done remotely.
         self._local_only = False
         if self._cxx_action.sources[0].file.endswith('.S'):
             # Compiling un-preprocessed assembly is not supported remotely.
             self._local_only = True
+
+        self._local_preprocess_command = None
+        self._cpp_strategy = self._resolve_cpp_strategy()
+
+        self._prepare_status = None
+        self._cleanup_files = []
+        self._remote_action = None
+        self.check_preconditions()
+
+    def check_preconditions(self):
+        if not self._cxx_action.target and self._cxx_action.compiler_is_clang:
+            raise Exception(
+                "For remote compiling with clang, an explicit --target is required, but is missing."
+            )
 
         # check for required remote tools
         # TODO: bypass this check when remote execution is disabled.
@@ -118,11 +141,12 @@ class CxxRemoteAction(object):
                 f"Missing the following tools needed for remote compiling C++: {missing_required_tools}.  See tqr/563565 for how to fetch the needed packages."
             )
 
-        self._cpp_strategy = self._resolve_cpp_strategy()
+    def prepare(self) -> int:
+        """Setup everything ahead of remote execution."""
+        if self._prepare_status is not None:
+            return self._prepare_status
 
         remote_inputs = self._forwarded_remote_args.inputs.copy()
-        self._cleanup_files = []
-        self._local_preprocess_command = None
         if self.cpp_strategy == 'local':
             # preprocess locally, then compile the result remotely
             preprocessed_source = self._cxx_action.preprocessed_output
@@ -130,6 +154,10 @@ class CxxRemoteAction(object):
             remote_inputs += [preprocessed_source]
             self._local_preprocess_command, remote_command = self._cxx_action.split_preprocessing(
             )
+            cpp_status = self.preprocess_locally()
+            if cpp_status != 0:
+                return cpp_status
+
         elif self.cpp_strategy == 'integrated':
             # preprocess driven by the compiler, done remotely
             remote_command = self._cxx_action.command
@@ -138,10 +166,11 @@ class CxxRemoteAction(object):
 
         # Prepare remote compile action
         remote_output_dirs = self._forwarded_remote_args.output_dirs.copy()
-        remote_options = main_remote_options + [
+        remote_options = [
             "--labels=type=compile,compiler=clang,lang=cpp",  # TODO: gcc?
             "--canonicalize_working_dir=true",
-        ]
+        ] + self._main_remote_options  # allow forwarded options to override defaults
+
         # The output file is inferred automatically by rewrapper in C++ mode,
         # but naming it explicitly here makes it easier for RemoteAction
         # to use the output file name for other auxiliary files.
@@ -155,7 +184,7 @@ class CxxRemoteAction(object):
         remote_options.extend(self._forwarded_remote_args.flags)
 
         # Support for remote cross-compilation:
-        if fuchsia.HOST_PREBUILT_PLATFORM_SUBDIR != 'linux-x64':
+        if self.host_platform != fuchsia.REMOTE_PLATFORM:
             # compiler path is relative to current working dir
             compiler_swapper_rel = os.path.relpath(
                 REMOTE_COMPILER_SWAPPER, self.working_dir)
@@ -174,6 +203,9 @@ class CxxRemoteAction(object):
             exec_root=self.exec_root,
         )
 
+        self._prepare_status = 0
+        return self._prepare_status
+
     @property
     def working_dir(self) -> str:
         return self._working_dir
@@ -181,6 +213,10 @@ class CxxRemoteAction(object):
     @property
     def exec_root(self) -> str:
         return self._exec_root
+
+    @property
+    def host_platform(self) -> str:
+        return self._host_platform
 
     @property
     def verbose(self) -> bool:
@@ -232,21 +268,27 @@ class CxxRemoteAction(object):
     def _run_locally(self) -> int:
         return subprocess.call(self.original_compile_command)
 
+    def preprocess_locally(self) -> int:
+        # Locally preprocess if needed
+        local_cpp_cmd = _command_to_str(self.local_preprocess_command)
+        if self.dry_run:
+            msg(f"[dry-run only] {local_cpp_cmd}")
+            return 0
+
+        cpp_status = subprocess.call(self.local_preprocess_command)
+        if cpp_status != 0:
+            print(
+                f"*** Local C-preprocessing failed (exit={cpp_status}): {local_cpp_cmd}"
+            )
+            return cpp_status
+
     def run(self) -> int:
         if self.local_only:
             return self._run_locally()
 
-        # Locally preprocess if needed
-        if self.local_preprocess_command:
-            local_cpp_cmd = _command_to_str(self.local_preprocess_command)
-            if self.dry_run:
-                msg(f"[dry-run only] {local_cpp_cmd}")
-            cpp_status = subprocess.call(self.local_preprocess_command)
-            if cpp_status != 0:
-                print(
-                    f"*** Local C-preprocessing failed (exit={cpp_status}): {local_cpp_cmd}"
-                )
-                return cpp_status
+        prepare_status = self.prepare()
+        if prepare_status != 0:
+            return prepare_status
 
         # Remote compile C++
         try:
@@ -263,6 +305,7 @@ def main(argv: Sequence[str]) -> int:
         argv,  # [remote options] -- C-compile-command...
         exec_root=remote_action.PROJECT_ROOT,
         working_dir=os.curdir,
+        host_platform=fuchsia.HOST_PREBUILT_PLATFORM,
     )
     return cxx_remote_action.run()
 

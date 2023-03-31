@@ -14,6 +14,61 @@ import remote_action
 import cl_utils
 
 
+class ReclientCanonicalWorkingDirTests(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(remote_action.reclient_canonical_working_dir(''), '')
+
+    def test_one_level(self):
+        self.assertEqual(
+            remote_action.reclient_canonical_working_dir('build-here'),
+            'set_by_reclient')
+
+    def test_two_levels(self):
+        self.assertEqual(
+            remote_action.reclient_canonical_working_dir('build/there'),
+            'set_by_reclient/a')
+
+    def test_three_levels(self):
+        self.assertEqual(
+            remote_action.reclient_canonical_working_dir('build/inside/there'),
+            'set_by_reclient/a/a')
+
+
+class RemoveWorkingDirAbspathsTests(unittest.TestCase):
+
+    def test_blank_no_change(self):
+        for t in ('', '\n'):
+            self.assertEqual(
+                remote_action.remove_working_dir_abspaths(t, 'build-out'), t)
+
+    def test_phony_dep_with_local_build_dir(self):
+        self.assertEqual(
+            remote_action.remove_working_dir_abspaths(
+                f'{remote_action._REMOTE_PROJECT_ROOT}/out/foo/path/to/thing.txt:\n',
+                'out/foo'),
+            'path/to/thing.txt:\n',
+        )
+
+    def test_phony_dep_with_canonical_build_dir(self):
+        self.assertEqual(
+            remote_action.remove_working_dir_abspaths(
+                f'{remote_action._REMOTE_PROJECT_ROOT}/set_by_reclient/a/path/to/somethingelse.txt:\n',
+                'out/foo'),
+            'path/to/somethingelse.txt:\n',
+        )
+
+    def test_typical_dep_line_multiple_occurrences(self):
+        root = remote_action._REMOTE_PROJECT_ROOT
+        subdir = 'out/inside/here'
+        wd = os.path.join(root, subdir)
+        self.assertEqual(
+            remote_action.remove_working_dir_abspaths(
+                f'obj/foo.o: {wd}/foo/bar.h {wd}/baz/quux.h\n', subdir),
+            'obj/foo.o: foo/bar.h baz/quux.h\n',
+        )
+
+
 class ResolvedShlibsFromLddTests(unittest.TestCase):
 
     def test_sample(self):
@@ -144,7 +199,6 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_run.assert_not_called()
 
-
     @mock.patch.object(fuchsia, 'REPROXY_WRAP', '/path/to/reproxy-wrap.sh')
     def test_auto_reproxy(self):
         p = self._make_main_parser()
@@ -191,9 +245,8 @@ class RemoteActionFlagParserTests(unittest.TestCase):
         p = remote_action.REMOTE_FLAG_ARG_PARSER
         command = [
             'clang++', '--target=powerpc-apple-darwin8',
-            '-fcrash-diagnostics-dir=nothing/to/see/here',
-            '-c', 'hello.cxx', '-o',
-            'hello.o'
+            '-fcrash-diagnostics-dir=nothing/to/see/here', '-c', 'hello.cxx',
+            '-o', 'hello.o'
         ]
         remote_args, other = p.parse_known_args(command)
         self.assertFalse(remote_args.disable)

@@ -320,6 +320,148 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 ]))
         self.assertEqual(remote_output_files, {exe})
 
+    def test_prepare_remote_option_forwarding(self):
+        exec_root = '/home/project'
+        working_dir = os.path.join(exec_root, 'build-here')
+        compiler = '../tools/bin/rustc'
+        shlib = 'tools/lib/librusteze.so'
+        shlib_abs = os.path.join(exec_root, shlib)
+        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
+        source = '../foo/src/lib.rs'
+        rlib = 'obj/foo.rlib'
+        deps = ['../foo/src/other.rs']
+        depfile_contents = [d + ':' for d in deps]
+        remote_flag = '--exec_strategy=local'
+        command = [compiler, source, '-o', rlib, f'--remote-flag={remote_flag}']
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in mocks:
+                stack.enter_context(m)
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 0)  # success
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        self.assertEqual(
+            remote_inputs, set([compiler, shlib_rel, source] + deps))
+        self.assertEqual(remote_output_files, {rlib})
+        # Position matters, not just presence.
+        # Could override the set of standard options.
+        self.assertEqual(r.remote_options[-1], remote_flag)
+
+    def test_prepare_environment_names_input_file(self):
+        exec_root = '/home/project'
+        working_dir = os.path.join(exec_root, 'build-here')
+        compiler = '../tools/bin/rustc'
+        shlib = 'tools/lib/librusteze.so'
+        shlib_abs = os.path.join(exec_root, shlib)
+        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
+        source = '../foo/src/lib.rs'
+        rlib = 'obj/foo.rlib'
+        deps = ['../foo/src/other.rs']
+        depfile_contents = [d + ':' for d in deps]
+        env_file = '../path/to/config.json'
+        command = [
+            f'CONFIGURE_THINGY={env_file}', compiler, source, '-o', rlib,
+            f'--remote-inputs={env_file}'
+        ]
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in mocks:
+                stack.enter_context(m)
+            # We are not scanning the environment variables automatically.
+            # Users should follow the above example command and
+            # explicitly pass --remote-inputs.
+            with mock.patch.object(rustc_remote_wrapper, '_env_file_exists',
+                                   return_value=True) as mock_exists:
+                prepare_status = r.prepare()
+            mock_exists.assert_not_called()
+
+        self.assertEqual(prepare_status, 0)  # success
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        self.assertEqual(
+            remote_inputs, set([compiler, shlib_rel, source, env_file] + deps))
+        self.assertEqual(remote_output_files, {rlib})
+
+    def test_post_run_actions(self):
+        exec_root = '/home/project'
+        working_dir = os.path.join(exec_root, 'build-here')
+        compiler = '../tools/bin/rustc'
+        shlib = 'tools/lib/librusteze.so'
+        shlib_abs = os.path.join(exec_root, shlib)
+        shlib_rel = os.path.relpath(shlib_abs, start=working_dir)
+        source = '../foo/src/lib.rs'
+        rlib = 'obj/foo.rlib'
+        deps = ['../foo/src/other.rs']
+        depfile_path = 'obj/foo.rlib.d'
+        depfile_contents = [d + ':' for d in deps]
+        command = [
+            compiler, source, '-o', rlib, f'--emit=dep-info={depfile_path}'
+        ]
+        r = rustc_remote_wrapper.RustRemoteAction(
+            ['--'] + command,
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        prepare_mocks = self.generate_prepare_mocks(
+            depfile_contents=depfile_contents,
+            compiler_shlibs=[shlib_rel],
+        )
+        with contextlib.ExitStack() as stack:
+            for m in prepare_mocks:
+                stack.enter_context(m)
+            prepare_status = r.prepare()
+
+        self.assertEqual(prepare_status, 0)  # success
+        a = r.remote_action
+        remote_inputs = set(a.inputs_relative_to_working_dir)
+        remote_output_files = set(a.output_files_relative_to_working_dir)
+        self.assertEqual(
+            remote_inputs, set([compiler, shlib_rel, source] + deps))
+        self.assertEqual(remote_output_files, {rlib, depfile_path})
+
+        run_mocks = [
+            mock.patch.object(
+                remote_action.RemoteAction,
+                'run_with_main_args',
+                return_value=0),
+            mock.patch.object(
+                rustc_remote_wrapper.RustRemoteAction,
+                '_depfile_exists',
+                return_value=True),
+            mock.patch.object(
+                rustc_remote_wrapper.RustRemoteAction, '_cleanup'),
+        ]
+        with contextlib.ExitStack() as stack:
+            for m in run_mocks:
+                stack.enter_context(m)
+            with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
+                                   '_rewrite_depfile') as mock_rewrite:
+                run_status = r.run()
+            mock_rewrite.assert_called_with()
+
 
 if __name__ == '__main__':
     unittest.main()

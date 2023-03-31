@@ -17,7 +17,6 @@ import remote_action
 
 class CxxRemoteActionTests(unittest.TestCase):
 
-    @mock.patch.object(fuchsia, 'HOST_PREBUILT_PLATFORM_SUBDIR', 'linux-x64')
     def test_clang_cxx(self):
         command = [
             'clang++', '--target=riscv64-apple-darwin21', '-c', 'hello.cc',
@@ -25,7 +24,10 @@ class CxxRemoteActionTests(unittest.TestCase):
         ]
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+            c = cxx_remote_wrapper.CxxRemoteAction(
+                ['--'] + command,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
         self.assertEqual(c.cxx_action.compiler.tool, 'clang++')
@@ -35,6 +37,8 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.cpp_strategy, 'integrated')
         self.assertEqual(c.original_compile_command, command)
         self.assertFalse(c.local_only)
+
+        self.assertEqual(c.prepare(), 0)
         # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root, [])
@@ -71,6 +75,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                 with mock.patch.object(remote_action, 'PROJECT_ROOT',
                                        fake_root):
                     c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+                    self.assertEqual(c.prepare(), 0)
                     self.assertEqual(
                         c.remote_compile_action.exec_root, fake_root)
                     self.assertEqual(
@@ -91,7 +96,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             with mock.patch.object(remote_action, 'PROJECT_ROOT', fake_root):
                 c = cxx_remote_wrapper.CxxRemoteAction(
                     ['--'] + command, working_dir=fake_cwd)
-                return  # DBEUG
+                self.assertEqual(c.prepare(), 0)
                 self.assertTrue(c.cxx_action.compiler_is_clang)
                 self.assertEqual(c.remote_compile_action.exec_root, fake_root)
                 self.assertEqual(
@@ -104,7 +109,6 @@ class CxxRemoteActionTests(unittest.TestCase):
                     output_dirs_relative_to_project_root,
                     [os.path.join(fake_builddir, crash_dir)])
 
-    @mock.patch.object(fuchsia, 'HOST_PREBUILT_PLATFORM_SUBDIR', 'linux-x64')
     def test_remote_flag_back_propagating(self):
         command = [
             'clang++', '--target=riscv64-apple-darwin21',
@@ -116,19 +120,26 @@ class CxxRemoteActionTests(unittest.TestCase):
         ]
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+            c = cxx_remote_wrapper.CxxRemoteAction(
+                ['--'] + command,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            )
+
+        self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
         remote_action_command = c.remote_compile_action.command
         ddash = remote_action_command.index('--')
         self.assertIn('--foo=bar', remote_action_command[:ddash])
         self.assertEqual(remote_action_command[ddash + 1:], filtered_command)
 
-    @mock.patch.object(fuchsia, 'HOST_PREBUILT_PLATFORM_SUBDIR', 'linux-x64')
     def test_gcc_cxx(self):
         command = ['g++', '-c', 'hello.cc', '-o', 'hello.o']
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+            c = cxx_remote_wrapper.CxxRemoteAction(
+                ['--'] + command,
+                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+            )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
         self.assertEqual(c.cxx_action.compiler.tool, 'g++')
@@ -137,6 +148,8 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.cpp_strategy, 'integrated')
         self.assertEqual(c.original_compile_command, command)
         self.assertFalse(c.local_only)
+
+        self.assertEqual(c.prepare(), 0)
         # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root, [])
@@ -145,15 +158,13 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
 
-    # Pretend host != 'linux-x64'
-    @mock.patch.object(fuchsia, 'HOST_PREBUILT_PLATFORM_SUBDIR', 'mac-arm64')
     def test_remote_cross_compile_clang(self):
         fake_root = remote_action.PROJECT_ROOT
         fake_builddir = 'make-it-so'
         fake_cwd = os.path.join(fake_root, fake_builddir)
         compiler_relpath = '../path/to/clang/mac-arm64/clang++'
         remote_compiler_relpath = os.path.join(
-            '../path/to/clang', fuchsia.REMOTE_PLATFORM_SUBDIR, 'clang++')
+            '../path/to/clang', fuchsia.REMOTE_PLATFORM, 'clang++')
         command = [
             compiler_relpath, '--target=riscv64-apple-darwin21', '-c',
             'hello.cc', '-o', 'hello.o'
@@ -166,7 +177,11 @@ class CxxRemoteActionTests(unittest.TestCase):
                                                 'scripts/swapperoo.sh')):
                 c = cxx_remote_wrapper.CxxRemoteAction(
                     [f'--exec_root={fake_root}', '--'] + command,
-                    working_dir=fake_cwd)
+                    working_dir=fake_cwd,
+                    # Pretend host != 'linux-x64' to cross-compile
+                    host_platform='mac-arm64',
+                )
+                self.assertEqual(c.prepare(), 0)
                 self.assertEqual(c.remote_compiler, remote_compiler_relpath)
                 self.assertEqual(
                     c.remote_compile_action.inputs_relative_to_project_root,
@@ -178,15 +193,13 @@ class CxxRemoteActionTests(unittest.TestCase):
                     '--remote_wrapper=../scripts/swapperoo.sh',
                     rewrapper_prefix)
 
-    # Pretend host != 'linux-x64'
-    @mock.patch.object(fuchsia, 'HOST_PREBUILT_PLATFORM_SUBDIR', 'mac-arm64')
     def test_remote_cross_compile_gcc(self):
         fake_root = remote_action.PROJECT_ROOT
         fake_builddir = 'make-it-so'
         fake_cwd = os.path.join(fake_root, fake_builddir)
         compiler_relpath = '../path/to/gcc/mac-arm64/g++'
         remote_compiler_relpath = os.path.join(
-            '../path/to/gcc', fuchsia.REMOTE_PLATFORM_SUBDIR, 'g++')
+            '../path/to/gcc', fuchsia.REMOTE_PLATFORM, 'g++')
         command = [
             compiler_relpath, '--target=riscv64-apple-darwin21', '-c',
             'hello.cc', '-o', 'hello.o'
@@ -199,7 +212,11 @@ class CxxRemoteActionTests(unittest.TestCase):
                                                 'scripts/swapperoo.sh')):
                 c = cxx_remote_wrapper.CxxRemoteAction(
                     [f'--exec_root={fake_root}', '--'] + command,
-                    working_dir=fake_cwd)
+                    working_dir=fake_cwd,
+                    # Pretend host != 'linux-x64' to cross-compile
+                    host_platform='mac-arm64',
+                )
+                self.assertEqual(c.prepare(), 0)
                 self.assertEqual(c.remote_compiler, remote_compiler_relpath)
                 self.assertEqual(
                     c.remote_compile_action.inputs_relative_to_project_root,
