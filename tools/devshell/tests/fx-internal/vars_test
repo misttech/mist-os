@@ -3,14 +3,16 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../lib/vars.sh || exit $?
+
 BT_FILE_DEPS=(
+  "prebuilt/third_party/jq/${HOST_PLATFORM}/bin/jq"
+  "tools/devshell/jq.fx"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-optional-features.sh"
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/platform.sh"
 )
-
-source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/../../lib/vars.sh || exit $?
 
 # Replace fx-gen with stub.
 unset -f fx-gen
@@ -380,6 +382,27 @@ TEST_get-ssh-components() {
   touch "${privkey}" "${authkey}"
   BT_EXPECT_EQ "$(get-ssh-privkey)" "${privkey}"
   BT_EXPECT_EQ "$(get-ssh-authkeys)" "${authkey}"
+}
+
+TEST_json_config() {
+  local json_test_file="${BT_TEMP_DIR}/config.json"
+  # expect the file doesn't already exist
+  BT_EXPECT_FILE_DOES_NOT_EXIST "${json_test_file}"
+
+  # Fail if there's no file there
+  BT_EXPECT_FAIL json-config-del "${json_test_file}" "something"
+
+  json-config-set "${json_test_file}" "test.value" "something"
+  BT_EXPECT_FILE_CONTAINS "${json_test_file}" '{"test":{"value":"something"}}'
+
+  json-config-set "${json_test_file}" "test.something" "else"
+  BT_EXPECT_FILE_CONTAINS "${json_test_file}" '{"test":{"something":"else","value":"something"}}'
+
+  json-config-del "${json_test_file}" "test.value"
+  BT_EXPECT_FILE_CONTAINS "${json_test_file}" '{"test":{"something":"else"}}'
+
+  BT_EXPECT_FAIL json-config-del "${json_test_file}" "not.existing"
+  BT_EXPECT_FILE_CONTAINS "${json_test_file}" '{"test":{"something":"else"}}'
 }
 
 BT_RUN_TESTS "$@"

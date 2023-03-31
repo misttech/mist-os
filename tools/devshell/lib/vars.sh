@@ -259,6 +259,60 @@ function fx-change-build-dir {
   done
 }
 
+# Runs a jq command against an existing file that will edit it, taking care
+# of piping output to a tempfile and replacing it if jq succeeds.
+# `_jq_edit <jq args> path/to/file.json`
+#
+# Note that the last argument is expected to be the filename being edited, to
+# match the normal argument order of jq, but unlike with jq it's required.
+function _jq_edit {
+  # Take the last argument as the path to the edited file.
+  local json_file="${@: -1}"
+
+  local -r tempfile="$(mktemp)"
+  if fx-command-run jq "$@" > "${tempfile}" ; then
+    mv -f "${tempfile}" "${json_file}"
+    return 0
+  else
+    return $?
+  fi
+}
+
+# Set a configuration value in a build config file:
+# `json-config-set path/to/file.json path.to.value "value"`
+function json-config-set {
+  local json_file="$1"
+  local path="$2"
+  local value="$3"
+
+  # There needs to be a file there in the first place, so if there isn't one
+  # create one with an empty object for jq to update.
+  if ! [[ -f "${json_file}" ]] ; then
+    echo "{}" > "${json_file}"
+  fi
+
+  _jq_edit -e -cS --arg value "${value}" ".${path} = \$value" "${json_file}"
+  return $?
+}
+
+# Remove a configuration value in a build config file:
+# `json-config-del path/to/file.json path.to.value`
+#
+# Will return a non-zero status code if the file or value did not already
+# exist.
+function json-config-del {
+  local json_file="$1"
+  local path="$2"
+
+  if [[ -f "${json_file}" ]] ; then
+    # check the path exists, delete it if so, exit with error code otherwise.
+    _jq_edit -e -cS "if .${path} then del(.${path}) else empty | halt_error(1) end" "${json_file}"
+    return $?
+  else
+    return 1
+  fi
+}
+
 function get-device-pair {
   # Uses a file outside the build dir so that it is not removed by `gn clean`
   local pairfile="${FUCHSIA_BUILD_DIR}.device"

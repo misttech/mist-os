@@ -45,7 +45,8 @@ function main {
     for d in ${FUCHSIA_DIR}/out/*; do
       local build_dir="${d##"${FUCHSIA_DIR}"/}"
       if [[ "${build_dir}" != out/*.zircon && "${build_dir}" != out/*.device \
-        && "${build_dir}" != "${current}" && "${build_dir}" != out/*crash.log ]]; then
+        && "${build_dir}" != "${current}" && "${build_dir}" != out/*crash.log
+        && "${build_dir}" != out/*.json ]]; then
         echo "${build_dir}"
       fi
     done

@@ -5,9 +5,13 @@
 
 ### Test expected usage of ffx target list in fx scripts
 
+# Source platform.sh so that we can point to jq and include it as a runtime dependency.
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)/../../lib/platform.sh" || exit $?
 
 BT_FILE_DEPS=(
+  "prebuilt/third_party/jq/${HOST_PLATFORM}/bin/jq"
   "scripts/fx"
+  "tools/devshell/jq.fx"
   "tools/devshell/lib/vars.sh"
   "tools/devshell/lib/fx-cmd-locator.sh"
   "tools/devshell/lib/fx-optional-features.sh"
