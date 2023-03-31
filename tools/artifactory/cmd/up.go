@@ -52,8 +52,8 @@ const (
 	// A mapping of build ids to binary labels.
 	buildIDsToLabelsManifestName = "build-ids.json"
 
-	// The blobs manifest. TODO(fxbug.dev/60322) remove this.
-	blobManifestName = "blobs.json"
+	// The blobs manifest.
+	blobManifestName = "all_blobs.json"
 
 	// The delivery blob config.
 	deliveryBlobConfigName = "delivery_blob_config.json"
@@ -107,7 +107,6 @@ Emits a GCS upload manifest for a build with the following structure:
 │   │   │   │   └── product_bundle
 │   │   │   ├── packages
 │   │   │   │   ├── all_blobs.json
-│   │   │   │   ├── blobs.json
 │   │   │   │   ├── delivery_blob_config.json
 │   │   │   │   ├── elf_sizes.json
 │   │   │   │   ├── repository
@@ -207,6 +206,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 		{
 			Source:      path.Join(buildDir, blobManifestName),
 			Destination: path.Join(packageNamespaceDir, blobManifestName),
+			Compress:    true,
 		},
 		{
 			Source:      path.Join(buildDir, deliveryBlobConfigName),
@@ -226,12 +226,6 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 			Destination: path.Join(cmd.namespace, ctsPlasaReportName),
 		},
 	}
-
-	allBlobsUpload, err := artifactory.BlobsUpload(m, path.Join(packageNamespaceDir, "all_blobs.json"))
-	if err != nil {
-		return fmt.Errorf("failed to obtain blobs upload: %w", err)
-	}
-	uploads = append(uploads, allBlobsUpload)
 
 	images, err := artifactory.ImageUploads(m, imageNamespaceDir)
 	if err != nil {

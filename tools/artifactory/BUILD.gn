@@ -46,8 +46,6 @@ go_library("lib") {
     "assembly_manifests_test.go",
     "binaries.go",
     "binaries_test.go",
-    "blobs.go",
-    "blobs_test.go",
     "images.go",
     "images_test.go",
     "licenses.go",
@@ -67,7 +65,6 @@ go_library("lib") {
     "upload.go",
   ]
   deps = [
-    "//src/sys/pkg/bin/pm/build",
     "//tools/build",
     "//tools/lib/logger",
     "//tools/lib/osmisc",

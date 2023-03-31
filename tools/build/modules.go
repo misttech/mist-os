@@ -36,7 +36,6 @@ type Modules struct {
 	generatedSources         []string
 	images                   []Image
 	licenses                 []License
-	packageManifestsLocation []string
 	packageRepositories      []PackageRepo
 	platforms                []DimensionSet
 	prebuiltBinarySets       []PrebuiltBinarySet
@@ -66,7 +65,6 @@ func NewModules(buildDir string) (*Modules, error) {
 		"generated_sources.json":           &m.generatedSources,
 		imageManifestName:                  &m.images,
 		"licenses.json":                    &m.licenses,
-		"all_package_manifest_paths.json":  &m.packageManifestsLocation,
 		"package-repositories.json":        &m.packageRepositories,
 		"platforms.json":                   &m.platforms,
 		"prebuilt_binaries.json":           &m.prebuiltBinarySets,
@@ -144,10 +142,6 @@ func (m Modules) Images() []Image {
 
 func (m Modules) Licenses() []License {
 	return m.licenses
-}
-
-func (m Modules) PackageManifestsLocation() []string {
-	return m.packageManifestsLocation
 }
 
 func (m Modules) PackageRepositories() []PackageRepo {

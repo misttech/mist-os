@@ -39,7 +39,6 @@ go_library("build") {
     "images.go",
     "licenses.go",
     "modules.go",
-    "package_manifest_list.go",
     "package_repositories.go",
     "prebuilt_binaries.go",
     "product_bundles.go",
