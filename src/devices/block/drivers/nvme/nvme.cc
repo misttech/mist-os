@@ -652,8 +652,9 @@ zx_status_t Nvme::Init() {
 zx_status_t Nvme::AddDevice() {
   auto cleanup = fit::defer([&] { DdkRelease(); });
 
-  zx_status_t status =
-      DdkAdd(ddk::DeviceAddArgs("nvme").set_inspect_vmo(inspector_.DuplicateVmo()));
+  zx_status_t status = DdkAdd(ddk::DeviceAddArgs("nvme")
+                                  .set_flags(DEVICE_ADD_NON_BINDABLE)
+                                  .set_inspect_vmo(inspector_.DuplicateVmo()));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed DdkAdd: %s", zx_status_get_string(status));
     return status;
