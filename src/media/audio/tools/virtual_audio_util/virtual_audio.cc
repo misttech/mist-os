@@ -21,6 +21,7 @@
 #include <zircon/syscalls/clock.h>
 
 #include <iterator>
+#include <limits>
 
 #include <fbl/algorithm.h>
 
@@ -33,7 +34,7 @@ namespace virtual_audio {
 
 class VirtualAudioUtil {
  public:
-  VirtualAudioUtil(async::Loop* loop) { VirtualAudioUtil::loop_ = loop; }
+  explicit VirtualAudioUtil(async::Loop* loop) { VirtualAudioUtil::loop_ = loop; }
 
   void Run(fxl::CommandLine* cmdline);
 
@@ -71,6 +72,7 @@ class VirtualAudioUtil {
     SET_IN,
     SET_OUT,
     WAIT,
+    HELP,
     INVALID,
   };
 
@@ -111,6 +113,8 @@ class VirtualAudioUtil {
       {"in", Command::SET_IN},
       {"out", Command::SET_OUT},
       {"wait", Command::WAIT},
+      {"help", Command::HELP},
+      {"?", Command::HELP},
   };
   static constexpr char kDefaultDeviceName[] = "Vertex";
   static constexpr char kDefaultManufacturer[] = "Puerile Virtual Functions, Incorporated";
@@ -124,11 +128,11 @@ class VirtualAudioUtil {
   static constexpr uint8_t kDefaultFormatRangeOption = 0;
 
   static constexpr uint32_t kDefaultFifoDepth = 0x100;
-  static constexpr uint64_t kDefaultExternalDelayNsec = zx::msec(1).get();
+  static constexpr int64_t kDefaultExternalDelayNsec = zx::msec(1).get();
   static constexpr uint8_t kDefaultRingBufferOption = 0;
 
   // This repeated value can be interpreted various ways, at various sample_sizes and num_chans.
-  static constexpr uint64_t kDefaultValueToWrite = 0x0000765400009ABC;
+  static constexpr uint64_t kDefaultValueToWrite = 0x22446688AACCEE00;
 
   static constexpr uint8_t kDefaultGainPropsOption = 0;
   static constexpr uint8_t kDefaultPlugPropsOption = 0;
@@ -137,10 +141,10 @@ class VirtualAudioUtil {
   static async::Loop* loop_;
   static bool received_callback_;
 
-  void QuitLoop();
-  bool RunForDuration(zx::duration duration);
-  bool WaitForNoCallback();
-  bool WaitForCallback();
+  static void QuitLoop();
+  static bool RunForDuration(zx::duration duration);
+  static bool WaitForNoCallback();
+  static bool WaitForCallback();
 
   void RegisterKeyWaiter();
   bool WaitForKey();
@@ -151,6 +155,7 @@ class VirtualAudioUtil {
 
   void ParseAndExecute(fxl::CommandLine* cmdline);
   bool ExecuteCommand(Command cmd, const std::string& value);
+  static void Usage();
 
   // Methods using the FIDL Service interface
   bool GetNumDevices();
@@ -161,7 +166,7 @@ class VirtualAudioUtil {
   bool SetManufacturer(const std::string& name);
   bool SetProductName(const std::string& name);
   bool SetUniqueId(const std::string& unique_id);
-  bool AddFormatRange(const std::string& format_str);
+  bool AddFormatRange(const std::string& format_range_str);
   bool ClearFormatRanges();
   bool SetClockDomain(const std::string& clock_domain_str);
   bool SetInitialClockRate(const std::string& initial_clock_rate_str);
@@ -178,7 +183,7 @@ class VirtualAudioUtil {
   bool GetGain();
   bool GetFormat();
   bool GetBuffer();
-  bool WriteBuffer(const std::string& write_val_str);
+  bool WriteBuffer(const std::string& write_value_str);
   bool GetPosition();
   bool SetNotificationFrequency(const std::string& override_notifs_str);
   bool AdjustClockRate(const std::string& clock_adjust_str);
@@ -197,7 +202,7 @@ class VirtualAudioUtil {
   static zx::vmo ring_buffer_vmo_;
 
   static uint32_t BytesPerSample(uint32_t format);
-  static void UpdateRunningPosition(uint32_t rb_pos, bool is_output_);
+  static void UpdateRunningPosition(uint32_t ring_position, bool is_output_);
 
   static size_t rb_size_[2];
   static uint32_t last_rb_position_[2];
@@ -228,7 +233,8 @@ class VirtualAudioUtil {
   static void GainCallback(bool current_mute, bool current_agc, float gain_db);
 
   template <bool is_out>
-  static void BufferNotification(zx::vmo buff, uint32_t rb_frames, uint32_t notifs);
+  static void BufferNotification(zx::vmo ring_buffer_vmo, uint32_t num_ring_buffer_frames,
+                                 uint32_t notifications_per_ring);
   template <bool is_out>
   static void BufferCallback(fuchsia::virtualaudio::Device_GetBuffer_Result result);
 
@@ -238,7 +244,7 @@ class VirtualAudioUtil {
   static void StopNotification(zx_time_t stop_time, uint32_t ring_position);
 
   template <bool is_out>
-  static void PositionNotification(zx_time_t monotonic_time, uint32_t ring_position);
+  static void PositionNotification(zx_time_t monotonic_time_for_position, uint32_t ring_position);
   template <bool is_out>
   static void PositionCallback(fuchsia::virtualaudio::Device_GetPosition_Result result);
 };
@@ -372,7 +378,7 @@ bool VirtualAudioUtil::ConnectToController() {
   zx_status_t status = fdio_service_connect(kControlNodePath.c_str(),
                                             controller_.NewRequest().TakeChannel().release());
   if (status != ZX_OK) {
-    printf("Failed to connect to '%s', status = %d\n", kControlNodePath.c_str(), status);
+    printf("ERROR: failed to connect to '%s', status = %d\n", kControlNodePath.c_str(), status);
     return false;
   }
 
@@ -404,7 +410,7 @@ void VirtualAudioUtil::SetUpEvents() {
 }
 
 void VirtualAudioUtil::ParseAndExecute(fxl::CommandLine* cmdline) {
-  if (!cmdline->has_argv0() || cmdline->options().size() == 0) {
+  if (!cmdline->has_argv0() || cmdline->options().empty()) {
     printf("No commands provided; no action taken\n");
     return;
   }
@@ -416,12 +422,12 @@ void VirtualAudioUtil::ParseAndExecute(fxl::CommandLine* cmdline) {
     return;
   }
 
-  for (auto option : cmdline->options()) {
+  for (const auto& option : cmdline->options()) {
     bool success = false;
     Command cmd = Command::INVALID;
 
     for (const auto& entry : COMMANDS) {
-      if (!option.name.compare(entry.name)) {
+      if (option.name == entry.name) {
         cmd = entry.cmd;
         success = true;
 
@@ -431,6 +437,7 @@ void VirtualAudioUtil::ParseAndExecute(fxl::CommandLine* cmdline) {
 
     if (!success) {
       printf("Failed to parse command ID `--%s'\n", option.name.c_str());
+      Usage();
       return;
     }
 
@@ -541,13 +548,72 @@ bool VirtualAudioUtil::ExecuteCommand(Command cmd, const std::string& value) {
     case Command::WAIT:
       success = WaitForKey();
       break;
+    case Command::HELP:
+      Usage();
+      success = true;
+      break;
     case Command::INVALID:
       success = false;
       break;
 
-      // Intentionally omitting default so new enums are not forgotten here.
+      // Intentionally omitting default, so new enums are not forgotten here.
   }
   return success;
+}
+
+void VirtualAudioUtil::Usage() {
+  printf("\nUsage: virtual_audio [options]\n");
+  printf("Interactively configure and control virtual audio devices.\n");
+
+  printf("\nValid options:\n");
+
+  printf("\n  By default, the virtual output device configuration is assumed\n");
+  printf("  --in\t\t\t  Switch to the virtual input device configuration\n");
+  printf("  --out\t\t\t  Switch back to the virtual output device configuration\n");
+
+  printf("\n  The following commands customize a device configuration, before it is added\n");
+  printf("  --dev[=<DEVICE_NAME>]\t  Set the device name\n");
+  printf("  --mfg[=<MANUFACTURER>]  Set the manufacturer name\n");
+  printf("  --prod[=<PRODUCT>]\t  Set the product name\n");
+  printf("  --id[=<UINT128>]\t  Set the unique ID (default 0123456789ABCDEF1122334455667788)\n");
+  printf("  --add-format[=<NUM>]\t  Add format range [0,6] (default 8-44.1 Mono/Stereo 24-32)\n");
+  printf("  --clear-format\t  Clear any format ranges (including the built-in default)\n");
+  printf("  --domain[=<NUM>]\t  Set device clock domain (default 0)\n");
+  printf(
+      "  --initial-rate[=<NUM>]  Set initial device clock rate in PPM [-1000, 1000] (default 0)\n");
+  printf("  --fifo[=<BYTES>]\t  Set the FIFO depth, in bytes (default 256)\n");
+  printf("  --delay[=<MSEC>]\t  Set external delay (default 1 ms)\n");
+  printf(
+      "  --rb[=<NUM>]\t\t  Set ring-buffer restrictions [0,2] (default 48k-72k frames mod 6k)\n");
+  printf("  --gain-props[=<NUM>]\t  Set gain properties [0,3] (default [-60, 0] -2dB mute)\n");
+  printf("  --plug-props[=<NUM>]\t  Set plug properties [0,5] (default plugged notifiable)\n");
+  printf("  --reset\t\t  Clear any customizations; return this configuration to the default\n");
+
+  printf("\n  --add\t\t\t  Activate the current configuration (AddDevice)\n");
+
+  printf("\n  Subsequent commands require an activated (added) virtual audio device\n");
+  printf("  --get-format\t\t  Retrieve the client-selected ring-buffer format\n");
+  printf("  --get-gain\t\t  Retrieve the current device gain\n");
+  printf("  --get-rb\t\t  Return a mapping of the ring buffer\n");
+  printf(
+      "  --write-rb[=<UINT64>]\t  Fill the ring-buffer with this uint64 (in hex, default "
+      "0x22446688AACCEE00)\n");
+  printf("  --get-pos\t\t  Retrieve the current ring-buffer position and corresponding ref time\n");
+  printf("  --notifs[=<FREQ>]\t  Set an alternate notifications-per-ring frequency (default 4).\n");
+  printf("\t\t\t  (Don't receive the same position notifications sent to the client)\n");
+  printf("  --rate=<DELTA PPM>\t  Adjust the rate of the device clock, in parts-per-million\n");
+  printf("\t\t\t  This is reflected in position notification delivery timing and timestamps.\n");
+  printf("  --plug\t\t  Change the device's plug-state to Plugged\n");
+  printf("  --unplug\t\t  Change the device's plug-state to Unplugged\n");
+
+  printf("\n  --remove\t\t  Deactivate the current device configuration (RemoveDevice)\n");
+
+  printf("\n  The following commands are on the virtualaudio::Control protocol:\n");
+  printf("  --num-devs\t\t  Retrieve the number of currently active virtual audio devices\n");
+
+  printf("\n  --wait\t\t  Wait for a key press before executing subsequent commands\n");
+  printf("  --help, --?\t\t  Show this message\n");
+  printf("\n");
 }
 
 bool VirtualAudioUtil::GetNumDevices() {
@@ -555,7 +621,7 @@ bool VirtualAudioUtil::GetNumDevices() {
   uint32_t num_outputs;
   zx_status_t status = controller_->GetNumDevices(&num_inputs, &num_outputs);
   if (status != ZX_OK) {
-    printf("GetNumDevices failed, status = %d", status);
+    printf("ERROR: GetNumDevices failed, status = %d", status);
     return false;
   }
 
@@ -580,9 +646,9 @@ bool VirtualAudioUtil::SetProductName(const std::string& name) {
 
 bool VirtualAudioUtil::SetUniqueId(const std::string& unique_id_str) {
   std::array<uint8_t, 16> unique_id;
-  bool use_default = (unique_id_str == "");
+  bool use_default = (unique_id_str.empty());
 
-  for (uint8_t index = 0; index < 16; ++index) {
+  for (size_t index = 0; index < 16; ++index) {
     unique_id[index] =
         use_default ? kDefaultUniqueId[index]
         : unique_id_str.size() <= (2 * index + 1)
@@ -595,8 +661,8 @@ bool VirtualAudioUtil::SetUniqueId(const std::string& unique_id_str) {
 }
 
 bool VirtualAudioUtil::SetClockDomain(const std::string& clock_domain_str) {
-  auto clock_domain = (clock_domain_str == "" ? kDefaultClockDomain
-                                              : fxl::StringToNumber<int32_t>(clock_domain_str));
+  auto clock_domain = (clock_domain_str.empty() ? kDefaultClockDomain
+                                                : fxl::StringToNumber<int32_t>(clock_domain_str));
 
   auto rate_adjustment_ppm = config()->has_clock_properties()
                                  ? config()->clock_properties().initial_rate_adjustment_ppm
@@ -611,9 +677,21 @@ bool VirtualAudioUtil::SetClockDomain(const std::string& clock_domain_str) {
 }
 
 bool VirtualAudioUtil::SetInitialClockRate(const std::string& initial_clock_rate_str) {
-  config()->mutable_clock_properties()->initial_rate_adjustment_ppm =
-      (initial_clock_rate_str == "" ? kDefaultInitialClockRatePpm
-                                    : fxl::StringToNumber<int32_t>(initial_clock_rate_str));
+  int32_t initial_clock_adjustment_ppm =
+      (initial_clock_rate_str.empty() ? kDefaultInitialClockRatePpm
+                                      : fxl::StringToNumber<int32_t>(initial_clock_rate_str));
+  config()->mutable_clock_properties()->initial_rate_adjustment_ppm = initial_clock_adjustment_ppm;
+
+  if (initial_clock_adjustment_ppm < ZX_CLOCK_UPDATE_MIN_RATE_ADJUST ||
+      initial_clock_adjustment_ppm > ZX_CLOCK_UPDATE_MAX_RATE_ADJUST) {
+    printf("ERROR: Clock rate adjustment must be within [%d, %d].\n",
+           ZX_CLOCK_UPDATE_MIN_RATE_ADJUST, ZX_CLOCK_UPDATE_MAX_RATE_ADJUST);
+    return false;
+  }
+  if (config()->clock_properties().domain == 0 && initial_clock_adjustment_ppm != 0) {
+    printf("WARNING: by definition, a clock in domain 0 should never have rate variance!\n");
+  }
+
   return true;
 }
 
@@ -635,63 +713,90 @@ struct Format {
 // 5: 3-chan device at 48k 16b
 // 6: 1-chan device at 8k 16b
 // 7: 1-chan device at 48k 16b
+// 8: 2-chan device at 96k 16b
 //
 // Going forward, it would be best to have chans, rate and bitdepth specifiable individually.
-constexpr Format kFormatSpecs[8] = {
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT | AUDIO_SAMPLE_FORMAT_24BIT_IN32,
-     .min_rate = 8000,
-     .max_rate = 44100,
-     .min_chans = 1,
-     .max_chans = 2,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_44100_FAMILY | ASF_RANGE_FLAG_FPS_48000_FAMILY},
-    {.flags = AUDIO_SAMPLE_FORMAT_32BIT_FLOAT,
-     .min_rate = 32000,
-     .max_rate = 96000,
-     .min_chans = 2,
-     .max_chans = 4,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY},
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT,
-     .min_rate = 48000,
-     .max_rate = 48000,
-     .min_chans = 2,
-     .max_chans = 2,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS},
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT,
-     .min_rate = 16000,
-     .max_rate = 16000,
-     .min_chans = 2,
-     .max_chans = 2,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY},
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT,
-     .min_rate = 48000,
-     .max_rate = 96000,
-     .min_chans = 2,
-     .max_chans = 2,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY},
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT,
-     .min_rate = 48000,
-     .max_rate = 48000,
-     .min_chans = 3,
-     .max_chans = 3,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY},
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT,
-     .min_rate = 8000,
-     .max_rate = 8000,
-     .min_chans = 1,
-     .max_chans = 1,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS},
-    {.flags = AUDIO_SAMPLE_FORMAT_16BIT,
-     .min_rate = 48000,
-     .max_rate = 48000,
-     .min_chans = 1,
-     .max_chans = 1,
-     .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY}};
+constexpr Format kFormatSpecs[9] = {
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT | AUDIO_SAMPLE_FORMAT_24BIT_IN32,
+        .min_rate = 8000,
+        .max_rate = 44100,
+        .min_chans = 1,
+        .max_chans = 2,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_44100_FAMILY | ASF_RANGE_FLAG_FPS_48000_FAMILY,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_32BIT_FLOAT,
+        .min_rate = 32000,
+        .max_rate = 96000,
+        .min_chans = 2,
+        .max_chans = 4,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 48000,
+        .max_rate = 48000,
+        .min_chans = 2,
+        .max_chans = 2,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 16000,
+        .max_rate = 16000,
+        .min_chans = 2,
+        .max_chans = 2,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 48000,
+        .max_rate = 96000,
+        .min_chans = 2,
+        .max_chans = 2,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 48000,
+        .max_rate = 48000,
+        .min_chans = 3,
+        .max_chans = 3,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 8000,
+        .max_rate = 8000,
+        .min_chans = 1,
+        .max_chans = 1,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 48000,
+        .max_rate = 48000,
+        .min_chans = 1,
+        .max_chans = 1,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_48000_FAMILY,
+    },
+    {
+        .flags = AUDIO_SAMPLE_FORMAT_16BIT,
+        .min_rate = 96000,
+        .max_rate = 96000,
+        .min_chans = 2,
+        .max_chans = 2,
+        .rate_family_flags = ASF_RANGE_FLAG_FPS_CONTINUOUS,
+    },
+};
 
 bool VirtualAudioUtil::AddFormatRange(const std::string& format_range_str) {
-  uint8_t format_option = (format_range_str == "" ? kDefaultFormatRangeOption
-                                                  : fxl::StringToNumber<uint8_t>(format_range_str));
+  uint8_t format_option =
+      (format_range_str.empty() ? kDefaultFormatRangeOption
+                                : fxl::StringToNumber<uint8_t>(format_range_str));
   if (format_option >= std::size(kFormatSpecs)) {
-    printf("Format range option must be %lu or less.\n", std::size(kFormatSpecs) - 1);
+    printf("ERROR: Format range option must be %lu or less.\n", std::size(kFormatSpecs) - 1);
     return false;
   }
 
@@ -713,13 +818,13 @@ bool VirtualAudioUtil::ClearFormatRanges() {
 
 bool VirtualAudioUtil::SetFifoDepth(const std::string& fifo_str) {
   config()->set_fifo_depth_bytes(
-      (fifo_str == "" ? kDefaultFifoDepth : fxl::StringToNumber<uint32_t>(fifo_str)));
+      (fifo_str.empty() ? kDefaultFifoDepth : fxl::StringToNumber<uint32_t>(fifo_str)));
   return true;
 }
 
 bool VirtualAudioUtil::SetExternalDelay(const std::string& delay_str) {
-  config()->set_external_delay(delay_str == "" ? kDefaultExternalDelayNsec
-                                               : fxl::StringToNumber<zx_duration_t>(delay_str));
+  config()->set_external_delay(delay_str.empty() ? kDefaultExternalDelayNsec
+                                                 : fxl::StringToNumber<zx_duration_t>(delay_str));
 
   return true;
 }
@@ -736,13 +841,14 @@ constexpr BufferSpec kBufferSpecs[4] = {
     {.min_frames = 48000, .max_frames = 72000, .mod_frames = 6000},
     {.min_frames = 9600, .max_frames = 28800, .mod_frames = 480},
     {.min_frames = 96000, .max_frames = 96000, .mod_frames = 96000},
-    {.min_frames = 288000, .max_frames = 288000, .mod_frames = 288000}};
+    {.min_frames = 288000, .max_frames = 288000, .mod_frames = 288000},
+};
 
 bool VirtualAudioUtil::SetRingBufferRestrictions(const std::string& rb_restr_str) {
-  uint8_t rb_option =
-      (rb_restr_str == "" ? kDefaultRingBufferOption : fxl::StringToNumber<uint8_t>(rb_restr_str));
+  uint8_t rb_option = (rb_restr_str.empty() ? kDefaultRingBufferOption
+                                            : fxl::StringToNumber<uint8_t>(rb_restr_str));
   if (rb_option >= std::size(kBufferSpecs)) {
-    printf("Ring buffer option must be %lu or less.\n", std::size(kBufferSpecs) - 1);
+    printf("ERROR: Ring buffer option must be %lu or less.\n", std::size(kBufferSpecs) - 1);
     return false;
   }
 
@@ -765,47 +871,48 @@ struct GainSpec {
 
 // The utility defines two preset groups of gain options. Although arbitrarily chosen, they exercise
 // the available range through SetGainProperties:
-// 0.Can and is mute.    Cannot AGC.       Gain -2, range [-60, 0] in 2.0dB.
+// 0.Can and is mute.    Cannot AGC.       Gain -2,  range [-60, 0] in 2.0dB.
 // 1.Can but isn't mute. Can AGC, enabled. Gain -7.5,range [-30,+2] in 0.5db.
-// 2 and above represent invalid combinations.
-constexpr GainSpec kGainSpecs[4] = {{.cur_mute = true,
-                                     .cur_agc = false,
-                                     .cur_gain_db = -2.0,
-                                     .can_mute = true,
-                                     .can_agc = false,
-                                     .min_gain_db = -60.0,
-                                     .max_gain_db = 0.0,
-                                     .gain_step_db = 2.0},
-                                    {.cur_mute = false,
-                                     .cur_agc = true,
-                                     .cur_gain_db = -7.5,
-                                     .can_mute = true,
-                                     .can_agc = true,
-                                     .min_gain_db = -30.0,
-                                     .max_gain_db = 2.0,
-                                     .gain_step_db = 0.5},
-                                    {.cur_mute = true,
-                                     .cur_agc = true,
-                                     .cur_gain_db = -12.0,
-                                     .can_mute = false,
-                                     .can_agc = false,
-                                     .min_gain_db = -96.0,
-                                     .max_gain_db = 0.0,
-                                     .gain_step_db = 1.0},
-                                    {.cur_mute = false,
-                                     .cur_agc = false,
-                                     .cur_gain_db = 50.0,
-                                     .can_mute = true,
-                                     .can_agc = false,
-                                     .min_gain_db = 20.0,
-                                     .max_gain_db = -20.0,
-                                     .gain_step_db = -3.0}};
+// 2.Cannot mute.        Cannot AGC.       Gain 0,   range [0,0]    in 0db.
+constexpr GainSpec kGainSpecs[] = {
+    {
+        .cur_mute = true,
+        .cur_agc = false,
+        .cur_gain_db = -2.0,
+        .can_mute = true,
+        .can_agc = false,
+        .min_gain_db = -60.0,
+        .max_gain_db = 0.0,
+        .gain_step_db = 2.0,
+    },
+    {
+        .cur_mute = false,
+        .cur_agc = true,
+        .cur_gain_db = -7.5,
+        .can_mute = true,
+        .can_agc = true,
+        .min_gain_db = -30.0,
+        .max_gain_db = 2.0,
+        .gain_step_db = 0.5,
+    },
+    {
+        .cur_mute = false,
+        .cur_agc = false,
+        .cur_gain_db = 0.0,
+        .can_mute = false,
+        .can_agc = false,
+        .min_gain_db = 0.0,
+        .max_gain_db = 0.0,
+        .gain_step_db = 0.0,
+    },
+};
 
 bool VirtualAudioUtil::SetGainProps(const std::string& gain_props_str) {
-  uint8_t gain_props_option = (gain_props_str == "" ? kDefaultGainPropsOption
-                                                    : fxl::StringToNumber<uint8_t>(gain_props_str));
+  uint8_t gain_props_option =
+      (gain_props_str.empty() ? kDefaultGainPropsOption
+                              : fxl::StringToNumber<uint8_t>(gain_props_str));
   if (gain_props_option >= std::size(kGainSpecs)) {
-    printf("Gain properties option must be %lu or less.\n", std::size(kGainSpecs));
+    printf("ERROR: Gain properties option must be %lu or less.\n", std::size(kGainSpecs));
     return false;
   }
 
@@ -837,11 +944,12 @@ constexpr zx_time_t kPlugTime[] = {0, -1, -1, ZX_SEC(1), ZX_SEC(2)};
 static_assert(std::size(kPlugFlags) == std::size(kPlugTime));
 
 bool VirtualAudioUtil::SetPlugProps(const std::string& plug_props_str) {
-  uint8_t plug_props_option = (plug_props_str == "" ? kDefaultPlugPropsOption
-                                                    : fxl::StringToNumber<uint8_t>(plug_props_str));
+  uint8_t plug_props_option =
+      (plug_props_str.empty() ? kDefaultPlugPropsOption
+                              : fxl::StringToNumber<uint8_t>(plug_props_str));
 
   if (plug_props_option >= std::size(kPlugFlags)) {
-    printf("Plug properties option must be %lu or less.\n", std::size(kPlugFlags) - 1);
+    printf("ERROR: Plug properties option must be %lu or less.\n", std::size(kPlugFlags) - 1);
     return false;
   }
 
@@ -861,8 +969,8 @@ bool VirtualAudioUtil::AdjustClockRate(const std::string& clock_adjust_str) {
   auto rate_adjustment_ppm = fxl::StringToNumber<int32_t>(clock_adjust_str);
   if (rate_adjustment_ppm < ZX_CLOCK_UPDATE_MIN_RATE_ADJUST ||
       rate_adjustment_ppm > ZX_CLOCK_UPDATE_MAX_RATE_ADJUST) {
-    printf("Clock rate adjustment must be within [%d, %d].\n", ZX_CLOCK_UPDATE_MIN_RATE_ADJUST,
-           ZX_CLOCK_UPDATE_MAX_RATE_ADJUST);
+    printf("ERROR: Clock rate adjustment must be within [%d, %d].\n",
+           ZX_CLOCK_UPDATE_MIN_RATE_ADJUST, ZX_CLOCK_UPDATE_MAX_RATE_ADJUST);
     return false;
   }
 
@@ -898,13 +1006,13 @@ bool VirtualAudioUtil::AddDevice() {
     }
   }
   if (status != ZX_OK) {
-    printf("Failed to add %s device, status = %d\n", configuring_output_ ? "output" : "input",
-           status);
+    printf("ERROR: Failed to add %s device, status = %d\n",
+           configuring_output_ ? "output" : "input", status);
     QuitLoop();
     return false;
   }
 
-  device()->set_error_handler([this, is_output = configuring_output_](zx_status_t error) {
+  device()->set_error_handler([is_output = configuring_output_](zx_status_t error) {
     printf("%s device disconnected (%d)!\n", is_output ? "output" : "input", error);
     QuitLoop();
   });
@@ -915,7 +1023,8 @@ bool VirtualAudioUtil::AddDevice() {
   bool success = (WaitForNoCallback() && device()->is_bound());
 
   if (!success) {
-    printf("Failed to establish channel to %s device\n", configuring_output_ ? "output" : "input");
+    printf("ERROR: Failed to establish channel to %s device\n",
+           configuring_output_ ? "output" : "input");
   }
   return success;
 }
@@ -927,12 +1036,12 @@ bool VirtualAudioUtil::RemoveDevice() {
 
 bool VirtualAudioUtil::ChangePlugState(const std::string& plug_time_str, bool plugged) {
   if (!device()->is_bound()) {
-    printf("Device not bound yet.\n");
+    printf("ERROR: Device not bound - you must add the device before using this flag.\n");
     return false;
   }
 
-  auto plug_change_time = (plug_time_str == "" ? zx::clock::get_monotonic().get()
-                                               : fxl::StringToNumber<zx_time_t>(plug_time_str));
+  auto plug_change_time = (plug_time_str.empty() ? zx::clock::get_monotonic().get()
+                                                 : fxl::StringToNumber<zx_time_t>(plug_time_str));
 
   (*device())->ChangePlugState(plug_change_time, plugged);
   return WaitForNoCallback();
@@ -940,7 +1049,7 @@ bool VirtualAudioUtil::ChangePlugState(const std::string& plug_time_str, bool pl
 
 bool VirtualAudioUtil::GetFormat() {
   if (!device()->is_bound()) {
-    printf("Device not bound yet.\n");
+    printf("ERROR: Device not bound - you must add the device before using this flag.\n");
     return false;
   }
 
@@ -955,7 +1064,7 @@ bool VirtualAudioUtil::GetFormat() {
 
 bool VirtualAudioUtil::GetGain() {
   if (!device()->is_bound()) {
-    printf("Device not bound yet.\n");
+    printf("ERROR: Device not bound - you must add the device before using this flag.\n");
     return false;
   }
 
@@ -970,7 +1079,7 @@ bool VirtualAudioUtil::GetGain() {
 
 bool VirtualAudioUtil::GetBuffer() {
   if (!device()->is_bound()) {
-    printf("Device not bound yet.\n");
+    printf("ERROR: Device not bound - you must add the device before using this flag.\n");
     return false;
   }
 
@@ -985,10 +1094,12 @@ bool VirtualAudioUtil::GetBuffer() {
 
 bool VirtualAudioUtil::WriteBuffer(const std::string& write_value_str) {
   size_t value_to_write =
-      (write_value_str == "" ? kDefaultValueToWrite : fxl::StringToNumber<size_t>(write_value_str));
+      (write_value_str.empty() ? kDefaultValueToWrite
+                               : fxl::StringToNumber<size_t>(write_value_str, fxl::Base::k16));
 
   if (!ring_buffer_vmo_.is_valid()) {
     if (!GetBuffer()) {
+      printf("ERROR: Failed to retrieve RingBuffer for writing.\n");
       return false;
     }
   }
@@ -997,16 +1108,20 @@ bool VirtualAudioUtil::WriteBuffer(const std::string& write_value_str) {
   for (size_t offset = 0; offset < rb_size; offset += sizeof(value_to_write)) {
     zx_status_t status = ring_buffer_vmo_.write(&value_to_write, offset, sizeof(value_to_write));
     if (status != ZX_OK) {
-      printf("Writing 0x%016zX to rb_vmo[%zu] failed (%d)\n", value_to_write, offset, status);
+      printf("ERROR: Writing %16ld (0x%016zX) to rb_vmo[%zu] failed (%d)\n", value_to_write,
+             value_to_write, offset, status);
       return false;
     }
   }
+
+  printf("--Wrote %16ld (0x%016zX) across the ring buffer\n", value_to_write, value_to_write);
+
   return WaitForNoCallback();
 }
 
 bool VirtualAudioUtil::GetPosition() {
   if (!device()->is_bound()) {
-    printf("Device not bound yet.\n");
+    printf("ERROR: Device not bound - you must add the device before using this flag.\n");
     return false;
   }
 
@@ -1021,12 +1136,13 @@ bool VirtualAudioUtil::GetPosition() {
 
 bool VirtualAudioUtil::SetNotificationFrequency(const std::string& notifs_str) {
   if (!device()->is_bound()) {
-    printf("Device not bound yet.\n");
+    printf("ERROR: Device not bound - you must add the device before using this flag.\n");
     return false;
   }
 
-  uint32_t notifications_per_ring = (notifs_str == "" ? kDefaultNotificationFrequency
-                                                      : fxl::StringToNumber<uint32_t>(notifs_str));
+  uint32_t notifications_per_ring =
+      (notifs_str.empty() ? kDefaultNotificationFrequency
+                          : fxl::StringToNumber<uint32_t>(notifs_str));
   if (configuring_output_) {
     output_device_->SetNotificationFrequency(notifications_per_ring);
   } else {
@@ -1082,7 +1198,7 @@ void VirtualAudioUtil::BufferNotification(zx::vmo ring_buffer_vmo, uint32_t num_
   uint64_t vmo_size;
   ring_buffer_vmo_.get_size(&vmo_size);
   DeviceType dev_type = is_out ? kOutput : kInput;
-  rb_size_[dev_type] = num_ring_buffer_frames * frame_size_[dev_type];
+  rb_size_[dev_type] = static_cast<uint32_t>(num_ring_buffer_frames * frame_size_[dev_type]);
 
   printf("--Received SetBuffer (vmo size: %zu, ring size: %zu, frames: %u, notifs: %u) for %s\n",
          vmo_size, rb_size_[dev_type], num_ring_buffer_frames, notifications_per_ring,
@@ -1100,15 +1216,15 @@ void VirtualAudioUtil::BufferCallback(fuchsia::virtualaudio::Device_GetBuffer_Re
                                                result.response().notifications_per_ring);
 }
 
-void VirtualAudioUtil::UpdateRunningPosition(uint32_t rb_pos, bool is_output) {
+void VirtualAudioUtil::UpdateRunningPosition(uint32_t ring_position, bool is_output) {
   auto dev_type = is_output ? kOutput : kInput;
 
-  if (rb_pos <= last_rb_position_[dev_type]) {
+  if (ring_position <= last_rb_position_[dev_type]) {
     running_position_[dev_type] += rb_size_[dev_type];
   }
   running_position_[dev_type] -= last_rb_position_[dev_type];
-  running_position_[dev_type] += rb_pos;
-  last_rb_position_[dev_type] = rb_pos;
+  running_position_[dev_type] += ring_position;
+  last_rb_position_[dev_type] = ring_position;
 }
 
 template <bool is_out>
@@ -1124,12 +1240,12 @@ void VirtualAudioUtil::StartNotification(zx_time_t start_time) {
 }
 
 template <bool is_out>
-void VirtualAudioUtil::StopNotification(zx_time_t stop_time, uint32_t rb_pos) {
+void VirtualAudioUtil::StopNotification(zx_time_t stop_time, uint32_t ring_position) {
   DeviceType dev_type = is_out ? kOutput : kInput;
   auto expected_running_position = ref_time_to_running_position_[dev_type].Apply(stop_time);
-  UpdateRunningPosition(rb_pos, is_out);
+  UpdateRunningPosition(ring_position, is_out);
 
-  printf("--Received Stop     (time: %zu, pos: %u) for %s\n", stop_time, rb_pos,
+  printf("--Received Stop     (time: %zu, pos: %u) for %s\n", stop_time, ring_position,
          (is_out ? "output" : "input"));
   printf("--Stop at  position: expected %zu; actual %zu\n", expected_running_position,
          running_position_[dev_type]);
@@ -1139,16 +1255,19 @@ void VirtualAudioUtil::StopNotification(zx_time_t stop_time, uint32_t rb_pos) {
 }
 
 template <bool is_out>
-void VirtualAudioUtil::PositionNotification(zx_time_t time_for_pos, uint32_t rb_pos) {
-  printf("--Received Position (time: %13zu, pos: %6u) for %s", time_for_pos, rb_pos,
-         (is_out ? "output" : "input "));
+void VirtualAudioUtil::PositionNotification(zx_time_t monotonic_time_for_position,
+                                            uint32_t ring_position) {
+  printf("--Received Position (time: %13zu, pos: %6u) for %s", monotonic_time_for_position,
+         ring_position, (is_out ? "output" : "input "));
 
   DeviceType dev_type = is_out ? kOutput : kInput;
-  if (time_for_pos > ref_time_to_running_position_[dev_type].reference_time()) {
-    auto expected_running_position = ref_time_to_running_position_[dev_type].Apply(time_for_pos);
+  if (monotonic_time_for_position > ref_time_to_running_position_[dev_type].reference_time()) {
+    int64_t expected_running_position =
+        ref_time_to_running_position_[dev_type].Apply(monotonic_time_for_position);
 
-    UpdateRunningPosition(rb_pos, is_out);
-    int64_t delta = expected_running_position - running_position_[dev_type];
+    UpdateRunningPosition(ring_position, is_out);
+    FX_CHECK(running_position_[dev_type] <= std::numeric_limits<int64_t>::max());
+    int64_t delta = expected_running_position - static_cast<int64_t>(running_position_[dev_type]);
     printf(" - running byte position: expect %8zu  actual %8zu  delta %6zd",
            expected_running_position, running_position_[dev_type], delta);
   }
