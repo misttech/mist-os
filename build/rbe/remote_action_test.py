@@ -222,11 +222,85 @@ class RemoteActionMainParserTests(unittest.TestCase):
             ['--label=//build/this:that', '--', 'echo'])
         self.assertEqual(main_args.label, '//build/this:that')
 
-    def test_remote_log(self):
+    def test_remote_log_named(self):
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
             ['--log', 'bar.remote-log', '--', 'echo'])
         self.assertEqual(main_args.remote_log, 'bar.remote-log')
+
+    def test_remote_log_unnamed(self):
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(['--log', '--', 'echo'])
+        self.assertEqual(main_args.remote_log, '<AUTO>')
+
+    def test_remote_log_from_main_args_auto_named(self):
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(['--log', '--', 'touch', output])
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        self.assertEqual(
+            [remote_action._REMOTE_LOG_SCRIPT],
+            action.inputs_relative_to_project_root)
+        self.assertEqual(
+            {
+                os.path.join(build_dir, output),
+                os.path.join(build_dir, output + '.remote-log')
+            }, set(action.output_files_relative_to_project_root))
+        # Ignore the rewrapper portion of the command
+        full_command = action.command
+        first_ddash = full_command.index('--')
+        # Confirm that the remote command is wrapped with the logger script.
+        remote_command = full_command[first_ddash + 1:]
+        next_ddash = remote_command.index('--')
+        self.assertEqual(
+            remote_command[:next_ddash], [
+                os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
+                output + '.remote-log'
+            ])
+
+    def test_remote_log_from_main_args_explicitly_named(self):
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--log', 'debug', '--', 'touch', output])
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        self.assertEqual(
+            [remote_action._REMOTE_LOG_SCRIPT],
+            action.inputs_relative_to_project_root)
+        self.assertEqual(
+            {
+                os.path.join(build_dir, output),
+                os.path.join(build_dir, 'debug.remote-log')
+            }, set(action.output_files_relative_to_project_root))
+        # Ignore the rewrapper portion of the command
+        full_command = action.command
+        first_ddash = full_command.index('--')
+        # Confirm that the remote command is wrapped with the logger script.
+        remote_command = full_command[first_ddash + 1:]
+        next_ddash = remote_command.index('--')
+        self.assertEqual(
+            remote_command[:next_ddash], [
+                os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
+                'debug.remote-log'
+            ])
 
 
 class RemoteActionFlagParserTests(unittest.TestCase):
@@ -336,6 +410,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         )
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+        self.assertEqual(action.exec_root_rel, '..')
         self.assertFalse(action.save_temps)
         self.assertFalse(action.auto_reproxy)
         self.assertFalse(action.remote_disable)
@@ -356,6 +431,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                     command=command,
                 )
                 self.assertEqual(action.exec_root, fake_root)
+                self.assertEqual(action.exec_root_rel, '../..')
                 self.assertEqual(action.build_subdir, fake_builddir)
 
     def test_path_setup_explicit(self):
@@ -370,15 +446,16 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 exec_root=fake_root,
             )
             self.assertEqual(action.exec_root, fake_root)
+            self.assertEqual(action.exec_root_rel, '../..')
             self.assertEqual(action.build_subdir, fake_builddir)
 
-    @mock.patch.object(os, 'curdir', _WORKING_DIR)
     def test_inputs_outputs(self):
         command = ['cat', '../src/meow.txt']
         action = remote_action.RemoteAction(
             rewrapper='/path/to/rewrapper',
             command=command,
             exec_root=self._PROJECT_ROOT,
+            working_dir=self._WORKING_DIR,
             inputs=['../src/meow.txt'],
             output_files=['obj/woof.txt'],
             output_dirs=['.debug'],
@@ -432,7 +509,6 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 mock_call.assert_called_once()
                 mock_cleanup.assert_not_called()
 
-    @mock.patch.object(os, 'curdir', _WORKING_DIR)
     def test_flag_forwarding(self):
         command = [
             'cat', '--remote-flag=--exec_strategy=racing', '../src/cow/moo.txt'
@@ -441,6 +517,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             rewrapper='/path/to/rewrapper',
             command=command,
             exec_root=self._PROJECT_ROOT,
+            working_dir=self._WORKING_DIR,
         )
         self.assertEqual(action.local_command, ['cat', '../src/cow/moo.txt'])
         self.assertEqual(action.options, ['--exec_strategy=racing'])

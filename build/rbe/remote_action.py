@@ -34,6 +34,9 @@ _ENV = '/usr/bin/env'
 # This should only be used for workarounds as a last resort.
 _REMOTE_PROJECT_ROOT = '/b/f/w'
 
+# Wrapper script to capture remote stdout/stderr.
+_REMOTE_LOG_SCRIPT = 'build/rbe/log-it.sh'  # co-located with this script
+
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
@@ -181,6 +184,7 @@ class RemoteAction(object):
         output_dirs: Sequence[str] = None,
         save_temps: bool = False,
         auto_reproxy: bool = False,
+        remote_log: str = "",
     ):
         """RemoteAction constructor.
 
@@ -198,6 +202,16 @@ class RemoteAction(object):
           save_temps: if true, keep around temporarily generated files after execution.
           auto_reproxy: if true, launch reproxy around the rewrapper invocation.
             This is not needed if reproxy is already running.
+          remote_log: "" means disabled.  Any other value, remote logging is
+            enabled, and stdout/stderr of the remote execution is captured
+            to a file and downloaded.
+            if "<AUTO>":
+              if there is at least one remote output file:
+                name the log "${output_files[0]}.remote-log"
+              else:
+                name the log "rbe-action-output.remote-log"
+            else:
+              use the given name appended with ".remote-log"
         """
         self._rewrapper = rewrapper
         self._save_temps = save_temps
@@ -219,11 +233,35 @@ class RemoteAction(object):
             cl_utils.flatten_comma_list(remote_args.output_files))
         self._output_dirs = (output_dirs or []) + list(
             cl_utils.flatten_comma_list(remote_args.output_dirs))
+
+        # Amend input/outputs when logging remotely.
+        self._remote_log_name = self._name_remote_log(remote_log)
+        if self._remote_log_name:
+            # These paths are relative to the working dir.
+            self._output_files.append(self._remote_log_name)
+            self._inputs.append(self._remote_log_script_path)
+
         self._cleanup_files = []
 
     @property
     def exec_root(self) -> str:
         return self._exec_root
+
+    def _name_remote_log(self, remote_log) -> str:
+        if remote_log == '<AUTO>':
+            if self._output_files:
+                return self._output_files[0] + '.remote-log'
+            else:  # pick something arbitrary, but deterministic
+                return 'rbe-action-output.remote-log'
+
+        if remote_log:
+            return remote_log + '.remote-log'
+
+        return None
+
+    @property
+    def _remote_log_script_path(self) -> str:
+        return os.path.join(self.exec_root_rel, _REMOTE_LOG_SCRIPT)
 
     @property
     def local_command(self) -> Sequence[str]:
@@ -258,6 +296,10 @@ class RemoteAction(object):
                 os.path.normpath(os.path.join(self.working_dir, path)),
                 start=self.exec_root) for path in paths
         ]
+
+    @property
+    def exec_root_rel(self) -> str:
+        return os.path.relpath(self.exec_root, start=self.working_dir)
 
     @property
     def build_subdir(self) -> str:
@@ -330,6 +372,14 @@ class RemoteAction(object):
             yield from self._generate_rewrapper_command_prefix()
             yield '--'
 
+            if self._remote_log_name:
+                yield from [
+                    self._remote_log_script_path,
+                    '--log',
+                    self._remote_log_name,
+                    '--',
+                ]
+
         yield from self.local_command
 
     @property
@@ -343,7 +393,6 @@ class RemoteAction(object):
 
     # features to port over from fuchsia-rbe-action.sh:
     # TODO(http://fxbug.dev/96250): implement fsatrace mutator
-    # TODO(http://fxbug.dev/96250): implement remote_log mutator
     # TODO(http://fxbug.dev/123178): facilitate delayed downloads using --action_log
 
     def _cleanup(self):
@@ -505,9 +554,13 @@ def inherit_main_arg_parser_flags(
         "--log",
         type=str,
         dest="remote_log",
-        default="",
+        const="<AUTO>",  # pick name based on ${output_files[0]}
+        default="",  # blank means to not log
         nargs='?',
-        help="Capture remote execution's stdout/stderr to a log file.",
+        help="""Capture remote execution's stdout/stderr to a log file.
+If a name argument BASE is given, the output will be 'BASE.remote-log'.
+Otherwise, BASE will default to the first output file named.
+        """,
     )
     group.add_argument(
         "--save-temps",
@@ -552,6 +605,7 @@ def remote_action_from_args(
         command=command or main_args.command,
         save_temps=main_args.save_temps,
         auto_reproxy=main_args.auto_reproxy,
+        remote_log=main_args.remote_log,
         **kwargs,
     )
 
