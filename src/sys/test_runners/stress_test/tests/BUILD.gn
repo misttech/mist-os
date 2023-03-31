@@ -44,7 +44,7 @@ fuchsia_test_package("stress-runner-integration-test") {
     test_specs = {
       environments = [
         {
-          dimensions = qemu_env
+          dimensions = qemu_env.dimensions
           tags = [ "disabled" ]
         },
       ]
