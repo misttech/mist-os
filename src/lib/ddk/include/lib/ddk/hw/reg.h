@@ -53,7 +53,7 @@ static inline uint64_t readll(const volatile void* a) {
   return v;
 }
 
-#else
+#elif defined(__x86_64__)
 // TODO(fxbug.dev/12611): Similar to arm64 above, the Fuchsia hypervisor's instruction decoder does
 // not support MMIO access via load/store instructions that use writeback, which the compiler may
 // generate. Until support is implemented, we use inline assembly definitions here to ensure that
@@ -93,6 +93,38 @@ static inline uint64_t readll(const volatile void* a) {
   return v;
 }
 
+#elif defined(__riscv)
+
+// Use plain C accessors for MMIO on RISC-V since there aren't any
+// fancy load/store instructions currently defined.
+static inline void writeb(uint8_t v, volatile void* a) {
+  *(volatile uint8_t *)a = v;
+}
+static inline void writew(uint16_t v, volatile void* a) {
+  *(volatile uint16_t *)a = v;
+}
+static inline void writel(uint32_t v, volatile void* a) {
+  *(volatile uint32_t *)a = v;
+}
+static inline void writell(uint64_t v, volatile void* a) {
+  *(volatile uint64_t *)a = v;
+}
+
+static inline uint8_t readb(const volatile void* a) {
+  return *(volatile uint8_t *)a;
+}
+static inline uint16_t readw(const volatile void* a) {
+  return *(volatile uint16_t *)a;
+}
+static inline uint32_t readl(const volatile void* a) {
+  return *(volatile uint32_t *)a;
+}
+static inline uint64_t readll(const volatile void* a) {
+  return *(volatile uint64_t *)a;
+}
+
+#else
+#error define for new architecture
 #endif
 
 #define RMWREG8(addr, startbit, width, val) \
