@@ -1,10 +1,10 @@
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
+#include <gtest/gtest.h>
 #include <wlan/drivers/internal/hexdump.h>
 #include <wlan/drivers/log_instance.h>
-
-#include "log_test.h"
+#include <wlan/drivers/test/log_overrides.h>
 
 namespace wlan::drivers {
 class HexDumpTest : public LogTest {

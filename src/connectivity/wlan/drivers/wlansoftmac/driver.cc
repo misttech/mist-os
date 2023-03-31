@@ -5,19 +5,22 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
-#include <cstdio>
 #include <memory>
+
+#include <wlan/drivers/log.h>
+#include <wlan/drivers/log_instance.h>
 
 #include "device.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/wlansoftmac_bind.h"
 
 zx_status_t wlan_bind(void* ctx, zx_device_t* device) {
-  std::printf("%s\n", __func__);
+  wlan::drivers::log::Instance::Init(0);
+  linfo("Binding wlansoftmac driver.");
 
   auto wlandev = std::make_unique<wlan::Device>(device);
   auto status = wlandev->Bind();
   if (status != ZX_OK) {
-    errorf("Failed to bind: %d\n", status);
+    lerror("Failed to bind: %d\n", status);
     return status;
   }
   // devhost is now responsible for the memory used by wlandev. It will be

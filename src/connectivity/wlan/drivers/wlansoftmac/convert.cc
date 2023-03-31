@@ -8,7 +8,7 @@
 #include <fuchsia/wlan/stats/cpp/fidl.h>
 #include <zircon/status.h>
 
-#include <wlan/common/logging.h>
+#include <wlan/drivers/log.h>
 
 namespace wlan {
 
@@ -25,7 +25,7 @@ zx_status_t ConvertMacRole(const fuchsia_wlan_common::wire::WlanMacRole& in, wla
       *out = WLAN_MAC_ROLE_MESH;
       break;
     default:
-      errorf("WlanMacRole is not supported: %u", static_cast<uint32_t>(in));
+      lerror("WlanMacRole is not supported: %u", static_cast<uint32_t>(in));
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -72,7 +72,7 @@ zx_status_t ConvertWlanPhyType(const fuchsia_wlan_common::wire::WlanPhyType& in,
       *out = WLAN_PHY_TYPE_HE;
       break;
     default:
-      errorf("WlanPhyType is not supported: %u", static_cast<uint32_t>(in));
+      lerror("WlanPhyType is not supported: %u", static_cast<uint32_t>(in));
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -95,7 +95,7 @@ zx_status_t ConvertWlanSoftmacQueryResponse(
   zx_status_t status;
   if (!(in.has_sta_addr() && in.has_mac_role() && in.has_supported_phys() &&
         in.has_hardware_capability() && in.has_band_caps())) {
-    errorf("WlanSoftmacQueryResponse missing fields: %s %s %s %s %s.",
+    lerror("WlanSoftmacQueryResponse missing fields: %s %s %s %s %s.",
            in.has_sta_addr() ? "" : "sta_addr", in.has_mac_role() ? "" : "mac_role",
            in.has_supported_phys() ? "" : "supported_phys",
            in.has_hardware_capability() ? "" : "hardware_capability",
@@ -112,7 +112,7 @@ zx_status_t ConvertWlanSoftmacQueryResponse(
   for (size_t i = 0; i < in.supported_phys().count(); i++) {
     if ((status = ConvertWlanPhyType(in.supported_phys().data()[i],
                                      &out->supported_phys_list[i])) != ZX_OK) {
-      errorf("WlanPhyType is not supported.");
+      lerror("WlanPhyType is not supported.");
       return status;
     }
   }
@@ -128,7 +128,7 @@ zx_status_t ConvertWlanSoftmacQueryResponse(
         out->band_caps_list[i].band = WLAN_BAND_FIVE_GHZ;
         break;
       default:
-        errorf("WlanBand is not supported: %hhu", static_cast<uint8_t>(in.band_caps()[i].band));
+        lerror("WlanBand is not supported: %hhu", static_cast<uint8_t>(in.band_caps()[i].band));
         return ZX_ERR_NOT_SUPPORTED;
     }
     out->band_caps_list[i].basic_rate_count = in.band_caps()[i].basic_rate_count;
@@ -166,7 +166,7 @@ zx_status_t ConvertMacSublayerSupport(const fuchsia_wlan_common::wire::MacSublay
       out->data_plane.data_plane_type = DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE;
       break;
     default:
-      errorf("DataPlaneType is not supported: %hhu",
+      lerror("DataPlaneType is not supported: %hhu",
              static_cast<uint8_t>(in.data_plane.data_plane_type));
       return ZX_ERR_INVALID_ARGS;
   }
@@ -180,7 +180,7 @@ zx_status_t ConvertMacSublayerSupport(const fuchsia_wlan_common::wire::MacSublay
       out->device.mac_implementation_type = MAC_IMPLEMENTATION_TYPE_FULLMAC;
       break;
     default:
-      errorf("MacImplementationType is not supported: %hhu",
+      lerror("MacImplementationType is not supported: %hhu",
              static_cast<uint8_t>(in.device.mac_implementation_type));
       return ZX_ERR_INVALID_ARGS;
   }
@@ -210,7 +210,7 @@ zx_status_t ConvertRxInfo(const fuchsia_wlan_softmac::wire::WlanRxInfo& in, wlan
   out->valid_fields = in.valid_fields;
 
   if ((status = ConvertWlanPhyType(in.phy, &out->phy)) != ZX_OK) {
-    errorf("WlanPhyType is not supported.");
+    lerror("WlanPhyType is not supported.");
     return status;
   }
 
@@ -236,7 +236,7 @@ zx_status_t ConvertRxInfo(const fuchsia_wlan_softmac::wire::WlanRxInfo& in, wlan
       out->channel.cbw = CHANNEL_BANDWIDTH_CBW80P80;
       break;
     default:
-      errorf("ChannelBandwidth is not supported: %u", static_cast<uint32_t>(in.channel.cbw));
+      lerror("ChannelBandwidth is not supported: %u", static_cast<uint32_t>(in.channel.cbw));
       return ZX_ERR_NOT_SUPPORTED;
   }
   out->channel.secondary80 = in.channel.secondary80;
@@ -274,7 +274,7 @@ zx_status_t ConvertTxStatus(const fuchsia_wlan_common::wire::WlanTxStatus& in,
       out->result = WLAN_TX_RESULT_SUCCESS;
       break;
     default:
-      errorf("WlanTxResult is not supported: %hhu", static_cast<uint8_t>(in.result));
+      lerror("WlanTxResult is not supported: %hhu", static_cast<uint8_t>(in.result));
       return ZX_ERR_INVALID_ARGS;
   }
   return ZX_OK;
@@ -293,7 +293,7 @@ zx_status_t ConvertMacRole(const wlan_mac_role_t& in, fuchsia_wlan_common::wire:
       *out = fuchsia_wlan_common::wire::WlanMacRole::kMesh;
       break;
     default:
-      errorf("WlanMacRole is not supported: %u", in);
+      lerror("WlanMacRole is not supported: %u", in);
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -322,7 +322,7 @@ zx_status_t ConvertChannelBandwidth(const channel_bandwidth_t& in,
       *out = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80P80;
       break;
     default:
-      errorf("ChannelBandwidth is not supported: %u", in);
+      lerror("ChannelBandwidth is not supported: %u", in);
       return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -371,7 +371,7 @@ zx_status_t ConvertTxInfo(const wlan_tx_info_t& in, fuchsia_wlan_softmac::wire::
       out->phy = fuchsia_wlan_common::wire::WlanPhyType::kHe;
       break;
     default:
-      errorf("WlanPhyType is not supported: %u", in.phy);
+      lerror("WlanPhyType is not supported: %u", in.phy);
       return ZX_ERR_INVALID_ARGS;
   }
   out->mcs = in.mcs;
@@ -415,7 +415,7 @@ zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
       out->bss_type = fuchsia_wlan_internal::wire::BssType::kPersonal;
       break;
     default:
-      errorf("BssType is not supported: %u", in.bss_type);
+      lerror("BssType is not supported: %u", in.bss_type);
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -474,7 +474,7 @@ void ConvertBcn(const wlan_beacon_configuration_t& in,
       packet_template.info.phy = fuchsia_wlan_common::wire::WlanPhyType::kHe;
       break;
     default:
-      infof("Empty WlanPhyType: %u", in.packet_template.info.phy);
+      linfo("Empty WlanPhyType: %u", in.packet_template.info.phy);
       // TODO(fxbug.dev/106984): In packet template, this field is allowed to be empty, but FIDL
       // doesn't allow out-of-range enum values. Since we don't define an empty value(e.g.
       // WlanPhyType::kNone) in this enum for now, use the first one as empty value here.
@@ -502,7 +502,7 @@ void ConvertBcn(const wlan_beacon_configuration_t& in,
           fuchsia_wlan_common::wire::ChannelBandwidth::kCbw80P80;
       break;
     default:
-      infof("Empty ChannelBandwidth: %u", in.packet_template.info.channel_bandwidth);
+      linfo("Empty ChannelBandwidth: %u", in.packet_template.info.channel_bandwidth);
       // TODO(fxbug.dev/106984): Similar to WlanPhyType, set the bandwidth to the lowest value when
       // higher layer doesn't indicate it. Print out a log to inform that the value was empty.
       packet_template.info.channel_bandwidth = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
@@ -536,7 +536,7 @@ zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
       wlan_protection = fuchsia_wlan_softmac::wire::WlanProtection::kRxTx;
       break;
     default:
-      errorf("WlanProtection is not supported: %hhu", in.protection);
+      lerror("WlanProtection is not supported: %hhu", in.protection);
       return ZX_ERR_INVALID_ARGS;
   }
 
@@ -563,7 +563,7 @@ zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
       wlan_key_type = fuchsia_hardware_wlan_associnfo::wire::WlanKeyType::kPeer;
       break;
     default:
-      errorf("WlanKeyType is not supported: %hhu", in.key_type);
+      lerror("WlanKeyType is not supported: %hhu", in.key_type);
       return ZX_ERR_INVALID_ARGS;
   }
   builder.key_type(wlan_key_type);

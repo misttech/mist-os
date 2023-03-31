@@ -7,7 +7,7 @@
 #include <lib/syslog/logger.h>
 #include <zircon/types.h>
 
-#include "log_test.h"
+#include <wlan/drivers/test/log_overrides.h>
 
 using wlan::drivers::LogTest;
 

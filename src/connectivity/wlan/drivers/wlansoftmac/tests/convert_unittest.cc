@@ -7,10 +7,12 @@
 
 #include <gtest/gtest.h>
 #include <src/connectivity/wlan/drivers/wlansoftmac/convert.h>
+#include <wlan/drivers/log_instance.h>
+#include <wlan/drivers/test/log_overrides.h>
 
 #include "fidl/fuchsia.wlan.softmac/cpp/wire_types.h"
 
-namespace wlan {
+namespace wlan::drivers {
 namespace {
 namespace wlan_softmac = fuchsia_wlan_softmac::wire;
 namespace wlan_common = fuchsia_wlan_common::wire;
@@ -83,8 +85,11 @@ static constexpr uint8_t kFakeBanjoMacImplementationType = MAC_IMPLEMENTATION_TY
 
 /* Test cases*/
 
+class ConvertTest : public LogTest {};
+
 // FIDL to banjo types tests.
-TEST(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
+TEST_F(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
+  log::Instance::Init(0);
   // Build WlanSoftmacQueryResponse
   fidl::Arena arena;
   auto builder = wlan_softmac::WlanSoftmacQueryResponse::Builder(arena);
@@ -165,7 +170,8 @@ TEST(ConvertTest, ToBanjoWlanSoftmacQueryResponse) {
   }
 }
 
-TEST(ConvertTest, ToBanjoDiscoverySuppport) {
+TEST_F(ConvertTest, ToBanjoDiscoverySuppport) {
+  log::Instance::Init(0);
   wlan_common::DiscoverySupport in = {
       .scan_offload =
           {
@@ -184,7 +190,8 @@ TEST(ConvertTest, ToBanjoDiscoverySuppport) {
   EXPECT_EQ(kPopulaterBool, out.probe_response_offload.supported);
 }
 
-TEST(ConvertTest, ToBanjoMacSublayerSupport) {
+TEST_F(ConvertTest, ToBanjoMacSublayerSupport) {
+  log::Instance::Init(0);
   wlan_common::MacSublayerSupport in = {
       .rate_selection_offload =
           {
@@ -212,7 +219,8 @@ TEST(ConvertTest, ToBanjoMacSublayerSupport) {
   EXPECT_EQ(kPopulaterBool, out.device.tx_status_report_supported);
 }
 
-TEST(ConvertTest, ToBanjoSecuritySupport) {
+TEST_F(ConvertTest, ToBanjoSecuritySupport) {
+  log::Instance::Init(0);
   wlan_common::SecuritySupport in = {
       .sae =
           {
@@ -233,7 +241,8 @@ TEST(ConvertTest, ToBanjoSecuritySupport) {
   EXPECT_EQ(kPopulaterBool, out.mfp.supported);
 }
 
-TEST(ConvertTest, ToBanjoSpectrumManagementSupport) {
+TEST_F(ConvertTest, ToBanjoSpectrumManagementSupport) {
+  log::Instance::Init(0);
   wlan_common::SpectrumManagementSupport in = {
       .dfs =
           {
@@ -247,7 +256,8 @@ TEST(ConvertTest, ToBanjoSpectrumManagementSupport) {
   EXPECT_EQ(kPopulaterBool, out.dfs.supported);
 }
 
-TEST(ConvertTest, ToBanjoRxPacket) {
+TEST_F(ConvertTest, ToBanjoRxPacket) {
+  log::Instance::Init(0);
   // Populate wlan_softmac::WlanRxPacket
   uint8_t* rx_packet = (uint8_t*)calloc(kFakePacketSize, sizeof(uint8_t));
   for (size_t i = 0; i < kFakePacketSize; i++) {
@@ -299,7 +309,8 @@ TEST(ConvertTest, ToBanjoRxPacket) {
   free(rx_packet);
 }  // namespace
 
-TEST(ConvertTest, ToBanjoTxStatus) {
+TEST_F(ConvertTest, ToBanjoTxStatus) {
+  log::Instance::Init(0);
   // Populate wlan_common::WlanTxStatus
   wlan_common::WlanTxStatus in = {
       .result = kFakeFidlTxResult,
@@ -329,7 +340,8 @@ TEST(ConvertTest, ToBanjoTxStatus) {
 }
 
 // banjo to FIDL types tests.
-TEST(ConvertTest, ToFidlMacRole) {
+TEST_F(ConvertTest, ToFidlMacRole) {
+  log::Instance::Init(0);
   wlan_common::WlanMacRole out;
   EXPECT_EQ(ZX_OK, ConvertMacRole(kFakeBanjoMacRole, &out));
 
@@ -339,7 +351,8 @@ TEST(ConvertTest, ToFidlMacRole) {
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertMacRole(kRandomPopulaterUint32, &out));
 }
 
-TEST(ConvertTest, ToFidlTxPacket) {
+TEST_F(ConvertTest, ToFidlTxPacket) {
+  log::Instance::Init(0);
   // Populate wlan_tx_info_t
   uint8_t* data_in = (uint8_t*)calloc(kFakePacketSize, sizeof(uint8_t));
   for (size_t i = 0; i < kFakePacketSize; i++) {
@@ -383,7 +396,8 @@ TEST(ConvertTest, ToFidlTxPacket) {
   free(data_in);
 }
 
-TEST(ConvertTest, ToFidlChannel) {
+TEST_F(ConvertTest, ToFidlChannel) {
+  log::Instance::Init(0);
   wlan_channel_t in = {
       .primary = kFakeChannel,
       .cbw = kFakeBanjoChannelBandwidth,
@@ -402,7 +416,8 @@ TEST(ConvertTest, ToFidlChannel) {
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, ConvertChannel(in, &out));
 }
 
-TEST(ConvertTest, ToFidlJoinBssRequest) {
+TEST_F(ConvertTest, ToFidlJoinBssRequest) {
+  log::Instance::Init(0);
   // Populate join_bss_request_t
   join_bss_request_t in = {
       .bss_type = kFakeBanjoBssType,
@@ -430,7 +445,8 @@ TEST(ConvertTest, ToFidlJoinBssRequest) {
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertJoinBssRequest(in, &out));
 }
 
-TEST(ConvertTest, ToFidlBcn) {
+TEST_F(ConvertTest, ToFidlBcn) {
+  drivers::log::Instance::Init(0);
   // Populate wlan_beacon_configuration_t
   uint8_t* tx_packet_template_buffer = (uint8_t*)calloc(kFakePacketSize, sizeof(uint8_t));
   for (size_t i = 0; i < kFakePacketSize; i++) {
@@ -488,7 +504,8 @@ TEST(ConvertTest, ToFidlBcn) {
   free(tx_packet_template_buffer);
 }
 
-TEST(ConvertTest, ToFidlKeyConfig) {
+TEST_F(ConvertTest, ToFidlKeyConfig) {
+  log::Instance::Init(0);
   // Create tmp non-const key from const key.
   uint8_t TmpKey[wlan_ieee80211::kMaxKeyLen];
   memcpy(TmpKey, kFakeKey, wlan_ieee80211::kMaxKeyLen);
@@ -538,7 +555,8 @@ TEST(ConvertTest, ToFidlKeyConfig) {
   }
 }
 
-TEST(ConvertTest, ToFidlPassiveScanArgs) {
+TEST_F(ConvertTest, ToFidlPassiveScanArgs) {
+  log::Instance::Init(0);
   // Populate wlan_softmac_start_passive_scan_request_t
   uint8_t* channel_list =
       (uint8_t*)calloc(wlan_ieee80211::kMaxUniqueChannelNumbers, sizeof(uint8_t));
@@ -571,7 +589,8 @@ TEST(ConvertTest, ToFidlPassiveScanArgs) {
   free(channel_list);
 }
 
-TEST(ConvertTest, ToFidlActiveScanArgs) {
+TEST_F(ConvertTest, ToFidlActiveScanArgs) {
+  log::Instance::Init(0);
   // Populate wlan_softmac_start_active_scan_request_t
   uint8_t* channel_list =
       (uint8_t*)calloc(wlan_ieee80211::kMaxUniqueChannelNumbers, sizeof(uint8_t));
@@ -660,7 +679,8 @@ void VerifyWlanWmmAcParams(wlan_associnfo::WlanWmmAcParams& in) {
   EXPECT_EQ(kPopulaterBool, in.acm);
 }
 
-TEST(ConvertTest, ToFidlAssocCtx) {
+TEST_F(ConvertTest, ToFidlAssocCtx) {
+  log::Instance::Init(0);
   // Populate wlan_association_config_t
   wlan_association_config_t in = {
       .aid = kRandomPopulaterUint16,
@@ -796,4 +816,4 @@ TEST(ConvertTest, ToFidlAssocCtx) {
 }
 
 }  // namespace
-}  // namespace wlan
+}  // namespace wlan::drivers

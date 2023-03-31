@@ -30,7 +30,9 @@ wlansoftmac_convert_deps = [
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal_banjo_c",
   "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_banjo_c",
   "//sdk/fidl/fuchsia.wlan.softmac:fuchsia.wlan.softmac_cpp_driver",
+  "//src/connectivity/wlan/drivers/lib/log/cpp",
   "//src/connectivity/wlan/lib/mlme/cpp:mlme",
+  "//src/lib/ddk",
   "//zircon/system/ulib/fbl",
   "//zircon/system/ulib/zx",
 ]
@@ -53,6 +55,7 @@ fuchsia_driver("wlansoftmac_driver-driver") {
     ":wlansoftmac_bind",
     ":wlansoftmac_convert",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
+    "//src/connectivity/wlan/drivers/lib/log/cpp",
     "//src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding:wlansoftmac-c",
     "//src/devices/lib/dev-operation",
     "//src/devices/lib/driver",
@@ -84,6 +87,7 @@ test("wlansoftmac_convert_unittest") {
   sources = wlansoftmac_convert_sources + [ "tests/convert_unittest.cc" ]
 
   deps = wlansoftmac_convert_deps + [
+           "//src/connectivity/wlan/drivers/lib/log/cpp/test:log_overrides",
            "//src/lib/fxl/test:gtest_main",
            "//third_party/googletest:gtest",
          ]

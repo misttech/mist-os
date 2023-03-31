@@ -28,7 +28,7 @@
 #include <utility>
 
 #include <wlan/common/channel.h>
-#include <wlan/common/logging.h>
+#include <wlan/drivers/log.h>
 #include <wlan/mlme/validate_frame.h>
 #include <wlan/mlme/wlan.h>
 
@@ -92,11 +92,11 @@ static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
 
 WlanSoftmacHandle::WlanSoftmacHandle(DeviceInterface* device)
     : device_(device), inner_handle_(nullptr) {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
 }
 
 WlanSoftmacHandle::~WlanSoftmacHandle() {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
   if (inner_handle_ != nullptr) {
     delete_sta(inner_handle_);
   }
@@ -217,8 +217,8 @@ zx_status_t WlanSoftmacHandle::QueueEthFrameTx(std::unique_ptr<Packet> pkt) {
 
 Device::Device(zx_device_t* device)
     : ddk::Device<Device, ddk::Unbindable>(device), parent_(device) {
-  infof("Creating a new WLAN device.");
-  debugfn();
+  ldebug(0, NULL, "Entering.");
+  linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
 
   // Create a dispatcher to wait on the runtime channel.
@@ -251,38 +251,38 @@ Device::Device(zx_device_t* device)
   client_dispatcher_ = *std::move(dispatcher);
 }
 
-Device::~Device() { debugfn(); }
+Device::~Device() { ldebug(0, NULL, "Entering."); }
 
 // Disable thread safety analysis, as this is a part of device initialization.
 // All thread-unsafe work should occur before multiple threads are possible
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
 zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
-  debugfn();
-  infof("Binding our new WLAN softmac device.");
+  ldebug(0, NULL, "Entering.");
+  linfo("Binding our new WLAN softmac device.");
 
   zx_status_t status;
   zx::result<fdf::ClientEnd<fuchsia_wlan_softmac::WlanSoftmac>> client_end =
       DdkConnectRuntimeProtocol<fuchsia_wlan_softmac::Service::WlanSoftmac>();
   if (client_end.is_error()) {
-    errorf("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
+    lerror("DDdkConnectRuntimeProtocol failed: %s", client_end.status_string());
     return client_end.status_value();
   }
   client_ = fdf::WireSharedClient(*std::move(client_end), client_dispatcher_.get());
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   auto result = client_.sync().buffer(*std::move(arena))->Query();
   if (!result.ok()) {
-    errorf("Failed getting query result (FIDL error %s)", result.status_string());
+    lerror("Failed getting query result (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("Failed getting query result (status %s)", zx_status_get_string(result->error_value()));
+    lerror("Failed getting query result (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -295,20 +295,20 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
       calloc(fuchsia_wlan_common_MAX_BANDS, sizeof(*wlan_softmac_query_response_.band_caps_list)));
   if ((status = ConvertWlanSoftmacQueryResponse(*result->value(), &wlan_softmac_query_response_)) !=
       ZX_OK) {
-    errorf("WlanSoftmacQueryResponse conversion failed (%s)", zx_status_get_string(status));
+    lerror("WlanSoftmacQueryResponse conversion failed (%s)", zx_status_get_string(status));
     return status;
   }
 
   auto discovery_arena = fdf::Arena::Create(0, 0);
   if (discovery_arena.is_error()) {
-    errorf("Arena creation failed: %s", discovery_arena.status_string());
+    lerror("Arena creation failed: %s", discovery_arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   auto discovery_result =
       client_.sync().buffer(*std::move(discovery_arena))->QueryDiscoverySupport();
   if (!discovery_result.ok()) {
-    errorf("Failed getting discovery result (FIDL error %s)", discovery_result.status_string());
+    lerror("Failed getting discovery result (FIDL error %s)", discovery_result.status_string());
     return discovery_result.status();
   }
 
@@ -316,33 +316,33 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
   if (mac_sublayer_arena.is_error()) {
-    errorf("Arena creation failed: %s", mac_sublayer_arena.status_string());
+    lerror("Arena creation failed: %s", mac_sublayer_arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   auto mac_sublayer_result =
       client_.sync().buffer(*std::move(mac_sublayer_arena))->QueryMacSublayerSupport();
   if (!mac_sublayer_result.ok()) {
-    errorf("Failed getting mac sublayer result (FIDL error %s)",
+    lerror("Failed getting mac sublayer result (FIDL error %s)",
            mac_sublayer_result.status_string());
     return mac_sublayer_result.status();
   }
 
   if ((status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp,
                                           &mac_sublayer_support_)) != ZX_OK) {
-    errorf("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
+    lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
     return status;
   }
 
   auto security_arena = fdf::Arena::Create(0, 0);
   if (security_arena.is_error()) {
-    errorf("Arena creation failed: %s", security_arena.status_string());
+    lerror("Arena creation failed: %s", security_arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   auto security_result = client_.sync().buffer(*std::move(security_arena))->QuerySecuritySupport();
   if (!security_result.ok()) {
-    errorf("Failed getting security result (FIDL error %s)", security_result.status_string());
+    lerror("Failed getting security result (FIDL error %s)", security_result.status_string());
     return security_result.status();
   }
 
@@ -350,7 +350,7 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
 
   auto spectrum_management_arena = fdf::Arena::Create(0, 0);
   if (spectrum_management_arena.is_error()) {
-    errorf("Arena creation failed: %s", spectrum_management_arena.status_string());
+    lerror("Arena creation failed: %s", spectrum_management_arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -359,7 +359,7 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
                                         ->QuerySpectrumManagementSupport();
 
   if (!spectrum_management_result.ok()) {
-    errorf("Failed getting spectrum management result (FIDL error %s)",
+    lerror("Failed getting spectrum management result (FIDL error %s)",
            spectrum_management_result.status_string());
     return spectrum_management_result.status();
   }
@@ -374,13 +374,13 @@ zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
   softmac_handle_.reset(new WlanSoftmacHandle(this));
   status = softmac_handle_->Init();
   if (status != ZX_OK) {
-    errorf("could not initialize Rust WlanSoftmac: %d", status);
+    lerror("could not initialize Rust WlanSoftmac: %d", status);
     return status;
   }
 
   status = AddEthDevice();
   if (status != ZX_OK) {
-    errorf("could not add eth device: %s", zx_status_get_string(status));
+    lerror("could not add eth device: %s", zx_status_get_string(status));
     softmac_handle_->StopMainLoop();
     return status;
   }
@@ -403,7 +403,7 @@ zx_status_t Device::AddEthDevice() {
 std::unique_ptr<Packet> Device::PreparePacket(const void* data, size_t length, Packet::Peer peer) {
   std::unique_ptr<Buffer> buffer = GetBuffer(length);
   if (buffer == nullptr) {
-    errorf("could not get buffer for packet of length %zu", length);
+    lerror("could not get buffer for packet of length %zu", length);
     return nullptr;
   }
 
@@ -411,7 +411,7 @@ std::unique_ptr<Packet> Device::PreparePacket(const void* data, size_t length, P
   packet->set_peer(peer);
   zx_status_t status = packet->CopyFrom(data, length, 0);
   if (status != ZX_OK) {
-    errorf("could not copy to packet: %d", status);
+    lerror("could not copy to packet: %d", status);
     return nullptr;
   }
   return packet;
@@ -427,7 +427,7 @@ void Device::DestroySelf() {
 
 void Device::ShutdownMainLoop() {
   if (main_loop_dead_) {
-    errorf("ShutdownMainLoop called while main loop was not running");
+    lerror("ShutdownMainLoop called while main loop was not running");
     return;
   }
   softmac_handle_->StopMainLoop();
@@ -437,18 +437,18 @@ void Device::ShutdownMainLoop() {
 // ddk ethernet_impl_protocol_ops methods
 
 void Device::EthUnbind() {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
   ShutdownMainLoop();
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return;
   }
   client_dispatcher_.ShutdownAsync();
 }
 
 void Device::EthRelease() {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
   // The lifetime of this device is managed by the parent ethernet device, but we don't
   // have a mechanism to make this explicit. EthUnbind is already called at this point,
   // so it's safe to clean up our memory usage.
@@ -468,7 +468,7 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
 void Device::DdkRelease() { delete this; }
 
 zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
   if (info == nullptr)
     return ZX_ERR_INVALID_ARGS;
 
@@ -478,13 +478,13 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   auto mac_sublayer_result = client_.sync().buffer(*std::move(arena))->QueryMacSublayerSupport();
   if (!mac_sublayer_result.ok()) {
-    errorf("Failed getting mac sublayer result (FIDL error %s)",
+    lerror("Failed getting mac sublayer result (FIDL error %s)",
            mac_sublayer_result.status_string());
     return mac_sublayer_result.status();
   }
@@ -493,7 +493,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
   mac_sublayer_support_t mac_sublayer;
   if ((status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer)) !=
       ZX_OK) {
-    errorf("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
+    lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
     return status;
   }
 
@@ -507,7 +507,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
 }
 
 zx_status_t Device::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
   ZX_DEBUG_ASSERT(ifc != nullptr);
 
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
@@ -519,11 +519,11 @@ zx_status_t Device::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
 }
 
 void Device::EthernetImplStop() {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
 
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
   if (!ethernet_proxy_.is_valid()) {
-    warnf("ethmac not started");
+    lwarn("ethmac not started");
   }
   ethernet_proxy_.clear();
 }
@@ -531,11 +531,11 @@ void Device::EthernetImplStop() {
 void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
                                  ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
   eth::BorrowedOperation<> op(netbuf, completion_cb, cookie, sizeof(ethernet_netbuf_t));
-  // no debugfn() because it's too noisy
+  // Do not log "Entering" because it's too noisy.
   auto packet = PreparePacket(op.operation()->data_buffer, op.operation()->data_size,
                               Packet::Peer::kEthernet);
   if (packet == nullptr) {
-    warnf("could not prepare Ethernet packet with len %zu", netbuf->data_size);
+    lwarn("could not prepare Ethernet packet with len %zu", netbuf->data_size);
     op.Complete(ZX_ERR_NO_RESOURCES);
     return;
   }
@@ -543,7 +543,7 @@ void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
   // Forward the packet straight into Rust MLME.
   auto status = softmac_handle_->QueueEthFrameTx(std::move(packet));
   if (status != ZX_OK) {
-    warnf("could not queue Ethernet packet err=%s", zx_status_get_string(status));
+    lwarn("could not queue Ethernet packet err=%s", zx_status_get_string(status));
     ZX_DEBUG_ASSERT(status != ZX_ERR_SHOULD_WAIT);
   }
   op.Complete(status);
@@ -551,7 +551,7 @@ void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
 
 zx_status_t Device::EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
                                          size_t data_size) {
-  debugfn();
+  ldebug(0, NULL, "Entering.");
 
   zx_status_t status = ZX_ERR_NOT_SUPPORTED;
 
@@ -563,7 +563,7 @@ zx_status_t Device::EthernetImplSetParam(uint32_t param, int32_t value, const vo
       //               bridging.
       // TODO(fxbug.dev/29113): To implement the real promiscuous mode.
       if (value == 1) {  // Only warn when enabling.
-        warnf("WLAN promiscuous not supported yet. see fxbug.dev/29113");
+        lwarn("WLAN promiscuous not supported yet. see fxbug.dev/29113");
       }
       status = ZX_OK;
       break;
@@ -578,13 +578,13 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::WlanSoftmacIfc>();
   if (endpoints.is_error()) {
-    errorf("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
+    lerror("Creating end point error: %s", zx_status_get_string(endpoints.status_value()));
     return endpoints.status_value();
   }
 
@@ -606,11 +606,11 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
 
   auto result = client_.sync().buffer(*std::move(arena))->Start(std::move(endpoints->client));
   if (!result.ok()) {
-    errorf("change channel failed (FIDL error %s)", result.status_string());
+    lerror("change channel failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("change channel failed (status %d)", result->error_value());
+    lerror("change channel failed (status %d)", result->error_value());
     return result->error_value();
   }
   *out_sme_channel = std::move(result->value()->sme_channel);
@@ -619,7 +619,7 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
 
 zx_status_t Device::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
   if (eth_frame.size() > ETH_FRAME_MAX_SIZE) {
-    errorf("Attempted to deliver an ethernet frame of invalid length: %zu", eth_frame.size());
+    lerror("Attempted to deliver an ethernet frame of invalid length: %zu", eth_frame.size());
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -635,7 +635,7 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -643,18 +643,18 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
   fuchsia_wlan_softmac::wire::WlanTxPacket fidl_tx_packet;
   if ((status = ConvertTxPacket(packet->data(), packet->len(), tx_info, &fidl_tx_packet)) !=
       ZX_OK) {
-    errorf("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
+    lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
   auto result = client_.sync().buffer(*arena)->QueueTx(fidl_tx_packet);
 
   if (!result.ok()) {
-    errorf("QueueTx failed (FIDL error %s)", result.status_string());
+    lerror("QueueTx failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("QueueTx failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("QueueTx failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -673,7 +673,7 @@ zx_status_t Device::SetChannel(wlan_channel_t channel) __TA_NO_THREAD_SAFETY_ANA
   // function.
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -681,13 +681,13 @@ zx_status_t Device::SetChannel(wlan_channel_t channel) __TA_NO_THREAD_SAFETY_ANA
   zx_status_t status = ZX_OK;
   fuchsia_wlan_common::wire::WlanChannel current_channel;
   if ((status = ConvertChannel(state_->channel(), &current_channel)) != ZX_OK) {
-    errorf("WlanChannel conversion failed: %s", zx_status_get_string(status));
+    lerror("WlanChannel conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
   fuchsia_wlan_common::wire::WlanChannel new_channel;
   if ((status = ConvertChannel(channel, &new_channel)) != ZX_OK) {
-    errorf("WlanChannel conversion failed: %s", zx_status_get_string(status));
+    lerror("WlanChannel conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -699,11 +699,11 @@ zx_status_t Device::SetChannel(wlan_channel_t channel) __TA_NO_THREAD_SAFETY_ANA
   builder.channel(new_channel);
   auto result = client_.sync().buffer(*std::move(arena))->SetChannel(builder.Build());
   if (!result.ok()) {
-    errorf("%s failed (FIDL error %s)", buf, result.status_string());
+    lerror("%s failed (FIDL error %s)", buf, result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("%s failed (status %s)", buf, zx_status_get_string(result->error_value()));
+    lerror("%s failed (status %s)", buf, zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -724,24 +724,24 @@ zx_status_t Device::SetStatus(uint32_t status) {
 zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
   zx_status_t status = ZX_OK;
   fuchsia_wlan_internal::wire::JoinBssRequest fidl_bss_config;
   if ((status = ConvertJoinBssRequest(*cfg, &fidl_bss_config)) != ZX_OK) {
-    errorf("JoinBssRequest conversion failed: %s", zx_status_get_string(status));
+    lerror("JoinBssRequest conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
   auto result = client_.sync().buffer(*std::move(arena))->JoinBss(fidl_bss_config);
   if (!result.ok()) {
-    errorf("Config bss failed (FIDL error %s)", result.status_string());
+    lerror("Config bss failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("Config bss failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("Config bss failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -756,7 +756,7 @@ static constexpr size_t kWlanBeaconConfigurationBufferSize =
 zx_status_t Device::EnableBeaconing(wlan_beacon_configuration_t* beacon_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -772,11 +772,11 @@ zx_status_t Device::EnableBeaconing(wlan_beacon_configuration_t* beacon_config) 
 
   auto result = client_.sync().buffer(*std::move(arena))->EnableBeaconing(fidl_beacon_config);
   if (!result.ok()) {
-    errorf("EnableBeaconing failed (FIDL error %s)", result.status_string());
+    lerror("EnableBeaconing failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("EnableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("EnableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -785,7 +785,7 @@ zx_status_t Device::EnableBeaconing(wlan_beacon_configuration_t* beacon_config) 
 zx_status_t Device::ConfigureBeaconing(std::unique_ptr<Packet> beacon) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -804,17 +804,17 @@ zx_status_t Device::ConfigureBeaconing(std::unique_ptr<Packet> beacon) {
   }
   if ((status = ConvertTxPacket(beacon->data(), static_cast<uint16_t>(beacon->len()), info,
                                 &fidl_tx_packet)) != ZX_OK) {
-    errorf("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
+    lerror("WlanTxPacket conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
   auto result = client_.sync().buffer(*std::move(arena))->ConfigureBeaconing(fidl_tx_packet);
   if (!result.ok()) {
-    errorf("ConfigureBeaconing failed (FIDL error %s)", result.status_string());
+    lerror("ConfigureBeaconing failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("ConfigureBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("ConfigureBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -823,7 +823,7 @@ zx_status_t Device::ConfigureBeaconing(std::unique_ptr<Packet> beacon) {
 zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -831,17 +831,17 @@ zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
   fidl::Arena fidl_arena;
   fuchsia_wlan_softmac::wire::WlanKeyConfiguration fidl_key_config;
   if ((status = ConvertKeyConfig(*key_config, &fidl_key_config, fidl_arena)) != ZX_OK) {
-    errorf("WlanKeyConfiguration conversion failed: %s", zx_status_get_string(status));
+    lerror("WlanKeyConfiguration conversion failed: %s", zx_status_get_string(status));
     return status;
   }
 
   auto result = client_.sync().buffer(*std::move(arena))->InstallKey(fidl_key_config);
   if (!result.ok()) {
-    errorf("InstallKey failed (FIDL error %s)", result.status_string());
+    lerror("InstallKey failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("InstallKey failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("InstallKey failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -851,7 +851,7 @@ zx_status_t Device::StartPassiveScan(
     const wlan_softmac_start_passive_scan_request_t* passive_scan_args, uint64_t* out_scan_id) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -861,11 +861,11 @@ zx_status_t Device::StartPassiveScan(
 
   auto result = client_.sync().buffer(*std::move(arena))->StartPassiveScan(fidl_passive_scan_args);
   if (!result.ok()) {
-    errorf("StartPassiveScan failed (FIDL error %s)", result.status_string());
+    lerror("StartPassiveScan failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("StartPassiveScan failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("StartPassiveScan failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -882,7 +882,7 @@ zx_status_t Device::StartActiveScan(
     const wlan_softmac_start_active_scan_request_t* active_scan_args, uint64_t* out_scan_id) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -891,11 +891,11 @@ zx_status_t Device::StartActiveScan(
   ConvertActiveScanArgs(*active_scan_args, &fidl_active_scan_args, fidl_arena);
   auto result = client_.sync().buffer(*std::move(arena))->StartActiveScan(fidl_active_scan_args);
   if (!result.ok()) {
-    errorf("StartActiveScan failed (FIDL error %s)", result.status_string());
+    lerror("StartActiveScan failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("StartActiveScan failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("StartActiveScan failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
 
@@ -906,7 +906,7 @@ zx_status_t Device::StartActiveScan(
 zx_status_t Device::CancelScan(uint64_t scan_id) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -915,7 +915,7 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
   builder.scan_id(scan_id);
   auto result = client_.sync().buffer(*std::move(arena))->CancelScan(builder.Build());
   if (!result.ok()) {
-    errorf("CancelScan Failed (FIDL error %s)", result.status_string());
+    lerror("CancelScan Failed (FIDL error %s)", result.status_string());
   }
   return result.status();
 }
@@ -923,7 +923,7 @@ zx_status_t Device::CancelScan(uint64_t scan_id) {
 zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -937,11 +937,11 @@ zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
 
   auto result = client_.sync().buffer(*std::move(arena))->ConfigureAssoc(fidl_assoc_cfg);
   if (!result.ok()) {
-    errorf("ConfigureAssoc failed (FIDL error %s)", result.status_string());
+    lerror("ConfigureAssoc failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("ConfigureAssoc failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("ConfigureAssoc failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -950,7 +950,7 @@ zx_status_t Device::ConfigureAssoc(wlan_association_config_t* assoc_cfg) {
 zx_status_t Device::ClearAssoc(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MAC_ADDR_LEN]) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
-    errorf("Arena creation failed: %s", arena.status_string());
+    lerror("Arena creation failed: %s", arena.status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -958,11 +958,11 @@ zx_status_t Device::ClearAssoc(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MA
   memcpy(fidl_peer_addr.begin(), peer_addr, fuchsia_wlan_ieee80211::wire::kMacAddrLen);
   auto result = client_.sync().buffer(*std::move(arena))->ClearAssoc(fidl_peer_addr);
   if (!result.ok()) {
-    errorf("ClearAssoc failed (FIDL error %s)", result.status_string());
+    lerror("ClearAssoc failed (FIDL error %s)", result.status_string());
     return result.status();
   }
   if (result->is_error()) {
-    errorf("ClearAssoc failed (status %s)", zx_status_get_string(result->error_value()));
+    lerror("ClearAssoc failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
   return ZX_OK;
@@ -992,7 +992,7 @@ void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Syn
     }
 
     if ((status = ConvertRxPacket(request->packet, &rx_packet, rx_packet_buffer)) != ZX_OK) {
-      errorf("RxPacket conversion failed: %s", zx_status_get_string(status));
+      lerror("RxPacket conversion failed: %s", zx_status_get_string(status));
     }
 
     wlan_softmac_ifc_protocol_->ops->recv(wlan_softmac_ifc_protocol_->ctx, &rx_packet);
@@ -1014,7 +1014,7 @@ void Device::ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena
   wlan_tx_status_t tx_status;
 
   if ((status = ConvertTxStatus(request->tx_status, &tx_status)) != ZX_OK) {
-    errorf("TxStatus conversion failed: %s", zx_status_get_string(status));
+    lerror("TxStatus conversion failed: %s", zx_status_get_string(status));
   }
 
   wlan_softmac_ifc_protocol_->ops->report_tx_status(wlan_softmac_ifc_protocol_->ctx, &tx_status);
