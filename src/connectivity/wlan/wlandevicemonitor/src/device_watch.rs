@@ -11,7 +11,7 @@ use {
         stream::{Stream, TryStreamExt as _},
     },
     log::error,
-    std::str::FromStr as _,
+    std::hash::{Hash as _, Hasher as _},
 };
 
 pub struct NewPhyDevice {
@@ -24,13 +24,14 @@ pub fn watch_phy_devices<'a>(
     device_directory: &'a str,
 ) -> Result<impl Stream<Item = Result<NewPhyDevice, anyhow::Error>> + 'a, anyhow::Error> {
     let directory =
-        fuchsia_fs::directory::open_in_namespace(device_directory, fio::OpenFlags::RIGHT_READABLE)?;
+        fuchsia_fs::directory::open_in_namespace(device_directory, fio::OpenFlags::empty())
+            .context("open directory")?;
     Ok(async move {
-        let watcher = Watcher::new(&directory).await?;
+        let watcher = Watcher::new(&directory).await.context("create watcher")?;
         Ok(watcher.err_into().try_filter_map(move |WatchMessage { event, filename }| {
             futures::future::ready((|| {
-                let filename = match event {
-                    WatchEvent::ADD_FILE | WatchEvent::EXISTING => filename,
+                match event {
+                    WatchEvent::ADD_FILE | WatchEvent::EXISTING => {}
                     _ => return Ok(None),
                 };
                 let filename = match filename.as_path().to_str() {
@@ -40,10 +41,12 @@ pub fn watch_phy_devices<'a>(
                 if filename == "." {
                     return Ok(None);
                 }
-                let (proxy, server_end) = fidl::endpoints::create_proxy()?;
+                let (proxy, server_end) =
+                    fidl::endpoints::create_proxy().context("create proxy")?;
                 let connector = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
                     fidl_fuchsia_wlan_device::ConnectorMarker,
-                >(&directory, filename)?;
+                >(&directory, filename)
+                .context("connect to device")?;
                 let () = match connector.connect(server_end) {
                     Ok(()) => (),
                     Err(e) => {
@@ -56,9 +59,15 @@ pub fn watch_phy_devices<'a>(
                         }
                     }
                 };
-                let id = u16::from_str(filename).with_context(|| {
-                    format!("Failed to parse device filename '{}' as a numeric ID", filename)
-                })?;
+                // TODO(https://fxbug.dev/124740): remove the assumption that devices have numeric IDs.
+                let mut s = std::collections::hash_map::DefaultHasher::new();
+                let () = filename.hash(&mut s);
+                let mut s: u64 = s.finish();
+                let mut id: u16 = 0;
+                while s != 0 {
+                    id |= s as u16;
+                    s = s >> 16;
+                }
                 Ok(Some(NewPhyDevice {
                     id,
                     proxy,
