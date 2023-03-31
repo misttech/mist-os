@@ -191,9 +191,6 @@ int RunDfv2(driver_manager_config::Config config,
     ZX_ASSERT_MSG(result.is_ok(), "%s", result.status_string());
   }
 
-  // TODO(https://fxbug.dev/99076) Remove this when this issue is fixed.
-  LOGF(INFO, "driver_manager loader loop started");
-
   async::PostTask(loop.dispatcher(), [] { LOGF(INFO, "driver_manager main loop is running"); });
 
   zx_status_t status = loop.Run();

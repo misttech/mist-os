@@ -42,8 +42,6 @@ group("core") {
   # Add-assign should contain all deps of //src/tests.
   # TODO(fxbug.dev/108563): Remove this add-assign when all tests in //src/tests
   # pass with DFv2 enabled.
-  # TODO(fxbug.dev/108569): Add //src/tests/oom:tests when all tests in
-  # //src/tests/oom:tests pass with DFv2 enabled.
   deps += [
     "//src/tests/assembly:tests",
     "//src/tests/coverage:tests",
@@ -63,6 +61,7 @@ group("core") {
     "//src/tests/kernel_panic:tests",
     "//src/tests/limited_netsvc:tests",
     "//src/tests/microbenchmarks:tests",
+    "//src/tests/oom:tests",
     "//src/tests/reboot:tests",
     "//src/tests/shutdown:tests",
   ]
