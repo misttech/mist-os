@@ -599,7 +599,7 @@ TEST(Mprotect, ProtGrowsdownOnNonGrowsdownMapping) {
   EXPECT_EQ(errno, EINVAL);
 }
 
-inline int MemFdCreate(const char *name, unsigned int flags) {
+inline int MemFdCreate(const char* name, unsigned int flags) {
   return static_cast<int>(syscall(SYS_memfd_create, name, flags));
 }
 
@@ -644,17 +644,20 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
 
     std::thread protect_rw([addr, &start, &count, kPageSize]() {
       count -= 1;
-      while (!start) {}
+      while (!start) {
+      }
       ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), kPageSize, PROT_READ | PROT_WRITE));
     });
 
     std::thread protect_none([addr, &start, &count, kPageSize]() {
       count -= 1;
-      while (!start) {}
+      while (!start) {
+      }
       ASSERT_EQ(0, mprotect(reinterpret_cast<void*>(addr), kPageSize, PROT_NONE));
     });
 
-    while (count != 0) {}
+    while (count != 0) {
+    }
     start = true;
     protect_none.join();
     protect_rw.join();
@@ -691,6 +694,41 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
       ASSERT_FALSE(true);
     }
   });
+}
+
+TEST(Mprotect, GrowTempFilePermisisons) {
+  const size_t kPageSize = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  char* tmp = getenv("TEST_TMPDIR");
+  std::string dir = tmp == nullptr ? "/tmp" : std::string(tmp);
+  std::string path = dir + "/grow_temp_file_permissions";
+  {
+    uint8_t buf[] = {'a'};
+    ScopedFD fd = ScopedFD(open(path.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0777));
+    ASSERT_TRUE(fd);
+    ASSERT_EQ(write(fd.get(), &buf[0], sizeof(buf)), 1) << errno << ": " << strerror(errno);
+  }
+  ASSERT_EQ(0, chmod(path.c_str(), S_IRUSR | S_IRGRP | S_IROTH));
+
+  std::string before;
+  ASSERT_TRUE(files::ReadFileToString(path.c_str(), &before));
+
+  {
+    uint8_t buf[] = {'b'};
+    ScopedFD fd = ScopedFD(open(path.c_str(), O_RDONLY));
+    ASSERT_EQ(-1, write(fd.get(), buf, sizeof(buf)));
+
+    void* ptr = mmap(NULL, kPageSize, PROT_READ, MAP_SHARED, fd.get(), 0);
+    EXPECT_NE(ptr, MAP_FAILED);
+
+    EXPECT_NE(mprotect(ptr, kPageSize, PROT_READ | PROT_WRITE), 0);
+    ForkHelper helper;
+    helper.RunInForkedProcess([ptr] { *reinterpret_cast<volatile char*>(ptr) = 'b'; });
+    EXPECT_FALSE(helper.WaitForChildren());
+  }
+  std::string after;
+  ASSERT_TRUE(files::ReadFileToString(path.c_str(), &after));
+  EXPECT_EQ(before, after);
+  ASSERT_EQ(0, unlink(path.c_str()));
 }
 
 }  // namespace

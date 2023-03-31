@@ -53,6 +53,18 @@ impl FsNodeOps for VmoFileNode {
     fs_node_impl_xattr_delegate!(self, self.xattrs);
 
     fn create_file_ops(&self, _node: &FsNode, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
+        // Produce a VMO handle with rights reduced to those requested in |flags|.
+        // self.vmo has the default VMO object rights plus the RESIZE as we create it with zx::VmoOptions::RESIZABLE.
+        let mut desired_rights = zx::Rights::VMO_DEFAULT | zx::Rights::RESIZE;
+        if !flags.can_read() {
+            desired_rights.remove(zx::Rights::READ);
+        }
+        if !flags.can_write() {
+            desired_rights.remove(zx::Rights::WRITE);
+        }
+        let scoped_vmo =
+            Arc::new(self.vmo.duplicate_handle(desired_rights).map_err(|_e| errno!(EIO))?);
+
         let file_object = if let Some(seals) = &self.seals {
             {
                 let seals = seals.lock();
@@ -61,9 +73,9 @@ impl FsNodeOps for VmoFileNode {
                     seals.check_not_present(SealFlags::SHRINK)?;
                 }
             }
-            VmoFileObject::new_with_seals(self.vmo.clone(), seals.clone())
+            VmoFileObject::new_with_seals(scoped_vmo, seals.clone())
         } else {
-            VmoFileObject::new(self.vmo.clone())
+            VmoFileObject::new(scoped_vmo)
         };
 
         Ok(Box::new(file_object))
