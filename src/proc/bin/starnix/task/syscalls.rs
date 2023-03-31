@@ -683,12 +683,16 @@ pub fn sys_prctl(
             Ok(current_task.read().no_new_privs().into())
         }
         PR_SET_SECCOMP => {
-            if arg2 == SECCOMP_MODE_STRICT as u64 {
-                return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
-            } else if arg2 == SECCOMP_SET_MODE_FILTER as u64 {
-                return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
-            }
-            error!(EINVAL)
+            // TODO(fxbug.dev/121283): Reenable this when seccomp filters work.  It causes
+            // libminijail to crash when enabled.
+            // if arg2 == SECCOMP_MODE_STRICT as u64 {
+            //     return sys_seccomp(current_task, SECCOMP_SET_MODE_STRICT, 0, UserAddress::NULL);
+            // } else if arg2 == SECCOMP_SET_MODE_FILTER as u64 {
+            //     return sys_seccomp(current_task, SECCOMP_SET_MODE_FILTER, 0, arg3.into());
+            // }
+            // error!(EINVAL)
+            not_implemented!(current_task, "prctl(PR_SET_SECCOMP, {})", arg2);
+            Ok(().into())
         }
         PR_GET_CHILD_SUBREAPER => {
             let addr = UserAddress::from(arg2);
