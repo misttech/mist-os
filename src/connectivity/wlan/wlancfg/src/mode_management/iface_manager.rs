@@ -366,6 +366,9 @@ impl IfaceManagerService {
         network_id: ap_types::NetworkIdentifier,
         reason: client_types::DisconnectReason,
     ) -> BoxFuture<'static, Result<(), Error>> {
+        // Cancel any ongoing network selection, since a disconnect makes it invalid.
+        self.network_selection_futures.clear();
+
         // Find the client interface associated with the given network config and disconnect from
         // the network.
         let mut fsm_ack_receiver = None;
@@ -2132,6 +2135,38 @@ mod tests {
                 assert!(connect_result.is_ok());
             });
         }
+
+        // Verify that the network selection future was dropped from the list.
+        assert!(iface_manager.network_selection_futures.is_empty());
+    }
+
+    #[fuchsia::test]
+    fn test_disconnect_cancels_autoconnect_future() {
+        let mut exec = fuchsia_async::TestExecutor::new();
+
+        let test_values = test_setup(&mut exec);
+        let (mut iface_manager, mut _sme_stream) =
+            create_iface_manager_with_client(&test_values, false);
+
+        // Add a network selection future which won't complete that should be canceled by a
+        // disconnect call.
+        async fn blocking_fn() -> Option<client_types::ScannedCandidate> {
+            loop {
+                fasync::Timer::new(zx::Duration::from_millis(1).after_now()).await
+            }
+        }
+        iface_manager.network_selection_futures.push(blocking_fn().boxed());
+        assert!(!iface_manager.network_selection_futures.is_empty());
+
+        // Request a disconnect through IfaceManager.
+        let disconnect_fut = iface_manager.disconnect(
+            NetworkIdentifier::new(TEST_SSID.clone(), SecurityType::Wpa),
+            client_types::DisconnectReason::NetworkUnsaved,
+        );
+        pin_mut!(disconnect_fut);
+
+        // Expect that we have requested a client SME proxy.
+        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
         // Verify that the network selection future was dropped from the list.
         assert!(iface_manager.network_selection_futures.is_empty());
