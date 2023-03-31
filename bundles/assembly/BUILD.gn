@@ -684,6 +684,26 @@ assembly_input_bundle("empty_live_usb") {
   bootfs_packages = [ "//src/sys/live_usb:empty_package" ]
 }
 
+# Session manager support
+#
+# feature_set_levels: minimal
+# build-types: all
+assembly_input_bundle("session_manager") {
+  base_packages = [ "//src/session/bin/session_manager" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
+        core = rebase_path(
+                [ "//src/session/bin/session_manager/meta/minimal.core_shard.cml" ],
+                root_build_dir)
+      }
+    },
+  ]
+}
+
 # Example assembly input bundle for testing
 #
 # Restricted for testing assembly itself (and to provide example code)

@@ -58,6 +58,9 @@ platform_aib_names = [
   # Storage
   "fshost_fxfs",
 
+  # Session
+  "session_manager",
+
   "starnix_support",
   "virtualization_support",
   "empty_live_usb",

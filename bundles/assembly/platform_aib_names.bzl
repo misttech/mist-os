@@ -29,6 +29,7 @@ PLATFORM_AIB_NAMES = [
     "wlan_fullmac_support",
     "wlan_legacy_privacy_support",
     "wlan_softmac_support",
+    "session_manager",
     "virtcon",
     "virtualization_support",
     "intl_services.icu_default_{}".format(icu_flavors.default_git_commit),

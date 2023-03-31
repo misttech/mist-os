@@ -4,14 +4,26 @@
 
 use crate::subsystems::prelude::*;
 use anyhow::ensure;
+use assembly_config_schema::platform_config::session_manager_config::PlatformSessionManagerConfig;
 
 pub(crate) struct SessionConfig;
-impl DefineSubsystemConfiguration<String> for SessionConfig {
+impl DefineSubsystemConfiguration<(&PlatformSessionManagerConfig, &String)> for SessionConfig {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        session_url: &String,
+        session_config: &(&PlatformSessionManagerConfig, &String),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        let session_manager_config = session_config.0;
+        let session_url = session_config.1;
+
+        if session_manager_config.enabled {
+            ensure!(
+                *context.feature_set_level == FeatureSupportLevel::Minimal,
+                "The platform session manager is only supported in the default feature set level"
+            );
+            builder.platform_bundle("session_manager");
+        }
+
         if *context.feature_set_level == FeatureSupportLevel::Minimal {
             // Configure the session URL.
             ensure!(

@@ -193,8 +193,12 @@ fn configure_subsystems(
     input::InputSubsystemConfig::define_configuration(context, &config.platform.input, builder)
         .context("Configuring the 'input' subsystem")?;
 
-    session::SessionConfig::define_configuration(context, &config.product.session_url, builder)
-        .context("Configuring the 'session' subsystem")?;
+    session::SessionConfig::define_configuration(
+        context,
+        &(&config.platform.session, &config.product.session_url),
+        builder,
+    )
+    .context("Configuring the 'session' subsystem")?;
 
     starnix::StarnixSubsystem::define_configuration(context, &config.platform.starnix, builder)
         .context("Configuring the starnix subsystem")?;

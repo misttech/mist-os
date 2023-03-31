@@ -13,6 +13,7 @@ pub mod graphics_config;
 pub mod icu_config;
 pub mod identity_config;
 pub mod input_config;
+pub mod session_manager_config;
 pub mod starnix_config;
 pub mod storage_config;
 pub mod swd_config;
@@ -74,6 +75,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the input area.
     #[serde(default)]
     pub input: input_config::PlatformInputConfig,
+
+    /// Platform configuration options for the session manager.
+    #[serde(default)]
+    pub session: session_manager_config::PlatformSessionManagerConfig,
 
     /// Platform configuration options for the SWD subsystem.
     pub software_delivery: Option<swd_config::SwdConfig>,
