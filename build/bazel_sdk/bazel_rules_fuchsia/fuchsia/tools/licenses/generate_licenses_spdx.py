@@ -36,8 +36,8 @@ def _create_doc_from_licenses_used_json(
     assert 'licenses' in licenses_used_dict
     json_list = licenses_used_dict['licenses']
 
-    package_id_factory = SpdxIdFactory.new_package_id_factory()
-    license_id_factory = SpdxIdFactory.new_license_id_factory()
+    package_id_factory = SpdxPackageIdFactory()
+    license_id_factory = SpdxLicenseIdFactory()
 
     packages = []
     describes = []
@@ -131,19 +131,21 @@ def _merge_duplicate_licenses(document: SpdxDocument):
     and see-alsos from the originals to void data loss.
     """
 
-    license_id_factory = SpdxIdFactory.new_license_id_factory()
-    id_replacer = SpdxIdReplacer(license_id_factory)
+    license_id_factory = SpdxLicenseIdFactory()
+    id_replacer = SpdxIdReplacer()
     unique_licenses: dict[Tuple, SpdxExtractedLicensingInfo] = {}
     for license in document.extracted_licenses:
         # What makes a unique license are the name and the text:
         key = (license.name, license.extracted_text)
         if key not in unique_licenses:
-            new_id = id_replacer.new_id(license.license_id)
+            new_id = license_id_factory.new_id()
+            id_replacer.replace_id(old_id=license.license_id, new_id=new_id)
             unique_licenses[key] = dataclasses.replace(
                 license, license_id=new_id)
         else:
             unique_license = unique_licenses[key]
-            id_replacer.map_id(license.license_id, unique_license.license_id)
+            id_replacer.replace_id(
+                old_id=license.license_id, new_id=unique_license.license_id)
             unique_licenses[key] = unique_license.merge_with(license)
 
     updated_licenses = list(unique_licenses.values())

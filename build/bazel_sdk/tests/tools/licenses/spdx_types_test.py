@@ -36,15 +36,29 @@ class TestSpdxTypes(unittest.TestCase):
         input = "LicenseRef-X AND (LicenseRef-Y+ OR LicenseRef-Z WITH LicenseRef-X)"
         exp = SpdxLicenseExpression.create(input)
 
-        id_replacer = SpdxIdReplacer(SpdxIdFactory.new_license_id_factory())
-        id_replacer.new_id("LicenseRef-X")
-        id_replacer.new_id("LicenseRef-Y")
-        id_replacer.new_id("LicenseRef-Z")
+        id_replacer = SpdxIdReplacer()
+        id_replacer.replace_id(old_id="LicenseRef-X", new_id="LicenseRef-0")
+        id_replacer.replace_id(old_id="LicenseRef-Y", new_id="LicenseRef-1")
+        id_replacer.replace_id(old_id="LicenseRef-Z", new_id="LicenseRef-2")
         exp = exp.replace_license_ids(id_replacer)
 
         self.assertEqual(
             "LicenseRef-0 AND (LicenseRef-1+ OR LicenseRef-2 WITH LicenseRef-0)",
             exp.serialize())
+
+    def test_license_id_replacer(self):
+        id_replacer = SpdxIdReplacer()
+        id_replacer.replace_id(old_id="old", new_id="new")
+        id_replacer.replace_id(old_id="foo", new_id="bar")
+
+        with self.assertRaises(LicenseException):
+            id_replacer.replace_id(old_id="foo", new_id="baz")
+
+        self.assertEquals(id_replacer.get_replaced_id("old"), "new")
+        self.assertEquals(id_replacer.get_replaced_id("foo"), "bar")
+
+        with self.assertRaises(LicenseException):
+            id_replacer.get_replaced_id("baz")
 
 
 if __name__ == '__main__':

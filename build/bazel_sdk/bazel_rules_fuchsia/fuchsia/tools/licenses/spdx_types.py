@@ -83,7 +83,7 @@ class SpdxLicenseExpression:
         return dataclasses.replace(
             self,
             license_ids=tuple(
-                [id_replacer.replaced_id(id) for id in self.license_ids]))
+                [id_replacer.get_replaced_id(id) for id in self.license_ids]))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -228,7 +228,9 @@ class SpdxDocument:
     extracted_licenses: List[SpdxExtractedLicensingInfo]
     spdx_id: str = _spdx_document_ref
 
-    def refactor_ids(self, package_id_factory, license_id_factory):
+    def refactor_ids(
+            self, package_id_factory: "SpdxPackageIdFactory",
+            license_id_factory: "SpdxLicenseIdFactory"):
         """
         Returns a copy of the document with all ids refactored.
 
@@ -236,30 +238,32 @@ class SpdxDocument:
         ids in the doc with new ones, and fixes all id references.
         """
 
-        package_id_replacer = SpdxIdReplacer(package_id_factory, self.file_path)
-        license_id_replacer = SpdxIdReplacer(license_id_factory, self.file_path)
+        package_id_replacer = SpdxIdReplacer(doc_location=self.file_path)
+        license_id_replacer = SpdxIdReplacer(doc_location=self.file_path)
 
-        new_extracted_licenses = [
-            dataclasses.replace(
-                el, license_id=license_id_replacer.new_id(el.license_id))
-            for el in self.extracted_licenses
-        ]
+        new_extracted_licenses = []
+        for el in self.extracted_licenses:
+            new_id = license_id_factory.new_id()
+            license_id_replacer.replace_id(old_id=el.license_id, new_id=new_id)
+            new_extracted_licenses.append(
+                dataclasses.replace(el, license_id=new_id))
+
         new_packages = []
         for p in self.packages:
             p = p.replace_license_ids(license_id_replacer)
-            new_packages.append(
-                dataclasses.replace(
-                    p, spdx_id=package_id_replacer.new_id(p.spdx_id)))
+            new_id = package_id_factory.new_id()
+            package_id_replacer.replace_id(old_id=p.spdx_id, new_id=new_id)
+            new_packages.append(dataclasses.replace(p, spdx_id=new_id))
 
         new_describes = [
-            package_id_replacer.replaced_id(d) for d in self.describes
+            package_id_replacer.get_replaced_id(d) for d in self.describes
         ]
         new_relationships = [
             dataclasses.replace(
                 r,
-                spdx_element_id=package_id_replacer.replaced_id(
+                spdx_element_id=package_id_replacer.get_replaced_id(
                     r.spdx_element_id),
-                related_spdx_element=package_id_replacer.replaced_id(
+                related_spdx_element=package_id_replacer.get_replaced_id(
                     r.related_spdx_element)) for r in self.relationships
         ]
         return dataclasses.replace(
@@ -503,55 +507,51 @@ class SpdxIndex:
         )
 
 
-class SpdxIdFactory:
-    """Factory for SPDX ids"""
+class SpdxPackageIdFactory:
+    """Factory for monotonically increasing SPDX package ids"""
 
     _next_id: int
 
-    def __init__(self, id_template):
-        self.id_template = id_template
+    def __init__(self):
         self._next_id = -1
 
     def new_id(self):
         self._next_id = self._next_id + 1
-        return self.id_template.format(id=self._next_id)
+        return "SPDXRef-Package-{id}".format(id=self._next_id)
 
-    def new_package_id_factory():
-        """A factory for SPDXIDs for packages"""
-        return SpdxIdFactory("SPDXRef-Package-{id}")
 
-    def new_license_id_factory():
-        """A factory for LicenseRef ids"""
-        return SpdxIdFactory("LicenseRef-{id}")
+class SpdxLicenseIdFactory:
+    """Factory for monotonically increasing SPDX license ids"""
+
+    _next_id: int
+
+    def __init__(self):
+        self._next_id = -1
+
+    def new_id(self):
+        self._next_id = self._next_id + 1
+        return "LicenseRef-{id}".format(id=self._next_id)
 
 
 class SpdxIdReplacer:
     """Helper for replacing Spdx Ids"""
 
     _replaced_ids: Dict[str, str]
+    _doc_location: str
 
-    def __init__(self, id_factory: SpdxIdFactory, doc_location: str = None):
-        self._id_factory = id_factory
+    def __init__(self, doc_location: str = None):
         self._doc_location = doc_location
         self._replaced_ids = {}
 
-    def new_id(self, old_id):
-        """Returns a new id"""
+    def replace_id(self, old_id, new_id):
+        """Maps an old id to a new id that replaces it"""
         if old_id in self._replaced_ids:
             raise LicenseException(
-                f"'{old_id}' declared twice", self._doc_location)
-        new_id = self._id_factory.new_id()
-        self._replaced_ids[old_id] = new_id
-        return new_id
-
-    def map_id(self, old_id, new_id):
-        """Maps an old id to a predefined new id"""
-        if old_id in self._replaced_ids:
-            raise LicenseException(
-                f"'{old_id}' already mapped", self._doc_location)
+                f"Can't map old_id='{old_id}' to new_id='{new_id}'. It is already mapped to '{self._replaced_ids[old_id]}'",
+                self._doc_location)
         self._replaced_ids[old_id] = new_id
 
-    def replaced_id(self, old_id):
+    def get_replaced_id(self, old_id):
         """Returns the new id associated with the given id"""
         if old_id is None:
             return old_id
