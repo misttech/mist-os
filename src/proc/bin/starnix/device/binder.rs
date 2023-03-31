@@ -3159,14 +3159,6 @@ impl BinderDriver {
         let mut transaction_state =
             TransientTransactionState::new(target_resource_accessor, target_proc);
 
-        // The current code only iterate once, but does multiple call to the source and target
-        // ResourceAccessor. For performance reason it might be more interesting to iterate over
-        // the buffer twice:
-        // 1. Iterate a first time to gather all the resources to access / transfer
-        // 2. Gather/Transder all required resources.
-        // 3. Iterate a second time to write the transaction data to the target process
-        //
-        // This would be particularly useful when accessing a remote process.
         let mut sg_remaining_buffer = sg_buffer.user_buffer();
         let mut sg_buffer_offset = 0;
         for (offset_idx, object_offset) in offsets.iter().map(|o| *o as usize).enumerate() {
@@ -3334,15 +3326,12 @@ impl BinderDriver {
 
                     // Dup each file descriptor and re-write the value of the new FD.
                     for fd in fd_array {
-                        let source_fd = FdNumber::from_raw(*fd as i32);
-                        let (file, flags) =
-                            source_resource_accessor.get_file_with_flags(source_fd)?;
+                        let (file, flags) = source_resource_accessor
+                            .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
                         let new_fd = target_resource_accessor.add_file_with_flags(file, flags)?;
+
                         // Close this FD if the transaction fails.
                         transaction_state.push_fd(new_fd);
-
-                        // Files in a FileArray are expected to be closed by the kernel.
-                        source_resource_accessor.close_fd(source_fd)?;
 
                         *fd = new_fd.raw() as u32;
                     }
@@ -3483,8 +3472,7 @@ enum SerializedBinderObject {
     /// implementation.
     Buffer { buffer: UserAddress, length: usize, parent: usize, parent_offset: usize, flags: u32 },
     /// A `BINDER_TYPE_FDA` object. Identifies an array of file descriptors in a parent buffer that
-    /// must be duped into the receiver's file descriptor table. The fds must then be closed in the
-    /// source process.
+    /// must be duped into the receiver's file descriptor table.
     FileArray { num_fds: usize, parent: usize, parent_offset: usize },
 }
 
@@ -5530,12 +5518,6 @@ mod tests {
             "FD in receiver does not refer to the same file as sender"
         );
         assert_eq!(receiver_fd_flags, FdFlags::CLOEXEC);
-
-        // Verify that the source fds have been closed.
-        for fd in sender_fds {
-            assert_eq!(test.sender_task.files.get(fd).expect_err("bad fd"), errno!(EBADF));
-            assert_matches!(test.sender_task.files.get(fd), Err(x) if x == EBADF);
-        }
     }
 
     #[fuchsia::test]
