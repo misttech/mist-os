@@ -112,6 +112,10 @@
                 "overriding_rules": [
                     {
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "public_source_mirrors": [
+                            "http://mirror1",
+                            "http://mirror2"
+                        ],
                         "override_condition_to": "allowed condition",
                         "bug": "fxb/456",
                         "comment": [
@@ -160,6 +164,10 @@
                         ]
                     }
                 },
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,

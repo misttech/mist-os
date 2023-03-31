@@ -26,6 +26,10 @@
         "comment": [
             "This is another test override rule"
         ],
+        "public_source_mirrors": [
+            "http://mirror1",
+            "http://mirror2"
+        ],
         "match_criteria": {
             "license_names": [
                 "Baz"

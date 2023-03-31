@@ -28,6 +28,8 @@ class IdentifiedSnippet:
     condition: str = None
     # Conditions from overriding rules
     overriden_conditions: List[str] = None
+    # Optional public source code mirroring urls (supplied by some override rules)
+    public_source_mirrors: List[str] = None
     # Dependents that were not matched by any rule
     dependents_unmatched_by_overriding_rules: List[str] = None
     # all rules that matched this IdentifiedSnippet
@@ -114,6 +116,8 @@ class IdentifiedSnippet:
         if self.suggested_override_rule:
             out["suggested_override_rule"] = self.suggested_override_rule.to_json_dict(
             )
+        if self.public_source_mirrors:
+            out["public_source_mirrors"] = self.public_source_mirrors
 
         out.update(
             {
@@ -146,6 +150,8 @@ class IdentifiedSnippet:
                 "verification_message", default=None),
             overriden_conditions=reader.get_or(
                 "overriden_conditions", default=None, expected_type=list),
+            public_source_mirrors=reader.get_or(
+                "public_source_mirrors", default=None, expected_type=list),
             dependents_unmatched_by_overriding_rules=reader.get_or(
                 "dependents_unmatched_by_overriding_rules",
                 default=None,
@@ -177,6 +183,7 @@ class IdentifiedSnippet:
         all_matching_rules = []
 
         new_conditions = set()
+        public_source_mirrors = set()
 
         remaining_dependents = set(license.dependents)
         for rule in rules:
@@ -198,6 +205,9 @@ class IdentifiedSnippet:
                 continue
 
             new_conditions.add(rule.override_condition_to)
+            if rule.public_source_mirrors:
+                public_source_mirrors.update(rule.public_source_mirrors)
+
             all_matching_rules.append(rule)
             for d in some_matching_dependents:
                 if d in remaining_dependents:
@@ -210,6 +220,7 @@ class IdentifiedSnippet:
                 dependents_unmatched_by_overriding_rules=sorted(
                     list(remaining_dependents)),
                 overriding_rules=all_matching_rules,
+                public_source_mirrors=sorted(list(public_source_mirrors)),
             )
         else:
             return self
@@ -441,6 +452,13 @@ class LicenseClassification:
             if msg:
                 out.append(msg)
         return out
+
+    def all_public_source_mirrors(self) -> List[str]:
+        out = []
+        for i in self.identifications:
+            if i.public_source_mirrors:
+                out.extend(i.public_source_mirrors)
+        return sorted(list(set(out)))
 
 
 @dataclasses.dataclass(frozen=True)
@@ -731,6 +749,9 @@ class ConditionOverrideRule:
     rule_file_path: str
     # Will override the condition to this condition
     override_condition_to: str
+    # Optional public source mirroring urls.
+    public_source_mirrors: List[str]
+    # Issue tracker URL.
     bug: str
     # List facilitates easier to read multi-line comments in JSON.
     comment: List[str]
@@ -799,10 +820,13 @@ class ConditionOverrideRule:
 
         # If there is a rule_file_path value in the dict, use it instead.
         rule_file_path = reader.get_or("rule_file_path", default=rule_file_path)
+        public_source_mirrors = reader.get_or(
+            "public_source_mirrors", default=None, expected_type=list)
 
         return ConditionOverrideRule(
             rule_file_path=rule_file_path,
             override_condition_to=override_condition_to,
+            public_source_mirrors=public_source_mirrors,
             bug=bug,
             comment=comment,
             match_license_names=match_license_names,
@@ -817,6 +841,9 @@ class ConditionOverrideRule:
         out = {}
         if self.rule_file_path:
             out["rule_file_path"] = self.rule_file_path
+
+        if self.public_source_mirrors:
+            out["public_source_mirrors"] = self.public_source_mirrors
 
         out.update(
             {
@@ -850,6 +877,7 @@ class ConditionOverrideRule:
             rule_file_path=None,
             override_condition_to="<CHOOSE ONE OF " +
             ", ".join([f"'{c}'" for c in allowed_conditions]) + ">",
+            public_source_mirrors=None,
             bug="<INSERT TICKET URL>",
             comment=["<INSERT DOCUMENTATION FOR OVERRIDE RULE>"],
             match_license_names=StringMatcher.create([license.name]),

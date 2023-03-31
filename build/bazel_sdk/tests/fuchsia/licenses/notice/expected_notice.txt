@@ -3,6 +3,10 @@ The following license text(s) applies to these projects:
  • Package A
  • Package B
 
+The projects source is hosted at:
+ • http://mirror1
+ • http://mirror2
+
 Test License X
 ================================================================================
 The following license text(s) applies to these projects:

@@ -28,6 +28,10 @@
                 "end_line": 4,
                 "snippet_checksum": "fa2258a0fd04107e67394fdb57c0eecf",
                 "snippet_text": "Some forbidden\ntest license 2",
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
                 "overriden_conditions": [
                     "allowed_condition"
                 ],

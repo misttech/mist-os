@@ -10,6 +10,7 @@ import os
 from sys import stderr
 from typing import Set, List
 import zipfile
+from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
 
@@ -27,6 +28,14 @@ def main():
         required=True,
     )
     parser.add_argument(
+        '--classifications',
+        help='A json file containing the classification output of'
+        ' the `fuchsia_licenses_classification` rule. When present,'
+        ' post-classification information such as public source mirrors'
+        ' are added to the generated notice.',
+        required=False,
+    )
+    parser.add_argument(
         '--output_file',
         help='Where to write the notice text file.',
         required=True,
@@ -40,6 +49,12 @@ def main():
     _log(f'Reading license info from {spdx_input}!')
     spdx_doc = SpdxDocument.from_json(spdx_input)
     spdx_index = SpdxIndex.create(spdx_doc)
+
+    if args.classifications:
+        classifications = LicensesClassifications.from_json(
+            args.classifications)
+    else:
+        classifications = LicensesClassifications.create_empty()
 
     output_path = args.output_file
     _log(f'Writing {output_path}...')
@@ -65,13 +80,25 @@ def main():
 
         for unique_text, licenses in licenses_by_unique_text.items():
             write_delimiter()
-            write('The following license text(s) applies to these projects:\n')
             unique_package_names = set()
+            unique_public_source_mirrors = set()
             for license in licenses:
                 for package in spdx_index.get_packages_by_license(license):
                     unique_package_names.add(package.name)
+
+            if license.license_id in classifications.classifications_by_id:
+                classification = classifications.classifications_by_id[
+                    license.license_id]
+                unique_public_source_mirrors.update(
+                    classification.all_public_source_mirrors())
+
+            write('The following license text(s) applies to these projects:\n')
             for package_name in sorted(list(unique_package_names)):
                 write(f' • {package_name}\n')
+            if unique_public_source_mirrors:
+                write('\nThe projects source is hosted at:\n')
+                for mirror in sorted(list(unique_public_source_mirrors)):
+                    write(f' • {mirror}\n')
 
             write('\n')
             write(unique_text)

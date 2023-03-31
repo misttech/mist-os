@@ -1,0 +1,22 @@
+[
+    {
+        "license_id": "LicenseRef-X",
+        "name": "License X",
+        "identifications": [
+            {
+                "identified_as": "License Kind Foo",
+                "condition": "notice",
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "xyz",
+                "snippet_text": "some text",
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ]
+            }
+        ],
+        "identification_stats": {}
+   }
+]

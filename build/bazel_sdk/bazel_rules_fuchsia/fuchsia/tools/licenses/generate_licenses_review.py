@@ -47,6 +47,7 @@ def _write_summary_csv(
                 "link",
                 "tracking_issues",
                 "comments",
+                "public_source_mirrors",
                 # The following 'debugging' fields begin with _ so can be easily
                 # filtered/hidden/sorted once in a spreadsheet.
                 "_spdx_license_id",
@@ -68,6 +69,7 @@ def _write_summary_csv(
             detailed_overrides = []
             tracking_issues = []
             comments = []
+            public_source_mirrors = []
             identification_stats = {}
             if license_id in classifications.classifications_by_id:
                 license_classification = classifications.classifications_by_id[
@@ -99,6 +101,8 @@ def _write_summary_csv(
                             )
                             tracking_issues.append(r.bug)
                             comments.append("\n".join(r.comment))
+                    if i.public_source_mirrors:
+                        public_source_mirrors.extend(i.public_source_mirrors)
 
             row = {
                 # License review columns
@@ -116,6 +120,8 @@ def _write_summary_csv(
                     "\n".join(_dedup(tracking_issues)),
                 "comments":
                     "\n=======\n".join(_dedup(comments)),
+                "public_source_mirrors":
+                    "\n".join(_dedup(public_source_mirrors)),
                 # Advanced / debugging columns
                 "_spdx_license_id":
                     license_id,
@@ -152,6 +158,7 @@ def _write_detailed_csv(
                 "overriding_rules",
                 "tracking_issues",
                 "comments",
+                "public_source_mirrors",
                 "snippet_checksum",
                 "snippet_text",
             ])
@@ -203,6 +210,9 @@ def _write_detailed_csv(
                                 for r in identification.overriding_rules
                                 if r.bug
                             ])
+                    if identification.public_source_mirrors:
+                        row["public_source_mirrors"] = "\n".join(
+                            _dedup(identification.public_source_mirrors))
 
                     writer.writerow(row)
 

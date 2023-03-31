@@ -43,7 +43,10 @@ py_binary(
     srcs = ["generate_licenses_notice.py"],
     main = "generate_licenses_notice.py",
     python_version = "PY3",
-    deps = [":spdx_types"],
+    deps = [
+        ":classification_types",
+        ":spdx_types",
+    ],
 )
 
 py_binary(
