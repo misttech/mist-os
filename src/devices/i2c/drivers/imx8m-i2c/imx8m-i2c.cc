@@ -425,8 +425,8 @@ zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
 
   pdev_device_info_t info;
   if ((status = pdev.GetDeviceInfo(&info)) != ZX_OK) {
-    zxlogf(ERROR, "pdev_get_device_info failed");
-    return ZX_ERR_NOT_SUPPORTED;
+    zxlogf(ERROR, "pdev_get_device_info failed: %s", zx_status_get_string(status));
+    return status;
   }
 
   if (info.mmio_count != 1 || info.irq_count != 1) {
@@ -443,6 +443,7 @@ zx_status_t Imx8mI2c::Create(void* ctx, zx_device_t* parent) {
 
   zx::interrupt irq;
   if ((status = pdev.GetInterrupt(0, 0, &irq)) != ZX_OK) {
+    zxlogf(ERROR, "pdev GetInterrupt failed: %s", zx_status_get_string(status));
     return status;
   }
 
