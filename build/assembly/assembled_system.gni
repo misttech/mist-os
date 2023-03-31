@@ -247,6 +247,8 @@ template("assembled_system") {
   assert(!generate_fvm || !generate_fxfs,
          "Only one of Fxfs and FVM can host blobs")
   _supports_blobs = generate_fvm || generate_fxfs
+  _has_fastboot_fvm = generate_fvm && (fvm_emmc_partition_size != false ||
+                                       fvm_ftl_nand_block_count != false)
 
   generate_image_metadata = true
   if (defined(invoker.generate_image_metadata)) {
@@ -412,13 +414,17 @@ template("assembled_system") {
     zbi = "${outdir}/${image_name}.zbi"
     zbi_signed = "${zbi}.signed"
     vbmeta = "${outdir}/${image_name}.vbmeta"
-    blobfs = "${outdir}/blob.blk"
-    fvm = "${outdir}/fvm.blk"
-    fvm_sparse = "${outdir}/fvm.sparse.blk"
-    fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
-    fvm_fastboot_tmp = "${outdir}/fvm.fastboot.tmp.blk"
-    fvm_fastboot = "${outdir}/fvm.fastboot.blk"
-    fxfs = "${outdir}/fxfs.blk"
+
+    if (generate_fvm) {
+      blobfs = "${outdir}/blob.blk"
+      fvm = "${outdir}/fvm.blk"
+      fvm_sparse = "${outdir}/fvm.sparse.blk"
+      fvm_blob_sparse = "${outdir}/fvm.blob.sparse.blk"
+      fvm_fastboot_tmp = "${outdir}/fvm.fastboot.tmp.blk"
+      fvm_fastboot = "${outdir}/fvm.fastboot.blk"
+    } else if (generate_fxfs) {
+      fxfs = "${outdir}/fxfs.blk"
+    }
 
     base_package = "${outdir}/base/meta.far"
     base_package_manifest = "${outdir}/base/package_manifest.json"
@@ -1069,8 +1075,7 @@ template("assembled_system") {
           files.blobfs,
           files.fvm_blob_sparse,
         ]
-        if (fvm_emmc_partition_size != false ||
-            fvm_ftl_nand_block_count != false) {
+        if (_has_fastboot_fvm) {
           outputs += [ files.fvm_fastboot ]
           if (fvm_ftl_nand_block_count != false) {
             outputs += [ files.fvm_fastboot_tmp ]
@@ -1229,7 +1234,7 @@ template("assembled_system") {
         }
 
         # Optionally include the blob-only sparse FVM.
-        if (include_fvm_blob_sparse) {
+        if (generate_fvm && include_fvm_blob_sparse) {
           images += [
             {
               name = "${image_name}.fvm_blob_sparse"
@@ -1242,7 +1247,7 @@ template("assembled_system") {
         }
 
         # Optionally include the fastboot FVM.
-        if (fvm_partition != "") {
+        if (_has_fastboot_fvm) {
           images += [
             {
               name = "${image_name}.fvm_fastboot"

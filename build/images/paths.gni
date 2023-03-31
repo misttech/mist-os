@@ -77,10 +77,14 @@ files = {
   if (!use_bringup_assembly) {
     blobfs = "${assembly_outdir}/blob.blk"
 
-    fvm = "${assembly_outdir}/fvm.blk"
-    fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
+    if (fvm_partition != "") {
+      fvm = "${assembly_outdir}/fvm.blk"
+      fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
+    } else if (fxfs_partition != "") {
+      fxfs = "${assembly_outdir}/fxfs.blk"
+    }
 
-    if (include_fvm_blob_sparse) {
+    if (fvm_partition != "" && include_fvm_blob_sparse) {
       fvm_blob_sparse = "${assembly_outdir}/fvm.blob.sparse.blk"
     }
 
