@@ -7752,7 +7752,7 @@ Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:20
+From //src/starnix/kernel/BUILD.gn:20
 
 ### starnix_disable_tracing
 
@@ -7766,7 +7766,7 @@ From //src/proc/bin/starnix/BUILD.gn:23
 
 **Current value (from the default):** `false`
 
-From //src/proc/bin/starnix/BUILD.gn:16
+From //src/starnix/kernel/BUILD.gn:16
 
 ### target_cpu
 
@@ -8872,4 +8872,3 @@ From //third_party/mesa/src/intel/vulkan/BUILD.gn:30
 **Current value (from the default):** `"//third_party/android/device/generic/goldfish-opengl:libvulkan_goldfish"`
 
 From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:11
-

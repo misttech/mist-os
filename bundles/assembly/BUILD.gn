@@ -525,7 +525,7 @@ assembly_input_bundle("common_minimal_userdebug") {
 assembly_input_bundle("starnix_support") {
   cache_packages = [ "//src/proc/bin/manager:starnix_package" ]
   if (target_cpu == "x64") {
-    cache_packages += [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    cache_packages += [ "//src/starnix/kernel:starnix_kernel_package" ]
   }
   compiled_packages = [
     {

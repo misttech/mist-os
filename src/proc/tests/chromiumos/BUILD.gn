@@ -55,7 +55,7 @@ fuchsia_test_package("test_chromiumos_distro") {
   }
 
   if (target_cpu == "x64") {
-    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
   }
   deps = [ ":container_resources" ]
 }
@@ -80,7 +80,7 @@ if (target_cpu == "x64") {
 
     deps = [ ":container_resources" ]
 
-    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
 
     test_specs = {
       log_settings = {

@@ -25,5 +25,5 @@ to report a bug or file a feature request, create an issue in the
 
 [glossary.runner]: /docs/glossary/README.md#runner
 [starnix-rfc]: /docs/contribute/governance/rfcs/0082_starnix.md
-[starnix-readme]: /src/proc/bin/starnix/README.md
+[starnix-readme]: /src/starnix/kernel/README.md
 [starnix-monorail-component]: https://bugs.fuchsia.dev/p/fuchsia/issues/list?q=component:Starnix

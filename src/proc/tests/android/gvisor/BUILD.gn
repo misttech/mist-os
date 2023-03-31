@@ -5,7 +5,7 @@
 import("//build/dist/zip_resource.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
-import("//src/proc/bin/starnix/starnix.gni")
+import("//src/starnix/kernel/starnix.gni")
 
 group("gvisor") {
   testonly = true
@@ -344,7 +344,7 @@ fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
   deps = [ ":container_resources" ]
 
   if (target_cpu == "x64") {
-    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
   }
 
   test_components = []
@@ -382,7 +382,7 @@ fuchsia_test_package("starnix_gvisor_benchmarks") {
   }
 
   if (target_cpu == "x64") {
-    subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+    subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
   }
 
   # Set environments to none so infra doesn't run these benchmarks.

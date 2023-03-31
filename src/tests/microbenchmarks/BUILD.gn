@@ -283,7 +283,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     test_components = [ ":starnix_microbenchmarks_component" ]
 
     if (target_cpu == "x64") {
-      subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+      subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
     }
 
     deps = [
@@ -297,7 +297,7 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     testonly = true
 
     if (target_cpu == "x64") {
-      subpackages = [ "//src/proc/bin/starnix:starnix_kernel_package" ]
+      subpackages = [ "//src/starnix/kernel:starnix_kernel_package" ]
     }
 
     deps = [

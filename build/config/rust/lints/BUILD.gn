@@ -88,6 +88,7 @@ config("allow_unused_results") {
     "//src/security/*",
     "//src/session/*",
     "//src/settings/service:*",
+    "//src/starnix/*",
     "//src/storage/*",
     "//src/sys/*",
     "//src/testing/*",

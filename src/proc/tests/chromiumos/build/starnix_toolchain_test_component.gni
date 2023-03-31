@@ -5,7 +5,7 @@
 import("//build/components.gni")
 import(
     "//src/lib/testing/expectation/fuchsia_test_component_with_expectations.gni")
-import("//src/proc/bin/starnix/starnix.gni")
+import("//src/starnix/kernel/starnix.gni")
 
 # Defines a Fuchsia component that contains a test binary built with a specific toolchain.
 #

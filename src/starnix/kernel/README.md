@@ -8,10 +8,10 @@ welcome!
 
 ### Configure your build
 
-In order to run starnix, we need to build `//src/proc`:
+In order to run starnix, we need to build `//src/starnix`:
 
 ```sh
-fx set core.x64 --with //src/proc,//src/proc:tests
+fx set core.x64 --with //src/starnix,//src/starnix:tests
 fx build
 ```
 
@@ -110,7 +110,7 @@ If you set the log level to `TRACE` (e.g.,  `ffx log --severity TRACE --select "
 [629.604][starnix][I] exit_group: pid=3 exit_code=1
 ```
 
-For GUnit tests (such as the syscall tests in //src/proc/tests/android/gvisor),
+For GUnit tests (such as the syscall tests in //src/starnix/tests/android/gvisor),
 you can run specific tests with the `--test-filter` flag. For example,
 
 ```sh
@@ -161,7 +161,7 @@ Android NDK. You can substitute your own prebuilt binary using the
 `starnix_syscalls_test_label` GN argument:
 
 ```sh
-fx set core.x64 --args 'starnix_syscalls_test_label="//local/starnix/syscalls"' --with //src/proc,//src/proc:tests
+fx set core.x64 --args 'starnix_syscalls_test_label="//local/starnix/syscalls"' --with //src/starnix,//src/starnix:tests
 ```
 
 Build your `syscalls` binary and put the file in `//local/starnix/syscalls`.

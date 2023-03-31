@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//src/proc/bin/starnix/starnix.gni")
+import("//src/starnix/kernel/starnix.gni")
 
 group("containers") {
   if (target_cpu == "x64" && !is_asan) {
