@@ -8,7 +8,6 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/io-buffer.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/mmio/mmio-buffer.h>

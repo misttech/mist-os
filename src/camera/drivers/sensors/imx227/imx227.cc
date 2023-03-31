@@ -7,7 +7,6 @@
 #include <endian.h>
 #include <fuchsia/hardware/camera/sensor/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver-unit-test/utils.h>
 #include <lib/fpromise/result.h>

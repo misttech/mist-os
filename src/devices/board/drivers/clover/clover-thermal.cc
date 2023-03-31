@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 

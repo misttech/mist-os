@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
 #include <zircon/syscalls/smc.h>
 

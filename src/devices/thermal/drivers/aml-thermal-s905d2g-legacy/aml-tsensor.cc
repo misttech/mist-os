@@ -5,7 +5,6 @@
 #include "aml-tsensor.h"
 
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <string.h>
 #include <threads.h>

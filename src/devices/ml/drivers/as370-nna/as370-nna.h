@@ -6,7 +6,6 @@
 #define SRC_DEVICES_ML_DRIVERS_AS370_NNA_AS370_NNA_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <zircon/fidl.h>

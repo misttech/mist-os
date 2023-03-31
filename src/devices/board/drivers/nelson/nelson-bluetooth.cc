@@ -9,7 +9,6 @@
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/mmio/mmio.h>

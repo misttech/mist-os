@@ -6,7 +6,6 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/image-format/image_format.h>
 #include <lib/syslog/cpp/macros.h>

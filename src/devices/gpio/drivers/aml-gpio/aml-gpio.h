@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>

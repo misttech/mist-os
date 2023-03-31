@@ -6,7 +6,6 @@
 #define SRC_UI_BACKLIGHT_DRIVERS_TI_LP8556_TI_LP8556_H_
 
 #include <fidl/fuchsia.hardware.adhoc.lp8556/cpp/wire.h>
-#include <lib/ddk/hw/reg.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>

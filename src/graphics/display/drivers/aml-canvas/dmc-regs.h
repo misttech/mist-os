@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AML_CANVAS_DMC_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AML_CANVAS_DMC_REGS_H_
 
-#include <lib/ddk/hw/reg.h>
 
 #include <hwreg/bitfields.h>
 
