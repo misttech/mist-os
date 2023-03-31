@@ -155,24 +155,22 @@ template("gigaboot_esp") {
   esp(target_name) {
     output_name = target_name
 
-    if (use_gigaboot) {
-      gigaboot_target = ":$_efi_target($efi_toolchain)"
-      gigaboot_bin = get_label_info("$gigaboot_target", "root_out_dir") + "/" +
-                     get_label_info(gigaboot_target, "name") + ".efi"
-      metadata = {
-        images = [
-          {
-            label = get_label_info(":$target_name", "label_with_toolchain")
-            archive = true
-            bootserver_pave = [ "--bootloader" ]
-            bootserver_pave_zedboot = [ "--bootloader" ]
-            fastboot_flash = [ "fuchsia-esp" ]
-            name = "${target_name}.esp"
-            path = "${target_name}.esp.blk"
-            type = "blk"
-          },
-        ]
-      }
+    gigaboot_target = ":$_efi_target($efi_toolchain)"
+    gigaboot_bin = get_label_info(gigaboot_target, "root_out_dir") + "/" +
+                   get_label_info(gigaboot_target, "name") + ".efi"
+    metadata = {
+      images = [
+        {
+          label = get_label_info(":$target_name", "label_with_toolchain")
+          archive = true
+          bootserver_pave = [ "--bootloader" ]
+          bootserver_pave_zedboot = [ "--bootloader" ]
+          fastboot_flash = [ "fuchsia-esp" ]
+          name = "${target_name}.esp"
+          path = "${target_name}.esp.blk"
+          type = "blk"
+        },
+      ]
     }
   }
 }

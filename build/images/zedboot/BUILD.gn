@@ -113,32 +113,7 @@ assembled_system("zedboot_assembly") {
   }
 }
 
-if (target_cpu != "arm64" && !use_vboot) {
-  esp("esp") {
-    output_name = "zedboot"
-    cmdline = "efi_cmdline.txt"
-    deps = [ ":zedboot_assembly" ]
-    zedboot = "$root_build_dir/zedboot.zbi"
-    testonly = true
-
-    metadata = {
-      images = [
-        {
-          label = get_label_info(":$target_name", "label_with_toolchain")
-          mkzedboot_mode = [ "efi" ]
-          name = "zedboot-efi"
-          path = "zedboot.esp.blk"
-          type = "blk"
-        },
-      ]
-    }
-  }
-}
-
 group("zedboot") {
   public_deps = [ ":zedboot_assembly" ]
-  if (target_cpu != "arm64" && !use_vboot) {
-    public_deps += [ ":esp" ]
-  }
   testonly = true
 }
