@@ -22,16 +22,16 @@ func deepCopy(x, y interface{}) error {
 func TestValidation(t *testing.T) {
 	platforms := []build.DimensionSet{
 		{
-			DeviceType: "qemu",
-			CPU:        "arm64",
+			"device_type": "qemu",
+			"cpu":         "arm64",
 		},
 		{
-			DeviceType: "nuc",
-			CPU:        "x64",
+			"device_type": "nuc",
+			"cpu":         "x64",
 		},
 		{
-			OS:  "Fuchsia",
-			CPU: "x64",
+			"os":  "Fuchsia",
+			"cpu": "x64",
 		},
 	}
 
@@ -51,7 +51,7 @@ func TestValidation(t *testing.T) {
 		Envs: []build.Environment{
 			{
 				Dimensions: build.DimensionSet{
-					OS: "Fuchsia",
+					"os": "Fuchsia",
 				},
 			},
 		},
@@ -87,7 +87,7 @@ func TestValidation(t *testing.T) {
 		spec.Envs = []build.Environment{
 			{
 				Dimensions: build.DimensionSet{
-					OS: "Mac",
+					"os": "Mac",
 				},
 			},
 		}

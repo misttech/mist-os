@@ -160,7 +160,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 	// Logic to get the environment name at this stage have to include information
 	// from the test specification that is not necessarily used in other
 	// usages of the environmentName function.
-	var calcShardName = func(env build.Environment, spec build.TestSpec) string {
+	calcShardName := func(env build.Environment, spec build.TestSpec) string {
 		envName := environmentName(env)
 		if spec.Test.Isolated {
 			envName = fmt.Sprintf("%s-%s", envName, normalizeTestName(spec.Test.Name))
@@ -245,10 +245,10 @@ func environmentName(env build.Environment) string {
 		}
 	}
 
-	addToken(env.Dimensions.DeviceType)
-	addToken(env.Dimensions.OS)
-	addToken(env.Dimensions.Testbed)
-	addToken(env.Dimensions.Pool)
+	addToken(env.Dimensions.DeviceType())
+	addToken(env.Dimensions.OS())
+	addToken(env.Dimensions.Testbed())
+	addToken(env.Dimensions.Pool())
 	if env.ServiceAccount != "" {
 		addToken(strings.Split(env.ServiceAccount, "@")[0])
 	}

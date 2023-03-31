@@ -38,22 +38,22 @@ func affectedShard(env build.Environment, os string, ids ...int) *Shard {
 
 func TestSplitOutMultipliers(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "NUC"},
+		Dimensions: build.DimensionSet{"device_type": "NUC"},
 		Tags:       []string{},
 	}
 	env3 := build.Environment{
-		Dimensions: build.DimensionSet{OS: "linux"},
+		Dimensions: build.DimensionSet{"os": "linux"},
 		Tags:       []string{},
 	}
 
 	makeModifierMatch := func(id int, env build.Environment, runs int) ModifierMatch {
 		os := "fuchsia"
-		if !envsEqual(env, build.Environment{}) && env.Dimensions.OS != "" {
-			os = env.Dimensions.OS
+		if !envsEqual(env, build.Environment{}) && env.Dimensions.OS() != "" {
+			os = env.Dimensions.OS()
 		}
 		return ModifierMatch{
 			Test: fullTestName(id, os),
@@ -462,11 +462,11 @@ func TestSplitOutMultipliers(t *testing.T) {
 
 func TestAddExpectedDurationTags(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{OS: "linux"},
+		Dimensions: build.DimensionSet{"os": "linux"},
 		Tags:       []string{},
 	}
 	shardWithDurations := func(s *Shard, durations ...time.Duration) *Shard {
@@ -523,18 +523,18 @@ func TestAddExpectedDurationTags(t *testing.T) {
 
 func TestApplyModifiers(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{OS: "linux"},
+		Dimensions: build.DimensionSet{"os": "linux"},
 		Tags:       []string{},
 	}
 
 	makeModifierMatch := func(id int, env build.Environment, affected bool, maxAttempts, totalRuns int) ModifierMatch {
 		os := "fuchsia"
-		if env.Dimensions.OS != "" {
-			os = env.Dimensions.OS
+		if env.Dimensions.OS() != "" {
+			os = env.Dimensions.OS()
 		}
 		return ModifierMatch{
 			Test: fullTestName(id, os),
@@ -742,11 +742,11 @@ func TestApplyModifiers(t *testing.T) {
 
 func TestPartitionShards(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "NUC"},
+		Dimensions: build.DimensionSet{"device_type": "NUC"},
 		Tags:       []string{},
 	}
 	shardWithAffected := func(s *Shard, affectedIndices ...int) *Shard {
@@ -832,10 +832,10 @@ func TestPartitionShards(t *testing.T) {
 
 func TestMarkShardsSkipped(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU"},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "NUC"},
+		Dimensions: build.DimensionSet{"device_type": "NUC"},
 	}
 
 	summary := func(os string, ids ...int) runtests.TestSummary {
@@ -989,11 +989,11 @@ func assertShardsContainRunConfigs(t *testing.T, shards []*Shard, expectedShards
 
 func TestWithTargetDuration(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "env1"},
+		Dimensions: build.DimensionSet{"device_type": "env1"},
 		Tags:       []string{"env1"},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "env2"},
+		Dimensions: build.DimensionSet{"device_type": "env2"},
 		Tags:       []string{"env2"},
 	}
 	defaultInput := []*Shard{shard(env1, "fuchsia", 1, 2, 3, 4, 5, 6)}

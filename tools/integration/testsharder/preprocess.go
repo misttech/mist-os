@@ -63,17 +63,10 @@ func validateAgainst(spec build.TestSpec, platforms []build.DimensionSet) error 
 // resolvesTo gives a partial ordering on DimensionSets in which one resolves to
 // another if the former's dimensions are given the latter.
 func resolvesTo(this, that build.DimensionSet) bool {
-	if this.DeviceType != "" && this.DeviceType != that.DeviceType {
-		return false
-	}
-	if this.OS != "" && this.OS != that.OS {
-		return false
-	}
-	if this.Testbed != "" && this.Testbed != that.Testbed {
-		return false
-	}
-	if this.Pool != "" && this.Pool != that.Pool {
-		return false
+	for k, v := range this {
+		if v != "" && v != that[k] {
+			return false
+		}
 	}
 	return true
 }

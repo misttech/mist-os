@@ -65,15 +65,15 @@ func shard(env build.Environment, os string, ids ...int) *Shard {
 
 func TestMakeShards(t *testing.T) {
 	env1 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "QEMU"},
+		Dimensions: build.DimensionSet{"device_type": "QEMU"},
 		Tags:       []string{},
 	}
 	env2 := build.Environment{
-		Dimensions: build.DimensionSet{DeviceType: "NUC"},
+		Dimensions: build.DimensionSet{"device_type": "NUC"},
 		Tags:       []string{},
 	}
 	env3 := build.Environment{
-		Dimensions: build.DimensionSet{OS: "Linux"},
+		Dimensions: build.DimensionSet{"os": "Linux"},
 		Tags:       []string{},
 	}
 

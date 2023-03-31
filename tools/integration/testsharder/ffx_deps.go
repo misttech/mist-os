@@ -24,13 +24,13 @@ func AddFFXDeps(s *Shard, buildDir string, images []build.Image, flash bool) err
 			return err
 		}
 		s.AddDeps(deps)
-	} else if flash && s.Env.Dimensions.DeviceType != "" {
+	} else if flash && s.Env.Dimensions.DeviceType() != "" {
 		deps, err := ffxutil.GetFlashDeps(buildDir, "fuchsia")
 		if err != nil {
 			return err
 		}
 		s.AddDeps(deps)
-	} else if s.Env.Dimensions.DeviceType != "" && s.Env.ImageOverrides.IsEmpty() {
+	} else if s.Env.Dimensions.DeviceType() != "" && s.Env.ImageOverrides.IsEmpty() {
 		deps := []string{}
 		for _, image := range images {
 			// This provisions the images used by `ffx target bootloader boot` in botanist:

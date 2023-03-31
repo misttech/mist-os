@@ -42,7 +42,13 @@ func TestUnmarshalTest(t *testing.T) {
 			}
 		  },
 		  {
-			"environments": [],
+			"environments": [
+			  {
+				"dimensions": {
+				  "device_type": "QEMU"
+				}
+			  }
+			],
 			"test": {
 			  "cpu": "x64",
 			  "label": "//garnet/bin/fuchsia:fuchsia_pkg(//build/toolchain/fuchsia:x64)",
@@ -95,7 +101,13 @@ func TestUnmarshalTest(t *testing.T) {
 				Parallel:        0,
 				CPU:             "x64",
 			},
-			Envs: []Environment{},
+			Envs: []Environment{
+				{
+					Dimensions: DimensionSet{
+						"device_type": "QEMU",
+					},
+				},
+			},
 		},
 	}
 	var testSpecs []TestSpec

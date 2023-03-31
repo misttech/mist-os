@@ -132,13 +132,13 @@ func AffectedModifiers(testSpecs []build.TestSpec, affectedTestNames []string, m
 			}
 			for _, env := range spec.Envs {
 				shouldMultiply := true
-				if env.Dimensions.DeviceType != "" && spec.OS != fuchsia {
+				if env.Dimensions.DeviceType() != "" && spec.OS != fuchsia {
 					// Don't multiply host+target tests because they tend to be
 					// flaky already. The idea is to expose new flakiness, not
 					// pre-existing flakiness.
 					shouldMultiply = false
-				} else if env.Dimensions.DeviceType != "" &&
-					!strings.HasSuffix(env.Dimensions.DeviceType, "EMU") {
+				} else if env.Dimensions.DeviceType() != "" &&
+					!strings.HasSuffix(env.Dimensions.DeviceType(), "EMU") {
 					// Only x64 Linux VMs are plentiful, don't multiply affected
 					// tests that would require any other type of bot.
 					shouldMultiply = false

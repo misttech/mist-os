@@ -107,7 +107,7 @@ type Environment struct {
 }
 
 func (env Environment) TargetsEmulator() bool {
-	return env.Dimensions.DeviceType == "QEMU" || env.Dimensions.DeviceType == "AEMU"
+	return env.Dimensions.DeviceType() == "QEMU" || env.Dimensions.DeviceType() == "AEMU"
 }
 
 // ImageOverrides gives images by label that should override the default images.
@@ -125,20 +125,30 @@ func (o ImageOverrides) IsEmpty() bool {
 }
 
 // DimensionSet encapsulates the Swarming dimensions a test wishes to target.
-type DimensionSet struct {
-	// DeviceType represents the class of device the test should run on.
-	// This is a required field.
-	DeviceType string `json:"device_type,omitempty"`
+type DimensionSet map[string]string
 
-	// The OS to run the test on (e.g., "Linux" or "Mac"). Used for host-side testing.
-	OS string `json:"os,omitempty"`
+// DeviceType represents the class of device the test should run on.  This
+// is a required field.
+func (ds DimensionSet) DeviceType() string {
+	return ds["device_type"]
+}
 
-	// The CPU type that the test is meant to run on.
-	CPU string `json:"cpu,omitempty"`
+// The OS to run the test on (e.g., "Linux" or "Mac"). Used for host-side testing.
+func (ds DimensionSet) OS() string {
+	return ds["os"]
+}
 
-	// Testbed denotes a physical test device configuration to run a test on (e.g., multi-device set-ups or devices inside chambers for connectivity testing).
-	Testbed string `json:"testbed,omitempty"`
+// CPU is architecture that the test is meant to run on.
+func (ds DimensionSet) CPU() string {
+	return ds["cpu"]
+}
 
-	// Pool denotes the swarming pool to run a test in.
-	Pool string `json:"pool,omitempty"`
+// Testbed denotes a physical test device configuration to run a test on (e.g., multi-device set-ups or devices inside chambers for connectivity testing).
+func (ds DimensionSet) Testbed() string {
+	return ds["testbed"]
+}
+
+// Pool denotes the swarming pool to run a test in.
+func (ds DimensionSet) Pool() string {
+	return ds["pool"]
 }

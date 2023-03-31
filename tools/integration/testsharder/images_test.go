@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"go.fuchsia.dev/fuchsia/tools/build"
 )
 
@@ -149,7 +150,7 @@ func TestAddImageDeps(t *testing.T) {
 				Env: build.Environment{
 					ImageOverrides: tc.imageOverrides,
 					Dimensions: build.DimensionSet{
-						DeviceType: tc.deviceType,
+						"device_type": tc.deviceType,
 					},
 				},
 			}

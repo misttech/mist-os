@@ -491,11 +491,11 @@ type fakeModules struct {
 func (m *fakeModules) Platforms() []build.DimensionSet {
 	return []build.DimensionSet{
 		{
-			DeviceType: "AEMU",
+			"device_type": "AEMU",
 		},
 		{
-			CPU: "x64",
-			OS:  "Linux",
+			"cpu": "x64",
+			"os":  "Linux",
 		},
 	}
 }
@@ -531,7 +531,7 @@ func fuchsiaTestSpec(basename string) build.TestSpec {
 		Envs: []build.Environment{
 			{
 				Dimensions: build.DimensionSet{
-					DeviceType: "AEMU",
+					"device_type": "AEMU",
 				},
 			},
 		},
@@ -552,8 +552,8 @@ func hostTestSpec(basename string) build.TestSpec {
 		Envs: []build.Environment{
 			{
 				Dimensions: build.DimensionSet{
-					CPU: "x64",
-					OS:  "Linux",
+					"cpu": "x64",
+					"os":  "Linux",
 				},
 			},
 		},

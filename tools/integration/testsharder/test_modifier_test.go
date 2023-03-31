@@ -58,11 +58,12 @@ func TestLoadTestModifiers(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	linuxEnv := build.Environment{Dimensions: build.DimensionSet{OS: linux, CPU: x64}}
-	aemuEnv := build.Environment{Dimensions: build.DimensionSet{DeviceType: "AEMU"}}
-	otherDeviceEnv := build.Environment{Dimensions: build.DimensionSet{DeviceType: "other-device"}}
+	linuxEnv := build.Environment{Dimensions: build.DimensionSet{"os": linux, "cpu": x64}}
+	aemuEnv := build.Environment{Dimensions: build.DimensionSet{"device_type": "AEMU"}}
+	otherDeviceEnv := build.Environment{Dimensions: build.DimensionSet{"device_type": "other-device"}}
 	specs := []build.TestSpec{
-		{Test: build.Test{Name: "baz_host_tests", OS: linux, CPU: x64},
+		{
+			Test: build.Test{Name: "baz_host_tests", OS: linux, CPU: x64},
 			Envs: []build.Environment{linuxEnv},
 		},
 		{
@@ -130,21 +131,21 @@ func TestAffectedModifiers(t *testing.T) {
 			{Test: build.Test{Name: "affected-mac", OS: "mac", CPU: x64}},
 			{
 				Test: build.Test{Name: "affected-host+target", OS: linux, CPU: x64},
-				Envs: []build.Environment{{Dimensions: build.DimensionSet{DeviceType: "AEMU"}}},
+				Envs: []build.Environment{{Dimensions: build.DimensionSet{"device_type": "AEMU"}}},
 			},
 			{
 				Test: build.Test{Name: "affected-AEMU", OS: fuchsia, CPU: x64},
-				Envs: []build.Environment{{Dimensions: build.DimensionSet{DeviceType: "AEMU"}}},
+				Envs: []build.Environment{{Dimensions: build.DimensionSet{"device_type": "AEMU"}}},
 			},
 			{
 				Test: build.Test{Name: "affected-other-device", OS: fuchsia, CPU: x64},
-				Envs: []build.Environment{{Dimensions: build.DimensionSet{DeviceType: "other-device"}}},
+				Envs: []build.Environment{{Dimensions: build.DimensionSet{"device_type": "other-device"}}},
 			},
 			{
 				Test: build.Test{Name: "affected-AEMU-and-other-device", OS: fuchsia, CPU: x64},
 				Envs: []build.Environment{
-					{Dimensions: build.DimensionSet{DeviceType: "AEMU"}},
-					{Dimensions: build.DimensionSet{DeviceType: "other-device"}},
+					{Dimensions: build.DimensionSet{"device_type": "AEMU"}},
+					{Dimensions: build.DimensionSet{"device_type": "other-device"}},
 				},
 			},
 			{Test: build.Test{Name: "not-affected"}},
@@ -189,8 +190,8 @@ func TestAffectedModifiers(t *testing.T) {
 }
 
 func TestMatchModifiersToTests(t *testing.T) {
-	aemuEnv := build.Environment{Dimensions: build.DimensionSet{DeviceType: "AEMU"}}
-	otherDeviceEnv := build.Environment{Dimensions: build.DimensionSet{DeviceType: "other-device"}}
+	aemuEnv := build.Environment{Dimensions: build.DimensionSet{"device_type": "AEMU"}}
+	otherDeviceEnv := build.Environment{Dimensions: build.DimensionSet{"device_type": "other-device"}}
 	makeTestSpecs := func(count int, envs []build.Environment) []build.TestSpec {
 		var specs []build.TestSpec
 		for i := 0; i < count; i++ {

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+
 	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
@@ -64,7 +65,7 @@ func TestAddFFXDeps(t *testing.T) {
 			s := &Shard{
 				Env: build.Environment{
 					Dimensions: build.DimensionSet{
-						DeviceType: tc.deviceType,
+						"device_type": tc.deviceType,
 					},
 				},
 				Tests: []Test{{Test: build.Test{CPU: tc.targetCPU}}},

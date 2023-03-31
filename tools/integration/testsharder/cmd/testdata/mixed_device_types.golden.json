@@ -51,8 +51,8 @@
         ],
         "environment": {
             "dimensions": {
-                "os": "Linux",
-                "cpu": "x64"
+                "cpu": "x64",
+                "os": "Linux"
             },
             "image_overrides": {}
         },

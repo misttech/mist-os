@@ -17,13 +17,13 @@ import (
 func AddImageDeps(s *Shard, buildDir string, images []build.Image, pave bool) error {
 	// Host-test only shards do not require any image deps because they are not running
 	// against a Fuchsia target.
-	if s.Env.Dimensions.DeviceType == "" {
+	if s.Env.Dimensions.DeviceType() == "" {
 		return nil
 	}
 	imageDeps := []string{"images.json"}
 	// GCE test shards do not require any image deps as the build creates a
 	// compute image with all the deps baked in.
-	if s.Env.Dimensions.DeviceType == "GCE" {
+	if s.Env.Dimensions.DeviceType() == "GCE" {
 		s.AddDeps(imageDeps)
 		return nil
 	}
