@@ -85,8 +85,8 @@ pub(super) async fn resuming_get<'a>(
                             resumptions = fetch_stats.resumptions(),
                             bytes_downloaded,
                             expected_len,
-                            error = %anyhow!(e),
-                            "Resuming failed blob GET after partial success."
+                            "Resuming failed blob GET after partial success: {:#}",
+                            anyhow!(e),
                         );
                         progress_this_attempt = false;
                         fetch_stats.resume();
