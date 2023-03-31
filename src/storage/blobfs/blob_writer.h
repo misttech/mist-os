@@ -16,6 +16,7 @@
 
 #include <optional>
 
+#include <fbl/array.h>
 #include <fbl/macros.h>
 #include <safemath/checked_math.h>
 
@@ -89,10 +90,9 @@ class Blob::Writer {
   // the blob layout can be recalculated without affecting the existing Merkle tree.
   zx::result<> Initialize(uint64_t blob_size, uint64_t data_size);
 
-  // Initialize seek table and decompressor when streaming precompressed blobs.
-  // Returns decompressed blob size on success. If not enough data is buffered to decode the seek
-  // table, returns ZX_ERR_BUFF_TOO_SMALL.
-  zx::result<uint64_t> InitializeDecompressor();
+  // Initialize seek table and decompressor when streaming precompressed blobs. If not enough data
+  // is buffered to decode the seek table, returns ZX_ERR_BUFFER_TOO_SMALL.
+  zx::result<> InitializeDecompressor();
 
   // If successful, allocates Blob Node and Blocks (in-memory) and sets `allocated_space_` to true.
   // Should not be called if `allocated_space_` is true.
@@ -204,7 +204,7 @@ class Blob::Writer {
 
   // The merkle tree creator stores the rest of the tree here. The buffer must include at least one
   // block's worth of space for padding (see `merkle_tree()` for details).
-  std::unique_ptr<uint8_t[]> merkle_tree_buffer_ = {};
+  fbl::Array<uint8_t> merkle_tree_buffer_ = {};
 
   // On-disk layout of the blob itself. Can only be initialized once we know the actual size of the
   // blob (i.e. the blob is compressed).
@@ -250,6 +250,10 @@ class Blob::Writer {
 
   // Delivery blob metadata (currently only type 1 blobs are supported).
   MetadataType1 metadata_ = {};
+
+  // Buffer to store decompressed data in when we will not save any space persisting compressed data
+  // to disk (i.e. the decompressed size is smaller than one block). Must be block aligned.
+  fbl::Array<uint8_t> decompressed_data_ = {};
 };
 
 }  // namespace blobfs
