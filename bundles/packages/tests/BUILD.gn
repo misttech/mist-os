@@ -67,7 +67,6 @@ group("all") {
     "//src/performance/traceutil:zedmon_test($host_toolchain)",
     "//src/power:tests",
     "//src/ui/a11y/bundles:tests",
-    "//src/ui/bin/shortcut:tests",
     "//src/ui/bin/terminal:tests",
     "//src/ui/bin/text:tests",
     "//src/ui/examples",

@@ -11,7 +11,6 @@ group("bin") {
     "root_presenter",
     "root_presenter:virtual_keyboard_manager",
     "scene_manager",
-    "shortcut",
     "text:text_manager",
   ]
 }
@@ -26,7 +25,6 @@ group("tests") {
     "input-pipeline:tests",
     "root_presenter:tests",
     "scene_manager:scene_manager_tests",
-    "shortcut:tests",
     "terminal:tests",
     "text:tests",
   ]
