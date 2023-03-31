@@ -14,7 +14,7 @@ From //zircon/system/ulib/acpica/acpica.gni:7
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:117
+From //build/images/args.gni:118
 
 ### add_qemu_to_build_archives
 
@@ -23,7 +23,7 @@ archives.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:123
+From //build/images/args.gni:124
 
 ### additional_bootserver_arguments
 
@@ -34,7 +34,7 @@ with specific boards, due to driver and hardware challenges.
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:129
+From //build/images/args.gni:130
 
 ### all_cpu_phys_boot_tests
 
@@ -85,7 +85,7 @@ Build boot images that prefer Zedboot over local boot (only for EFI).
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:151
+From //build/images/args.gni:152
 
 ### api_compatibility_testing
 
@@ -133,7 +133,7 @@ Used as a parameter to assembled_system().
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:184
+From //build/images/args.gni:185
 
 ### authorized_ssh_keys
 
@@ -143,7 +143,7 @@ for non-production builds and requires inclusion of configuration data from
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:171
+From //build/images/args.gni:172
 
 ### auto_update_packages
 
@@ -291,7 +291,7 @@ When set, include the corresponding Bazel assembly targets in this build.
 
 **Current value (from the default):** `[]`
 
-From //build/images/args.gni:187
+From //build/images/args.gni:188
 
 ### bazel_quiet
 
@@ -315,7 +315,7 @@ The format blobfs should store blobs in.
 
 **Current value (from the default):** `"compact"`
 
-From //build/images/args.gni:141
+From //build/images/args.gni:142
 
 ### blobfs_board_maximum_bytes
 
@@ -1071,7 +1071,7 @@ non-production GN labels. Build will fail if such dependency is found.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:135
+From //build/images/args.gni:136
 
 ### check_repeatability
 
@@ -1198,7 +1198,7 @@ Whether to compress the blobfs image.
 
 **Current value (from the default):** `true`
 
-From //build/images/args.gni:138
+From //build/images/args.gni:139
 
 ### config_example_cpp_greeting
 
@@ -1589,7 +1589,7 @@ This arg is for local developer only, products should not set this arg.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:148
+From //build/images/args.gni:149
 
 ### deny_warnings
 
@@ -3104,7 +3104,7 @@ From //build/images/vbmeta.gni:37
 
 **Current value (from the default):** `""`
 
-From //build/images/args.gni:118
+From //build/images/args.gni:119
 
 ### ffmpeg_profile
 
@@ -3652,6 +3652,12 @@ Use Fxfs's blob implementation
 
 From //src/storage/fshost/generated_fshost_config.gni:45
 
+### fxfs_partition
+
+**Current value (from the default):** `""`
+
+From //build/images/args.gni:117
+
 ### gcc_tool_dir
 
 Directory where the GCC toolchain binaries ("gcc", "nm", etc.) are found.
@@ -4068,7 +4074,7 @@ Include an account partition in the FVM image if set to true.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:157
+From //build/images/args.gni:158
 
 ### include_clippy
 
@@ -4085,7 +4091,7 @@ Include fvm.blob.sparse.blk image into the build if set to true
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:154
+From //build/images/args.gni:155
 
 ### include_internal_fonts
 
@@ -4111,7 +4117,7 @@ assembled_system().  See documentation there.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:180
+From //build/images/args.gni:181
 
 ### include_zxdb_large_tests
 
@@ -5712,7 +5718,7 @@ From //build/security/policies.gni:21
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:119
+From //build/images/args.gni:120
 
 ### prebuilt_dart_sdk
 
@@ -6996,7 +7002,7 @@ Example value: "//build/images/recovery"
 
 **Current value (from the default):** `"//build/images/zedboot"`
 
-From //build/images/args.gni:166
+From //build/images/args.gni:167
 
 ### recovery_logo_path
 
@@ -8145,7 +8151,7 @@ exactly what you are doing.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:194
+From //build/images/args.gni:195
 
 ### use_blink
 
@@ -8517,7 +8523,7 @@ is meant solely for developer debugging.
 
 **Current value (from the default):** `false`
 
-From //build/images/args.gni:176
+From //build/images/args.gni:177
 
 ### virtcon_boot_animation_path
 
@@ -8726,9 +8732,9 @@ From //build/board.gni:112
 Arguments to `fx flash` script (along with any `firmware_prebuilts` which
 specify a partition).
 
-If `fvm_partition` is provided, the flash script will flash the full OS,
-recovery + Zircon + FVM + SSH keys. In this case, the bootloader must also
-support `fastboot oem add-staged-bootloader-file ssh.authorized_keys`.
+If (exactly one of) `fvm_partition` or `fxfs_partition` is provided, the flash script will flash
+the full OS, recovery + Zircon + FVM (or Fxfs) + SSH keys. In this case, the bootloader must
+also support `fastboot oem add-staged-bootloader-file ssh.authorized_keys`.
 
 Otherwise, the script will flash the recovery image to all slots, which
 doesn't require the FVM or SSH keys.
