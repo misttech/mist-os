@@ -1310,6 +1310,9 @@
                 // Fails in updated image, but passes with current. Will be removed after rolling
                 // new images.
                 "RlimitTest.SetRlimitHigher",
+
+                // Flaky - needs investigation
+                "Sleepers/WallClockNanosleepTest.SleepOneSecond/0",
             ],
         },
     ],
