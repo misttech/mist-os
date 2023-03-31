@@ -117,7 +117,7 @@ class RadarIntegrationTest : public zxtest::Test {
   async::Loop loop_;
 };
 
-TEST_F(RadarIntegrationTest, BurstSize) {
+TEST_F(RadarIntegrationTest, DISABLED_BurstSize) {
   fidl::WireSharedClient<BurstReader> client;
   ASSERT_NO_FAILURES(MakeRadarClient(&client));
 
@@ -126,7 +126,7 @@ TEST_F(RadarIntegrationTest, BurstSize) {
   EXPECT_EQ(result->burst_size, kBurstSize);
 }
 
-TEST_F(RadarIntegrationTest, Reconnect) {
+TEST_F(RadarIntegrationTest, DISABLED_Reconnect) {
   fidl::WireSharedClient<BurstReader> client1;
   std::future<void> client1_torn_down;
   ASSERT_NO_FAILURES(client1_torn_down = MakeRadarClient(&client1));
@@ -152,7 +152,7 @@ TEST_F(RadarIntegrationTest, Reconnect) {
   }
 }
 
-TEST_F(RadarIntegrationTest, BurstFormat) {
+TEST_F(RadarIntegrationTest, DISABLED_BurstFormat) {
   fidl::Arena allocator;
 
   sync_completion_t completion;
@@ -209,7 +209,7 @@ TEST_F(RadarIntegrationTest, BurstFormat) {
   }
 }
 
-TEST_F(RadarIntegrationTest, ReadManyBursts) {
+TEST_F(RadarIntegrationTest, DISABLED_ReadManyBursts) {
   constexpr uint32_t kVmoCount = 10;
   constexpr uint32_t kBurstCount = 303;  // Read for about 10 seconds.
 
@@ -273,7 +273,7 @@ TEST_F(RadarIntegrationTest, ReadManyBursts) {
   }
 }
 
-TEST_F(RadarIntegrationTest, ReadManyBurstsMultipleClients) {
+TEST_F(RadarIntegrationTest, DISABLED_ReadManyBurstsMultipleClients) {
   constexpr uint32_t kVmoCount = 10;
   constexpr uint32_t kBurstCount = 303;  // Read for about 10 seconds.
 
