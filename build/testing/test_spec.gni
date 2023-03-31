@@ -228,6 +228,9 @@ template("test_spec") {
       dim = env.dimensions
       assert(!defined(dim.tags),
              "tags are only valid in an environments scope, not in dimensions")
+      assert(
+          !defined(dim.dimensions),
+          "found nested dimensions environment field. Did you set `dimensions = some_env`? It should be `dimensions = some_env.dimensions`")
       foreach(key, all_dimension_keys) {
         dims += [
           {
