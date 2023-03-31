@@ -10,7 +10,7 @@ use anyhow::{anyhow, bail, Context, Result};
 use assembly_manifest::Image;
 use camino::Utf8PathBuf;
 use emulator_instance::{
-    DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
+    DeviceConfig, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
 use pbms::{
     fms_entries_from, get_images_dir, load_product_bundle, select_product_bundle, ListingMode,
@@ -216,18 +216,13 @@ fn convert_v1_bundle_to_configs(
     }
 
     if let Some(emu) = &product_bundle.manifests.emu {
-        // TODO(fxbug.dev/88908): Eventually we'll need to support multiple disk_images.
-        let disk_image = emu.disk_images.get(0).and_then(|path| {
-            if path.contains("fvm") {
-                Some(DiskImage::Fvm(data_root.join(path)))
-            } else if path.contains("fxfs") {
-                Some(DiskImage::Fxfs(data_root.join(path)))
+        emulator_configuration.guest = GuestConfig {
+            // TODO(fxbug.dev/88908): Eventually we'll need to support multiple disk_images.
+            fvm_image: if !emu.disk_images.is_empty() {
+                Some(data_root.join(&emu.disk_images[0]))
             } else {
                 None
-            }
-        });
-        emulator_configuration.guest = GuestConfig {
-            disk_image,
+            },
             kernel_image: data_root.join(&emu.kernel),
             zbi_image: data_root.join(&emu.initial_ramdisk),
         };
@@ -288,9 +283,8 @@ fn convert_v2_bundle_to_configs(
         })
         .ok_or(anyhow!("No emulator kernels specified in the product bundle"))?;
 
-    let disk_image: Option<DiskImage> = system.iter().find_map(|i| match i {
-        Image::FVM(path) => Some(DiskImage::Fvm(path.clone().into())),
-        Image::Fxfs { path, .. } => Some(DiskImage::Fxfs(path.clone().into())),
+    let fvm_image: Option<PathBuf> = system.iter().find_map(|i| match i {
+        Image::FVM(path) => Some(path.clone().into()),
         _ => None,
     });
 
@@ -302,7 +296,7 @@ fn convert_v2_bundle_to_configs(
         })
         .ok_or(anyhow!("No ZBI in the product bundle"))?;
 
-    emulator_configuration.guest = GuestConfig { disk_image, kernel_image, zbi_image };
+    emulator_configuration.guest = GuestConfig { fvm_image, kernel_image, zbi_image };
 
     Ok(emulator_configuration)
 }
@@ -310,7 +304,6 @@ fn convert_v2_bundle_to_configs(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use assembly_manifest::BlobfsContents;
     use assembly_partitions_config::PartitionsConfig;
     use sdk_metadata::{
         virtual_device::{Cpu, Hardware},
@@ -337,7 +330,7 @@ mod tests {
             images: vec![],
             manifests: Manifests {
                 emu: Some(EmuManifest {
-                    disk_images: vec!["path/to/disk/fxfs.blk".to_string()],
+                    disk_images: vec!["path/to/disk".to_string()],
                     initial_ramdisk: "path/to/zbi".to_string(),
                     kernel: "path/to/kernel".to_string(),
                 }),
@@ -374,14 +367,14 @@ mod tests {
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
 
-        assert!(config.guest.disk_image.is_some());
+        assert!(config.guest.fvm_image.is_some());
         let emu = pb.manifests.emu.unwrap();
 
         let expected_kernel = sdk_root.join(emu.kernel);
-        let expected_fxfs = sdk_root.join(&emu.disk_images[0]);
+        let expected_fvm = sdk_root.join(&emu.disk_images[0]);
         let expected_zbi = sdk_root.join(emu.initial_ramdisk);
 
-        assert_eq!(config.guest.disk_image.unwrap(), DiskImage::Fxfs(expected_fxfs.into()));
+        assert_eq!(config.guest.fvm_image.unwrap(), expected_fvm);
         assert_eq!(config.guest.kernel_image, expected_kernel);
         assert_eq!(config.guest.zbi_image, expected_zbi);
 
@@ -390,7 +383,7 @@ mod tests {
         // Adjust all of the values that affect the config, then run it again.
         pb.manifests = Manifests {
             emu: Some(EmuManifest {
-                disk_images: vec!["different_path/to/disk/fxfs.blk".to_string()],
+                disk_images: vec!["different_path/to/disk".to_string()],
                 initial_ramdisk: "different_path/to/zbi".to_string(),
                 kernel: "different_path/to/kernel".to_string(),
             }),
@@ -422,13 +415,13 @@ mod tests {
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
 
-        assert!(config.guest.disk_image.is_some());
+        assert!(config.guest.fvm_image.is_some());
         let emu = pb.manifests.emu.unwrap();
         let expected_kernel = sdk_root.join(emu.kernel);
-        let expected_disk_image = DiskImage::Fxfs(sdk_root.join(&emu.disk_images[0]));
+        let expected_fvm = sdk_root.join(&emu.disk_images[0]);
         let expected_zbi = sdk_root.join(emu.initial_ramdisk);
 
-        assert_eq!(config.guest.disk_image.unwrap(), expected_disk_image);
+        assert_eq!(config.guest.fvm_image.unwrap(), expected_fvm);
         assert_eq!(config.guest.kernel_image, expected_kernel);
         assert_eq!(config.guest.zbi_image, expected_zbi);
 
@@ -455,7 +448,7 @@ mod tests {
         // Set up some test data to pass into the conversion routine.
         let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("kernel"))
             .expect("couldn't convert kernel to utf8");
-        let expected_disk_image_path =
+        let expected_fvm =
             Utf8PathBuf::from_path_buf(sdk_root.join("fvm")).expect("couldn't convert fvm to utf8");
         let expected_zbi =
             Utf8PathBuf::from_path_buf(sdk_root.join("zbi")).expect("couldn't convert zbi to utf8");
@@ -469,7 +462,7 @@ mod tests {
                 // By the time we call convert_, these should be canonicalized.
                 Image::ZBI { path: expected_zbi.clone(), signed: false },
                 Image::QemuKernel(expected_kernel.clone()),
-                Image::FVM(expected_disk_image_path.clone()),
+                Image::FVM(expected_fvm.clone()),
             ]),
             system_b: None,
             system_r: None,
@@ -503,12 +496,9 @@ mod tests {
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
 
-        assert!(config.guest.disk_image.is_some());
+        assert!(config.guest.fvm_image.is_some());
 
-        assert_eq!(
-            config.guest.disk_image.unwrap(),
-            DiskImage::Fvm(expected_disk_image_path.into())
-        );
+        assert_eq!(config.guest.fvm_image.unwrap(), expected_fvm);
         assert_eq!(config.guest.kernel_image, expected_kernel);
         assert_eq!(config.guest.zbi_image, expected_zbi);
 
@@ -517,18 +507,15 @@ mod tests {
         // Adjust all of the values that affect the config, then run it again.
         let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("some/new_kernel"))
             .expect("couldn't convert kernel to utf8");
-        let expected_disk_image_path = Utf8PathBuf::from_path_buf(sdk_root.join("fxfs"))
-            .expect("couldn't convert fxfs to utf8");
+        let expected_fvm = Utf8PathBuf::from_path_buf(sdk_root.join("another_fvm"))
+            .expect("couldn't convert fvm to utf8");
         let expected_zbi = Utf8PathBuf::from_path_buf(sdk_root.join("path/to/new_zbi"))
             .expect("couldn't convert zbi to utf8");
 
         pb.system_a = Some(vec![
             Image::ZBI { path: expected_zbi.clone(), signed: false },
             Image::QemuKernel(expected_kernel.clone()),
-            Image::Fxfs {
-                path: expected_disk_image_path.clone(),
-                contents: BlobfsContents::default(),
-            },
+            Image::FVM(expected_fvm.clone()),
         ]);
         device.hardware = Hardware {
             cpu: Cpu { arch: CpuArchitecture::Arm64 },
@@ -556,12 +543,9 @@ mod tests {
         assert_eq!(config.device.screen, device.hardware.window_size);
         assert_eq!(config.device.storage, device.hardware.storage);
 
-        assert!(config.guest.disk_image.is_some());
+        assert!(config.guest.fvm_image.is_some());
 
-        assert_eq!(
-            config.guest.disk_image.unwrap(),
-            DiskImage::Fxfs(expected_disk_image_path.into())
-        );
+        assert_eq!(config.guest.fvm_image.unwrap(), expected_fvm);
         assert_eq!(config.guest.kernel_image, expected_kernel);
         assert_eq!(config.guest.zbi_image, expected_zbi);
 

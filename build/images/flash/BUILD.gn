@@ -582,8 +582,6 @@ product_metadata("product_metadata") {
       disk_images = []
       if (defined(files.fvm)) {
         disk_images = [ rebase_path(files.fvm, root_build_dir) ]
-      } else if (defined(files.fxfs)) {
-        disk_images = [ rebase_path(files.fxfs, root_build_dir) ]
       }
     }
   }

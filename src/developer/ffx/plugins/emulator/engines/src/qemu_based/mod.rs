@@ -15,8 +15,8 @@ use anyhow::{anyhow, bail, Context, Result};
 use async_trait::async_trait;
 use cfg_if::cfg_if;
 use emulator_instance::{
-    AccelerationMode, ConsoleType, DiskImage, EmulatorConfiguration, EngineState, GuestConfig,
-    HostConfig, NetworkingMode,
+    AccelerationMode, ConsoleType, EmulatorConfiguration, EngineState, GuestConfig, HostConfig,
+    NetworkingMode,
 };
 use errors::ffx_bail;
 use ffx_config::SshKeyFiles;
@@ -161,7 +161,7 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
     fn check_required_files(&self, guest: &GuestConfig) -> Result<()> {
         let kernel_path = &guest.kernel_image;
         let zbi_path = &guest.zbi_image;
-        let disk_image_path = &guest.disk_image;
+        let fvm_path = &guest.fvm_image;
 
         if !kernel_path.exists() {
             bail!("kernel file {:?} does not exist.", kernel_path);
@@ -169,9 +169,9 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         if !zbi_path.exists() {
             bail!("zbi file {:?} does not exist.", zbi_path);
         }
-        if let Some(file_path) = disk_image_path.as_ref() {
+        if let Some(file_path) = &fvm_path {
             if !file_path.exists() {
-                bail!("disk image file {:?} does not exist.", file_path);
+                bail!("fvm file {:?} does not exist.", file_path);
             }
         }
         Ok(())
@@ -229,8 +229,8 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .context("cannot embed boot data")?;
         }
 
-        let disk_image = match &emu_config.guest.disk_image {
-            Some(DiskImage::Fvm(src_fvm)) => {
+        let fvm_path = match &emu_config.guest.fvm_image {
+            Some(src_fvm) => {
                 let fvm_path = instance_root
                     .join(src_fvm.file_name().ok_or_else(|| anyhow!("cannot read fvm file name"))?);
                 if fvm_path.exists() && reuse {
@@ -259,29 +259,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         bail!("Error resizing fvm: {}", str::from_utf8(&resize_result.stderr)?);
                     }
                 }
-                Some(DiskImage::Fvm(fvm_path))
-            }
-            // TODO(fxbug.dev/122056): Support resizing Fxfs images.
-            Some(DiskImage::Fxfs(src_path)) => {
-                let image_path = instance_root.join(
-                    src_path.file_name().ok_or_else(|| anyhow!("malformed Fxfs image path"))?,
-                );
-                if image_path.exists() && reuse {
-                    tracing::debug!(
-                        "Using existing file for {:?}",
-                        image_path.file_name().unwrap()
-                    );
-                } else {
-                    fs::copy(src_path, &image_path).context("cannot stage Fxfs image")?;
-                }
-                Some(DiskImage::Fxfs(image_path))
+                Some(fvm_path)
             }
             None => None,
         };
 
         updated_guest.kernel_image = kernel_path;
         updated_guest.zbi_image = zbi_path;
-        updated_guest.disk_image = disk_image;
+        updated_guest.fvm_image = fvm_path;
         Ok(updated_guest)
     }
 
@@ -661,7 +646,7 @@ mod tests {
 
     use super::*;
     use async_trait::async_trait;
-    use emulator_instance::{DiskImage, EngineType};
+    use emulator_instance::EngineType;
     use ffx_config::{query, ConfigLevel};
     use serde::Serialize;
     use serde_json::json;
@@ -729,7 +714,7 @@ mod tests {
 
         guest.kernel_image = kernel_path;
         guest.zbi_image = zbi_path;
-        guest.disk_image = Some(DiskImage::Fvm(fvm_path));
+        guest.fvm_image = Some(fvm_path);
 
         // Set the paths to use for the SSH keys
         query("ssh.pub")
@@ -770,7 +755,7 @@ mod tests {
 
         write_to(&emu_config.guest.kernel_image, ORIGINAL)
             .context("cannot write original value to kernel file")?;
-        write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
+        write_to(emu_config.guest.fvm_image.as_ref().unwrap(), ORIGINAL)
             .context("cannot write original value to fvm file")?;
 
         let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
@@ -787,14 +772,14 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            fvm_image: Some(root.join(instance_name).join("fvm")),
         };
         assert_eq!(actual, expected);
 
         // Test no reuse when old files exist. The original files should be overwritten.
         write_to(&emu_config.guest.kernel_image, UPDATED)
             .context("cannot write updated value to kernel file")?;
-        write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
+        write_to(emu_config.guest.fvm_image.as_ref().unwrap(), UPDATED)
             .context("cannot write updated value to fvm file")?;
 
         let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
@@ -811,15 +796,15 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            fvm_image: Some(root.join(instance_name).join("fvm")),
         };
         assert_eq!(actual, expected);
 
         println!("Reading contents from {}", actual.kernel_image.display());
-        println!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
+        println!("Reading contents from {}", actual.fvm_image.as_ref().unwrap().display());
         let mut kernel = File::open(&actual.kernel_image)
             .context("cannot open overwritten kernel file for read")?;
-        let mut fvm = File::open(&*actual.disk_image.unwrap())
+        let mut fvm = File::open(&actual.fvm_image.unwrap())
             .context("cannot open overwritten fvm file for read")?;
 
         let mut kernel_contents = String::new();
@@ -852,7 +837,7 @@ mod tests {
         // This checks if --reuse is true, but the directory isn't there to reuse; should succeed.
         write_to(&emu_config.guest.kernel_image, ORIGINAL)
             .context("cannot write original value to kernel file")?;
-        write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
+        write_to(emu_config.guest.fvm_image.as_ref().unwrap(), ORIGINAL)
             .context("cannot write original value to fvm file")?;
 
         let updated: Result<GuestConfig> = <TestEngine as QemuBasedEngine>::stage_image_files(
@@ -869,7 +854,7 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            fvm_image: Some(root.join(instance_name).join("fvm")),
         };
         assert_eq!(actual, expected);
 
@@ -877,7 +862,7 @@ mod tests {
         // the ZBI tool with an "echo" command.
         write_to(&emu_config.guest.kernel_image, UPDATED)
             .context("cannot write updated value to kernel file")?;
-        write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
+        write_to(emu_config.guest.fvm_image.as_ref().unwrap(), UPDATED)
             .context("cannot write updated value to fvm file")?;
 
         let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
@@ -894,14 +879,14 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            fvm_image: Some(root.join(instance_name).join("fvm")),
         };
         assert_eq!(actual, expected);
 
         println!("Reading contents from {}", actual.kernel_image.display());
         let mut kernel =
             File::open(&actual.kernel_image).context("cannot open reused kernel file for read")?;
-        let mut fvm = File::open(&*actual.disk_image.unwrap())
+        let mut fvm = File::open(&actual.fvm_image.unwrap())
             .context("cannot open reused fvm file for read")?;
 
         let mut kernel_contents = String::new();
