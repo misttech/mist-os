@@ -30,6 +30,8 @@ __END_CDECLS
 #define mmio_hw_mb() __asm__ volatile("dmb sy" : : : "memory")
 #elif defined(__x86_64__)
 #define mmio_hw_mb() __asm__ volatile("mfence" ::: "memory")
+#elif defined(__riscv)
+#define mmio_hw_mb() __asm__ volatile("fence iorw,iorw" ::: "memory")
 #endif
 
 namespace fdf::internal {
