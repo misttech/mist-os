@@ -4,10 +4,7 @@
 
 use crate::{errors::Error, update_manager::TargetChannelUpdater, DEFAULT_UPDATE_PACKAGE_URL};
 use anyhow::{anyhow, Context as _};
-use fidl::{
-    endpoints::{Proxy, ServerEnd},
-    AsHandleRef,
-};
+use fidl::endpoints::{Proxy, ServerEnd};
 use fidl_fuchsia_update_ext::Initiator;
 use fidl_fuchsia_update_installer::{
     InstallerMarker, InstallerProxy, RebootControllerMarker, RebootControllerProxy,
@@ -18,7 +15,6 @@ use fidl_fuchsia_update_installer_ext::{
 };
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_url::AbsolutePackageUrl;
-use fuchsia_zircon as zx;
 use futures::{future::BoxFuture, prelude::*, stream::BoxStream};
 use tracing::info;
 
@@ -163,12 +159,7 @@ async fn monitor_update_progress(
 
             info!("Successful update, rebooting...");
 
-            // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
-            if reboot_controller
-                .as_channel()
-                .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
-                .is_ok()
-            {
+            if reboot_controller.is_closed() {
                 return Err((
                     apply_progress,
                     Error::RebootFailed(anyhow!("reboot controller peer closed")).into(),

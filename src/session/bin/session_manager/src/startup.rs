@@ -284,9 +284,8 @@ mod tests {
         // By not implementing a handler for exposed_dir channel, the
         // set_session function will observe a PEER_CLOSED signal.
         let exposed_dir = set_session(session_url, &realm).await.unwrap();
-        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
         exposed_dir
-            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
             .expect("exposed_dir should be closed");
     }
 }

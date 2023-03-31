@@ -859,9 +859,8 @@ mod tests {
         let element = element_manager.launch_element(component_url, "").await.unwrap();
         let exposed_dir = element.directory_channel();
 
-        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
         exposed_dir
-            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
             .expect("exposed_dir should be closed");
     }
 }

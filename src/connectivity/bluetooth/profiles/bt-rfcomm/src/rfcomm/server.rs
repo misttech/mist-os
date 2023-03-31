@@ -13,7 +13,6 @@ use fuchsia_bluetooth::detachable_map::DetachableMap;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use fuchsia_inspect as inspect;
 use fuchsia_inspect_derive::{AttachError, Inspect};
-use fuchsia_zircon as zx;
 use futures::{lock::Mutex, FutureExt};
 use std::collections::{HashMap, HashSet};
 use std::{convert::TryFrom, sync::Arc};
@@ -110,13 +109,7 @@ impl Clients {
         // Build the RFCOMM protocol descriptor and relay the channel.
         let mut protocol: Vec<bredr::ProtocolDescriptor> =
             build_rfcomm_protocol(server_channel).iter().map(Into::into).collect();
-        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
-        if client
-            .connection_receiver
-            .as_channel()
-            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
-            .is_ok()
-        {
+        if client.connection_receiver.is_closed() {
             return Err(format_err!("connection receiver peer closed"));
         }
         client

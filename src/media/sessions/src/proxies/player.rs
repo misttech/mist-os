@@ -480,7 +480,6 @@ mod test {
         endpoints::{create_endpoints, create_proxy_and_stream},
         prelude::*,
     };
-    use fuchsia_zircon as zx;
     use futures::{
         future,
         stream::{StreamExt, TryStreamExt},
@@ -525,11 +524,7 @@ mod test {
 
         drop(player);
 
-        // TODO(fxbug.dev/121348): Use is_closed() here when it's more reliable.
-        assert!(session_control_fidl_proxy
-            .as_channel()
-            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::from_nanos(0))
-            .is_ok());
+        assert!(session_control_fidl_proxy.is_closed());
 
         Ok(())
     }
