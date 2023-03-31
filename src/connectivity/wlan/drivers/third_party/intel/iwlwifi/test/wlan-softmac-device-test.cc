@@ -157,11 +157,6 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     recv_called_ = true;
     completer.buffer(arena).Reply();
   }
-  void CompleteTx(CompleteTxRequestView request, fdf::Arena& arena,
-                  CompleteTxCompleter::Sync& completer) override {
-    // Overriding the virtual function, not being used at this point.
-    completer.buffer(arena).Reply();
-  }
   void ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
                       ReportTxStatusCompleter::Sync& completer) override {
     // Overriding the virtual function, not being used at this point.
@@ -1500,7 +1495,6 @@ TEST_F(MacInterfaceTest, TxPkt) {
   EXPECT_EQ(iwl_stats_read(IWL_STATS_CNT_DATA_TO_FW), 1);
   ASSERT_TRUE(result.ok());
   EXPECT_FALSE(result->is_error());
-  ASSERT_FALSE(result->value()->enqueue_pending);
   unbindTx();
 }
 

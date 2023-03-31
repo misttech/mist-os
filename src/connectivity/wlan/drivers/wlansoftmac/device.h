@@ -107,8 +107,6 @@ class Device : public DeviceInterface,
   void Status(StatusRequestView request, fdf::Arena& arena,
               StatusCompleter::Sync& completer) override;
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
-  void CompleteTx(CompleteTxRequestView request, fdf::Arena& arena,
-                  CompleteTxCompleter::Sync& completer) override;
   void ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
                       ReportTxStatusCompleter::Sync& completer) override;
   void ScanComplete(ScanCompleteRequestView request, fdf::Arena& arena,

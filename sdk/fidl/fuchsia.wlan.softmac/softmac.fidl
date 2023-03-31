@@ -212,18 +212,6 @@ protocol WlanSoftmacIfc {
         packet WlanRxPacket;
     }) -> ();
 
-    /// complete_tx() is called to return ownership of a packet to the wlan driver.
-    /// Return status indicates queue state:
-    ///   ZX_OK: Packet has been enqueued.
-    ///   Other: Packet could not be enqueued.
-    ///
-    /// Upon a return of ZX_OK, the packet has been enqueued, but no information is returned as to
-    /// the completion state of the transmission itself.
-    CompleteTx(struct {
-        packet WlanTxPacket;
-        status zx.status;
-    }) -> ();
-
     /// Reports the status of an attempted transmission.
     /// |tx_status|: contains status info of one transmitted packet to one peer at one specific rate.
     ReportTxStatus(struct {
@@ -452,12 +440,7 @@ protocol WlanSoftmac {
     /// it was successfully transmitted.
     QueueTx(struct {
         packet WlanTxPacket;
-    }) -> (struct {
-        /// The ZX_OK returned from error syntax only indicates that the packet was successfully
-        /// queued, not successfully transmitted. enqueue_pending should only be true if the error
-        /// below returns as ZX_OK.
-        enqueue_pending bool;
-    }) error zx.status;
+    }) -> () error zx.status;
 
     /// Set the primary radio channel, e.g. in response to a channel switch event.
     /// If successful, this will trigger the channel switch immediately. This may

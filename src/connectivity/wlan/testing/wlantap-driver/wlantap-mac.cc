@@ -137,7 +137,7 @@ struct WlantapMacImpl : WlantapMac,
   void QueueTx(QueueTxRequestView request, fdf::Arena& arena,
                QueueTxCompleter::Sync& completer) override {
     listener_->WlantapMacQueueTx(request->packet);
-    completer.buffer(arena).ReplySuccess(false);
+    completer.buffer(arena).ReplySuccess();
   }
 
   void SetChannel(SetChannelRequestView request, fdf::Arena& arena,

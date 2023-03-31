@@ -186,7 +186,7 @@ void WlanSoftmacDevice::QueueTx(QueueTxRequestView request, fdf::Arena& arena,
   }
 
   // Delayed transmission is never used right now, setting enqueue_pending to false;
-  completer.buffer(arena).ReplySuccess(false);
+  completer.buffer(arena).ReplySuccess();
 }
 
 // Reject the request that firmware doesn't allow. See fxb/89911 for more context.

@@ -596,7 +596,6 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   wlan_softmac_ifc_protocol_ops_.reset(new wlan_softmac_ifc_protocol_ops_t{
       .status = ifc->ops->status,
       .recv = ifc->ops->recv,
-      .complete_tx = ifc->ops->complete_tx,
       .report_tx_status = ifc->ops->report_tx_status,
       .scan_complete = ifc->ops->scan_complete,
   });
@@ -658,9 +657,6 @@ zx_status_t Device::QueueTx(std::unique_ptr<Packet> packet, wlan_tx_info_t tx_in
     errorf("QueueTx failed (status %s)", zx_status_get_string(result->error_value()));
     return result->error_value();
   }
-  // TODO(fxbug.dev/85924): Remove this once we implement WlanSoftmacCompleteTx
-  // and allow wlan-softmac drivers to complete transmits asynchronously.
-  ZX_DEBUG_ASSERT(!result->value()->enqueue_pending);
 
   return ZX_OK;
 }
@@ -1011,11 +1007,7 @@ void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Syn
 
   completer.buffer(arena).Reply();
 }
-void Device::CompleteTx(CompleteTxRequestView request, fdf::Arena& arena,
-                        CompleteTxCompleter::Sync& completer) {
-  // No one is using this interface right now, saving ink for the mid product.
-  ZX_PANIC("CompleteTx is not supportted.");
-}
+
 void Device::ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
                             ReportTxStatusCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
