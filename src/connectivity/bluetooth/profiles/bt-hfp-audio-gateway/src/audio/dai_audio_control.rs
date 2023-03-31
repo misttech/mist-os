@@ -151,7 +151,7 @@ impl AudioControl for DaiAudioControl {
     }
 
     fn stop(&mut self) -> Result<(), AudioError> {
-        let Some(_connection) = self.active_connection.as_mut().take() else {
+        let Some(_connection) = self.active_connection.take() else {
             return Err(AudioError::NotStarted);
         };
         self.output.stop();
@@ -257,6 +257,8 @@ mod tests {
         audio.stop().expect("audio should stop okay");
         let _audio_closed = audio_client_one.client.on_closed().await;
         let _audio_closed = audio_client_two.client.on_closed().await;
+
+        let _ = audio.stop().expect_err("audio should not be able to stop after stopping");
     }
 
     struct TestAudioClient {
