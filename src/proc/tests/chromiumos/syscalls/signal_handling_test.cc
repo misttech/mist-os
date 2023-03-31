@@ -111,9 +111,9 @@ TEST(SignalHandlingDeathTest, ExitsKilledBySignal) {
 
   // Generate signals by causing architectural exceptions.
 #if defined(__x86_64__)
-  EXPECT_EXIT([]() { __builtin_trap(); }(), testing::KilledBySignal(SIGILL), "");
+  EXPECT_EXIT([]() { __asm__("ud2"); }(), testing::KilledBySignal(SIGILL), "");
 #elif defined(__aarch64__)
-  EXPECT_EXIT([]() { __asm__(".byte 0x0f, 0x0b"); }(), testing::KilledBySignal(SIGILL), "");
+  EXPECT_EXIT([]() { __asm__("udf #0"); }(), testing::KilledBySignal(SIGILL), "");
 #endif
 
   EXPECT_EXIT([]() { __builtin_debugtrap(); }(), testing::KilledBySignal(SIGTRAP), "");
