@@ -290,7 +290,6 @@ hlcpp_visibility = [
   "//src/power/fidl/testing:*",
   "//src/power/testing/thermal-test-control:*",
   "//src/power/thermd:*",
-  "//src/recovery/factory_reset:*",
   "//src/security/bin/tee_manager:*",
   "//src/storage/blobfs/*",
   "//src/storage/blobfs/test/integration:*",

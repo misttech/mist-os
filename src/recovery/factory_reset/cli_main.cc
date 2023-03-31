@@ -2,29 +2,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/recovery/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/sys/cpp/component_context.h>
+#include <fidl/fuchsia.recovery/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 
-// A simplie command-line tool for initiating factory reset.
+// A simple command-line tool for initiating factory reset.
 int main(int argc, const char** argv) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-  fuchsia::recovery::FactoryResetSyncPtr fdr;
-  context->svc()->Connect(fdr.NewRequest());
-  zx_status_t status, call_status;
-  status = fdr->Reset(&call_status);
-  if (status != ZX_OK) {
-    if (status == ZX_ERR_PEER_CLOSED) {
-      // "/svc/fuchsia.recovery.FactoryReset" may not be available if the cli
-      // is run from the serial console which does not depend on appmgr.
+  zx::result client_end = component::Connect<fuchsia_recovery::FactoryReset>();
+  if (client_end.is_error()) {
+    fprintf(stderr, "failed to connect to fuchsia.recovery/FactoryReset: %s\n",
+            client_end.status_string());
+    return -1;
+  }
+  const fidl::WireResult result = fidl::WireCall(client_end.value())->Reset();
+  if (!result.ok()) {
+    if (result.is_peer_closed()) {
       fprintf(stderr,
               "If you're running this from the serial console, "
               "that's unsupported -- try again from fx shell.\n");
+    } else {
+      fprintf(stderr, "fuchsia.recovery/FactoryReset.Reset call failed: %s\n",
+              result.status_string());
     }
-    return status;
+    return -1;
   }
-  return call_status;
+  const fidl::WireResponse response = result.value();
+  if (zx_status_t status = response.status; status != ZX_OK) {
+    fprintf(stderr, "fuchsia.recovery/FactoryReset.Reset returned error: %s\n",
+            zx_status_get_string(status));
+    return -1;
+  }
+  return 0;
 }

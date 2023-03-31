@@ -21,13 +21,14 @@ int main(int argc, const char** argv) {
   zx::result admin = component::Connect<fuchsia_hardware_power_statecontrol::Admin>();
   if (admin.is_error()) {
     std::cerr << "failed to connect to fuchsia.hardware.power.statecontrol/Admin: "
-              << admin.status_string();
+              << admin.status_string() << std::endl;
     return -1;
   }
 
   zx::result fshost = component::Connect<fuchsia_fshost::Admin>();
   if (fshost.is_error()) {
-    std::cerr << "failed to connect to fuchsia.fshost/Admin: " << fshost.status_string();
+    std::cerr << "failed to connect to fuchsia.fshost/Admin: " << fshost.status_string()
+              << std::endl;
     return -1;
   }
 
@@ -40,17 +41,18 @@ int main(int argc, const char** argv) {
   if (zx::result<> result = outgoing.AddUnmanagedProtocol<fuchsia_recovery::FactoryReset>(
           bindings.CreateHandler(&factory_reset, loop.dispatcher(), fidl::kIgnoreBindingClosure));
       result.is_error()) {
-    std::cerr << "failed to expose fuchsia.recovery/FactoryReset: " << result.status_string();
+    std::cerr << "failed to expose fuchsia.recovery/FactoryReset: " << result.status_string()
+              << std::endl;
     return -1;
   }
 
   if (zx::result<> result = outgoing.ServeFromStartupInfo(); result.is_error()) {
-    std::cerr << "failed to serve outgoing directory: " << result.status_string();
+    std::cerr << "failed to serve outgoing directory: " << result.status_string() << std::endl;
     return -1;
   }
 
   if (zx_status_t status = loop.Run(); status != ZX_OK) {
-    std::cerr << "failed to run async loop: " << zx_status_get_string(status);
+    std::cerr << "failed to run async loop: " << zx_status_get_string(status) << std::endl;
     return -1;
   }
   return 0;
