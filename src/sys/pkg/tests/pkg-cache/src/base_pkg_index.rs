@@ -7,7 +7,6 @@ use {
     blobfs_ramdisk::BlobfsRamdisk,
     fidl_fuchsia_pkg::{PackageIndexIteratorMarker, PackageIndexIteratorProxy},
     fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_async as fasync,
     fuchsia_hash::Hash,
     fuchsia_pkg::PackagePath,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
@@ -78,7 +77,7 @@ async fn verify_base_packages_iterator(
 }
 
 /// Verifies that no base packages does not start package cache.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn no_base_package_error() {
     let env = TestEnv::builder()
         .blobfs_and_system_image_hash(BlobfsRamdisk::start().await.unwrap(), Some([0u8; 32].into()))
@@ -89,7 +88,7 @@ async fn no_base_package_error() {
 }
 
 /// Verifies that a single base package is handled correctly.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_pkg_index_with_one_package() {
     let pkg = PackageBuilder::new("base-package-0")
         .add_resource_at("resource", &[][..])
@@ -101,7 +100,7 @@ async fn base_pkg_index_with_one_package() {
     assert_base_packages_match(pkg_iterator, &[&pkg], env.system_image.unwrap()).await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_pkg_index_sorted_by_url() {
     let pkg_0 = PackageBuilder::new("base-package-zzz")
         .add_resource_at("resource", &[][..])
@@ -125,7 +124,7 @@ async fn base_pkg_index_sorted_by_url() {
 }
 
 /// Verifies that the package index can be split across multiple chunks.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_pkg_index_verify_multiple_chunks() {
     // Try to get a partial chunk by using an unaligned value, though the server may choose to
     // provide fewer entries in a single chunk.

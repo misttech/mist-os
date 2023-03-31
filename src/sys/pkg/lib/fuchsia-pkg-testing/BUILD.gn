@@ -51,6 +51,7 @@ rustc_library("fuchsia-pkg-testing") {
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:tokio",
     "//third_party/rust_crates:tokio-rustls",
+    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:walkdir",
   ]
 

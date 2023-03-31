@@ -12,7 +12,7 @@ pub async fn get_inspect_hierarchy(
     nested_environment_label: &str,
     component_name: &str,
 ) -> DiagnosticsHierarchy {
-    ArchiveReader::new()
+    let data = ArchiveReader::new()
         .add_selector(ComponentSelector::new(vec![
             nested_environment_label.to_string(),
             component_name.to_string(),
@@ -22,7 +22,9 @@ pub async fn get_inspect_hierarchy(
         .expect("read inspect hierarchy")
         .into_iter()
         .next()
-        .expect("there's one result")
-        .payload
-        .expect("payload is not none")
+        .expect("there's one result");
+    if data.payload.is_none() {
+        tracing::error!(?data, "Unexpected empty payload");
+    }
+    data.payload.unwrap()
 }

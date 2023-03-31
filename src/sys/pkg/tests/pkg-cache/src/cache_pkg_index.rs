@@ -6,7 +6,6 @@ use {
     crate::TestEnv,
     fidl_fuchsia_pkg::PackageIndexIteratorMarker,
     fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_async as fasync,
     fuchsia_hash::Hash,
     fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder},
 };
@@ -35,7 +34,7 @@ async fn verify_cache_packages(
     assert_eq!(expected_entries.next(), None);
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn missing_cache_package_manifest_empty_iterator() {
     let system_image_package = SystemImageBuilder::new().build().await;
     let env = TestEnv::builder()
@@ -48,7 +47,7 @@ async fn missing_cache_package_manifest_empty_iterator() {
     verify_cache_packages(&env, vec![].into_iter()).await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn present_cache_package_manifest() {
     let pkg = PackageBuilder::new("some-cache-package").build().await.unwrap();
     let system_image_package = SystemImageBuilder::new().cache_packages(&[&pkg]).build().await;

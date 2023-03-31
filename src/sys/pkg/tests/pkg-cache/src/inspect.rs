@@ -11,7 +11,6 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker, PackageCacheMarker},
     fidl_fuchsia_pkg_ext::BlobId,
-    fuchsia_async as fasync,
     fuchsia_inspect::{
         assert_data_tree, hierarchy::DiagnosticsHierarchy, testing::AnyProperty, tree_assertion,
     },
@@ -22,7 +21,7 @@ use {
     std::collections::HashMap,
 };
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn system_image_hash_present() {
     let system_image_package = SystemImageBuilder::new().build().await;
     let env =
@@ -39,7 +38,7 @@ async fn system_image_hash_present() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn system_image_hash_ignored() {
     let env = TestEnv::builder().ignore_system_image().build().await;
     env.block_until_started().await;
@@ -54,7 +53,7 @@ async fn system_image_hash_ignored() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn non_static_allow_list() {
     let system_image_package = SystemImageBuilder::new()
         .pkgfs_non_static_packages_allowlist(&["a-package-name", "another-name"])
@@ -114,13 +113,13 @@ async fn assert_base_blob_count(
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_blob_count_with_empty_system_image() {
     // system_image: meta.far and data/static_packages (the empty blob)
     assert_base_blob_count(&[], None, 2).await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_blob_count_with_one_base_package() {
     let pkg = PackageBuilder::new("a-base-package")
         .add_resource_at("some-empty-blob", &[][..])
@@ -132,7 +131,7 @@ async fn base_blob_count_with_one_base_package() {
     assert_base_blob_count(&[&pkg], None, 4).await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_blob_count_with_two_base_packages_and_one_shared_blob() {
     let pkg0 = PackageBuilder::new("a-base-package")
         .add_resource_at("some-blob", &b"shared-contents"[..])
@@ -150,7 +149,7 @@ async fn base_blob_count_with_two_base_packages_and_one_shared_blob() {
     assert_base_blob_count(&[&pkg0, &pkg1], None, 5).await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn base_blob_count_ignores_cache_packages() {
     let pkg = PackageBuilder::new("a-cache-package")
         .add_resource_at("some-cached-blob", &b"unique contents"[..])
@@ -162,7 +161,7 @@ async fn base_blob_count_ignores_cache_packages() {
     assert_base_blob_count(&[], Some(&[&pkg]), 3).await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn executability_restrictions_enabled() {
     let env = TestEnv::builder().build().await;
     env.block_until_started().await;
@@ -178,7 +177,7 @@ async fn executability_restrictions_enabled() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn executability_restrictions_disabled() {
     let system_image_package =
         SystemImageBuilder::new().pkgfs_disable_executability_restrictions().build().await;
@@ -197,7 +196,7 @@ async fn executability_restrictions_disabled() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn dynamic_index_inital_state() {
     let system_image_package = SystemImageBuilder::new().build().await;
     let env =
@@ -217,7 +216,7 @@ async fn dynamic_index_inital_state() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn dynamic_index_with_cache_packages() {
     let cache_package = PackageBuilder::new("a-cache-package")
         .add_resource_at("some-cached-blob", &b"unique contents"[..])
@@ -255,7 +254,7 @@ async fn dynamic_index_with_cache_packages() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn dynamic_index_needed_blobs() {
     let env = TestEnv::builder().build().await;
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
@@ -356,7 +355,7 @@ async fn dynamic_index_needed_blobs() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn dynamic_index_package_hash_update() {
     let env = TestEnv::builder().build().await;
     let pkg = PackageBuilder::new("single-blob").build().await.unwrap();
@@ -436,7 +435,7 @@ async fn dynamic_index_package_hash_update() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn package_cache_get() {
     async fn expect_and_return_inspect(env: &TestEnv, state: &'static str) -> DiagnosticsHierarchy {
         let hierarchy = env
@@ -607,7 +606,7 @@ async fn package_cache_get() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn package_cache_concurrent_gets() {
     let package = PackageBuilder::new("a-blob").build().await.unwrap();
     let package2 = PackageBuilder::new("b-blob").build().await.unwrap();
@@ -706,7 +705,7 @@ async fn package_cache_concurrent_gets() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn retained_index_inital_state() {
     let env = TestEnv::builder().build().await;
 
@@ -726,7 +725,7 @@ async fn retained_index_inital_state() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn retained_index_updated_and_persisted() {
     let env = TestEnv::builder().build().await;
     let packages = vec![
@@ -871,7 +870,7 @@ async fn retained_index_updated_and_persisted() {
     env.stop().await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn index_updated_mid_package_write() {
     let env = TestEnv::builder().build().await;
     let package = PackageBuilder::new("multi-pkg-a")

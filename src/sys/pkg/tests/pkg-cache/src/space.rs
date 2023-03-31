@@ -10,7 +10,7 @@ use {
     fidl_fuchsia_pkg::{self as fpkg, NeededBlobsMarker},
     fidl_fuchsia_pkg_ext::BlobId,
     fidl_fuchsia_space::ErrorCode,
-    fuchsia_async::{self as fasync, OnSignals},
+    fuchsia_async::OnSignals,
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
     fuchsia_zircon::{self as zx, Status},
     futures::TryFutureExt,
@@ -69,7 +69,7 @@ async fn do_fetch(package_cache: &fpkg::PackageCacheProxy, pkg: &Package) {
     let () = pkg.verify_contents(&dir).await.unwrap();
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn gc_error_pending_commit() {
     let (throttle_hook, throttler) = mphooks::throttle();
 
@@ -131,7 +131,7 @@ async fn setup_test_env(
 
 /// Assert that performing a GC does nothing on a blobfs that only includes the system image and
 /// static packages.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn gc_noop_system_image() {
     let static_package = PackageBuilder::new("static-package")
         .add_resource_at("resource", &[][..])
@@ -148,7 +148,7 @@ async fn gc_noop_system_image() {
 /// Assert that any blobs protected by the dynamic index are ineligible for garbage collection.
 /// Furthermore, ensure that an incomplete package does not lose blobs, and that the previous
 /// packages' blobs survive until the new package is entirely written.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn gc_dynamic_index_protected() {
     let (env, sysimg_pkg) = setup_test_env(None, &[]).await;
 
@@ -253,7 +253,7 @@ async fn gc_dynamic_index_protected() {
 }
 
 /// Test that a blobfs with blobs not belonging to a known package will lose those blobs on GC.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn gc_random_blobs() {
     let static_package = PackageBuilder::new("static-package")
         .add_resource_at("resource", &[][..])
@@ -281,7 +281,7 @@ async fn gc_random_blobs() {
 
 /// Effectively the same as gc_dynamic_index_protected, except that the updated package also
 /// existed as a static package as well.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn gc_updated_static_package() {
     let static_package = PackageBuilder::new("gc_updated_static_package_pkg_cache")
         .add_resource_at("bin/x", "bin-x-version-0".as_bytes())

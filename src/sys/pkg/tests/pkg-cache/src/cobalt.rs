@@ -9,7 +9,6 @@ use {
     cobalt_client::traits::AsEventCodes,
     cobalt_sw_delivery_registry as metrics,
     fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload},
-    fuchsia_async as fasync,
     fuchsia_pkg_testing::SystemImageBuilder,
     fuchsia_zircon as zx,
 };
@@ -44,7 +43,7 @@ async fn assert_count_events(
     }
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn pkg_cache_open_failure() {
     let env = TestEnv::builder().build().await;
 
@@ -62,7 +61,7 @@ async fn pkg_cache_open_failure() {
     .await;
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn pkg_cache_open_success() {
     let system_image_package = SystemImageBuilder::new().build().await;
 

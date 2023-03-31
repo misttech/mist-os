@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::TestEnv, fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon::Status,
-    futures::TryFutureExt,
-};
+use {crate::TestEnv, fidl_fuchsia_io as fio, fuchsia_zircon::Status, futures::TryFutureExt};
 
 struct BrokenBlobfs;
 
@@ -15,7 +12,7 @@ impl crate::Blobfs for BrokenBlobfs {
     }
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn sync_success() {
     let env = TestEnv::builder().build().await;
 
@@ -24,7 +21,7 @@ async fn sync_success() {
     assert_eq!(res.unwrap(), Ok(()));
 }
 
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn sync_returns_errs() {
     let env = TestEnv::builder()
         .blobfs_and_system_image_hash(BrokenBlobfs, None)
