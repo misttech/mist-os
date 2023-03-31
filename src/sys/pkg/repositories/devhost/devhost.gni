@@ -104,6 +104,9 @@ template("devhost_root_metadata") {
 #
 #   package_list_manifests (required)
 #     A list of package list manifest paths.
+#
+#   output_blob_manifest_path (optional)
+#     If set, write the blob manifest of all staged blobs to the given path.
 template("devhost_repository_publish") {
   assert(defined(invoker.output_repository_dir) &&
              invoker.output_repository_dir != "",
@@ -128,6 +131,7 @@ template("devhost_repository_publish") {
                              "metadata",
                              "output_repository_dir",
                              "package_list_manifests",
+                             "output_blob_manifest_path",
                              "testonly",
                              "visibility",
                            ])

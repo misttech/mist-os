@@ -618,7 +618,7 @@ struct PackageMetadata {
     version: PackageVariant,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize, PartialOrd, Ord)]
 pub struct BlobInfo {
     pub source_path: String,
     pub path: String,

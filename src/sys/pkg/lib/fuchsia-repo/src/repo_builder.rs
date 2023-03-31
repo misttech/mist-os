@@ -381,8 +381,8 @@ where
     /// Read all remaining subpackages, and then commit the changes to the
     /// repository.
     ///
-    /// Returns the list of the files that were read.
-    pub async fn commit(self) -> Result<HashSet<Utf8PathBuf>> {
+    /// Returns the list of the files that were read and the staged blobs.
+    pub async fn commit(self) -> Result<(HashSet<Utf8PathBuf>, HashMap<Hash, BlobInfo>)> {
         let repo_builder = if let Some(database) = self.database.as_ref() {
             TufRepoBuilder::from_database(&self.repo, database)
         } else {
@@ -510,17 +510,17 @@ where
         repo_builder.commit().await.context("publishing metadata")?;
 
         // Stage the blobs.
-        let () = futures::stream::iter(staged_blobs)
+        let () = futures::stream::iter(&staged_blobs)
             .map(Ok)
             .try_for_each_concurrent(
                 std::thread::available_parallelism()?.get(),
                 |(blob_hash, blob)| {
-                    self.repo.store_blob(&blob_hash, Utf8Path::new(&blob.source_path))
+                    self.repo.store_blob(blob_hash, Utf8Path::new(&blob.source_path))
                 },
             )
             .await?;
 
-        Ok(self.deps)
+        Ok((self.deps, staged_blobs))
     }
 }
 
@@ -904,7 +904,7 @@ mod tests {
 
         // Add the two named packages. The anonymous subpackage will be added
         // automatically.
-        let actual_deps = RepoBuilder::create(&repo, &repo_keys)
+        let (actual_deps, _) = RepoBuilder::create(&repo, &repo_keys)
             .add_package(superpkg_manifest_path.clone())
             .await
             .unwrap()

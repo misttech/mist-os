@@ -198,6 +198,9 @@ declare_args() {
 #   initial_trusted_root_metadata (optional)
 #     Initialize TUF trust with this root metadata. Defaults to
 #     ${repository_dir}/repository/1.root.json if unspecified.
+#
+#   output_blob_manifest_path (optional)
+#     If set, write the blob manifest of all staged blobs to the given path.
 template("package_tool_repository_publish") {
   assert(defined(invoker.output_repository_dir) &&
              invoker.output_repository_dir != "",
@@ -260,6 +263,16 @@ template("package_tool_repository_publish") {
         "--trusted-root",
         rebase_path(invoker.initial_trusted_root_metadata, root_build_dir),
       ]
+    }
+
+    if (defined(invoker.output_blob_manifest_path)) {
+      assert(invoker.output_blob_manifest_path != "",
+             "output_blob_manifest_path cannot be empty")
+      args += [
+        "--blob-manifest",
+        rebase_path(invoker.output_blob_manifest_path, root_build_dir),
+      ]
+      outputs += [ invoker.output_blob_manifest_path ]
     }
 
     if (delivery_blob_type != false) {

@@ -295,17 +295,17 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
     };
 
     // Publish all the packages.
-    deps.extend(
-        repo_builder
-            .add_packages(cmd.package_manifests.iter().cloned())
-            .await?
-            .add_package_lists(cmd.package_list_manifests.iter().cloned())
-            .await?
-            .add_package_archives(cmd.package_archives.iter().cloned())
-            .await?
-            .commit()
-            .await?,
-    );
+
+    let (repo_deps, staged_blobs) = repo_builder
+        .add_packages(cmd.package_manifests.iter().cloned())
+        .await?
+        .add_package_lists(cmd.package_list_manifests.iter().cloned())
+        .await?
+        .add_package_archives(cmd.package_archives.iter().cloned())
+        .await?
+        .commit()
+        .await?;
+    deps.extend(repo_deps);
 
     if cmd.watch {
         // Deps don't need to be written for incremental publish.
@@ -317,6 +317,16 @@ async fn repo_publish_oneshot(cmd: &RepoPublishCommand) -> Result<()> {
         let dep_paths = deps.iter().map(|x| x.to_string()).collect::<BTreeSet<String>>();
 
         write_depfile(depfile_path.as_std_path(), timestamp_path.as_path(), dep_paths.into_iter())?;
+    }
+    if let Some(blob_manifest_path) = &cmd.blob_manifest {
+        let file = File::create(blob_manifest_path)
+            .with_context(|| format!("creating {}", blob_manifest_path))?;
+
+        serde_json::to_writer(
+            std::io::BufWriter::new(file),
+            &staged_blobs.into_values().collect::<BTreeSet<fuchsia_pkg::BlobInfo>>(),
+        )
+        .with_context(|| format!("writing {}", blob_manifest_path))?;
     }
 
     Ok(())
@@ -499,6 +509,7 @@ mod tests {
             delivery_blob_type: None,
             blobfs_compression_path: None,
             ignore_missing_packages: false,
+            blob_manifest: None,
             repo_path: "".into(),
         }
     }
@@ -1141,5 +1152,21 @@ mod tests {
             &json!("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9")
         );
         assert!(trusted_targets.targets().get("packageb/0").is_some());
+    }
+
+    #[fuchsia::test]
+    async fn test_write_blob_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let blob_manifest = tmp.path().join("all_blobs.json");
+        let mut env = TestEnv::new();
+        env.cmd.blob_manifest = Some(Utf8PathBuf::from_path_buf(blob_manifest.clone()).unwrap());
+
+        assert_matches!(repo_publish(&env.cmd).await, Ok(()));
+
+        let all_blobs = serde_json::from_reader(File::open(blob_manifest).unwrap()).unwrap();
+
+        let expected_all_blobs: BTreeSet<_> =
+            env.manifests.into_iter().flat_map(|manifest| manifest.into_blobs()).collect();
+        assert_eq!(expected_all_blobs, all_blobs);
     }
 }

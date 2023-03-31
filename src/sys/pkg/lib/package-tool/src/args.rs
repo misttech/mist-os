@@ -191,6 +191,10 @@ pub struct RepoPublishCommand {
     #[argh(switch)]
     pub ignore_missing_packages: bool,
 
+    /// path to write the blob manifest to
+    #[argh(option)]
+    pub blob_manifest: Option<Utf8PathBuf>,
+
     /// path to the repository directory
     #[argh(positional)]
     pub repo_path: Utf8PathBuf,
