@@ -129,31 +129,41 @@ class PartitionMatchesTest : public testing::Test {
 
 TEST_F(PartitionMatchesTest, TestTypeMatch) {
   const PartitionMatcher kMatcher = {.type_guids = {kInvalidGUID1, kValidTypeGUID, kInvalidGUID2}};
-  ASSERT_TRUE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestInstanceMatch) {
   const PartitionMatcher kMatcher = {
       .instance_guids = {kInvalidGUID1, kValidInstanceGUID, kInvalidGUID2}};
-  ASSERT_TRUE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestTypeAndInstanceMatch) {
   const PartitionMatcher kMatcher = {
       .type_guids = {kInvalidGUID1, kValidTypeGUID, kInvalidGUID2},
       .instance_guids = {kInvalidGUID1, kValidInstanceGUID, kInvalidGUID2}};
-  ASSERT_TRUE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestParentMatch) {
   {
     const PartitionMatcher kMatcher = {.parent_device = kParent};
-    ASSERT_TRUE(PartitionMatches(client_, kMatcher));
+    zx::result result = PartitionMatches(client_, kMatcher);
+    ASSERT_TRUE(result.is_ok()) << result.status_string();
+    ASSERT_TRUE(result.value());
   }
 
   {
     const PartitionMatcher kMatcher = {.parent_device = kNotParent};
-    ASSERT_FALSE(PartitionMatches(client_, kMatcher));
+    zx::result result = PartitionMatches(client_, kMatcher);
+    ASSERT_TRUE(result.is_ok()) << result.status_string();
+    ASSERT_FALSE(result.value());
   }
 }
 
@@ -163,7 +173,9 @@ TEST_F(PartitionMatchesTest, TestLabelMatch) {
                                          kValidLabel,
                                          kInvalidLabel2,
                                      }};
-  ASSERT_TRUE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestTypeAndLabelMatch) {
@@ -171,18 +183,24 @@ TEST_F(PartitionMatchesTest, TestTypeAndLabelMatch) {
       .type_guids = {kValidTypeGUID},
       .labels = {kValidLabel},
   };
-  ASSERT_TRUE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_TRUE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestTypeMismatch) {
   const PartitionMatcher kMatcher = {.type_guids = {kInvalidGUID1}};
-  ASSERT_FALSE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_FALSE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestInstanceMismatch) {
   const PartitionMatcher kMatcher = {.type_guids = {kValidTypeGUID},
                                      .instance_guids = {kInvalidGUID2}};
-  ASSERT_FALSE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_FALSE(result.value());
 }
 
 TEST_F(PartitionMatchesTest, TestLabelMismatch) {
@@ -191,7 +209,9 @@ TEST_F(PartitionMatchesTest, TestLabelMismatch) {
                                          kInvalidLabel1,
                                          kInvalidLabel2,
                                      }};
-  ASSERT_FALSE(PartitionMatches(client_, kMatcher));
+  zx::result result = PartitionMatches(client_, kMatcher);
+  ASSERT_TRUE(result.is_ok()) << result.status_string();
+  ASSERT_FALSE(result.value());
 }
 
 }  // namespace

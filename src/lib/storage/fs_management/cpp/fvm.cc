@@ -172,7 +172,13 @@ zx::result<fbl::unique_fd> OpenPartitionImpl(fidl::ClientEnd<fuchsia_io::Directo
     if (channel.is_error()) {
       return channel.take_error();
     }
-    if (!PartitionMatches(channel.value(), matcher)) {
+    zx::result result = PartitionMatches(channel.value(), matcher);
+    if (result.is_error()) {
+      fprintf(stderr, "OpenPartitionImpl: matcher failed on %s: %s\n", std::string(name).c_str(),
+              result.status_string());
+      return {};
+    }
+    if (!result.value()) {
       return {};
     }
     fbl::unique_fd partition;
@@ -231,8 +237,8 @@ zx::result<> DestroyPartitionImpl(
 }  // namespace
 
 __EXPORT
-bool PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Controller> channel,
-                      const PartitionMatcher& matcher) {
+zx::result<bool> PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Controller> channel,
+                                  const PartitionMatcher& matcher) {
   ZX_ASSERT(!matcher.type_guids.empty() || !matcher.instance_guids.empty() ||
             !matcher.detected_formats.empty() || !matcher.labels.empty() ||
             !matcher.parent_device.empty());
@@ -240,89 +246,87 @@ bool PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Controller> channel
   zx::result partition_endpoints =
       fidl::CreateEndpoints<fuchsia_hardware_block_partition::Partition>();
   if (partition_endpoints.is_error()) {
-    return false;
+    return partition_endpoints.take_error();
   }
   auto& [partition_client_end, partition_server_end] = partition_endpoints.value();
-  if (fidl::OneWayStatus response =
+  if (const fidl::OneWayStatus result =
           fidl::WireCall(channel)->ConnectToDeviceFidl(partition_server_end.TakeChannel());
-      !response.ok()) {
-    return false;
+      !result.ok()) {
+    return zx::error(result.status());
   }
 
   if (!matcher.type_guids.empty()) {
     const fidl::WireResult result = fidl::WireCall(partition_client_end)->GetTypeGuid();
     if (!result.ok()) {
-      return false;
+      return zx::error(result.status());
     }
     const fidl::WireResponse response = result.value();
-    if (response.status != ZX_OK) {
-      return false;
+    if (zx_status_t status = response.status; status != ZX_OK) {
+      return zx::error(status);
     }
     if (!std::any_of(matcher.type_guids.cbegin(), matcher.type_guids.cend(),
                      [type_guid = response.guid->value](const uuid::Uuid& match_guid) {
                        return std::equal(type_guid.cbegin(), type_guid.cend(), match_guid.cbegin());
                      })) {
-      return false;
+      return zx::ok(false);
     }
   }
   if (!matcher.instance_guids.empty()) {
     const fidl::WireResult result = fidl::WireCall(partition_client_end)->GetInstanceGuid();
     if (!result.ok()) {
-      return false;
+      return zx::error(result.status());
     }
     const fidl::WireResponse response = result.value();
-    if (response.status != ZX_OK) {
-      return false;
+    if (zx_status_t status = response.status; status != ZX_OK) {
+      return zx::error(status);
     }
     if (!std::any_of(matcher.instance_guids.cbegin(), matcher.instance_guids.cend(),
                      [instance_guid = response.guid->value](const uuid::Uuid& match_guid) {
                        return std::equal(instance_guid.cbegin(), instance_guid.cend(),
                                          match_guid.cbegin());
                      })) {
-      return false;
+      return zx::ok(false);
     }
   }
   if (!matcher.labels.empty()) {
     const fidl::WireResult result = fidl::WireCall(partition_client_end)->GetName();
     if (!result.ok()) {
-      return false;
+      return zx::error(result.status());
     }
     const fidl::WireResponse response = result.value();
-    if (response.status != ZX_OK) {
-      return false;
+    if (zx_status_t status = response.status; status != ZX_OK) {
+      return zx::error(status);
     }
 
     if (!std::any_of(matcher.labels.cbegin(), matcher.labels.cend(),
                      [part_label = response.name.get()](std::string_view match_label) {
                        return part_label == match_label;
                      })) {
-      return false;
+      return zx::ok(false);
     }
   }
 
-  std::string topological_path;
   if (!matcher.parent_device.empty() || !matcher.ignore_prefix.empty() ||
       !matcher.ignore_if_path_contains.empty()) {
     const fidl::WireResult result = fidl::WireCall(channel)->GetTopologicalPath();
     if (!result.ok()) {
-      return false;
+      return zx::error(result.status());
     }
     const fit::result response = result.value();
     if (response.is_error()) {
-      return false;
+      return zx::error(response.error_value());
     }
-    topological_path = response.value()->path.get();
-  }
-  const std::string_view path(topological_path);
-  if (!matcher.parent_device.empty() && !cpp20::starts_with(path, matcher.parent_device)) {
-    return false;
-  }
-  if (!matcher.ignore_prefix.empty() && cpp20::starts_with(path, matcher.ignore_prefix)) {
-    return false;
-  }
-  if (!matcher.ignore_if_path_contains.empty() &&
-      path.find(matcher.ignore_if_path_contains) != std::string::npos) {
-    return false;
+    std::string_view path = response.value()->path.get();
+    if (!matcher.parent_device.empty() && !cpp20::starts_with(path, matcher.parent_device)) {
+      return zx::ok(false);
+    }
+    if (!matcher.ignore_prefix.empty() && cpp20::starts_with(path, matcher.ignore_prefix)) {
+      return zx::ok(false);
+    }
+    if (!matcher.ignore_if_path_contains.empty() &&
+        path.find(matcher.ignore_if_path_contains) != std::string::npos) {
+      return zx::ok(false);
+    }
   }
   if (!matcher.detected_formats.empty()) {
     // TODO(https://fxbug.dev/122007): avoid this cast
@@ -332,10 +336,10 @@ bool PartitionMatches(fidl::UnownedClientEnd<fuchsia_device::Controller> channel
     if (!std::any_of(
             matcher.detected_formats.cbegin(), matcher.detected_formats.cend(),
             [part_format](const DiskFormat match_format) { return part_format == match_format; })) {
-      return false;
+      return zx::ok(false);
     }
   }
-  return true;
+  return zx::ok(true);
 }
 
 __EXPORT
