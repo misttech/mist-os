@@ -15,7 +15,9 @@
 #include <gtest/gtest.h>
 
 #include "lib/syslog/cpp/log_level.h"
-#include "logging_backend_shared.h"
+#ifndef __Fuchsia__
+#include "host_encoder.h"
+#endif
 #include "src/lib/files/file.h"
 #include "src/lib/files/scoped_temp_dir.h"
 #include "src/lib/uuid/uuid.h"
@@ -389,8 +391,6 @@ TEST(StructuredLogging, LOGS) {
 }
 
 #ifndef __Fuchsia__
-// Fuchsia no longer uses logging_backend_shared
-// since all logs are now structured.
 TEST(StructuredLogging, Remaining) {
   LogSettings new_settings;
   new_settings.wait_for_initial_interest = false;

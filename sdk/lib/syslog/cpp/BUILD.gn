@@ -87,9 +87,10 @@ sdk_source_set("backend_host") {
   include_base = "//sdk"
 
   sources = [
+    # TODO(https://fxbug.dev/124673): Move these to a host directory.
+    "host_encoder.cc",
+    "host_encoder.h",
     "logging_backend_host.cc",
-    "logging_backend_shared.cc",
-    "logging_backend_shared.h",
   ]
 
   deps = [ ":cpp" ]
@@ -123,8 +124,6 @@ sdk_source_set("backend_fuchsia_lib") {
     "logging_backend_fuchsia.cc",
     "logging_backend_fuchsia_globals.h",
     "logging_backend_fuchsia_private.h",
-    "logging_backend_shared.cc",
-    "logging_backend_shared.h",
     "macros.h",
   ]
 
@@ -162,8 +161,6 @@ sdk_source_set("backend_fuchsia_compat") {
     "logging_backend_fuchsia.cc",
     "logging_backend_fuchsia_globals.h",
     "logging_backend_fuchsia_private.h",
-    "logging_backend_shared.cc",
-    "logging_backend_shared.h",
   ]
 
   deps = [
@@ -207,6 +204,7 @@ sdk_source_set("backend") {
 
 test("logging_cpp_unittests") {
   sources = [
+    "host_encoder.h",
     "log_settings_unittest.cc",
     "logging_unittest.cc",
   ]

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lib/syslog/cpp/logging_backend_shared.h"
+#include "lib/syslog/cpp/host_encoder.h"
 
 #include <inttypes.h>
 

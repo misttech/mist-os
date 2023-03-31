@@ -14,7 +14,6 @@
 
 #include <gtest/gtest.h>
 
-#include "lib/syslog/cpp/logging_backend_shared.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/scoped_temp_dir.h"
 

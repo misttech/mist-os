@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_SYSLOG_CPP_LOGGING_BACKEND_SHARED_H_
-#define LIB_SYSLOG_CPP_LOGGING_BACKEND_SHARED_H_
+#ifndef LIB_SYSLOG_CPP_HOST_ENCODER_H_
+#define LIB_SYSLOG_CPP_HOST_ENCODER_H_
 
 #include <assert.h>
 #include <lib/syslog/cpp/log_level.h>
@@ -130,4 +130,4 @@ void EndRecordLegacy(LogBuffer* buffer);
 
 }  // namespace syslog_backend
 
-#endif  // LIB_SYSLOG_CPP_LOGGING_BACKEND_SHARED_H_
+#endif  // LIB_SYSLOG_CPP_HOST_ENCODER_H_
