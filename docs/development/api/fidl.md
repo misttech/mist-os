@@ -45,7 +45,7 @@ undermine that core value proposition.
 ### Ordinals
 
 Protocols contain a number of methods.  Each method is automatically assigned a
-unique 32 bit identifier, called an ordinal.  Servers use the ordinal value
+unique 64-bit identifier, called an ordinal.  Servers use the ordinal value
 to determine which protocol method should be dispatched.
 
 The compiler determines the ordinal value by hashing the library, protocol, and
