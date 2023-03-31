@@ -28,13 +28,23 @@ pub enum Protocol {
     Specific(NonZeroU16),
 }
 
-/// Selector for devices to receive packets on.
+/// Selector for devices to send and receive packets on.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum DeviceSelector<D> {
-    /// Select packets received on any device.
+pub enum TargetDevice<D> {
+    /// Act on any device in the system.
     AnyDevice,
-    /// Select packets received on the given device.
+    /// Act on a specific device.
     SpecificDevice(D),
+}
+
+/// Information about the bound state of a socket.
+#[derive(Debug)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct SocketInfo<D> {
+    /// The protocol the socket is bound to, or `None` if no protocol is set.
+    pub protocol: Option<Protocol>,
+    /// The device selector for which the socket is set.
+    pub device: TargetDevice<D>,
 }
 
 /// Non-sync context for packet sockets.
@@ -123,20 +133,23 @@ pub(crate) trait DeviceSocketAccessor: DeviceIdContext<AnyDevice> {
 }
 
 /// Internal implementation trait that allows abstracting over device ID types.
-trait SocketHandler<D, C: NonSyncContext> {
+trait SocketHandler<C: NonSyncContext>: DeviceIdContext<AnyDevice> {
     /// Creates a new packet socket.
     fn create(&mut self) -> SocketId;
 
     /// Sets the device for a packet socket without affecting the protocol.
-    fn set_device(&mut self, socket: &mut SocketId, device: DeviceSelector<&D>);
+    fn set_device(&mut self, socket: &mut SocketId, device: TargetDevice<&Self::DeviceId>);
 
     /// Sets both the device and protocol for a packet socket.
     fn set_device_and_protocol(
         &mut self,
         id: &mut SocketId,
-        device: DeviceSelector<&D>,
+        device: TargetDevice<&Self::DeviceId>,
         protocol: Protocol,
     );
+
+    /// Gets information about a socket.
+    fn get_info(&mut self, id: &SocketId) -> SocketInfo<Self::WeakDeviceId>;
 
     /// Removes a packet socket.
     fn remove(&mut self, id: SocketId);
@@ -150,7 +163,7 @@ enum MaybeUpdate<T> {
 fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext>(
     sync_ctx: &mut SC,
     socket: &SocketId,
-    new_device: DeviceSelector<&SC::DeviceId>,
+    new_device: TargetDevice<&SC::DeviceId>,
     protocol_update: MaybeUpdate<Protocol>,
 ) {
     let SocketId(index) = socket;
@@ -186,24 +199,21 @@ fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext>(
 
         // Add the reference to the new device, if there is one.
         match &new_device {
-            DeviceSelector::SpecificDevice(new_device) => sync_ctx
+            TargetDevice::SpecificDevice(new_device) => sync_ctx
                 .with_device_sockets_mut(new_device, |DeviceSockets(device_sockets)| {
                     device_sockets.push(*index)
                 }),
-            DeviceSelector::AnyDevice => (),
+            TargetDevice::AnyDevice => (),
         };
 
         *device = match new_device {
-            DeviceSelector::AnyDevice => None,
-            DeviceSelector::SpecificDevice(d) => Some(sync_ctx.downgrade_device_id(d)),
+            TargetDevice::AnyDevice => None,
+            TargetDevice::SpecificDevice(d) => Some(sync_ctx.downgrade_device_id(d)),
         };
     });
 }
 
-impl<SC: SyncContext<C>, C: NonSyncContext> SocketHandler<SC::DeviceId, C> for SC
-where
-    SC::DeviceId: Clone + Debug + Eq + Hash,
-{
+impl<SC: SyncContext<C>, C: NonSyncContext> SocketHandler<C> for SC {
     fn create(&mut self) -> SocketId {
         let index =
             self.with_sockets_mut(|Sockets(sockets), _: &mut SC::DeviceSocketAccessor<'_>| {
@@ -212,17 +222,28 @@ where
         SocketId(index)
     }
 
-    fn set_device(&mut self, socket: &mut SocketId, device: DeviceSelector<&SC::DeviceId>) {
+    fn set_device(&mut self, socket: &mut SocketId, device: TargetDevice<&SC::DeviceId>) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NoChange)
     }
 
     fn set_device_and_protocol(
         &mut self,
         socket: &mut SocketId,
-        device: DeviceSelector<&SC::DeviceId>,
+        device: TargetDevice<&SC::DeviceId>,
         protocol: Protocol,
     ) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NewValue(protocol))
+    }
+
+    fn get_info(&mut self, id: &SocketId) -> SocketInfo<Self::WeakDeviceId> {
+        self.with_sockets(|Sockets(sockets), _: &mut SC::DeviceSocketAccessor<'_>| {
+            let SocketId(index) = id;
+            let SocketState { protocol, device } =
+                sockets.get(*index).unwrap_or_else(|| panic!("invalid socket ID {id:?}"));
+            let device =
+                device.clone().map_or(TargetDevice::AnyDevice, TargetDevice::SpecificDevice);
+            SocketInfo { device, protocol: *protocol }
+        })
     }
 
     fn remove(&mut self, id: SocketId) {
@@ -267,7 +288,7 @@ pub fn create<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>) -> SocketId {
 pub fn set_device<C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: &mut SocketId,
-    device: DeviceSelector<&DeviceId<C>>,
+    device: TargetDevice<&DeviceId<C>>,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
     SocketHandler::set_device(&mut sync_ctx, id, device)
@@ -277,11 +298,20 @@ pub fn set_device<C: crate::NonSyncContext>(
 pub fn set_device_and_protocol<C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     id: &mut SocketId,
-    device: DeviceSelector<&DeviceId<C>>,
+    device: TargetDevice<&DeviceId<C>>,
     protocol: Protocol,
 ) {
     let mut sync_ctx = Locked::new(sync_ctx);
     SocketHandler::set_device_and_protocol(&mut sync_ctx, id, device, protocol)
+}
+
+/// Gets the bound info for a socket.
+pub fn get_info<C: crate::NonSyncContext>(
+    sync_ctx: &SyncCtx<C>,
+    id: &SocketId,
+) -> SocketInfo<WeakDeviceId<C>> {
+    let mut sync_ctx = Locked::new(sync_ctx);
+    SocketHandler::get_info(&mut sync_ctx, id)
 }
 
 /// Removes a bound socket.
@@ -396,6 +426,17 @@ mod tests {
     struct FakeSockets<D> {
         shared_sockets: Sockets<FakeWeakDeviceId<D>>,
         device_sockets: HashMap<D, DeviceSockets>,
+    }
+
+    impl<D: Clone> TargetDevice<&D> {
+        fn with_weak_id(&self) -> TargetDevice<FakeWeakDeviceId<D>> {
+            match self {
+                TargetDevice::AnyDevice => TargetDevice::AnyDevice,
+                TargetDevice::SpecificDevice(d) => {
+                    TargetDevice::SpecificDevice(FakeWeakDeviceId((*d).clone()))
+                }
+            }
+        }
     }
 
     impl<D: Eq + Hash> FakeSockets<D> {
@@ -525,21 +566,29 @@ mod tests {
     fn create_remove() {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
-        let bound = SocketHandler::<MultipleDevicesId, _>::create(&mut sync_ctx);
+        let bound = SocketHandler::create(&mut sync_ctx);
+        assert_eq!(
+            SocketHandler::get_info(&mut sync_ctx, &bound),
+            SocketInfo { device: TargetDevice::AnyDevice, protocol: None }
+        );
 
         SocketHandler::remove(&mut sync_ctx, bound);
     }
 
-    #[test_case(DeviceSelector::AnyDevice)]
-    #[test_case(DeviceSelector::SpecificDevice(&MultipleDevicesId::A))]
-    fn set_device(device: DeviceSelector<&MultipleDevicesId>) {
+    #[test_case(TargetDevice::AnyDevice)]
+    #[test_case(TargetDevice::SpecificDevice(&MultipleDevicesId::A))]
+    fn set_device(device: TargetDevice<&MultipleDevicesId>) {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
         let mut bound = SocketHandler::create(&mut sync_ctx);
         SocketHandler::set_device(&mut sync_ctx, &mut bound, device.clone());
+        assert_eq!(
+            SocketHandler::get_info(&mut sync_ctx, &bound),
+            SocketInfo { device: device.with_weak_id(), protocol: None }
+        );
 
         let FakeSockets { device_sockets, shared_sockets: _ } = sync_ctx.get_ref();
-        if let DeviceSelector::SpecificDevice(d) = device {
+        if let TargetDevice::SpecificDevice(d) = device {
             let DeviceSockets(indexes) = device_sockets.get(&d).expect("device state exists");
             let SocketId(index) = bound;
             assert_eq!(indexes, &[index]);
@@ -555,7 +604,7 @@ mod tests {
         SocketHandler::set_device(
             &mut sync_ctx,
             &mut bound,
-            DeviceSelector::SpecificDevice(&MultipleDevicesId::A),
+            TargetDevice::SpecificDevice(&MultipleDevicesId::A),
         );
 
         // Now update the device and make sure the socket only appears in the
@@ -563,7 +612,14 @@ mod tests {
         SocketHandler::set_device(
             &mut sync_ctx,
             &mut bound,
-            DeviceSelector::SpecificDevice(&MultipleDevicesId::B),
+            TargetDevice::SpecificDevice(&MultipleDevicesId::B),
+        );
+        assert_eq!(
+            SocketHandler::get_info(&mut sync_ctx, &bound),
+            SocketInfo {
+                device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
+                protocol: None
+            }
         );
 
         let FakeSockets { device_sockets, shared_sockets: _ } = sync_ctx.get_ref();
@@ -582,22 +638,26 @@ mod tests {
         );
     }
 
-    #[test_case(Protocol::All, DeviceSelector::AnyDevice)]
-    #[test_case(Protocol::Specific(SOME_PROTOCOL), DeviceSelector::AnyDevice)]
-    #[test_case(Protocol::All, DeviceSelector::SpecificDevice(&MultipleDevicesId::A))]
+    #[test_case(Protocol::All, TargetDevice::AnyDevice)]
+    #[test_case(Protocol::Specific(SOME_PROTOCOL), TargetDevice::AnyDevice)]
+    #[test_case(Protocol::All, TargetDevice::SpecificDevice(&MultipleDevicesId::A))]
     #[test_case(
         Protocol::Specific(SOME_PROTOCOL),
-        DeviceSelector::SpecificDevice(&MultipleDevicesId::A)
+        TargetDevice::SpecificDevice(&MultipleDevicesId::A)
     )]
     fn create_set_device_and_protocol_remove_multiple(
         protocol: Protocol,
-        device: DeviceSelector<&MultipleDevicesId>,
+        device: TargetDevice<&MultipleDevicesId>,
     ) {
         let mut sync_ctx = FakeSyncCtx::with_state(FakeSockets::new(MultipleDevicesId::all()));
 
         let mut sockets = [(); 3].map(|()| SocketHandler::create(&mut sync_ctx));
         for socket in &mut sockets {
-            SocketHandler::set_device_and_protocol(&mut sync_ctx, socket, device.clone(), protocol)
+            SocketHandler::set_device_and_protocol(&mut sync_ctx, socket, device.clone(), protocol);
+            assert_eq!(
+                SocketHandler::get_info(&mut sync_ctx, socket),
+                SocketInfo { device: device.with_weak_id(), protocol: Some(protocol) }
+            );
         }
 
         for socket in sockets {
@@ -616,7 +676,7 @@ mod tests {
         SocketHandler::set_device(
             &mut sync_ctx,
             &mut bound,
-            DeviceSelector::SpecificDevice(&DEVICE_TO_REMOVE),
+            TargetDevice::SpecificDevice(&DEVICE_TO_REMOVE),
         );
 
         // Now remove the device; this should cause future attempts to upgrade
@@ -635,7 +695,14 @@ mod tests {
         SocketHandler::set_device(
             &mut sync_ctx,
             &mut bound,
-            DeviceSelector::SpecificDevice(&MultipleDevicesId::B),
+            TargetDevice::SpecificDevice(&MultipleDevicesId::B),
+        );
+        assert_eq!(
+            SocketHandler::get_info(&mut sync_ctx, &bound),
+            SocketInfo {
+                device: TargetDevice::SpecificDevice(FakeWeakDeviceId(MultipleDevicesId::B)),
+                protocol: None,
+            }
         );
 
         let FakeSockets { device_sockets, shared_sockets: _ } = sync_ctx.get_ref();

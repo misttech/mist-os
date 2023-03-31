@@ -16,7 +16,10 @@ use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::TryStreamExt as _;
 use log::error;
 use netstack3_core::{
-    device::socket::{DeviceSelector, Protocol, SocketId},
+    device::{
+        socket::{Protocol, SocketId, SocketInfo, TargetDevice},
+        DeviceId, WeakDeviceId,
+    },
     Ctx, SyncCtx,
 };
 
@@ -25,7 +28,7 @@ use crate::bindings::{
         worker::{self, CloseResponder, SocketWorker},
         IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
     },
-    util::TryIntoCoreWithContext as _,
+    util::{DeviceNotFoundError, IntoFidl, TryIntoCoreWithContext as _, TryIntoFidlWithContext},
     BindingsNonSyncCtxImpl, NetstackContext,
 };
 
@@ -37,15 +40,15 @@ pub(crate) async fn serve(
     stream
         .try_for_each(|req| async {
             match req {
-                fppacket::ProviderRequest::Socket { responder, kind: _ } => {
+                fppacket::ProviderRequest::Socket { responder, kind } => {
                     let (client, request_stream) = fidl::endpoints::create_request_stream()
                         .unwrap_or_else(|e: fidl::Error| {
                             panic!("failed to create a new request stream: {e}")
                         });
                     fasync::Task::spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
-                        |sync_ctx, _: &mut BindingsNonSyncCtxImpl, properties| {
-                            BindingData::new(sync_ctx, properties)
+                        move |sync_ctx, _: &mut BindingsNonSyncCtxImpl, properties| {
+                            BindingData::new(sync_ctx, kind, properties)
                         },
                         SocketWorkerProperties {},
                         request_stream,
@@ -70,6 +73,7 @@ struct BindingData {
 impl BindingData {
     fn new(
         sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
         let (local_event, peer_event) = zx::EventPair::create();
@@ -81,13 +85,16 @@ impl BindingData {
         BindingData {
             _local_event: local_event,
             peer_event,
-            state: State(netstack3_core::device::socket::create(sync_ctx)),
+            state: State { id: netstack3_core::device::socket::create(sync_ctx), kind },
         }
     }
 }
 
 #[derive(Debug)]
-struct State(SocketId);
+struct State {
+    id: SocketId,
+    kind: fppacket::Kind,
+}
 
 impl CloseResponder for fppacket::SocketCloseResponder {
     fn send(self, arg: &mut fidl_fuchsia_unknown::CloseableCloseResult) -> Result<(), fidl::Error> {
@@ -114,7 +121,7 @@ impl worker::SocketWorkerHandler for BindingData {
         _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { peer_event: _, state, _local_event: _ } = self;
-        let State(id) = state;
+        let State { id, kind: _ } = state;
         netstack3_core::device::socket::remove(sync_ctx, id)
     }
 }
@@ -165,23 +172,53 @@ impl<'a> RequestHandler<'a> {
             }
         };
         let device_selector = match device.as_ref() {
-            Some(d) => DeviceSelector::SpecificDevice(d),
-            None => DeviceSelector::AnyDevice,
+            Some(d) => TargetDevice::SpecificDevice(d),
+            None => TargetDevice::AnyDevice,
         };
 
-        let State(socket_id) = state;
+        let State { id, kind: _ } = state;
         match protocol {
             Some(protocol) => netstack3_core::device::socket::set_device_and_protocol(
                 sync_ctx,
-                socket_id,
+                id,
                 device_selector,
                 protocol,
             ),
-            None => {
-                netstack3_core::device::socket::set_device(sync_ctx, socket_id, device_selector)
-            }
+            None => netstack3_core::device::socket::set_device(sync_ctx, id, device_selector),
         }
         Ok(())
+    }
+
+    async fn get_info(
+        self,
+    ) -> Result<
+        (fppacket::Kind, Option<Box<fppacket::ProtocolAssociation>>, fppacket::BoundInterface),
+        fposix::Errno,
+    > {
+        let Self {
+            ctx,
+            data: BindingData { peer_event: _, _local_event, state: State { id, kind } },
+        } = self;
+        let mut guard = ctx.lock().await;
+        let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
+
+        let SocketInfo { device, protocol } =
+            netstack3_core::device::socket::get_info(sync_ctx, id);
+        let interface = match device {
+            TargetDevice::AnyDevice => fppacket::BoundInterface::All(fppacket::Empty),
+            TargetDevice::SpecificDevice(d) => fppacket::BoundInterface::Specified(
+                d.try_into_fidl_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?,
+            ),
+        };
+
+        let protocol = protocol.map(|p| {
+            Box::new(match p {
+                Protocol::All => fppacket::ProtocolAssociation::All(fppacket::Empty),
+                Protocol::Specific(p) => fppacket::ProtocolAssociation::Specified(p.get()),
+            })
+        });
+
+        Ok((*kind, protocol, interface))
     }
 
     async fn handle_request(
@@ -280,7 +317,7 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, &mut self.bind(protocol, bound_interface_id).await)
             }
             fppacket::SocketRequest::GetInfo { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, &mut self.get_info().await);
             }
             fppacket::SocketRequest::RecvMsg {
                 want_packet_info: _,
@@ -300,5 +337,31 @@ impl<'a> RequestHandler<'a> {
             }
         }
         ControlFlow::Continue(None)
+    }
+}
+
+impl TryIntoFidlWithContext<fppacket::InterfaceProperties>
+    for WeakDeviceId<BindingsNonSyncCtxImpl>
+{
+    type Error = DeviceNotFoundError;
+    fn try_into_fidl_with_ctx<C: crate::bindings::util::ConversionContext>(
+        self,
+        ctx: &C,
+    ) -> Result<fppacket::InterfaceProperties, Self::Error> {
+        let device = self.upgrade().ok_or(DeviceNotFoundError)?;
+        let (iface_type, addr) = match &device {
+            DeviceId::Ethernet(e) => (
+                fppacket::HardwareType::Ethernet,
+                fppacket::HardwareAddress::Eui48(e.external_state().mac.into_fidl()),
+            ),
+            DeviceId::Loopback(_) => (
+                fppacket::HardwareType::Loopback,
+                // Pretend that the loopback interface has an all-zeroes MAC
+                // address to match Linux behavior.
+                fppacket::HardwareAddress::Eui48(fidl_fuchsia_net::MacAddress { octets: [0; 6] }),
+            ),
+        };
+        let id = ctx.get_binding_id(device);
+        Ok(fppacket::InterfaceProperties { addr, id, type_: iface_type })
     }
 }

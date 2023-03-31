@@ -13,9 +13,7 @@
             type: "expect_failure",
             matchers: [
                 // TODO(https://fxbug.dev/106735): Support packet sockets.
-                "AllPacketSocketTests/GenericPacketSocketTest.SockOptSoType/*",
                 "PacketSocketTest.SendAndReceive*",
-                "PacketSocketTest.Getsockname",
             ],
         },
     ],
