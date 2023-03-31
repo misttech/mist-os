@@ -60,8 +60,8 @@ use crate::{
             BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockCreationError,
             IpSockSendError, IpSocketHandler,
         },
-        BufferIpLayerHandler, BufferIpTransportContext, EitherDeviceId, IpDeviceIdContext, IpExt,
-        IpTransportContext, SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+        AnyDevice, BufferIpLayerHandler, BufferIpTransportContext, DeviceIdContext, EitherDeviceId,
+        IpExt, IpTransportContext, SendIpPacketMeta, TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{ConnSocketEntry, ConnSocketMap},
     sync::{Mutex, RwLock},
@@ -412,7 +412,7 @@ pub(crate) enum Icmpv6ErrorKind {
 
 /// The handler exposed by ICMP.
 pub(crate) trait BufferIcmpHandler<I: IcmpHandlerIpExt, C, B: BufferMut>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 {
     /// Sends an error message in response to an incoming packet.
     ///
@@ -636,7 +636,7 @@ impl<I: IcmpIpExt, C: InstantContext + IcmpContext<I> + CounterContext> IcmpNonS
 /// Unlike [`IcmpContext`], `InnerIcmpContext` is not exposed outside of this
 /// crate.
 pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I>>:
-    IpSocketHandler<I, C> + IpDeviceIdContext<I>
+    IpSocketHandler<I, C> + DeviceIdContext<AnyDevice>
 {
     // TODO(joshlf): If we end up needing to respond to these messages with new
     // outbound packets, then perhaps it'd be worth passing the original buffer
@@ -1587,7 +1587,7 @@ impl<
             + InnerBufferIcmpContext<Ipv6, C, B>
             + Ipv6DeviceHandler<C>
             + PmtuHandler<Ipv6, C>
-            + MldPacketHandler<C, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>
+            + MldPacketHandler<C, <SC as DeviceIdContext<AnyDevice>>::DeviceId>
             + RouteDiscoveryHandler<C>
             + SlaacHandler<C>
             + NudIpHandler<Ipv6, C>
@@ -1731,7 +1731,7 @@ fn send_icmp_reply<
     I: crate::ip::IpExt,
     B: BufferMut,
     C: BufferIcmpNonSyncCtx<I, B>,
-    SC: BufferIpSocketHandler<I, C, B> + IpDeviceIdContext<I>,
+    SC: BufferIpSocketHandler<I, C, B> + DeviceIdContext<AnyDevice>,
     S: Serializer<Buffer = B>,
     F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
 >(
@@ -3985,8 +3985,8 @@ mod tests {
                 }
             }
 
-            impl AsRef<FakeIpDeviceIdCtx<$ip, FakeDeviceId>> for $inner {
-                fn as_ref(&self) -> &FakeIpDeviceIdCtx<$ip, FakeDeviceId> {
+            impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for $inner {
+                fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
                     self.inner.socket_ctx.as_ref()
                 }
             }

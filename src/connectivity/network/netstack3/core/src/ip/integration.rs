@@ -21,7 +21,7 @@ use crate::{
         reassembly::FragmentStateContext,
         send_ipv4_packet_from_device, send_ipv6_packet_from_device,
         socket::{BufferIpSocketContext, IpSocketContext, IpSocketNonSyncContext},
-        IpDeviceIdContext, IpLayerNonSyncContext, IpPacketFragmentCache, IpStateContext,
+        AnyDevice, DeviceIdContext, IpLayerNonSyncContext, IpPacketFragmentCache, IpStateContext,
         Ipv4StateContext, MulticastMembershipHandler, SendIpPacketMeta,
     },
     NonSyncContext, SyncCtx,
@@ -72,7 +72,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv
 impl<
         B: BufferMut,
         C: IpSocketNonSyncContext
-            + IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
+            + IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
         SC: ip::BufferIpDeviceContext<Ipv4, C, B>
             + Ipv4StateContext<C>
             + IpSocketContext<Ipv4, C>
@@ -84,7 +84,7 @@ impl<
         ctx: &mut C,
         meta: SendIpPacketMeta<
             Ipv4,
-            &<SC as IpDeviceIdContext<Ipv4>>::DeviceId,
+            &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
             SpecifiedAddr<Ipv4Addr>,
         >,
         body: S,
@@ -96,7 +96,7 @@ impl<
 impl<
         B: BufferMut,
         C: IpSocketNonSyncContext
-            + IpLayerNonSyncContext<Ipv6, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>,
+            + IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
         SC: ip::BufferIpDeviceContext<Ipv6, C, B>
             + IpStateContext<Ipv6, C>
             + IpSocketContext<Ipv6, C>
@@ -108,7 +108,7 @@ impl<
         ctx: &mut C,
         meta: SendIpPacketMeta<
             Ipv6,
-            &<SC as IpDeviceIdContext<Ipv6>>::DeviceId,
+            &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
             SpecifiedAddr<Ipv6Addr>,
         >,
         body: S,

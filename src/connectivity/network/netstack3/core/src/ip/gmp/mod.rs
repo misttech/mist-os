@@ -42,12 +42,6 @@ use alloc::vec::Vec;
 use core::num::NonZeroUsize;
 use core::{convert::TryFrom, fmt::Debug, time::Duration};
 
-use crate::{
-    context::{RngContext, TimerContext},
-    data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult},
-    ip::IpDeviceIdContext,
-    Instant,
-};
 use assert_matches::assert_matches;
 use net_types::{
     ip::{Ip, IpAddress},
@@ -55,6 +49,14 @@ use net_types::{
 };
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
+
+use crate::{
+    context::{RngContext, TimerContext},
+    data_structures::ref_counted_hash_map::{InsertResult, RefCountedHashMap, RemoveResult},
+    device::DeviceIdContext,
+    ip::AnyDevice,
+    Instant,
+};
 
 /// The result of joining a multicast group.
 ///
@@ -288,7 +290,7 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
 /// An implementation of a Group Management Protocol (GMP) such as the Internet
 /// Group Management Protocol, Version 2 (IGMPv2) for IPv4 or the Multicast
 /// Listener Discovery (MLD) protocol for IPv6.
-pub(crate) trait GmpHandler<I: Ip, C>: IpDeviceIdContext<I> {
+pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Handles GMP potentially being enabled.
     ///
     /// Attempts to transition memberships in the non-member state to a member
@@ -888,7 +890,9 @@ pub(crate) struct GmpState<'a, A: IpAddress, GroupState> {
 /// Provides common functionality for GMP context implementations.
 ///
 /// This trait implements portions of a group management protocol.
-trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: IpDeviceIdContext<I> {
+trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
+    DeviceIdContext<AnyDevice>
+{
     type ProtocolSpecific: ProtocolSpecific;
     type Err;
     type GroupState: From<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>

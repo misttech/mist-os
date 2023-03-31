@@ -8,11 +8,14 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, hash::Hash, num::NonZeroU16};
 
 use derivative::Derivative;
-use lock_order::{lock::RwLockFor, relation::LockBefore, Locked, Unlocked};
+use lock_order::{lock::RwLockFor, relation::LockBefore, Locked};
 
 use crate::{
     data_structures::id_map::IdMap,
-    device::{with_ethernet_state, with_loopback_state, DeviceId, WeakDeviceId},
+    device::{
+        with_ethernet_state, with_loopback_state, AnyDevice, DeviceId, DeviceIdContext,
+        WeakDeviceId,
+    },
     SyncCtx,
 };
 
@@ -78,33 +81,15 @@ pub(crate) struct DeviceSockets(
     Vec<usize>,
 );
 
-/// Temporary parallel implementation of [`crate::ip::IpDeviceIdContext`]. Once
-/// that one is not IP-specific, this trait should be removed in favor of that
-/// one.
-// TODO(https://fxbug.dev/123704): Use IpDeviceIdContext instead of this once it
-// has been generalized.
-pub(crate) trait DeviceIdContext {
-    type SocketDeviceId: Debug;
-    type WeakSocketDeviceId: Debug;
-
-    fn downgrade_device_id(&mut self, device_id: &Self::SocketDeviceId)
-        -> Self::WeakSocketDeviceId;
-
-    fn upgrade_weak_device_id(
-        &mut self,
-        weak_device_id: &Self::WeakSocketDeviceId,
-    ) -> Option<Self::SocketDeviceId>;
-}
-
 pub(crate) trait SyncContext<C: NonSyncContext>: DeviceSocketAccessor {
     type DeviceSocketAccessor<'a>: DeviceSocketAccessor<
-        SocketDeviceId = Self::SocketDeviceId,
-        WeakSocketDeviceId = Self::WeakSocketDeviceId,
+        DeviceId = Self::DeviceId,
+        WeakDeviceId = Self::WeakDeviceId,
     >;
 
     /// Executes the provided callback with immutable access to socket state.
     fn with_sockets<
-        F: FnOnce(&Sockets<Self::WeakSocketDeviceId>, &mut Self::DeviceSocketAccessor<'_>) -> R,
+        F: FnOnce(&Sockets<Self::WeakDeviceId>, &mut Self::DeviceSocketAccessor<'_>) -> R,
         R,
     >(
         &mut self,
@@ -113,7 +98,7 @@ pub(crate) trait SyncContext<C: NonSyncContext>: DeviceSocketAccessor {
 
     /// Executes the provided callback with mutable access to socket state.
     fn with_sockets_mut<
-        F: FnOnce(&mut Sockets<Self::WeakSocketDeviceId>, &mut Self::DeviceSocketAccessor<'_>) -> R,
+        F: FnOnce(&mut Sockets<Self::WeakDeviceId>, &mut Self::DeviceSocketAccessor<'_>) -> R,
         R,
     >(
         &mut self,
@@ -121,18 +106,18 @@ pub(crate) trait SyncContext<C: NonSyncContext>: DeviceSocketAccessor {
     ) -> R;
 }
 
-pub(crate) trait DeviceSocketAccessor: DeviceIdContext {
+pub(crate) trait DeviceSocketAccessor: DeviceIdContext<AnyDevice> {
     /// Executes the provided callback with immutable access to device-specific socket state.
     fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
         &mut self,
-        device: &Self::SocketDeviceId,
+        device: &Self::DeviceId,
         cb: F,
     ) -> R;
 
     // Executes the provided callback with mutable access to device-specific socket state.
     fn with_device_sockets_mut<F: FnOnce(&mut DeviceSockets) -> R, R>(
         &mut self,
-        device: &Self::SocketDeviceId,
+        device: &Self::DeviceId,
         cb: F,
     ) -> R;
 }
@@ -165,7 +150,7 @@ enum MaybeUpdate<T> {
 fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext>(
     sync_ctx: &mut SC,
     socket: &SocketId,
-    new_device: DeviceSelector<&SC::SocketDeviceId>,
+    new_device: DeviceSelector<&SC::DeviceId>,
     protocol_update: MaybeUpdate<Protocol>,
 ) {
     let SocketId(index) = socket;
@@ -215,9 +200,9 @@ fn update_device_and_protocol<SC: SyncContext<C>, C: NonSyncContext>(
     });
 }
 
-impl<SC: SyncContext<C>, C: NonSyncContext> SocketHandler<SC::SocketDeviceId, C> for SC
+impl<SC: SyncContext<C>, C: NonSyncContext> SocketHandler<SC::DeviceId, C> for SC
 where
-    SC::SocketDeviceId: Clone + Debug + Eq + Hash,
+    SC::DeviceId: Clone + Debug + Eq + Hash,
 {
     fn create(&mut self) -> SocketId {
         let index =
@@ -227,14 +212,14 @@ where
         SocketId(index)
     }
 
-    fn set_device(&mut self, socket: &mut SocketId, device: DeviceSelector<&SC::SocketDeviceId>) {
+    fn set_device(&mut self, socket: &mut SocketId, device: DeviceSelector<&SC::DeviceId>) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NoChange)
     }
 
     fn set_device_and_protocol(
         &mut self,
         socket: &mut SocketId,
-        device: DeviceSelector<&SC::SocketDeviceId>,
+        device: DeviceSelector<&SC::DeviceId>,
         protocol: Protocol,
     ) {
         update_device_and_protocol(self, socket, device, MaybeUpdate::NewValue(protocol))
@@ -305,70 +290,6 @@ pub fn remove<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>, id: SocketId) {
     SocketHandler::remove(&mut sync_ctx, id)
 }
 
-impl<C: crate::NonSyncContext> DeviceIdContext for &'_ SyncCtx<C> {
-    type SocketDeviceId = DeviceId<C>;
-    type WeakSocketDeviceId = WeakDeviceId<C>;
-
-    fn downgrade_device_id(
-        &mut self,
-        device_id: &Self::SocketDeviceId,
-    ) -> Self::WeakSocketDeviceId {
-        device_id.downgrade()
-    }
-
-    fn upgrade_weak_device_id(
-        &mut self,
-        weak_device_id: &Self::WeakSocketDeviceId,
-    ) -> Option<Self::SocketDeviceId> {
-        weak_device_id.upgrade()
-    }
-}
-
-// TODO(https://fxbug.dev/120973): Remove this impl.
-impl<C: crate::NonSyncContext> DeviceSocketAccessor for &'_ SyncCtx<C> {
-    fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
-        &mut self,
-        device: &Self::SocketDeviceId,
-        cb: F,
-    ) -> R {
-        DeviceSocketAccessor::with_device_sockets(&mut Locked::new(*self), device, cb)
-    }
-
-    fn with_device_sockets_mut<F: FnOnce(&mut DeviceSockets) -> R, R>(
-        &mut self,
-        device: &Self::SocketDeviceId,
-        cb: F,
-    ) -> R {
-        DeviceSocketAccessor::with_device_sockets_mut(&mut Locked::new(*self), device, cb)
-    }
-}
-
-// TODO(https://fxbug.dev/120973): Remove this impl.
-impl<C: crate::NonSyncContext> SyncContext<C> for &'_ SyncCtx<C> {
-    type DeviceSocketAccessor<'a> =
-        <Locked<'a, SyncCtx<C>, Unlocked> as SyncContext<C>>::DeviceSocketAccessor<'a>;
-
-    fn with_sockets<
-        F: FnOnce(&Sockets<WeakDeviceId<C>>, &mut Self::DeviceSocketAccessor<'_>) -> R,
-        R,
-    >(
-        &mut self,
-        cb: F,
-    ) -> R {
-        SyncContext::with_sockets(&mut Locked::new(*self), cb)
-    }
-
-    fn with_sockets_mut<
-        F: FnOnce(&mut Sockets<WeakDeviceId<C>>, &mut Self::DeviceSocketAccessor<'_>) -> R,
-        R,
-    >(
-        &mut self,
-        cb: F,
-    ) -> R {
-        SyncContext::with_sockets_mut(&mut Locked::new(*self), cb)
-    }
-}
-
 impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AnyDeviceSockets>> SyncContext<C>
     for Locked<'_, SyncCtx<C>, L>
 {
@@ -403,7 +324,7 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
 {
     fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
         &mut self,
-        device: &Self::SocketDeviceId,
+        device: &Self::DeviceId,
         cb: F,
     ) -> R {
         match device {
@@ -420,7 +341,7 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
 
     fn with_device_sockets_mut<F: FnOnce(&mut DeviceSockets) -> R, R>(
         &mut self,
-        device: &Self::SocketDeviceId,
+        device: &Self::DeviceId,
         cb: F,
     ) -> R {
         match device {
@@ -433,27 +354,6 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets
                 cb(&mut *device_sockets)
             }),
         }
-    }
-}
-
-impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets>> DeviceIdContext
-    for Locked<'_, SyncCtx<C>, L>
-{
-    type SocketDeviceId = DeviceId<C>;
-    type WeakSocketDeviceId = WeakDeviceId<C>;
-
-    fn downgrade_device_id(
-        &mut self,
-        device_id: &Self::SocketDeviceId,
-    ) -> Self::WeakSocketDeviceId {
-        device_id.downgrade()
-    }
-
-    fn upgrade_weak_device_id(
-        &mut self,
-        weak_device_id: &Self::WeakSocketDeviceId,
-    ) -> Option<Self::SocketDeviceId> {
-        weak_device_id.upgrade()
     }
 }
 
@@ -480,7 +380,10 @@ mod tests {
 
     use crate::{
         context::testutil::FakeSyncCtx,
-        device::testutil::{FakeWeakDeviceId, MultipleDevicesId},
+        device::{
+            testutil::{FakeWeakDeviceId, MultipleDevicesId},
+            StrongId,
+        },
     };
 
     use super::*;
@@ -508,46 +411,50 @@ mod tests {
         }
     }
 
-    impl<D: Clone + Debug + Eq + Hash + 'static> DeviceSocketAccessor for HashMap<D, DeviceSockets> {
+    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> DeviceSocketAccessor
+        for HashMap<D, DeviceSockets>
+    {
         fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
             &mut self,
-            device: &Self::SocketDeviceId,
+            device: &Self::DeviceId,
             cb: F,
         ) -> R {
             cb(self.get_mut(device).unwrap())
         }
         fn with_device_sockets_mut<F: FnOnce(&mut DeviceSockets) -> R, R>(
             &mut self,
-            device: &Self::SocketDeviceId,
+            device: &Self::DeviceId,
             cb: F,
         ) -> R {
             cb(self.get_mut(device).unwrap())
         }
     }
 
-    impl<D: Clone + Debug + Eq + Hash + 'static> DeviceIdContext for HashMap<D, DeviceSockets> {
-        type SocketDeviceId = D;
-        type WeakSocketDeviceId = FakeWeakDeviceId<D>;
-        fn downgrade_device_id(
-            &mut self,
-            device_id: &Self::SocketDeviceId,
-        ) -> Self::WeakSocketDeviceId {
+    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> DeviceIdContext<AnyDevice>
+        for HashMap<D, DeviceSockets>
+    {
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             FakeWeakDeviceId(device_id.clone())
         }
         fn upgrade_weak_device_id(
-            &mut self,
-            FakeWeakDeviceId(id): &Self::WeakSocketDeviceId,
-        ) -> Option<Self::SocketDeviceId> {
+            &self,
+            FakeWeakDeviceId(id): &Self::WeakDeviceId,
+        ) -> Option<Self::DeviceId> {
             self.contains_key(id).then_some(id.clone())
+        }
+        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+            self.contains_key(device_id)
         }
     }
 
-    impl<D: Clone + Debug + Eq + Hash + 'static> DeviceSocketAccessor
+    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> DeviceSocketAccessor
         for FakeSyncCtx<FakeSockets<D>, (), D>
     {
         fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
             &mut self,
-            device: &Self::SocketDeviceId,
+            device: &Self::DeviceId,
             cb: F,
         ) -> R {
             DeviceSocketAccessor::with_device_sockets(
@@ -558,7 +465,7 @@ mod tests {
         }
         fn with_device_sockets_mut<F: FnOnce(&mut DeviceSockets) -> R, R>(
             &mut self,
-            device: &Self::SocketDeviceId,
+            device: &Self::DeviceId,
             cb: F,
         ) -> R {
             DeviceSocketAccessor::with_device_sockets_mut(
@@ -569,26 +476,23 @@ mod tests {
         }
     }
 
-    impl<D: Clone + Debug + Eq + Hash + 'static> DeviceIdContext
+    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> DeviceIdContext<AnyDevice>
         for FakeSyncCtx<FakeSockets<D>, (), D>
     {
-        type SocketDeviceId = D;
-        type WeakSocketDeviceId = FakeWeakDeviceId<D>;
-        fn downgrade_device_id(
-            &mut self,
-            device_id: &Self::SocketDeviceId,
-        ) -> Self::WeakSocketDeviceId {
-            DeviceIdContext::downgrade_device_id(&mut self.get_mut().device_sockets, device_id)
+        type DeviceId = D;
+        type WeakDeviceId = FakeWeakDeviceId<D>;
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            DeviceIdContext::downgrade_device_id(&self.get_ref().device_sockets, device_id)
         }
-        fn upgrade_weak_device_id(
-            &mut self,
-            device_id: &Self::WeakSocketDeviceId,
-        ) -> Option<Self::SocketDeviceId> {
-            DeviceIdContext::upgrade_weak_device_id(&mut self.get_mut().device_sockets, device_id)
+        fn upgrade_weak_device_id(&self, device_id: &Self::WeakDeviceId) -> Option<Self::DeviceId> {
+            DeviceIdContext::upgrade_weak_device_id(&self.get_ref().device_sockets, device_id)
+        }
+        fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+            DeviceIdContext::is_device_installed(&self.get_ref().device_sockets, device_id)
         }
     }
 
-    impl<D: Clone + Debug + Eq + Hash + 'static> SyncContext<FakeNonSyncCtx>
+    impl<D: StrongId<Weak = FakeWeakDeviceId<D>> + 'static> SyncContext<FakeNonSyncCtx>
         for FakeSyncCtx<FakeSockets<D>, (), D>
     {
         type DeviceSocketAccessor<'a> = HashMap<D, DeviceSockets>;

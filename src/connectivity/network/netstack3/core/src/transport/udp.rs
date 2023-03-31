@@ -40,13 +40,13 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged as _},
     },
-    device::{DeviceId, WeakDeviceId, WeakId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{LocalAddressError, SocketError, ZonedAddressError},
     ip::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        BufferIpTransportContext, BufferTransportIpContext, IpDeviceId, IpDeviceIdContext, IpExt,
-        IpTransportContext, MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
+        BufferIpTransportContext, BufferTransportIpContext, IpExt, IpTransportContext,
+        MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -337,7 +337,7 @@ pub(crate) fn check_posix_sharing<A: SocketMapAddrSpec, P: PosixSocketStateSpec>
     }
 }
 
-impl<I: IpExt, D: IpDeviceId> PosixSocketStateSpec for Udp<I, D> {
+impl<I: IpExt, D: Id> PosixSocketStateSpec for Udp<I, D> {
     type ListenerId = ListenerId<I>;
     type ConnId = ConnId<I>;
 
@@ -376,7 +376,7 @@ impl<I: IpExt, D: WeakId> DatagramSocketSpec<IpPortSpec<I, D>> for Udp<I, D> {
     }
 }
 
-enum LookupResult<I: Ip, D: IpDeviceId> {
+enum LookupResult<I: Ip, D: Id> {
     Conn(ConnId<I>, ConnAddr<I::Addr, D, NonZeroU16, NonZeroU16>),
     Listener(ListenerId<I>, ListenerAddr<I::Addr, D, NonZeroU16>),
 }
@@ -823,7 +823,7 @@ impl<I: IpExt, C: InstantContext + RngContext + NonSyncContext<I> + CounterConte
 
 /// An execution context for the UDP protocol which also provides access to state.
 pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback provided to
     /// `with_sockets_mut`.
@@ -1063,7 +1063,7 @@ pub enum SendToError {
     Zone(ZonedAddressError),
 }
 
-pub(crate) trait SocketHandler<I: IpExt, C>: IpDeviceIdContext<I> {
+pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     fn create_udp_unbound(&mut self) -> UnboundId<I>;
 
     fn remove_udp_unbound(&mut self, ctx: &mut C, id: UnboundId<I>);
@@ -2908,7 +2908,7 @@ mod tests {
         device_removed: bool,
     ) {
         let sync_ctx: &mut FakeSyncCtx<_, _, _> = sync_ctx.as_mut();
-        let sync_ctx: &mut FakeIpDeviceIdCtx<_, _> = sync_ctx.get_mut().as_mut();
+        let sync_ctx: &mut FakeIpDeviceIdCtx<_> = sync_ctx.get_mut().as_mut();
         sync_ctx.set_device_removed(FakeDeviceId, device_removed);
     }
 

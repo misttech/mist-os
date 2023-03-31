@@ -69,7 +69,6 @@ use crate::{
             IpDeviceContext, IpDeviceStateAccessor, Ipv6DeviceContext,
         },
         types::RawMetric,
-        DualStackDeviceIdContext, IpDeviceIdContext,
     },
     sync::{PrimaryRc, RwLock, StrongRc, WeakRc},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
@@ -81,11 +80,10 @@ use crate::{
 /// is only intended to exist at the type level, never instantiated at runtime.
 pub(crate) trait Device: 'static {}
 
-/// An execution context which provides a `DeviceId` type for various netstack
-/// internals to share.
-pub(crate) trait DeviceIdContext<D: Device> {
-    type DeviceId: Clone + Display + Debug + Eq + Send + Sync + 'static;
-}
+/// Marker type for a generic device.
+pub(crate) enum AnyDevice {}
+
+impl Device for AnyDevice {}
 
 // An identifier for a device.
 pub(crate) trait Id: Clone + Display + Debug + Eq + Hash + PartialEq + Send + Sync {
@@ -99,6 +97,28 @@ pub(crate) trait StrongId: Id {
 
 pub(crate) trait WeakId: Id + PartialEq<Self::Strong> {
     type Strong: StrongId<Weak = Self>;
+}
+
+/// An execution context which provides device ID types type for various
+/// netstack internals to share.
+pub(crate) trait DeviceIdContext<D: Device> {
+    /// The type of device IDs.
+    type DeviceId: StrongId<Weak = Self::WeakDeviceId> + 'static;
+
+    /// The type of weakly referenced device IDs.
+    type WeakDeviceId: WeakId<Strong = Self::DeviceId> + 'static;
+
+    /// Returns a weak ID for the strong ID.
+    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId;
+
+    /// Attempts to upgrade the weak device ID to a strong ID.
+    ///
+    /// Returns `None` if the device has been removed.
+    fn upgrade_weak_device_id(&self, weak_device_id: &Self::WeakDeviceId)
+        -> Option<Self::DeviceId>;
+
+    /// Returns true if the device has not been removed.
+    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool;
 }
 
 struct RecvIpFrameMeta<D, I: Ip> {
@@ -398,7 +418,7 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx>
         F: FnOnce(DualStackDeviceStateRef<'_, NonSyncCtx::Instant>) -> O,
     >(
         &mut self,
-        device_id: &Self::DualStackDeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
         with_ip_device_state(self, device_id, |mut state| {
@@ -858,6 +878,16 @@ impl<I: Instant, S> Display for EthernetWeakDeviceId<I, S> {
     }
 }
 
+impl<I: Instant, S: Send + Sync> Id for EthernetWeakDeviceId<I, S> {
+    fn is_loopback(&self) -> bool {
+        false
+    }
+}
+
+impl<I: Instant, S: Send + Sync> WeakId for EthernetWeakDeviceId<I, S> {
+    type Strong = EthernetDeviceId<I, S>;
+}
+
 impl<I: Instant, S> EthernetWeakDeviceId<I, S> {
     /// Attempts to upgrade the ID to an [`EthernetDeviceId`], failing if the
     /// device no longer exists.
@@ -906,6 +936,16 @@ impl<I: Instant, S> Display for EthernetDeviceId<I, S> {
     }
 }
 
+impl<I: Instant, S: Send + Sync> Id for EthernetDeviceId<I, S> {
+    fn is_loopback(&self) -> bool {
+        false
+    }
+}
+
+impl<I: Instant, S: Send + Sync> StrongId for EthernetDeviceId<I, S> {
+    type Weak = EthernetWeakDeviceId<I, S>;
+}
+
 impl<I: Instant, S> EthernetDeviceId<I, S> {
     /// Returns a reference to the external state for the device.
     pub fn external_state(&self) -> &S {
@@ -917,6 +957,11 @@ impl<I: Instant, S> EthernetDeviceId<I, S> {
     pub fn downgrade(&self) -> EthernetWeakDeviceId<I, S> {
         let Self(id, rc) = self;
         EthernetWeakDeviceId(*id, StrongRc::downgrade(rc))
+    }
+
+    fn removed(&self) -> bool {
+        let Self(_id, rc) = self;
+        StrongRc::marked_for_destruction(rc)
     }
 }
 
@@ -959,6 +1004,21 @@ impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
     for Locked<'a, SyncCtx<NonSyncCtx>, L>
 {
     type DeviceId = EthernetDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState>;
+    type WeakDeviceId = EthernetWeakDeviceId<NonSyncCtx::Instant, NonSyncCtx::EthernetDeviceState>;
+    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+        device_id.downgrade()
+    }
+
+    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+        !device_id.removed()
+    }
+
+    fn upgrade_weak_device_id(
+        &self,
+        weak_device_id: &Self::WeakDeviceId,
+    ) -> Option<Self::DeviceId> {
+        weak_device_id.upgrade()
+    }
 }
 
 impl_timer_context!(
@@ -1110,8 +1170,8 @@ impl<C: DeviceLayerEventDispatcher> DeviceId<C> {
 
     fn removed(&self) -> bool {
         match self {
-            DeviceId::Ethernet(EthernetDeviceId(_id, rc)) => StrongRc::marked_for_destruction(rc),
-            DeviceId::Loopback(LoopbackDeviceId(rc)) => StrongRc::marked_for_destruction(rc),
+            DeviceId::Ethernet(id) => id.removed(),
+            DeviceId::Loopback(id) => id.removed(),
         }
     }
 }
@@ -1670,13 +1730,7 @@ pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
     }
 }
 
-impl<'a, NonSyncCtx: NonSyncContext, L> DualStackDeviceIdContext
-    for Locked<'a, SyncCtx<NonSyncCtx>, L>
-{
-    type DualStackDeviceId = DeviceId<NonSyncCtx>;
-}
-
-impl<'a, NonSyncCtx: NonSyncContext, I: Ip, L> IpDeviceIdContext<I>
+impl<'a, NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice>
     for Locked<'a, SyncCtx<NonSyncCtx>, L>
 {
     type DeviceId = DeviceId<NonSyncCtx>;

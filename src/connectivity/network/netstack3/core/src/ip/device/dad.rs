@@ -7,15 +7,13 @@
 use core::{num::NonZeroU8, time::Duration};
 
 use log::debug;
-use net_types::{
-    ip::{Ipv6, Ipv6Addr},
-    MulticastAddr, UnicastAddr, Witness as _,
-};
+use net_types::{ip::Ipv6Addr, MulticastAddr, UnicastAddr, Witness as _};
 use packet_formats::icmp::ndp::NeighborSolicitation;
 
 use crate::{
     context::{EventContext, TimerContext},
-    ip::{device::state::AddressState, IpDeviceIdContext},
+    device::AnyDevice,
+    ip::{device::state::AddressState, DeviceIdContext},
 };
 
 /// A timer ID for duplicate address detection.
@@ -26,7 +24,7 @@ pub(crate) struct DadTimerId<DeviceId> {
 }
 
 /// The IP device context provided to DAD.
-pub(super) trait Ipv6DeviceDadContext<C>: IpDeviceIdContext<Ipv6> {
+pub(super) trait Ipv6DeviceDadContext<C>: DeviceIdContext<AnyDevice> {
     /// Calls the callback function with a mutable reference to the address's
     /// state and the NDP retransmission timer configured on the device if the
     /// address exists on the interface.
@@ -42,7 +40,7 @@ pub(super) trait Ipv6DeviceDadContext<C>: IpDeviceIdContext<Ipv6> {
 }
 
 /// The IP layer context provided to DAD.
-pub(super) trait Ipv6LayerDadContext<C>: IpDeviceIdContext<Ipv6> {
+pub(super) trait Ipv6LayerDadContext<C>: DeviceIdContext<AnyDevice> {
     /// Sends an NDP Neighbor Solicitation message for DAD to the local-link.
     ///
     /// The message will be sent with the unspecified (all-zeroes) source
@@ -90,7 +88,7 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: Ipv6DeviceDadContext<C> + Ipv6Layer
 }
 
 /// An implementation for Duplicate Address Detection.
-pub(crate) trait DadHandler<C>: IpDeviceIdContext<Ipv6> {
+pub(crate) trait DadHandler<C>: DeviceIdContext<AnyDevice> {
     /// Do duplicate address detection.
     ///
     /// # Panics
@@ -236,7 +234,7 @@ mod tests {
         addr: UnicastAddr<Ipv6Addr>,
         state: AddressState,
         retrans_timer: Duration,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     #[derive(Debug)]
@@ -245,8 +243,8 @@ mod tests {
         message: NeighborSolicitation,
     }
 
-    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeDadContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeDadContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
             &self.ip_device_id_ctx
         }
     }

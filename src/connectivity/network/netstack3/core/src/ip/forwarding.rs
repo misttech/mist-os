@@ -17,8 +17,8 @@ use thiserror::Error;
 use crate::ip::{
     self,
     types::{AddableMetric, Metric},
-    ExistsError, IpDeviceContext, IpDeviceIdContext, IpLayerContext, IpLayerEvent, IpLayerIpExt,
-    IpLayerNonSyncContext,
+    AnyDevice, DeviceIdContext, ExistsError, IpDeviceContext, IpLayerContext, IpLayerEvent,
+    IpLayerIpExt, IpLayerNonSyncContext,
 };
 
 /// Add a route with a gateway to the forwarding table, returning `Err` if the
@@ -287,7 +287,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
     ///
     /// The unspecified address (0.0.0.0 in IPv4 and :: in IPv6) are not
     /// routable and will return None even if they have been added to the table.
-    pub(crate) fn lookup<SC: IpDeviceIdContext<I, DeviceId = D>>(
+    pub(crate) fn lookup<SC: DeviceIdContext<AnyDevice, DeviceId = D>>(
         &self,
         sync_ctx: &mut SC,
         local_device: Option<&D>,
@@ -324,6 +324,8 @@ pub(crate) mod testutil {
 }
 #[cfg(test)]
 mod tests {
+    use core::marker::PhantomData;
+
     use fakealloc::collections::HashSet;
     use ip_test_macro::ip_test;
     use itertools::Itertools;
@@ -344,11 +346,12 @@ mod tests {
 
     #[derive(Default)]
     struct FakeForwardingContext<I> {
-        ip_device_id_ctx: FakeIpDeviceIdCtx<I, MultipleDevicesId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<MultipleDevicesId>,
+        _marker: PhantomData<I>,
     }
 
-    impl<I> AsRef<FakeIpDeviceIdCtx<I, MultipleDevicesId>> for FakeForwardingContext<I> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<I, MultipleDevicesId> {
+    impl<I> AsRef<FakeIpDeviceIdCtx<MultipleDevicesId>> for FakeForwardingContext<I> {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<MultipleDevicesId> {
             &self.ip_device_id_ctx
         }
     }

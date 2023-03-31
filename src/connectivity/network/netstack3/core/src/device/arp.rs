@@ -443,7 +443,9 @@ mod tests {
             TimerHandler,
         },
         device::{
-            ethernet::EthernetLinkDevice, link::testutil::FakeLinkDeviceId, testutil::FakeDeviceId,
+            ethernet::EthernetLinkDevice,
+            link::testutil::FakeLinkDeviceId,
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
         },
         ip::device::nud::{
             testutil::{assert_dynamic_neighbor_with_addr, assert_neighbor_unknown},
@@ -488,6 +490,20 @@ mod tests {
 
     impl DeviceIdContext<EthernetLinkDevice> for FakeCtxImpl {
         type DeviceId = FakeLinkDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            FakeWeakDeviceId(device_id.clone())
+        }
+        fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
+            true
+        }
+        fn upgrade_weak_device_id(
+            &self,
+            weak_device_id: &Self::WeakDeviceId,
+        ) -> Option<Self::DeviceId> {
+            let FakeWeakDeviceId(id) = weak_device_id;
+            Some(id.clone())
+        }
     }
 
     impl ArpContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {

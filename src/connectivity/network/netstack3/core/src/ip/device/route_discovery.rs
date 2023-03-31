@@ -10,14 +10,14 @@ use core::hash::Hash;
 
 use fakealloc::collections::HashSet;
 use net_types::{
-    ip::{Ipv6, Ipv6Addr, Subnet},
+    ip::{Ipv6Addr, Subnet},
     LinkLocalUnicastAddr,
 };
 use packet_formats::icmp::ndp::NonZeroNdpLifetime;
 
 use crate::{
     context::{EventContext, TimerContext, TimerHandler},
-    ip::IpDeviceIdContext,
+    ip::{AnyDevice, DeviceIdContext},
 };
 
 #[derive(Default)]
@@ -73,7 +73,7 @@ pub(crate) struct Ipv6DiscoveredRouteTimerId<DeviceId> {
 }
 
 /// The state context provided to IPv6 route discovery.
-pub(super) trait Ipv6RouteDiscoveryStateContext<C>: IpDeviceIdContext<Ipv6> {
+pub(super) trait Ipv6RouteDiscoveryStateContext<C>: DeviceIdContext<AnyDevice> {
     /// Gets the route discovery state, mutably.
     fn with_discovered_routes_mut<F: FnOnce(&mut Ipv6RouteDiscoveryState)>(
         &mut self,
@@ -107,7 +107,7 @@ impl<C: Ipv6RouteDiscoveryNonSyncContext<SC::DeviceId>, SC: Ipv6RouteDiscoverySt
 }
 
 /// An implementation of IPv6 route discovery.
-pub(crate) trait RouteDiscoveryHandler<C>: IpDeviceIdContext<Ipv6> {
+pub(crate) trait RouteDiscoveryHandler<C>: DeviceIdContext<AnyDevice> {
     /// Handles an update affecting discovered routes.
     ///
     /// A `None` value for `lifetime` indicates that the route is not valid and
@@ -218,7 +218,7 @@ fn send_event<DeviceId: Clone, C: Ipv6RouteDiscoveryNonSyncContext<DeviceId>>(
 mod tests {
     use core::{convert::TryInto as _, num::NonZeroU64, time::Duration};
 
-    use net_types::Witness as _;
+    use net_types::{ip::Ipv6, Witness as _};
     use packet::{BufferMut, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         icmp::{
@@ -253,11 +253,11 @@ mod tests {
     #[derive(Default)]
     struct FakeIpv6RouteDiscoveryContext {
         state: Ipv6RouteDiscoveryState,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
-    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeIpv6RouteDiscoveryContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeIpv6RouteDiscoveryContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
             &self.ip_device_id_ctx
         }
     }

@@ -21,8 +21,7 @@ use packet_formats::utils::NonZeroDuration;
 
 use crate::{
     context::{TimerContext, TimerHandler},
-    device::{link::LinkDevice, DeviceIdContext},
-    ip::IpDeviceIdContext,
+    device::{link::LinkDevice, AnyDevice, DeviceIdContext},
 };
 
 /// The maximum number of multicast solicitations as defined in [RFC 4861
@@ -180,7 +179,7 @@ pub(crate) trait BufferNudContext<
 }
 
 /// An implementation of NUD for the IP layer.
-pub(crate) trait NudIpHandler<I: Ip, C>: IpDeviceIdContext<I> {
+pub(crate) trait NudIpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Handles an incoming neighbor probe message.
     ///
     /// For IPv6, this can be an NDP Neighbor Solicitation or an NDP Router

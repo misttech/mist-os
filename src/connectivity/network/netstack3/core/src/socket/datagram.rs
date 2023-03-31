@@ -26,15 +26,15 @@ use crate::{
         id_map::{Entry as IdMapEntry, IdMap, OccupiedEntry as IdMapOccupied},
         socketmap::Tagged,
     },
-    device::WeakId,
+    device::{AnyDevice, DeviceIdContext, WeakId},
     error::{LocalAddressError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::{
         socket::{
             BufferIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
             IpSockSendError, IpSocketHandler as _, SendOptions,
         },
-        BufferTransportIpContext, EitherDeviceId, HopLimits, IpDeviceId, IpDeviceIdContext, IpExt,
-        MulticastMembershipHandler, TransportIpContext,
+        BufferTransportIpContext, EitherDeviceId, HopLimits, IpExt, MulticastMembershipHandler,
+        TransportIpContext,
     },
     socket::{
         self,
@@ -170,7 +170,7 @@ impl<A: Eq + Hash, D: Eq + Hash> IntoIterator for MulticastMemberships<A, D> {
     }
 }
 
-impl<A: IpAddress, D: IpDeviceId> ConnAddr<A, D, NonZeroU16, NonZeroU16> {
+impl<A: IpAddress, D: crate::device::Id> ConnAddr<A, D, NonZeroU16, NonZeroU16> {
     pub(crate) fn from_protocol_flow_and_local_port(
         id: &ProtocolFlowId<A>,
         local_port: NonZeroU16,
@@ -491,7 +491,7 @@ pub(crate) fn listen<
     ctx: &mut C,
     id: S::UnboundId,
     addr: Option<
-        ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+        ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     >,
     local_id: Option<A::LocalIdentifier>,
 ) -> Result<S::ListenerId, LocalAddressError>
@@ -546,7 +546,7 @@ where
                         }
                     } else {
                         if !assigned_to.any(
-                            |_: <SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId| {
+                            |_: <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId| {
                                 true
                             },
                         ) {
@@ -618,10 +618,7 @@ pub(crate) fn connect<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::UnboundId,
-    remote_ip: ZonedAddr<
-        A::IpAddr,
-        <SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId,
-    >,
+    remote_ip: ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     remote_id: A::RemoteIdentifier,
     proto: IpProto,
 ) -> Result<S::ConnId, SockCreationError>
@@ -712,10 +709,7 @@ pub(crate) fn connect_listener<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::ListenerId,
-    remote_ip: ZonedAddr<
-        A::IpAddr,
-        <SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId,
-    >,
+    remote_ip: ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     remote_id: A::RemoteIdentifier,
     proto: IpProto,
 ) -> Result<S::ConnId, (ConnectListenerError, S::ListenerId)>
@@ -797,10 +791,7 @@ pub(crate) fn reconnect<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::ConnId,
-    remote_ip: ZonedAddr<
-        A::IpAddr,
-        <SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId,
-    >,
+    remote_ip: ZonedAddr<A::IpAddr, <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
     remote_id: A::RemoteIdentifier,
 ) -> Result<S::ConnId, (ConnectListenerError, S::ConnId)>
 where
@@ -880,7 +871,7 @@ pub(crate) fn set_unbound_device<
     sync_ctx: &mut SC,
     _ctx: &mut C,
     id: S::UnboundId,
-    device_id: Option<&<SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+    device_id: Option<&<SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
 ) where
     Bound<S>: Tagged<AddrVec<A>>,
 {
@@ -975,7 +966,7 @@ pub(crate) fn send_conn_to<
     id: S::ConnId,
     remote_ip: ZonedAddr<
         A::IpAddr,
-        <SC::BufferIpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId,
+        <SC::BufferIpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId,
     >,
     remote_port: A::RemoteIdentifier,
     body: B,
@@ -1020,7 +1011,7 @@ pub(crate) fn send_listener_to<
     proto: <A::IpVersion as IpProtoExt>::Proto,
     remote_ip: ZonedAddr<
         A::IpAddr,
-        <SC::BufferIpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId,
+        <SC::BufferIpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId,
     >,
     remote_port: A::RemoteIdentifier,
     body: B,
@@ -1122,14 +1113,14 @@ pub(crate) fn set_listener_device<
     sync_ctx: &mut SC,
     _ctx: &mut C,
     id: S::ListenerId,
-    new_device: Option<&<SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+    new_device: Option<&<SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
 ) -> Result<(), LocalAddressError>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ListenerAddrState:
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     for<'a> A::WeakDeviceId:
-        PartialEq<<SC::IpSocketsCtx<'a> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+        PartialEq<<SC::IpSocketsCtx<'a> as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     sync_ctx.with_sockets_mut(|sync_ctx, DatagramSockets { unbound: _, bound }, _allocator| {
         // Don't allow changing the device if one of the IP addresses in the socket
@@ -1173,13 +1164,13 @@ pub(crate) fn set_connected_device<
     sync_ctx: &mut SC,
     ctx: &mut C,
     id: S::ConnId,
-    new_device: Option<&<SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+    new_device: Option<&<SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId>,
 ) -> Result<(), SocketError>
 where
     Bound<S>: Tagged<AddrVec<A>>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     for<'a> A::WeakDeviceId:
-        PartialEq<<SC::IpSocketsCtx<'a> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+        PartialEq<<SC::IpSocketsCtx<'a> as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     sync_ctx.with_sockets_mut(|sync_ctx, DatagramSockets { bound, unbound: _ }, _allocator| {
         // Don't allow changing the device if one of the IP addresses in the socket
@@ -1382,7 +1373,7 @@ pub(crate) fn set_multicast_membership<
     multicast_group: MulticastAddr<A::IpAddr>,
     interface: MulticastMembershipInterfaceSelector<
         A::IpAddr,
-        <SC::IpSocketsCtx<'_> as IpDeviceIdContext<A::IpVersion>>::DeviceId,
+        <SC::IpSocketsCtx<'_> as DeviceIdContext<AnyDevice>>::DeviceId,
     >,
     want_membership: bool,
 ) -> Result<(), SetMulticastMembershipError>
@@ -1392,7 +1383,7 @@ where
         SocketMapAddrStateSpec<Id = S::ListenerId, SharingState = S::ListenerSharingState>,
     S::ConnAddrState: SocketMapAddrStateSpec<Id = S::ConnId, SharingState = S::ConnSharingState>,
     for<'a> A::WeakDeviceId:
-        PartialEq<<SC::IpSocketsCtx<'a> as IpDeviceIdContext<A::IpVersion>>::DeviceId>,
+        PartialEq<<SC::IpSocketsCtx<'a> as DeviceIdContext<AnyDevice>>::DeviceId>,
 {
     let id = id.into();
 
@@ -1687,7 +1678,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: IpDeviceId> SocketMapStateSpec for FakeStateSpec<I, D> {
+    impl<I: DatagramIpExt, D: crate::device::Id> SocketMapStateSpec for FakeStateSpec<I, D> {
         type AddrVecTag = Tag;
         type ConnAddrState = Id<Conn>;
         type ConnId = Id<Conn>;
@@ -1706,7 +1697,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: IpDeviceId> From<Id<Conn>>
+    impl<I: DatagramIpExt, D: crate::device::Id> From<Id<Conn>>
         for DatagramSocketId<FakeStateSpec<I, FakeWeakDeviceId<D>>>
     {
         fn from(u: Id<Conn>) -> Self {
@@ -1714,7 +1705,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: IpDeviceId> From<Id<Listen>>
+    impl<I: DatagramIpExt, D: crate::device::Id> From<Id<Listen>>
         for DatagramSocketId<FakeStateSpec<I, FakeWeakDeviceId<D>>>
     {
         fn from(u: Id<Listen>) -> Self {
@@ -1722,7 +1713,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: IpDeviceId> From<Id<Unbound>>
+    impl<I: DatagramIpExt, D: crate::device::Id> From<Id<Unbound>>
         for DatagramSocketId<FakeStateSpec<I, FakeWeakDeviceId<D>>>
     {
         fn from(u: Id<Unbound>) -> Self {
@@ -1730,7 +1721,7 @@ mod test {
         }
     }
 
-    impl<I: DatagramIpExt, D: IpDeviceId> DatagramSocketStateSpec
+    impl<I: DatagramIpExt, D: crate::device::Id> DatagramSocketStateSpec
         for FakeStateSpec<I, FakeWeakDeviceId<D>>
     {
         type UnboundId = Id<Unbound>;
@@ -1948,7 +1939,7 @@ mod test {
         );
 
         // If the device is removed, use default hop limits.
-        AsMut::<FakeIpDeviceIdCtx<_, _>>::as_mut(&mut sync_ctx.state)
+        AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx.state)
             .set_device_removed(FakeDeviceId, true);
         assert_eq!(get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound), DEFAULT_HOP_LIMITS);
     }
@@ -2047,7 +2038,7 @@ mod test {
         }
 
         if remove_device_b {
-            AsMut::<FakeIpDeviceIdCtx<_, _>>::as_mut(&mut sync_ctx)
+            AsMut::<FakeIpDeviceIdCtx<_>>::as_mut(&mut sync_ctx)
                 .set_device_removed(MultipleDevicesId::B, true);
         }
 

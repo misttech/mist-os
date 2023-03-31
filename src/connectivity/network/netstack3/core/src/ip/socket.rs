@@ -20,12 +20,13 @@ use crate::{
     ip::{
         device::state::{IpDeviceStateIpExt, Ipv6AddressEntry},
         forwarding::Destination,
-        EitherDeviceId, IpDeviceContext, IpDeviceIdContext, IpExt, IpLayerIpExt, SendIpPacketMeta,
+        AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceContext, IpExt, IpLayerIpExt,
+        SendIpPacketMeta,
     },
 };
 
 /// An execution context defining a type of IP socket.
-pub(crate) trait IpSocketHandler<I: IpExt, C>: IpDeviceIdContext<I> {
+pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     /// Constructs a new [`IpSock`].
     ///
     /// `new_ip_socket` constructs a new `IpSock` to the given remote IP
@@ -210,7 +211,7 @@ pub(crate) enum MmsError {
 }
 
 /// Gets device related information of an IP socket.
-pub(crate) trait DeviceIpSocketHandler<I, C>: IpDeviceIdContext<I>
+pub(crate) trait DeviceIpSocketHandler<I, C>: DeviceIdContext<AnyDevice>
 where
     I: IpLayerIpExt,
 {
@@ -366,7 +367,7 @@ impl<C: InstantContext + CounterContext> IpSocketNonSyncContext for C {}
 /// Blanket impls of `IpSocketHandler` are provided in terms of
 /// `IpSocketContext`.
 pub(super) trait IpSocketContext<I, C: IpSocketNonSyncContext>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 where
     I: IpDeviceStateIpExt,
 {
@@ -916,18 +917,18 @@ pub(crate) mod testutil {
     pub(crate) struct FakeIpSocketCtx<I: IpDeviceStateIpExt, D> {
         pub(crate) table: ForwardingTable<I, D>,
         device_state: HashMap<D, IpDeviceState<FakeInstant, I>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<I, D>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<D>,
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<I, D>> for FakeIpSocketCtx<I, D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_device_id_ctx } = self;
             ip_device_id_ctx
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<I, D>> for FakeIpSocketCtx<I, D> {
-        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
+        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_device_id_ctx } = self;
             ip_device_id_ctx
         }
@@ -956,11 +957,12 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId + 'static> IpDeviceIdContext<I>
+    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
         for FakeIpSocketCtx<I, DeviceId>
     {
-        type DeviceId = <FakeIpDeviceIdCtx<I, DeviceId> as IpDeviceIdContext<I>>::DeviceId;
-        type WeakDeviceId = <FakeIpDeviceIdCtx<I, DeviceId> as IpDeviceIdContext<I>>::WeakDeviceId;
+        type DeviceId = <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::DeviceId;
+        type WeakDeviceId =
+            <FakeIpDeviceIdCtx<DeviceId> as DeviceIdContext<AnyDevice>>::WeakDeviceId;
 
         fn downgrade_device_id(&self, device_id: &DeviceId) -> FakeWeakDeviceId<DeviceId> {
             self.ip_device_id_ctx.downgrade_device_id(device_id)
@@ -1026,7 +1028,7 @@ pub(crate) mod testutil {
             I: IpDeviceStateIpExt,
             S: AsRef<FakeIpSocketCtx<I, DeviceId>>
                 + AsMut<FakeIpSocketCtx<I, DeviceId>>
-                + AsRef<FakeIpDeviceIdCtx<I, DeviceId>>,
+                + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
             Id,
             Meta,
             Event: Debug,
@@ -1051,7 +1053,7 @@ pub(crate) mod testutil {
             B: BufferMut,
             S: AsRef<FakeIpSocketCtx<I, DeviceId>>
                 + AsMut<FakeIpSocketCtx<I, DeviceId>>
-                + AsRef<FakeIpDeviceIdCtx<I, DeviceId>>,
+                + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
             Id,
             Meta,
             Event: Debug,
@@ -1209,15 +1211,15 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<I, D>> for FakeBufferIpSocketCtx<I, D> {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeBufferIpSocketCtx<I, D> {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
             let this: &FakeIpSocketCtx<_, _> = self.as_ref();
             this.as_ref()
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<I, D>> for FakeBufferIpSocketCtx<I, D> {
-        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<I, D> {
+    impl<I: IpDeviceStateIpExt, D> AsMut<FakeIpDeviceIdCtx<D>> for FakeBufferIpSocketCtx<I, D> {
+        fn as_mut(&mut self) -> &mut FakeIpDeviceIdCtx<D> {
             let this: &mut FakeIpSocketCtx<_, _> = self.as_mut();
             this.as_mut()
         }
@@ -1504,7 +1506,7 @@ mod tests {
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
         for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
-            + IpDeviceIdContext<I, DeviceId = DeviceId<FakeNonSyncCtx>>
+            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>
             + DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
         FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeNonSyncCtx>>>
             + EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>,
@@ -1569,7 +1571,7 @@ mod tests {
         let get_expected_result = |template| expected_result.map(|()| template);
         let weak_local_device = local_device
             .as_ref()
-            .map(|d| IpDeviceIdContext::<I>::downgrade_device_id(&Locked::new(sync_ctx), d));
+            .map(|d| DeviceIdContext::downgrade_device_id(&Locked::new(sync_ctx), d));
         let template = IpSock {
             definition: IpSockDefinition {
                 remote_ip: to_ip,
@@ -1625,7 +1627,7 @@ mod tests {
         to_addr_type: AddressType,
     ) where
         for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
-            + IpDeviceIdContext<I, DeviceId = DeviceId<FakeNonSyncCtx>>,
+            + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>,
         IcmpEchoReply: IcmpMessage<I, &'static [u8], Code = IcmpUnusedCode>,
     {
         set_logger_for_test();

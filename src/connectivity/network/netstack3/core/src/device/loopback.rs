@@ -20,7 +20,6 @@ use net_types::{
 use packet::{Buf, BufferMut, Serializer};
 
 use crate::{
-    device::Mtu,
     device::{
         queue::{
             rx::{
@@ -40,6 +39,7 @@ use crate::{
         with_loopback_state, with_loopback_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, FrameDestination,
     },
+    device::{Id, Mtu, StrongId, WeakId},
     ip::types::RawMetric,
     sync::{RwLock, StrongRc, WeakRc},
     Instant, NonSyncContext, SyncCtx,
@@ -81,6 +81,16 @@ impl<I: Instant, S> Debug for LoopbackWeakDeviceId<I, S> {
 impl<I: Instant, S> Display for LoopbackWeakDeviceId<I, S> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "Weak Loopback")
+    }
+}
+
+impl<I: Instant, S: Send + Sync> WeakId for LoopbackWeakDeviceId<I, S> {
+    type Strong = LoopbackDeviceId<I, S>;
+}
+
+impl<I: Instant, S: Send + Sync> Id for LoopbackWeakDeviceId<I, S> {
+    fn is_loopback(&self) -> bool {
+        true
     }
 }
 
@@ -132,6 +142,16 @@ impl<I: Instant, S> Display for LoopbackDeviceId<I, S> {
     }
 }
 
+impl<I: Instant, S: Send + Sync> StrongId for LoopbackDeviceId<I, S> {
+    type Weak = LoopbackWeakDeviceId<I, S>;
+}
+
+impl<I: Instant, S: Send + Sync> Id for LoopbackDeviceId<I, S> {
+    fn is_loopback(&self) -> bool {
+        true
+    }
+}
+
 impl<I: Instant, S> LoopbackDeviceId<I, S> {
     /// Returns a reference to the external state for the device.
     pub fn external_state(&self) -> &S {
@@ -144,6 +164,11 @@ impl<I: Instant, S> LoopbackDeviceId<I, S> {
         let Self(rc) = self;
         LoopbackWeakDeviceId(StrongRc::downgrade(rc))
     }
+
+    pub(super) fn removed(&self) -> bool {
+        let Self(rc) = self;
+        StrongRc::marked_for_destruction(rc)
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -155,6 +180,19 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<LoopbackDevice>
     for Locked<'_, SyncCtx<NonSyncCtx>, L>
 {
     type DeviceId = LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>;
+    type WeakDeviceId = LoopbackWeakDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>;
+    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+        device_id.downgrade()
+    }
+    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool {
+        !device_id.removed()
+    }
+    fn upgrade_weak_device_id(
+        &self,
+        weak_device_id: &Self::WeakDeviceId,
+    ) -> Option<Self::DeviceId> {
+        weak_device_id.upgrade()
+    }
 }
 
 pub(super) struct LoopbackDeviceState {

@@ -8,10 +8,7 @@
 
 use core::{num::NonZeroU8, time::Duration};
 
-use net_types::{
-    ip::{Ipv6, Ipv6Addr},
-    UnicastAddr,
-};
+use net_types::{ip::Ipv6Addr, UnicastAddr};
 use packet::{EitherSerializer, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::icmp::ndp::{
     options::NdpOptionBuilder, OptionSequenceBuilder, RouterSolicitation,
@@ -20,7 +17,7 @@ use rand::Rng as _;
 
 use crate::{
     context::{RngContext, TimerContext, TimerHandler},
-    ip::IpDeviceIdContext,
+    ip::{AnyDevice, DeviceIdContext},
 };
 
 /// Amount of time to wait after sending `MAX_RTR_SOLICITATIONS` Router
@@ -51,7 +48,7 @@ pub(crate) struct RsTimerId<DeviceId> {
 }
 
 /// The IP device context provided to RS.
-pub(super) trait Ipv6DeviceRsContext<C>: IpDeviceIdContext<Ipv6> {
+pub(super) trait Ipv6DeviceRsContext<C>: DeviceIdContext<AnyDevice> {
     /// A link-layer address.
     type LinkLayerAddr: AsRef<[u8]>;
 
@@ -83,7 +80,7 @@ pub(super) trait Ipv6DeviceRsContext<C>: IpDeviceIdContext<Ipv6> {
 }
 
 /// The IP layer context provided to RS.
-pub(super) trait Ipv6LayerRsContext<C>: IpDeviceIdContext<Ipv6> {
+pub(super) trait Ipv6LayerRsContext<C>: DeviceIdContext<AnyDevice> {
     /// Sends an NDP Router Solicitation to the local-link.
     ///
     /// The callback is called with a source address suitable for an outgoing
@@ -120,7 +117,7 @@ impl<C: RsNonSyncContext<SC::DeviceId>, SC: Ipv6DeviceRsContext<C> + Ipv6LayerRs
 
 /// An implementation of Router Solicitation.
 pub(crate) trait RsHandler<C>:
-    IpDeviceIdContext<Ipv6> + TimerHandler<C, RsTimerId<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + TimerHandler<C, RsTimerId<Self::DeviceId>>
 {
     /// Starts router solicitation.
     fn start_router_solicitation(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
@@ -249,11 +246,11 @@ mod tests {
         router_soliciations_remaining: Option<NonZeroU8>,
         source_address: Option<UnicastAddr<Ipv6Addr>>,
         link_layer_bytes: Option<Vec<u8>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
-    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeRsContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeRsContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
             &self.ip_device_id_ctx
         }
     }

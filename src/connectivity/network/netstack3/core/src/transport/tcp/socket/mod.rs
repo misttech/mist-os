@@ -56,15 +56,14 @@ use crate::{
         id_map_collection::IdMapCollectionKey,
         socketmap::{IterShadows as _, SocketMap, Tagged},
     },
-    device::{DeviceId, WeakDeviceId, WeakId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, Id, WeakDeviceId, WeakId},
     error::{ExistsError, LocalAddressError, ZonedAddressError},
     ip::{
         socket::{
             BufferIpSocketHandler as _, DefaultSendOptions, DeviceIpSocketHandler, IpSock,
             IpSockCreationError, IpSocketHandler as _, Mms,
         },
-        BufferTransportIpContext, EitherDeviceId, IpDeviceId, IpDeviceIdContext, IpExt,
-        IpLayerIpExt, TransportIpContext as _,
+        BufferTransportIpContext, EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext as _,
     },
     socket::{
         address::{ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr},
@@ -166,7 +165,7 @@ pub trait NonSyncContext: TimerContext<TimerId> {
 
 /// Sync context for TCP.
 pub(crate) trait SyncContext<I: IpLayerIpExt, C: NonSyncContext>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 {
     type IpTransportCtx<'a>: BufferTransportIpContext<
             I,
@@ -250,7 +249,7 @@ pub(crate) enum TcpIpTransportContext {}
 /// Uninstantiatable type for implementing [`SocketMapStateSpec`].
 struct TcpSocketSpec<Ip, Device, NonSyncContext>(PhantomData<(Ip, Device, NonSyncContext)>, Never);
 
-impl<I: IpExt, D: IpDeviceId, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I, D, C> {
+impl<I: IpExt, D: Id, C: NonSyncContext> SocketMapStateSpec for TcpSocketSpec<I, D, C> {
     type ListenerId = MaybeListenerId<I>;
     type ConnId = MaybeClosedConnectionId<I>;
 
@@ -856,8 +855,7 @@ enum Acceptor<I: Ip> {
 /// connection can be in any state as long as both the local and remote socket
 /// addresses are specified.
 #[derive(Debug)]
-struct Connection<I: IpExt, D: IpDeviceId, II: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen>
-{
+struct Connection<I: IpExt, D: Id, II: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> {
     acceptor: Option<Acceptor<I>>,
     state: State<II, R, S, ActiveOpen>,
     ip_sock: IpSock<I, D, DefaultSendOptions>,
@@ -1034,7 +1032,9 @@ impl<I: Ip> From<BoundId<I>> for SocketId<I> {
     }
 }
 
-pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>: IpDeviceIdContext<I> {
+pub(crate) trait SocketHandler<I: Ip, C: NonSyncContext>:
+    DeviceIdContext<AnyDevice>
+{
     fn create_socket(&mut self, ctx: &mut C) -> UnboundId<I>;
 
     fn bind(

@@ -1159,7 +1159,11 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::FakeFrameCtx,
-        device::{set_routing_enabled, testutil::FakeDeviceId, DeviceId},
+        device::{
+            set_routing_enabled,
+            testutil::{FakeDeviceId, FakeWeakDeviceId},
+            DeviceId,
+        },
         error::{ExistsError, NotFoundError},
         ip::{
             device::{nud::DynamicNeighborUpdateSource, state::AssignedAddress},
@@ -1357,6 +1361,20 @@ mod tests {
 
     impl DeviceIdContext<EthernetLinkDevice> for FakeCtx {
         type DeviceId = FakeDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeDeviceId>;
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            FakeWeakDeviceId(device_id.clone())
+        }
+        fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
+            true
+        }
+        fn upgrade_weak_device_id(
+            &self,
+            weak_device_id: &Self::WeakDeviceId,
+        ) -> Option<Self::DeviceId> {
+            let FakeWeakDeviceId(id) = weak_device_id;
+            Some(id.clone())
+        }
     }
 
     fn contains_addr<A: IpAddress>(

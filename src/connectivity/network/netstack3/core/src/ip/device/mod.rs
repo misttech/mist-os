@@ -47,7 +47,7 @@ use crate::{
             GroupLeaveResult,
         },
         types::RawMetric,
-        DualStackDeviceIdContext, IpDeviceIdContext,
+        AnyDevice, DeviceIdContext,
     },
     Instant,
 };
@@ -285,33 +285,27 @@ impl<C: InstantContext> DualStackDeviceNonSyncContext for C {}
 
 /// The synchronized execution context for dual-stack devices.
 pub(crate) trait DualStackDeviceContext<C: DualStackDeviceNonSyncContext>:
-    DualStackDeviceIdContext
+    DeviceIdContext<AnyDevice>
 {
     /// Calls the function with an immutable view into the dual-stack device's
     /// state.
     fn with_dual_stack_device_state<O, F: FnOnce(DualStackDeviceStateRef<'_, C::Instant>) -> O>(
         &mut self,
-        device_id: &Self::DualStackDeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
 }
 
 /// An implementation of dual-stack devices.
-pub(crate) trait DualStackDeviceHandler<C>: DualStackDeviceIdContext {
+pub(crate) trait DualStackDeviceHandler<C>: DeviceIdContext<AnyDevice> {
     /// Get all IPv4 and IPv6 address/subnet pairs configured on a device.
-    fn get_all_ip_addr_subnets(
-        &mut self,
-        device_id: &Self::DualStackDeviceId,
-    ) -> Vec<AddrSubnetEither>;
+    fn get_all_ip_addr_subnets(&mut self, device_id: &Self::DeviceId) -> Vec<AddrSubnetEither>;
 }
 
 impl<C: DualStackDeviceNonSyncContext, SC: DualStackDeviceContext<C>> DualStackDeviceHandler<C>
     for SC
 {
-    fn get_all_ip_addr_subnets(
-        &mut self,
-        device_id: &Self::DualStackDeviceId,
-    ) -> Vec<AddrSubnetEither> {
+    fn get_all_ip_addr_subnets(&mut self, device_id: &Self::DeviceId) -> Vec<AddrSubnetEither> {
         self.with_dual_stack_device_state(device_id, |DualStackDeviceStateRef { ipv4, ipv6 }| {
             let addrs_v4 = ipv4
                 .ip_state
@@ -348,7 +342,7 @@ impl<
 
 /// Accessor for IP device state.
 pub(crate) trait IpDeviceStateAccessor<I: IpDeviceIpExt, Instant>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 {
     /// Calls the function with an immutable reference to IP device state.
     fn with_ip_device_state<O, F: FnOnce(&I::State<Instant>) -> O>(
@@ -360,7 +354,7 @@ pub(crate) trait IpDeviceStateAccessor<I: IpDeviceIpExt, Instant>:
 
 /// The execution context for IP devices.
 pub(crate) trait IpDeviceContext<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, Self::DeviceId>>:
-    IpDeviceStateAccessor<I, <C as InstantContext>::Instant> + IpDeviceIdContext<I>
+    IpDeviceStateAccessor<I, <C as InstantContext>::Instant> + DeviceIdContext<AnyDevice>
 where
     I::State<C::Instant>: AsRef<IpDeviceState<C::Instant, I>>,
 {
@@ -446,7 +440,7 @@ pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceI
 }
 
 /// An implementation of an IP device.
-pub(crate) trait IpDeviceHandler<I: Ip, C>: IpDeviceIdContext<I> {
+pub(crate) trait IpDeviceHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool;
 
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8);
@@ -849,19 +843,16 @@ pub(crate) fn is_ip_routing_enabled<
 
 /// Enables or disables IP packet routing on `device`.
 pub(crate) fn set_routing_enabled<
-    C: IpDeviceNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>
-        + IpDeviceNonSyncContext<Ipv6, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>,
+    C: IpDeviceNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>
+        + IpDeviceNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
     SC: IpDeviceContext<Ipv4, C> + Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + RsHandler<C>,
     I: Ip,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    device: &<SC as IpDeviceIdContext<Ipv6>>::DeviceId,
+    device: &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
     enabled: bool,
-) -> Result<(), NotSupportedError>
-where
-    SC: IpDeviceIdContext<Ipv6, DeviceId = <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
-{
+) -> Result<(), NotSupportedError> {
     match I::VERSION {
         IpVersion::V4 => set_ipv4_routing_enabled(sync_ctx, ctx, device, enabled),
         IpVersion::V6 => set_ipv6_routing_enabled(sync_ctx, ctx, device, enabled),

@@ -72,7 +72,10 @@ pub(crate) mod testutil {
     use zerocopy::{AsBytes, FromBytes, Unaligned};
 
     use super::*;
-    use crate::device::DeviceIdContext;
+    use crate::{
+        context::testutil::FakeSyncCtx,
+        device::{testutil::FakeWeakDeviceId, DeviceIdContext, Id, StrongId},
+    };
 
     /// A fake [`LinkDevice`].
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -123,7 +126,34 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<C> DeviceIdContext<FakeLinkDevice> for C {
+    impl StrongId for FakeLinkDeviceId {
+        type Weak = FakeWeakDeviceId<Self>;
+    }
+
+    impl Id for FakeLinkDeviceId {
+        fn is_loopback(&self) -> bool {
+            false
+        }
+    }
+
+    impl<S, M> DeviceIdContext<FakeLinkDevice> for FakeSyncCtx<S, M, FakeLinkDeviceId> {
         type DeviceId = FakeLinkDeviceId;
+        type WeakDeviceId = FakeWeakDeviceId<FakeLinkDeviceId>;
+
+        fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
+            FakeWeakDeviceId(device_id.clone())
+        }
+
+        fn is_device_installed(&self, _device_id: &Self::DeviceId) -> bool {
+            true
+        }
+
+        fn upgrade_weak_device_id(
+            &self,
+            weak_device_id: &Self::WeakDeviceId,
+        ) -> Option<Self::DeviceId> {
+            let FakeWeakDeviceId(id) = weak_device_id;
+            Some(id.clone())
+        }
     }
 }

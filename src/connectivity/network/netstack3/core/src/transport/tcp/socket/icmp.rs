@@ -8,11 +8,12 @@ use log::error;
 use net_types::SpecifiedAddr;
 
 use crate::{
-    ip::{icmp::IcmpIpExt, IpDeviceIdContext, IpTransportContext},
+    device::{AnyDevice, DeviceIdContext},
+    ip::{icmp::IcmpIpExt, IpTransportContext},
     transport::tcp::socket::TcpIpTransportContext,
 };
 
-impl<I: IcmpIpExt, C, SC: IpDeviceIdContext<I> + ?Sized> IpTransportContext<I, C, SC>
+impl<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I, C, SC>
     for TcpIpTransportContext
 {
     fn receive_icmp_error(

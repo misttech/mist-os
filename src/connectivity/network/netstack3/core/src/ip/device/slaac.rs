@@ -20,7 +20,7 @@ use nonzero_ext::nonzero;
 use assert_matches::assert_matches;
 use log::{debug, error, trace};
 use net_types::{
-    ip::{AddrSubnet, IpAddress, Ipv6, Ipv6Addr, Subnet},
+    ip::{AddrSubnet, IpAddress, Ipv6Addr, Subnet},
     UnicastAddr, Witness as _,
 };
 use packet_formats::{icmp::ndp::NonZeroNdpLifetime, utils::NonZeroDuration};
@@ -33,7 +33,7 @@ use crate::{
     error::{ExistsError, NotFoundError},
     ip::{
         device::state::{DelIpv6AddrReason, Lifetime, SlaacConfig, TemporarySlaacConfig},
-        IpDeviceIdContext,
+        AnyDevice, DeviceIdContext,
     },
     Instant,
 };
@@ -158,7 +158,7 @@ pub(super) struct SlaacAddrsMutAndConfig<'a, C: InstantContext, A: SlaacAddresse
 
 /// The state context provided to SLAAC.
 pub(super) trait SlaacStateContext<C: SlaacNonSyncContext<Self::DeviceId>>:
-    IpDeviceIdContext<Ipv6>
+    DeviceIdContext<AnyDevice>
 {
     type SlaacAddrs<'a>: SlaacAddresses<C>
     where
@@ -238,7 +238,7 @@ trait SlaacContext<C: SlaacNonSyncContext<Self::DeviceId>>: SlaacStateContext<C>
 impl<'a, C: SlaacNonSyncContext<SC::DeviceId>, SC: SlaacStateContext<C>> SlaacContext<C> for SC {}
 
 /// An implementation of SLAAC.
-pub(crate) trait SlaacHandler<C: InstantContext>: IpDeviceIdContext<Ipv6> {
+pub(crate) trait SlaacHandler<C: InstantContext>: DeviceIdContext<AnyDevice> {
     /// Executes the algorithm in [RFC 4862 Section 5.5.3], with the extensions
     /// from [RFC 8981 Section 3.4] for temporary addresses, for a given prefix
     /// advertised by a router.
@@ -1558,7 +1558,7 @@ mod tests {
     use assert_matches::assert_matches;
     use lock_order::Locked;
     use net_declare::net::ip_v6;
-    use net_types::{ethernet::Mac, LinkLocalAddress as _};
+    use net_types::{ethernet::Mac, ip::Ipv6, LinkLocalAddress as _};
     use packet::{Buf, InnerPacketBuilder as _, Serializer as _};
     use packet_formats::{
         icmp::{
@@ -1597,11 +1597,11 @@ mod tests {
         retrans_timer: Duration,
         iid: [u8; 8],
         slaac_addrs: FakeSlaacAddrs,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
-    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeSlaacContext {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeSlaacContext {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
             &self.ip_device_id_ctx
         }
     }

@@ -55,7 +55,7 @@ use packet_formats::{
 use crate::{
     context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},
     data_structures::token_bucket::TokenBucket,
-    device::{DeviceId, FrameDestination, Id, StrongId, WeakDeviceId, WeakId},
+    device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
@@ -162,7 +162,7 @@ impl IpExt for Ipv6 {
 ///
 /// An implementation for `()` is provided which indicates that a particular
 /// transport layer protocol is unsupported.
-pub(crate) trait IpTransportContext<I: IcmpIpExt, C, SC: IpDeviceIdContext<I> + ?Sized> {
+pub(crate) trait IpTransportContext<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> {
     /// Receive an ICMP error message.
     ///
     /// All arguments beginning with `original_` are fields from the IP packet
@@ -192,7 +192,7 @@ pub(crate) trait IpTransportContext<I: IcmpIpExt, C, SC: IpDeviceIdContext<I> + 
 pub(crate) trait BufferIpTransportContext<
     I: IpExt,
     C,
-    SC: IpDeviceIdContext<I> + ?Sized,
+    SC: DeviceIdContext<AnyDevice> + ?Sized,
     B: BufferMut,
 >: IpTransportContext<I, C, SC>
 {
@@ -211,7 +211,7 @@ pub(crate) trait BufferIpTransportContext<
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
-impl<I: IcmpIpExt, C, SC: IpDeviceIdContext<I> + ?Sized> IpTransportContext<I, C, SC> for () {
+impl<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I, C, SC> for () {
     fn receive_icmp_error(
         _sync_ctx: &mut SC,
         _ctx: &mut C,
@@ -225,7 +225,7 @@ impl<I: IcmpIpExt, C, SC: IpDeviceIdContext<I> + ?Sized> IpTransportContext<I, C
     }
 }
 
-impl<I: IpExt, C, SC: IpDeviceIdContext<I> + ?Sized, B: BufferMut>
+impl<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized, B: BufferMut>
     BufferIpTransportContext<I, C, SC, B> for ()
 {
     fn receive_ip_packet(
@@ -245,7 +245,7 @@ impl<I: IpExt, C, SC: IpDeviceIdContext<I> + ?Sized, B: BufferMut>
 
 /// The execution context provided by the IP layer to transport layer protocols.
 pub(crate) trait TransportIpContext<I: IpExt, C>:
-    IpDeviceIdContext<I> + IpSocketHandler<I, C>
+    DeviceIdContext<AnyDevice> + IpSocketHandler<I, C>
 {
     type DevicesWithAddrIter<'s>: Iterator<Item = Self::DeviceId>
     where
@@ -269,7 +269,7 @@ pub(crate) trait TransportIpContext<I: IpExt, C>:
 }
 
 /// Abstraction over the ability to join and leave multicast groups.
-pub(crate) trait MulticastMembershipHandler<I: Ip, C>: IpDeviceIdContext<I> {
+pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Requests that the specified device join the given multicast group.
     ///
     /// If this method is called multiple times with the same device and
@@ -394,8 +394,8 @@ impl<S: PartialEq, W: PartialEq + PartialEq<S>> PartialEq for EitherDeviceId<S, 
     }
 }
 
-impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<&'_ S, &'_ W> {
-    fn as_strong_ref<'a, I: Ip, SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>>(
+impl<S: Id, W: Id> EitherDeviceId<&'_ S, &'_ W> {
+    fn as_strong_ref<'a, SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
         &'a self,
         sync_ctx: &SC,
     ) -> Option<Cow<'a, SC::DeviceId>> {
@@ -407,8 +407,7 @@ impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<&'_ S, &'_ W> {
 
     pub(crate) fn as_weak_ref<
         'a,
-        I: Ip,
-        SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>,
+        SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>,
     >(
         &'a self,
         sync_ctx: &SC,
@@ -433,8 +432,8 @@ impl<S, W> EitherDeviceId<S, W> {
     }
 }
 
-impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<S, W> {
-    pub(crate) fn as_strong<'a, I: Ip, SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>>(
+impl<S: Id, W: Id> EitherDeviceId<S, W> {
+    pub(crate) fn as_strong<'a, SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
         &'a self,
         sync_ctx: &SC,
     ) -> Option<Cow<'a, SC::DeviceId>> {
@@ -444,7 +443,7 @@ impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<S, W> {
         }
     }
 
-    pub(crate) fn as_weak<'a, I: Ip, SC: IpDeviceIdContext<I, DeviceId = S, WeakDeviceId = W>>(
+    pub(crate) fn as_weak<'a, SC: DeviceIdContext<AnyDevice, DeviceId = S, WeakDeviceId = W>>(
         &'a self,
         sync_ctx: &SC,
     ) -> Cow<'a, SC::WeakDeviceId> {
@@ -453,42 +452,6 @@ impl<S: IpDeviceId, W: IpDeviceId> EitherDeviceId<S, W> {
             EitherDeviceId::Weak(w) => Cow::Borrowed(w),
         }
     }
-}
-
-/// An IP device ID.
-pub(crate) trait IpDeviceId: Id {}
-impl<D: Id> IpDeviceId for D {}
-
-pub(crate) trait DualStackDeviceIdContext {
-    type DualStackDeviceId: IpDeviceId;
-}
-
-/// An execution context which provides a `DeviceId` type for various IP
-/// internals to share.
-///
-/// This trait provides the associated `DeviceId` type, and is used by
-/// [`IgmpContext`], [`MldContext`], and [`InnerIcmpContext`]. It allows them to use
-/// the same `DeviceId` type rather than each providing their own, which would
-/// require lots of verbose type bounds when they need to be interoperable (such
-/// as when ICMP delivers an MLD packet to the `mld` module for processing).
-pub(crate) trait IpDeviceIdContext<I: Ip> {
-    /// The type of device IDs.
-    type DeviceId: StrongId<Weak = Self::WeakDeviceId> + 'static;
-
-    /// The type of weakly referenced device IDs.
-    type WeakDeviceId: WeakId<Strong = Self::DeviceId> + 'static;
-
-    /// Returns a weak ID for the strong ID.
-    fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId;
-
-    /// Attempts to upgrade the weak device ID to a strong ID.
-    ///
-    /// Returns `None` if the device has been removed.
-    fn upgrade_weak_device_id(&self, weak_device_id: &Self::WeakDeviceId)
-        -> Option<Self::DeviceId>;
-
-    /// Returns true if the device has not been removed.
-    fn is_device_installed(&self, device_id: &Self::DeviceId) -> bool;
 }
 
 /// The status of an IP address on an interface.
@@ -545,8 +508,8 @@ impl IpLayerIpExt for Ipv6 {
 // TODO(https://fxbug.dev/48578): Do not return references to state. Instead,
 // callers of methods on this trait should provide a callback that takes a state
 // reference.
-pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
-    type IpDeviceIdCtx<'a>: IpDeviceIdContext<I, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
+    type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpDeviceContext<I, C>;
 
     /// Calls the function with an immutable reference to IP routing table.
@@ -573,7 +536,7 @@ pub(crate) trait Ipv4StateContext<C>: IpStateContext<Ipv4, C> {
 }
 
 /// The IP device context provided to the IP layer.
-pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: IpDeviceIdContext<I> {
+pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -648,14 +611,14 @@ impl<
 /// The execution context for the IP layer.
 pub(crate) trait IpLayerContext<
     I: IpLayerIpExt,
-    C: IpLayerNonSyncContext<I, <Self as IpDeviceIdContext<I>>::DeviceId>,
+    C: IpLayerNonSyncContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >: IpStateContext<I, C> + IpDeviceContext<I, C>
 {
 }
 
 impl<
         I: IpLayerIpExt,
-        C: IpLayerNonSyncContext<I, <SC as IpDeviceIdContext<I>>::DeviceId>,
+        C: IpLayerNonSyncContext<I, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
         SC: IpStateContext<I, C> + IpDeviceContext<I, C>,
     > IpLayerContext<I, C> for SC
 {
@@ -869,7 +832,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 
 /// The transport context provided to the IP layer requiring a buffer type.
 pub(crate) trait BufferTransportContext<I: IpLayerIpExt, C, B: BufferMut>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 {
     /// Dispatches a received incoming IP packet to the appropriate protocol.
     fn dispatch_receive_ip_packet(
@@ -2488,7 +2451,7 @@ impl<I: packet_formats::ip::IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<
 }
 
 pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
-    IpDeviceIdContext<I>
+    DeviceIdContext<AnyDevice>
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
         &mut self,
@@ -2500,7 +2463,7 @@ pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
 
 impl<
         B: BufferMut,
-        C: IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
+        C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
         SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv4, C, B> for SC
 {
@@ -2516,7 +2479,7 @@ impl<
 
 impl<
         B: BufferMut,
-        C: IpLayerNonSyncContext<Ipv6, <SC as IpDeviceIdContext<Ipv6>>::DeviceId>,
+        C: IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
         SC: BufferIpDeviceContext<Ipv6, C, B> + IpStateContext<Ipv6, C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv6, C, B> for SC
 {
@@ -2538,7 +2501,7 @@ impl<
 /// and the device is a non-loopback device.
 pub(crate) fn send_ipv4_packet_from_device<
     B: BufferMut,
-    C: IpLayerNonSyncContext<Ipv4, <SC as IpDeviceIdContext<Ipv4>>::DeviceId>,
+    C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
     SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C>,
     S: Serializer<Buffer = B>,
 >(
@@ -2546,7 +2509,7 @@ pub(crate) fn send_ipv4_packet_from_device<
     ctx: &mut C,
     SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
         Ipv4,
-        &<SC as IpDeviceIdContext<Ipv4>>::DeviceId,
+        &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
         Option<SpecifiedAddr<Ipv4Addr>>,
     >,
     body: S,
@@ -2845,11 +2808,13 @@ pub(crate) mod testutil {
         testutil::{FakeNonSyncCtx, FakeSyncCtx},
     };
 
-    impl<I: Ip, S: AsRef<FakeIpDeviceIdCtx<I, D>>, Meta, D: FakeStrongDeviceId + 'static>
-        IpDeviceIdContext<I> for crate::context::testutil::FakeSyncCtx<S, Meta, D>
+    impl<S: AsRef<FakeIpDeviceIdCtx<D>>, Meta, D: StrongId + 'static> DeviceIdContext<AnyDevice>
+        for crate::context::testutil::FakeSyncCtx<S, Meta, D>
+    where
+        FakeIpDeviceIdCtx<D>: DeviceIdContext<AnyDevice, DeviceId = D, WeakDeviceId = D::Weak>,
     {
-        type DeviceId = <FakeIpDeviceIdCtx<I, D> as IpDeviceIdContext<I>>::DeviceId;
-        type WeakDeviceId = <FakeIpDeviceIdCtx<I, D> as IpDeviceIdContext<I>>::WeakDeviceId;
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
 
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             self.get_ref().as_ref().downgrade_device_id(device_id)
@@ -2864,17 +2829,12 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<
-            I: Ip,
-            Outer,
-            S: AsRef<FakeIpDeviceIdCtx<I, D>>,
-            Meta,
-            D: FakeStrongDeviceId + 'static,
-        > IpDeviceIdContext<I> for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
+    impl<Outer, S: AsRef<FakeIpDeviceIdCtx<D>>, Meta, D: FakeStrongDeviceId + 'static>
+        DeviceIdContext<AnyDevice>
+        for crate::context::testutil::WrappedFakeSyncCtx<Outer, S, Meta, D>
     {
-        type DeviceId =
-            <crate::context::testutil::FakeSyncCtx<S, Meta, D> as IpDeviceIdContext<I>>::DeviceId;
-        type WeakDeviceId = <crate::context::testutil::FakeSyncCtx<S, Meta, D> as IpDeviceIdContext<I>>::WeakDeviceId;
+        type DeviceId = D;
+        type WeakDeviceId = D::Weak;
 
         fn downgrade_device_id(&self, device_id: &Self::DeviceId) -> Self::WeakDeviceId {
             self.inner.downgrade_device_id(device_id)
@@ -2891,14 +2851,13 @@ pub(crate) mod testutil {
 
     #[derive(Derivative)]
     #[derivative(Default(bound = ""))]
-    pub(crate) struct FakeIpDeviceIdCtx<I, D> {
+    pub(crate) struct FakeIpDeviceIdCtx<D> {
         devices_removed: HashSet<D>,
-        _marker: core::marker::PhantomData<(I, D)>,
     }
 
-    impl<I, D: Eq + Hash> FakeIpDeviceIdCtx<I, D> {
+    impl<D: Eq + Hash> FakeIpDeviceIdCtx<D> {
         pub(crate) fn set_device_removed(&mut self, device: D, removed: bool) {
-            let Self { devices_removed, _marker } = self;
+            let Self { devices_removed } = self;
             let _existed: bool = if removed {
                 devices_removed.insert(device)
             } else {
@@ -2907,8 +2866,8 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: Ip, DeviceId: FakeStrongDeviceId + 'static> IpDeviceIdContext<I>
-        for FakeIpDeviceIdCtx<I, DeviceId>
+    impl<DeviceId: FakeStrongDeviceId + 'static> DeviceIdContext<AnyDevice>
+        for FakeIpDeviceIdCtx<DeviceId>
     {
         type DeviceId = DeviceId;
         type WeakDeviceId = FakeWeakDeviceId<DeviceId>;
@@ -2921,12 +2880,12 @@ pub(crate) mod testutil {
             &self,
             FakeWeakDeviceId(device_id): &FakeWeakDeviceId<DeviceId>,
         ) -> Option<DeviceId> {
-            let Self { devices_removed, _marker } = self;
+            let Self { devices_removed } = self;
             (!devices_removed.contains(&device_id)).then(|| device_id.clone())
         }
 
         fn is_device_installed(&self, device_id: &DeviceId) -> bool {
-            let Self { devices_removed, _marker } = self;
+            let Self { devices_removed } = self;
             !devices_removed.contains(&device_id)
         }
     }
@@ -2974,7 +2933,7 @@ pub(crate) mod testutil {
             I: Ip + IpDeviceStateIpExt,
             C: RngContext + InstantContext<Instant = FakeInstant>,
             D: FakeStrongDeviceId + 'static,
-            State: AsMut<FakeIpSocketCtx<I, D>> + AsRef<FakeIpDeviceIdCtx<I, D>>,
+            State: AsMut<FakeIpSocketCtx<I, D>> + AsRef<FakeIpDeviceIdCtx<D>>,
             Meta,
         > MulticastMembershipHandler<I, C>
         for crate::context::testutil::FakeSyncCtx<State, Meta, D>

@@ -38,7 +38,7 @@ use crate::{
             GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateMachine, IpExt,
             ProtocolSpecific, QueryTarget,
         },
-        IpDeviceIdContext,
+        AnyDevice, DeviceIdContext,
     },
     Instant,
 };
@@ -73,7 +73,7 @@ impl<DeviceId, C: RngContext + TimerContext<IgmpTimerId<DeviceId>>> IgmpNonSyncC
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
 pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
-    IpDeviceIdContext<Ipv4> + SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
 {
     /// Gets an IP address and subnet associated with this device.
     fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
@@ -281,7 +281,7 @@ impl<DeviceId> From<GmpDelayedReportTimerId<Ipv4Addr, DeviceId>> for IgmpTimerId
 }
 
 // Impl `TimerContext<GmpDelayedReportTimerId<Ipv4Addr, C::DeviceId>>` for all
-// implementors of `TimerContext<IgmpTimerId<C::DeviceId>> + IpDeviceIdContext<Ipv4>`.
+// implementors of `TimerContext<IgmpTimerId<C::DeviceId>> + DeviceIdContext<AnyDevice>`.
 impl_timer_context!(
     DeviceId,
     IgmpTimerId<DeviceId>,
@@ -535,7 +535,7 @@ mod tests {
         groups: MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>,
         igmp_enabled: bool,
         addr_subnet: Option<AddrSubnet<Ipv4Addr>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv4, FakeDeviceId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     impl Default for FakeIgmpCtx {
@@ -549,8 +549,8 @@ mod tests {
         }
     }
 
-    impl AsRef<FakeIpDeviceIdCtx<Ipv4, FakeDeviceId>> for FakeIgmpCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv4, FakeDeviceId> {
+    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeIgmpCtx {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
             &self.ip_device_id_ctx
         }
     }

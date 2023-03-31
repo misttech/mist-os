@@ -42,7 +42,7 @@ use crate::{
             GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateMachine, IpExt,
             ProtocolSpecific, QueryTarget,
         },
-        IpDeviceIdContext,
+        AnyDevice, DeviceIdContext,
     },
     Instant,
 };
@@ -78,7 +78,7 @@ impl<DeviceId, C: RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>>
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
 pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
-    IpDeviceIdContext<Ipv6> + SendFrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + SendFrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
 {
     /// Gets the IPv6 link local address on `device`.
     fn get_ipv6_link_local_addr(
@@ -453,7 +453,7 @@ mod tests {
         groups: MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>,
         mld_enabled: bool,
         ipv6_link_local: Option<LinkLocalUnicastAddr<Ipv6Addr>>,
-        ip_device_id_ctx: FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>,
+        ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
     impl Default for FakeMldCtx {
@@ -467,8 +467,8 @@ mod tests {
         }
     }
 
-    impl AsRef<FakeIpDeviceIdCtx<Ipv6, FakeDeviceId>> for FakeMldCtx {
-        fn as_ref(&self) -> &FakeIpDeviceIdCtx<Ipv6, FakeDeviceId> {
+    impl AsRef<FakeIpDeviceIdCtx<FakeDeviceId>> for FakeMldCtx {
+        fn as_ref(&self) -> &FakeIpDeviceIdCtx<FakeDeviceId> {
             &self.ip_device_id_ctx
         }
     }
