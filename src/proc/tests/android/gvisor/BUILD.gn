@@ -365,7 +365,7 @@ fuchsia_test_with_expectations_package("starnix_gvisor_tests") {
   if (is_coverage) {
     test_specs.environments = [
       {
-        dimensions = qemu_env
+        dimensions = qemu_env.dimensions
         tags = [ "disabled" ]
       },
     ]
