@@ -8,10 +8,8 @@ group("sbc") {
 
 executable("codec_runner_sw_sbc") {
   visibility = [
-    "//src/media/codec:codec_runner_sw_sbc",
-    "//src/media/codec:codec_runner_sw_sbc.manifest",
-    "//src/media/codec/*",  # TODO(fxbug.dev/4129): Dep shouldn't be needed
-    "//src/media/codec/factory",
+    ":sbc",
+    "//src/media/codec:*",
   ]
 
   sources = [

@@ -11,10 +11,8 @@ group("cvsd") {
 
 executable("codec_runner_sw_cvsd") {
   visibility = [
-    "//src/media/codec:codec_runner_sw_cvsd",
-    "//src/media/codec:codec_runner_sw_cvsd.manifest",
-    "//src/media/codec/*",  # TODO(fxbug.dev/4129): Dep shouldn't be needed
-    "//src/media/codec/factory",
+    ":cvsd",
+    "//src/media/codec:*",
   ]
 
   sources = [
