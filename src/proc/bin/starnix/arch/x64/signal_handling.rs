@@ -1,10 +1,9 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
 
-use crate::mm::MemoryAccessor;
 use crate::signals::*;
 use crate::task::*;
 use crate::types::*;
@@ -19,10 +18,10 @@ use crate::types::*;
 ///   > may use this area for their entire stack frame, rather than adjusting the
 ///   > stack pointer in the prologue and epilogue. This area is known as the red
 ///   > zone.
-const RED_ZONE_SIZE: u64 = 128;
+pub const RED_ZONE_SIZE: u64 = 128;
 
 /// The size of the syscall instruction in bytes.
-const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
+pub const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
 
 /// A `SignalStackFrame` contains all the state that is stored on the stack prior
 /// to executing a signal handler.
@@ -31,66 +30,33 @@ const SYSCALL_INSTRUCTION_SIZE_BYTES: u64 = 2;
 /// restorer_address must be the first field, since that is where the signal handler will return
 /// after it finishes executing.
 #[repr(C)]
-struct SignalStackFrame {
+pub struct SignalStackFrame {
     /// The address of the signal handler function.
     ///
     /// Must be the first field, to be positioned to serve as the return address.
     restorer_address: u64,
 
     /// Information about the signal.
-    siginfo_bytes: [u8; std::mem::size_of::<siginfo_t>()],
+    pub siginfo_bytes: [u8; std::mem::size_of::<siginfo_t>()],
 
     /// The state of the thread at the time the signal was handled.
-    context: ucontext,
+    pub context: ucontext,
     /// The FPU state. Must be immediately after the ucontext field, since Bionic considers this to
     /// be part of the ucontext for some reason.
     fpstate: _fpstate_64,
 }
 
-const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
+pub const SIG_STACK_SIZE: usize = std::mem::size_of::<SignalStackFrame>();
 
 impl SignalStackFrame {
-    fn new(siginfo: &SignalInfo, context: ucontext, restorer_address: u64) -> SignalStackFrame {
-        SignalStackFrame {
-            context,
-            siginfo_bytes: siginfo.as_siginfo_bytes(),
-            restorer_address,
-            fpstate: Default::default(),
-        }
-    }
-
-    fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {
-        unsafe { std::mem::transmute(self) }
-    }
-
-    fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
-        unsafe { std::mem::transmute(bytes) }
-    }
-}
-
-/// Aligns the stack pointer to be 16 byte aligned, and then misaligns it by 8 bytes.
-///
-/// This is done because x86-64 functions expect the stack to be misaligned by 8 bytes,
-/// as if the stack was 16 byte aligned and then someone used a call instruction. This
-/// is due to alignment-requiring SSE instructions.
-fn misalign_stack_pointer(pointer: u64) -> u64 {
-    pointer - (pointer % 16 + 8)
-}
-
-/// Prepares `current` state to execute the signal handler stored in `action`.
-///
-/// This function stores the state required to restore after the signal handler on the stack.
-// TODO(lindkvist): Honor the flags in `sa_flags`.
-pub fn dispatch_signal_handler(
-    task: &Task,
-    registers: &mut RegisterState,
-    signal_state: &mut SignalState,
-    siginfo: SignalInfo,
-    action: sigaction_t,
-) -> Result<(), Errno> {
-    let signal_stack_frame = SignalStackFrame::new(
-        &siginfo,
-        ucontext {
+    pub fn new(
+        _task: &Task,
+        registers: &RegisterState,
+        signal_state: &SignalState,
+        siginfo: &SignalInfo,
+        action: sigaction_t,
+    ) -> SignalStackFrame {
+        let context = ucontext {
             uc_mcontext: sigcontext {
                 r8: registers.r8,
                 r9: registers.r9,
@@ -124,80 +90,35 @@ pub fn dispatch_signal_handler(
                 .unwrap_or_default(),
             uc_sigmask: signal_state.mask().into(),
             ..Default::default()
-        },
-        action.sa_restorer.ptr() as u64,
-    );
-
-    // Determine which stack pointer to use for the signal handler.
-    // If the signal handler is executed on the main stack, adjust the stack pointer to account for
-    // the red zone.
-    // https://en.wikipedia.org/wiki/Red_zone_%28computing%29
-    let main_stack = registers.rsp.checked_sub(RED_ZONE_SIZE);
-    let stack_bottom = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
-        match signal_state.alt_stack {
-            Some(sigaltstack) => {
-                match main_stack {
-                    // Only install the sigaltstack if the stack pointer is not already in it.
-                    Some(sp) if sigaltstack.contains_pointer(sp) => main_stack,
-                    _ => {
-                        // Since the stack grows down, the size is added to the ss_sp when calculating
-                        // the "bottom" of the stack.
-                        // Use the main stack if sigaltstack overflows.
-                        sigaltstack
-                            .ss_sp
-                            .ptr()
-                            .checked_add(sigaltstack.ss_size)
-                            .map(|sp| sp as u64)
-                            .or(main_stack)
-                    }
-                }
-            }
-            None => main_stack,
-        }
-    } else {
-        main_stack
-    }
-    .ok_or(errno!(EINVAL))?;
-
-    let mut stack_pointer =
-        stack_bottom.checked_sub(SIG_STACK_SIZE as u64).ok_or(errno!(EINVAL))?;
-    stack_pointer = misalign_stack_pointer(stack_pointer);
-
-    // Check that if the stack pointer is inside altstack, the entire signal stack is inside
-    // altstack.
-    if let Some(sigaltstack) = signal_state.alt_stack {
-        if sigaltstack.contains_pointer(stack_pointer) ^ sigaltstack.contains_pointer(stack_bottom)
-        {
-            return error!(EINVAL);
+        };
+        let restorer_address = action.sa_restorer.ptr() as u64;
+        SignalStackFrame {
+            context,
+            siginfo_bytes: siginfo.as_siginfo_bytes(),
+            restorer_address,
+            fpstate: Default::default(),
         }
     }
 
-    // Write the signal stack frame at the updated stack pointer.
-    task.mm.write_memory(UserAddress::from(stack_pointer), signal_stack_frame.as_bytes())?;
-
-    signal_state.set_mask(action.sa_mask);
-
-    registers.rsp = stack_pointer;
-    registers.rdi = siginfo.signal.number() as u64;
-    if (action.sa_flags & SA_SIGINFO as u64) != 0 {
-        registers.rsi =
-            stack_pointer + memoffset::offset_of!(SignalStackFrame, siginfo_bytes) as u64;
-        registers.rdx = stack_pointer + memoffset::offset_of!(SignalStackFrame, context) as u64;
+    pub fn as_bytes(&self) -> &[u8; SIG_STACK_SIZE] {
+        unsafe { std::mem::transmute(self) }
     }
-    registers.rip = action.sa_handler.ptr() as u64;
-    Ok(())
+
+    pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
+        unsafe { std::mem::transmute(bytes) }
+    }
 }
 
-pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {
-    // The stack pointer was intentionally misaligned, so this must be done
-    // again to get the correct address for the stack frame.
-    let signal_frame_address = misalign_stack_pointer(current_task.registers.rsp);
-    let mut signal_stack_bytes = [0; SIG_STACK_SIZE];
-    current_task
-        .mm
-        .read_memory(UserAddress::from(signal_frame_address), &mut signal_stack_bytes)?;
+/// Aligns the stack pointer to be 16 byte aligned, and then misaligns it by 8 bytes.
+///
+/// This is done because x86-64 functions expect the stack to be misaligned by 8 bytes,
+/// as if the stack was 16 byte aligned and then someone used a call instruction. This
+/// is due to alignment-requiring SSE instructions.
+pub fn align_stack_pointer(pointer: u64) -> u64 {
+    pointer - (pointer % 16 + 8)
+}
 
-    let signal_stack_frame = SignalStackFrame::from_bytes(signal_stack_bytes);
+pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &SignalStackFrame) {
     let uctx = &signal_stack_frame.context.uc_mcontext;
     // Restore the register state from before executing the signal handler.
     current_task.registers = zx::sys::zx_thread_state_general_regs_t {
@@ -223,42 +144,16 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
         gs_base: current_task.registers.gs_base,
     }
     .into();
-    current_task.write().signals.set_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));
-    Ok(())
 }
 
-/// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
-/// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-pub fn prepare_to_restart_syscall(current_task: &mut CurrentTask, sigaction: Option<sigaction_t>) {
-    let err = ErrnoCode::from_return_value(current_task.registers.rax);
-    // If sigaction is None, the syscall must be restarted if it is restartable. The default
-    // sigaction will not have a sighandler, which will guarantee a restart.
-    let sigaction = sigaction.unwrap_or_default();
-
-    let should_restart = match err {
-        ERESTARTSYS => sigaction.sa_flags & SA_RESTART as u64 != 0,
-        ERESTARTNOINTR => true,
-        ERESTARTNOHAND | ERESTART_RESTARTBLOCK => false,
-
-        // The syscall did not request to be restarted.
-        _ => return,
-    };
-    // Always restart if the signal did not call a handler (i.e. SIGSTOP).
-    let should_restart = should_restart || sigaction.sa_handler.is_null();
-
-    if !should_restart {
-        current_task.registers.rax = EINTR.return_value();
-        return;
-    }
-
-    // The syscall should be restarted. Reload the original `rax` (syscall number) into `rax`,
-    // and backup the instruction pointer to the `syscall` instruction.
-    current_task.registers.rax = match err {
+pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {
+    registers.rax = match err {
         // Custom restart, invoke restart_syscall instead of the original syscall.
         ERESTART_RESTARTBLOCK => __NR_restart_syscall as u64,
-        _ => current_task.registers.orig_rax,
+        // If the restart is not custom, simply replace `rax` with the value it had when the
+        // original syscall trap occurred.
+        _ => registers.orig_rax,
     };
-    current_task.registers.rip -= SYSCALL_INSTRUCTION_SIZE_BYTES;
 }
 
 #[cfg(test)]
@@ -280,7 +175,6 @@ mod tests {
     const SYSCALL2_ARGS: (u64, u64, u64, u64, u64, u64) = (30, 31, 32, 33, 34, 35);
     const SA_HANDLER2_ADDRESS: UserAddress = UserAddress::from(0xBADDAD00);
 
-    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn syscall_restart_adjusts_instruction_pointer_and_rax() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
@@ -345,7 +239,6 @@ mod tests {
         assert_eq!(current_task.registers.rip, SYSCALL_INSTRUCTION_ADDRESS.ptr() as u64);
     }
 
-    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn syscall_nested_restart() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_stack();
@@ -463,7 +356,6 @@ mod tests {
         assert_eq!(current_task.registers.rip, SYSCALL_INSTRUCTION_ADDRESS.ptr() as u64);
     }
 
-    #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     fn syscall_does_not_restart_if_signal_action_has_no_sa_restart_flag() {
         let (_kernel, mut current_task) = create_kernel_and_task_with_stack();

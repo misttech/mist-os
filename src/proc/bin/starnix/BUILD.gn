@@ -111,6 +111,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:macro_rules_attribute",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:memchr",
+    "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:paste",
@@ -129,7 +130,6 @@ rustc_binary("starnix_kernel_bin") {
     deps += [
       ":vdso-data($target_linux_toolchain)",
       "//src/lib/fuchsia-fs",
-      "//third_party/rust_crates:memoffset",
     ]
   }
 
@@ -142,7 +142,6 @@ rustc_binary("starnix_kernel_bin") {
     "//src/lib/test_util",
     "//src/storage/ext4:test_img",
     "//third_party/rust_crates:assert_matches",
-    "//third_party/rust_crates:memoffset",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-mutex",
   ]
@@ -307,15 +306,15 @@ rustc_binary("starnix_kernel_bin") {
   if (current_cpu == "x64") {
     sources += [
       "arch/x64/mod.rs",
+      "arch/x64/signal_handling.rs",
       "arch/x64/syscalls.rs",
-      "signals/signal_handling_x64.rs",
       "task/task_x64.rs",
     ]
   } else if (current_cpu == "arm64") {
     sources += [
       "arch/aarch64/mod.rs",
+      "arch/aarch64/signal_handling.rs",
       "arch/aarch64/syscalls.rs",
-      "signals/signal_handling_arm64.rs",
       "task/task_arm64.rs",
     ]
   }

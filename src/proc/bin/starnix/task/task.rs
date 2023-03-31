@@ -14,7 +14,7 @@ use crate::auth::*;
 use crate::execution::*;
 use crate::fs::*;
 use crate::loader::*;
-use crate::lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use crate::logging::{log_warn, not_implemented, set_zx_name};
 use crate::mm::{MemoryAccessorExt, MemoryManager};
 use crate::signals::{types::*, SignalInfo};
@@ -285,6 +285,13 @@ pub struct Task {
     /// The signal this task generates on exit.
     pub exit_signal: Option<Signal>,
 
+    /// The address of the signal trampoline in the task, or nullptr if no trampoline has been mapped.
+    ///
+    /// The signal trampoline consists of a call to sys_rt_sigreturn, which allows the kernel to restore
+    /// the task state after a signal handler has run.
+    // TODO(fxbug.dev/121659): Remove this onec the vDSO contains a signal trampoline.
+    pub signal_trampoline: Mutex<UserAddress>,
+
     /// The mutable state of the Task.
     mutable_state: RwLock<TaskMutableState>,
 
@@ -360,6 +367,7 @@ impl Task {
             command: RwLock::new(command),
             creds: RwLock::new(creds),
             vfork_event,
+            signal_trampoline: Default::default(),
             mutable_state: RwLock::new(TaskMutableState {
                 clear_child_tid: UserRef::default(),
                 signals: Default::default(),
@@ -1351,22 +1359,54 @@ pub struct RegisterState {
     /// A copy of the x64 `rax` register at the time of the `syscall` instruction. This is important
     /// to store, as the return value of a syscall overwrites `rax`, making it impossible to recover
     /// the original syscall number in the case of syscall restart and strace output.
-    ///
-    /// On ARM the syscall number is in r8 which is not overwritten so this is not needed.
     #[cfg(target_arch = "x86_64")]
     pub orig_rax: u64,
+
+    /// A copy of the aarch64 `x0` register at the time of the `syscall` instruction. This is important
+    /// to store, as the return value of a syscall overwrites `x0`, making it impossible to recover
+    /// the original `x0` value in the case of syscall restart and strace output.
+    #[cfg(target_arch = "aarch64")]
+    pub orig_x0: u64,
 }
 
 impl RegisterState {
+    /// Returns the register on this task that indicates the single-machine-word return value from a
+    /// function call.
+    #[cfg(target_arch = "x86_64")]
+    pub fn instruction_pointer_register(&self) -> u64 {
+        self.real_registers.rip
+    }
+    /// Returns the register on this task that indicates the single-machine-word return value from a
+    /// function call.
+    #[cfg(target_arch = "aarch64")]
+    pub fn instruction_pointer_register(&self) -> u64 {
+        self.real_registers.pc
+    }
+
     /// Sets the register on this task that indicates the single-machine-word return value from a
     /// function call.
     #[cfg(target_arch = "x86_64")]
     pub fn set_instruction_pointer_register(&mut self, new_ip: u64) {
         self.real_registers.rip = new_ip;
     }
+    /// Sets the register on this task that indicates the single-machine-word return value from a
+    /// function call.
     #[cfg(target_arch = "aarch64")]
     pub fn set_instruction_pointer_register(&mut self, new_ip: u64) {
         self.real_registers.pc = new_ip;
+    }
+
+    /// Returns the register on this task that indicates the single-machine-word return value from a
+    /// function call.
+    #[cfg(target_arch = "x86_64")]
+    pub fn return_register(&self) -> u64 {
+        self.real_registers.rax
+    }
+    /// Returns the register on this task that indicates the single-machine-word return value from a
+    /// function call.
+    #[cfg(target_arch = "aarch64")]
+    pub fn return_register(&self) -> u64 {
+        self.real_registers.r[0]
     }
 
     /// Sets the register on this task that indicates the single-machine-word return value from a
@@ -1375,6 +1415,8 @@ impl RegisterState {
     pub fn set_return_register(&mut self, return_value: u64) {
         self.real_registers.rax = return_value;
     }
+    /// Sets the register on this task that indicates the single-machine-word return value from a
+    /// function call.
     #[cfg(target_arch = "aarch64")]
     pub fn set_return_register(&mut self, return_value: u64) {
         self.real_registers.r[0] = return_value;
@@ -1385,6 +1427,7 @@ impl RegisterState {
     pub fn stack_pointer_register(&self) -> u64 {
         self.real_registers.rsp
     }
+    /// Gets the register on this task that indicates the current stack pointer.
     #[cfg(target_arch = "aarch64")]
     pub fn stack_pointer_register(&self) -> u64 {
         self.real_registers.sp
@@ -1395,6 +1438,7 @@ impl RegisterState {
     pub fn set_stack_pointer_register(&mut self, sp: u64) {
         self.real_registers.rsp = sp;
     }
+    /// Sets the register on this task that indicates the current stack pointer.
     #[cfg(target_arch = "aarch64")]
     pub fn set_stack_pointer_register(&mut self, sp: u64) {
         self.real_registers.sp = sp;
@@ -1405,9 +1449,43 @@ impl RegisterState {
     pub fn set_thread_pointer_register(&mut self, tp: u64) {
         self.real_registers.fs_base = tp;
     }
+    /// Sets the register on this task that indicates the TLS.
     #[cfg(target_arch = "aarch64")]
     pub fn set_thread_pointer_register(&mut self, tp: u64) {
         self.real_registers.tpidr = tp;
+    }
+
+    /// Sets the register on this task that indicates the first argument to a function.
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_arg0_register(&mut self, rdi: u64) {
+        self.real_registers.rdi = rdi;
+    }
+    /// Sets the register on this task that indicates the first argument to a function.
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_arg0_register(&mut self, x0: u64) {
+        self.real_registers.r[0] = x0;
+    }
+
+    /// Sets the register on this task that indicates the second argument to a function.
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_arg1_register(&mut self, rsi: u64) {
+        self.real_registers.rsi = rsi;
+    }
+    /// Sets the register on this task that indicates the second argument to a function.
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_arg1_register(&mut self, x1: u64) {
+        self.real_registers.r[1] = x1;
+    }
+
+    /// Sets the register on this task that indicates the third argument to a function.
+    #[cfg(target_arch = "x86_64")]
+    pub fn set_arg2_register(&mut self, rdx: u64) {
+        self.real_registers.rdx = rdx;
+    }
+    /// Sets the register on this task that indicates the third argument to a function.
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_arg2_register(&mut self, x2: u64) {
+        self.real_registers.r[2] = x2;
     }
 }
 
@@ -1433,7 +1511,7 @@ impl From<zx::sys::zx_thread_state_general_regs_t> for RegisterState {
 
     #[cfg(target_arch = "aarch64")]
     fn from(regs: zx::sys::zx_thread_state_general_regs_t) -> Self {
-        RegisterState { real_registers: regs }
+        RegisterState { real_registers: regs, orig_x0: 0 }
     }
 }
 

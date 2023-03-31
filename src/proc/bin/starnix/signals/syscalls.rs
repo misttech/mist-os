@@ -11,6 +11,7 @@ use super::signalfd::*;
 use crate::fs::*;
 use crate::logging::not_implemented;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::signals::restore_from_signal_handler;
 use crate::signals::*;
 use crate::syscalls::*;
 use crate::task::*;
