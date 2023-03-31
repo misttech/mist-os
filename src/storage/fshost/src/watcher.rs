@@ -216,11 +216,6 @@ impl Watcher {
         Ok(())
     }
 
-    /// Returns a boolean that indicates whether or not the Watcher is paused
-    pub async fn is_paused(&self) -> bool {
-        *self.paused.lock().await
-    }
-
     /// Resume the watcher. It doesn't return until the watcher task has set up the new directory
     /// watchers and will process new entries again.
     ///

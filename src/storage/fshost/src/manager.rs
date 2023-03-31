@@ -6,21 +6,27 @@ use {
     crate::{device::Device, environment::Environment, matcher, service},
     anyhow::{format_err, Error},
     fs_management::format::DiskFormat,
-    futures::{channel::mpsc, StreamExt},
+    futures::{channel::mpsc, lock::Mutex, StreamExt},
+    std::{collections::HashSet, sync::Arc},
 };
 
-pub struct Manager<E> {
+pub struct Manager {
     matcher: matcher::Matchers,
-    environment: E,
+    environment: Arc<Mutex<dyn Environment>>,
+    /// Holds a set of topological paths that have already been processed and
+    /// should be ignored when matching. When matched, the ignored paths are removed from the set.
+    /// (i.e. The device is ignored only once.)
+    matcher_lock: Arc<Mutex<HashSet<String>>>,
 }
 
-impl<E: Environment> Manager<E> {
+impl Manager {
     pub fn new(
         config: &fshost_config::Config,
         ramdisk_path: Option<String>,
-        environment: E,
+        environment: Arc<Mutex<dyn Environment>>,
+        matcher_lock: Arc<Mutex<HashSet<String>>>,
     ) -> Self {
-        Manager { matcher: matcher::Matchers::new(config, ramdisk_path), environment }
+        Manager { matcher: matcher::Matchers::new(config, ramdisk_path), environment, matcher_lock }
     }
 
     /// The main loop of fshost. Watch for new devices, match them against filesystems we expect,
@@ -31,6 +37,7 @@ impl<E: Environment> Manager<E> {
         mut shutdown_rx: mpsc::Receiver<service::FshostShutdownResponder>,
     ) -> Result<service::FshostShutdownResponder, Error> {
         let mut device_stream = Box::pin(device_stream).fuse();
+        let mut ignored_paths = HashSet::new();
         loop {
             // Wait for the next device to come in, or the shutdown signal to arrive.
             let mut device = futures::select! {
@@ -48,15 +55,31 @@ impl<E: Environment> Manager<E> {
                 },
             };
 
+            for path in (*self.matcher_lock.lock().await).drain() {
+                ignored_paths.insert(path);
+            }
+            let topological_path = device.topological_path().to_string();
+            if ignored_paths.remove(&topological_path) {
+                tracing::info!(
+                    topological_path = topological_path.as_str(),
+                    "Skipping explicitly ignored device."
+                );
+                continue;
+            }
+
             let content_format = device.content_format().await.unwrap_or(DiskFormat::Unknown);
             tracing::info!(
-                topological_path = %device.topological_path(),
+                topological_path=topological_path.as_str(),
                 path = %device.path(),
                 ?content_format,
                 "Matching device"
             );
 
-            match self.matcher.match_device(device.as_mut(), &mut self.environment).await {
+            match self
+                .matcher
+                .match_device(device.as_mut(), &mut *self.environment.lock().await)
+                .await
+            {
                 Ok(true) => {}
                 // TODO(fxbug.dev/118209): //src/tests/installer and //src/tests/femu look for
                 // "/dev/class/block/008 ignored"

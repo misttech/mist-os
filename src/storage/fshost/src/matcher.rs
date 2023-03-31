@@ -4,17 +4,15 @@
 
 use {
     crate::{
-        crypt::zxcrypt::UnsealOutcome,
         device::{
             constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
                 LEGACY_DATA_PARTITION_LABEL, MBR_DRIVER_PATH, NAND_BROKER_DRIVER_PATH,
-                ZXCRYPT_DRIVER_PATH,
             },
             Device,
         },
-        environment::Environment,
+        environment::{Environment, ServeFilesystemStatus},
     },
     anyhow::Error,
     async_trait::async_trait,
@@ -105,16 +103,13 @@ impl Matchers {
 
             if config.fvm && config.fvm_ramdisk {
                 // Add another matcher for the non-ramdisk version of fvm.
-                let mut non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
+                let non_ramdisk_fvm_matcher = Box::new(PartitionMapMatcher::new(
                     DiskFormat::Fvm,
                     false,
                     FVM_DRIVER_PATH,
                     "/fvm",
                     None,
                 ));
-                if config.data_filesystem_format != "fxfs" && !config.no_zxcrypt {
-                    non_ramdisk_fvm_matcher.child_matchers.push(Box::new(ZxcryptMatcher::new()));
-                }
                 matchers.push(non_ramdisk_fvm_matcher);
             }
         }
@@ -346,6 +341,10 @@ impl Matcher for PartitionMapMatcher {
         parent_path: &str,
     ) -> Result<bool, Error> {
         let topological_path = device.topological_path();
+        // If allow_multiple is not true, don't match children multiple times either.
+        if !self.allow_multiple && self.device_paths.iter().any(|x| x == &topological_path) {
+            return Ok(false);
+        }
         // Only match against children that are immediate children.
         // Child partitions should have topological paths of the form:
         //   ...<suffix>/<partition-name>/block
@@ -358,6 +357,7 @@ impl Matcher for PartitionMapMatcher {
                         for m in self.child_matchers.iter_mut() {
                             if m.match_device(device).await {
                                 m.process_device(device, env).await?;
+                                self.device_paths.push(device.topological_path().to_string());
                                 return Ok(true);
                             }
                         }
@@ -436,42 +436,11 @@ impl Matcher for DataMatcher {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<(), Error> {
-        env.mount_data(device).await
-    }
-}
-
-// Matches a zxcrypt partition.
-struct ZxcryptMatcher(PartitionMatcher, PartitionMatcher);
-
-impl ZxcryptMatcher {
-    fn new() -> Self {
-        Self(
-            PartitionMatcher::new(DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
-            PartitionMatcher::new(LEGACY_DATA_PARTITION_LABEL, &DATA_TYPE_GUID),
-        )
-    }
-}
-
-#[async_trait]
-impl Matcher for ZxcryptMatcher {
-    async fn match_device(&self, device: &mut dyn Device) -> bool {
-        self.0.match_device(device).await || self.1.match_device(device).await
-    }
-
-    async fn process_device(
-        &mut self,
-        device: &mut dyn Device,
-        env: &mut dyn Environment,
-    ) -> Result<(), Error> {
-        env.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
-        let _zxcrypt_device = match env.unseal_zxcrypt(device).await? {
-            UnsealOutcome::Unsealed(_) => {}
-            UnsealOutcome::FormatRequired => {
-                tracing::warn!("failed to unseal zxcrypt, reformatting");
-                env.format_zxcrypt(device).await?;
-            }
+        let fs = match env.launch_data(device).await? {
+            ServeFilesystemStatus::Serving(fs) => fs,
+            ServeFilesystemStatus::FormatRequired => env.format_data(device).await?,
         };
-        Ok(())
+        env.bind_data(fs)
     }
 }
 
@@ -481,12 +450,12 @@ mod tests {
         super::{Device, DiskFormat, Environment, Matchers},
         crate::{
             config::default_config,
-            crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice},
             device::constants::{
                 BLOBFS_PARTITION_LABEL, BLOBFS_TYPE_GUID, BOOTPART_DRIVER_PATH,
                 DATA_PARTITION_LABEL, DATA_TYPE_GUID, FVM_DRIVER_PATH, GPT_DRIVER_PATH,
-                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH, ZXCRYPT_DRIVER_PATH,
+                LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
             },
+            environment::{Filesystem, ServeFilesystemStatus},
         },
         anyhow::{anyhow, Error},
         async_trait::async_trait,
@@ -599,46 +568,42 @@ mod tests {
 
     struct MockEnv {
         expected_driver_path: Mutex<Option<String>>,
-        expect_unseal_zxcrypt: Mutex<bool>,
-        expect_format_zxcrypt: Mutex<bool>,
         expect_mount_blobfs: Mutex<bool>,
-        expect_mount_data: Mutex<bool>,
         expect_mount_fxblob: Mutex<bool>,
         expect_mount_blob_volume: Mutex<bool>,
         expect_mount_data_volume: Mutex<bool>,
+        expect_format_data: Mutex<bool>,
+        expect_bind_data: Mutex<bool>,
+        data_format_required: bool,
     }
 
     impl MockEnv {
         fn new() -> Self {
             MockEnv {
                 expected_driver_path: Mutex::new(None),
-                expect_unseal_zxcrypt: Mutex::new(false),
-                expect_format_zxcrypt: Mutex::new(false),
                 expect_mount_blobfs: Mutex::new(false),
-                expect_mount_data: Mutex::new(false),
                 expect_mount_fxblob: Mutex::new(false),
                 expect_mount_blob_volume: Mutex::new(false),
                 expect_mount_data_volume: Mutex::new(false),
+                expect_format_data: Mutex::new(false),
+                expect_bind_data: Mutex::new(false),
+                data_format_required: false,
             }
         }
         fn expect_attach_driver(mut self, path: impl ToString) -> Self {
             *self.expected_driver_path.get_mut().unwrap() = Some(path.to_string());
             self
         }
-        fn expect_unseal_zxcrypt(mut self) -> Self {
-            *self.expect_unseal_zxcrypt.get_mut().unwrap() = true;
-            self
-        }
-        fn expect_format_zxcrypt(mut self) -> Self {
-            *self.expect_format_zxcrypt.get_mut().unwrap() = true;
-            self
-        }
         fn expect_mount_blobfs(mut self) -> Self {
             *self.expect_mount_blobfs.get_mut().unwrap() = true;
             self
         }
-        fn expect_mount_data(mut self) -> Self {
-            *self.expect_mount_data.get_mut().unwrap() = true;
+        fn expect_format_data(mut self) -> Self {
+            *self.expect_format_data.get_mut().unwrap() = true;
+            self
+        }
+        fn expect_bind_data(mut self) -> Self {
+            *self.expect_bind_data.get_mut().unwrap() = true;
             self
         }
         fn expect_mount_fxblob(mut self) -> Self {
@@ -653,12 +618,16 @@ mod tests {
             *self.expect_mount_data_volume.get_mut().unwrap() = true;
             self
         }
+        fn data_format_required(mut self) -> Self {
+            self.data_format_required = true;
+            self
+        }
     }
 
     #[async_trait]
     impl Environment for MockEnv {
         async fn attach_driver(
-            &mut self,
+            &self,
             _device: &mut dyn Device,
             driver_path: &str,
         ) -> Result<(), Error> {
@@ -673,29 +642,6 @@ mod tests {
             Ok(())
         }
 
-        async fn unseal_zxcrypt(
-            &mut self,
-            _device: &mut dyn Device,
-        ) -> Result<UnsealOutcome, Error> {
-            assert_eq!(
-                std::mem::take(&mut *self.expect_unseal_zxcrypt.lock().unwrap()),
-                true,
-                "Unexpected call to unseal_zxcrypt"
-            );
-            Ok(UnsealOutcome::Unsealed(ZxcryptDevice::new_mock(Box::new(MockDevice::new()))))
-        }
-        async fn format_zxcrypt(
-            &mut self,
-            _device: &mut dyn Device,
-        ) -> Result<ZxcryptDevice, Error> {
-            assert_eq!(
-                std::mem::take(&mut *self.expect_format_zxcrypt.lock().unwrap()),
-                true,
-                "Unexpected call to format_zxcrypt"
-            );
-            Ok(ZxcryptDevice::new_mock(Box::new(MockDevice::new())))
-        }
-
         async fn mount_blobfs(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
             assert_eq!(
                 std::mem::take(&mut *self.expect_mount_blobfs.lock().unwrap()),
@@ -705,11 +651,31 @@ mod tests {
             Ok(())
         }
 
-        async fn mount_data(&mut self, _device: &mut dyn Device) -> Result<(), Error> {
+        async fn launch_data(
+            &mut self,
+            _device: &mut dyn Device,
+        ) -> Result<ServeFilesystemStatus, Error> {
+            Ok(if self.data_format_required {
+                ServeFilesystemStatus::FormatRequired
+            } else {
+                ServeFilesystemStatus::Serving(Filesystem::Queue(vec![]))
+            })
+        }
+
+        async fn format_data(&mut self, _device: &mut dyn Device) -> Result<Filesystem, Error> {
             assert_eq!(
-                std::mem::take(&mut *self.expect_mount_data.lock().unwrap()),
+                std::mem::take(&mut *self.expect_format_data.lock().unwrap()),
                 true,
-                "Unexpected call to mount_data"
+                "Unexpected call to format_data"
+            );
+            Ok(Filesystem::Queue(vec![]))
+        }
+
+        fn bind_data(&mut self, mut _fs: Filesystem) -> Result<(), Error> {
+            assert_eq!(
+                std::mem::take(&mut *self.expect_bind_data.lock().unwrap()),
+                true,
+                "Unexpected call to bind_data"
             );
             Ok(())
         }
@@ -746,7 +712,7 @@ mod tests {
         fn drop(&mut self) {
             assert!(self.expected_driver_path.get_mut().unwrap().is_none());
             assert!(!*self.expect_mount_blobfs.lock().unwrap());
-            assert!(!*self.expect_mount_data.lock().unwrap());
+            assert!(!*self.expect_bind_data.lock().unwrap());
         }
     }
 
@@ -870,14 +836,13 @@ mod tests {
             .await
             .expect("match_device failed"));
 
-        // However, we will bind zxcrypt to the device which matched the non-ramdisk prefix.
+        // We will NOT bind to the device which matched the non-ramdisk prefix.
         let mut data_device = MockDevice::new()
             .set_topological_path("first_prefix/fvm/data-p-2/block")
             .set_partition_label(DATA_PARTITION_LABEL)
             .set_partition_type(&DATA_TYPE_GUID);
-        let mut env =
-            MockEnv::new().expect_attach_driver(ZXCRYPT_DRIVER_PATH).expect_unseal_zxcrypt();
-        assert!(matchers
+        let mut env = MockEnv::new();
+        assert!(!matchers
             .match_device(&mut data_device, &mut env)
             .await
             .expect("match_device failed"));
@@ -910,7 +875,7 @@ mod tests {
             .await
             .expect("match_device failed"));
 
-        // When configured with fxfs as the data format, zxcrypt is not bound.
+        // Does not match due to the wrong prefix.
         let mut data_device = MockDevice::new()
             .set_topological_path("first_prefix/fvm/data-p-2/block")
             .set_partition_label(DATA_PARTITION_LABEL)
@@ -945,16 +910,6 @@ mod tests {
         let mut fvm_device = fvm_device.set_topological_path("second_prefix");
         assert!(!matchers
             .match_device(&mut fvm_device, &mut MockEnv::new())
-            .await
-            .expect("match_device failed"));
-
-        // When configured with fxfs as the data format, zxcrypt is not bound.
-        let mut data_device = MockDevice::new()
-            .set_topological_path("first_prefix/fvm/data-p-2/block")
-            .set_partition_label(DATA_PARTITION_LABEL)
-            .set_partition_type(&DATA_TYPE_GUID);
-        assert!(!matchers
-            .match_device(&mut data_device, &mut MockEnv::new().expect_unseal_zxcrypt())
             .await
             .expect("match_device failed"));
     }
@@ -1028,7 +983,21 @@ mod tests {
                     .set_topological_path("mock_device/fvm/data-p-2/block")
                     .set_partition_label(DATA_PARTITION_LABEL)
                     .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new().expect_mount_data()
+                &mut MockEnv::new().expect_bind_data()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_legacy_data_matcher() {
+        let mut matchers = Matchers::new(&default_config(), None);
+
+        // Attach FVM device.
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
+                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
             )
             .await
             .expect("match_device failed"));
@@ -1040,7 +1009,33 @@ mod tests {
                     .set_topological_path("mock_device/fvm/data-p-2/block")
                     .set_partition_label(LEGACY_DATA_PARTITION_LABEL)
                     .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new().expect_mount_data()
+                &mut MockEnv::new().expect_bind_data()
+            )
+            .await
+            .expect("match_device failed"));
+    }
+
+    #[fuchsia::test]
+    async fn test_data_matcher_reformat() {
+        let mut matchers = Matchers::new(&default_config(), None);
+
+        // Attach FVM device.
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
+                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
+            )
+            .await
+            .expect("match_device failed"));
+
+        // Check that the data partition is reformatted and then mounted.
+        assert!(matchers
+            .match_device(
+                &mut MockDevice::new()
+                    .set_topological_path("mock_device/fvm/data-p-2/block")
+                    .set_partition_label(DATA_PARTITION_LABEL)
+                    .set_partition_type(&DATA_TYPE_GUID),
+                &mut MockEnv::new().data_format_required().expect_format_data().expect_bind_data()
             )
             .await
             .expect("match_device failed"));
@@ -1082,42 +1077,6 @@ mod tests {
                     .set_partition_label(DATA_PARTITION_LABEL)
                     .set_partition_type(&DATA_TYPE_GUID),
                 env
-            )
-            .await
-            .expect("match_device failed"));
-    }
-
-    #[fuchsia::test]
-    async fn test_zxcrypt_matcher() {
-        let mut matchers = Matchers::new(
-            &fshost_config::Config {
-                fvm_ramdisk: true,
-                data_filesystem_format: "minfs".to_string(),
-                ..default_config()
-            },
-            None,
-        );
-
-        // Attach FVM device.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new().set_content_format(DiskFormat::Fvm),
-                &mut MockEnv::new().expect_attach_driver(FVM_DRIVER_PATH)
-            )
-            .await
-            .expect("match_device failed"));
-
-        // Check that the data partition is mounted.
-        assert!(matchers
-            .match_device(
-                &mut MockDevice::new()
-                    .set_topological_path("mock_device/fvm/data-p-2/block")
-                    .set_partition_label(DATA_PARTITION_LABEL)
-                    .set_partition_type(&DATA_TYPE_GUID),
-                &mut MockEnv::new()
-                    .expect_attach_driver(ZXCRYPT_DRIVER_PATH)
-                    .expect_format_zxcrypt()
-                    .expect_unseal_zxcrypt()
             )
             .await
             .expect("match_device failed"));

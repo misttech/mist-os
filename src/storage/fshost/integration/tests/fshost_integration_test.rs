@@ -275,16 +275,6 @@ async fn ramdisk_data_ignores_non_ramdisk() {
         })
         .await
         .unwrap();
-
-        if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
-            device_watcher::wait_for_device_with(&dev, |info| {
-                info.topological_path
-                    .ends_with("fvm/data-p-2/block/zxcrypt/unsealed/block")
-                    .then_some(())
-            })
-            .await
-            .unwrap();
-        }
     }
 
     // There isn't really a good way to tell that something is not mounted, but at this point we

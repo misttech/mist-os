@@ -7,7 +7,7 @@ use {
         crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice},
         debug_log,
         device::{constants, BlockDevice, Device},
-        environment::FilesystemLauncher,
+        environment::{FilesystemLauncher, ServeFilesystemStatus},
         service::constants::ZXCRYPT_DRIVER_PATH,
         watcher,
     },
@@ -32,10 +32,9 @@ use {
     },
     fuchsia_runtime::HandleType,
     fuchsia_zircon::{self as zx, sys::zx_handle_t, zx_status_t, AsHandleRef, Duration},
-    futures::{channel::mpsc, StreamExt, TryStreamExt},
+    futures::{channel::mpsc, lock::Mutex, StreamExt, TryStreamExt},
     remote_block_device::{BlockClient, BufferSlice, RemoteBlockClient},
-    std::sync::Arc,
-    tracing::info,
+    std::{collections::HashSet, sync::Arc},
     uuid::Uuid,
     vfs::service,
 };
@@ -108,7 +107,7 @@ async fn wipe_storage(
     config: &fshost_config::Config,
     ramdisk_prefix: Option<String>,
     launcher: &FilesystemLauncher,
-    mut pauser: watcher::Watcher,
+    ignored_paths: &mut HashSet<String>,
     blobfs_root: ServerEnd<DirectoryMarker>,
 ) -> Result<(), Error> {
     tracing::info!("Searching for block device with FVM");
@@ -127,16 +126,6 @@ async fn wipe_storage(
         .context("fvm get_topo_path transport error")?
         .map_err(zx::Status::from_raw)
         .context("fvm get_topo_path returned error")?;
-
-    // We need to pause the block watcher to make sure fshost doesn't try to mount or format any of
-    // the newly provisioned volumes in the FVM.
-    let paused = pauser.is_paused().await;
-    if !paused {
-        tracing::info!("Pausing block watcher");
-        pauser.pause().await.context("Failed to pause the block watcher")?;
-    } else {
-        tracing::info!("Block watcher already paused in WipeStorage");
-    }
 
     tracing::info!(device_path = ?fvm_path, "Wiping storage");
     tracing::info!("Unbinding child drivers (FVM/zxcrypt).");
@@ -176,6 +165,10 @@ async fn wipe_storage(
     )
     .await
     .context("Failed to allocate blobfs fvm partition")?;
+
+    let device_path =
+        blobfs_controller.get_topological_path().await?.map_err(zx::Status::from_raw)?;
+    ignored_paths.insert(device_path.clone());
 
     fvm_allocate_partition(
         &fvm_volume_manager_proxy,
@@ -221,9 +214,6 @@ async fn write_data_file(
             fvm_ramdisk must be set."
         ));
     }
-    // When `fvm_ramdisk` is set, zxcrypt will be bound (and formatted if needed) automatically
-    // during matching.  Otherwise, do it ourselves.
-    let bind_zxcrypt = !config.fvm_ramdisk;
 
     let content_size = if let Ok(content_size) = payload.get_content_size() {
         content_size
@@ -259,39 +249,54 @@ async fn write_data_file(
     );
     let mut device: &mut dyn Device = device.as_mut();
     let mut zxcrypt_device;
-    let mut inside_zxcrypt = false;
     if format != DiskFormat::Fxfs && !config.no_zxcrypt {
-        if bind_zxcrypt {
-            launcher.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
-            info!("Ensuring device is formatted with zxcrypt");
-            zxcrypt_device = Box::new(
-                match ZxcryptDevice::unseal(device).await.context("Failed to unseal zxcrypt")? {
-                    UnsealOutcome::Unsealed(device) => device,
-                    UnsealOutcome::FormatRequired => ZxcryptDevice::format(device).await?,
-                },
-            );
-            device = zxcrypt_device.as_mut();
-        } else {
-            zxcrypt_device = Box::new(ZxcryptDevice::get_zxcrypt_child(device).await?);
-            device = zxcrypt_device.as_mut();
-        };
-        inside_zxcrypt = true;
+        launcher.attach_driver(device, ZXCRYPT_DRIVER_PATH).await?;
+        tracing::info!("Ensuring device is formatted with zxcrypt");
+        zxcrypt_device = Box::new(
+            match ZxcryptDevice::unseal(device).await.context("Failed to unseal zxcrypt")? {
+                UnsealOutcome::Unsealed(device) => device,
+                UnsealOutcome::FormatRequired => ZxcryptDevice::format(device).await?,
+            },
+        );
+        device = zxcrypt_device.as_mut();
     }
 
-    let mut filesystem = match format {
-        DiskFormat::Fxfs => launcher
-            .serve_data(device, Fxfs::dynamic_child(), inside_zxcrypt)
-            .await
-            .context("serving fxfs")?,
-        DiskFormat::F2fs => launcher
-            .serve_data(device, F2fs::dynamic_child(), inside_zxcrypt)
-            .await
-            .context("serving f2fs")?,
-        DiskFormat::Minfs => launcher
-            .serve_data(device, Minfs::dynamic_child(), inside_zxcrypt)
-            .await
-            .context("serving minfs")?,
+    let filesystem = match format {
+        DiskFormat::Fxfs => {
+            launcher.serve_data(device, Fxfs::dynamic_child()).await.context("serving fxfs")?
+        }
+        DiskFormat::F2fs => {
+            launcher.serve_data(device, F2fs::dynamic_child()).await.context("serving f2fs")?
+        }
+        DiskFormat::Minfs => {
+            launcher.serve_data(device, Minfs::dynamic_child()).await.context("serving minfs")?
+        }
         _ => unreachable!(),
+    };
+    let mut filesystem = match filesystem {
+        ServeFilesystemStatus::Serving(fs) => fs,
+        ServeFilesystemStatus::FormatRequired => {
+            tracing::info!(
+                "Format required {:?} for device {:?}",
+                format,
+                device.topological_path()
+            );
+            match format {
+                DiskFormat::Fxfs => launcher
+                    .format_data(device, Fxfs::dynamic_child())
+                    .await
+                    .context("serving fxfs")?,
+                DiskFormat::F2fs => launcher
+                    .format_data(device, F2fs::dynamic_child())
+                    .await
+                    .context("serving f2fs")?,
+                DiskFormat::Minfs => launcher
+                    .format_data(device, Minfs::dynamic_child())
+                    .await
+                    .context("serving minfs")?,
+                _ => unreachable!(),
+            }
+        }
     };
 
     let data_root = filesystem.root(None).context("Failed to get data root")?;
@@ -369,13 +374,13 @@ pub fn fshost_admin(
     config: Arc<fshost_config::Config>,
     ramdisk_prefix: Option<String>,
     launcher: Arc<FilesystemLauncher>,
-    pauser: watcher::Watcher,
+    matcher_lock: Arc<Mutex<HashSet<String>>>,
 ) -> Arc<service::Service> {
     service::host(move |mut stream: fshost::AdminRequestStream| {
         let config = config.clone();
         let ramdisk_prefix = ramdisk_prefix.clone();
         let launcher = launcher.clone();
-        let pauser = pauser.clone();
+        let matcher_lock = matcher_lock.clone();
         async move {
             while let Some(request) = stream.next().await {
                 match request {
@@ -432,7 +437,7 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::WipeStorage { responder, blobfs_root }) => {
                         tracing::info!("admin wipe storage called");
-                        let pauser = pauser.clone();
+                        let mut ignored_paths = matcher_lock.lock().await;
                         let mut res = if !config.fvm_ramdisk {
                             tracing::error!(
                                 "Can't WipeStorage from a non-recovery build; \
@@ -444,7 +449,7 @@ pub fn fshost_admin(
                                 &config,
                                 ramdisk_prefix.clone(),
                                 &launcher,
-                                pauser,
+                                &mut *ignored_paths,
                                 blobfs_root,
                             )
                             .await

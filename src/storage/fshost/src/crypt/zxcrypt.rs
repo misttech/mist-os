@@ -39,16 +39,11 @@ pub enum UnsealOutcome {
 /// A BlockDevice representing a zxcrypt wrapped child device.
 pub struct ZxcryptDevice {
     parent_is_nand: bool,
+    proxy: DeviceManagerProxy,
     inner_device: Box<dyn Device>,
 }
 
 impl ZxcryptDevice {
-    /// Creates a non-functional ZxcryptDevice for use with mock tests.
-    #[cfg(test)]
-    pub fn new_mock(device: Box<dyn Device>) -> Self {
-        ZxcryptDevice { parent_is_nand: false, inner_device: device }
-    }
-
     /// Unseals a Zxcrypt BlockDevice and returns it.
     /// If device is not in zxcrypt format, return 'FormatRequired'.
     pub async fn unseal(outer_device: &mut dyn Device) -> Result<UnsealOutcome, Error> {
@@ -56,7 +51,7 @@ impl ZxcryptDevice {
             return Ok(UnsealOutcome::FormatRequired);
         }
         let proxy = device_to_device_manager_proxy(outer_device).await?;
-        ZxcryptDevice::from_proxy(outer_device, &proxy).await
+        ZxcryptDevice::from_proxy(outer_device, proxy).await
     }
     /// Formats a BlockDevice as Zxcrypt and returns it.
     pub async fn format(outer_device: &mut dyn Device) -> Result<ZxcryptDevice, Error> {
@@ -69,7 +64,8 @@ impl ZxcryptDevice {
             let key = source.get_key(KeyConsumer::Zxcrypt).await?;
             match zx::ok(proxy.format(&key, 0).await?) {
                 Ok(()) => {
-                    let zxcrypt_device = ZxcryptDevice::from_proxy(outer_device, &proxy).await?;
+                    let zxcrypt_device =
+                        ZxcryptDevice::from_proxy(outer_device, proxy.clone()).await?;
                     if let UnsealOutcome::Unsealed(zxcrypt_device) = zxcrypt_device {
                         return Ok(zxcrypt_device);
                     } else {
@@ -85,7 +81,7 @@ impl ZxcryptDevice {
     /// Attempts to unseal a zxcrypt device and return it.
     async fn from_proxy(
         outer_device: &mut dyn Device,
-        proxy: &DeviceManagerProxy,
+        proxy: DeviceManagerProxy,
     ) -> Result<UnsealOutcome, Error> {
         let policy = get_policy().await?;
         let sources = unseal_sources(policy);
@@ -95,10 +91,17 @@ impl ZxcryptDevice {
             let key = source.get_key(KeyConsumer::Zxcrypt).await?;
             match zx::ok(proxy.unseal(&key, 0).await?) {
                 Ok(()) => {
-                    last_res = Ok(UnsealOutcome::Unsealed(ZxcryptDevice {
+                    let device = ZxcryptDevice {
                         parent_is_nand: outer_device.is_nand(),
+                        proxy: proxy.clone(),
                         inner_device: outer_device.get_child("/zxcrypt/unsealed/block").await?,
-                    }))
+                    };
+                    tracing::info!(
+                        path = device.path(),
+                        topological_path = device.topological_path(),
+                        "created zxcryptdevice"
+                    );
+                    return Ok(UnsealOutcome::Unsealed(device));
                 }
                 Err(zx::Status::ACCESS_DENIED) => last_res = Ok(UnsealOutcome::FormatRequired),
                 Err(status) => last_res = Err(status.into()),
@@ -107,12 +110,8 @@ impl ZxcryptDevice {
         last_res
     }
 
-    /// Creates a new ZxcryptDevice using the outer_device.
-    pub async fn get_zxcrypt_child(device: &dyn Device) -> Result<Self, Error> {
-        Ok(ZxcryptDevice {
-            parent_is_nand: device.is_nand(),
-            inner_device: device.get_child("/zxcrypt/unsealed/block").await?,
-        })
+    pub async fn seal(self) -> Result<(), Error> {
+        zx::ok(self.proxy.seal().await?).map_err(|e| e.into())
     }
 }
 

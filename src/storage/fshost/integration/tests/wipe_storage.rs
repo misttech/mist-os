@@ -6,10 +6,7 @@
 //! among other things, sets the fvm_ramdisk flag to prevent binding of the on-disk filesystems.)
 
 use {
-    crate::{
-        blob_fs_type, data_fs_name, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder,
-        volumes_spec,
-    },
+    crate::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec},
     device_watcher::recursive_wait,
     fidl::endpoints::{create_proxy, Proxy as _},
     fidl_fuchsia_fshost as fshost,
@@ -47,9 +44,8 @@ async fn write_test_blob(directory: &fio::DirectoryProxy) {
 // TODO(fxbug.dev/112142): Due to a race between the block watcher and some fshost functionality
 // (e.g. WipeStorage), we have to wait for the block watcher to finish binding all expected drivers.
 //
-// Regardless of the `fvm_ramdisk` / `gpt_all` config options, fshost will match the first block
-// device with a GPT or FVM partition and bind those drivers. zxcrypt volumes are also unsealed,
-// unless `no_zxcrypt` is true.
+// Regardless of the `fvm_ramdisk` / `gpt_all` config options, fshost will match
+// the first block device with a GPT or FVM partition and bind those drivers.
 async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) {
     let ramdisk = fixture.ramdisks.first().unwrap();
     let gpt_path = "/part-000/block";
@@ -59,12 +55,7 @@ async fn wait_for_block_watcher(fixture: &TestFixture, has_formatted_fvm: bool) 
         let blobfs_path = format!("{}/fvm/blobfs-p-1/block", gpt_path);
         recursive_wait(ramdisk_dir, &blobfs_path).await.unwrap();
         let data_path = format!("{}/fvm/data-p-2/block", gpt_path);
-        if data_fs_name() != "fxfs" && data_fs_zxcrypt() {
-            let zxcrypt_path = format!("{}/zxcrypt/unsealed/block", data_path);
-            recursive_wait(ramdisk_dir, &zxcrypt_path).await.unwrap();
-        } else {
-            recursive_wait(ramdisk_dir, &data_path).await.unwrap();
-        }
+        recursive_wait(ramdisk_dir, &data_path).await.unwrap();
     } else {
         recursive_wait(ramdisk_dir, &gpt_path).await.unwrap();
     }

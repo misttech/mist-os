@@ -4,7 +4,9 @@
 
 use {
     crate::{
-        boot_args::BootArgs, config::apply_boot_args_to_config, environment::FshostEnvironment,
+        boot_args::BootArgs,
+        config::apply_boot_args_to_config,
+        environment::{Environment, FshostEnvironment},
         inspect::register_stats,
     },
     anyhow::{format_err, Error},
@@ -12,9 +14,9 @@ use {
     fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio,
     fuchsia_runtime::{take_startup_handle, HandleType},
     fuchsia_zircon::sys::zx_debug_write,
-    futures::{channel::mpsc, StreamExt},
+    futures::{channel::mpsc, lock::Mutex, StreamExt},
     inspect_runtime,
-    std::sync::Arc,
+    std::{collections::HashSet, sync::Arc},
     vfs::{
         directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path,
         remote::remote_dir,
@@ -72,31 +74,44 @@ async fn main() -> Result<(), Error> {
         None
     };
 
-    let mut env = FshostEnvironment::new(config.clone(), boot_args, ramdisk_path.clone());
+    // matcher_lock is used to block matching temporarily and inject
+    // paths to be ignored.
+    let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
+    let mut env = FshostEnvironment::new(
+        config.clone(),
+        boot_args,
+        ramdisk_path.clone(),
+        matcher_lock.clone(),
+    );
+
+    let launcher = env.launcher();
     let inspector = fuchsia_inspect::component::inspector();
+    // Records inspect metrics
+    register_stats(inspector.root(), env.data_root()?).await;
+    let blob_root = env.blobfs_root()?;
+    let data_root = env.data_root()?;
+    let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let export = vfs::pseudo_directory! {
         "svc" => vfs::pseudo_directory! {
             fshost::AdminMarker::PROTOCOL_NAME =>
                 service::fshost_admin(
                     config.clone(),
                     ramdisk_path.clone(),
-                    env.launcher(),
-                    watcher.clone()
+                    launcher,
+                    matcher_lock.clone()
                 ),
             fshost::BlockWatcherMarker::PROTOCOL_NAME =>
                 service::fshost_block_watcher(watcher),
         },
         "fs" => vfs::pseudo_directory! {
-            "blob" => remote_dir(env.blobfs_root().await?),
-            "data" => remote_dir(env.data_root().await?),
+            "blob" => remote_dir(blob_root),
+            "data" => remote_dir(data_root),
         },
         "mnt" => vfs::pseudo_directory! {},
         inspect_runtime::DIAGNOSTICS_DIR => inspect_runtime::create_diagnostics_dir(
             inspector.clone(),
         ),
     };
-    // Records inspect metrics
-    register_stats(inspector.root(), env.data_root().await?).await;
 
     // The inspector is global and will maintain strong references to callbacks used to gather
     // inspect data which will include env.data_root() which is a proxy with an async channel that
@@ -123,7 +138,7 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(&config, ramdisk_path, env);
+    let mut fs_manager = manager::Manager::new(&config, ramdisk_path, env, matcher_lock);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
         // processing devices.
