@@ -10,6 +10,12 @@
 //
 // usbpd3.1 is Revision 3.1, Version 1.7, published January 2023.
 
+// The comments in this file also reference the USB Type-C Cable and Connector
+// Specification, downloadable at
+// https://usb.org/document-library/usb-type-cr-cable-and-connector-specification-release-22
+//
+// typec2.2 is Release 2.2, published October 2022
+
 #include <zircon/assert.h>
 
 #include <cstdint>
@@ -76,13 +82,23 @@ enum class ConfigChannelPinSwitch : int8_t {
 const char* ConfigChannelPinSwitchToString(ConfigChannelPinSwitch cc_switch);
 
 // Measured voltage of a CC pin.
+//
+// The voltage ranges are specified in typec2.2 4.11.3 "Voltage Parameters".
 enum class ConfigChannelTermination : int8_t {
   kUnknown = 0,
   kOpen = 1,
   kRa = 2,
   kRd = 3,
   kRpStandardUsb = 4,
+
+  // usbpd3.1 5.7 "Collision Avoidance" states that after a PD Explicit Contract
+  // is established, this Source termination signals SinkTxOk (the Sink may
+  // initiate a BMC transmission). This helps avoid BMC collisions.
   kRp1500mA = 5,
+
+  // usbpd3.1 5.7 "Collision Avoidance" states that after a PD Explicit Contract
+  // is established, this Source termination signals SinkTxNG (Sink transmission
+  // No Go). This helps avoid BMC collisions.
   kRp3000mA = 6,
 };
 
