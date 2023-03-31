@@ -856,7 +856,8 @@ class DispatcherCoordinator {
   fbl::ConditionVariable drivers_destroyed_event_ __TA_GUARDED(&lock_);
 
   // Thread pools which have scheduler roles.
-  fbl::DoublyLinkedList<std::unique_ptr<Dispatcher::ThreadPool>> role_thread_pools_;
+  fbl::DoublyLinkedList<std::unique_ptr<Dispatcher::ThreadPool>> role_thread_pools_
+      __TA_GUARDED(&lock_);
   // Thread pool which has no scheduler role applied.
   // This must come after |role_thread_pools_|, so that we shutdown the loop first,
   // in case we have any scheduled tasks to delete thread pools.

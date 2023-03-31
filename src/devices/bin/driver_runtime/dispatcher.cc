@@ -358,7 +358,6 @@ zx_status_t Dispatcher::CreateWithAdder(uint32_t options, std::string_view name,
   if (scheduler_role != ThreadPool::kNoSchedulerRole) {
     // We need to set the scheduler role on the thread pool's thread.
     status = async::PostTask(thread_pool->loop()->dispatcher(), [dispatcher]() mutable {
-      fbl::AutoLock lock(&dispatcher->callback_lock_);
       zx_status_t status = dispatcher->thread_pool_->SetRoleProfile();
       if (status != ZX_OK) {
         // Failing to set the role profile is not a fatal error.
@@ -1623,16 +1622,24 @@ zx::result<Dispatcher::ThreadPool*> DispatcherCoordinator::CreateThreadPool(
     return zx::error(status);
   }
   auto* thread_pool_ptr = thread_pool.get();
-  role_thread_pools_.push_back(std::move(thread_pool));
+  {
+    fbl::AutoLock al(&lock_);
+    role_thread_pools_.push_back(std::move(thread_pool));
+  }
   return zx::ok(thread_pool_ptr);
 }
 
 void DispatcherCoordinator::RemoveThreadPool(Dispatcher::ThreadPool* thread_pool) {
   async::PostTask(default_thread_pool()->loop()->dispatcher(), [thread_pool]() {
     auto& coordinator = GetDispatcherCoordinator();
-    fbl::AutoLock al(&coordinator.lock_);
+    // We need to declare this outside the lock.
+    std::unique_ptr<Dispatcher::ThreadPool> owned_thread_pool;
+    {
+      fbl::AutoLock al(&coordinator.lock_);
+      owned_thread_pool = coordinator.role_thread_pools_.erase(*thread_pool);
+      ZX_ASSERT(owned_thread_pool != nullptr);
+    }
     // This will destruct the thread pool and join with its threads.
-    ZX_ASSERT(coordinator.role_thread_pools_.erase(*thread_pool) != nullptr);
   });
 }
 

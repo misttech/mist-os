@@ -59,7 +59,7 @@ void ThreadPoolTest::InitTestDispatcher(std::string_view scheduler_role,
   dispatcher_ = *std::move(dispatcher);
 }
 
-TEST_F(ThreadPoolTest, DISABLED_NoSchedulerRole) {
+TEST_F(ThreadPoolTest, NoSchedulerRole) {
   constexpr std::string_view scheduler_role = "";
   ASSERT_NO_FATAL_FAILURE(InitTestDispatcher(scheduler_role));
 
@@ -76,7 +76,7 @@ TEST_F(ThreadPoolTest, DISABLED_NoSchedulerRole) {
   task_completion.Wait();
 }
 
-TEST_F(ThreadPoolTest, DISABLED_WithSchedulerRole) {
+TEST_F(ThreadPoolTest, WithSchedulerRole) {
   constexpr std::string_view scheduler_role = "fuchsia.test-role:ok";
   ASSERT_NO_FATAL_FAILURE(InitTestDispatcher(scheduler_role));
 
@@ -92,7 +92,7 @@ TEST_F(ThreadPoolTest, DISABLED_WithSchedulerRole) {
   task_completion.Wait();
 }
 
-TEST_F(ThreadPoolTest, DISABLED_BadSchedulerRole) {
+TEST_F(ThreadPoolTest, BadSchedulerRole) {
   constexpr std::string_view scheduler_role = "fuchsia.test-role:not-found";
   ASSERT_NO_FATAL_FAILURE(InitTestDispatcher(scheduler_role));
 
@@ -108,7 +108,7 @@ TEST_F(ThreadPoolTest, DISABLED_BadSchedulerRole) {
   task_completion.Wait();
 }
 
-TEST_F(ThreadPoolTest, DISABLED_AllowSyncCalls) {
+TEST_F(ThreadPoolTest, AllowSyncCalls) {
   constexpr std::string_view scheduler_role = "fuchsia.test-role:ok";
   ASSERT_NO_FATAL_FAILURE(
       InitTestDispatcher(scheduler_role, fdf::SynchronizedDispatcher::Options::kAllowSyncCalls));
@@ -128,7 +128,7 @@ TEST_F(ThreadPoolTest, DISABLED_AllowSyncCalls) {
   task_completion.Wait();
 }
 
-TEST_F(ThreadPoolTest, DISABLED_Shutdown) {
+TEST_F(ThreadPoolTest, Shutdown) {
   constexpr std::string_view scheduler_role = "fuchsia.test-role:ok";
 
   auto fake_driver = CreateFakeDriver();
