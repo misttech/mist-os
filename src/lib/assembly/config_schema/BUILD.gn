@@ -12,7 +12,6 @@ rustc_library("config_schema") {
   name = "assembly_config_schema"
   with_unit_tests = true
   deps = [
-    "//src/lib/assembly/fvm",
     "//src/lib/assembly/package_utils",
     "//src/lib/assembly/util",
     "//src/ui/lib/input-device-constants:lib",
