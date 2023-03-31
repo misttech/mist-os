@@ -54,7 +54,7 @@ struct ProtocolInfo {
   uint32_t flags;
 };
 
-static constexpr ProtocolInfo proto_infos[] = {
+constexpr ProtocolInfo proto_infos[] = {
 #define DDK_PROTOCOL_DEF(tag, val, name, flags) {name, val, flags},
 #include <lib/ddk/protodefs.h>
 };
@@ -83,9 +83,8 @@ std::optional<std::string_view> ProtocolIdToClassName(uint32_t protocol_id) {
     }
     if (info.flags & PF_NOPUB) {
       return std::nullopt;
-    } else {
-      return info.name;
     }
+    return info.name;
   }
   return std::nullopt;
 }
