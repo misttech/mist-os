@@ -104,7 +104,7 @@ std::optional<std::reference_wrapper<ProtoNode>> Devfs::proto_node(uint32_t prot
     return std::nullopt;
   }
   auto& [key, value] = *it;
-  return value;
+  return *value;
 }
 
 std::string_view Devnode::name() const {
@@ -344,14 +344,26 @@ void DevfsDevice::unpublish() {
   protocol_.reset();
 }
 
-ProtoNode::ProtoNode(fbl::String name, uint32_t initial_device_number)
-    : name_(std::move(name)), next_device_number_(initial_device_number) {}
+ProtoNode::ProtoNode(fbl::String name) : name_(std::move(name)) {}
+
+SequentialProtoNode::SequentialProtoNode(fbl::String name) : ProtoNode(std::move(name)) {}
+
+uint32_t SequentialProtoNode::allocate_device_number() { return (next_device_number_++) % 1000; }
+
+RandomizedProtoNode::RandomizedProtoNode(fbl::String name,
+                                         std::default_random_engine::result_type seed)
+    : ProtoNode(std::move(name)), device_number_generator_(seed) {}
+
+uint32_t RandomizedProtoNode::allocate_device_number() {
+  std::uniform_int_distribution<> distrib(0, 1000);
+  return distrib(device_number_generator_);
+}
 
 zx::result<fbl::String> ProtoNode::seq_name() {
   std::string dest;
   for (uint32_t i = 0; i < 1000; ++i) {
     dest.clear();
-    fxl::StringAppendf(&dest, "%03u", (next_device_number_++) % 1000);
+    fxl::StringAppendf(&dest, "%03u", allocate_device_number());
     {
       fbl::RefPtr<fs::Vnode> out;
       switch (const zx_status_t status = children().Lookup(dest, &out); status) {
@@ -446,10 +458,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
     MustAddEntry(pd, "builtin", std::move(builtin));
   }
 
-  // Pre-populate the class directories.
-  std::random_device rd;
-  std::mt19937 gen(rd());
-  std::uniform_int_distribution<> distrib(0, 1000);
   // TODO(https://fxbug.dev/113679): shrink this list to zero.
   //
   // Do not add to this list.
@@ -513,16 +521,18 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113845): Remove.
       "zxcrypt",
   });
+  // Pre-populate the class directories.
+  std::random_device rd;
   for (const auto& info : proto_infos) {
     if (!(info.flags & PF_NOPUB)) {
-      uint32_t seq = distrib(gen);
+      std::unique_ptr<ProtoNode>& value = proto_info_nodes[info.id];
+      ZX_ASSERT_MSG(value == nullptr, "duplicate protocol with id %d", info.id);
       if (classes_that_assume_ordering.find(info.name) != classes_that_assume_ordering.end()) {
-        seq = 0;
+        value = std::make_unique<SequentialProtoNode>(info.name);
+      } else {
+        value = std::make_unique<RandomizedProtoNode>(info.name, rd());
       }
-      const auto [it, inserted] = proto_info_nodes.try_emplace(info.id, info.name, seq);
-      const auto& [key, value] = *it;
-      ZX_ASSERT_MSG(inserted, "duplicate protocol with id %d", key);
-      MustAddEntry(*class_, info.name, value.children_);
+      MustAddEntry(*class_, info.name, value->children_);
     }
   }
 }

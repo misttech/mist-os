@@ -11,6 +11,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/component/incoming/cpp/clone.h>
 
+#include <random>
 #include <variant>
 
 #include <fbl/ref_ptr.h>
@@ -154,7 +155,8 @@ class PseudoDir : public fs::PseudoDir {
 // contained within it.
 class ProtoNode {
  public:
-  ProtoNode(fbl::String name, uint32_t initial_device_number);
+  explicit ProtoNode(fbl::String name);
+  virtual ~ProtoNode() = default;
 
   ProtoNode(const ProtoNode&) = delete;
   ProtoNode& operator=(const ProtoNode&) = delete;
@@ -170,13 +172,35 @@ class ProtoNode {
   friend class Devfs;
   friend class Devnode;
 
+  virtual uint32_t allocate_device_number() = 0;
+
   zx::result<fbl::String> seq_name();
 
   const fbl::String name_;
 
-  uint32_t next_device_number_;
-
   fbl::RefPtr<PseudoDir> children_ = fbl::MakeRefCounted<PseudoDir>();
+};
+
+// Contains nodes with sequential decimal names.
+class SequentialProtoNode : public ProtoNode {
+ public:
+  explicit SequentialProtoNode(fbl::String name);
+
+ private:
+  uint32_t allocate_device_number() override;
+
+  uint32_t next_device_number_ = 0;
+};
+
+// Contains nodes with randomized decimal names.
+class RandomizedProtoNode : public ProtoNode {
+ public:
+  RandomizedProtoNode(fbl::String name, std::default_random_engine::result_type seed);
+
+ private:
+  uint32_t allocate_device_number() override;
+
+  std::default_random_engine device_number_generator_;
 };
 
 class DevfsDevice {
@@ -216,7 +240,8 @@ class Devfs {
   Devnode& root_;
 
   fbl::RefPtr<PseudoDir> class_ = fbl::MakeRefCounted<PseudoDir>();
-  std::unordered_map<uint32_t, ProtoNode> proto_info_nodes;
+  // TODO(https://fxbug.dev/113679): Unbox the unique_ptr when ProtoNode is no longer abstract.
+  std::unordered_map<uint32_t, std::unique_ptr<ProtoNode>> proto_info_nodes;
 };
 
 #endif  // SRC_DEVICES_BIN_DRIVER_MANAGER_DEVFS_DEVFS_H_
