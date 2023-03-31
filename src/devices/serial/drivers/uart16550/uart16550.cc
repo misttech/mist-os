@@ -8,7 +8,6 @@
 #include <fuchsia/hardware/serial/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/inout.h>
 #include <lib/ddk/metadata.h>
 #include <lib/uart/ns8250.h>
 #include <zircon/syscalls.h>

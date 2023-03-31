@@ -5,7 +5,6 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/inout.h>
 #include <lib/virtio/backends/pci.h>
 #include <lib/virtio/device.h>
 #include <limits.h>

@@ -4,7 +4,6 @@
 
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
-#include <lib/ddk/hw/inout.h>
 #include <zircon/syscalls/types.h>
 
 #include <fbl/auto_lock.h>
