@@ -327,7 +327,8 @@ zx_status_t AmlI2c::Bind(void* ctx, zx_device_t* parent) {
   auto i2c =
       std::make_unique<AmlI2c>(parent, std::move(irq), std::move(event), *std::move(regs_iobuff));
 
-  status = i2c->DdkAdd("aml-i2c");
+  status = i2c->DdkAdd(
+      ddk::DeviceAddArgs("aml-i2c").forward_metadata(parent, DEVICE_METADATA_I2C_CHANNELS));
   if (status != ZX_OK) {
     zxlogf(ERROR, "device_add failed");
     return status;
