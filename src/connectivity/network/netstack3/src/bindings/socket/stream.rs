@@ -1562,11 +1562,13 @@ where
             fposix_socket::StreamSocketRequest::GetTcpInfo { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetTcpQuickAck { value: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetTcpQuickAck { value, responder } => {
+                self.with_socket_options_mut(|so| so.delayed_ack = !value).await;
+                responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpQuickAck { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let quick_ack = self.with_socket_options(|so| !so.delayed_ack).await;
+                responder_send!(responder, &mut Ok(quick_ack));
             }
             fposix_socket::StreamSocketRequest::SetTcpCongestion { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));

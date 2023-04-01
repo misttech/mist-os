@@ -162,8 +162,13 @@ impl Default for SocketOptions {
             // RFC 9293 Section 4.2:
             //   The delayed ACK algorithm specified in [RFC1122] SHOULD be used
             //   by a TCP receiver.
-            // TODO(https://fxbug.dev/124309): After we support disabling
-            // delayed ACK through socket options, we should enable it by default.
+            // Delayed acks have *bad* performance for connections that are not
+            // interactive, especially when combined with the Nagle algorithm.
+            // We disable it by default here because:
+            //   1. RFC does not say MUST;
+            //   2. Common implementations like Linux has it turned off by
+            //   default.
+            // More context: https://news.ycombinator.com/item?id=10607422
             delayed_ack: false,
         }
     }

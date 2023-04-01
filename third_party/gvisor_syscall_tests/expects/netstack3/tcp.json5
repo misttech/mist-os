@@ -104,8 +104,6 @@
                 "AllTCPSockets/TCPSocketPairTest.TCPCorkDefault/*",
                 "AllTCPSockets/TCPSocketPairTest.SetTCPCork/*",
                 "AllTCPSockets/TCPSocketPairTest.TCPCork/*",
-                "AllTCPSockets/TCPSocketPairTest.TCPQuickAckDefault/*",
-                "AllTCPSockets/TCPSocketPairTest.SetTCPQuickAck/*",
                 "AllTCPSockets/TCPSocketPairTest.SetSoKeepaliveClosed/*",
                 "AllTCPSockets/TCPSocketPairTest.SetOOBInline/*",
                 "AllTCPSockets/TCPSocketPairTest.MsgTruncMsgPeek/*",

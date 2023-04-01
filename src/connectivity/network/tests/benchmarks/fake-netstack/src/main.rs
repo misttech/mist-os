@@ -770,6 +770,9 @@ async fn handle_stream_request(
         fposix_socket::StreamSocketRequest::SetTcpNoDelay { value: _, responder } => {
             responder.send(&mut Ok(())).context("send SetTcpNoDelay response")?;
         }
+        fposix_socket::StreamSocketRequest::SetTcpQuickAck { value: _, responder } => {
+            responder.send(&mut Ok(())).context("send SetTcpQuickAck response")?;
+        }
         other => {
             error!("got unexpected stream socket request: {:#?}", other);
             socket.borrow().close(sockets);
