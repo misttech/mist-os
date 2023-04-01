@@ -1075,8 +1075,8 @@ zx_status_t AmlogicDisplay::Bind() {
   // Set scheduler role for vsync thread.
   {
     const char* role_name = "fuchsia.graphics.display.drivers.amlogic-display.vsync";
-    zx_status_t status = device_set_profile_by_role(
-        this->zxdev(), thrd_get_zx_handle(vsync_thread_), role_name, strlen(role_name));
+    zx_status_t status = device_set_profile_by_role(parent(), thrd_get_zx_handle(vsync_thread_),
+                                                    role_name, strlen(role_name));
     if (status != ZX_OK) {
       DISP_ERROR("Failed to apply role: %d\n", status);
     }
