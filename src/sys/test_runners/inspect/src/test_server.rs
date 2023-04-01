@@ -131,7 +131,7 @@ impl TestServer {
                 .with_archive(proxy)
                 .with_timeout(end_time - start_time)
                 .add_selector(case.selector.as_str())
-                .snapshot_raw::<Inspect>()
+                .snapshot_raw::<Inspect, serde_json::Value>()
                 .await
             {
                 Ok(json) => {

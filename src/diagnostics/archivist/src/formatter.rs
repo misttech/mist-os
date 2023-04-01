@@ -216,15 +216,21 @@ impl From<SerializedVmo> for FormattedContent {
     fn from(content: SerializedVmo) -> FormattedContent {
         match content.format {
             Format::Json => {
-                // set_size() is redundant, but consumers may expect the size there.
-                content.vmo.set_size(content.size).expect("set_size always returns Ok");
+                // set_content_size() is redundant, but consumers may expect the size there.
+                content
+                    .vmo
+                    .set_content_size(&content.size)
+                    .expect("set_content_size always returns Ok");
                 FormattedContent::Json(fidl_fuchsia_mem::Buffer {
                     vmo: content.vmo,
                     size: content.size,
                 })
             }
             Format::Cbor => {
-                content.vmo.set_size(content.size).expect("set_size always returns Ok");
+                content
+                    .vmo
+                    .set_content_size(&content.size)
+                    .expect("set_content_size always returns Ok");
                 FormattedContent::Cbor(content.vmo)
             }
             Format::Text => unreachable!("We'll never get Text"),

@@ -238,7 +238,7 @@ async fn ns_persist_counters_under_size_limit<N: Netstack>(name: &str) {
     let mut archive_reader = diagnostics_reader::ArchiveReader::new();
     let archive_reader = archive_reader.add_selectors(selectors).retry_if_empty(true);
     let data = archive_reader
-        .snapshot_raw::<diagnostics_reader::Inspect>()
+        .snapshot_raw::<diagnostics_reader::Inspect, serde_json::Value>()
         .await
         .expect("snapshot raw failed");
 

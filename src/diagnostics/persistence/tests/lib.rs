@@ -173,7 +173,7 @@ async fn wait_for_inspect_source() {
     loop {
         assert!(start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS) > Time::get_monotonic());
         let published_inspect =
-            inspect_fetcher.snapshot_raw::<Inspect>().await.unwrap().to_string();
+            inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
         if published_inspect.contains(KEY_FROM_INSPECT_SOURCE) {
             return;
         }
@@ -452,7 +452,7 @@ async fn verify_diagnostics_persistence_publication(published: Published) {
     inspect_fetcher.add_selector("realm_builder*/persistence:root");
     loop {
         let published_inspect =
-            inspect_fetcher.snapshot_raw::<Inspect>().await.unwrap().to_string();
+            inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
         if published_inspect.contains(PUBLISHED_TIME_KEY) {
             assert!(json_strings_match(
                 &collapse_realm_builder_strings(

@@ -433,7 +433,7 @@ async fn retrieve_and_validate_results(
     } else {
         reader.with_minimum_schema_count(expected_results_count);
     }
-    let results = reader.snapshot_raw::<Inspect>().await.expect("got result");
+    let results = reader.snapshot_raw::<Inspect, serde_json::Value>().await.expect("got result");
 
     // Convert the json struct into a "pretty" string rather than converting the
     // golden file into a json struct because deserializing the golden file into a
@@ -499,7 +499,7 @@ async fn pipeline_is_filtered(
     let pipeline_results = ArchiveReader::new()
         .with_archive(archive_accessor)
         .with_minimum_schema_count(expected_results_count)
-        .snapshot_raw::<Inspect>()
+        .snapshot_raw::<Inspect, serde_json::Value>()
         .await
         .expect("got result");
 
@@ -509,7 +509,7 @@ async fn pipeline_is_filtered(
     let all_results = ArchiveReader::new()
         .with_archive(all_archive_accessor)
         .with_minimum_schema_count(expected_results_count)
-        .snapshot_raw::<Inspect>()
+        .snapshot_raw::<Inspect, serde_json::Value>()
         .await
         .expect("got result");
 

@@ -31,7 +31,7 @@ impl DiagnosticsFacade {
             .with_archive(proxy)
             .add_selectors(args.selectors.into_iter())
             .with_batch_retrieval_timeout_seconds(BATCH_RETRIEVAL_TIMEOUT_SECONDS)
-            .snapshot_raw::<Inspect>()
+            .snapshot_raw::<Inspect, serde_json::Value>()
             .await?;
         Ok(value)
     }

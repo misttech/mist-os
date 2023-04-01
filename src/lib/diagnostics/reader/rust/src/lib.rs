@@ -53,6 +53,9 @@ pub enum Error {
     #[error("Failed to read json received")]
     ReadJson(#[source] serde_json::Error),
 
+    #[error("Failed to read cbor received")]
+    ReadCbor(#[source] serde_cbor::Error),
+
     #[error("Failed to parse the diagnostics data from the json received")]
     ParseDiagnosticsData(#[source] serde_json::Error),
 
@@ -125,6 +128,55 @@ pub struct ArchiveReader {
     timeout: Option<Duration>,
     batch_retrieval_timeout_seconds: Option<i64>,
     max_aggregated_content_size_bytes: Option<u64>,
+}
+
+// Before unsealing this, consider whether your code belongs in this file.
+pub trait SerializableValue: private::Sealed {
+    const FORMAT_OF_VALUE: Format;
+    fn flatten(datas: Vec<Self>) -> Self
+    where
+        Self: Sized;
+}
+
+macro_rules! define_fn_flatten_for_format {
+    ($($format:ident),*) => {
+        $(
+            paste::paste! {
+                fn flatten(datas: Vec<Self>) -> Self {
+                    let mut final_result = vec![];
+                    // Flatten the result.
+                    for data in datas {
+                        match data {
+                            [<serde_ $format>]::Value::Array(mut values) => {
+                                final_result.append(&mut values)
+                            }
+                            data => final_result.push(data),
+                        }
+                    }
+                    Self::Array(final_result)
+                }
+            }
+        )*
+    }
+}
+
+// The "sealed trait" pattern.
+//
+// https://rust-lang.github.io/api-guidelines/future-proofing.html
+mod private {
+    pub trait Sealed {}
+}
+impl private::Sealed for serde_json::Value {}
+impl private::Sealed for serde_cbor::Value {}
+
+impl SerializableValue for serde_json::Value {
+    const FORMAT_OF_VALUE: Format = Format::Json;
+    define_fn_flatten_for_format!(json);
+}
+
+impl SerializableValue for serde_cbor::Value {
+    const FORMAT_OF_VALUE: Format = Format::Cbor;
+    define_fn_flatten_for_format!(cbor);
 }
 
 impl ArchiveReader {
@@ -211,7 +263,7 @@ impl ArchiveReader {
     where
         D: DiagnosticsData,
     {
-        let data_future = self.snapshot_inner::<D, Data<D>>();
+        let data_future = self.snapshot_inner::<D, Data<D>>(Format::Cbor);
         let data = match self.timeout {
             Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
             None => data_future.await?,
@@ -223,40 +275,34 @@ impl ArchiveReader {
     where
         D: DiagnosticsData + 'static,
     {
-        let iterator = self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe)?;
+        let iterator = self.batch_iterator::<D>(StreamMode::SnapshotThenSubscribe, Format::Cbor)?;
         Ok(Subscription::new(iterator))
     }
 
     /// Connects to the ArchiveAccessor and returns inspect data matching provided selectors.
     /// Returns the raw json for each hierarchy fetched.
-    pub async fn snapshot_raw<D>(&self) -> Result<serde_json::Value, Error>
+    pub async fn snapshot_raw<D, T: SerializableValue>(&self) -> Result<T, Error>
     where
         D: DiagnosticsData,
+        T: for<'a> Deserialize<'a>,
     {
-        let data_future = self.snapshot_inner::<D, serde_json::Value>();
+        let data_future = self.snapshot_inner::<D, T>(T::FORMAT_OF_VALUE);
         let datas = match self.timeout {
             Some(timeout) => data_future.on_timeout(timeout.after_now(), || Ok(Vec::new())).await?,
             None => data_future.await?,
         };
-        let mut final_result = vec![];
-        // Flatten the result.
-        for data in datas {
-            match data {
-                serde_json::Value::Array(mut values) => final_result.append(&mut values),
-                data => final_result.push(data),
-            }
-        }
-        Ok(serde_json::Value::Array(final_result))
+        let final_result = T::flatten(datas);
+        Ok(final_result)
     }
 
-    async fn snapshot_inner<D, T>(&self) -> Result<Vec<T>, Error>
+    async fn snapshot_inner<D, T>(&self, format: Format) -> Result<Vec<T>, Error>
     where
         D: DiagnosticsData,
         T: for<'a> Deserialize<'a>,
     {
         loop {
             let mut result = Vec::new();
-            let iterator = self.batch_iterator::<D>(StreamMode::Snapshot)?;
+            let iterator = self.batch_iterator::<D>(StreamMode::Snapshot, format)?;
             drain_batch_iterator(iterator, |d| {
                 result.push(d);
                 async {}
@@ -271,7 +317,11 @@ impl ArchiveReader {
         }
     }
 
-    fn batch_iterator<D>(&self, mode: StreamMode) -> Result<BatchIteratorProxy, Error>
+    fn batch_iterator<D>(
+        &self,
+        mode: StreamMode,
+        format: Format,
+    ) -> Result<BatchIteratorProxy, Error>
     where
         D: DiagnosticsData,
     {
@@ -292,7 +342,7 @@ impl ArchiveReader {
         let mut stream_parameters = StreamParameters::EMPTY;
         stream_parameters.stream_mode = Some(mode);
         stream_parameters.data_type = Some(D::DATA_TYPE);
-        stream_parameters.format = Some(Format::Json);
+        stream_parameters.format = Some(format);
 
         stream_parameters.client_selector_configuration = if self.selectors.is_empty() {
             Some(ClientSelectorConfiguration::SelectAll(true))
@@ -343,23 +393,28 @@ where
             return Ok(());
         }
         for formatted_content in next_batch {
-            match formatted_content {
+            let output: OneOrMany<T> = match formatted_content {
                 FormattedContent::Json(data) => {
                     let mut buf = vec![0; data.size as usize];
                     data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
                     let hierarchy_json = std::str::from_utf8(&buf).unwrap();
-                    let output: OneOrMany<T> =
-                        serde_json::from_str(&hierarchy_json).map_err(Error::ReadJson)?;
-                    match output {
-                        OneOrMany::One(data) => send(data).await,
-                        OneOrMany::Many(datas) => {
-                            for data in datas {
-                                send(data).await;
-                            }
-                        }
+                    serde_json::from_str(&hierarchy_json).map_err(Error::ReadJson)?
+                }
+                FormattedContent::Cbor(vmo) => {
+                    let mut buf =
+                        vec![0; vmo.get_content_size().expect("Always returns Ok") as usize];
+                    vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
+                    serde_cbor::from_slice(&buf).map_err(Error::ReadCbor)?
+                }
+                _ => OneOrMany::Many(vec![]),
+            };
+            match output {
+                OneOrMany::One(data) => send(data).await,
+                OneOrMany::Many(datas) => {
+                    for data in datas {
+                        send(data).await;
                     }
                 }
-                _ => unreachable!("JSON was requested, no other data type should be received"),
             }
         }
     }
@@ -626,9 +681,9 @@ mod tests {
             "version": 1,
             "data_source": "Inspect",
             "metadata": {
-              "component_url": "component-url",
-              "timestamp": 0,
-              "filename": "filename",
+            "component_url": "component-url",
+            "timestamp": 0,
+            "filename": "filename",
             },
             "payload": {
                 "root": {
@@ -637,15 +692,26 @@ mod tests {
             }
         });
         let proxy = spawn_fake_archive(serde_json::json!([value.clone()]));
-        let result = ArchiveReader::new()
-            .with_archive(proxy)
-            .snapshot_raw::<Inspect>()
-            .await
-            .expect("got result");
-        match result {
+        let mut reader = ArchiveReader::new();
+        reader.with_archive(proxy);
+        let json_result =
+            reader.snapshot_raw::<Inspect, serde_json::Value>().await.expect("got result");
+        match json_result {
             serde_json::Value::Array(values) => {
                 assert_eq!(values.len(), 1);
                 assert_eq!(values[0], value);
+            }
+            result => panic!("unexpected result: {:?}", result),
+        }
+        let cbor_result =
+            reader.snapshot_raw::<Inspect, serde_cbor::Value>().await.expect("got result");
+        match cbor_result {
+            serde_cbor::Value::Array(values) => {
+                assert_eq!(values.len(), 1);
+                let json_result =
+                    serde_cbor::value::from_value::<serde_json::Value>(values[0].to_owned())
+                        .expect("Should convert cleanly to JSON");
+                assert_eq!(json_result, value);
             }
             result => panic!("unexpected result: {:?}", result),
         }

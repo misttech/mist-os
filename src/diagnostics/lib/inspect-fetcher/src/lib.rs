@@ -57,7 +57,7 @@ impl InspectFetcher {
             None => Ok("[]".to_string()),
             Some(reader) => {
                 // TODO(fxbug.dev/62480): Make TriageLib accept structured data
-                Ok(reader.snapshot_raw::<Inspect>().await?.to_string())
+                Ok(reader.snapshot_raw::<Inspect, serde_json::Value>().await?.to_string())
             }
         }
     }
