@@ -37,18 +37,19 @@ class CfiParser {
  private:
   struct RegisterLocation {
     enum class Type {
-      kUndefined,   // register is scratched, i.e. DW_CFA_undefined.
-      kSameValue,   // register is preserved, i.e. DW_CFA_same_value.
-      kRegister,    // register is stored in another register, i.e. DW_CFA_register.
-      kOffset,      // register is saved relative to the CFA with an offset, i.e. DW_CFA_offset.
-      kExpression,  // register is saved at an address that can be calculated by a DWARF expression.
-      kValExpression,  // register's value can be calculated by a DWARF expression.
+      kUndefined,   // the previous value is scratched, i.e. DW_CFA_undefined.
+      kSameValue,   // the previous value is preserved, i.e. DW_CFA_same_value.
+      kRegister,    // the previous value is stored in another register, i.e. DW_CFA_register.
+      kOffset,      // the previous value is saved at CFA+offset, i.e. DW_CFA_offset.
+      kValOffset,   // the previous value is just CFA+offset, i.e., DW_CFA_val_offset.
+      kExpression,  // the previous value is saved at an address calculated by a DWARF expression.
+      kValExpression,  // the previous value can be calculated by a DWARF expression.
     } type = Type::kUndefined;
 
     // The ID of the other register. Only valid when type is kRegister.
     RegisterID reg_id;
 
-    // Only valid when type is kOffset.
+    // Only valid when type is kOffset or kValOffset.
     int64_t offset;
 
     // Only valid when type is kExpression or kValExpression.
@@ -58,10 +59,19 @@ class CfiParser {
   const uint64_t code_alignment_factor_;
   const int64_t data_alignment_factor_;
 
-  // CFA can only be retrieved from *($reg+offset).
   struct CfaLocation {
+    enum class Type {
+      kUndefined,   // CFA is not set yet.
+      kOffset,      // CFA is reg+offset.
+      kExpression,  // CFA can be calculated by a DWARF expression.
+    } type = Type::kUndefined;
+
+    // Only valid when type is kOffset.
     RegisterID reg = RegisterID::kInvalid;
-    uint64_t offset = -1;
+    int64_t offset;
+
+    // Only valid when type is kValExpression.
+    DwarfExpr expression;
   } cfa_location_;
 
   using RegisterLocations = std::map<RegisterID, RegisterLocation>;
@@ -71,6 +81,7 @@ class CfiParser {
   RegisterLocations initial_register_locations_;
 
   // Stack of states for DW_CFA_remember_state and DW_CFA_restore_state.
+  // CFA is also included, see https://dwarfstd.org/issues/230103.1.html.
   std::vector<std::pair<CfaLocation, RegisterLocations>> state_stack_;
 };
 

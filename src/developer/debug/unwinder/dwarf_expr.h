@@ -21,7 +21,8 @@ class DwarfExpr {
   explicit DwarfExpr(Memory* expr, uint64_t begin, uint64_t length)
       : expr_(expr), expr_begin_(begin), expr_end_(begin + length) {}
 
-  Error Eval(Memory* mem, const Registers& regs, uint64_t initial_value, uint64_t& result);
+  // Evaluate the expression with the given stack, possibly with initial values.
+  Error Eval(Memory* mem, const Registers& regs, std::vector<uint64_t> stack, uint64_t& result);
 
  private:
   Memory* expr_ = nullptr;

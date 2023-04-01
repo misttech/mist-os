@@ -11,13 +11,11 @@
 
 namespace unwinder {
 
-Error DwarfExpr::Eval(Memory* mem, const Registers& regs, uint64_t initial_value,
+Error DwarfExpr::Eval(Memory* mem, const Registers& regs, std::vector<uint64_t> stack,
                       uint64_t& result) {
   if (!expr_) {
     return Error("No DWARF expression to evaluate");
   }
-  std::vector<uint64_t> stack;  // the evaluation stack
-  stack.push_back(initial_value);
 
   uint64_t p = expr_begin_;
   while (p < expr_end_) {

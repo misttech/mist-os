@@ -17,7 +17,7 @@ namespace {
 
 Error EvaluateWithError(const std::vector<uint8_t>& expr,
                         const std::map<RegisterID, uint64_t>& register_values,
-                        uint64_t initial_value, uint64_t& result) {
+                        std::vector<uint64_t> stack, uint64_t& result) {
   LocalMemory mem;
   Registers regs(Registers::Arch::kArm64);
   for (auto [reg, val] : register_values) {
@@ -25,20 +25,20 @@ Error EvaluateWithError(const std::vector<uint8_t>& expr,
     EXPECT_TRUE(err.ok()) << err.msg();
   }
   DwarfExpr dwarf_expr(&mem, reinterpret_cast<uint64_t>(expr.data()), expr.size());
-  return dwarf_expr.Eval(&mem, regs, initial_value, result);
+  return dwarf_expr.Eval(&mem, regs, std::move(stack), result);
 }
 
 uint64_t Evaluate(const std::vector<uint8_t>& expr,
                   const std::map<RegisterID, uint64_t>& register_values = {},
-                  uint64_t initial_value = 0) {
+                  std::vector<uint64_t> stack = {}) {
   uint64_t res;
-  Error err = EvaluateWithError(expr, register_values, initial_value, res);
+  Error err = EvaluateWithError(expr, register_values, std::move(stack), res);
   EXPECT_TRUE(err.ok()) << err.msg();
   return res;
 }
 
 TEST(DwarfExpr, Const) {
-  EXPECT_EQ(10u, Evaluate({}, {}, 10));
+  EXPECT_EQ(10u, Evaluate({}, {}, {10}));
   EXPECT_EQ(20u, Evaluate({DW_OP_lit20}));
   EXPECT_EQ(30u, Evaluate({DW_OP_const2s, 30, 0}));
   EXPECT_EQ(40u, Evaluate({DW_OP_constu, 40}));
@@ -52,18 +52,18 @@ TEST(DwarfExpr, Comparison) {
 
 TEST(DwarfExpr, Arithmetic) {
   // 1 + 1
-  EXPECT_EQ(2u, Evaluate({DW_OP_lit1, DW_OP_plus}, {}, 1));
+  EXPECT_EQ(2u, Evaluate({DW_OP_lit1, DW_OP_plus}, {}, {1}));
 
   // 10 - (3 * 3) / 4
   EXPECT_EQ(8u, Evaluate({DW_OP_lit10, DW_OP_lit3, DW_OP_lit3, DW_OP_mul, DW_OP_lit4, DW_OP_div,
                           DW_OP_minus}));
 
   // 0 + 30 + 70
-  EXPECT_EQ(100u, Evaluate({DW_OP_lit30, DW_OP_plus_uconst, 70, DW_OP_plus}));
+  EXPECT_EQ(100u, Evaluate({DW_OP_lit30, DW_OP_plus_uconst, 70, DW_OP_plus}, {}, {0}));
 
   // Invalid
   uint64_t res;
-  EXPECT_TRUE(EvaluateWithError({DW_OP_eq}, {}, 0, res).has_err());
+  EXPECT_TRUE(EvaluateWithError({DW_OP_eq}, {}, {0}, res).has_err());
 }
 
 TEST(DwarfExpr, StackOperations) {
@@ -81,7 +81,7 @@ TEST(DwarfExpr, StackOperations) {
 
   // Stack too shallow.
   uint64_t res;
-  EXPECT_TRUE(EvaluateWithError({DW_OP_drop}, {}, 0, res).has_err());
+  EXPECT_TRUE(EvaluateWithError({DW_OP_drop}, {}, {0}, res).has_err());
 }
 
 TEST(DwarfExpr, Breg) {
@@ -99,7 +99,7 @@ TEST(DwarfExpr, Breg) {
 
   // breg3 not present.
   uint64_t res;
-  EXPECT_TRUE(EvaluateWithError({DW_OP_breg3, 0}, {}, 0, res).has_err());
+  EXPECT_TRUE(EvaluateWithError({DW_OP_breg3, 0}, {}, {0}, res).has_err());
 }
 
 TEST(DwarfExpr, ControlFlow) {
@@ -119,7 +119,8 @@ TEST(DwarfExpr, ControlFlow) {
 
   // Condition with wrong offset.
   uint64_t res;
-  EXPECT_TRUE(EvaluateWithError({DW_OP_bra, 3, 0, DW_OP_lit10, DW_OP_lit20}, {}, 1, res).has_err());
+  EXPECT_TRUE(
+      EvaluateWithError({DW_OP_bra, 3, 0, DW_OP_lit10, DW_OP_lit20}, {}, {1}, res).has_err());
 }
 
 }  // namespace
