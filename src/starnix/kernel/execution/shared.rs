@@ -83,6 +83,13 @@ pub fn execute_syscall(
         current_task.registers.orig_rax = syscall.decl.number;
     }
 
+    #[cfg(target_arch = "aarch64")]
+    {
+        // The x0 register may be clobbered during syscall handling (for the return value), but is
+        // needed when restarting a syscall.
+        current_task.registers.orig_x0 = current_task.registers.r[0];
+    }
+
     log_trace!(current_task, "{:?}", syscall);
     match dispatch_syscall(current_task, &syscall) {
         Ok(return_value) => {

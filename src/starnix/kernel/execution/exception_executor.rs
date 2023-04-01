@@ -22,6 +22,16 @@ use crate::syscalls::decls::SyscallDecl;
 use crate::task::*;
 use crate::types::*;
 
+/// From Zircon's exceptions.S:
+///
+/// > Spectre: ARM64 CPUs may speculatively execute instructions after an SVC instruction.
+/// > The userspace entry code has a speculation barrier; advance ELR_EL1 past in on the return
+/// > since it has already done its job.
+///
+/// This barrier is added to the pc before Starnix sees the exception. To get an accurate view of
+/// the thread's state at the point of a bad syscall, this needs to be subtracted from the pc.
+const SYSCALL_SPECULATION_BARRIER_SIZE: u64 = 12;
+
 /// Spawns a thread that executes `current_task`.
 ///
 /// The `current_task` is expected to be initialized before calling `execute_task`. This means
@@ -124,7 +134,17 @@ fn run_exception_loop(
         let report = thread.get_exception_report()?;
         current_task.registers = thread.read_state_general_regs()?.into();
 
+        #[cfg(target_arch = "aarch64")]
+        {
+            // By the time we see the exception, Zircon has already incremented the thread's pc by
+            // SYSCALL_SPECULATION_BARRIER_SIZE.
+            current_task.registers.pc -= SYSCALL_SPECULATION_BARRIER_SIZE;
+        }
+
+        #[cfg(target_arch = "x86_64")]
         let syscall_decl = SyscallDecl::from_number(report.context.synth_data as u64);
+        #[cfg(target_arch = "aarch64")]
+        let syscall_decl = SyscallDecl::from_number(current_task.registers.r[8]);
 
         if info.type_ == ZX_EXCP_POLICY_ERROR
             && report.context.synth_code == ZX_EXCP_POLICY_CODE_BAD_SYSCALL
