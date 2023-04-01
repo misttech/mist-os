@@ -1665,11 +1665,20 @@ void GetBacktraceCommon(Thread* thread, vaddr_t fp, Backtrace& out_bt) {
   vaddr_t pc;
   size_t n = 0;
   for (; n < Backtrace::kMaxSize; n++) {
-    if (ReadStack(thread, fp + 8, &pc, sizeof(vaddr_t))) {
+    vaddr_t actual_fp = fp;
+
+    // RISC-V has a nonstandard frame pointer which points to the CFA instead of
+    // the previous frame pointer. Since the frame pointer and return address are
+    // always just below the CFA, subtract 16 bytes to get to the actual frame pointer.
+#if __riscv
+    actual_fp -= 16;
+#endif
+
+    if (ReadStack(thread, actual_fp + 8, &pc, sizeof(vaddr_t))) {
       break;
     }
     out_bt.push_back(pc);
-    if (ReadStack(thread, fp, &fp, sizeof(vaddr_t))) {
+    if (ReadStack(thread, actual_fp, &fp, sizeof(vaddr_t))) {
       break;
     }
   }
