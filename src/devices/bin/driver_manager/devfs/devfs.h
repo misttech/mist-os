@@ -173,6 +173,7 @@ class ProtoNode {
   friend class Devnode;
 
   virtual uint32_t allocate_device_number() = 0;
+  virtual const char* format() = 0;
 
   zx::result<fbl::String> seq_name();
 
@@ -188,17 +189,25 @@ class SequentialProtoNode : public ProtoNode {
 
  private:
   uint32_t allocate_device_number() override;
+  const char* format() override;
+
+  static constexpr uint32_t maximum_device_number_ = 999;
+  static constexpr char format_[] = "%03u";
 
   uint32_t next_device_number_ = 0;
 };
 
-// Contains nodes with randomized decimal names.
+// Contains nodes with randomized hexadecimal names.
 class RandomizedProtoNode : public ProtoNode {
  public:
   RandomizedProtoNode(fbl::String name, std::default_random_engine::result_type seed);
 
  private:
   uint32_t allocate_device_number() override;
+  const char* format() override;
+
+  static constexpr uint32_t maximum_device_number_ = 0xffffffff;
+  static constexpr char format_[] = "%08x";
 
   std::default_random_engine device_number_generator_;
 };

@@ -348,22 +348,28 @@ ProtoNode::ProtoNode(fbl::String name) : name_(std::move(name)) {}
 
 SequentialProtoNode::SequentialProtoNode(fbl::String name) : ProtoNode(std::move(name)) {}
 
-uint32_t SequentialProtoNode::allocate_device_number() { return (next_device_number_++) % 1000; }
+uint32_t SequentialProtoNode::allocate_device_number() {
+  return (next_device_number_++) % (maximum_device_number_ + 1);
+}
+
+const char* SequentialProtoNode::format() { return format_; }
 
 RandomizedProtoNode::RandomizedProtoNode(fbl::String name,
                                          std::default_random_engine::result_type seed)
     : ProtoNode(std::move(name)), device_number_generator_(seed) {}
 
 uint32_t RandomizedProtoNode::allocate_device_number() {
-  std::uniform_int_distribution<> distrib(0, 1000);
+  std::uniform_int_distribution<uint32_t> distrib(0, maximum_device_number_);
   return distrib(device_number_generator_);
 }
+
+const char* RandomizedProtoNode::format() { return format_; }
 
 zx::result<fbl::String> ProtoNode::seq_name() {
   std::string dest;
   for (uint32_t i = 0; i < 1000; ++i) {
     dest.clear();
-    fxl::StringAppendf(&dest, "%03u", allocate_device_number());
+    fxl::StringAppendf(&dest, format(), allocate_device_number());
     {
       fbl::RefPtr<fs::Vnode> out;
       switch (const zx_status_t status = children().Lookup(dest, &out); status) {
