@@ -19,6 +19,8 @@
 #define ACPI_MACHINE_WIDTH 64
 #elif __aarch64__
 #define ACPI_MACHINE_WIDTH 64
+#elif __riscv && __riscv_xlen == 64
+#define ACPI_MACHINE_WIDTH 64
 #else
 #error Unexpected architecture
 #endif
