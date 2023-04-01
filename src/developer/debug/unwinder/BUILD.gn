@@ -31,14 +31,14 @@ sdk_source_set("unwinder") {
     "cfi_parser.cc",
     "cfi_unwinder.cc",
     "dwarf_expr.cc",
+    "error.cc",
     "fp_unwinder.cc",
     "memory.cc",
     "registers.cc",
     "scs_unwinder.cc",
     "unwind.cc",
   ]
-  public_deps = [ "//src/lib/fxl" ]
-  deps = [ "//sdk/lib/syslog/cpp" ]
+  deps = []
   friend = [ ":tests" ]
 
   if (is_mac) {

@@ -9,19 +9,11 @@
 #include <utility>
 #include <variant>
 
-#include "src/lib/fxl/strings/string_printf.h"
-
 namespace unwinder {
 
 class Error {
  public:
-  [[gnu::format(printf, 2, 3)]] explicit Error(const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    has_err_ = true;
-    msg_ = fxl::StringVPrintf(fmt, ap);
-    va_end(ap);
-  }
+  [[gnu::format(printf, 2, 3)]] explicit Error(const char* fmt, ...);
 
   explicit Error(std::string msg) : has_err_(true), msg_(std::move(msg)) {}
 

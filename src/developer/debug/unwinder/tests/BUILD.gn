@@ -28,6 +28,7 @@ source_set("tests") {
     ":fp_only",
     ":scs_only",
     "..",
+    "//src/lib/fxl",
     "//third_party/googletest:gtest",
   ]
 }
