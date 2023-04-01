@@ -29,6 +29,8 @@ static bool hypervisor_supported() {
     unittest_printf("Hypervisor not supported\n");
     return false;
   }
+#elif __riscv
+  return false;
 #endif
   return true;
 }
@@ -457,6 +459,10 @@ static bool guest_physical_aspace_query() {
 
 static bool direct_physical_aspace_create() {
   BEGIN_TEST;
+
+  if (!hypervisor_supported()) {
+    return true;
+  }
 
 #ifdef ARCH_X86
   auto dpa = hypervisor::DirectPhysicalAspace::Create();

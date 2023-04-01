@@ -35,8 +35,8 @@
 
 // Most mmu tests want a 'sufficiently large' aspace to play in, these constants define an aspace
 // that is large without having a discontinuity over the sign extended canonical addresses.
-constexpr vaddr_t kAspaceBase = 1UL << 20;
-constexpr size_t kAspaceSize = (1UL << 47) - kAspaceBase - (1UL << 20);
+constexpr vaddr_t kAspaceBase = USER_ASPACE_BASE;
+constexpr size_t kAspaceSize = USER_ASPACE_SIZE;
 
 static bool test_large_unaligned_region() {
   BEGIN_TEST;
