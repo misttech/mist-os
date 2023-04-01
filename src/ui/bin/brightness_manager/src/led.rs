@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use fidl_fuchsia_hardware_light::{Info, LightError, LightMarker, LightProxy};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_fs::{directory::open_in_namespace, OpenFlags};
-use fuchsia_syslog::fx_log_info;
 use futures::TryStreamExt;
 
 async fn open_light() -> Result<LightProxy, Error> {
@@ -35,7 +34,7 @@ pub struct Led {
 
 impl Led {
     pub async fn new() -> Result<Led, Error> {
-        fx_log_info!("Opening LEDs");
+        tracing::info!("Opening LEDs");
         let proxy = open_light().await?;
 
         Ok(Led { proxy })

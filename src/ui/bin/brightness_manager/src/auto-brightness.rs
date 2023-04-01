@@ -4,8 +4,7 @@
 
 use anyhow::Context;
 use anyhow::Error;
-use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_syslog::fx_log_info;
+use fuchsia_async::DurationExt;
 use fuchsia_zircon::Duration;
 use led::{Led, LedControl};
 use lib::backlight::{Backlight, BacklightControl};
@@ -41,13 +40,13 @@ impl Control {
         leds: &mut impl LedControl,
     ) -> Result<(), Error> {
         let num_leds = leds.get_num_lights().await.context("error received get num lights")?;
-        fx_log_info!("There is/are {} led(s)", num_leds);
+        tracing::info!("There is/are {} led(s)", num_leds);
         for i in 0..num_leds {
             let info = match leds.get_info(i).await {
                 Ok(Ok(info)) => info,
                 _ => continue,
             };
-            fx_log_info!("LED {} is {:?}", i + 1, info);
+            tracing::info!("LED {} is {:?}", i + 1, info);
         }
         loop {
             let sleep_time =
@@ -104,10 +103,9 @@ impl Control {
     }
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["auto-brightness"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["auto-brightness"])?;
-    fx_log_info!("Started");
+    tracing::info!("Started");
 
     let backlight = Backlight::without_display_power()?;
     let mut leds = Led::new().await?;

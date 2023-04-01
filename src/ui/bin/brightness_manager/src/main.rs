@@ -18,7 +18,6 @@ use control::{
 use fidl_fuchsia_ui_brightness::ControlRequestStream;
 use fuchsia_async::{self as fasync};
 use fuchsia_component::server::ServiceFs;
-use fuchsia_syslog::{self, fx_log_info, fx_log_warn};
 use futures::channel::mpsc::UnboundedReceiver;
 use futures::future::{AbortHandle, Abortable};
 use lib::backlight::Backlight;
@@ -125,7 +124,10 @@ async fn get_initial_value(control: Arc<Mutex<dyn ControlTrait>>) -> Result<(f32
     let mut control = control.lock().await;
     let (backlight, auto_brightness_on) = control.get_backlight_and_auto_brightness_on();
     let initial_brightness = backlight.get_brightness().await.unwrap_or_else(|e| {
-        fx_log_warn!("Didn't get the initial brightness in watch due to err {}, assuming 1.0.", e);
+        tracing::warn!(
+            "Didn't get the initial brightness in watch due to err {}, assuming 1.0.",
+            e
+        );
         1.0
     });
     Ok((initial_brightness as f32, auto_brightness_on))
@@ -142,16 +144,15 @@ async fn run_brightness_service(
     const MAX_CONCURRENT: usize = 10_000;
     let fut = fs.for_each_concurrent(MAX_CONCURRENT, |stream| {
         let control = control.clone();
-        run_server(stream, control).unwrap_or_else(|e| fx_log_info!("{:?}", e))
+        run_server(stream, control).unwrap_or_else(|e| tracing::info!("{:?}", e))
     });
     fut.await;
     Ok(())
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["auto-brightness"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["brightness"])?;
-    fx_log_info!("Started");
+    tracing::info!("Started");
     let config = Config::take_from_startup_handle();
     inspector().root().record_child("config", |config_node| config.record_inspect(config_node));
 

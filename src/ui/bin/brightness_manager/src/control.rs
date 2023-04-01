@@ -12,7 +12,6 @@ use fidl_fuchsia_ui_brightness::{
     ControlWatchAutoBrightnessResponder, ControlWatchCurrentBrightnessResponder,
 };
 use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_syslog::{self, fx_log_err, fx_log_info, fx_log_warn};
 use fuchsia_zircon::sys::ZX_ERR_NOT_SUPPORTED;
 use fuchsia_zircon::{Duration, DurationNum};
 use futures::channel::mpsc::UnboundedSender;
@@ -116,7 +115,7 @@ pub struct WatcherCurrentResponder {
 impl Sender<f32> for WatcherCurrentResponder {
     fn send_response(self, data: f32) {
         if let Err(e) = self.watcher_current_responder.send(data) {
-            fx_log_err!("Failed to reply to WatchCurrentBrightness: {}", e);
+            tracing::error!("Failed to reply to WatchCurrentBrightness: {}", e);
         }
     }
 }
@@ -128,7 +127,7 @@ pub struct WatcherAutoResponder {
 impl Sender<bool> for WatcherAutoResponder {
     fn send_response(self, data: bool) {
         if let Err(e) = self.watcher_auto_responder.send(data) {
-            fx_log_err!("Failed to reply to WatchAutoBrightness: {}", e);
+            tracing::error!("Failed to reply to WatchAutoBrightness: {}", e);
         }
     }
 }
@@ -140,7 +139,7 @@ pub struct WatcherAdjustmentResponder {
 impl Sender<f32> for WatcherAdjustmentResponder {
     fn send_response(self, data: f32) {
         if let Err(e) = self.watcher_adjustment_responder.send(data) {
-            fx_log_err!("Failed to reply to WatchAutoBrightnessAdjustment: {}", e);
+            tracing::error!("Failed to reply to WatchAutoBrightnessAdjustment: {}", e);
         }
     }
 }
@@ -165,13 +164,13 @@ impl Control {
         auto_sender_channel: Arc<Mutex<SenderChannel<bool>>>,
         adjustment_sender_channel: Arc<Mutex<SenderChannel<f32>>>,
     ) -> Control {
-        fx_log_info!("New Control class");
+        tracing::info!("New Control class");
 
         let set_brightness_abort_handle = Arc::new(Mutex::new(None::<AbortHandle>));
         let default_table_points = &*BRIGHTNESS_TABLE.lock().await.points;
         let brightness_table = read_brightness_table_file(BRIGHTNESS_TABLE_FILE_PATH)
             .unwrap_or_else(|e| {
-                fx_log_warn!(
+                tracing::warn!(
                     "Failed to read existing settings: {}, using default table instead.",
                     e
                 );
@@ -214,7 +213,7 @@ impl Control {
                     self.watch_auto_brightness(watch_auto_handler, responder).await;
                 match watch_auto_result {
                     Ok(_v) => {}
-                    Err(e) => fx_log_err!("Watch auto brightness failed due to err {}.", e),
+                    Err(e) => tracing::error!("Watch auto brightness failed due to err {}.", e),
                 }
             }
             BrightnessControlRequest::SetManualBrightness { value, control_handle: _ } => {
@@ -233,16 +232,16 @@ impl Control {
                     self.watch_current_brightness(watch_current_handler, responder).await;
                 match watch_current_result {
                     Ok(_v) => {}
-                    Err(e) => fx_log_err!("Watch current brightness failed due to err {}.", e),
+                    Err(e) => tracing::error!("Watch current brightness failed due to err {}.", e),
                 }
             }
             BrightnessControlRequest::SetBrightnessTable { table, control_handle: _ } => {
                 let result = self.check_brightness_table_and_set_new_curve(&table.into()).await;
                 match result {
-                    Ok(_v) => fx_log_info!("Brightness table is valid and set"),
+                    Ok(_v) => tracing::info!("Brightness table is valid and set"),
                     Err(e) => {
                         // TODO(lingxueluo): Close the connection if brightness table not valid.
-                        fx_log_err!("Brightness table is not valid because {}", e);
+                        tracing::error!("Brightness table is not valid because {}", e);
                     }
                 }
             }
@@ -259,7 +258,7 @@ impl Control {
                     .await;
                 match watch_adjustment_result {
                     Ok(_v) => {}
-                    Err(e) => fx_log_err!("Watch adjustment failed due to err {}.", e),
+                    Err(e) => tracing::error!("Watch adjustment failed due to err {}.", e),
                 }
             }
             BrightnessControlRequest::GetMaxAbsoluteBrightness { responder } => {
@@ -267,14 +266,14 @@ impl Control {
                 match result.await {
                     Ok(value) => {
                         if let Err(e) = responder.send(&mut Ok(value)) {
-                            fx_log_err!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
+                            tracing::error!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
                         }
                     }
                     Err(e) => {
-                        fx_log_err!("Failed to get max absolute brightness: {}", e);
+                        tracing::error!("Failed to get max absolute brightness: {}", e);
 
                         if let Err(e) = responder.send(&mut Err(ZX_ERR_NOT_SUPPORTED)) {
-                            fx_log_err!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
+                            tracing::error!("Failed to reply to GetMaxAbsoluteBrightness: {}", e);
                         }
                     }
                 }
@@ -301,7 +300,7 @@ impl Control {
     // FIDL message handlers
     async fn set_auto_brightness(&mut self) {
         if self.auto_brightness_abort_handle.is_none() {
-            fx_log_info!("Auto-brightness turned on");
+            tracing::info!("Auto-brightness turned on");
             self.start_auto_brightness_task();
             self.auto_sender_channel
                 .lock()
@@ -381,7 +380,7 @@ impl Control {
 
     async fn set_manual_brightness_smooth(&mut self, value: f32, duration: Duration) {
         if let Some(handle) = self.auto_brightness_abort_handle.take() {
-            fx_log_info!("Auto-brightness off, brightness set to {}", value);
+            tracing::info!("Auto-brightness off, brightness set to {}", value);
             handle.abort();
         }
 
@@ -412,15 +411,15 @@ impl Control {
     }
 
     async fn set_brightness_curve(&mut self, table: &BrightnessTable) {
-        fx_log_info!("Setting new brightness curve.");
+        tracing::info!("Setting new brightness curve.");
         self.spline = generate_spline(table);
 
         self.start_auto_brightness_task();
 
         let result = self.store_brightness_table(table, BRIGHTNESS_TABLE_FILE_PATH);
         match result {
-            Ok(_v) => fx_log_info!("Stored successfully"),
-            Err(e) => fx_log_info!("Didn't store successfully due to error {}", e),
+            Ok(_v) => tracing::info!("Stored successfully"),
+            Err(e) => tracing::info!("Didn't store successfully due to error {}", e),
         }
     }
 
@@ -429,7 +428,7 @@ impl Control {
         table: &BrightnessTable,
         file_path: &str,
     ) -> Result<(), Error> {
-        fx_log_info!("Storing brightness table set.");
+        tracing::info!("Storing brightness table set.");
         let file = fs::File::create(file_path)?;
         serde_json::to_writer(io::BufWriter::new(file), &table)
             .map_err(|e| anyhow::format_err!("Failed to write to file, ran into error: {:?}", e))
@@ -441,7 +440,7 @@ impl Control {
     ) -> Result<(), Error> {
         let BrightnessTable { points } = table;
         if points.is_empty() {
-            fx_log_info!("Brightness table can not be empty, use the default table instead.");
+            tracing::info!("Brightness table can not be empty, use the default table instead.");
             let BrightnessTable { points } = &*BRIGHTNESS_TABLE.lock().await;
             let brightness_table = BrightnessTable { points: points.to_vec() };
             self.set_brightness_curve(&brightness_table).await;
@@ -450,13 +449,13 @@ impl Control {
         let mut last_lux = -1.0;
         for brightness_point in points {
             if brightness_point.ambient_lux < 0.0 || brightness_point.display_nits < 0.0 {
-                fx_log_info!("Lux or nits in this table is negative.");
+                tracing::info!("Lux or nits in this table is negative.");
                 return Err(format_err!(format!("Lux or nits in this table is negative.")));
             }
             if brightness_point.ambient_lux > last_lux {
                 last_lux = brightness_point.ambient_lux;
             } else {
-                fx_log_info!("Not increasing lux in this table.");
+                tracing::info!("Not increasing lux in this table.");
                 return Err(format_err!(format!("Not increasing lux in this table.")));
             }
         }
@@ -588,7 +587,7 @@ async fn get_current_brightness(backlight: Arc<dyn BacklightControl>) -> f32 {
         Ok(brightness) => brightness as f32,
         Err(e) => {
             if *GET_BRIGHTNESS_FAILED_FIRST.lock().await {
-                fx_log_warn!("Failed to get backlight: {}. assuming 1.0", e);
+                tracing::warn!("Failed to get backlight: {}. assuming 1.0", e);
                 *GET_BRIGHTNESS_FAILED_FIRST.lock().await = false;
             }
             *LAST_SET_BRIGHTNESS.lock().await
@@ -600,7 +599,7 @@ async fn set_current_brightness(backlight: Arc<dyn BacklightControl>, value: f64
     backlight
         .set_brightness(value)
         .await
-        .unwrap_or_else(|e| fx_log_err!("Failed to set backlight: {}", e))
+        .unwrap_or_else(|e| tracing::error!("Failed to set backlight: {}", e))
 }
 
 async fn read_sensor_and_get_brightness(

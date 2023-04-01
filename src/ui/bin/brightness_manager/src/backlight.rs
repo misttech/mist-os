@@ -12,7 +12,6 @@ use fidl_fuchsia_hardware_backlight::{
 use fidl_fuchsia_ui_display_internal::{DisplayPowerMarker, DisplayPowerProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
-use fuchsia_syslog::*;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, lock::Mutex};
 use std::sync::Arc;
@@ -23,7 +22,7 @@ const MIN_REGULATED_BRIGHTNESS: f64 = 0.0004;
 const MAX_REGULATED_BRIGHTNESS: f64 = 1.0;
 
 fn open_backlight() -> Result<BacklightProxy, Error> {
-    fx_log_info!("Opening backlight");
+    tracing::info!("Opening backlight");
     let (proxy, server) = fidl::endpoints::create_proxy::<BacklightMarker>()
         .context("Failed to create backlight proxy")?;
     // TODO(kpt): Don't hardcode this path b/138666351
@@ -33,7 +32,7 @@ fn open_backlight() -> Result<BacklightProxy, Error> {
 }
 
 fn open_display_power_service() -> Result<DisplayPowerProxy, Error> {
-    fx_log_info!("Opening display controller");
+    tracing::info!("Opening display controller");
     connect_to_protocol::<DisplayPowerMarker>()
         .context("Failed to connect to display power service")
 }
@@ -180,8 +179,8 @@ impl Backlight {
                     // See below
                 } else {
                     self.set_backlight_state_normalized(regulated_value, backlight_on).await?;
-                    fx_log_info!("Turned backlight off");
-                    fx_log_info!("DDIC power off scheduled");
+                    tracing::info!("Turned backlight off");
+                    tracing::info!("DDIC power off scheduled");
                     let task =
                         self.clone().make_scheduled_updates_task(display_power.power_off_delay);
                     *power_state = PowerState::BacklightOffDisplayPoweringDown(task);
@@ -191,7 +190,7 @@ impl Backlight {
             }
             PowerState::BacklightOffDisplayPoweringDown(_task) => {
                 if backlight_on {
-                    fx_log_info!("DDIC power on cancelled");
+                    tracing::info!("DDIC power on cancelled");
                     // Cancel the scheduled display shutdown.
                     *power_state = PowerState::BothOn;
                     drop(power_state);
@@ -212,7 +211,7 @@ impl Backlight {
                     *power_state =
                         PowerState::DisplayOnBacklightPoweringUp(task, vec![pending_change]);
                     drop(power_state);
-                    fx_log_info!("Backlight power on scheduled");
+                    tracing::info!("Backlight power on scheduled");
                     receiver.await?
                 } else {
                     // No-op. Already off.
@@ -228,7 +227,7 @@ impl Backlight {
                     drop(power_state);
                     receiver.await?
                 } else {
-                    fx_log_info!("Backlight power on cancelled");
+                    tracing::info!("Backlight power on cancelled");
                     // Cancel scheduled backlight power on.
                     *power_state = PowerState::BothOff;
                     drop(power_state);
@@ -243,13 +242,13 @@ impl Backlight {
 
     fn make_scheduled_updates_task(&self, delay: zx::Duration) -> fasync::Task<()> {
         let time = fasync::Time::after(delay);
-        fx_log_trace!("Setting timer for {:?}", &time);
+        tracing::trace!("Setting timer for {:?}", &time);
         let timer = fasync::Timer::new(time);
         let self_ = self.clone();
         let fut = async move {
-            fx_log_trace!("Awaiting timer");
+            tracing::trace!("Awaiting timer");
             timer.await;
-            fx_log_trace!("Timer {:?} elapsed", time);
+            tracing::trace!("Timer {:?} elapsed", time);
             self_.process_scheduled_updates().await;
         };
         fasync::Task::local(fut)
@@ -278,7 +277,7 @@ impl Backlight {
                 let mut power_state_guard = power_state_arc.lock().await;
                 let power_state = std::mem::take(&mut *power_state_guard);
 
-                fx_log_debug!(
+                tracing::debug!(
                     "Processing scheduled updates after timer. Most recent state: {:?}",
                     &power_state
                 );
@@ -307,15 +306,18 @@ impl Backlight {
                             // Even if a backlight command fails for some reason, we need to treat
                             // the backlight as on. Subsequent commands should still work.
                             *power_state_guard = PowerState::BothOn;
-                            fx_log_debug!(
+                            tracing::debug!(
                                 "Sending result for pending change {:?}",
                                 &pending_change
                             );
                             if let Err(e) = pending_change.future_handle.send(result) {
-                                fx_log_warn!("Failed to send result for pending change: {:#?}", e);
+                                tracing::warn!(
+                                    "Failed to send result for pending change: {:#?}",
+                                    e
+                                );
                             } else if !turned_on {
                                 turned_on = true;
-                                fx_log_info!("Turned backlight on");
+                                tracing::info!("Turned backlight on");
                             }
                         }
                     }
@@ -336,7 +338,7 @@ impl Backlight {
         regulated_value: f64,
         backlight_on: bool,
     ) -> Result<(), Error> {
-        fx_log_debug!(
+        tracing::debug!(
             "set_state_normalized(brightness: {:.3}, backlight_on: {}",
             regulated_value,
             backlight_on
@@ -375,7 +377,7 @@ impl DisplayPower {
         } else {
             PowerState::BothOff
         };
-        fx_log_info!("Initial power state: {:?}", &initial_state);
+        tracing::info!("Initial power state: {:?}", &initial_state);
 
         Ok(DisplayPower {
             proxy: display_power_proxy,
@@ -387,7 +389,7 @@ impl DisplayPower {
 
     async fn set_display_power_and_log_errors(&self, display_on: bool) -> Result<(), Error> {
         let on_off = if display_on { "on" } else { "off" };
-        fx_log_info!("Turning DDIC power {}", on_off);
+        tracing::info!("Turning DDIC power {}", on_off);
         self.proxy
             .set_display_power(display_on)
             .await
@@ -401,10 +403,10 @@ impl DisplayPower {
             })
             .with_context(|| format!("Failed to turn {on_off} display"))
             .map_err(|e| {
-                fx_log_err!("{:#?}", &e);
+                tracing::error!("{:#?}", &e);
                 e
             })?;
-        fx_log_info!("Turned DDIC power {}", on_off);
+        tracing::info!("Turned DDIC power {}", on_off);
         Ok(())
     }
 }
@@ -593,7 +595,6 @@ mod dual_state_tests {
     use fidl_fuchsia_hardware_backlight::DeviceRequestStream as BacklightRequestStream;
     use fidl_fuchsia_ui_display_internal::{DisplayPowerRequest, DisplayPowerRequestStream};
     use fuchsia_async::{self as fasync, Task};
-    use fuchsia_syslog::fx_log_warn;
     use futures::{prelude::future, Future, TryStreamExt};
     use std::task::Poll;
     use test_helpers::ResettableFuture;
@@ -622,9 +623,9 @@ mod dual_state_tests {
         async fn process_requests(self, mut stream: BacklightRequestStream) {
             use fidl_fuchsia_hardware_backlight::DeviceRequest::*;
 
-            fx_log_debug!("FakeBacklightService::process_requests");
+            tracing::debug!("FakeBacklightService::process_requests");
             while let Ok(Some(req)) = stream.try_next().await {
-                fx_log_debug!("FakeBacklightService: {}", req.method_name());
+                tracing::debug!("FakeBacklightService: {}", req.method_name());
                 match req {
                     GetStateNormalized { responder } => {
                         let mut result = self.get_state_normalized_response.get().await;
@@ -683,9 +684,9 @@ mod dual_state_tests {
         }
 
         async fn process_requests(self, mut stream: DisplayPowerRequestStream) {
-            fx_log_debug!("FakeDisplayPowerService::process_requests");
+            tracing::debug!("FakeDisplayPowerService::process_requests");
             while let Ok(Some(req)) = stream.try_next().await {
-                fx_log_debug!("FakeDisplayPowerService: {}", req.method_name());
+                tracing::debug!("FakeDisplayPowerService: {}", req.method_name());
                 match req {
                     DisplayPowerRequest::SetDisplayPower { power_on, responder } => {
                         let mut result = self.set_display_power_response.lock().await.clone();
@@ -696,7 +697,7 @@ mod dual_state_tests {
                     }
                 };
             }
-            fx_log_warn!("FakeDisplayPowerService stopped");
+            tracing::warn!("FakeDisplayPowerService stopped");
         }
 
         pub async fn set_set_display_power_response(&self, response: Result<(), i32>) {

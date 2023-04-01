@@ -11,7 +11,6 @@ use fidl_fuchsia_input_report::{
     DeviceDescriptor, InputDeviceMarker, InputDeviceProxy, InputReportsReaderMarker,
     InputReportsReaderProxy, SensorInputDescriptor, SensorType,
 };
-use fuchsia_syslog::fx_log_info;
 
 #[derive(Debug)]
 pub struct AmbientLightInputRpt {
@@ -37,7 +36,7 @@ struct AmbientLightInputReportReaderProxy {
 }
 
 fn open_input_report_device(path: &str) -> Result<InputDeviceProxy, Error> {
-    fx_log_info!("Opening sensor at {:?}", path);
+    tracing::info!("Opening sensor at {:?}", path);
     let (proxy, server) = fidl::endpoints::create_proxy::<InputDeviceMarker>()
         .context("Failed to create sensor proxy")?;
     fdio::service_connect(path, server.into_channel())
@@ -45,8 +44,7 @@ fn open_input_report_device(path: &str) -> Result<InputDeviceProxy, Error> {
     Ok(proxy)
 }
 
-async fn open_sensor_input_report_reader() -> Result<AmbientLightInputReportReaderProxy, Error>
-{
+async fn open_sensor_input_report_reader() -> Result<AmbientLightInputReportReaderProxy, Error> {
     let input_report_directory = "/dev/class/input-report";
     let dir_path = Path::new(input_report_directory);
     let entries = fs::read_dir(dir_path)?;
@@ -56,7 +54,9 @@ async fn open_sensor_input_report_reader() -> Result<AmbientLightInputReportRead
         let device_path = device_path.to_str().expect("Bad path");
         let device = open_input_report_device(device_path)?;
 
-        fn get_sensor_input(descriptor: &DeviceDescriptor) -> Result<&Vec<SensorInputDescriptor>, Error> {
+        fn get_sensor_input(
+            descriptor: &DeviceDescriptor,
+        ) -> Result<&Vec<SensorInputDescriptor>, Error> {
             let sensor = descriptor.sensor.as_ref().context("device has no sensor")?;
             let input_desc = sensor.input.as_ref().context("sensor has no input descriptor")?;
             Ok(input_desc)
@@ -109,7 +109,7 @@ async fn open_sensor_input_report_reader() -> Result<AmbientLightInputReportRead
                     }
                 }
                 Err(e) => {
-                    fx_log_info!("Skip device {}: {}", device_path, e);
+                    tracing::info!("Skip device {}: {}", device_path, e);
                 }
             };
         }
