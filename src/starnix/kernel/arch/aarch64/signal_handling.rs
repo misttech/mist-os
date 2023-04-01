@@ -93,9 +93,9 @@ impl SignalStackFrame {
                         vmo,
                         0,
                         instructions.len(),
-                        zx::VmarFlags::PERM_EXECUTE | zx::VmarFlags::PERM_READ_IF_XOM_UNSUPPORTED,
+                        zx::VmarFlags::PERM_EXECUTE | zx::VmarFlags::PERM_READ,
                         MappingOptions::empty(),
-                        MappingName::Vma("signal trampoline".into()),
+                        MappingName::None,
                     )
                     .expect("Failed to map signal trampoline vmo.");
             }
