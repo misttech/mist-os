@@ -1269,19 +1269,11 @@ From //third_party/crashpad/src/util/net/tls.gni:30
 
 ### cts_version
 
-Name of the CTS version.
-
-Used to change the dependency paths of CTS deps.
-
-Example of path change:
-  //zircon/system/ulib/zxtest -> //prebuilt/cts/${cts_version}/pkg/zxtest
-
-Usage:
-  `fx set PRODUCT.BOARD --args cts_version='"version_name"'`
+The replacement of "99991231.0.1" changed the string, so this is in-tree.
 
 **Current value (from the default):** `""`
 
-From //sdk/ctf/build/internal/ctf_version.gni:16
+From //sdk/ctf/build/internal/ctf_version.gni:18
 
 ### current_cpu
 
@@ -7492,7 +7484,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `""`
+**Current value (from the default):** `"12.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7760,7 +7752,7 @@ Whether or not tracing is disabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/proc/bin/starnix/BUILD.gn:23
+From //src/starnix/kernel/BUILD.gn:23
 
 ### starnix_restricted_mode
 
@@ -8872,3 +8864,4 @@ From //third_party/mesa/src/intel/vulkan/BUILD.gn:30
 **Current value (from the default):** `"//third_party/android/device/generic/goldfish-opengl:libvulkan_goldfish"`
 
 From //src/graphics/lib/goldfish-vulkan/gnbuild/BUILD.gn:11
+
