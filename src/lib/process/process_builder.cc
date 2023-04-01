@@ -22,6 +22,7 @@
 
 #include <array>
 #include <string_view>
+#include <utility>
 
 #include <fbl/unique_fd.h>
 
@@ -41,12 +42,12 @@ constexpr int kFdioMaxResolveDepth = 256;
 }  // namespace
 
 ProcessBuilder::ProcessBuilder(std::shared_ptr<sys::ServiceDirectory> services)
-    : services_(services) {
+    : services_(std::move(services)) {
   services_->Connect(launcher_.NewRequest());
 }
 
 ProcessBuilder::ProcessBuilder(zx::job job, std::shared_ptr<sys::ServiceDirectory> services)
-    : ProcessBuilder(services) {
+    : ProcessBuilder(std::move(services)) {
   launch_info_.job = std::move(job);
 }
 
@@ -132,8 +133,10 @@ void ProcessBuilder::AddArgs(const std::vector<std::string>& argv) {
   if (launch_info_.name.empty())
     launch_info_.name = argv[0];
   std::vector<std::vector<uint8_t>> args;
-  for (const auto& arg : argv)
-    args.push_back(std::vector<uint8_t>(arg.data(), arg.data() + arg.size()));
+  args.reserve(argv.size());
+  for (const auto& arg : argv) {
+    args.emplace_back(arg.data(), arg.data() + arg.size());
+  }
   launcher_->AddArgs(std::move(args));
 }
 
@@ -160,10 +163,11 @@ void ProcessBuilder::SetName(std::string name) { launch_info_.name = std::move(n
 
 void ProcessBuilder::CloneJob() {
   zx::job duplicate_job;
-  if (launch_info_.job)
+  if (launch_info_.job) {
     launch_info_.job.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_job);
-  else
+  } else {
     zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate_job);
+  }
   SetDefaultJob(std::move(duplicate_job));
 }
 
@@ -194,7 +198,7 @@ void ProcessBuilder::CloneEnvironment() {
   std::vector<std::vector<uint8_t>> env;
   for (size_t i = 0; environ[i]; ++i) {
     const char* var = environ[i];
-    env.push_back(std::vector<uint8_t>(var, var + strlen(var)));
+    env.emplace_back(var, var + strlen(var));
   }
   launcher_->AddEnvirons(std::move(env));
 }
