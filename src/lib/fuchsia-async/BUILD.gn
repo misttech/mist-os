@@ -4,9 +4,11 @@
 
 import("//build/components.gni")
 import("//build/product.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_staticlib.gni")
 import("//build/testing/environments.gni")
+import("//build/testing/host_test.gni")
 
 config("trace_level_logging") {
   rustflags = [ "--cfg=trace_level_logging" ]
@@ -129,9 +131,29 @@ fuchsia_unittest_package("fuchsia-async-tests") {
   }
 }
 
+if (is_host) {
+  rustc_binary("fuchsia-async-shutdown-test-bin") {
+    edition = "2021"
+    with_unit_tests = false
+    deps = [
+      ":fuchsia-async",
+      "//src/lib/zircon/rust:fuchsia-zircon-status",
+      "//third_party/rust_crates:futures",
+    ]
+    source_root = "src/handle/emulated/shutdown_test.rs"
+    sources = [ "src/handle/emulated/shutdown_test.rs" ]
+  }
+
+  host_test("fuchsia-async-shutdown-test") {
+    binary_path = "$root_out_dir/fuchsia-async-shutdown-test-bin"
+    deps = [ ":fuchsia-async-shutdown-test-bin" ]
+  }
+}
+
 group("tests") {
   testonly = true
   deps = [
+    ":fuchsia-async-shutdown-test($host_toolchain)",
     ":fuchsia-async-tests",
     ":fuchsia-async_test($host_toolchain)",
     "cpp:tests",

@@ -17,11 +17,11 @@ use futures::task::noop_waker_ref;
 #[cfg(debug_assertions)]
 use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
-use std::future::Future;
+use std::future::{poll_fn, Future};
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::task::{Context, Poll, Waker};
@@ -740,6 +740,7 @@ impl Channel {
                 if !obj.is_open() {
                     return Err(zx_status::Status::PEER_CLOSED);
                 }
+                check_write_shutdown()?;
                 obj.q
                     .side_mut(side)
                     .push_back(ChannelMessage { bytes: bytes_vec, handles: handles_vec });
@@ -781,7 +782,10 @@ impl Channel {
                     // Move the handles outside this closure before dropping them.  If any are
                     // channels in the same shard as this channel, dropping them will attempt to
                     // re-acquire the lock held by with_handle.
-                    return Err(handles_vec);
+                    return Err((handles_vec, zx_status::Status::PEER_CLOSED));
+                }
+                if let Err(e) = check_write_shutdown() {
+                    return Err((handles_vec, e));
                 }
                 obj.q
                     .side_mut(side)
@@ -793,7 +797,7 @@ impl Channel {
                 unreachable!();
             }
         })
-        .map_err(|_handles_to_drop| zx_status::Status::PEER_CLOSED)
+        .map_err(|(_handles_to_drop, err)| err)
     }
 }
 
@@ -891,6 +895,7 @@ impl Socket {
                     if !obj.is_open() {
                         return Err(zx_status::Status::PEER_CLOSED);
                     }
+                    check_write_shutdown()?;
                     obj.q.side_mut(side).extend(bytes);
                     obj.signal(side.opposite(), Signals::NONE, Signals::OBJECT_READABLE)
                         .status_for_peer()?;
@@ -899,6 +904,7 @@ impl Socket {
                     if !obj.is_open() {
                         return Err(zx_status::Status::PEER_CLOSED);
                     }
+                    check_write_shutdown()?;
                     obj.q.side_mut(side).push_back(bytes.to_vec());
                     obj.signal(side.opposite(), Signals::NONE, Signals::OBJECT_READABLE)
                         .status_for_peer()?;
@@ -1756,6 +1762,7 @@ struct KObject<Q> {
     koid_left: u64,
     signals: Sided<Signals>,
     closed_reason: Option<String>,
+    drain_waker: Option<Waker>,
 }
 
 impl<Q> KObject<Q> {
@@ -1764,8 +1771,44 @@ impl<Q> KObject<Q> {
             && (!self.two_sided || *self.open_count.side(Side::Right) != 0)
     }
 
+    /// Returns true unless:
+    ///   1) We are a two-sided handle.
+    ///   2) One side is closed.
+    ///   3) The other side hasn't read all the data.
+    fn is_drained(&self) -> bool {
+        if !self.two_sided || self.is_open() {
+            return true;
+        }
+
+        if *self.open_count.side(Side::Left) == 0
+            && self.signals.side(Side::Right).contains(Signals::OBJECT_READABLE)
+        {
+            return false;
+        }
+
+        if *self.open_count.side(Side::Right) == 0
+            && self.signals.side(Side::Left).contains(Signals::OBJECT_READABLE)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    fn poll_drained(&mut self, ctx: &mut Context<'_>) -> Poll<()> {
+        if self.is_drained() {
+            Poll::Ready(())
+        } else {
+            self.drain_waker = Some(ctx.waker().clone());
+            Poll::Pending
+        }
+    }
+
     fn do_close(&mut self, side: Side) {
         let open_count = self.open_count.side_mut(side);
+        if *open_count == 0 {
+            return;
+        }
         *open_count = open_count.saturating_sub(1);
 
         if *open_count == 0 {
@@ -1791,10 +1834,16 @@ impl<Q> HdlData for KObject<Q> {
         if *self.open_count.side(side) == 0 {
             return Err(SignalError::HandleInvalid);
         }
+        let was_drained = self.is_drained();
         let signals = self.signals.side_mut(side);
         signals.remove(clear_mask);
         signals.insert(set_mask);
         self.wakers.side_mut(side).wake(*signals);
+        if !was_drained && self.is_drained() {
+            if let Some(waker) = self.drain_waker.take() {
+                waker.wake()
+            }
+        }
         Ok(())
     }
 
@@ -1888,6 +1937,7 @@ fn new_handle_pair(hdl_type: HdlType, rights: Rights) -> (u32, u32, Arc<Mutex<KO
             koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
             signals: Sided { left: Signals::empty(), right: Signals::empty() },
             closed_reason: None,
+            drain_waker: None,
         }
     }
 
@@ -1925,6 +1975,7 @@ fn new_handle(hdl_type: HdlType, rights: Rights) -> (u32, Arc<Mutex<KObjectEntry
             koid_left: NEXT_KOID.fetch_add(2, Ordering::Relaxed),
             signals: Sided { left: Signals::empty(), right: Signals::empty() },
             closed_reason: None,
+            drain_waker: None,
         }
     }
 
@@ -2004,6 +2055,48 @@ lazy_static::lazy_static! {
 
 static NEXT_KOID: AtomicU64 = AtomicU64::new(1);
 static NEXT_HANDLE: AtomicU32 = AtomicU32::new(1);
+static SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
+/// Flush all data buffered in emulated handles, then force them to close. If you want to preserve
+/// the property that writing to a handle and then closing it means all the data got to the other
+/// side, and your handles are being serviced by Overnet rather than a local process, you should
+/// probably call this before the process exits. Note that this guarantees the data has left the
+/// emulated handle layer, not that it's made it over the network. Also this could in theory block
+/// forever so you should time out around it.
+pub async fn shut_down_handles() {
+    SHUTTING_DOWN.store(true, Ordering::Release);
+
+    poll_fn(|ctx| {
+        let handle_table = HANDLE_TABLE.lock().unwrap();
+        for v in handle_table.values() {
+            let mut object = v.object.lock().unwrap();
+            match &mut *object {
+                KObjectEntry::Channel(o) => ready!(o.poll_drained(ctx)),
+                KObjectEntry::StreamSocket(o) => ready!(o.poll_drained(ctx)),
+                KObjectEntry::DatagramSocket(o) => ready!(o.poll_drained(ctx)),
+                KObjectEntry::EventPair(o) => ready!(o.poll_drained(ctx)),
+                KObjectEntry::Event(o) => ready!(o.poll_drained(ctx)),
+            }
+        }
+        Poll::Ready(())
+    })
+    .await;
+
+    let handle_table = HANDLE_TABLE.lock().unwrap();
+    for v in handle_table.values() {
+        let mut object = v.object.lock().unwrap();
+        object.do_close(Side::Left);
+        object.do_close(Side::Right);
+    }
+}
+
+fn check_write_shutdown() -> Result<(), zx_status::Status> {
+    if SHUTTING_DOWN.load(Ordering::Acquire) {
+        Err(zx_status::Status::SHOULD_WAIT)
+    } else {
+        Ok(())
+    }
+}
 
 fn get_hdl_type(handle: u32) -> Option<HdlType> {
     let object = {
