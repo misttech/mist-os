@@ -39,15 +39,14 @@
   .cfi_same_value t6
 
   // Take 4 slots to 16-byte alignment, though we only need 3 slots.
-  // Skip the bottom slot (at the new sp) so that it can be used below.
   add sp, sp, -4*8
   .cfi_adjust_cfa_offset 4*8
   sd a1, 1*8(sp)
-  .cfi_offset a1, (1-4)*8(sp)
+  .cfi_offset a1, (1-4)*8
   sd a2, 2*8(sp)
-  .cfi_offset a2, (2-4)*8(sp)
+  .cfi_offset a2, (2-4)*8
   sd a3, 3*8(sp)
-  .cfi_offset a3, (3-4)*8(sp)
+  .cfi_offset a3, (3-4)*8
 
   ld a2, 8(tp)   // DTV
   ld a1, 16(a0)  // module ID
@@ -102,35 +101,34 @@
     \op t4, 7
     \op t5, 8
     \op t6, 9
-    \op t7, 10
     // We could probably reasonably assume that __tls_get_new won't
     // clobber any F/D registers, but we don't. Note however that the
     // LP64D calling convention allows it to clobber the high halves
     // when they're actually Q registers. We're not preserving those
     // since we can't presume the Q instructions are available.
-    \op ft0, 11, f
-    \op ft1, 12, f
-    \op ft2, 13, f
-    \op ft3, 14, f
-    \op ft4, 15, f
-    \op ft5, 16, f
-    \op ft6, 17, f
-    \op ft7, 18, f
-    \op ft8, 19, f
-    \op ft9, 20, f
-    \op ft10, 21, f
-    \op ft11, 22, f
-    \op fa0, 23, f
-    \op fa1, 24, f
-    \op fa2, 25, f
-    \op fa3, 26, f
-    \op fa4, 27, f
-    \op fa5, 28, f
-    \op fa6, 29, f
-    \op fa7, 30, f
+    \op ft0, 10, f
+    \op ft1, 11, f
+    \op ft2, 12, f
+    \op ft3, 13, f
+    \op ft4, 14, f
+    \op ft5, 15, f
+    \op ft6, 16, f
+    \op ft7, 17, f
+    \op ft8, 18, f
+    \op ft9, 19, f
+    \op ft10, 20, f
+    \op ft11, 21, f
+    \op fa0, 22, f
+    \op fa1, 23, f
+    \op fa2, 24, f
+    \op fa3, 25, f
+    \op fa4, 26, f
+    \op fa5, 27, f
+    \op fa6, 28, f
+    \op fa7, 29, f
   .endm
 
-  // We need 31 slots here, but an unused one was left at sp in the prologue.
+  // We need 30 slots here
   add sp, sp, -30*8
   .cfi_adjust_cfa_offset 30*8
   on_saved_regs spill
