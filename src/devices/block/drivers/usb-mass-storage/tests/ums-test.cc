@@ -5,7 +5,6 @@
 #include <dirent.h>
 #include <endian.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <fidl/fuchsia.hardware.usb.peripheral.block/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.peripheral/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.virtual.bus/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -45,7 +44,6 @@ zx_status_t BWrite(fidl::UnownedClientEnd<fuchsia_hardware_block::Block> device,
 }
 
 namespace usb_peripheral = fuchsia_hardware_usb_peripheral;
-namespace usb_peripheral_block = fuchsia_hardware_usb_peripheral_block;
 
 constexpr const char kManufacturer[] = "Google";
 constexpr const char kProduct[] = "USB test drive";
@@ -78,12 +76,22 @@ usb_peripheral::wire::DeviceDescriptor GetDeviceDescriptor() {
   return device_desc;
 }
 
-class BlockDeviceController {
- public:
-  explicit BlockDeviceController(BusLauncher* bus) : bus_(bus) {}
+class UmsTest : public zxtest::Test {
+ protected:
+  void SetUp() override {
+    auto bus = BusLauncher::Create();
+    ASSERT_OK(bus.status_value());
+    bus_ = std::move(bus.value());
+    ASSERT_NO_FATAL_FAILURE(Connect());
+  }
+
+  void TearDown() override {
+    ASSERT_OK(bus_->ClearPeripheralDeviceFunctions());
+
+    ASSERT_OK(bus_->Disable());
+  }
 
   void Disconnect() {
-    cachecontrol_ = {};
     ASSERT_OK(bus_->ClearPeripheralDeviceFunctions());
     ASSERT_OK(bus_->Disconnect());
   }
@@ -102,89 +110,10 @@ class BlockDeviceController {
     std::vector<ConfigurationDescriptor> config_descs;
     config_descs.emplace_back(
         fidl::VectorView<usb_peripheral::wire::FunctionDescriptor>::FromExternal(function_descs));
-    ASSERT_OK(bus_->SetupPeripheralDevice(GetDeviceDescriptor(), std::move(config_descs)));
-
-    fbl::unique_fd fd;
-    ASSERT_OK(
-        fdio_open_fd_at(bus_->GetRootFd(), "class/usb-cache-test", 0, fd.reset_and_get_address()));
-
-    fbl::String devpath;
-    ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath),
-                  ZX_ERR_STOP);
-    fdio_cpp::UnownedFdioCaller caller(fd);
-
-    zx::result client_end =
-        component::ConnectAt<usb_peripheral_block::Device>(caller.directory(), devpath.c_str());
-    ASSERT_OK(client_end);
-
-    cachecontrol_.Bind(std::move(client_end.value()));
-  }
-
-  void EnableWritebackCache() {
-    auto result = cachecontrol_->EnableWritebackCache();
-    ASSERT_NO_FATAL_FAILURE(ValidateResult(result));
-  }
-
-  void DisableWritebackCache() {
-    auto result = cachecontrol_->DisableWritebackCache();
-    ASSERT_NO_FATAL_FAILURE(ValidateResult(result));
-  }
-
-  void SetWritebackCacheReported(bool report) {
-    auto result = cachecontrol_->SetWritebackCacheReported(report);
-    ASSERT_NO_FATAL_FAILURE(ValidateResult(result));
-  }
-
- private:
-  BusLauncher* bus_;
-  fidl::WireSyncClient<usb_peripheral_block::Device> cachecontrol_;
-};
-
-class UmsTest : public zxtest::Test {
- public:
-  void SetUp() override {
-    auto bus = BusLauncher::Create();
-    ASSERT_OK(bus.status_value());
-    bus_ = std::move(bus.value());
-    ASSERT_NO_FATAL_FAILURE(InitUMS(devpath_));
-  }
-
-  void TearDown() override {
-    ASSERT_OK(bus_->ClearPeripheralDeviceFunctions());
-
-    ASSERT_OK(bus_->Disable());
-  }
-
- protected:
-  // Initialize UMS. Asserts on failure.
-  void InitUMS(fbl::String& devpath) {
-    using ConfigurationDescriptor =
-        ::fidl::VectorView<fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor>;
-    usb_peripheral::wire::FunctionDescriptor ums_function_desc = {
-        .interface_class = USB_CLASS_MSC,
-        .interface_subclass = USB_SUBCLASS_MSC_SCSI,
-        .interface_protocol = USB_PROTOCOL_MSC_BULK_ONLY,
-    };
-
-    std::vector<usb_peripheral::wire::FunctionDescriptor> function_descs;
-    function_descs.push_back(ums_function_desc);
-    std::vector<ConfigurationDescriptor> config_descs;
-    config_descs.emplace_back(
-        fidl::VectorView<usb_peripheral::wire::FunctionDescriptor>::FromExternal(function_descs));
 
     ASSERT_OK(bus_->SetupPeripheralDevice(GetDeviceDescriptor(), std::move(config_descs)));
-
-    fbl::unique_fd fd;
-    ASSERT_OK(fdio_open_fd_at(bus_->GetRootFd(), "class/block", 0, fd.reset_and_get_address()));
-    ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForAnyFile, ZX_TIME_INFINITE, &devpath),
-                  ZX_ERR_STOP);
-    devpath = fbl::String::Concat({fbl::String("class/block/"), devpath});
   }
 
-  std::optional<BusLauncher> bus_;
-  fbl::String devpath_;
-  zx::unowned_channel peripheral_;
-  zx::unowned_channel virtual_bus_handle_;
   fbl::String GetTestdevPath() {
     // Open the block device
     // Special case for bad block mode. Need to enumerate the singleton block device.
@@ -219,7 +148,7 @@ class UmsTest : public zxtest::Test {
       ;
   }
 
- private:
+  std::optional<BusLauncher> bus_;
   fbl::String last_known_devpath_;
 };
 
@@ -228,75 +157,16 @@ TEST_F(UmsTest, ReconnectTest) {
   // for race conditions and deadlocks.
   // If the test freezes; or something crashes at this point, it is likely
   // a regression in a driver (not a test flake).
-  BlockDeviceController controller(&bus_.value());
   for (size_t i = 0; i < 50; i++) {
-    ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
+    ASSERT_NO_FATAL_FAILURE(Disconnect());
     WaitForRemove();
-    ASSERT_NO_FATAL_FAILURE(controller.Connect());
+    ASSERT_NO_FATAL_FAILURE(Connect());
     GetTestdevPath();
   }
-  ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
+  ASSERT_NO_FATAL_FAILURE(Disconnect());
 }
 
-TEST_F(UmsTest, DISABLED_CachedWriteWithNoFlushShouldBeDiscarded) {
-  // Enable writeback caching on the block device
-  BlockDeviceController controller(&bus_.value());
-  ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
-  ASSERT_NO_FATAL_FAILURE(controller.Connect());
-  ASSERT_NO_FATAL_FAILURE(controller.SetWritebackCacheReported(true));
-  ASSERT_NO_FATAL_FAILURE(controller.EnableWritebackCache());
-  fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
-
-  uint32_t blk_size;
-  std::unique_ptr<uint8_t[]> read_buffer;
-  {
-    zx::result client_end =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
-    ASSERT_OK(client_end);
-
-    {
-      const fidl::WireResult result = fidl::WireCall(client_end.value())->GetInfo();
-      ASSERT_OK(result.status());
-      const fit::result response = result.value();
-      ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
-      blk_size = response.value()->info.block_size;
-    }
-    read_buffer.reset(new uint8_t[blk_size]);
-
-    ASSERT_EQ(ZX_OK, BRead(client_end.value(), read_buffer.get(), blk_size, 0));
-  }
-  std::unique_ptr<uint8_t[]> write_buffer(new uint8_t[blk_size]);
-  {
-    zx::result client_end =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
-    ASSERT_OK(client_end);
-    // Create a pattern to write to the block device
-    for (size_t i = 0; i < blk_size; i++) {
-      write_buffer.get()[i] = static_cast<unsigned char>(i);
-    }
-    // Write the data to the block device
-    ASSERT_EQ(ZX_OK, BWrite(client_end.value(), write_buffer.get(), blk_size, 0));
-  }
-  // Disconnect the block device without flushing the cache.
-  // This will cause the data that was written to be discarded.
-  ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
-  ASSERT_NO_FATAL_FAILURE(controller.Connect());
-  {
-    zx::result client_end =
-        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());
-    ASSERT_OK(client_end);
-    ASSERT_EQ(ZX_OK, BRead(client_end.value(), write_buffer.get(), blk_size, 0));
-    ASSERT_NE(0, memcmp(read_buffer.get(), write_buffer.get(), blk_size));
-  }
-}
-
-TEST_F(UmsTest, DISABLED_UncachedWriteShouldBePersistedToBlockDevice) {
-  BlockDeviceController controller(&bus_.value());
-  // Disable writeback caching on the device
-  ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
-  ASSERT_NO_FATAL_FAILURE(controller.Connect());
-  ASSERT_NO_FATAL_FAILURE(controller.SetWritebackCacheReported(false));
-  ASSERT_NO_FATAL_FAILURE(controller.DisableWritebackCache());
+TEST_F(UmsTest, WriteShouldBePersistedToBlockDevice) {
   fdio_cpp::UnownedFdioCaller caller(bus_->GetRootFd());
 
   uint32_t blk_size;
@@ -323,8 +193,8 @@ TEST_F(UmsTest, DISABLED_UncachedWriteShouldBePersistedToBlockDevice) {
     memset(write_buffer.get(), 0, blk_size);
   }
   // Disconnect and re-connect the block device
-  ASSERT_NO_FATAL_FAILURE(controller.Disconnect());
-  ASSERT_NO_FATAL_FAILURE(controller.Connect());
+  ASSERT_NO_FATAL_FAILURE(Disconnect());
+  ASSERT_NO_FATAL_FAILURE(Connect());
   {
     zx::result client_end =
         component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), GetTestdevPath());

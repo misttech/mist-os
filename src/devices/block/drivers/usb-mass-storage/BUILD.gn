@@ -84,7 +84,6 @@ test("ums-integration") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.usb.peripheral:fuchsia.hardware.usb.peripheral_cpp_wire",
-    "//sdk/fidl/fuchsia.hardware.usb.peripheral.block:fuchsia.hardware.usb.peripheral.block_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.usb.virtual.bus:fuchsia.hardware.usb.virtual.bus_cpp_wire",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
