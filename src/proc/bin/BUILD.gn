@@ -5,8 +5,8 @@
 group("bin") {
   deps = [
     "containers",
-    "manager",
     "//src/starnix/kernel",
+    "//src/starnix/runner",
   ]
 }
 
