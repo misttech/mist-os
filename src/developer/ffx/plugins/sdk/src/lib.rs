@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use ffx_config::{query, ConfigLevel};
 use ffx_sdk_args::{SdkCommand, SetCommand, SetRootCommand, SetSubCommand, SubCommand};
 use fho::{FfxMain, FfxTool, SimpleWriter};
-use sdk::{Sdk, SdkVersion};
+use sdk::{in_tree_sdk_version, Sdk, SdkVersion};
 use std::io::Write;
 
 #[derive(FfxTool)]
@@ -41,7 +41,7 @@ pub async fn exec_sdk(
 async fn exec_version<W: Write>(sdk: Sdk, mut writer: W) -> Result<()> {
     match sdk.get_version() {
         SdkVersion::Version(v) => writeln!(writer, "{}", v)?,
-        SdkVersion::InTree => writeln!(writer, "<in tree>")?,
+        SdkVersion::InTree => writeln!(writer, "{}", in_tree_sdk_version())?,
         SdkVersion::Unknown => writeln!(writer, "<unknown>")?,
     }
 
@@ -85,7 +85,8 @@ mod test {
         exec_version(sdk, &mut out).await.unwrap();
         let out = String::from_utf8(out).unwrap();
 
-        assert_eq!("<in tree>\n", out);
+        let re = regex::Regex::new(r"^\d+.99991231.0.1\n$").expect("creating regex");
+        assert!(re.is_match(&out));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

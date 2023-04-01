@@ -19,7 +19,10 @@ ffx_plugin("ffx_sdk") {
     "//src/developer/ffx/lib/sdk:lib",
     "//third_party/rust_crates:async-trait",
   ]
-  test_deps = [ "//src/lib/fuchsia-async" ]
+  test_deps = [
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:regex",
+  ]
 
   sources = [ "src/lib.rs" ]
 }

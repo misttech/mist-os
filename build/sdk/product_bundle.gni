@@ -228,16 +228,12 @@ template("product_bundle") {
     ffx_tool = "//src/developer/ffx/plugins/product:ffx_product_tool_versioned"
     ffx_tool_output_name = "ffx-product"
 
-    # This value can be set (e.g. for testing) with `--args sdk_id=1234` on the
-    # `fx set` call.
-    sdk_version = sdk_id
-    if (sdk_version == "") {
-      sdk_version = "unversioned"
-    }
-
+    # The sdk_id holds the sdk_version. This value can be set (e.g. for testing)
+    # with `--args sdk_id=1234` on the `fx set` call.
     # In the future, the product bundles should be versioned independently of
     # the sdk version. So far they have been the same value.
-    product_version = sdk_version
+    assert(sdk_id != "")
+    product_version = sdk_id
     product_name = "${build_info_product}.${build_info_board}"
     args = [
       "--config",

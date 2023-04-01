@@ -13,7 +13,7 @@ use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
 use epoch::EpochFile;
-use ffx_config::sdk::SdkVersion;
+use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_core::ffx_plugin;
 use ffx_product_create_args::CreateCommand;
 use fuchsia_pkg::PackageManifest;
@@ -35,12 +35,12 @@ pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
         .await
         .context("getting sdk env context")?;
     let sdk_version = match sdk.get_version() {
-        SdkVersion::Version(version) => version,
-        SdkVersion::InTree => "unversioned",
+        SdkVersion::Version(version) => version.to_string(),
+        SdkVersion::InTree => in_tree_sdk_version(),
         SdkVersion::Unknown => bail!("Unable to determine SDK version"),
     };
     let sdk_tools = SdkToolProvider::try_new().context("getting sdk tools")?;
-    pb_create_with_tools(cmd, sdk_version, Box::new(sdk_tools)).await
+    pb_create_with_tools(cmd, &sdk_version, Box::new(sdk_tools)).await
 }
 
 /// Create a product bundle using the provided `tools`.

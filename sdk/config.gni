@@ -4,7 +4,7 @@
 
 declare_args() {
   # Identifier for the Core SDK.
-  sdk_id = ""
+  sdk_id = read_file("//integration/MILESTONE", "trim string") + ".99991231.0.1"
 
   # Whether to cross-compile SDK tools for all supported host toolchains,
   # rather than just the current host toolchains.

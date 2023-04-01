@@ -13,5 +13,10 @@ declare_args() {
   #
   # Usage:
   #   `fx set PRODUCT.BOARD --args cts_version='"version_name"'`
-  cts_version = sdk_id
+  if (string_replace(sdk_id, "99991231.0.1", "") != sdk_id) {
+    # The replacement of "99991231.0.1" changed the string, so this is in-tree.
+    cts_version = ""
+  } else {
+    cts_version = sdk_id
+  }
 }

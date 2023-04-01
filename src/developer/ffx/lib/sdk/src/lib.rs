@@ -17,6 +17,9 @@ use tracing::warn;
 pub const SDK_MANIFEST_PATH: &str = "meta/manifest.json";
 pub const SDK_BUILD_MANIFEST_PATH: &str = "sdk/manifest/core";
 
+/// Current "F" milestone for Fuchsia (e.g. F38).
+const MILESTONE: &'static str = include_str!("../../../../../../integration/MILESTONE");
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum SdkVersion {
     Version(String),
@@ -313,6 +316,21 @@ impl Sdk {
     }
 }
 
+/// Even though an sdk_version for in-tree is an oxymoron, a value can be
+/// generated.
+///
+/// Returns the current "F" milestone (e.g. F38) and a fixed date.major.minor
+/// value of ".99991231.0.1". (e.g. "38.99991231.0.1" altogether).
+///
+/// The value was chosen because:
+/// - it will never conflict with a real sdk build
+/// - it will be newest for an sdk build of the same F
+/// - it's just weird enough to recognizable and searchable
+/// - the major.minor values align with fuchsia.dev guidelines
+pub fn in_tree_sdk_version() -> String {
+    format!("{}.99991231.0.1", MILESTONE.trim())
+}
+
 impl FfxToolFiles {
     fn from_metadata(sdk: &Sdk, tool: FfxTool) -> Result<Self> {
         let executable = sdk.path_prefix.join(&sdk.get_real_path(&tool.executable)?);
@@ -326,13 +344,11 @@ impl FfxToolFiles {
 
 #[cfg(test)]
 mod test {
-    use std::io::Write;
-
-    use tempfile::TempDir;
-
-    use sdk_metadata::ElementType;
-
     use super::*;
+    use regex::Regex;
+    use sdk_metadata::ElementType;
+    use std::io::Write;
+    use tempfile::TempDir;
 
     /// Writes the file to $root, with the path $path, from the source tree prefix $prefix
     /// (relative to this source file)
@@ -545,5 +561,12 @@ mod test {
 
         assert_eq!(sdk_root.join("ffx_tools/x64/ffx-assembly"), ffx_assembly.executable);
         assert_eq!(sdk_root.join("ffx_tools/x64/ffx-assembly.json"), ffx_assembly.metadata);
+    }
+
+    #[test]
+    fn test_in_tree_sdk_version() {
+        let version = in_tree_sdk_version();
+        let re = Regex::new(r"^\d+.99991231.0.1$").expect("creating regex");
+        assert!(re.is_match(&version));
     }
 }

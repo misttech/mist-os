@@ -21,12 +21,14 @@ rustc_library("lib") {
 
   test_deps = [
     "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:regex",
     "//third_party/rust_crates:tempfile",
   ]
 
   sources = [ "src/lib.rs" ]
 
   inputs = [
+    "//integration/MILESTONE",
     "test_data/core-sdk-root/host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json",
     "test_data/core-sdk-root/sdk/manifest/core",
     "test_data/core-sdk-root/host_x64/gen/src/developer/ffx/plugins/assembly/sdk.meta.json",
