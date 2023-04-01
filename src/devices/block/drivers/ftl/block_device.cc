@@ -121,7 +121,7 @@ zx_status_t BlockDevice::Init() {
   // need to set deadline profiles for all threads that the blobfs-pager-thread interacts with in
   // order to service page requests.
   const char* role_name = "fuchsia.devices.block.drivers.ftl.device";
-  const zx_status_t status = device_set_profile_by_role(this->zxdev(), thrd_get_zx_handle(worker_),
+  const zx_status_t status = device_set_profile_by_role(parent(), thrd_get_zx_handle(worker_),
                                                         role_name, strlen(role_name));
   if (status != ZX_OK) {
     zxlogf(WARNING, "FTL: Failed to apply role to worker: %d\n", status);
