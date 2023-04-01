@@ -19,8 +19,9 @@ namespace unwinder {
 struct Frame {
   enum class Trust {
     kScan,     // From scanning the stack with heuristics, least reliable.
-    kFP,       // From the frame pointer.
     kSCS,      // From the shadow call stack.
+    kFP,       // From the frame pointer.
+    kPLT,      // From PLT unwinder.
     kCFI,      // From call frame info / .eh_frame section.
     kContext,  // From the input / context, most reliable.
   };

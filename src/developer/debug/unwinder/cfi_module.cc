@@ -243,10 +243,6 @@ Error CfiModule::Step(Memory* stack, const Registers& current, Registers& next) 
   if (auto err = SearchEhFrame(pc, cie, fde); err.has_err()) {
     // Cannot find the correct FDE in .eh_frame, try to find in .debug_frame.
     if (SearchDebugFrame(pc, cie, fde).has_err()) {
-      // Heuristic for PLT trampolines.
-      if (!StepPLT(stack, current, next).has_err()) {
-        return Success();
-      }
       return err;  // return the error from .eh_frame.
     }
   }
@@ -546,42 +542,6 @@ Error CfiModule::DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, Dwa
   fde.instructions_begin = fde_ptr;
 
   return Success();
-}
-
-Error CfiModule::StepPLT(Memory* stack, const Registers& current, Registers& next) {
-  if (current.arch() == Registers::Arch::kX64) {
-    uint64_t sp;
-    if (auto err = current.GetSP(sp); err.has_err()) {
-      return err;
-    }
-    uint64_t sp_val;
-    if (auto err = stack->Read(sp, sp_val); err.has_err()) {
-      return err;
-    }
-    if (!IsValidPC(sp_val)) {
-      return Error("It doesn't look like a PLT trampoline");
-    }
-    // A trampoline will usually not scratch any registers, we could copy all the register values.
-    next = current;
-    // Simulate a return.
-    next.SetPC(sp_val);
-    next.SetSP(sp + 8);
-    return Success();
-  }
-  if (current.arch() == Registers::Arch::kArm64) {
-    uint64_t lr;
-    if (auto err = current.Get(RegisterID::kArm64_lr, lr); err.has_err()) {
-      return err;
-    }
-    if (!IsValidPC(lr)) {
-      return Error("It doesn't look like a PLT trampoline");
-    }
-    next = current;
-    next.SetPC(lr);
-    next.Unset(RegisterID::kArm64_lr);
-    return Success();
-  }
-  return Error("Not supported yet");
 }
 
 }  // namespace unwinder

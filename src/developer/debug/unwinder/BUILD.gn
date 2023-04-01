@@ -24,6 +24,7 @@ sdk_source_set("unwinder") {
     "cfi_unwinder.h",
     "dwarf_expr.h",
     "fp_unwinder.h",
+    "plt_unwinder.h",
     "scs_unwinder.h",
   ]
   sources = [
@@ -34,6 +35,7 @@ sdk_source_set("unwinder") {
     "error.cc",
     "fp_unwinder.cc",
     "memory.cc",
+    "plt_unwinder.cc",
     "registers.cc",
     "scs_unwinder.cc",
     "unwind.cc",

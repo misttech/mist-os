@@ -5,7 +5,6 @@
 #ifndef SRC_DEVELOPER_DEBUG_UNWINDER_SCS_UNWINDER_H_
 #define SRC_DEVELOPER_DEBUG_UNWINDER_SCS_UNWINDER_H_
 
-#include "src/developer/debug/unwinder/cfi_module.h"
 #include "src/developer/debug/unwinder/memory.h"
 #include "src/developer/debug/unwinder/registers.h"
 

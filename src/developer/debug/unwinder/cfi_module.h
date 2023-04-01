@@ -66,13 +66,6 @@ class CfiModule {
   [[nodiscard]] Error DecodeFde(uint8_t version, uint64_t fde_ptr, DwarfCie& cie, DwarfFde& fde);
   [[nodiscard]] Error DecodeCie(uint8_t version, uint64_t cie_ptr, DwarfCie& cie);
 
-  // A heuristic when PC is in PLT. See fxbug.dev/112402.
-  //
-  // This function lives here because it needs to know the PC range of the current module.
-  // As we're adding more heuristics, it might be better to move to a new unwinder with a dedicated
-  // trust level.
-  [[nodiscard]] Error StepPLT(Memory* stack, const Registers& current, Registers& next);
-
   // Inputs. Use const to prevent accidental modification.
   Memory* const elf_;
   const uint64_t elf_ptr_;

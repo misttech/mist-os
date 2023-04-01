@@ -48,9 +48,11 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
   // DW_CFA_val_expression rules for x18, and SCS-disabled functions don't touch x18.
   //
   // LR is considered to be preserved, because a function has to ensure that when it returns, LR has
-  // the same value as when the function begins.
+  // the same value as when the function begins. And the LR will be unset when we simulate the
+  // return, to reflect the fact that LR is clobbered during the bl/blr instruction.
   //
-  // SP is not considered to be preserved: its value will be recovered from CFA.
+  // SP is not considered to be preserved: its value will be recovered from CFA, unless it's
+  // overridden by custom rules, e.g., in starnix restricted executor.
   static RegisterID kArm64Preserved[] = {
       RegisterID::kArm64_x18, RegisterID::kArm64_x19, RegisterID::kArm64_x20,
       RegisterID::kArm64_x21, RegisterID::kArm64_x22, RegisterID::kArm64_x23,

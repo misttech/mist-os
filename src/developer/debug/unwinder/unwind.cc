@@ -17,6 +17,7 @@
 #include "src/developer/debug/unwinder/fp_unwinder.h"
 #include "src/developer/debug/unwinder/memory.h"
 #include "src/developer/debug/unwinder/module.h"
+#include "src/developer/debug/unwinder/plt_unwinder.h"
 #include "src/developer/debug/unwinder/registers.h"
 #include "src/developer/debug/unwinder/scs_unwinder.h"
 
@@ -28,11 +29,14 @@ std::string Frame::Describe() const {
     case Trust::kScan:
       res += "Scan";
       break;
+    case Trust::kSCS:
+      res += "SCS";
+      break;
     case Trust::kFP:
       res += "FP";
       break;
-    case Trust::kSCS:
-      res += "SCS";
+    case Trust::kPLT:
+      res += "PLT";
       break;
     case Trust::kCFI:
       res += "CFI";
@@ -80,6 +84,7 @@ std::vector<Frame> Unwinder::Unwind(Memory* stack, const Registers& registers, s
 
 Error Unwinder::Step(Memory* stack, const Frame& current, Frame& next) {
   FramePointerUnwinder fp_unwinder(&cfi_unwinder_);
+  PltUnwinder plt_unwinder(&cfi_unwinder_);
   ShadowCallStackUnwinder scs_unwinder;
 
   bool success = false;
@@ -95,7 +100,17 @@ Error Unwinder::Step(Memory* stack, const Frame& current, Frame& next) {
     err_msg = "CFI: " + err.msg();
   }
 
-  // Try frame pointers second because it plays well with the CFI.
+  if (!success && is_first_frame) {
+    // PLT unwinder only works for the first frame.
+    if (auto err = plt_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
+      next.trust = Frame::Trust::kPLT;
+      success = true;
+    } else {
+      err_msg += "; PLT: " + err.msg();
+    }
+  }
+
+  // Try frame pointers before SCS because it plays well with the CFI.
   if (!success) {
     if (auto err = fp_unwinder.Step(stack, current.regs, next.regs); err.ok()) {
       next.trust = Frame::Trust::kFP;
