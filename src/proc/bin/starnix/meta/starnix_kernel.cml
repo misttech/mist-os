@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 {
     // Just a forwarding shard while //src/proc -> //src/starnix is in process.
-    include: [ "//src/starnix/bin/starnix/meta/starnix_kernel.cml" ],
+    include: [ "//src/starnix/kernel/meta/starnix_kernel.cml" ],
 }
