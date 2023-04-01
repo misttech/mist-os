@@ -603,7 +603,7 @@ int SdmmcBlockDevice::WorkerThread() {
     const char* role_name = "fuchsia.devices.block.drivers.sdmmc.worker";
     const size_t role_name_size = strlen(role_name);
     const zx_status_t status = device_set_profile_by_role(
-        this->zxdev(), thrd_get_zx_handle(thrd_current()), role_name, role_name_size);
+        parent(), thrd_get_zx_handle(thrd_current()), role_name, role_name_size);
     if (status != ZX_OK) {
       zxlogf(WARNING,
              "Failed to apply role \"%s\" to worker thread: %s Performance may be reduced.",
