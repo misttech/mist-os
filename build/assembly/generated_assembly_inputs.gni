@@ -55,7 +55,7 @@ template("generated_assembly_inputs") {
     if (testonly) {
       deps += eng_platform_aib_labels
     } else {
-      deps += platform_aib_labels
+      deps += user_platform_aib_labels
     }
 
     # The legacy bundle from the assembly.

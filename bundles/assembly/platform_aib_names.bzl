@@ -7,7 +7,7 @@
 load("@fuchsia_icu_config//:constants.bzl", "icu_flavors")
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
-PLATFORM_AIB_NAMES = [
+USER_PLATFORM_AIB_NAMES = [
     "bootstrap",
     "core_realm",
     "core_realm_networking",
@@ -37,8 +37,12 @@ PLATFORM_AIB_NAMES = [
     "intl_services.icu_stable_{}".format(icu_flavors.stable_git_commit),
 ]
 
+USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
+    # TODO
+]
+
 # The names of all of the platform's Assembly Input Bundles.
-ENG_PLATFORM_AIB_NAMES = PLATFORM_AIB_NAMES + [
+ENG_PLATFORM_AIB_NAMES = USERDEBUG_PLATFORM_AIB_NAMES + [
     "core_realm_eng",
     "common_minimal_eng",
     "system_update_checker",

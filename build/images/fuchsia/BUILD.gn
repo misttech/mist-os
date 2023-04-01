@@ -141,8 +141,9 @@ if (is_fuchsia) {
 
     check_production_tag = check_production_eligibility
 
-    # In non-prod builds, allow use of the eng platform bundles.
+    # In non-prod builds, allow use of the eng and userdebug platform bundles.
     allow_eng_platform_bundle_use = !check_production_eligibility
+    allow_userdebug_platform_bundle_use = !check_production_eligibility
 
     include_component_id_index = true
 

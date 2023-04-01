@@ -92,8 +92,14 @@ template("bazel_assembled_system") {
     if (defined(invoker.allow_eng_platform_bundle_use) &&
         invoker.allow_eng_platform_bundle_use) {
       _aibs_to_use = eng_platform_aib_labels
+      not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
     } else {
-      _aibs_to_use = platform_aib_labels
+      if (defined(invoker.allow_userdebug_platform_bundle_use) &&
+          invoker.allow_userdebug_platform_bundle_use) {
+        _aibs_to_use = userdebug_platform_aib_labels
+      } else {
+        _aibs_to_use = user_platform_aib_labels
+      }
     }
     foreach(_aib, _aibs_to_use) {
       bazel_inputs += [ "${_aib}_bazel_inputs" ]

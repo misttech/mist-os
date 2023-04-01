@@ -76,6 +76,11 @@ import("//src/storage/fshost/generated_fshost_config.gni")
 #     [label] A label for the product assembly config, should be a
 #     `product_assembly_configuration` target.
 #
+#   allow_userdebug_platform_bundle_use (optional; default=false)
+#     [boolean] If true, allow the 'userdebug' platform bundles to be used by
+#     the assembled system.  (this is only a check made by GN, assembly itself
+#     may still access them)
+
 #   allow_eng_platform_bundle_use (optional; default=false)
 #     [boolean] If true, allow the 'eng' platform bundles to be used by the
 #     assembled system.  (this is only a check made by GN, assembly itself may
@@ -361,13 +366,18 @@ template("assembled_system") {
     compare_command_logs = "${namespace}.compare_command_logs"
     compare_images_manifests = "${namespace}.compare_images_manifests"
 
-    # platform_aib_labels and eng_platform_aib_labels come from
-    # //bundles/assembly/platform_aibs.gni.
+    # *_platform_aib_labels come from //bundles/assembly/platform_aibs.gni
     if (defined(invoker.allow_eng_platform_bundle_use) &&
         invoker.allow_eng_platform_bundle_use) {
       platform_common_aibs = eng_platform_aib_labels
+      not_needed(invoker, [ "allow_userdebug_platform_bundle_use" ])
     } else {
-      platform_common_aibs = platform_aib_labels
+      if (defined(invoker.allow_userdebug_platform_bundle_use) &&
+          invoker.allow_userdebug_platform_bundle_use) {
+        platform_common_aibs = userdebug_platform_aib_labels
+      } else {
+        platform_common_aibs = user_platform_aib_labels
+      }
     }
 
     bazel_images_config_inputs = "${namespace}.bazel_images_config_inputs"
@@ -457,7 +467,12 @@ template("assembled_system") {
         invoker.allow_eng_platform_bundle_use) {
       platform_common_aibs = eng_platform_aib_files
     } else {
-      platform_common_aibs = platform_aib_files
+      if (defined(invoker.allow_userdebug_platform_bundle_use) &&
+          invoker.allow_userdebug_platform_bundle_use) {
+        platform_common_aibs = userdebug_platform_aib_files
+      } else {
+        platform_common_aibs = user_platform_aib_files
+      }
     }
   }
 
