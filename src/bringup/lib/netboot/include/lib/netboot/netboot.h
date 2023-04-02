@@ -16,38 +16,37 @@
 #define NETBOOT_MAGIC              0xAA774217
 #define NETBOOT_DEBUGLOG_MAGIC     0xAEAE1123
 
-#define NETBOOT_SERVER_PORT        33330
-#define NETBOOT_ADVERT_PORT        33331
-#define NETBOOT_CMD_PORT_START     33332
-#define NETBOOT_CMD_PORT_END       33339
-#define NETBOOT_TFTP_OUTGOING_PORT 33340
-#define NETBOOT_TFTP_INCOMING_PORT 33341
+#define NETBOOT_PORT_SERVER        33330
+#define NETBOOT_PORT_ADVERT        33331
+#define NETBOOT_PORT_CMD_START     33332
+#define NETBOOT_PORT_CMD_END       33339
+#define NETBOOT_PORT_TFTP_OUTGOING 33340
+#define NETBOOT_PORT_TFTP_INCOMING 33341
 
+#define NETBOOT_COMMAND_ACK               0   // arg=0 or -err, NETBOOT_READ: data=data
+#define NETBOOT_COMMAND_EXECUTE           1   // arg=0, data=command
+#define NETBOOT_COMMAND_SEND_FILE         2   // arg=size, data=filename
+#define NETBOOT_COMMAND_DATA              3   // arg=offset, data=data
+#define NETBOOT_COMMAND_BOOT              4   // arg=0
+#define NETBOOT_COMMAND_QUERY             5   // arg=0, data=hostname (or "*")
+#define NETBOOT_COMMAND_SHELL_CMD         6   // arg=0, data=command string
+#define NETBOOT_COMMAND_OPEN              7   // arg=O_RDONLY|O_WRONLY, data=filename
+#define NETBOOT_COMMAND_READ              8   // arg=blocknum
+#define NETBOOT_COMMAND_WRITE             9   // arg=blocknum, data=data
+#define NETBOOT_COMMAND_CLOSE             10  // arg=0
+#define NETBOOT_COMMAND_LAST_DATA         11  // arg=offset, data=data
+#define NETBOOT_COMMAND_REBOOT            12  // arg=0
+#define NETBOOT_COMMAND_GET_ADVERT        13  // arg=0
 
-#define NETBOOT_COMMAND           1   // arg=0, data=command
-#define NETBOOT_SEND_FILE         2   // arg=size, data=filename
-#define NETBOOT_DATA              3   // arg=offset, data=data
-#define NETBOOT_BOOT              4   // arg=0
-#define NETBOOT_QUERY             5   // arg=0, data=hostname (or "*")
-#define NETBOOT_SHELL_CMD         6   // arg=0, data=command string
-#define NETBOOT_OPEN              7   // arg=O_RDONLY|O_WRONLY, data=filename
-#define NETBOOT_READ              8   // arg=blocknum
-#define NETBOOT_WRITE             9   // arg=blocknum, data=data
-#define NETBOOT_CLOSE             10  // arg=0
-#define NETBOOT_LAST_DATA         11  // arg=offset, data=data
-#define NETBOOT_REBOOT            12  // arg=0
-#define NETBOOT_GET_ADVERT        13  // arg=0
+#define NETBOOT_COMMAND_FILE_RECEIVED      0x70000001 // arg=size
 
-#define NETBOOT_ACK                0 // arg=0 or -err, NETBOOT_READ: data=data
-#define NETBOOT_FILE_RECEIVED      0x70000001 // arg=size
+#define NETBOOT_COMMAND_ADVERTISE          0x77777777
 
-#define NETBOOT_ADVERTISE          0x77777777
-
-#define NETBOOT_ERROR              0x80000000
-#define NETBOOT_ERROR_BAD_CMD      0x80000001
-#define NETBOOT_ERROR_BAD_PARAM    0x80000002
-#define NETBOOT_ERROR_TOO_LARGE    0x80000003
-#define NETBOOT_ERROR_BAD_FILE     0x80000004
+#define NETBOOT_COMMAND_ERROR_GENERIC      0x80000000
+#define NETBOOT_COMMAND_ERROR_BAD_CMD      0x80000001
+#define NETBOOT_COMMAND_ERROR_BAD_PARAM    0x80000002
+#define NETBOOT_COMMAND_ERROR_TOO_LARGE    0x80000003
+#define NETBOOT_COMMAND_ERROR_BAD_FILE     0x80000004
 
 #define NETBOOT_VERSION_1_0  0x0001000
 #define NETBOOT_VERSION_1_1  0x0001010
@@ -55,7 +54,7 @@
 #define NETBOOT_VERSION_1_3  0x0001030
 #define NETBOOT_VERSION_CURRENT NETBOOT_VERSION_1_3
 
-#define NETBOOT_MAX_NODENAME_LENGTH 64
+#define NETBOOT_MAX_NODENAME_LEN 64
 
 #define NETBOOT_FILENAME_PREFIX "<<netboot>>"
 #define NETBOOT_KERNEL_FILENAME NETBOOT_FILENAME_PREFIX "kernel.bin"
@@ -128,15 +127,15 @@ typedef struct {
     uint32_t arg;
 } netboot_message_header_t;
 
-#define NETBOOT_DEBUGLOG_PORT         33337
-#define NETBOOT_DEBUGLOG_ACK_PORT     33338
+#define NETBOOT_DEBUGLOG_PORT_SERVER  33337
+#define NETBOOT_DEBUGLOG_PORT_ACK     33338
 
 #define NETBOOT_DEBUGLOG_MAX_DATA 1216
 
 typedef struct {
     uint32_t magic;
     uint32_t seqno;
-    char nodename[NETBOOT_MAX_NODENAME_LENGTH];
+    char nodename[NETBOOT_MAX_NODENAME_LEN];
     char data[NETBOOT_DEBUGLOG_MAX_DATA];
 } netboot_debuglog_packet_t;
 

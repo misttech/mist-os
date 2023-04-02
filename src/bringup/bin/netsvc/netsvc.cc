@@ -39,7 +39,7 @@ namespace {
 bool g_netbootloader = false;
 
 // When false (default), will only respond to a limited number of commands.
-// Currently, NETBOOT_QUERY (to support netls and netaddr), as well as responding to
+// Currently, NETBOOT_COMMAND_QUERY (to support netls and netaddr), as well as responding to
 // ICMP as usual.
 bool g_all_features = false;
 bool g_log_packets = false;
@@ -57,21 +57,21 @@ void udp6_recv(async_dispatcher_t* dispatcher, void* data, size_t len, const ip6
   bool mcast = (memcmp(daddr, &ip6_ll_all_nodes, sizeof(ip6_addr_t)) == 0);
 
   if (!all_features()) {
-    if (dport != NETBOOT_SERVER_PORT) {
+    if (dport != NETBOOT_PORT_SERVER) {
       // Only some netboot commands allowed in limited mode.
       return;
     }
   }
 
   switch (dport) {
-    case NETBOOT_SERVER_PORT:
+    case NETBOOT_PORT_SERVER:
       netboot_recv(data, len, mcast, daddr, dport, saddr, sport);
       break;
-    case NETBOOT_DEBUGLOG_ACK_PORT:
+    case NETBOOT_DEBUGLOG_PORT_ACK:
       debuglog_recv(dispatcher, data, len, mcast);
       break;
-    case NETBOOT_TFTP_INCOMING_PORT:
-    case NETBOOT_TFTP_OUTGOING_PORT:
+    case NETBOOT_PORT_TFTP_INCOMING:
+    case NETBOOT_PORT_TFTP_OUTGOING:
       tftp_recv(dispatcher, data, len, daddr, dport, saddr, sport);
       break;
   }

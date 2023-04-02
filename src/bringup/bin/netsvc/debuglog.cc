@@ -226,8 +226,8 @@ zx_status_t debuglog_init(async_dispatcher_t* dispatcher) {
   auto& listener = gListener.emplace(
       dispatcher,
       [](const netboot_debuglog_packet_t& pkt, size_t len) {
-        zx_status_t status = udp6_send(&pkt, len, &ip6_ll_all_nodes, NETBOOT_DEBUGLOG_PORT,
-                                       NETBOOT_DEBUGLOG_ACK_PORT, false);
+        zx_status_t status = udp6_send(&pkt, len, &ip6_ll_all_nodes, NETBOOT_DEBUGLOG_PORT_SERVER,
+                                       NETBOOT_DEBUGLOG_PORT_ACK, false);
         if (status != ZX_OK) {
           printf("netsvc: failed to send debuglog: %s\n", zx_status_get_string(status));
         }

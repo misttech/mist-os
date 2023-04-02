@@ -292,13 +292,13 @@ int send_boot_command(struct sockaddr_in6* ra) {
   static int cookie = 0;
   hdr.magic = NETBOOT_MAGIC;
   hdr.cookie = cookie++;
-  hdr.cmd = NETBOOT_BOOT;
+  hdr.cmd = NETBOOT_COMMAND_BOOT;
   hdr.arg = 0;
 
-  // Send to NETBOOT_SERVER_PORT
+  // Send to NETBOOT_PORT_SERVER
   struct sockaddr_in6 target_addr;
   memcpy(&target_addr, ra, sizeof(struct sockaddr_in6));
-  target_addr.sin6_port = htons(NETBOOT_SERVER_PORT);
+  target_addr.sin6_port = htons(NETBOOT_PORT_SERVER);
   int s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   if (s < 0) {
     log("cannot create socket %d", s);
@@ -322,13 +322,13 @@ int send_reboot_command(struct sockaddr_in6* ra) {
   static int cookie = 0;
   hdr.magic = NETBOOT_MAGIC;
   hdr.cookie = cookie++;
-  hdr.cmd = NETBOOT_REBOOT;
+  hdr.cmd = NETBOOT_COMMAND_REBOOT;
   hdr.arg = 0;
 
-  // Send to NETBOOT_SERVER_PORT
+  // Send to NETBOOT_PORT_SERVER
   struct sockaddr_in6 target_addr;
   memcpy(&target_addr, ra, sizeof(struct sockaddr_in6));
-  target_addr.sin6_port = htons(NETBOOT_SERVER_PORT);
+  target_addr.sin6_port = htons(NETBOOT_PORT_SERVER);
   int s = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
   if (s < 0) {
     log("cannot create socket %d", s);
@@ -728,11 +728,11 @@ int main(int argc, char** argv) {
       return -1;
     }
     memcpy(&addr.sin6_addr, &allowed_addr, sizeof(struct in6_addr));
-    addr.sin6_port = htons(NETBOOT_SERVER_PORT);
+    addr.sin6_port = htons(NETBOOT_PORT_SERVER);
     addr.sin6_scope_id = allowed_scope_id;
     log("Sending request to %s", sockaddr_str(&addr));
   } else {
-    addr.sin6_port = htons(NETBOOT_ADVERT_PORT);
+    addr.sin6_port = htons(NETBOOT_PORT_ADVERT);
     if (bind(sock, (void*)&addr, sizeof(addr)) < 0) {
       log("cannot bind to %s %d: %s\nthere may be another bootserver running\n",
           sockaddr_str(&addr), errno, strerror(errno));
@@ -754,7 +754,7 @@ int main(int argc, char** argv) {
       // Send request to device to get the advertisement instead of waiting for the
       // broadcasted advertisement.
       hdr->magic = NETBOOT_MAGIC;
-      hdr->cmd = NETBOOT_GET_ADVERT;
+      hdr->cmd = NETBOOT_COMMAND_GET_ADVERT;
 
       ssize_t send_result = sendto(sock, buf, sizeof(netboot_message_header_t), 0,
                                    (struct sockaddr*)&addr, sizeof(addr));
@@ -804,7 +804,7 @@ int main(int argc, char** argv) {
     }
     if (hdr->magic != NETBOOT_MAGIC)
       continue;
-    if (hdr->cmd != NETBOOT_ADVERTISE)
+    if (hdr->cmd != NETBOOT_COMMAND_ADVERTISE)
       continue;
     if ((use_tftp && (hdr->arg < NETBOOT_VERSION_1_3)) ||
         (!use_tftp && (hdr->arg < NETBOOT_VERSION_1_1))) {

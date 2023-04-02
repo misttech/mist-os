@@ -56,7 +56,7 @@ static int netboot_bind_to_cmd_port(int socket) {
   memset(&addr, 0, sizeof(addr));
   addr.sin6_family = AF_INET6;
 
-  for (uint16_t port = NETBOOT_CMD_PORT_START; port <= NETBOOT_CMD_PORT_END; port++) {
+  for (uint16_t port = NETBOOT_PORT_CMD_START; port <= NETBOOT_PORT_CMD_END; port++) {
     addr.sin6_port = htons(port);
     if (bind(socket, (void*)&addr, sizeof(addr)) == 0) {
       return 0;
@@ -72,7 +72,7 @@ static int netboot_send_query(int socket, unsigned port, const char* ifname) {
   msg m;
   m.hdr.magic = NETBOOT_MAGIC;
   m.hdr.cookie = ++cookie;
-  m.hdr.cmd = NETBOOT_QUERY;
+  m.hdr.cmd = NETBOOT_COMMAND_QUERY;
   m.hdr.arg = 0;
   memcpy(m.data, hostname, hostname_len);
 
@@ -136,7 +136,8 @@ static bool netboot_receive_query(int socket, on_device_cb callback, void* data)
   } else if ((size_t)r > sizeof(netboot_message_header_t)) {
     r -= sizeof(netboot_message_header_t);
     m.data[r] = 0;
-    if ((m.hdr.magic == NETBOOT_MAGIC) && (m.hdr.cookie == cookie) && (m.hdr.cmd == NETBOOT_ACK)) {
+    if ((m.hdr.magic == NETBOOT_MAGIC) && (m.hdr.cookie == cookie) &&
+        (m.hdr.cmd == NETBOOT_COMMAND_ACK)) {
       char tmp[INET6_ADDRSTRLEN];
       if (inet_ntop(AF_INET6, &ra.sin6_addr, tmp, sizeof(tmp)) == NULL) {
         strcpy(tmp, "???");
@@ -355,7 +356,7 @@ int netboot_open(const char* hostname, const char* ifname, struct sockaddr_in6* 
   memset(&(cookie.addr), 0, sizeof(cookie.addr));
   cookie.index = 0;
   cookie.hostname = hostname;
-  if (netboot_discover(NETBOOT_SERVER_PORT, ifname, netboot_open_callback, &cookie) < 0) {
+  if (netboot_discover(NETBOOT_PORT_SERVER, ifname, netboot_open_callback, &cookie) < 0) {
     return -1;
   }
   // Device not found

@@ -68,7 +68,7 @@ int main(int argc, char** argv) {
   msg m;
   m.hdr.magic = NETBOOT_MAGIC;
   m.hdr.cookie = 0x11224455;
-  m.hdr.cmd = NETBOOT_SHELL_CMD;
+  m.hdr.cmd = NETBOOT_COMMAND_SHELL_CMD;
   m.hdr.arg = 0;
   memcpy(m.data, cmd, cmd_len);
 

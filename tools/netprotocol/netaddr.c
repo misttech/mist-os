@@ -22,7 +22,7 @@
 static const char* hostname;
 static struct sockaddr_in6 addr;
 static bool found = false;
-static char found_device_nodename[NETBOOT_MAX_NODENAME_LENGTH];
+static char found_device_nodename[NETBOOT_MAX_NODENAME_LEN];
 static bool local_address = false;
 static const char* appname;
 
@@ -39,7 +39,7 @@ static bool on_device(device_info_t* device, void* cookie) {
   }
 
   addr = device->inet6_addr;
-  strncpy(found_device_nodename, device->nodename, NETBOOT_MAX_NODENAME_LENGTH);
+  strncpy(found_device_nodename, device->nodename, NETBOOT_MAX_NODENAME_LEN);
   found = true;
   return true;
 }
@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
       hostname = NULL;
   }
 
-  if (netboot_discover(NETBOOT_SERVER_PORT, NULL, on_device, NULL) || !found) {
+  if (netboot_discover(NETBOOT_PORT_SERVER, NULL, on_device, NULL) || !found) {
     fprintf(stderr, "Failed to discover %s\n", hostname ? hostname : "");
     return 1;
   }

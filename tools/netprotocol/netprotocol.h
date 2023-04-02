@@ -29,7 +29,7 @@ typedef enum device_state {
 } device_state_t;
 
 typedef struct device_info {
-  char nodename[NETBOOT_MAX_NODENAME_LENGTH];
+  char nodename[NETBOOT_MAX_NODENAME_LEN];
   char inet6_addr_s[INET6_ADDRSTRLEN];
   struct sockaddr_in6 inet6_addr;
   device_state_t state;

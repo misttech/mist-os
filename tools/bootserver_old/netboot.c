@@ -59,24 +59,24 @@ static int io_rcv(int s, netboot_message_header_t* hdr, netboot_message_header_t
       }
     }
 
-    if (ack->cmd == NETBOOT_ACK || ack->cmd == NETBOOT_FILE_RECEIVED) {
+    if (ack->cmd == NETBOOT_COMMAND_ACK || ack->cmd == NETBOOT_COMMAND_FILE_RECEIVED) {
       return 0;
     }
 
     switch (ack->cmd) {
-      case NETBOOT_ERROR:
+      case NETBOOT_COMMAND_ERROR_GENERIC:
         fprintf(stderr, "\n%s: error: Generic error\n", appname);
         break;
-      case NETBOOT_ERROR_BAD_CMD:
+      case NETBOOT_COMMAND_ERROR_BAD_CMD:
         fprintf(stderr, "\n%s: error: Bad command\n", appname);
         break;
-      case NETBOOT_ERROR_BAD_PARAM:
+      case NETBOOT_COMMAND_ERROR_BAD_PARAM:
         fprintf(stderr, "\n%s: error: Bad parameter\n", appname);
         break;
-      case NETBOOT_ERROR_TOO_LARGE:
+      case NETBOOT_COMMAND_ERROR_TOO_LARGE:
         fprintf(stderr, "\n%s: error: File too large\n", appname);
         break;
-      case NETBOOT_ERROR_BAD_FILE:
+      case NETBOOT_COMMAND_ERROR_BAD_FILE:
         fprintf(stderr, "\n%s: error: Bad file\n", appname);
         break;
       default:
@@ -161,7 +161,7 @@ static int io(int s, netboot_message_header_t* msg, size_t len, netboot_message_
       }
 
       // If we got an ack, don't bother sending anything - go handle the ack first
-      if (!r && FD_ISSET(s, &writes) && (ack->cookie == 0 || ack->cmd != NETBOOT_ACK)) {
+      if (!r && FD_ISSET(s, &writes) && (ack->cookie == 0 || ack->cmd != NETBOOT_COMMAND_ACK)) {
         r = io_send(s, msg, len);
       }
 
@@ -281,7 +281,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     goto done;
   }
 
-  msg->cmd = NETBOOT_SEND_FILE;
+  msg->cmd = NETBOOT_COMMAND_SEND_FILE;
   msg->arg = sz;
   strcpy((void*)msg_data, name);
   if (io(s, msg, sizeof(netboot_message_header_t) + strlen(name) + 1, ack, true)) {
@@ -289,7 +289,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     goto done;
   }
 
-  msg->cmd = NETBOOT_DATA;
+  msg->cmd = NETBOOT_COMMAND_DATA;
   msg->arg = 0;
 
   bool completed = false;
@@ -313,9 +313,9 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
       }
     } else {
       if (current_pos + (size_t)r >= sz) {
-        msg->cmd = NETBOOT_LAST_DATA;
+        msg->cmd = NETBOOT_COMMAND_LAST_DATA;
       } else {
-        msg->cmd = NETBOOT_DATA;
+        msg->cmd = NETBOOT_COMMAND_DATA;
       }
 
       if (io(s, msg, sizeof(netboot_message_header_t) + r, ack, false)) {
@@ -339,7 +339,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     }
 
     // ACKs really are NACKs
-    if (ack->cookie > 0 && ack->cmd == NETBOOT_ACK) {
+    if (ack->cookie > 0 && ack->cmd == NETBOOT_COMMAND_ACK) {
       // ACKs tend to be generated in groups, since a dropped packet will cause ACKs for all
       // outstanding packets. Therefore briefly sleep when we receive an ACK with a different
       // position, to let things settle and prevent ourselves from fighting subsequent acks.
@@ -354,7 +354,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
         fprintf(stderr, "\n%s: error: Failed to rewind '%s' to %zu\n", appname, fn, current_pos);
         goto done;
       }
-    } else if (ack->cmd == NETBOOT_FILE_RECEIVED) {
+    } else if (ack->cmd == NETBOOT_COMMAND_FILE_RECEIVED) {
       current_pos += r;
       completed = true;
     } else {
