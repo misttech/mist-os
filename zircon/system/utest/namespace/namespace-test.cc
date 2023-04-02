@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,9 +55,9 @@ void CreateNamespaceHelper(fdio_ns_t** out) {
   ASSERT_OK(fdio_ns_create(&ns));
   for (unsigned n = 0; n < std::size(NS); n++) {
     fbl::unique_fd fd(open(NS[n].remote, O_RDONLY | O_DIRECTORY));
-    ASSERT_GT(fd.get(), 0);
+    ASSERT_TRUE(fd, "%s", strerror(errno));
     ASSERT_OK(fdio_ns_bind_fd(ns, NS[n].local, fd.get()));
-    ASSERT_EQ(close(fd.release()), 0);
+    ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno));
   }
   *out = ns;
 }
@@ -73,54 +74,62 @@ TEST(NamespaceTest, Destroy) {
 TEST(NamespaceTest, DestroyWhileInUse) {
   fdio_ns_t* ns;
   ASSERT_NO_FATAL_FAILURE(CreateNamespaceHelper(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   fbl::unique_fd fd(fdio_ns_opendir(ns));
-  ASSERT_GE(fd.get(), 0, "Couldn't open root");
-  ASSERT_OK(fdio_ns_destroy(ns));
-  ASSERT_EQ(close(fd.release()), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno));
 }
 
 // Tests that remote connections may be bound to the root of the namespace.
 TEST(NamespaceTest, BindRoot) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_OK(fdio_ns_bind_fd(ns, "/", fd.get()));
-  ASSERT_EQ(close(fd.release()), 0);
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, BindRootHandle) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   zx::channel h1, h2;
   ASSERT_OK(zx::channel::create(0, &h1, &h2));
   ASSERT_OK(fdio_service_connect("/boot/bin", h1.release()));
   ASSERT_OK(fdio_ns_bind(ns, "/", h2.release()));
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests that rebinding and shadowing are disallowed on the root vnode.
 TEST(NamespaceTest, ShadowRoot) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_OK(fdio_ns_bind_fd(ns, "/", fd.get()));
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/", fd.get()), ZX_ERR_ALREADY_EXISTS, "Rebind disallowed");
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/a", fd.get()), ZX_ERR_NOT_SUPPORTED);
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/a/b", fd.get()), ZX_ERR_NOT_SUPPORTED);
-  ASSERT_EQ(close(fd.release()), 0);
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests that rebinding and shadowing are disallowed on non-root vnodes.
 TEST(NamespaceTest, ShadowNonRoot) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
 
   ASSERT_OK(fdio_ns_bind_fd(ns, "/foo", fd.get()));
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/foo", fd.get()), ZX_ERR_ALREADY_EXISTS);
@@ -132,59 +141,57 @@ TEST(NamespaceTest, ShadowNonRoot) {
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/bar/foo", fd.get()), ZX_ERR_ALREADY_EXISTS);
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/bar/foo/b", fd.get()), ZX_ERR_NOT_SUPPORTED);
   ASSERT_EQ(fdio_ns_bind_fd(ns, "/bar/foo/b/c", fd.get()), ZX_ERR_NOT_SUPPORTED);
-
-  ASSERT_EQ(close(fd.release()), 0);
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests exporting a namespace with no contents.
 TEST(NamespaceTest, ExportEmpty) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fdio_flat_namespace_t* flat = nullptr;
   ASSERT_OK(fdio_ns_export(ns, &flat));
-  ASSERT_EQ(flat->count, 0);
+  auto flat_cleanup = fit::defer([&flat] { fdio_ns_free_flat_ns(flat); });
 
-  fdio_ns_free_flat_ns(flat);
-  ASSERT_OK(fdio_ns_destroy(ns));
+  ASSERT_EQ(flat->count, 0);
 }
 
 // Tests exporting a namespace with a single entry: the root.
 TEST(NamespaceTest, ExportRoot) {
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_OK(fdio_ns_bind_fd(ns, "/", fd.get()));
-  ASSERT_EQ(close(fd.release()), 0);
 
   fdio_flat_namespace_t* flat = nullptr;
   ASSERT_OK(fdio_ns_export(ns, &flat));
+  auto flat_cleanup = fit::defer([&flat] { fdio_ns_free_flat_ns(flat); });
+
   ASSERT_EQ(flat->count, 1);
   ASSERT_STREQ(flat->path[0], "/");
-
-  fdio_ns_free_flat_ns(flat);
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests exporting a namespace with multiple entries.
 TEST(NamespaceTest, Export) {
   fdio_ns_t* ns;
   ASSERT_NO_FATAL_FAILURE(CreateNamespaceHelper(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
 
   // Actually create the flat namespace.
   fdio_flat_namespace_t* flat = nullptr;
   ASSERT_OK(fdio_ns_export(ns, &flat));
+  auto flat_cleanup = fit::defer([&flat] { fdio_ns_free_flat_ns(flat); });
 
   // Validate the contents match the initialized mapping.
   ASSERT_EQ(flat->count, std::size(NS));
   for (unsigned n = 0; n < std::size(NS); n++) {
     ASSERT_STREQ(flat->path[n], NS[n].local);
   }
-
-  fdio_ns_free_flat_ns(flat);
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests changing the current namespace.
@@ -194,7 +201,10 @@ TEST(NamespaceTest, Chdir) {
 
   fdio_ns_t* ns;
   ASSERT_NO_FATAL_FAILURE(CreateNamespaceHelper(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   ASSERT_OK(fdio_ns_chdir(ns));
+  auto chdir_cleanup = fit::defer([&old_ns] { ASSERT_OK(fdio_ns_chdir(old_ns)); });
 
   DIR* dir;
   struct dirent* de;
@@ -224,16 +234,14 @@ TEST(NamespaceTest, Chdir) {
 
   // Try doing some basic file ops within the namespace
   fbl::unique_fd fd(open("fake/tmp/newfile", O_CREAT | O_RDWR | O_EXCL, S_IRUSR | S_IWUSR));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_GT(write(fd.get(), "hello", strlen("hello")), 0);
-  ASSERT_EQ(close(fd.release()), 0);
   ASSERT_EQ(unlink("fake/tmp/newfile"), 0);
   ASSERT_EQ(mkdir("fake/tmp/newdir", 0666), 0);
   ASSERT_EQ(rename("fake/tmp/newdir", "fake/tmp/olddir"), 0);
   ASSERT_EQ(rmdir("fake/tmp/olddir"), 0);
-
-  ASSERT_OK(fdio_ns_chdir(old_ns));
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests that we can unbind nodes from the namespace.
@@ -244,13 +252,17 @@ TEST(NamespaceTest, UnbindNonRoot) {
   // Create a namespace with a single entry.
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_OK(fdio_ns_bind_fd(ns, "/my/local/path", fd.get()));
   ASSERT_OK(fdio_ns_bind_fd(ns, "/top", fd.get()));
   ASSERT_OK(fdio_ns_bind_fd(ns, "/another_top", fd.get()));
-  ASSERT_EQ(close(fd.release()), 0);
   ASSERT_OK(fdio_ns_chdir(ns));
+  auto chdir_cleanup = fit::defer([&old_ns] { ASSERT_OK(fdio_ns_chdir(old_ns)); });
 
   struct stat st;
   ASSERT_EQ(stat("my", &st), 0);
@@ -269,9 +281,6 @@ TEST(NamespaceTest, UnbindNonRoot) {
   ASSERT_EQ(stat("my", &st), -1);
   ASSERT_EQ(stat("my/local", &st), -1);
   ASSERT_EQ(stat("my/local/path", &st), -1);
-
-  ASSERT_OK(fdio_ns_chdir(old_ns));
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests that we can unbind the root of the namespace.
@@ -282,11 +291,15 @@ TEST(NamespaceTest, UnbindRoot) {
   // Create a namespace with a single entry.
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fbl::unique_fd fd(open("/boot", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_OK(fdio_ns_bind_fd(ns, "/", fd.get()));
-  ASSERT_EQ(close(fd.release()), 0);
   ASSERT_OK(fdio_ns_chdir(ns));
+  auto chdir_cleanup = fit::defer([&old_ns] { ASSERT_OK(fdio_ns_chdir(old_ns)); });
 
   constexpr char kBinDir[] = "bin";
   struct stat st;
@@ -299,9 +312,6 @@ TEST(NamespaceTest, UnbindRoot) {
   ASSERT_OK(fdio_ns_chdir(ns));
   ASSERT_EQ(stat(kBinDir, &st), -1);
   ASSERT_EQ(errno, ENOENT, "%s", strerror(errno));
-
-  ASSERT_OK(fdio_ns_chdir(old_ns));
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 // Tests that intermediate nodes are unbound up to an ancestor that
@@ -313,12 +323,16 @@ TEST(NamespaceTest, UnbindAncestor) {
   // Create a namespace with a single entry.
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   fbl::unique_fd fd(open("/boot/bin", O_RDONLY | O_DIRECTORY));
-  ASSERT_GT(fd.get(), 0);
+  ASSERT_TRUE(fd, "%s", strerror(errno));
+  auto fd_cleanup = fit::defer([&fd] { ASSERT_EQ(close(fd.release()), 0, "%s", strerror(errno)); });
+
   ASSERT_OK(fdio_ns_bind_fd(ns, "/my/local/path", fd.get()));
   ASSERT_OK(fdio_ns_bind_fd(ns, "/my/other/path", fd.get()));
-  ASSERT_EQ(close(fd.release()), 0);
   ASSERT_OK(fdio_ns_chdir(ns));
+  auto chdir_cleanup = fit::defer([&old_ns] { ASSERT_OK(fdio_ns_chdir(old_ns)); });
 
   struct stat st;
   ASSERT_EQ(stat("my", &st), 0);
@@ -336,16 +350,14 @@ TEST(NamespaceTest, UnbindAncestor) {
   ASSERT_EQ(stat("my/local/path", &st), -1);  // Removed
   ASSERT_EQ(stat("my/other", &st), 0);
   ASSERT_EQ(stat("my/other/path", &st), 0);
-
-  ASSERT_OK(fdio_ns_chdir(old_ns));
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 TEST(NamespaceTest, ExportGlobalRoot) {
   fdio_flat_namespace_t* flat = nullptr;
   ASSERT_OK(fdio_ns_export_root(&flat));
+  auto flat_cleanup = fit::defer([&flat] { fdio_ns_free_flat_ns(flat); });
+
   ASSERT_LE(1, flat->count);
-  fdio_ns_free_flat_ns(flat);
 }
 
 TEST(NamespaceTest, GetInstalled) {
@@ -362,6 +374,8 @@ TEST(NamespaceTest, Readdir) {
   constexpr size_t kNumChildren = 1000;
   fdio_ns_t* ns;
   ASSERT_OK(fdio_ns_create(&ns));
+  auto ns_cleanup = fit::defer([&ns] { ASSERT_OK(fdio_ns_destroy(ns)); });
+
   std::vector<zx::channel> client_ends;
   for (size_t n = 0; n < kNumChildren; n++) {
     std::string path = std::string("/test_") + std::to_string(n);
@@ -371,6 +385,7 @@ TEST(NamespaceTest, Readdir) {
     client_ends.push_back(std::move(fake_client_end));
   }
   ASSERT_OK(fdio_ns_chdir(ns));
+  auto chdir_cleanup = fit::defer([&old_ns] { ASSERT_OK(fdio_ns_chdir(old_ns)); });
 
   DIR* dir;
   struct dirent* de;
@@ -385,9 +400,6 @@ TEST(NamespaceTest, Readdir) {
   }
   ASSERT_NULL((de = readdir(dir)));
   ASSERT_EQ(closedir(dir), 0);
-
-  ASSERT_OK(fdio_ns_chdir(old_ns));
-  ASSERT_OK(fdio_ns_destroy(ns));
 }
 
 }  // namespace

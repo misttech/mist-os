@@ -10,6 +10,7 @@ test("namespace") {
   sources = [ "namespace-test.cc" ]
   deps = [
     "//sdk/lib/fdio",
+    "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
