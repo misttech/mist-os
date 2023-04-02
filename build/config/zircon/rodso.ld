@@ -136,4 +136,5 @@ PHDRS {
     dynamic PT_DYNAMIC FLAGS(4);
     note PT_NOTE;
     eh_frame_hdr PT_GNU_EH_FRAME;
+    stack PT_GNU_STACK FLAGS(6);  /* RW- */
 }

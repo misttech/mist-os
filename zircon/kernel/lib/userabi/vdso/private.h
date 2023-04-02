@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_ZIRCON_PRIVATE_H_
-#define ZIRCON_SYSTEM_ULIB_ZIRCON_PRIVATE_H_
+#ifndef ZIRCON_KERNEL_LIB_USERABI_VDSO_PRIVATE_H_
+#define ZIRCON_KERNEL_LIB_USERABI_VDSO_PRIVATE_H_
 
 #include <zircon/compiler.h>
 #include <zircon/syscalls.h>
@@ -58,12 +58,12 @@ __LOCAL decltype(zx_ticks_get) CODE_ticks_get_arm_a73;
 
 // Code should define '_zx_foo' and then do 'VDSO_INTERFACE_FUNCTION(zx_foo);'
 // to define the public name 'zx_foo' and the vDSO-private name 'VDSO_zx_foo'.
-#define VDSO_INTERFACE_FUNCTION(name)                   \
-  __EXPORT decltype(name) name __WEAK_ALIAS("_" #name); \
-  decltype(name) VDSO_##name __LOCAL __ALIAS("_" #name)
+#define VDSO_INTERFACE_FUNCTION(name)                             \
+  __EXPORT decltype(name) name __LEAF_FN __WEAK_ALIAS("_" #name); \
+  decltype(name) VDSO_##name __LEAF_FN __LOCAL __ALIAS("_" #name)
 
 // This symbol is expected to appear in the build-time vDSO symbol table so
 // kernel/lib/userabi/ code can use it.
 #define VDSO_KERNEL_EXPORT __attribute__((used))
 
-#endif  // ZIRCON_SYSTEM_ULIB_ZIRCON_PRIVATE_H_
+#endif  // ZIRCON_KERNEL_LIB_USERABI_VDSO_PRIVATE_H_
