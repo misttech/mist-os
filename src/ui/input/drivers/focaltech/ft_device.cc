@@ -180,7 +180,7 @@ zx_status_t FtDevice::Create(void* ctx, zx_device_t* device) {
   // Set scheduler role for device thread.
   {
     const char* role_name = "fuchsia.ui.input.drivers.focaltech.device";
-    status = device_set_profile_by_role(ft_dev->zxdev(), thrd_get_zx_handle(ft_dev->thread_),
+    status = device_set_profile_by_role(ft_dev->parent(), thrd_get_zx_handle(ft_dev->thread_),
                                         role_name, strlen(role_name));
     if (status != ZX_OK) {
       zxlogf(WARNING, "focaltouch: Failed to apply scheduler role: %s",
