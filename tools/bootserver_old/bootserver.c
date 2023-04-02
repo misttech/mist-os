@@ -288,12 +288,12 @@ void drain(int fd) {
 
 int send_boot_command(struct sockaddr_in6* ra) {
   // Construct message
-  netboot_message_t msg;
+  netboot_message_header_t hdr;
   static int cookie = 0;
-  msg.magic = NETBOOT_MAGIC;
-  msg.cookie = cookie++;
-  msg.cmd = NETBOOT_BOOT;
-  msg.arg = 0;
+  hdr.magic = NETBOOT_MAGIC;
+  hdr.cookie = cookie++;
+  hdr.cmd = NETBOOT_BOOT;
+  hdr.arg = 0;
 
   // Send to NETBOOT_SERVER_PORT
   struct sockaddr_in6 target_addr;
@@ -305,8 +305,8 @@ int send_boot_command(struct sockaddr_in6* ra) {
     return -1;
   }
   ssize_t send_result =
-      sendto(s, &msg, sizeof(msg), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
-  if (send_result == sizeof(msg)) {
+      sendto(s, &hdr, sizeof(hdr), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
+  if (send_result == sizeof(hdr)) {
     close(s);
     log("Issued boot command to %s\n\n", sockaddr_str(ra));
     return 0;
@@ -318,12 +318,12 @@ int send_boot_command(struct sockaddr_in6* ra) {
 
 int send_reboot_command(struct sockaddr_in6* ra) {
   // Construct message
-  netboot_message_t msg;
+  netboot_message_header_t hdr;
   static int cookie = 0;
-  msg.magic = NETBOOT_MAGIC;
-  msg.cookie = cookie++;
-  msg.cmd = NETBOOT_REBOOT;
-  msg.arg = 0;
+  hdr.magic = NETBOOT_MAGIC;
+  hdr.cookie = cookie++;
+  hdr.cmd = NETBOOT_REBOOT;
+  hdr.arg = 0;
 
   // Send to NETBOOT_SERVER_PORT
   struct sockaddr_in6 target_addr;
@@ -335,8 +335,8 @@ int send_reboot_command(struct sockaddr_in6* ra) {
     return -1;
   }
   ssize_t send_result =
-      sendto(s, &msg, sizeof(msg), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
-  if (send_result == sizeof(msg)) {
+      sendto(s, &hdr, sizeof(hdr), 0, (struct sockaddr*)&target_addr, sizeof(target_addr));
+  if (send_result == sizeof(hdr)) {
     close(s);
     log("Issued reboot command to %s\n\n", sockaddr_str(ra));
     return 0;
@@ -469,9 +469,9 @@ int main(int argc, char** argv) {
         // Skip the '-' delimiter and use the remainder as the type.
         type++;
 
-        if (strlen(type) > NETBOOT_FIRMWARE_TYPE_MAX_LENGTH) {
-          fprintf(stderr, "firmware type '%s' is too long (max %d characters)\n", type,
-                  NETBOOT_FIRMWARE_TYPE_MAX_LENGTH);
+        if (strlen(type) > NETBOOT_FIRMWARE_TYPE_MAX_LENGTH - 1) {
+          fprintf(stderr, "firmware type '%s' is too long (max %d characters, including NUL)\n",
+                  type, NETBOOT_FIRMWARE_TYPE_MAX_LENGTH);
           return -1;
         }
       } else {
@@ -746,18 +746,19 @@ int main(int argc, char** argv) {
     struct sockaddr_in6 ra;
     socklen_t rlen;
     char buf[4096];
-    netboot_message_t* msg = (void*)buf;
+    netboot_message_header_t* hdr = (void*)buf;
+    uint8_t* payload = (uint8_t*)(hdr + 1);
     rlen = sizeof(ra);
 
     if (no_bind) {
       // Send request to device to get the advertisement instead of waiting for the
       // broadcasted advertisement.
-      msg->magic = NETBOOT_MAGIC;
-      msg->cmd = NETBOOT_GET_ADVERT;
+      hdr->magic = NETBOOT_MAGIC;
+      hdr->cmd = NETBOOT_GET_ADVERT;
 
-      ssize_t send_result =
-          sendto(sock, buf, sizeof(netboot_message_t), 0, (struct sockaddr*)&addr, sizeof(addr));
-      if (send_result != sizeof(netboot_message_t)) {
+      ssize_t send_result = sendto(sock, buf, sizeof(netboot_message_header_t), 0,
+                                   (struct sockaddr*)&addr, sizeof(addr));
+      if (send_result != sizeof(netboot_message_header_t)) {
         if (fail_fast) {
           close(sock);
           return -1;
@@ -788,7 +789,7 @@ int main(int argc, char** argv) {
       close(sock);
       return -1;
     }
-    if ((size_t)r < sizeof(netboot_message_t)) {
+    if ((size_t)r < sizeof(netboot_message_header_t)) {
       continue;
     }
     if (!IN6_IS_ADDR_LINKLOCAL(&ra.sin6_addr)) {
@@ -801,15 +802,15 @@ int main(int argc, char** argv) {
           inet_ntop(AF_INET6, &allowed_addr, tmp, sizeof(tmp)));
       continue;
     }
-    if (msg->magic != NETBOOT_MAGIC)
+    if (hdr->magic != NETBOOT_MAGIC)
       continue;
-    if (msg->cmd != NETBOOT_ADVERTISE)
+    if (hdr->cmd != NETBOOT_ADVERTISE)
       continue;
-    if ((use_tftp && (msg->arg < NETBOOT_VERSION_1_3)) ||
-        (!use_tftp && (msg->arg < NETBOOT_VERSION_1_1))) {
+    if ((use_tftp && (hdr->arg < NETBOOT_VERSION_1_3)) ||
+        (!use_tftp && (hdr->arg < NETBOOT_VERSION_1_1))) {
       log("%sIncompatible version 0x%08X of bootloader "
           "detected from %s, please upgrade your bootloader%s",
-          ANSI(RED), msg->arg, sockaddr_str(&ra), ANSI(RESET));
+          ANSI(RED), hdr->arg, sockaddr_str(&ra), ANSI(RESET));
       if (fail_fast) {
         close(sock);
         return -1;
@@ -825,7 +826,7 @@ int main(int argc, char** argv) {
     char* save = NULL;
     char* adv_nodename = NULL;
     const char* adv_version = "unknown";
-    for (char* var = strtok_r((char*)msg->data, ";", &save); var;
+    for (char* var = strtok_r((char*)(payload), ";", &save); var;
          var = strtok_r(NULL, ";", &save)) {
       if (!strncmp(var, "nodename=", 9)) {
         adv_nodename = var + 9;
@@ -920,8 +921,7 @@ int main(int argc, char** argv) {
     }
     for (size_t i = 0; i < num_firmware; i++) {
       if (status == 0) {
-        char filename[strlen(NETBOOT_FIRMWARE_FILENAME_PREFIX) + NETBOOT_FIRMWARE_TYPE_MAX_LENGTH +
-                      1];
+        char filename[strlen(NETBOOT_FIRMWARE_FILENAME_PREFIX) + NETBOOT_FIRMWARE_TYPE_MAX_LENGTH];
         int result = snprintf(filename, sizeof(filename), "%s%s", NETBOOT_FIRMWARE_FILENAME_PREFIX,
                               firmware_images[i].type);
         if (result < 0 || (size_t)result >= sizeof(filename)) {
@@ -929,6 +929,7 @@ int main(int argc, char** argv) {
                   firmware_images[i].type);
           status = -1;
         } else {
+          filename[sizeof(filename) - 1] = '\0';
           status = xfer(&ra, firmware_images[i].image, filename);
         }
       }

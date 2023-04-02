@@ -27,7 +27,7 @@ static uint32_t cookie = 1;
 static const int MAX_READ_RETRIES = 10;
 static const int MAX_SEND_RETRIES = 10000;
 
-static int io_rcv(int s, netboot_message_t* msg, netboot_message_t* ack) {
+static int io_rcv(int s, netboot_message_header_t* hdr, netboot_message_header_t* ack) {
   for (int i = 0; i < MAX_READ_RETRIES; i++) {
     bool retry_allowed = i + 1 < MAX_READ_RETRIES;
 
@@ -39,7 +39,7 @@ static int io_rcv(int s, netboot_message_t* msg, netboot_message_t* ack) {
       fprintf(stderr, "\n%s: error: Socket read error %d\n", appname, errno);
       return -1;
     }
-    if ((size_t)r < sizeof(netboot_message_t)) {
+    if ((size_t)r < sizeof(netboot_message_header_t)) {
       fprintf(stderr, "\n%s: error: Read too short\n", appname);
       return -1;
     }
@@ -52,8 +52,8 @@ static int io_rcv(int s, netboot_message_t* msg, netboot_message_t* ack) {
       fprintf(stderr, "\n%s: error: Bad magic\n", appname);
       return 0;
     }
-    if (msg) {
-      if (ack->cookie > msg->cookie) {
+    if (hdr) {
+      if (ack->cookie > hdr->cookie) {
         fprintf(stderr, "\n%s: error: Bad cookie\n", appname);
         return 0;
       }
@@ -88,7 +88,7 @@ static int io_rcv(int s, netboot_message_t* msg, netboot_message_t* ack) {
   return -1;
 }
 
-static int io_send(int s, netboot_message_t* msg, size_t len) {
+static int io_send(int s, netboot_message_header_t* msg, size_t len) {
   for (int i = 0; i < MAX_SEND_RETRIES; i++) {
 #if defined(__APPLE__)
     bool retry_allowed = i + 1 < MAX_SEND_RETRIES;
@@ -115,7 +115,8 @@ static int io_send(int s, netboot_message_t* msg, size_t len) {
   return -1;
 }
 
-static int io(int s, netboot_message_t* msg, size_t len, netboot_message_t* ack, bool wait_reply) {
+static int io(int s, netboot_message_header_t* msg, size_t len, netboot_message_header_t* ack,
+              bool wait_reply) {
   int r, n;
   struct timeval tv;
   fd_set reads, writes;
@@ -231,8 +232,9 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
   char ackbuf[2048];
   char tmp[INET6_ADDRSTRLEN];
   struct timeval tv;
-  netboot_message_t* msg = (void*)msgbuf;
-  netboot_message_t* ack = (void*)ackbuf;
+  netboot_message_header_t* msg = (void*)msgbuf;
+  char* msg_data = (char*)(msg + 1);
+  netboot_message_header_t* ack = (void*)ackbuf;
   int s;
   int status = -1;
   size_t current_pos = 0;
@@ -281,8 +283,8 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
 
   msg->cmd = NETBOOT_SEND_FILE;
   msg->arg = sz;
-  strcpy((void*)msg->data, name);
-  if (io(s, msg, sizeof(netboot_message_t) + strlen(name) + 1, ack, true)) {
+  strcpy((void*)msg_data, name);
+  if (io(s, msg, sizeof(netboot_message_header_t) + strlen(name) + 1, ack, true)) {
     fprintf(stderr, "%s: error: Failed to start transfer\n", appname);
     goto done;
   }
@@ -295,7 +297,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
     struct timeval packet_start_time;
     gettimeofday(&packet_start_time, NULL);
 
-    ssize_t r = xread(&xd, msg->data, PAYLOAD_SIZE);
+    ssize_t r = xread(&xd, msg_data, PAYLOAD_SIZE);
     if (r < 0) {
       fprintf(stderr, "\n%s: error: Reading '%s'\n", appname, fn);
       goto done;
@@ -316,7 +318,7 @@ int netboot_xfer(struct sockaddr_in6* addr, const char* fn, const char* name) {
         msg->cmd = NETBOOT_DATA;
       }
 
-      if (io(s, msg, sizeof(netboot_message_t) + r, ack, false)) {
+      if (io(s, msg, sizeof(netboot_message_header_t) + r, ack, false)) {
         goto done;
       }
 

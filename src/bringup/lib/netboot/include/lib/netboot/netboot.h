@@ -103,8 +103,6 @@
 #define NETBOOT_WIPE_PARTITION_TABLES_FILENAME NETBOOT_IMAGE_PREFIX NETBOOT_WIPE_PARTITION_TABLES_HOST_FILENAME
 
 // Should match paver FIDL definition.
-// Length does not include the '\0' terminator, so when allocating a character
-// buffer to hold the type use (NETBOOT_FIRMWARE_TYPE_MAX_LENGTH  + 1).
 #define NETBOOT_FIRMWARE_TYPE_MAX_LENGTH 256
 
 // Historically equal to ZX_MAX_NAME_LEN.
@@ -120,7 +118,7 @@ typedef struct {
 #define NETBOOT_PATH_MAX 4096
 
 typedef struct {
-  char block_device_path[NETBOOT_PATH_MAX + 1];
+  char block_device_path[NETBOOT_PATH_MAX];
 } netboot_block_device_t;
 
 typedef struct {
@@ -128,8 +126,7 @@ typedef struct {
     uint32_t cookie;
     uint32_t cmd;
     uint32_t arg;
-    uint8_t  data[0];
-} netboot_message_t;
+} netboot_message_header_t;
 
 #define NETBOOT_DEBUGLOG_PORT         33337
 #define NETBOOT_DEBUGLOG_ACK_PORT     33338

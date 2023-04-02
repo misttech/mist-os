@@ -17,7 +17,7 @@
 #define TFTP_DEFAULT_WINDOW_SZ 256
 
 typedef struct {
-  netboot_message_t hdr;
+  netboot_message_header_t hdr;
   uint8_t data[MAXSIZE];
 } msg;
 

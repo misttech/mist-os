@@ -72,7 +72,7 @@ int main(int argc, char** argv) {
   m.hdr.arg = 0;
   memcpy(m.data, cmd, cmd_len);
 
-  write(s, &m, sizeof(netboot_message_t) + cmd_len);
+  write(s, &m, sizeof(netboot_message_header_t) + cmd_len);
   close(s);
 
   return 0;

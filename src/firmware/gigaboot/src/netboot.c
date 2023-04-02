@@ -48,42 +48,45 @@ static char advertise_data[256] = "nodename=zircon";
 
 static void send_query_ack(const ip6_addr* addr, uint16_t port, uint32_t cookie) {
   uint8_t buffer[256];
-  netboot_message_t* msg = (void*)buffer;
-  msg->magic = NETBOOT_MAGIC;
-  msg->cookie = cookie;
-  msg->cmd = NETBOOT_ACK;
-  msg->arg = NETBOOT_VERSION_CURRENT;
-  memcpy(msg->data, advertise_nodename, sizeof(advertise_nodename));
-  udp6_send(buffer, sizeof(netboot_message_t) + strlen(advertise_nodename) + 1, addr, port,
+  netboot_message_header_t* hdr = (void*)buffer;
+  uint8_t* payload = (uint8_t*)(hdr + 1);
+  hdr->magic = NETBOOT_MAGIC;
+  hdr->cookie = cookie;
+  hdr->cmd = NETBOOT_ACK;
+  hdr->arg = NETBOOT_VERSION_CURRENT;
+  memcpy(payload, advertise_nodename, sizeof(advertise_nodename));
+  udp6_send(buffer, sizeof(netboot_message_header_t) + strlen(advertise_nodename) + 1, addr, port,
             NETBOOT_SERVER_PORT);
 }
 
 static void advertise(void) {
-  uint8_t buffer[sizeof(netboot_message_t) + sizeof(advertise_data)];
-  netboot_message_t* msg = (void*)buffer;
-  msg->magic = NETBOOT_MAGIC;
-  msg->cookie = 0;
-  msg->cmd = NETBOOT_ADVERTISE;
-  msg->arg = NETBOOT_VERSION_CURRENT;
+  uint8_t buffer[sizeof(netboot_message_header_t) + sizeof(advertise_data)];
+  netboot_message_header_t* hdr = (void*)buffer;
+  uint8_t* payload = (uint8_t*)(hdr + 1);
+  hdr->magic = NETBOOT_MAGIC;
+  hdr->cookie = 0;
+  hdr->cmd = NETBOOT_ADVERTISE;
+  hdr->arg = NETBOOT_VERSION_CURRENT;
   size_t data_len = strlen(advertise_data) + 1;
-  memcpy(msg->data, advertise_data, data_len);
-  udp6_send(buffer, sizeof(netboot_message_t) + data_len, &ip6_ll_all_nodes, NETBOOT_ADVERT_PORT,
-            NETBOOT_SERVER_PORT);
+  memcpy(payload, advertise_data, data_len);
+  udp6_send(buffer, sizeof(netboot_message_header_t) + data_len, &ip6_ll_all_nodes,
+            NETBOOT_ADVERT_PORT, NETBOOT_SERVER_PORT);
 }
 
 void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport) {
-  netboot_message_t* msg = data;
-  netboot_message_t ack;
+  netboot_message_header_t* hdr = data;
+  uint8_t* payload = (uint8_t*)(hdr + 1);
+  netboot_message_header_t ack;
   int do_transmit = 1;
 
-  if (len < sizeof(netboot_message_t))
+  if (len < sizeof(netboot_message_header_t))
     return;
-  len -= sizeof(netboot_message_t);
+  len -= sizeof(netboot_message_header_t);
 
   // printf("netboot: MSG %08x %08x %08x %08x datalen %zu\n",
-  //        msg->magic, msg->cookie, msg->cmd, msg->arg, len);
+  //        hdr->magic, hdr->cookie, hdr->cmd, hdr->arg, len);
 
-  if ((last_cookie == msg->cookie) && (last_cmd == msg->cmd) && (last_arg == msg->arg)) {
+  if ((last_cookie == hdr->cookie) && (last_cmd == hdr->cmd) && (last_arg == hdr->arg)) {
     // host must have missed the ack. resend
     ack.magic = NETBOOT_MAGIC;
     ack.cookie = last_cookie;
@@ -95,35 +98,35 @@ void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport)
   ack.cmd = NETBOOT_ACK;
   ack.arg = 0;
 
-  switch (msg->cmd) {
+  switch (hdr->cmd) {
     case NETBOOT_COMMAND:
       if (len == 0)
         return;
-      msg->data[len - 1] = 0;
+      payload[len - 1] = 0;
       break;
     case NETBOOT_SEND_FILE:
       if (len == 0)
         return;
-      msg->data[len - 1] = 0;
+      payload[len - 1] = 0;
       for (size_t i = 0; i < (len - 1); i++) {
-        if ((msg->data[i] < ' ') || (msg->data[i] > 127)) {
-          msg->data[i] = '.';
+        if ((payload[i] < ' ') || (payload[i] > 127)) {
+          payload[i] = '.';
         }
       }
-      item = netboot_get_buffer((const char*)msg->data, msg->arg);
+      item = netboot_get_buffer((const char*)payload, hdr->arg);
       if (item) {
         item->offset = 0;
-        ack.arg = msg->arg;
+        ack.arg = hdr->arg;
         size_t prefix_len = strlen(NETBOOT_FILENAME_PREFIX);
         const char* filename;
-        if (!strncmp((char*)msg->data, NETBOOT_FILENAME_PREFIX, prefix_len)) {
-          filename = &((const char*)msg->data)[prefix_len];
+        if (!strncmp((char*)payload, NETBOOT_FILENAME_PREFIX, prefix_len)) {
+          filename = &((const char*)payload)[prefix_len];
         } else {
-          filename = (const char*)msg->data;
+          filename = (const char*)payload;
         }
         printf("netboot: Receive File '%s'...\n", filename);
       } else {
-        printf("netboot: Rejected File '%s'...\n", (char*)msg->data);
+        printf("netboot: Rejected File '%s'...\n", (char*)payload);
         ack.cmd = NETBOOT_ERROR_BAD_FILE;
       }
       break;
@@ -134,19 +137,19 @@ void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport)
         printf("netboot: > received chunk before NETBOOT_FILE\n");
         return;
       }
-      if (msg->arg != item->offset) {
-        // printf("netboot: < received chunk at offset %d but current offset is %zu\n", msg->arg,
+      if (hdr->arg != item->offset) {
+        // printf("netboot: < received chunk at offset %d but current offset is %zu\n", hdr->arg,
         // item->offset);
         ack.arg = item->offset;
         ack.cmd = NETBOOT_ACK;
       } else if ((item->offset + len) > item->size) {
         ack.cmd = NETBOOT_ERROR_TOO_LARGE;
-        ack.arg = msg->arg;
+        ack.arg = hdr->arg;
       } else {
-        memcpy(item->data + item->offset, msg->data, len);
+        memcpy(item->data + item->offset, payload, len);
         item->offset += len;
-        ack.cmd = msg->cmd == NETBOOT_LAST_DATA ? NETBOOT_FILE_RECEIVED : NETBOOT_ACK;
-        if (msg->cmd != NETBOOT_LAST_DATA) {
+        ack.cmd = hdr->cmd == NETBOOT_LAST_DATA ? NETBOOT_FILE_RECEIVED : NETBOOT_ACK;
+        if (hdr->cmd != NETBOOT_LAST_DATA) {
           do_transmit = 0;
         }
       }
@@ -157,20 +160,20 @@ void netboot_recv(void* data, size_t len, const ip6_addr* saddr, uint16_t sport)
       break;
     case NETBOOT_QUERY:
       // Send reply and return w/o getting the netboot state out of sync.
-      send_query_ack(saddr, sport, msg->cookie);
+      send_query_ack(saddr, sport, hdr->cookie);
       return;
     default:
       ack.cmd = NETBOOT_ERROR_BAD_CMD;
       ack.arg = 0;
   }
 
-  last_cookie = msg->cookie;
-  last_cmd = msg->cmd;
-  last_arg = msg->arg;
+  last_cookie = hdr->cookie;
+  last_cmd = hdr->cmd;
+  last_arg = hdr->arg;
   last_ack_cmd = ack.cmd;
   last_ack_arg = ack.arg;
 
-  ack.cookie = msg->cookie;
+  ack.cookie = hdr->cookie;
   ack.magic = NETBOOT_MAGIC;
 transmit:
   nb_active = 1;

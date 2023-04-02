@@ -331,7 +331,7 @@ zx_status_t Paver::OpenDataSink(fuchsia_mem::wire::Buffer buffer,
     fprintf(stderr, "netsvc: Unable to read from vmo\n");
     return status;
   }
-  if (partition_info.block_device_path[NETBOOT_PATH_MAX] != '\0') {
+  if (partition_info.block_device_path[NETBOOT_PATH_MAX - 1] != '\0') {
     fprintf(stderr, "netsvc: Invalid block device path specified\n");
     return ZX_ERR_INVALID_ARGS;
   }
@@ -528,9 +528,9 @@ tftp_status Paver::ProcessAsFirmwareImage(std::string_view host_filename) {
     printf("netsvc: Running FIRMWARE%s Paver (firmware type '%.*s')\n", match.config_suffix,
            static_cast<int>(type->size()), type->data());
 
-    if (type->length() >= sizeof(firmware_type_)) {
-      fprintf(stderr, "netsvc: Firmware type '%.*s' is too long (max %zu)\n",
-              static_cast<int>(type->size()), type->data(), sizeof(firmware_type_) - 1);
+    if (type->length() > sizeof(firmware_type_) - 1) {
+      fprintf(stderr, "netsvc: Firmware type '%.*s' is too long (max %zu, including NUL)\n",
+              static_cast<int>(type->size()), type->data(), sizeof(firmware_type_));
       return TFTP_ERR_INVALID_ARGS;
     }
 

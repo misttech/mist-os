@@ -106,7 +106,7 @@ static int netboot_send_query(int socket, unsigned port, const char* ifname) {
       continue;
     }
     // printf("tx %s (sid=%d)\n", ifa_it->ifa_name, in6->sin6_scope_id);
-    size_t sz = sizeof(netboot_message_t) + hostname_len;
+    size_t sz = sizeof(netboot_message_header_t) + hostname_len;
     addr.sin6_scope_id = in6->sin6_scope_id;
 
     ssize_t r = sendto(socket, &m, sz, 0, (struct sockaddr*)&addr, sizeof(addr));
@@ -133,8 +133,8 @@ static bool netboot_receive_query(int socket, on_device_cb callback, void* data)
   ssize_t r = recvfrom(socket, &m, sizeof(m), 0, (void*)&ra, &rlen);
   if (r < 0) {
     fprintf(stderr, "error: recvfrom: %s\n", strerror(errno));
-  } else if ((size_t)r > sizeof(netboot_message_t)) {
-    r -= sizeof(netboot_message_t);
+  } else if ((size_t)r > sizeof(netboot_message_header_t)) {
+    r -= sizeof(netboot_message_header_t);
     m.data[r] = 0;
     if ((m.hdr.magic == NETBOOT_MAGIC) && (m.hdr.cookie == cookie) && (m.hdr.cmd == NETBOOT_ACK)) {
       char tmp[INET6_ADDRSTRLEN];

@@ -556,7 +556,7 @@ TEST_F(PaverTest, WriteFirmwareFailure) {
 }
 
 TEST_F(PaverTest, WriteFirmwareTypeMaxLength) {
-  const std::string type(NETBOOT_FIRMWARE_TYPE_MAX_LENGTH, 'a');
+  const std::string type(NETBOOT_FIRMWARE_TYPE_MAX_LENGTH - 1, 'a');  // Max length includes NUL
   size_t size = sizeof(kFakeData);
   fake_svc_.fake_paver().set_expected_payload_size(size);
   fake_svc_.fake_paver().set_supported_firmware_type(type);
@@ -574,7 +574,7 @@ TEST_F(PaverTest, WriteFirmwareTypeMaxLength) {
 }
 
 TEST_F(PaverTest, WriteFirmwareTypeTooLong) {
-  const std::string type(NETBOOT_FIRMWARE_TYPE_MAX_LENGTH + 1, 'a');
+  const std::string type(NETBOOT_FIRMWARE_TYPE_MAX_LENGTH, 'a');  // Max length includes NUL
   size_t size = sizeof(kFakeData);
   fake_svc_.fake_paver().set_expected_payload_size(size);
 
