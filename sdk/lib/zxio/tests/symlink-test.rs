@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use {
+    async_trait::async_trait,
     fidl::endpoints::create_endpoints,
     fidl_fuchsia_io as fio,
     fuchsia_zircon::{self as zx, HandleBased},
@@ -19,15 +20,18 @@ use {
 async fn test_symlink() {
     struct TestSymlink;
 
+    #[async_trait]
     impl Symlink for TestSymlink {
-        fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
+        async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
             Ok(b"target".to_vec())
         }
     }
 
     struct ErrorSymlink;
+
+    #[async_trait]
     impl Symlink for ErrorSymlink {
-        fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
+        async fn read_target(&self) -> Result<Vec<u8>, zx::Status> {
             Err(zx::Status::IO)
         }
     }

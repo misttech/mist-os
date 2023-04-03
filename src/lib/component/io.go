@@ -348,6 +348,10 @@ func (dirState *directoryState) Enumerate(ctx fidl.Context, options io.Directory
 	return nil
 }
 
+func (*directoryState) CreateSymlink(fidl.Context, string, []uint8) (io.Directory2CreateSymlinkResult, error) {
+	return io.Directory2CreateSymlinkResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (dirState *directoryState) ReadDirents(ctx fidl.Context, maxOut uint64) (int32, []uint8, error) {
 	if !dirState.reading {
 		writeFn := func(name string, node Node) error {

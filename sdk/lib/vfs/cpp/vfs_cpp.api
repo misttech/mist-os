@@ -3,7 +3,7 @@
   "pkg/vfs_cpp/include/lib/vfs/cpp/flags.h": "f4a6059da5b27d3e5f32a3c93b91a171",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/connection.h": "a2be773389fab801281bbc4fe3dafe2e",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/directory.h": "792644b6f38ecbf2b291c2862603fce3",
-  "pkg/vfs_cpp/include/lib/vfs/cpp/internal/directory_connection.h": "ea1a52ace4ddfecbd1a77e0e84c6a84b",
+  "pkg/vfs_cpp/include/lib/vfs/cpp/internal/directory_connection.h": "097e1e25828c47985b94abbb1b49a045",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/dirent_filler.h": "ee345a473fcd059824371a39bf82a6c5",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/file.h": "19287212a6cd5c3b0dd71ff92f06d498",
   "pkg/vfs_cpp/include/lib/vfs/cpp/internal/file_connection.h": "739b2048bb17208b08d2b953966f1269",

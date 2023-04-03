@@ -582,6 +582,11 @@ class _DirConnection extends Directory {
     // TODO(https://fxbug.dev/77623): Close `iterator` with epitaph.
     throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
   }
+
+  @override
+  Future<void> createSymlink(String name, Uint8List target) async {
+    throw fidl.MethodException(ZX.ERR_NOT_SUPPORTED);
+  }
 }
 
 /// _Entry class to store in pseudo directory.
