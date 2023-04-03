@@ -8,7 +8,6 @@
 #include <lib/zx/time.h>
 
 #include <memory>
-#include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>

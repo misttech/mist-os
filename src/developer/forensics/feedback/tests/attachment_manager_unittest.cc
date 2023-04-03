@@ -22,7 +22,6 @@
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics::feedback {
 namespace {

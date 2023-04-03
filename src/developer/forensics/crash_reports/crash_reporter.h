@@ -24,13 +24,9 @@
 #include "src/developer/forensics/crash_reports/report_store.h"
 #include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
 #include "src/developer/forensics/crash_reports/snapshot_collector.h"
-#include "src/developer/forensics/feedback/annotations/annotation_manager.h"
-#include "src/developer/forensics/feedback/annotations/types.h"
 #include "src/developer/forensics/feedback/config.h"
-#include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/utc_clock_ready_watcher.h"
 #include "src/developer/forensics/utils/utc_time_provider.h"
-#include "src/lib/fxl/macros.h"
 #include "src/lib/timekeeper/clock.h"
 
 namespace forensics {

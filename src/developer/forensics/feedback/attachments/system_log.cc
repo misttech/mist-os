@@ -25,8 +25,6 @@
 #include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/log_format.h"
 #include "src/lib/backoff/exponential_backoff.h"
-#include "src/lib/diagnostics/accessor2logger/log_message.h"
-#include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics::feedback {

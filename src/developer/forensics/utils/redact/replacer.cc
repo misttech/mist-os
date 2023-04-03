@@ -9,7 +9,6 @@
 #include <algorithm>
 #include <iterator>
 #include <memory>
-#include <optional>
 #include <queue>
 #include <string>
 #include <string_view>

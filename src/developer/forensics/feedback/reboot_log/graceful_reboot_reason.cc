@@ -12,7 +12,6 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/files/file_descriptor.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
 namespace feedback {

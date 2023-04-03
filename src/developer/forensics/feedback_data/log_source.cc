@@ -14,7 +14,6 @@
 #include <memory>
 
 #include "src/developer/forensics/feedback_data/constants.h"
-#include "src/developer/forensics/feedback_data/log_source.h"
 #include "src/lib/backoff/backoff.h"
 #include "src/lib/diagnostics/accessor2logger/log_message.h"
 

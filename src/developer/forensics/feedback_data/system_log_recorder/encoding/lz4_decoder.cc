@@ -5,7 +5,6 @@
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_decoder.h"
 
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_utils.h"
-#include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {

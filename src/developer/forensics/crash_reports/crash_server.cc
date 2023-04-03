@@ -18,7 +18,6 @@
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/feedback/annotations/types.h"
-#include "src/developer/forensics/utils/sized_data.h"
 #include "src/lib/fsl/socket/blocking_drain.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fsl/vmo/vector.h"

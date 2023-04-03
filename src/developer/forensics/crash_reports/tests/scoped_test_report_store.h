@@ -5,7 +5,6 @@
 #ifndef SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_TESTS_SCOPED_TEST_REPORT_STORE_H_
 #define SRC_DEVELOPER_FORENSICS_CRASH_REPORTS_TESTS_SCOPED_TEST_REPORT_STORE_H_
 
-#include "src/developer/forensics/crash_reports/constants.h"
 #include "src/developer/forensics/crash_reports/report_store.h"
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/developer/forensics/utils/storage_size.h"

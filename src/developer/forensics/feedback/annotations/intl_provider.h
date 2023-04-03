@@ -11,7 +11,6 @@
 #include <lib/sys/cpp/service_directory.h>
 
 #include <memory>
-#include <set>
 #include <string>
 
 #include "src/developer/forensics/feedback/annotations/provider.h"

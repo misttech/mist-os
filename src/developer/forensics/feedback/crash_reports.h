@@ -8,7 +8,6 @@
 #include <fuchsia/feedback/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 
-#include "src/developer/forensics/crash_reports/annotation_map.h"
 #include "src/developer/forensics/crash_reports/crash_register.h"
 #include "src/developer/forensics/crash_reports/crash_reporter.h"
 #include "src/developer/forensics/crash_reports/crash_server.h"
@@ -18,7 +17,6 @@
 #include "src/developer/forensics/feedback/annotations/annotation_manager.h"
 #include "src/developer/forensics/feedback/config.h"
 #include "src/developer/forensics/feedback_data/data_provider.h"
-#include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/storage_size.h"
 
 namespace forensics::feedback {

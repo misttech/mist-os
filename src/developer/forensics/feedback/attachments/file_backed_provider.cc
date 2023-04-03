@@ -9,7 +9,6 @@
 #include <string>
 
 #include "src/lib/files/file.h"
-#include "src/lib/files/path.h"
 
 namespace forensics::feedback {
 

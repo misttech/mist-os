@@ -18,7 +18,6 @@
 #include <memory>
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "src/developer/forensics/feedback/annotation_providers.h"
 #include "src/developer/forensics/feedback/config.h"
@@ -27,7 +26,6 @@
 #include "src/developer/forensics/feedback/last_reboot.h"
 #include "src/developer/forensics/feedback/network_watcher.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
-#include "src/developer/forensics/utils/component/component.h"
 #include "src/developer/forensics/utils/inspect_node_manager.h"
 #include "src/developer/forensics/utils/instrumented_binding_set.h"
 #include "src/developer/forensics/utils/redact/redactor.h"

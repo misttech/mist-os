@@ -7,7 +7,6 @@
 
 #include <lib/fit/function.h>
 
-#include <optional>
 #include <string>
 #include <string_view>
 

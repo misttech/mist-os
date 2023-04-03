@@ -6,7 +6,6 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/lib/diagnostics/accessor2logger/log_message.h"
 #include "src/lib/files/path.h"
 
 namespace forensics {

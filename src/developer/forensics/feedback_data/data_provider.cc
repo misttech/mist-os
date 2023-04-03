@@ -29,7 +29,6 @@
 #include "src/developer/forensics/utils/cobalt/metrics.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fsl/vmo/vector.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/uuid/uuid.h"
 
 namespace forensics {

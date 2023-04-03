@@ -14,9 +14,7 @@
 #include "src/developer/forensics/feedback/reboot_log/graceful_reboot_reason.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/files/file.h"
-#include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics {

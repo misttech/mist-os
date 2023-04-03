@@ -14,8 +14,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
-#include "src/developer/forensics/last_reboot/reporter.h"
-#include "src/developer/forensics/testing/stubs/cobalt_logger.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
 #include "src/developer/forensics/testing/stubs/crash_reporter.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"

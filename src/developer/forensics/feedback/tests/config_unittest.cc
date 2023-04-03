@@ -15,7 +15,6 @@
 
 #include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
-#include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
 
 namespace forensics::feedback {

@@ -11,8 +11,6 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 
-#include "src/lib/fsl/vmo/strings.h"
-
 namespace forensics {
 namespace stubs {
 

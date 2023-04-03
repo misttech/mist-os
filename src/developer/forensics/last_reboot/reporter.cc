@@ -17,7 +17,6 @@
 #include "src/developer/forensics/feedback/reboot_log/reboot_reason.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/lib/files/file.h"
-#include "src/lib/fsl/vmo/file.h"
 #include "src/lib/fsl/vmo/strings.h"
 
 namespace forensics {

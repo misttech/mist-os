@@ -8,7 +8,6 @@
 #include <fuchsia/metrics/cpp/fidl.h>
 #include <fuchsia/metrics/cpp/fidl_test_base.h>
 
-#include <limits>
 #include <memory>
 
 #include "src/developer/forensics/testing/stubs/cobalt_logger.h"

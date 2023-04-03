@@ -9,7 +9,6 @@
 #include <optional>
 
 #include "src/developer/forensics/feedback/annotations/constants.h"
-#include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/uuid/uuid.h"

@@ -10,7 +10,6 @@
 
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
-#include "src/lib/testing/loop_fixture/test_loop.h"
 #include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics::feedback {

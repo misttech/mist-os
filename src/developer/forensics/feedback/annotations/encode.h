@@ -8,7 +8,6 @@
 #include <fuchsia/feedback/cpp/fidl.h>
 
 #include "src/developer/forensics/feedback/annotations/types.h"
-#include "third_party/rapidjson/include/rapidjson/document.h"
 
 namespace forensics::feedback {
 

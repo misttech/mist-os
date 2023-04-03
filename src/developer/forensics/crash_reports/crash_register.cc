@@ -7,8 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/developer/forensics/feedback/annotations/constants.h"
-#include "src/developer/forensics/feedback/constants.h"
-#include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/fostr/fidl/fuchsia/feedback/formatting.h"

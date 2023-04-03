@@ -9,9 +9,6 @@
 #include <lib/fit/function.h>
 #include <lib/zx/time.h>
 
-#include <optional>
-#include <variant>
-
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/time.h"

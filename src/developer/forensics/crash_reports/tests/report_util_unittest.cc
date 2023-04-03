@@ -11,7 +11,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/crash_reports/annotation_map.h"
-#include "src/developer/forensics/crash_reports/reporting_policy_watcher.h"
 #include "src/developer/forensics/crash_reports/snapshot.h"
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/feedback/annotations/types.h"

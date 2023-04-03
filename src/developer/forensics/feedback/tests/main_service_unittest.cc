@@ -9,10 +9,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/testing/stubs/cobalt_logger.h"
-#include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
-#include "src/developer/forensics/testing/stubs/crash_reporter.h"
-#include "src/developer/forensics/testing/stubs/reboot_methods_watcher_register.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/fxl/strings/substitute.h"
 #include "src/lib/timekeeper/async_test_clock.h"

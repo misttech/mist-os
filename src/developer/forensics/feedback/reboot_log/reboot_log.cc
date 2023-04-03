@@ -6,7 +6,6 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include <array>
 #include <sstream>
 
 #include "src/developer/forensics/feedback/reboot_log/graceful_reboot_reason.h"

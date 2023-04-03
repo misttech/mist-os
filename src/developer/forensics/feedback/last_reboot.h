@@ -11,8 +11,6 @@
 #include <lib/sys/cpp/service_directory.h>
 #include <lib/zx/time.h>
 
-#include <string>
-
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
 #include "src/developer/forensics/last_reboot/last_reboot_info_provider.h"
 #include "src/developer/forensics/last_reboot/reporter.h"

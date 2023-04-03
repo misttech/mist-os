@@ -14,7 +14,6 @@
 
 #include <deque>
 #include <memory>
-#include <optional>
 #include <string>
 
 #include "src/developer/forensics/feedback/attachments/provider.h"

@@ -7,8 +7,6 @@
 
 #include <fuchsia/feedback/cpp/fidl.h>
 
-#include <optional>
-
 #include "src/developer/forensics/feedback/annotations/types.h"
 
 namespace forensics::feedback {

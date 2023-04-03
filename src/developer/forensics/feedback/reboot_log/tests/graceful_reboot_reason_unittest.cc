@@ -10,14 +10,11 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/testing/gpretty_printers.h"
-#include "src/developer/forensics/testing/stubs/cobalt_logger.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
-#include "src/lib/fxl/strings/split_string.h"
-#include "src/lib/fxl/strings/string_printf.h"
 #include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics {

@@ -22,12 +22,10 @@
 #include "src/developer/forensics/feedback/attachments/metrics.h"
 #include "src/developer/forensics/feedback_data/inspect_data_budget.h"
 #include "src/developer/forensics/feedback_data/metadata.h"
-#include "src/developer/forensics/feedback_data/screenshot.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/redact/redactor.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/timekeeper/clock.h"
-#include "src/lib/timekeeper/system_clock.h"
 
 namespace forensics {
 namespace feedback_data {

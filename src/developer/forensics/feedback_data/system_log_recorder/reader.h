@@ -6,7 +6,6 @@
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_READER_H_
 
 #include <string>
-#include <vector>
 
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/decoder.h"
 #include "src/developer/forensics/utils/storage_size.h"

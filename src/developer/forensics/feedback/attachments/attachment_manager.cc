@@ -11,8 +11,6 @@
 #include <utility>
 
 #include "src/developer/forensics/feedback/attachments/types.h"
-#include "src/developer/forensics/feedback_data/constants.h"
-#include "src/lib/timekeeper/clock.h"
 
 namespace forensics::feedback {
 namespace {

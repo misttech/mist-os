@@ -22,7 +22,6 @@
 #include "src/developer/forensics/testing/stubs/data_provider.h"
 #include "src/developer/forensics/testing/stubs/loader.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
-#include "src/lib/timekeeper/test_clock.h"
 
 namespace forensics {
 namespace crash_reports {

@@ -6,7 +6,6 @@
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_SYSTEM_LOG_RECORDER_ENCODING_LZ4_ENCODER_H_
 
 #include <string>
-#include <vector>
 
 #include <lz4/lz4.h>
 

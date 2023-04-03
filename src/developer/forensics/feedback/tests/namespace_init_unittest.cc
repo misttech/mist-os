@@ -10,8 +10,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/production_encoding.h"
-#include "src/developer/forensics/feedback_data/system_log_recorder/encoding/version.h"
-#include "src/developer/forensics/feedback_data/system_log_recorder/reader.h"
 #include "src/developer/forensics/testing/log_message.h"
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"

@@ -13,7 +13,6 @@
 #include "src/lib/files/scoped_temp_dir.h"
 #include "src/lib/fsl/vmo/file.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
-#include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/fxl/strings/substitute.h"
 
 namespace forensics {

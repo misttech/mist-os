@@ -19,7 +19,6 @@
 #include "src/lib/backoff/exponential_backoff.h"
 #include "src/lib/fxl/functional/cancelable_callback.h"
 #include "src/lib/timekeeper/clock.h"
-#include "src/lib/timekeeper/system_clock.h"
 
 namespace forensics {
 namespace cobalt {

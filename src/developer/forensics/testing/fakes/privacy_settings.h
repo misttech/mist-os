@@ -13,7 +13,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
-#include <vector>
 
 namespace forensics {
 namespace fakes {

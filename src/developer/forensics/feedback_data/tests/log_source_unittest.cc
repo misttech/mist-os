@@ -19,7 +19,6 @@
 #include "src/developer/forensics/testing/stubs/diagnostics_archive.h"
 #include "src/developer/forensics/testing/stubs/diagnostics_batch_iterator.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
-#include "src/developer/forensics/utils/log_format.h"
 #include "src/lib/backoff/backoff.h"
 #include "src/lib/fxl/strings/string_printf.h"
 

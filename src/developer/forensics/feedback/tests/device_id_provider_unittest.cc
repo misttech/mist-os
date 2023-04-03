@@ -4,8 +4,6 @@
 
 #include "src/developer/forensics/feedback/annotations/device_id_provider.h"
 
-#include <memory>
-#include <optional>
 #include <string>
 
 #include <gmock/gmock.h>

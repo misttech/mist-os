@@ -13,17 +13,13 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
-#include <vector>
 
-#include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/feedback/annotations/device_id_provider.h"
 #include "src/developer/forensics/feedback/annotations/provider.h"
 #include "src/developer/forensics/feedback/reboot_log/graceful_reboot_reason.h"
 #include "src/developer/forensics/feedback/redactor_factory.h"
 #include "src/developer/forensics/feedback/stop_signals.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
-#include "src/lib/backoff/exponential_backoff.h"
-#include "src/lib/timekeeper/system_clock.h"
 
 namespace forensics::feedback {
 namespace {

@@ -9,7 +9,6 @@
 #include <fuchsia/feedback/testing/cpp/fidl.h>
 #include <lib/fidl/cpp/binding.h>
 
-#include <list>
 #include <memory>
 
 namespace forensics {

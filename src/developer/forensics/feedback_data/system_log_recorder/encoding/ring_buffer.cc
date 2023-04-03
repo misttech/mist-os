@@ -7,7 +7,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <cstring>
-#include <string>
 #include <vector>
 
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_utils.h"

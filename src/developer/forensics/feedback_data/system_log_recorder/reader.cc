@@ -8,6 +8,7 @@
 #include <lib/trace/event.h>
 #include <lib/zx/time.h>
 
+#include <algorithm>
 #include <cctype>
 #include <charconv>
 #include <cmath>
@@ -19,8 +20,6 @@
 #include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
-#include "src/lib/fxl/strings/split_string.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
 namespace feedback_data {

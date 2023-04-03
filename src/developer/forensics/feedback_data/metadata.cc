@@ -14,7 +14,6 @@
 #include "src/developer/forensics/feedback/attachments/types.h"
 #include "src/developer/forensics/feedback_data/constants.h"
 #include "src/developer/forensics/feedback_data/errors.h"
-#include "src/developer/forensics/utils/cobalt/metrics.h"
 #include "src/developer/forensics/utils/errors.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "third_party/rapidjson/include/rapidjson/document.h"

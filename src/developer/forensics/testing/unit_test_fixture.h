@@ -21,7 +21,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/testing/stubs/cobalt_logger_factory.h"
-#include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 
 namespace forensics {

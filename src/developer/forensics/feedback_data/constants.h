@@ -5,15 +5,8 @@
 #ifndef SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_CONSTANTS_H_
 #define SRC_DEVELOPER_FORENSICS_FEEDBACK_DATA_CONSTANTS_H_
 
-#include <fuchsia/feedback/cpp/fidl.h>
 #include <lib/zx/time.h>
 
-#include <cstdint>
-#include <set>
-#include <string>
-#include <vector>
-
-#include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/utils/cobalt/metrics.h"
 #include "src/developer/forensics/utils/storage_size.h"
 

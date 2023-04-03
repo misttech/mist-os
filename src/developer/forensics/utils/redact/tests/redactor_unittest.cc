@@ -9,8 +9,6 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/utils/redact/redactor.h"
-
 namespace forensics {
 namespace {
 

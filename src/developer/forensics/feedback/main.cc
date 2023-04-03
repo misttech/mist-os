@@ -20,12 +20,9 @@
 #include "src/developer/forensics/feedback/namespace_init.h"
 #include "src/developer/forensics/feedback/reboot_log/annotations.h"
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
-#include "src/developer/forensics/feedback/redactor_factory.h"
-#include "src/developer/forensics/feedback/stop_signals.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"
 #include "src/developer/forensics/utils/component/component.h"
 #include "src/lib/files/file.h"
-#include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/uuid/uuid.h"
 
 namespace forensics::feedback {

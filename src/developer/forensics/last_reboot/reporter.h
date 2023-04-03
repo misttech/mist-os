@@ -12,7 +12,6 @@
 #include <lib/zx/time.h>
 
 #include <memory>
-#include <string>
 
 #include "src/developer/forensics/feedback/reboot_log/reboot_log.h"
 #include "src/developer/forensics/utils/cobalt/logger.h"

@@ -8,7 +8,6 @@
 #include <lib/fpromise/result.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include "lib/async/cpp/task.h"
 #include "src/lib/fsl/vmo/strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 

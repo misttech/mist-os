@@ -6,12 +6,9 @@
 #include <gtest/gtest.h>
 #include <re2/re2.h>
 
-#include "src/developer/forensics/feedback_data/system_log_recorder/encoding/identity_decoder.h"
-#include "src/developer/forensics/feedback_data/system_log_recorder/encoding/identity_encoder.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_decoder.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_encoder.h"
 #include "src/developer/forensics/feedback_data/system_log_recorder/encoding/lz4_utils.h"
-#include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/regexp.h"
 #include "src/lib/fxl/strings/string_printf.h"
 

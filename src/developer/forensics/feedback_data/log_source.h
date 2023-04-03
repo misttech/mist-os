@@ -13,7 +13,6 @@
 
 #include <memory>
 #include <string>
-#include <vector>
 
 #include "src/lib/backoff/backoff.h"
 #include "src/lib/fxl/memory/weak_ptr.h"

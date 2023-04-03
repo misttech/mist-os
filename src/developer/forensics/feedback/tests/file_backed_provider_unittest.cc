@@ -10,9 +10,7 @@
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 #include "src/developer/forensics/utils/errors.h"
-#include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
-#include "src/lib/files/path.h"
 #include "src/lib/files/scoped_temp_dir.h"
 
 namespace forensics::feedback {

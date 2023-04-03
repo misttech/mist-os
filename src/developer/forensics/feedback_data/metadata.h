@@ -8,7 +8,6 @@
 #include <lib/async/dispatcher.h>
 #include <lib/fpromise/result.h>
 
-#include <optional>
 #include <string>
 
 #include "src/developer/forensics/feedback/annotations/types.h"
