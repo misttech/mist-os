@@ -89,7 +89,7 @@ if (is_fuchsia) {
 
   product_assembly_configuration("product_assembly_config") {
     platform = {
-      build_type = "eng"
+      build_type = "user"
       feature_set_level = "utility"
     }
   }
