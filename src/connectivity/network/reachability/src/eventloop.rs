@@ -378,7 +378,7 @@ impl EventLoop {
                 },
                 ping_res = ping_futures.select_next_some() => {
                     let (cookie, success) = ping_res;
-                    match self.monitor.resume(cookie, success).await {
+                    match self.monitor.resume(cookie, success) {
                         Ok(NetworkCheckerOutcome::MustResume) => {},
                         Ok(NetworkCheckerOutcome::Complete) => {
                             let (system_internet, system_gateway) = {

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![deny(clippy::unused_async)]
+
 mod inspect;
 mod neighbor_cache;
 pub mod ping;
@@ -466,7 +468,6 @@ pub enum NetworkCheckerOutcome {
 
 /// A Network Checker is a re-entrant, asynchronous state machine that monitors availability of
 /// networks over a given network interface.
-#[async_trait::async_trait]
 pub trait NetworkChecker {
     /// `begin` starts a re-entrant, asynchronous network check on the supplied interface. It
     /// returns whether the network check was completed, must be resumed, or if the supplied
@@ -474,7 +475,7 @@ pub trait NetworkChecker {
     fn begin(&mut self, view: InterfaceView<'_>) -> Result<NetworkCheckerOutcome, anyhow::Error>;
 
     /// `resume` continues a network check that was not yet completed.
-    async fn resume(
+    fn resume(
         &mut self,
         cookie: NetworkCheckCookie,
         ping_success: bool,
@@ -737,7 +738,7 @@ impl Monitor {
         }
     }
 
-    async fn handle_ping_action(
+    fn handle_ping_action(
         &mut self,
         cookie: NetworkCheckCookie,
         success: bool,
@@ -847,7 +848,6 @@ impl Monitor {
     }
 }
 
-#[async_trait::async_trait]
 impl NetworkChecker for Monitor {
     fn begin(
         &mut self,
@@ -1038,13 +1038,13 @@ impl NetworkChecker for Monitor {
         Ok(NetworkCheckerOutcome::MustResume)
     }
 
-    async fn resume(
+    fn resume(
         &mut self,
         cookie: NetworkCheckCookie,
         success: bool,
     ) -> Result<NetworkCheckerOutcome, anyhow::Error> {
         match cookie.action {
-            NetworkCheckAction::Ping { .. } => self.handle_ping_action(cookie, success).await,
+            NetworkCheckAction::Ping { .. } => self.handle_ping_action(cookie, success),
         }
     }
 }
@@ -1279,7 +1279,7 @@ mod tests {
                     match action {
                         NetworkCheckAction::Ping { interface_name, addr } => {
                             let ping_success = p.ping(&interface_name, addr).await;
-                            match monitor.resume(cookie, ping_success).await {
+                            match monitor.resume(cookie, ping_success) {
                                 // Has reached final state.
                                 Ok(NetworkCheckerOutcome::Complete) => return,
                                 _ => {}

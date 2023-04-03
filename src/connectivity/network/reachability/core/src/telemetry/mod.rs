@@ -159,7 +159,7 @@ pub fn serve_telemetry(
                     }
                 }
                 _ = report_interval_stream.next() => {
-                    telemetry.handle_ten_secondly_telemetry().await;
+                    telemetry.handle_ten_secondly_telemetry();
 
                     interval_tick += 1;
                     if interval_tick % INTERVAL_TICKS_PER_HR == 0 {
@@ -457,7 +457,7 @@ impl Telemetry {
         self.network_config_last_refreshed = now;
     }
 
-    pub async fn handle_ten_secondly_telemetry(&mut self) {
+    pub fn handle_ten_secondly_telemetry(&mut self) {
         let now = fasync::Time::now();
         let duration_sec_inspect =
             round_to_nearest_second(now - self.state_last_refreshed_for_inspect) as i32;
