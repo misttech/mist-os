@@ -621,7 +621,7 @@ async fn dispatch_control_request(
         }
         fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
-            responder.send(&mut Ok(set_configuration(ctx, id, config).await))
+            responder.send(&mut set_configuration(ctx, id, config).await)
         }
         fnet_interfaces_admin::ControlRequest::GetConfiguration { responder } => {
             responder.send(&mut Ok(get_configuration(ctx, id).await))
@@ -795,18 +795,28 @@ async fn set_configuration(
     ctx: &NetstackContext,
     id: BindingId,
     config: fnet_interfaces_admin::Configuration,
-) -> fnet_interfaces_admin::Configuration {
+) -> fnet_interfaces_admin::ControlSetConfigurationResult {
     let mut ctx = ctx.lock().await;
     let Ctx { sync_ctx, non_sync_ctx } = ctx.deref_mut();
     let core_id = non_sync_ctx
         .devices
         .get_core_id(id)
         .expect("device lifetime should be tied to channel lifetime");
+
     let fnet_interfaces_admin::Configuration { ipv4, ipv6, .. } = config;
-    let ipv4 = ipv4.map(|ipv4_config| {
-        let fnet_interfaces_admin::Ipv4Configuration {
-            igmp, multicast_forwarding, forwarding, ..
-        } = ipv4_config;
+
+    let is_loopback = match core_id {
+        DeviceId::Loopback(_) => true,
+        DeviceId::Ethernet(_) => false,
+    };
+
+    if let Some(fnet_interfaces_admin::Ipv4Configuration {
+        igmp,
+        multicast_forwarding,
+        forwarding,
+        ..
+    }) = ipv4.as_ref()
+    {
         if let Some(_) = igmp {
             todo!("https://fxbug.dev/120293 support enable/disable igmp")
         }
@@ -815,37 +825,21 @@ async fn set_configuration(
                 "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
             )
         }
-
-        fnet_interfaces_admin::Ipv4Configuration {
-            forwarding: forwarding.map(|enable| {
-                let was_enabled = netstack3_core::device::is_routing_enabled::<
-                    _,
-                    net_types::ip::Ipv4,
-                >(&sync_ctx, &core_id);
-                netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv4>(
-                    sync_ctx,
-                    non_sync_ctx,
-                    &core_id,
-                    enable,
-                )
-                .unwrap_or_else(|e| {
-                    // TODO(https://fxbug.dev/124447): Return error when forwarding not
-                    // supported on device.
-                    log::error!(
-                        "ip forwarding not supported on interface {} with error {}",
-                        core_id,
-                        e
-                    );
-                });
-                was_enabled
-            }),
-            ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+        if let Some(forwarding) = forwarding {
+            if *forwarding && is_loopback {
+                return Err(
+                    fnet_interfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported,
+                );
+            }
         }
-    });
-    let ipv6 = ipv6.map(|ipv6_config| {
-        let fnet_interfaces_admin::Ipv6Configuration {
-            mld, multicast_forwarding, forwarding, ..
-        } = ipv6_config;
+    }
+    if let Some(fnet_interfaces_admin::Ipv6Configuration {
+        mld,
+        multicast_forwarding,
+        forwarding,
+        ..
+    }) = ipv6.as_ref()
+    {
         if let Some(_) = mld {
             todo!("https://fxbug.dev/120293 support enable/disable mld")
         }
@@ -854,37 +848,56 @@ async fn set_configuration(
                 "TODO(https://fxbug.dev/124237): setting multicast_forwarding not yet supported"
             )
         }
-        fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: forwarding.map(|enable| {
-                let was_enabled = netstack3_core::device::is_routing_enabled::<
-                    _,
-                    net_types::ip::Ipv6,
-                >(&sync_ctx, &core_id);
-                netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv6>(
-                    sync_ctx,
-                    non_sync_ctx,
-                    &core_id,
-                    enable,
-                )
-                .unwrap_or_else(|e| {
-                    // TODO(https://fxbug.dev/124447): Return error when forwarding not
-                    // supported on device.
-                    log::error!(
-                        "ip forwarding not supported on interface {} with error {}",
-                        core_id,
-                        e
-                    );
-                });
-                was_enabled
-            }),
-            ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+        if let Some(forwarding) = forwarding {
+            if *forwarding && is_loopback {
+                return Err(
+                    fnet_interfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported,
+                );
+            }
         }
-    });
-    fnet_interfaces_admin::Configuration {
-        ipv4,
-        ipv6,
-        ..fnet_interfaces_admin::Configuration::EMPTY
     }
+
+    Ok(fnet_interfaces_admin::Configuration {
+        ipv4: ipv4.map(|fnet_interfaces_admin::Ipv4Configuration { forwarding, .. }| {
+            fnet_interfaces_admin::Ipv4Configuration {
+                forwarding: forwarding.map(|enable| {
+                    let was_enabled = netstack3_core::device::is_routing_enabled::<
+                        _,
+                        net_types::ip::Ipv4,
+                    >(&sync_ctx, &core_id);
+                    netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv4>(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &core_id,
+                        enable,
+                    )
+                    .expect("checked supported configuration before calling");
+                    was_enabled
+                }),
+                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+            }
+        }),
+        ipv6: ipv6.map(|fnet_interfaces_admin::Ipv6Configuration { forwarding, .. }| {
+            fnet_interfaces_admin::Ipv6Configuration {
+                forwarding: forwarding.map(|enable| {
+                    let was_enabled = netstack3_core::device::is_routing_enabled::<
+                        _,
+                        net_types::ip::Ipv6,
+                    >(&sync_ctx, &core_id);
+                    netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv6>(
+                        sync_ctx,
+                        non_sync_ctx,
+                        &core_id,
+                        enable,
+                    )
+                    .expect("checked supported configuration before calling");
+                    was_enabled
+                }),
+                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            }
+        }),
+        ..fnet_interfaces_admin::Configuration::EMPTY
+    })
 }
 
 /// Returns the configuration used for the interface with the given `id`.

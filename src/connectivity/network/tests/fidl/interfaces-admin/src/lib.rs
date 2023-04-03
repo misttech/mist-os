@@ -10,6 +10,7 @@ use fidl_fuchsia_net_debug as fnet_debug;
 use fidl_fuchsia_net_ext as fnet_ext;
 use fidl_fuchsia_net_ext::IntoExt;
 use fidl_fuchsia_net_interfaces_admin as finterfaces_admin;
+use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
 use fidl_fuchsia_net_routes as fnet_routes;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fidl_fuchsia_posix_socket as fposix_socket;
@@ -1927,7 +1928,7 @@ async fn control_owns_interface_lifetime<N: Netstack>(name: &str, detach: bool) 
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Default, Debug, PartialEq)]
 struct IpForwarding {
     v4: Option<bool>,
     v4_multicast: Option<bool>,
@@ -1980,13 +1981,147 @@ impl IpForwarding {
             v6_multicast: false_if_some(self.v6_multicast),
         }
     }
+
+    fn as_configuration(&self) -> finterfaces_admin::Configuration {
+        let IpForwarding { v4, v4_multicast, v6, v6_multicast } = *self;
+        finterfaces_admin::Configuration {
+            ipv4: Some(finterfaces_admin::Ipv4Configuration {
+                forwarding: v4,
+                multicast_forwarding: v4_multicast,
+                ..finterfaces_admin::Ipv4Configuration::EMPTY
+            }),
+            ipv6: Some(finterfaces_admin::Ipv6Configuration {
+                forwarding: v6,
+                multicast_forwarding: v6_multicast,
+                ..finterfaces_admin::Ipv6Configuration::EMPTY
+            }),
+            ..finterfaces_admin::Configuration::EMPTY
+        }
+    }
+}
+
+async fn get_ip_forwarding(iface: &fnet_interfaces_ext::admin::Control) -> IpForwarding {
+    let finterfaces_admin::Configuration { ipv4: ipv4_config, ipv6: ipv6_config, .. } = iface
+        .get_configuration()
+        .await
+        .expect("get_configuration FIDL error")
+        .expect("error getting configuration");
+
+    let finterfaces_admin::Ipv4Configuration {
+        forwarding: v4,
+        multicast_forwarding: v4_multicast,
+        ..
+    } = ipv4_config.expect("IPv4 configuration should be populated");
+    let finterfaces_admin::Ipv6Configuration {
+        forwarding: v6,
+        multicast_forwarding: v6_multicast,
+        ..
+    } = ipv6_config.expect("IPv6 configuration should be populated");
+
+    IpForwarding { v4, v4_multicast, v6, v6_multicast }
+}
+
+#[netstack_test]
+#[test_case(
+    IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None },
+    None
+; "set_none")]
+#[test_case(
+    IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None },
+    None
+; "set_ip_false")]
+#[test_case(
+    IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
+; "set_ipv4_true")]
+#[test_case(
+    IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(true), v6_multicast: None },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv6ForwardingUnsupported)
+; "set_ipv6_true")]
+#[test_case(
+    IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(true), v6_multicast: None },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
+; "set_ip_true")]
+#[test_case(
+    IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(false) },
+    None
+; "set_multicast_ip_false")]
+#[test_case(
+    IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(false) },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
+; "set_multicast_ipv4_true")]
+#[test_case(
+    IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(true) },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv6MulticastForwardingUnsupported)
+; "set_multicast_ipv6_true")]
+#[test_case(
+    IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(true) },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
+; "set_multicast_ip_true")]
+#[test_case(
+    IpForwarding { v4: Some(true), v4_multicast: Some(false), v6: Some(true), v6_multicast: Some(false) },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
+; "set_ip_true_and_multicast_ip_false")]
+#[test_case(
+    IpForwarding { v4: Some(false), v4_multicast: Some(true), v6: Some(false), v6_multicast: Some(true) },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4MulticastForwardingUnsupported)
+; "set_ip_false_and_multicast_ip_true")]
+#[test_case(
+    IpForwarding { v4: Some(true), v4_multicast: Some(true), v6: Some(true), v6_multicast: Some(true) },
+    Some(finterfaces_admin::ControlSetConfigurationError::Ipv4ForwardingUnsupported)
+; "set_ip_and_multicast_ip_true")]
+async fn get_set_forwarding_loopback<N: Netstack>(
+    name: &str,
+    forwarding_config: IpForwarding,
+    expected_err: Option<finterfaces_admin::ControlSetConfigurationError>,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create netstack realm");
+    let loopback_control = realm
+        .interface_control(assert_matches::assert_matches!(
+            realm.loopback_properties().await,
+            Ok(Some(fnet_interfaces_ext::Properties {
+                id,
+                name: _,
+                device_class: _,
+                online: _,
+                addresses: _,
+                has_default_ipv4_route: _,
+                has_default_ipv6_route: _,
+            })) => id
+        ))
+        .unwrap();
+
+    let expected_get_forwarding_response_when_previously_unset =
+        IpForwarding::default().expected_next_get_forwarding_response::<N>();
+    // Initially, interfaces have IP forwarding disabled.
+    assert_eq!(
+        get_ip_forwarding(&loopback_control).await,
+        expected_get_forwarding_response_when_previously_unset
+    );
+
+    assert_eq!(
+        loopback_control
+            .set_configuration(forwarding_config.as_configuration())
+            .await
+            .expect("set_configuration FIDL error"),
+        expected_err.map_or_else(
+            || Ok(forwarding_config.expected_first_set_forwarding_response().as_configuration()),
+            Err,
+        ),
+    );
+    // The configuration should not have changed.
+    assert_eq!(
+        get_ip_forwarding(&loopback_control).await,
+        expected_get_forwarding_response_when_previously_unset,
+    );
 }
 
 #[netstack_test]
 #[test_case(IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None }; "set_none")]
 #[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ip_false")]
 #[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ipv4_true")]
-#[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(false), v6_multicast: None }; "set_ipv6_true")]
+#[test_case(IpForwarding { v4: Some(false), v4_multicast: None, v6: Some(true), v6_multicast: None }; "set_ipv6_true")]
 #[test_case(IpForwarding { v4: Some(true), v4_multicast: None, v6: Some(true), v6_multicast: None }; "set_ip_true")]
 #[test_case(IpForwarding { v4: None, v4_multicast: Some(false), v6: None, v6_multicast: Some(false) }; "set_multicast_ip_false")]
 #[test_case(IpForwarding { v4: None, v4_multicast: Some(true), v6: None, v6_multicast: Some(false) }; "set_multicast_ipv4_true")]
@@ -2002,38 +2137,15 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     let iface1 = realm.join_network(&net, "iface1").await.expect("create iface1");
     let iface2 = realm.join_network(&net, "iface2").await.expect("create iface1");
 
-    async fn get_ip_forwarding(iface: &netemul::TestInterface<'_>) -> IpForwarding {
-        let finterfaces_admin::Configuration { ipv4: ipv4_config, ipv6: ipv6_config, .. } = iface
-            .control()
-            .get_configuration()
-            .await
-            .expect("get_configuration FIDL error")
-            .expect("error getting configuration");
-
-        let finterfaces_admin::Ipv4Configuration {
-            forwarding: v4,
-            multicast_forwarding: v4_multicast,
-            ..
-        } = ipv4_config.expect("IPv4 configuration should be populated");
-        let finterfaces_admin::Ipv6Configuration {
-            forwarding: v6,
-            multicast_forwarding: v6_multicast,
-            ..
-        } = ipv6_config.expect("IPv6 configuration should be populated");
-
-        IpForwarding { v4, v4_multicast, v6, v6_multicast }
-    }
-    const INITIAL_FORWARDING_CONFIG_STATE: IpForwarding =
-        IpForwarding { v4: None, v4_multicast: None, v6: None, v6_multicast: None };
     let expected_get_forwarding_response_when_previously_unset =
-        INITIAL_FORWARDING_CONFIG_STATE.expected_next_get_forwarding_response::<N>();
+        IpForwarding::default().expected_next_get_forwarding_response::<N>();
     // Initially, interfaces have IP forwarding disabled.
     assert_eq!(
-        get_ip_forwarding(&iface1).await,
+        get_ip_forwarding(iface1.control()).await,
         expected_get_forwarding_response_when_previously_unset
     );
     assert_eq!(
-        get_ip_forwarding(&iface2).await,
+        get_ip_forwarding(iface2.control()).await,
         expected_get_forwarding_response_when_previously_unset
     );
 
@@ -2044,31 +2156,14 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
         enable: &IpForwarding,
         expected_previous: &IpForwarding,
     ) {
-        let config_with_ip_forwarding_set = |forwarding: &IpForwarding| {
-            let IpForwarding { v4, v4_multicast, v6, v6_multicast } = *forwarding;
-            finterfaces_admin::Configuration {
-                ipv4: Some(finterfaces_admin::Ipv4Configuration {
-                    forwarding: v4,
-                    multicast_forwarding: v4_multicast,
-                    ..finterfaces_admin::Ipv4Configuration::EMPTY
-                }),
-                ipv6: Some(finterfaces_admin::Ipv6Configuration {
-                    forwarding: v6,
-                    multicast_forwarding: v6_multicast,
-                    ..finterfaces_admin::Ipv6Configuration::EMPTY
-                }),
-                ..finterfaces_admin::Configuration::EMPTY
-            }
-        };
-
         let configuration = iface
             .control()
-            .set_configuration(config_with_ip_forwarding_set(enable))
+            .set_configuration(enable.as_configuration())
             .await
             .expect("set_configuration FIDL error")
             .expect("error setting configuration");
 
-        assert_eq!(configuration, config_with_ip_forwarding_set(expected_previous))
+        assert_eq!(configuration, expected_previous.as_configuration())
     }
 
     set_ip_forwarding(
@@ -2079,17 +2174,23 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     .await;
     let expected_get_forwarding_response_after_set =
         forwarding_config.expected_next_get_forwarding_response::<N>();
-    assert_eq!(get_ip_forwarding(&iface1).await, expected_get_forwarding_response_after_set);
     assert_eq!(
-        get_ip_forwarding(&iface2).await,
+        get_ip_forwarding(iface1.control()).await,
+        expected_get_forwarding_response_after_set
+    );
+    assert_eq!(
+        get_ip_forwarding(iface2.control()).await,
         expected_get_forwarding_response_when_previously_unset
     );
 
     // Setting the same config should be a no-op.
     set_ip_forwarding(&iface1, &forwarding_config, &forwarding_config).await;
-    assert_eq!(get_ip_forwarding(&iface1).await, expected_get_forwarding_response_after_set,);
     assert_eq!(
-        get_ip_forwarding(&iface2).await,
+        get_ip_forwarding(iface1.control()).await,
+        expected_get_forwarding_response_after_set,
+    );
+    assert_eq!(
+        get_ip_forwarding(iface2.control()).await,
         expected_get_forwarding_response_when_previously_unset
     );
 
@@ -2110,12 +2211,21 @@ async fn get_set_forwarding<N: Netstack>(name: &str, forwarding_config: IpForwar
     .await;
     let expected_get_forwarding_response_after_reverse =
         reversed_forwarding_config.expected_next_get_forwarding_response::<N>();
-    assert_eq!(get_ip_forwarding(&iface2).await, expected_get_forwarding_response_after_reverse,);
-    assert_eq!(get_ip_forwarding(&iface1).await, expected_get_forwarding_response_after_set);
+    assert_eq!(
+        get_ip_forwarding(iface2.control()).await,
+        expected_get_forwarding_response_after_reverse,
+    );
+    assert_eq!(
+        get_ip_forwarding(iface1.control()).await,
+        expected_get_forwarding_response_after_set
+    );
 
     // Unset forwarding.
     set_ip_forwarding(&iface1, &reversed_forwarding_config, &forwarding_config).await;
-    assert_eq!(get_ip_forwarding(&iface1).await, expected_get_forwarding_response_after_reverse);
+    assert_eq!(
+        get_ip_forwarding(iface1.control()).await,
+        expected_get_forwarding_response_after_reverse
+    );
 }
 
 // Test that reinstalling a port with the same base port identifier works.

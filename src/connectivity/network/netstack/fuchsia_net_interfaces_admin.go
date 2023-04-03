@@ -222,12 +222,16 @@ func (ci *adminControlImpl) Detach(fidl.Context) error {
 	return nil
 }
 
-func (ci *adminControlImpl) Remove(fidl.Context) (admin.ControlRemoveResult, error) {
+func (ci *adminControlImpl) isLoopback() bool {
 	nicInfo, ok := ci.ns.stack.NICInfo()[ci.nicid]
 	if !ok {
 		panic(fmt.Sprintf("Remove on NIC %d not present", ci.nicid))
 	}
-	if nicInfo.Flags.Loopback {
+	return nicInfo.Flags.Loopback
+}
+
+func (ci *adminControlImpl) Remove(fidl.Context) (admin.ControlRemoveResult, error) {
+	if ci.isLoopback() {
 		return admin.ControlRemoveResultWithErr(admin.ControlRemoveErrorNotAllowed), nil
 	}
 
@@ -484,21 +488,47 @@ func toAdminMldVersion(v ipv6.MLDVersion) admin.MldVersion {
 }
 
 func (ci *adminControlImpl) SetConfiguration(_ fidl.Context, config admin.Configuration) (admin.ControlSetConfigurationResult, error) {
-	// Make sure the IGMP version (if specified) is supported.
-	if config.HasIpv4() && config.Ipv4.HasIgmp() && config.Ipv4.Igmp.HasVersion() {
-		switch config.Ipv4.Igmp.Version {
-		case admin.IgmpVersionV1, admin.IgmpVersionV2, admin.IgmpVersionV3:
-		default:
-			return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4IgmpVersionUnsupported), nil
+	if config.HasIpv4() {
+		// Loopback does not support forwarding.
+		if ci.isLoopback() {
+			if config.Ipv4.HasForwarding() && config.Ipv4.Forwarding {
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4ForwardingUnsupported), nil
+			}
+
+			if config.Ipv4.HasMulticastForwarding() && config.Ipv4.MulticastForwarding {
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4MulticastForwardingUnsupported), nil
+			}
+		}
+
+		// Make sure the IGMP version (if specified) is supported.
+		if config.Ipv4.HasIgmp() && config.Ipv4.Igmp.HasVersion() {
+			switch config.Ipv4.Igmp.Version {
+			case admin.IgmpVersionV1, admin.IgmpVersionV2, admin.IgmpVersionV3:
+			default:
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv4IgmpVersionUnsupported), nil
+			}
 		}
 	}
 
-	// Make sure the MLD version (if specified) is supported.
-	if config.HasIpv6() && config.Ipv6.HasMld() && config.Ipv6.Mld.HasVersion() {
-		switch config.Ipv6.Mld.Version {
-		case admin.MldVersionV1, admin.MldVersionV2:
-		default:
-			return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6MldVersionUnsupported), nil
+	if config.HasIpv6() {
+		// Loopback does not support forwarding.
+		if ci.isLoopback() {
+			if config.Ipv6.HasForwarding() && config.Ipv6.Forwarding {
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6ForwardingUnsupported), nil
+			}
+
+			if config.Ipv6.HasMulticastForwarding() && config.Ipv6.MulticastForwarding {
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6MulticastForwardingUnsupported), nil
+			}
+		}
+
+		// Make sure the MLD version (if specified) is supported.
+		if config.Ipv6.HasMld() && config.Ipv6.Mld.HasVersion() {
+			switch config.Ipv6.Mld.Version {
+			case admin.MldVersionV1, admin.MldVersionV2:
+			default:
+				return admin.ControlSetConfigurationResultWithErr(admin.ControlSetConfigurationErrorIpv6MldVersionUnsupported), nil
+			}
 		}
 	}
 

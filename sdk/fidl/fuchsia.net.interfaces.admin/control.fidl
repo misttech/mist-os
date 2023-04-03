@@ -142,12 +142,24 @@ protocol Control {
     }) -> (struct {
         previous_config Configuration;
     }) error flexible enum {
+        /// Indicates that the provided value for `config.ipv4.forwarding` is
+        /// unsupported.
+        IPV4_FORWARDING_UNSUPPORTED = 1;
+        /// Indicates that the provided value for `config.ipv4.multicast_forwarding`
+        /// is unsupported.
+        IPV4_MULTICAST_FORWARDING_UNSUPPORTED = 2;
         /// Indicates that the provided value for `config.ipv4.igmp.version` is
         /// unsupported.
-        IPV4_IGMP_VERSION_UNSUPPORTED = 1;
+        IPV4_IGMP_VERSION_UNSUPPORTED = 3;
+        /// Indicates that the provided value for `config.ipv6.forwarding` is
+        /// unsupported.
+        IPV6_FORWARDING_UNSUPPORTED = 4;
+        /// Indicates that the provided value for `config.ipv6.multicast_forwarding`
+        /// is unsupported.
+        IPV6_MULTICAST_FORWARDING_UNSUPPORTED = 5;
         /// Indicates that the provided value for `config.ipv6.mld.version` is
         /// unsupported.
-        IPV6_MLD_VERSION_UNSUPPORTED = 2;
+        IPV6_MLD_VERSION_UNSUPPORTED = 6;
     };
 
     /// Gets a snapshot of the interface's configuration.
