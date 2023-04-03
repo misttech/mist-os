@@ -36,6 +36,8 @@ function HELP {
     echo "--debugger           : Enable gdb stub and wait for connection"
     echo "--gic=<version>      : use GIC 2, 3, or max supported. default is max"
     echo "--no-serial          : Disable writing out to the guest's serial port"
+    echo "-S <device>          : output serial port to a QEMU character device"
+    echo "-M <device>          : output QEMU monitor console to a QEMU character device"
     echo "--uefi               : Boot QEMU through UEFI. With this setting, one of -t or -D must be"
     echo "                       supplied: if -t is supplied, then that value is assumed to be a"
     echo "                       UEFI executable; else, the value under -D is assumbed to be a "
@@ -98,6 +100,8 @@ UPSCRIPT=no
 VNC=
 VIRTIO=1
 SERIAL=1
+SERIAL_DEV=
+MONITOR_DEV=
 SMP=$SMP_DEFAULT
 CMDLINE=""
 OPT_CMDLINE=""
@@ -193,7 +197,7 @@ function append-disk-args {
     ARGS+="$extra_args"
 }
 
-while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
+while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:S:M:h-:" FLAG; do
     case $FLAG in
         a) ARCH=$OPTARG;;
         c) OPT_CMDLINE+="$OPTARG ";;
@@ -240,6 +244,8 @@ while getopts "a:c:D:gHI:km:nNq:s:t::u:Vz:h-:" FLAG; do
         u) UPSCRIPT="$(abspath "$OPTARG")";;
         V) VIRTIO=1;;
         z) QEMU_INITRD="$(abspath "$OPTARG")";;
+        S) SERIAL_DEV=$OPTARG;;
+        M) MONITOR_DEV=$OPTARG;;
         h) HELP;;
         \?)
             echo unrecognized option
@@ -370,10 +376,20 @@ fi
 # Always use virtio as the rng source
 ARGS+=" -device virtio-rng-pci"
 
+if [[ -n "$SERIAL_DEV" ]]; then
+  ARGS+=" -serial $SERIAL_DEV"
+fi
+
+if [[ -n "$MONITOR_DEV" ]]; then
+  ARGS+=" -monitor $MONITOR_DEV"
+fi
+
 if (( !$GRAPHICS  )); then
     ARGS+=" -nographic -vga none"
 else
-    ARGS+=" -serial stdio"
+    if [[ -z "$SERIAL" ]]; then
+      ARGS+=" -serial stdio"
+    fi
     if [[ "$ARCH" == "x64" && $VIRTIO == 0 ]]; then
         # Enable Bochs VBE device, which Zircon has a device for
         ARGS+=" -vga std"
