@@ -92,8 +92,11 @@ impl TargetHandleInner {
                     .target
                     .set_preferred_ssh_address(ip.into())
                     .then(|| ())
-                    .ok_or(ffx::TargetError::AddressNotFound)
-                    .map(|_| self.target.maybe_reconnect());
+                    .ok_or(ffx::TargetError::AddressNotFound);
+
+                if result.is_ok() {
+                    self.target.maybe_reconnect();
+                }
 
                 responder.send(&mut result).map_err(Into::into)
             }
@@ -177,12 +180,22 @@ impl TargetHandleInner {
 pub(crate) async fn wait_for_rcs(
     t: &Rc<Target>,
 ) -> Result<Result<rcs::RcsConnection, ffx::TargetConnectionError>> {
+    // This setup here is due to the events not having a proper streaming implementation. The
+    // closure is intended to have a static lifetime, which forces this to happen to extract an
+    // event.
+    let seen_event = Rc::new(RefCell::new(None));
+
     Ok(loop {
-        // This setup here is due to the events not having a proper streaming implementation. The
-        // closure is intended to have a static lifetime, which forces this to happen to extract an
-        // event.
-        let seen_event = Rc::new(RefCell::new(None));
+        if let Some(rcs) = t.rcs() {
+            break Ok(rcs);
+        } else if let Some(err) = seen_event.borrow_mut().take() {
+            break Err(host_pipe_err_to_fidl(err));
+        } else {
+            tracing::trace!("RCS dropped after event fired. Waiting again.");
+        }
+
         let se_clone = seen_event.clone();
+
         t.events
             .wait_for(None, move |e| match e {
                 TargetEvent::RcsActivated => true,
@@ -194,13 +207,6 @@ pub(crate) async fn wait_for_rcs(
             })
             .await
             .context("waiting for RCS")?;
-        if let Some(rcs) = t.rcs() {
-            break Ok(rcs);
-        } else if let Some(err) = seen_event.borrow_mut().take() {
-            break Err(host_pipe_err_to_fidl(err));
-        } else {
-            tracing::trace!("RCS dropped after event fired. Waiting again.");
-        }
     })
 }
 
@@ -329,6 +335,7 @@ mod tests {
                         let mut stream = server_end.into_stream().unwrap();
                         let nodename = nodename.clone();
                         Task::local(async move {
+                            let mut knock_channels = Vec::new();
                             while let Ok(Some(req)) = stream.try_next().await {
                                 match req {
                                     fidl_rcs::RemoteControlRequest::IdentifyHost { responder } => {
@@ -348,6 +355,19 @@ mod tests {
                                                 ..fidl_rcs::IdentifyHostResponse::EMPTY
                                             }))
                                             .unwrap();
+                                    }
+                                    fidl_rcs::RemoteControlRequest::Connect { selector, service_chan, responder } => {
+                                        if selector != selectors::parse_selector::<selectors::VerboseError>(
+                                            "core/remote-control:expose:fuchsia.developer.remotecontrol.RemoteControl",
+                                        ).unwrap() {
+                                            panic!("unsupported for this test");
+                                        }
+                                        knock_channels.push(service_chan);
+                                        responder.send(&mut Ok(fidl_rcs::ServiceMatch {
+                                            moniker: Vec::new(),
+                                            subdir: "".to_owned(),
+                                            service: "".to_owned()
+                                        })).unwrap();
                                     }
                                     _ => panic!("unsupported for this test"),
                                 }

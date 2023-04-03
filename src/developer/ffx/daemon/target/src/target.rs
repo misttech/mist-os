@@ -22,7 +22,7 @@ use fidl_fuchsia_net::{IpAddress, Ipv4Address, Ipv6Address, Subnet};
 use fuchsia_async::Task;
 use netext::IsLocalAddr;
 use rand::random;
-use rcs::{RcsConnection, RcsConnectionError};
+use rcs::{knock_rcs, RcsConnection, RcsConnectionError};
 use std::{
     cell::RefCell,
     cmp::Ordering,
@@ -946,6 +946,24 @@ impl Target {
         let weak_target = Rc::downgrade(self);
         let target_name_str = format!("{}@{}", self.nodename_str(), self.id());
         self.host_pipe.borrow_mut().replace(Task::local(async move {
+            // The purpose of a host pipe is to ultimately get us connected to RCS and let us transition
+            // to the RCS connected state. If we're already in that state, and the RCS connection is
+            // active, we don't need a host pipe. This will start happening more as we introduce USB
+            // links, where the first thing we hear about a target is its appearance as an Overnet peer,
+            // and thus we have an RCS connection from inception.
+            {
+                let Some(target) = weak_target.upgrade() else {
+                    // weird that self is already gone, but ¯\_(ツ)_/¯
+                    return;
+                };
+                let state = target.state.borrow();
+                if let TargetConnectionState::Rcs(rcs) = &*state {
+                    if knock_rcs(&rcs.proxy).await.is_ok() {
+                        return;
+                    }
+                }
+            }
+
             let modes = ffx_config::get_connection_modes().await;
             let legacy = async {
                 if modes.use_legacy() {
