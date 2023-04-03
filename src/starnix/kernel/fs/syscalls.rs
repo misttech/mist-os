@@ -80,6 +80,7 @@ pub fn sys_fcntl(
             let fd_number = arg as i32;
             let flags = if cmd == F_DUPFD_CLOEXEC { FdFlags::CLOEXEC } else { FdFlags::empty() };
             let newfd = current_task.files.duplicate(
+                current_task,
                 fd,
                 TargetFdNumber::Minimum(FdNumber::from_raw(fd_number)),
                 flags,
@@ -392,7 +393,7 @@ pub fn sys_openat(
 ) -> Result<FdNumber, Errno> {
     let file = open_file_at(current_task, dir_fd, user_path, flags, mode)?;
     let fd_flags = get_fd_flags(flags);
-    current_task.files.add_with_flags(file, fd_flags)
+    current_task.add_file(file, fd_flags)
 }
 
 pub fn sys_faccessat(
@@ -1151,8 +1152,8 @@ pub fn sys_pipe2(
     write.update_file_flags(file_flags, supported_file_flags);
 
     let fd_flags = get_fd_flags(flags);
-    let fd_read = current_task.files.add_with_flags(read, fd_flags)?;
-    let fd_write = current_task.files.add_with_flags(write, fd_flags)?;
+    let fd_read = current_task.add_file(read, fd_flags)?;
+    let fd_write = current_task.add_file(write, fd_flags)?;
     log_trace!(current_task, "pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
     current_task.mm.write_object(user_pipe, &fd_read)?;
@@ -1222,7 +1223,7 @@ pub fn sys_symlinkat(
 }
 
 pub fn sys_dup(current_task: &CurrentTask, oldfd: FdNumber) -> Result<FdNumber, Errno> {
-    current_task.files.duplicate(oldfd, TargetFdNumber::Default, FdFlags::empty())
+    current_task.files.duplicate(current_task, oldfd, TargetFdNumber::Default, FdFlags::empty())
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -1251,7 +1252,7 @@ pub fn sys_dup3(
         return error!(EINVAL);
     }
     let fd_flags = get_fd_flags(flags);
-    current_task.files.duplicate(oldfd, TargetFdNumber::Specific(newfd), fd_flags)?;
+    current_task.files.duplicate(current_task, oldfd, TargetFdNumber::Specific(newfd), fd_flags)?;
     Ok(newfd)
 }
 
@@ -1279,7 +1280,7 @@ pub fn sys_memfd_create(
     if flags & MFD_CLOEXEC != 0 {
         fd_flags |= FdFlags::CLOEXEC;
     }
-    let fd = current_task.files.add_with_flags(file, fd_flags)?;
+    let fd = current_task.add_file(file, fd_flags)?;
     Ok(fd)
 }
 
@@ -1433,7 +1434,7 @@ pub fn sys_eventfd2(current_task: &CurrentTask, value: u32, flags: u32) -> Resul
         if (flags & EFD_SEMAPHORE) == 0 { EventFdType::Counter } else { EventFdType::Semaphore };
     let file = new_eventfd(current_task, value, eventfd_type, blocking);
     let fd_flags = if flags & EFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.files.add_with_flags(file, fd_flags)?;
+    let fd = current_task.add_file(file, fd_flags)?;
     Ok(fd)
 }
 
@@ -1486,7 +1487,7 @@ pub fn sys_timerfd_create(
     };
 
     let timer = TimerFile::new_file(current_task, timer_file_clock, open_flags)?;
-    let fd = current_task.files.add_with_flags(timer, fd_flags)?;
+    let fd = current_task.add_file(timer, fd_flags)?;
     Ok(fd)
 }
 
@@ -1688,7 +1689,7 @@ pub fn sys_epoll_create1(current_task: &CurrentTask, flags: u32) -> Result<FdNum
     }
     let ep_file = EpollFileObject::new_file(current_task);
     let fd_flags = if flags & EPOLL_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.files.add_with_flags(ep_file, fd_flags)?;
+    let fd = current_task.add_file(ep_file, fd_flags)?;
     Ok(fd)
 }
 
@@ -1815,8 +1816,7 @@ fn poll(
     mask: Option<SigSet>,
     timeout: i32,
 ) -> Result<usize, Errno> {
-    // TODO: Update this to use a dynamic limit (that can be set by setrlimit).
-    if num_fds > RLIMIT_NOFILE_MAX as i32 || num_fds < 0 {
+    if num_fds < 0 || num_fds as u64 > current_task.thread_group.get_rlimit(Resource::NOFILE) {
         return error!(EINVAL);
     }
 
@@ -1992,7 +1992,7 @@ pub fn sys_inotify_init1(current_task: &CurrentTask, flags: u32) -> Result<FdNum
     let close_on_exec = flags & IN_CLOEXEC != 0;
     let ep_file = InotifyFileObject::new_file(current_task, non_blocking);
     let fd_flags = if close_on_exec { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.files.add_with_flags(ep_file, fd_flags)?;
+    let fd = current_task.add_file(ep_file, fd_flags)?;
     Ok(fd)
 }
 
@@ -2063,7 +2063,7 @@ mod tests {
         let fd = FdNumber::from_raw(10);
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
         let file_size = file_handle.node().stat().unwrap().st_size;
-        current_task.files.insert(fd, file_handle);
+        current_task.files.insert(&current_task, fd, file_handle).unwrap();
 
         assert_eq!(sys_lseek(&current_task, fd, 0, SeekOrigin::Cur as u32)?, 0);
         assert_eq!(sys_lseek(&current_task, fd, 1, SeekOrigin::Cur as u32)?, 1);
@@ -2088,11 +2088,11 @@ mod tests {
     fn test_sys_dup() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
-        let files = &current_task.files;
-        let oldfd = files.add(file_handle)?;
+        let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
         let newfd = sys_dup(&current_task, oldfd)?;
 
         assert_ne!(oldfd, newfd);
+        let files = &current_task.files;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
 
         assert_eq!(sys_dup(&current_task, FdNumber::from_raw(3)), error!(EBADF));
@@ -2104,12 +2104,12 @@ mod tests {
     fn test_sys_dup3() -> Result<(), Errno> {
         let (_kernel, current_task) = create_kernel_and_task_with_pkgfs();
         let file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
-        let files = &current_task.files;
-        let oldfd = files.add(file_handle)?;
+        let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
         let newfd = FdNumber::from_raw(2);
         sys_dup3(&current_task, oldfd, newfd, O_CLOEXEC)?;
 
         assert_ne!(oldfd, newfd);
+        let files = &current_task.files;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
         assert_eq!(files.get_fd_flags(oldfd).unwrap(), FdFlags::empty());
         assert_eq!(files.get_fd_flags(newfd).unwrap(), FdFlags::CLOEXEC);
@@ -2123,7 +2123,7 @@ mod tests {
         // Makes sure that dup closes the old file handle before the fd points
         // to the new file handle.
         let second_file_handle = current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY)?;
-        let different_file_fd = files.add(second_file_handle)?;
+        let different_file_fd = current_task.add_file(second_file_handle, FdFlags::empty())?;
         assert!(!Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
         sys_dup3(&current_task, oldfd, different_file_fd, O_CLOEXEC)?;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
@@ -2140,8 +2140,7 @@ mod tests {
         assert_eq!(sys_dup2(&current_task, fd, fd), error!(EBADF));
         let file_handle =
             current_task.open_file(b"data/testfile.txt", OpenFlags::RDONLY).expect("open_file");
-        let files = &current_task.files;
-        let fd = files.add(file_handle).expect("add");
+        let fd = current_task.add_file(file_handle, FdFlags::empty()).expect("add");
         assert_eq!(sys_dup2(&current_task, fd, fd), Ok(fd));
     }
 

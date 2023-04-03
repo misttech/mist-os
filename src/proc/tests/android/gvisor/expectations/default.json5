@@ -70,9 +70,6 @@
                 // dev_test
                 "DevTest.OpenDevFuse",
 
-                // dup_test
-                "DupTest.Rlimit",
-
                 // epoll_test - https://fxbug.dev/79261
                 "EpollTest.CloseFile",
 
@@ -763,8 +760,6 @@
 
                 // rlimits_test
                 "RlimitTest.ParseProcPidLimits",
-                "RlimitTest.UnprivilegedSetRlimit",
-                "RlimitTest.SetSoftRlimitAboveHard",
                 "RlimitTest.RlimitNProc",
 
                 // rtsignal_test
@@ -1154,7 +1149,6 @@
                 "Waiters/WaitSpecificChildTest.AfterChildExecve/*",
 
                 // write_test
-                "WriteTest.WriteNoExceedsRLimit",
                 "WriteTest.WriteExceedsRLimit",
                 "WriteTest.PartialWriteSIGSEGV",
                 "WriteTest.PartialWriteSIGBUS",

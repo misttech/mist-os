@@ -2296,7 +2296,7 @@ impl ResourceAccessor for CurrentTask {
         self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        self.files.add_with_flags(file, flags)
+        self.add_file(file, flags)
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -2325,7 +2325,7 @@ impl ResourceAccessor for Task {
         self.files.get_with_flags(fd)
     }
     fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        self.files.add_with_flags(file, flags)
+        self.add_file(file, flags)
     }
 
     fn as_memory_accessor(&self) -> &dyn MemoryAccessor {
@@ -5368,8 +5368,7 @@ mod tests {
         // descriptor so that the translation doesn't happen to use the same FDs for receiver and
         // sender, potentially hiding a bug.
         test.sender_task
-            .files
-            .add_with_flags(PanickingFile::new_file(&test.sender_task), FdFlags::empty())
+            .add_file(PanickingFile::new_file(&test.sender_task), FdFlags::empty())
             .unwrap();
 
         // Open two files in the sender process. These will be sent in the transaction.
@@ -5380,10 +5379,7 @@ mod tests {
         let sender_fds = files
             .iter()
             .map(|file| {
-                test.sender_task
-                    .files
-                    .add_with_flags(file.clone(), FdFlags::CLOEXEC)
-                    .expect("add file")
+                test.sender_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file")
             })
             .collect::<Vec<_>>();
 
@@ -5906,11 +5902,8 @@ mod tests {
 
         // Open a file in the sender process.
         let file = PanickingFile::new_file(&test.sender_task);
-        let sender_fd = test
-            .sender_task
-            .files
-            .add_with_flags(file.clone(), FdFlags::CLOEXEC)
-            .expect("add file");
+        let sender_fd =
+            test.sender_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file");
 
         // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
         // driver doesn't touch them/passes them through.
@@ -5983,8 +5976,7 @@ mod tests {
         // Open a file in the sender process.
         let sender_fd = test
             .sender_task
-            .files
-            .add_with_flags(PanickingFile::new_file(&test.sender_task), FdFlags::CLOEXEC)
+            .add_file(PanickingFile::new_file(&test.sender_task), FdFlags::CLOEXEC)
             .expect("add file");
 
         // Send the fd in a transaction.

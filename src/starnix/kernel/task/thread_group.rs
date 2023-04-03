@@ -85,6 +85,9 @@ pub struct ThreadGroupMutableState {
     pub terminating: bool,
 
     pub selinux: SeLinuxThreadGroupState,
+
+    /// The resource limits for this thread group.
+    pub limits: ResourceLimits,
 }
 
 pub struct ThreadGroup {
@@ -207,6 +210,7 @@ impl ThreadGroup {
                 zombie_leader: None,
                 terminating: false,
                 selinux: Default::default(),
+                limits: Default::default(),
             }),
         });
 
@@ -634,6 +638,29 @@ impl ThreadGroup {
         for pg in process_groups {
             pg.check_orphaned();
         }
+    }
+
+    pub fn get_rlimit(self: &Arc<Self>, resource: Resource) -> u64 {
+        self.read().limits.get(resource).rlim_cur
+    }
+
+    pub fn adjust_rlimits(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        resource: Resource,
+        maybe_new_limit: Option<rlimit>,
+    ) -> Result<rlimit, Errno> {
+        let mut state = self.write();
+        let old_limit = state.limits.get(resource);
+        if let Some(new_limit) = maybe_new_limit {
+            if new_limit.rlim_max > old_limit.rlim_max
+                && !current_task.creds().has_capability(CAP_SYS_RESOURCE)
+            {
+                return error!(EPERM);
+            }
+            state.limits.set(resource, new_limit);
+        }
+        Ok(old_limit)
     }
 }
 

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use crate::fs::*;
 use crate::lock::{Mutex, RwLock};
+use crate::task::Task;
 use crate::types::*;
 
 bitflags! {
@@ -91,33 +92,56 @@ impl FdTable {
         self.table.lock().write().retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
     }
 
-    pub fn insert(&self, fd: FdNumber, file: FileHandle) {
-        self.insert_with_flags(fd, file, FdFlags::empty())
+    pub fn insert(&self, task: &Task, fd: FdNumber, file: FileHandle) -> Result<(), Errno> {
+        self.insert_with_flags(task, fd, file, FdFlags::empty())
     }
 
-    pub fn insert_with_flags(&self, fd: FdNumber, file: FileHandle, flags: FdFlags) {
+    pub fn insert_with_flags(
+        &self,
+        task: &Task,
+        fd: FdNumber,
+        file: FileHandle,
+        flags: FdFlags,
+    ) -> Result<(), Errno> {
         let id = self.id();
-        self.table.lock().write().insert(fd, FdTableEntry::new(file, id, flags));
+        let state = self.table.lock();
+        let mut table = state.write();
+        self.insert_entry(task, &mut table, fd, FdTableEntry::new(file, id, flags))
     }
 
-    #[cfg(test)]
-    pub fn add(&self, file: FileHandle) -> Result<FdNumber, Errno> {
-        self.add_with_flags(file, FdFlags::empty())
-    }
-
-    pub fn add_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+    pub fn add_with_flags(
+        &self,
+        task: &Task,
+        file: FileHandle,
+        flags: FdFlags,
+    ) -> Result<FdNumber, Errno> {
         let id = self.id();
         let state = self.table.lock();
         let mut table = state.write();
         let fd = self.get_lowest_available_fd(&table, FdNumber::from_raw(0));
-        table.insert(fd, FdTableEntry::new(file, id, flags));
+        self.insert_entry(task, &mut table, fd, FdTableEntry::new(file, id, flags))?;
         Ok(fd)
+    }
+
+    fn insert_entry(
+        &self,
+        task: &Task,
+        table: &mut HashMap<FdNumber, FdTableEntry>,
+        fd: FdNumber,
+        entry: FdTableEntry,
+    ) -> Result<(), Errno> {
+        if fd.raw() as u64 >= task.thread_group.get_rlimit(Resource::NOFILE) {
+            return error!(EMFILE);
+        }
+        table.insert(fd, entry);
+        Ok(())
     }
 
     // Duplicates a file handle.
     // If newfd does not contain a value, a new FdNumber is allocated. Returns the new FdNumber.
     pub fn duplicate(
         &self,
+        task: &Task,
         oldfd: FdNumber,
         target: TargetFdNumber,
         flags: FdFlags,
@@ -142,7 +166,7 @@ impl FdTable {
                     self.get_lowest_available_fd(&table, FdNumber::from_raw(0))
                 }
             };
-            table.insert(fd, FdTableEntry::new(file, id, flags));
+            self.insert_entry(task, &mut table, fd, FdTableEntry::new(file, id, flags))?;
             Ok(fd)
         };
         result
@@ -229,7 +253,16 @@ mod test {
     use super::*;
 
     use crate::fs::fuchsia::SyslogFile;
+    use crate::task::*;
     use crate::testing::*;
+
+    fn add(
+        current_task: &CurrentTask,
+        files: &FdTable,
+        file: FileHandle,
+    ) -> Result<FdNumber, Errno> {
+        files.add_with_flags(current_task, file, FdFlags::empty())
+    }
 
     #[::fuchsia::test]
     fn test_fd_table_install() {
@@ -237,9 +270,9 @@ mod test {
         let files = FdTable::new();
         let file = SyslogFile::new_file(&current_task);
 
-        let fd0 = files.add(file.clone()).unwrap();
+        let fd0 = add(&current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
-        let fd1 = files.add(file.clone()).unwrap();
+        let fd1 = add(&current_task, &files, file.clone()).unwrap();
         assert_eq!(fd1.raw(), 1);
 
         assert!(Arc::ptr_eq(&files.get(fd0).unwrap(), &file));
@@ -253,8 +286,8 @@ mod test {
         let files = FdTable::new();
         let file = SyslogFile::new_file(&current_task);
 
-        let fd0 = files.add(file.clone()).unwrap();
-        let fd1 = files.add(file).unwrap();
+        let fd0 = add(&current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&current_task, &files, file).unwrap();
         let fd2 = FdNumber::from_raw(2);
 
         let forked = files.fork();
@@ -275,8 +308,8 @@ mod test {
         let files = FdTable::new();
         let file = SyslogFile::new_file(&current_task);
 
-        let fd0 = files.add(file.clone()).unwrap();
-        let fd1 = files.add(file).unwrap();
+        let fd0 = add(&current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&current_task, &files, file).unwrap();
 
         files.set_fd_flags(fd0, FdFlags::CLOEXEC).unwrap();
 
@@ -296,8 +329,8 @@ mod test {
         let file = SyslogFile::new_file(&current_task);
 
         // Add two FDs.
-        let fd0 = files.add(file.clone()).unwrap();
-        let fd1 = files.add(file.clone()).unwrap();
+        let fd0 = add(&current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
         assert_eq!(fd1.raw(), 1);
 
@@ -308,7 +341,7 @@ mod test {
         assert!(files.get(fd0).is_err());
 
         // The next FD we insert fills in the hole we created.
-        let another_fd = files.add(file).unwrap();
+        let another_fd = add(&current_task, &files, file).unwrap();
         assert_eq!(another_fd.raw(), 0);
     }
 }

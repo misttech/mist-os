@@ -259,7 +259,7 @@ impl UnixControlData {
                 };
                 let fds: Vec<FdNumber> = files
                     .iter()
-                    .map(|file| current_task.files.add_with_flags(file.clone(), flags))
+                    .map(|file| current_task.add_file(file.clone(), flags))
                     .collect::<Result<Vec<FdNumber>, Errno>>()?;
                 (SCM_RIGHTS, fds.as_bytes().to_owned())
             }

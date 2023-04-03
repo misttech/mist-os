@@ -33,7 +33,7 @@ pub fn sys_socket(
     );
 
     let fd_flags = socket_flags_to_fd_flags(flags);
-    let fd = current_task.files.add_with_flags(socket_file, fd_flags)?;
+    let fd = current_task.add_file(socket_file, fd_flags)?;
 
     Ok(fd)
 }
@@ -219,7 +219,7 @@ pub fn sys_accept4(
     let open_flags = socket_flags_to_open_flags(flags);
     let accepted_socket_file = Socket::new_file(current_task, accepted_socket, open_flags);
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let accepted_fd = current_task.files.add_with_flags(accepted_socket_file, fd_flags)?;
+    let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
 }
 
@@ -345,8 +345,8 @@ pub fn sys_socketpair(
     // TODO: Eventually this will need to allocate two fd numbers (each of which could
     // potentially fail), and only populate the fd numbers (which can't fail) if both allocations
     // succeed.
-    let left_fd = current_task.files.add_with_flags(left, fd_flags)?;
-    let right_fd = current_task.files.add_with_flags(right, fd_flags)?;
+    let left_fd = current_task.add_file(left, fd_flags)?;
+    let right_fd = current_task.add_file(right, fd_flags)?;
 
     let fds = [left_fd, right_fd];
     log_trace!(current_task, "socketpair -> [{:#x}, {:#x}]", fds[0].raw(), fds[1].raw());

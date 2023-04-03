@@ -362,7 +362,7 @@ pub fn export_buffer(
             }
         };
 
-        let fd = current_task.files.add_with_flags(file, FdFlags::empty())?;
+        let fd = current_task.add_file(file, FdFlags::empty())?;
         response.buffer_handle_out = fd.raw() as u64;
     }
 
@@ -414,7 +414,7 @@ pub fn get_buffer_handle(
             Box::new(VmoFileObject::new(Arc::new(vmo))),
             OpenFlags::RDWR,
         );
-        let fd = current_task.files.add_with_flags(file, FdFlags::empty())?;
+        let fd = current_task.add_file(file, FdFlags::empty())?;
         response.handle_out = fd.raw() as u64;
         response.result_return = MAGMA_STATUS_OK as u64;
     }
@@ -450,7 +450,7 @@ pub fn query(
             Box::new(VmoFileObject::new(Arc::new(vmo))),
             OpenFlags::RDWR,
         );
-        let fd = current_task.files.add_with_flags(file, FdFlags::empty())?;
+        let fd = current_task.add_file(file, FdFlags::empty())?;
         response.result_buffer_out = fd.raw() as u64;
     } else {
         response.result_buffer_out = u64::MAX;

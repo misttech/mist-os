@@ -239,7 +239,7 @@ pub fn sys_signalfd4(
     let mask = current_task.mm.read_object(mask_addr)?;
     let signalfd = SignalFd::new_file(current_task, mask, flags);
     let flags = if flags & SFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.files.add_with_flags(signalfd, flags)?;
+    let fd = current_task.add_file(signalfd, flags)?;
     Ok(fd)
 }
 

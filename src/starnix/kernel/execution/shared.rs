@@ -304,9 +304,10 @@ pub fn parse_numbered_handles(
             let info = HandleInfo::try_from(numbered_handle.id)?;
             if info.handle_type() == HandleType::FileDescriptor {
                 files.insert(
+                    current_task,
                     FdNumber::from_raw(info.arg().into()),
                     create_file_from_handle(current_task, numbered_handle.handle)?,
-                );
+                )?;
             } else if info.handle_type() == HandleType::User0 {
                 shell_controller = Some(ServerEnd::<fstardev::ShellControllerMarker>::from(
                     numbered_handle.handle,
@@ -319,7 +320,7 @@ pub fn parse_numbered_handles(
     // If no numbered handle is provided for each stdio handle, default to syslog.
     for i in [0, 1, 2] {
         if files.get(FdNumber::from_raw(i)).is_err() {
-            files.insert(FdNumber::from_raw(i), stdio.clone());
+            files.insert(current_task, FdNumber::from_raw(i), stdio.clone())?;
         }
     }
 

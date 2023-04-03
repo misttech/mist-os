@@ -399,6 +399,10 @@ impl Task {
         self.mutable_state.write()
     }
 
+    pub fn add_file(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+        self.files.add_with_flags(self, file, flags)
+    }
+
     pub fn creds(&self) -> Credentials {
         self.creds.read().clone()
     }

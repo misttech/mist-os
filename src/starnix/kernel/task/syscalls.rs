@@ -873,37 +873,47 @@ pub fn sys_setrlimit(
 pub fn sys_prlimit64(
     current_task: &CurrentTask,
     pid: pid_t,
-    resource: u32,
-    new_limit: UserRef<rlimit>,
-    old_limit: UserRef<rlimit>,
+    user_resource: u32,
+    user_new_limit: UserRef<rlimit>,
+    user_old_limit: UserRef<rlimit>,
 ) -> Result<(), Errno> {
+    // TODO: Lookup tasks by pid.
     if pid != 0 {
         not_implemented!(current_task, "prlimit64 with non 0 pid");
         return error!(ENOSYS);
     }
-    if !new_limit.is_null() {
-        not_implemented!(current_task, "prlimit64 to edit limits");
-        return Ok(());
-    }
-    if !old_limit.is_null() {
-        let limit = match resource {
-            resource if resource == RLIMIT_NOFILE => {
-                Ok(rlimit { rlim_cur: RLIMIT_NOFILE_MAX, rlim_max: RLIMIT_NOFILE_MAX })
+    let task = &current_task.task;
+
+    let resource = Resource::from_raw(user_resource);
+
+    let maybe_new_limit = if !user_new_limit.is_null() {
+        let new_limit = current_task.mm.read_object(user_new_limit)?;
+        if new_limit.rlim_cur > new_limit.rlim_max {
+            return error!(EINVAL);
+        }
+        Some(new_limit)
+    } else {
+        None
+    };
+
+    let old_limit = match resource {
+        // TODO: Integrate Resource::STACK with generic ResourceLimits machinery.
+        Resource::STACK => {
+            if maybe_new_limit.is_some() {
+                not_implemented!(current_task, "prlimit64 cannot set RLIMIT_STACK");
             }
-            resource if resource == RLIMIT_STACK => {
-                // The stack size is fixed at the moment, but
-                // if MAP_GROWSDOWN is implemented this should
-                // report the limit that it can be grown.
-                let mm_state = current_task.mm.state.read();
-                let stack_size = mm_state.stack_size as u64;
-                Ok(rlimit { rlim_cur: stack_size, rlim_max: stack_size })
-            }
-            _ => {
-                not_implemented!(current_task, "getrlimit: {:?}", resource);
-                error!(ENOSYS)
-            }
-        }?;
-        current_task.mm.write_object(old_limit, &limit)?;
+            // The stack size is fixed at the moment, but
+            // if MAP_GROWSDOWN is implemented this should
+            // report the limit that it can be grown.
+            let mm_state = task.mm.state.read();
+            let stack_size = mm_state.stack_size as u64;
+            rlimit { rlim_cur: stack_size, rlim_max: stack_size }
+        }
+        _ => task.thread_group.adjust_rlimits(current_task, resource, maybe_new_limit)?,
+    };
+
+    if !user_old_limit.is_null() {
+        current_task.mm.write_object(user_old_limit, &old_limit)?;
     }
     Ok(())
 }
