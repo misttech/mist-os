@@ -44,6 +44,42 @@ class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecCon
     fidl::BindServer(core_->dispatcher(), std::move(server), this, std::move(on_unbound));
   }
 
+  zx::result<> Serve(fidl::ClientEnd<fuchsia_driver_framework::Node>& parent) {
+    fidl::Arena arena;
+    zx::result connector = devfs_connector_.Bind(core_->dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
+    }
+
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                     .connector(std::move(connector.value()))
+                     .class_name("codec");
+
+    auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                    .name(arena, is_input_ ? "da7219-input" : "da7219-output")
+                    .devfs_args(devfs.Build())
+                    .Build();
+
+    // Create endpoints of the `NodeController` for the node.
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+
+    zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+    ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+
+    fidl::WireResult result = fidl::WireCall(parent)->AddChild(
+        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+    if (!result.ok()) {
+      FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
+      return zx::error(result.status());
+    }
+    controller_.Bind(std::move(controller_endpoints->client));
+    node_.Bind(std::move(node_endpoints->client));
+
+    return zx::ok();
+  }
+
   driver_devfs::Connector<fuchsia_hardware_audio::CodecConnector>& devfs_connector() {
     return devfs_connector_;
   }
@@ -80,6 +116,9 @@ class ServerConnector : public fidl::WireServer<fuchsia_hardware_audio::CodecCon
   std::shared_ptr<Core> core_;
   bool is_input_;
   std::unique_ptr<Server> server_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_hardware_audio::CodecConnector> devfs_connector_;
 };
 
