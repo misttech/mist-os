@@ -3257,7 +3257,7 @@ int brcmf_sdio_oob_irqhandler(void* cookie) {
   BRCMF_INFO("OOB IRQ thread starting");
 
   constexpr char kRoleName[] = "fuchsia.devices.wlan.drivers.brcmf.sdio.oob-interrupt";
-  zx_device_t* zx_device = sdiodev->drvr->device->zxdev();
+  zx_device_t* zx_device = sdiodev->drvr->device->parent();
   status = device_set_profile_by_role(zx_device, thrd_get_zx_handle(thrd_current()), kRoleName,
                                       strlen(kRoleName));
   if (status != ZX_OK) {
