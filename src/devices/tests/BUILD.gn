@@ -36,6 +36,7 @@ group("tests") {
     "libdriver-integration-test",
     "node-group-test:tests",
     "nonbindable:tests",
+    "runtime-composite-test:tests",
     "string-bind-test",
     "v2:tests",
   ]
@@ -76,6 +77,7 @@ group("drivers") {
     "mock-device:mock-device",
     "node-group-test/drivers:drivers",
     "nonbindable:drivers",
+    "runtime-composite-test/drivers:drivers",
     "string-bind-test:child-driver",
     "string-bind-test:parent-driver",
     "sysdev:sysdev",

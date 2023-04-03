@@ -355,6 +355,28 @@ __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const cha
   return fdio_service_connect_at(outgoing.channel().get(), path.c_str(), server_token.release());
 }
 
+__EXPORT zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* dev,
+                                                              const char* fragment_name,
+                                                              const char* service_name,
+                                                              const char* protocol_name,
+                                                              fdf_handle_t request) {
+  DEBUG_ASSERT_VALID_DEVICE(dev);
+  zx::channel client_token, server_token;
+  auto status = zx::channel::create(0, &client_token, &server_token);
+  if (status != ZX_OK) {
+    return status;
+  }
+  status = fdf::ProtocolConnect(std::move(client_token), fdf::Channel(request));
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
+  auto dev_ref = fbl::RefPtr(dev);
+  return internal::ContextForApi()->ConnectFidlProtocol(dev_ref, fragment_name, service_name,
+                                                        protocol_name, std::move(server_token));
+}
+
 // LibDriver Misc Interfaces
 
 // Please do not use get_root_resource() in new code. See fxbug.dev/31358.

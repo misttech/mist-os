@@ -378,6 +378,26 @@ zx_status_t device_service_connect(zx_device_t* device, const char* service_name
 zx_status_t device_connect_runtime_protocol(zx_device_t* device, const char* service_name,
                                             const char* protocol_name, fdf_handle_t request);
 
+// Opens a connection to the specified runtime service offered by |device|.
+//
+// |device| should be a composite device. |fragment_name| picks out the specific
+// fragment device to use; it must match the fragment name declared in the
+// composite device's bind file.
+//
+// Arguments are otherwise the same as for device_connect_runtime_protocol.
+//
+// The ddktl equivalent is DdkConnectFragmentRuntimeProtocol.
+//
+// Returns |ZX_ERR_UNAVAILABLE| if the parent (or fragment) does not have an outgoing directory.
+// Returns |ZX_ERR_NOT_FOUND| if |fragment_name| is not the name of a parent.
+// Returns |ZX_ERR_NOT_SUPPORTED| if |fragment_name| specified by the device is not a
+// composite node.
+// Returns |ZX_ERR_BAD_HANDLE| if |request| is not a valid runtime handle.
+zx_status_t device_connect_fragment_runtime_protocol(zx_device_t* device, const char* fragment_name,
+                                                     const char* service_name,
+                                                     const char* protocol_name,
+                                                     fdf_handle_t request);
+
 // Device Metadata Support
 
 // retrieves metadata for a specific device

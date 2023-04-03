@@ -605,6 +605,16 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return DdkConnectRuntimeProtocol<ServiceMember>(parent());
   }
 
+  template <typename ServiceMember,
+            typename = std::enable_if_t<fidl::IsServiceMemberV<ServiceMember>>>
+  zx::result<fdf::ClientEnd<typename ServiceMember::ProtocolType>>
+  DdkConnectFragmentRuntimeProtocol(const char* fragment_name) const {
+    static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
+                                 fidl::internal::DriverTransport>);
+
+    return DdkConnectFragmentRuntimeProtocol<ServiceMember>(parent(), fragment_name);
+  }
+
   template <typename ServiceMember>
   static zx::result<fdf::ClientEnd<typename ServiceMember::ProtocolType>> DdkConnectRuntimeProtocol(
       zx_device_t* parent) {
@@ -620,6 +630,27 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     auto status =
         device_connect_runtime_protocol(parent, ServiceMember::ServiceName, ServiceMember::Name,
                                         endpoints->server.TakeChannel().release());
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+    return zx::ok(std::move(endpoints->client));
+  }
+
+  template <typename ServiceMember>
+  static zx::result<fdf::ClientEnd<typename ServiceMember::ProtocolType>>
+  DdkConnectFragmentRuntimeProtocol(zx_device_t* parent, const char* fragment_name) {
+    static_assert(fidl::IsServiceMemberV<ServiceMember>);
+    static_assert(std::is_same_v<typename ServiceMember::ProtocolType::Transport,
+                                 fidl::internal::DriverTransport>);
+
+    auto endpoints = fdf::CreateEndpoints<typename ServiceMember::ProtocolType>();
+    if (endpoints.is_error()) {
+      return endpoints.take_error();
+    }
+
+    auto status = device_connect_fragment_runtime_protocol(
+        parent, fragment_name, ServiceMember::ServiceName, ServiceMember::Name,
+        endpoints->server.TakeChannel().release());
     if (status != ZX_OK) {
       return zx::error(status);
     }

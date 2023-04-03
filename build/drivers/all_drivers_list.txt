@@ -246,6 +246,9 @@
 //src/devices/tests/node-group-test/drivers:node-group-driver
 //src/devices/tests/node-group-test/drivers:root-driver
 //src/devices/tests/nonbindable:driver
+//src/devices/tests/runtime-composite-test/drivers:composite-driver
+//src/devices/tests/runtime-composite-test/drivers:leaf-driver
+//src/devices/tests/runtime-composite-test/drivers:root-driver
 //src/devices/tests/string-bind-test:child-driver-driver
 //src/devices/tests/string-bind-test:parent-driver-driver
 //src/devices/tests/sysdev:sysdev-driver
