@@ -30,18 +30,23 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
     }
     sleep(1);
   }
-  fidl::Result<fuchsia_tracing_controller::Controller::GetProviders> providers =
-      client->GetProviders();
-  ASSERT_TRUE(providers.is_ok());
-  ASSERT_EQ(providers->providers().size(), size_t{1});
-
   zx::socket in_socket;
   zx::socket outgoing_socket;
 
   ASSERT_EQ(zx::socket::create(0u, &in_socket, &outgoing_socket), ZX_OK);
-  const fuchsia_tracing_controller::TraceConfig config{
-      {.buffer_size_megabytes_hint = uint32_t{4},
-       .buffering_mode = fuchsia_tracing::BufferingMode::kOneshot}};
+  const fuchsia_tracing_controller::TraceConfig config{{
+      .buffer_size_megabytes_hint = uint32_t{4},
+      .buffering_mode = fuchsia_tracing::BufferingMode::kOneshot,
+  }};
+
+  fidl::Result<fuchsia_tracing_controller::Controller::GetProviders> providers =
+      client->GetProviders();
+
+  // We should have a single provider: perfetto
+  ASSERT_TRUE(providers.is_ok());
+  ASSERT_EQ(providers->providers().size(), size_t{1});
+  ASSERT_EQ(providers->providers().begin()->name(), "perfetto");
+
   auto init_response = client->InitializeTracing({config, std::move(outgoing_socket)});
   ASSERT_TRUE(init_response.is_ok());
 
@@ -49,26 +54,45 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   loop.Run(zx::deadline_after(zx::sec(1)));
   client->StopTracing({{{.write_results = true}}});
 
-  uint8_t buffer[1024];
-  size_t actual;
-  ASSERT_EQ(in_socket.read(0, buffer, 1024, &actual), ZX_OK);
-  ASSERT_GT(actual, size_t{0});
-  ASSERT_LT(actual, size_t{1024});
-  FX_LOGS(INFO) << "Socket read " << actual << " bytes of trace data.";
-
-  bool saw_perfetto_blob = false;
+  size_t num_perfetto_bytes = 0;
   trace::TraceReader::RecordConsumer handle_perfetto_blob =
-      [&saw_perfetto_blob](trace::Record record) {
+      [&num_perfetto_bytes](trace::Record record) {
         if (record.type() == trace::RecordType::kBlob &&
             record.GetBlob().type == TRACE_BLOB_TYPE_PERFETTO) {
-          saw_perfetto_blob = true;
+          num_perfetto_bytes += record.GetBlob().blob_size;
         }
       };
-  trace::TraceReader reader(std::move(handle_perfetto_blob), [](fbl::String) {});
-  trace::Chunk data{reinterpret_cast<uint64_t*>(buffer), actual >> 3};
-  reader.ReadRecords(data);
-  EXPECT_TRUE(saw_perfetto_blob);
+  trace::TraceReader reader(std::move(handle_perfetto_blob), [](fbl::String&&) {});
 
+  uint8_t buffer[ZX_PAGE_SIZE];
+  uint8_t* buffer_base = buffer;
+  size_t leftover_bytes = 0;
+  for (;;) {
+    size_t actual = 0;
+    zx_status_t read_result =
+        in_socket.read(0, buffer_base, sizeof(buffer) - leftover_bytes, &actual);
+    EXPECT_TRUE(read_result == ZX_OK || read_result == ZX_ERR_SHOULD_WAIT);
+    if (read_result == ZX_ERR_SHOULD_WAIT || actual == 0) {
+      EXPECT_EQ(leftover_bytes, size_t{0});
+      break;
+    }
+    trace::Chunk data{reinterpret_cast<uint64_t*>(buffer), (actual + leftover_bytes) >> 3};
+    reader.ReadRecords(data);
+
+    // trace::Chunk only deals in full words so we may have some bytes we rounded off
+    size_t unchunked_bytes = (actual + leftover_bytes) % 8;
+
+    // We may have leftover data in the chunk if our read boundary was not on a record boundary.
+    // Copy it back into the buffer for the next round.
+    leftover_bytes = (data.remaining_words() * 8) + unchunked_bytes;
+    if (leftover_bytes != 0) {
+      memcpy(buffer, buffer + data.current_byte_offset(), leftover_bytes);
+    }
+    buffer_base = buffer + leftover_bytes;
+  }
+
+  EXPECT_GT(num_perfetto_bytes, size_t{30000});
+  client->TerminateTracing({});
   loop.RunUntilIdle();
 }
 

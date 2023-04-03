@@ -7,12 +7,18 @@
         runner: "elf",
         binary: "bin/perfetto_producer",
     },
+    capabilities: [
+        { protocol: "fuchsia.tracing.perfetto.BufferReceiver" },
+    ],
     use: [
         {
-            protocol: [
-                "fuchsia.tracing.perfetto.ProducerConnector",
-                "fuchsia.tracing.provider.Registry",
-            ],
+            protocol: [ "fuchsia.tracing.perfetto.ProducerConnector" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.tracing.perfetto.BufferReceiver",
+            from: "self",
         },
     ],
 }

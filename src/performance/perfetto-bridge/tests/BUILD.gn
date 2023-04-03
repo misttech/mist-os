@@ -25,11 +25,14 @@ executable("perfetto_bridge_integration_test_bin") {
 }
 
 executable("perfetto_producer_bin") {
-  # perfetto_build_with_fuchsia = true
   testonly = true
   output_name = "perfetto_producer"
 
-  sources = [ "perfetto_producer.cc" ]
+  sources = [
+    "perfetto_producer.cc",
+    "shared_vmo.cc",
+    "shared_vmo.h",
+  ]
 
   # Perfetto (3P library) performs some pointer arithmetic that breaks UBSan
   # (nullptr + offset). The arithmetic is legal because the addresses are used
@@ -46,11 +49,10 @@ executable("perfetto_producer_bin") {
     "//third_party/perfetto:libperfetto_client_experimental",
     "//third_party/perfetto/include/perfetto/ext/ipc",
     "//third_party/perfetto/src/base",
+    "//third_party/perfetto/src/tracing/ipc:common",
     "//third_party/perfetto/src/tracing/ipc/service",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/trace",
-    "//zircon/system/ulib/trace-provider",
   ]
 }
 
