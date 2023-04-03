@@ -6,37 +6,32 @@
 
 import logging
 
-from honeydew.interfaces.device_classes import bluetooth_capable_device
-from honeydew.mobly_controller import fuchsia_device
-from mobly import asserts, base_test, test_runner
+from fuchsia_base_test import fuchsia_base_test
+from honeydew.interfaces.device_classes import (
+    bluetooth_capable_device, fuchsia_device)
+from mobly import asserts, test_runner
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class BluetoothCapabilityTests(base_test.BaseTestClass):
+class BluetoothCapabilityTests(fuchsia_base_test.FuchsiaBaseTest):
     """Bluetooth capability tests"""
 
-    def setup_class(self):
-        """setup_class is called once before running tests."""
-        fuchsia_devices = self.register_controller(fuchsia_device)
-        self.device = fuchsia_devices[0]
+    def setup_class(self) -> None:
+        """setup_class is called once before running tests.
 
-    def on_fail(self, _):
-        """on_fail is called once when a test case fails."""
-        if not hasattr(self, "device"):
-            return
+        It does the following things:
+            * Assigns `device` variable with FuchsiaDevice object
+        """
+        super().setup_class()
+        self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-        try:
-            self.device.snapshot(directory=self.current_test_info.output_path)
-        except Exception:  # pylint: disable=broad-except
-            _LOGGER.warning("Unable to take snapshot")
-
-    def test_is_device_bluetooth_capable(self):
+    def test_is_device_bluetooth_capable(self) -> None:
         """Test case to make sure DUT is a Bluetooth capable device"""
         asserts.assert_is_instance(
             self.device, bluetooth_capable_device.BluetoothCapableDevice)
 
-    def test_request_discovery(self):
+    def test_request_discovery(self) -> None:
         """Test case for bluetooth.request_discovery()"""
         self.device.bluetooth.request_discovery(True)
 

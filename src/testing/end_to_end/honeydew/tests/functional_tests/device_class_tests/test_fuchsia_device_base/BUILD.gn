@@ -8,17 +8,21 @@ import("//build/python/python_mobly_test.gni")
 if (is_host) {
   python_library("test_fuchsia_device_base_lib") {
     library_name = "test_fuchsia_device_base"
-    source_root = "."
     sources = [
       "__init__.py",
       "test_fuchsia_device_base.py",
     ]
+    library_deps =
+        [ "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test" ]
   }
 
   python_mobly_test("fuchsia_device_base_test") {
     main_source = "test_fuchsia_device_base.py"
 
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+    ]
 
     params_source = "params.yaml"
     local_config_source = "../../testbeds/One-FEmu.yaml"

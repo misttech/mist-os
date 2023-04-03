@@ -8,7 +8,10 @@ if (is_host) {
   python_mobly_test("component_default_test") {
     main_source = "test_component_default.py"
 
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/fuchsia_base_test:fuchsia_base_test",
+    ]
 
     local_config_source = "../../testbeds/One-FEmu.yaml"
 

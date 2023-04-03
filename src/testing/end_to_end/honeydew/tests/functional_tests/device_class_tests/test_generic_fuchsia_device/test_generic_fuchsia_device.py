@@ -10,14 +10,14 @@ from honeydew.device_classes import generic_fuchsia_device
 from mobly import asserts, test_runner
 from test_fuchsia_device_base import test_fuchsia_device_base
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class GenericFuchsiaDeviceTests(test_fuchsia_device_base.FuchsiaDeviceBaseTests
                                ):
     """GenericFuchsia device tests"""
 
-    def test_device_instance(self):
+    def test_device_instance(self) -> None:
         """Test case to make sure DUT is a GenericFuchsiaDevice device"""
         asserts.assert_is_instance(
             self.device, generic_fuchsia_device.GenericFuchsiaDevice)

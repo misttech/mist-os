@@ -12,7 +12,7 @@ from test_fuchsia_device_base import test_fuchsia_device_base
 class X64Tests(test_fuchsia_device_base.FuchsiaDeviceBaseTests):
     """X64 device tests"""
 
-    def test_device_instance(self):
+    def test_device_instance(self) -> None:
         """Test case to make sure DUT is a X64 device"""
         asserts.assert_is_instance(self.device, x64.X64)
 
