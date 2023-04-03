@@ -758,7 +758,6 @@
                 "ReadaheadTest.CrossesEnd",
 
                 // rlimits_test
-                "RlimitTest.ParseProcPidLimits",
                 "RlimitTest.RlimitNProc",
 
                 // rtsignal_test

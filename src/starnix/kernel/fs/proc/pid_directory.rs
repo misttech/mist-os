@@ -42,6 +42,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
     dir.entry(b"exe", ExeSymlink::new(task), mode!(IFLNK, 0o777));
     dir.entry(b"fd", FdDirectory::new(task), mode!(IFDIR, 0o777));
     dir.entry(b"fdinfo", FdInfoDirectory::new(task), mode!(IFDIR, 0o777));
+    dir.entry(b"limits", LimitsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"maps", ProcMapsFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"stat", ProcStatFile::new_node(task), mode!(IFREG, 0o444));
     dir.entry(b"status", ProcStatusFile::new_node(task), mode!(IFREG, 0o444));
@@ -441,6 +442,74 @@ impl FileOps for CommFile {
         let iter = move |_cursor, sink: &mut SeqFileBuf| {
             sink.write(comm.as_bytes());
             sink.write(b"\n");
+            Ok(None)
+        };
+        seq.read_at(current_task, iter, offset, data)
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(ENOSYS)
+    }
+}
+
+/// `LimitsFile` implements the `FsNodeOps` for a `proc/<pid>/limits` file.
+pub struct LimitsFile {
+    /// The task from which the `LimitsFile` fetches the limits.
+    task: Arc<Task>,
+    seq: Mutex<SeqFileState<()>>,
+}
+
+impl LimitsFile {
+    fn new_node(task: &Arc<Task>) -> impl FsNodeOps {
+        let task = Arc::clone(task);
+        SimpleFileNode::new(move || {
+            Ok(LimitsFile { task: Arc::clone(&task), seq: Default::default() })
+        })
+    }
+}
+
+impl FileOps for LimitsFile {
+    fileops_impl_seekable!();
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let state = self.task.thread_group.read();
+        let limits = &state.limits;
+        let mut seq = self.seq.lock();
+        let iter = move |_cursor, sink: &mut SeqFileBuf| {
+            let write_limit = |sink: &mut SeqFileBuf, value| {
+                if value == RLIM_INFINITY as u64 {
+                    sink.write(format!("{:<20}", "unlimited").as_bytes());
+                } else {
+                    sink.write(format!("{:<20}", value).as_bytes());
+                }
+            };
+            sink.write(
+                format!("{:<25}{:<20}{:<20}Units\n", "Limit", "Soft Limit", "Hard Limit")
+                    .as_bytes(),
+            );
+            for resource in Resource::ALL {
+                let desc = resource.desc();
+                let limit = limits.get(resource);
+                sink.write(format!("{:<25}", desc.name).as_bytes());
+                write_limit(sink, limit.rlim_cur);
+                write_limit(sink, limit.rlim_max);
+                if !desc.unit.is_empty() {
+                    sink.write(format!("{:<10}", desc.unit).as_bytes());
+                }
+                sink.write(b"\n");
+            }
             Ok(None)
         };
         seq.read_at(current_task, iter, offset, data)

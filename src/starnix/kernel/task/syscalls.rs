@@ -884,7 +884,7 @@ pub fn sys_prlimit64(
     }
     let task = &current_task.task;
 
-    let resource = Resource::from_raw(user_resource);
+    let resource = Resource::from_raw(user_resource)?;
 
     let maybe_new_limit = if !user_new_limit.is_null() {
         let new_limit = current_task.mm.read_object(user_new_limit)?;
