@@ -108,9 +108,11 @@
                 "ExecveatTest.SymlinkNoFollowWithNormalFile",
 
                 // exec_binary_test
-                "InterpreterScriptTest.UncleanPath",
-                "ElfTest.MissingHeader",
-                "ElfTest.OutOfBoundsPhdrs",
+                //
+                // These tests try to use `/tmp` and that doesn't exist in
+                // the Android system image (it's actually under `/data/tmp`).
+                "ExecveTest.SymlinkLoop",
+                "ExecveTest.Directory",
                 "InterpreterScriptTest.Execute",
                 "InterpreterScriptTest.InterpreterScriptNoExecute",
                 "InterpreterScriptTest.Whitespace",
@@ -118,9 +120,8 @@
                 "InterpreterScriptTest.MaxRecursion",
                 "InterpreterScriptTest.RelativePath",
                 "InterpreterScriptTest.Symlink",
-                "ExecveTest.SymlinkLoop",
+                "InterpreterScriptTest.UncleanPath",
                 "InterpreterScriptTest.SymlinkLoop",
-                "ExecveTest.Directory",
 
                 // exit_test
                 "ExitTest.SigkillZombieGroup",
