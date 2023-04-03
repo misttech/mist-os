@@ -280,6 +280,7 @@ zx::result<std::unique_ptr<abr::Client>> X64AbrClientFactory::New(
   // than provided in an update package, so just use the default content type.
   auto partition = partitioner->FindPartition(paver::PartitionSpec(paver::Partition::kAbrMeta));
   if (partition.is_error()) {
+    ERROR("Failed to find abr partition\n");
     return partition.take_error();
   }
 

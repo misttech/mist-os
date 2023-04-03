@@ -115,6 +115,7 @@ zx::result<Configuration> PartitionUuidToConfiguration(const fbl::unique_fd& dev
   std::string name;
   auto result = FindPartitionLabelByGuid(devfs_root, uuid.bytes(), name);
   if (!result) {
+    ERROR("Failed to get partition label by GUID\n");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -122,12 +123,14 @@ zx::result<Configuration> PartitionUuidToConfiguration(const fbl::unique_fd& dev
   static const size_t kZirconLength = sizeof("zircon") - 1;  // no null terminator.
   // Partition must start with "zircon".
   if (strncasecmp(name.data(), "zircon", kZirconLength) != 0) {
+    ERROR("Incorrect partition name: %s \n", name.c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   name.erase(0, kZirconLength);
 
   if (name[0] != '-' && name[0] != '_') {
+    ERROR("Incorrect partition name: %s \n", name.c_str());
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -143,6 +146,7 @@ zx::result<Configuration> PartitionUuidToConfiguration(const fbl::unique_fd& dev
       return zx::ok(Configuration::kRecovery);
   }
 
+  ERROR("Incorrect partition name: %s \n", name.c_str());
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -167,8 +171,11 @@ zx::result<Configuration> QueryBootConfig(const fbl::unique_fd& devfs_root,
     return CurrentSlotToConfiguration(response->values[0].get());
   }
   if (!response->values[1].is_null()) {
-    auto uuid = uuid::Uuid::FromString(response->values[1].get());
+    std::string_view uuid_str = response->values[1].get();
+    auto uuid = uuid::Uuid::FromString(uuid_str);
     if (uuid == std::nullopt) {
+      ERROR("Invalid UUID in zvb.boot-partition-uuid: %.*s \n", (int)uuid_str.size(),
+            uuid_str.data());
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
 
@@ -191,6 +198,7 @@ zx::result<std::unique_ptr<abr::Client>> AbrPartitionClient::Create(
     std::unique_ptr<paver::PartitionClient> partition) {
   auto status = partition->GetBlockSize();
   if (status.is_error()) {
+    ERROR("Unabled to get block size\n");
     return status.take_error();
   }
   size_t block_size = status.value();
@@ -199,10 +207,12 @@ zx::result<std::unique_ptr<abr::Client>> AbrPartitionClient::Create(
   if (auto status = zx::make_result(
           zx::vmo::create(fbl::round_up(block_size, zx_system_get_page_size()), 0, &vmo));
       status.is_error()) {
+    ERROR("Failed to create vmo\n");
     return status.take_error();
   }
 
   if (auto status = partition->Read(vmo, block_size); status.is_error()) {
+    ERROR("Failed to read from partition\n");
     return status.take_error();
   }
 
@@ -241,6 +251,7 @@ zx::result<std::unique_ptr<abr::Client>> ClientFactory::Create(
     fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
   if (auto status = SupportsVerifiedBoot(devfs_root, svc_root); status.is_error()) {
+    ERROR("System doesn't support verified boot\n");
     return status.take_error();
   }
 
@@ -251,6 +262,7 @@ zx::result<std::unique_ptr<abr::Client>> ClientFactory::Create(
     }
   }
 
+  ERROR("Unabled to initialize ABR Client\n");
   return zx::error(ZX_ERR_NOT_FOUND);
 }
 
