@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/config/current_target_tuple.gni")
-import("//build/config/zircon/standard.gni")
 import("//build/toolchain/zircon/clang.gni")
 
 _llvm_ifs = "$clang_tool_dir/llvm-ifs"
@@ -32,7 +31,6 @@ _llvm_ifs = "$clang_tool_dir/llvm-ifs"
 #
 #   * abi
 #     - Required: Source path to a `.ifs` file defining the library's ELF ABI.
-#     **NOTE:** This file must be consistent across $current_cpu values!
 #     - Type: file
 #
 #   * output_name
@@ -53,10 +51,10 @@ template("ifs_shared_library") {
   stub_target = "$target_name.stub"
   config_target = "$target_name.config"
 
-  gen_target_base = "_ifs_shared_library.$target_name."
-  gen_target = "$gen_target_base$clang_cpu"
+  gen_target = "_ifs_shared_library.$target_name.$clang_cpu"
   gen_label = ":$gen_target($default_toolchain)"
-  gen_dir_base = get_label_info(gen_label, "target_gen_dir") + "/$target_name."
+  gen_dir =
+      get_label_info(gen_label, "target_gen_dir") + "/$target_name.$clang_cpu"
 
   if (defined(invoker.output_name)) {
     output_name = invoker.output_name
@@ -64,7 +62,6 @@ template("ifs_shared_library") {
     output_name = target_name
   }
 
-  gen_dir = "$gen_dir_base$clang_cpu"
   gen_stub_file = "$gen_dir/lib$output_name.so"
   public_stub_file = "$root_out_dir/lib$output_name.so"
 
@@ -107,49 +104,33 @@ template("ifs_shared_library") {
   }
 
   if (current_toolchain == default_toolchain) {
-    # Define a target to generate a stub for each CPU type, but all generated
-    # in the default toolchain since nothing but CPU varies among them.  Note
-    # that because of GN's special treatment of the default toolchain, these
-    # will all get Ninja targets even if they're not in any GN deps graph.
-    # But since these targets depend only on the source files and don't cause
-    # anything else new to get built, that should not add any build overhead.
-    foreach(cpu, standard_fuchsia_cpus) {
-      foreach(translation, clang_cpu_translations) {
-        if (cpu == translation.gn) {
-          cpu = translation.clang
-        }
-      }
-      gen_target = "$gen_target_base$cpu"
-      gen_dir = "$gen_dir_base$cpu"
-      gen_stub_file = "$gen_dir/lib$output_name.so"
-      action(gen_target) {
-        forward_variables_from(invoker,
-                               [
-                                 "visibility",
-                                 "testonly",
-                                 "deps",
-                               ])
-        if (defined(visibility)) {
-          visibility += [
-            ":$main_target",
-            ":$stub_target",
-          ]
-        }
-
-        # Output timestamps are not freshened if contents do not change.
-        all_outputs_fresh = false
-
-        script = _llvm_ifs
-        sources = [ invoker.abi ]
-        outputs = [ gen_stub_file ]
-        args = [
-          "--input-format=IFS",
-          "--target=$cpu-fuchsia",
-          "--write-if-changed",
-          "--output-elf=" + rebase_path(gen_stub_file, root_build_dir),
-          rebase_path(invoker.abi, root_build_dir),
+    action(gen_target) {
+      forward_variables_from(invoker,
+                             [
+                               "visibility",
+                               "testonly",
+                               "deps",
+                             ])
+      if (defined(visibility)) {
+        visibility += [
+          ":$main_target",
+          ":$stub_target",
         ]
       }
+
+      # Output timestamps are not freshened if contents do not change.
+      all_outputs_fresh = false
+
+      script = _llvm_ifs
+      sources = [ invoker.abi ]
+      outputs = [ gen_stub_file ]
+      args = [
+        "--input-format=IFS",
+        "--target=${current_target_tuple}",
+        "--write-if-changed",
+        "--output-elf=" + rebase_path(gen_stub_file, root_build_dir),
+        rebase_path(invoker.abi, root_build_dir),
+      ]
     }
   } else {
     not_needed(invoker,
