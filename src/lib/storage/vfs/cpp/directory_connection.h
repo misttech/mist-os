@@ -80,12 +80,6 @@ class DirectoryConnection final : public Connection,
                  EnumerateCompleter::Sync& completer) final {
     request->iterator.Close(ZX_ERR_NOT_SUPPORTED);
   }
-#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
-  void CreateSymlink(fuchsia_io::wire::Directory2CreateSymlinkRequest* request,
-                     CreateSymlinkCompleter::Sync& completer) final {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
 
   //
   // |fuchsia.io/AdvisoryLocking| operations.

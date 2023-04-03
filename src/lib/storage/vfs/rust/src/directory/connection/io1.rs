@@ -342,9 +342,6 @@ where
             fio::DirectoryRequest::Sync { responder } => {
                 responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
             }
-            fio::DirectoryRequest::CreateSymlink { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
         }
         Ok(ConnectionState::Alive)
     }

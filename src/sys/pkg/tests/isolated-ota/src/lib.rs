@@ -684,9 +684,6 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::QueryFilesystem { responder } => responder
                 .send(zx::Status::IO.into_raw(), None)
                 .context("failing queryfilesystem")?,
-            fio::DirectoryRequest::CreateSymlink { responder, .. } => {
-                responder.send(&mut Err(zx::Status::NOT_SUPPORTED.into_raw()))?
-            }
         };
     }
 
