@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/flatland/flatland_manager.h"
 
+#include <lib/fit/thread_checker.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
@@ -108,8 +109,10 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
     ON_CALL(*mock_flatland_presenter_, RemoveSession(_, _))
         .WillByDefault(::testing::Invoke(
             [&](scheduling::SessionId session_id, std::optional<zx::event> release_fence) {
-              async::PostTask(this->dispatcher(),
-                              [&, session_id]() { removed_sessions_.insert(session_id); });
+              async::PostTask(this->dispatcher(), [&, session_id]() {
+                std::lock_guard lock(removed_session_thread_checker_);
+                removed_sessions_.insert(session_id);
+              });
             }));
 
     uint64_t kDisplayId = 1;
@@ -130,12 +133,26 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
     // |manager_| may have been reset during the test. If not, run until all sessions have closed,
     // which depends on the worker threads receiving "peer closed" for the clients created in
     // the tests.
-    removed_sessions_.clear();
+    {
+      std::lock_guard lock(removed_session_thread_checker_);
+      removed_sessions_.clear();
+    }
     if (manager_) {
       const size_t session_count = manager_->GetSessionCount();
       EXPECT_CALL(*mock_flatland_presenter_, RemoveSession(_, _)).Times(AtLeast(session_count));
-      RunLoopUntil([this] { return manager_->GetSessionCount() == 0; });
-      RunLoopUntil([this, session_count] { return removed_sessions_.size() == session_count; });
+      RunLoopUntil([this, session_count] {
+        std::lock_guard lock(removed_session_thread_checker_);
+        // It could be tempting to only check a single condition here. However,
+        // it won't work as expected. `FlatlandManager` posts the task
+        // destroying `Flatland` instance on the Session's loop thread, and then
+        // deletes the session from its session list immediately.
+        //
+        // The `Flatland` destructor later calls presenter API to remove the
+        // session, which is handled on the presenter handler's FIDL loop.
+        // There may be a critical section in between and we should make sure
+        // both conditions are fulfilled before proceeding.
+        return manager_->GetSessionCount() == 0 && removed_sessions_.size() == session_count;
+      });
     }
 
     auto snapshot = uber_struct_system_->Snapshot();
@@ -148,8 +165,11 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
 
     pending_presents_.clear();
     pending_session_updates_.clear();
-    removed_sessions_.clear();
     mock_flatland_presenter_.reset();
+    {
+      std::lock_guard lock(removed_session_thread_checker_);
+      removed_sessions_.clear();
+    }
 
     gtest::RealLoopFixture::TearDown();
   }
@@ -188,7 +208,12 @@ class FlatlandManagerTest : public gtest::RealLoopFixture {
   std::unordered_map<scheduling::SessionId, std::queue<scheduling::PresentId>>
       pending_session_updates_;
 
-  std::unordered_set<scheduling::SessionId> removed_sessions_;
+  // std::unordered_set is not thread-safe. Here we add the thread checker
+  // to make sure that it is only used on the test loop (which runs on the same
+  // thread as test main thread).
+  fit::thread_checker removed_session_thread_checker_;
+  std::unordered_set<scheduling::SessionId> removed_sessions_
+      FIT_GUARDED(removed_session_thread_checker_);
 
   const std::shared_ptr<LinkSystem> link_system_;
 
@@ -260,10 +285,19 @@ TEST_F(FlatlandManagerTest, ClientDiesBeforeManager) {
   }
 
   // The session should show up in the set of removed sessions.
-  RunLoopUntil([this] { return manager_->GetSessionCount() == 0; });
-
-  EXPECT_EQ(removed_sessions_.size(), 1ul);
-  EXPECT_TRUE(removed_sessions_.count(id));
+  RunLoopUntil([this] {
+    std::lock_guard lock(removed_session_thread_checker_);
+    // It could be tempting to only check a single condition here, however,
+    // this will cause a race and won't work as expected, since FlatlandManager
+    // removing session from manager's session list and Flatland impl requests
+    // presenter to remove the session occur on different threads.
+    // See the comment at `TearDown()` for details.
+    return manager_->GetSessionCount() == 0 && removed_sessions_.size() == 1;
+  });
+  {
+    std::lock_guard lock(removed_session_thread_checker_);
+    EXPECT_TRUE(removed_sessions_.count(id));
+  }
 }
 
 TEST_F(FlatlandManagerTest, ManagerDiesBeforeClients) {
@@ -281,9 +315,15 @@ TEST_F(FlatlandManagerTest, ManagerDiesBeforeClients) {
 
   EXPECT_EQ(uber_struct_system_->GetSessionCount(), 0ul);
 
-  RunLoopUntil([this] { return removed_sessions_.size() == 1ul; });
-  EXPECT_EQ(removed_sessions_.size(), 1ul);
-  EXPECT_TRUE(removed_sessions_.count(id));
+  RunLoopUntil([this] {
+    std::lock_guard lock(removed_session_thread_checker_);
+    return removed_sessions_.size() == 1ul;
+  });
+
+  {
+    std::lock_guard lock(removed_session_thread_checker_);
+    EXPECT_TRUE(removed_sessions_.count(id));
+  }
 
   // Wait until unbound.
   RunLoopUntil([&flatland] { return !flatland.is_bound(); });
