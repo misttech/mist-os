@@ -4,6 +4,7 @@
 
 import("//build/images/args.gni")
 import("//build/product.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 # This centralizes the definition of a bunch of labels and files used in the
 # various //build/images/**/BUILD.gn files.
@@ -77,10 +78,14 @@ files = {
   if (!use_bringup_assembly) {
     blobfs = "${assembly_outdir}/blob.blk"
 
-    fvm = "${assembly_outdir}/fvm.blk"
-    fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
+    if (fxfs_blob) {
+      fxfs = "${assembly_outdir}/fxfs.blk"
+    } else {
+      fvm = "${assembly_outdir}/fvm.blk"
+      fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
+    }
 
-    if (include_fvm_blob_sparse) {
+    if (fvm_partition != "" && include_fvm_blob_sparse) {
       fvm_blob_sparse = "${assembly_outdir}/fvm.blob.sparse.blk"
     }
 

@@ -101,9 +101,9 @@ declare_args() {
   # Arguments to `fx flash` script (along with any `firmware_prebuilts` which
   # specify a partition).
   #
-  # If `fvm_partition` is provided, the flash script will flash the full OS,
-  # recovery + Zircon + FVM + SSH keys. In this case, the bootloader must also
-  # support `fastboot oem add-staged-bootloader-file ssh.authorized_keys`.
+  # If (exactly one of) `fvm_partition` or `fxfs_partition` is provided, the flash script will flash
+  # the full OS, recovery + Zircon + FVM (or Fxfs) + SSH keys. In this case, the bootloader must
+  # also support `fastboot oem add-staged-bootloader-file ssh.authorized_keys`.
   #
   # Otherwise, the script will flash the recovery image to all slots, which
   # doesn't require the FVM or SSH keys.
@@ -114,6 +114,7 @@ declare_args() {
   vbmeta_b_partition = ""
   vbmeta_r_partition = ""
   fvm_partition = ""
+  fxfs_partition = ""
   active_partition = ""
   fastboot_product = ""
   pre_erase_flash = false
@@ -218,3 +219,6 @@ sign_zbi = custom_signing_script != "" || use_vboot
 # Increment this number if the platform has introduced a backwards-incompatible
 # change. See: src/sys/pkg/bin/system-updater/epoch/playbook.md
 update_platform_epoch = 1
+
+assert(fxfs_partition == "" || fvm_partition == "",
+       "only one of fxfs_partition/fvm_partition can be specified")
