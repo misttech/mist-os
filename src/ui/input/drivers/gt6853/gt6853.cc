@@ -256,7 +256,7 @@ zx_status_t Gt6853Device::Init() {
   // Set scheduling role for device thread.
   {
     const char* role_name = "fuchsia.ui.input.drivers.gt6853.device";
-    status = device_set_profile_by_role(zxdev(), thrd_get_zx_handle(thread_), role_name,
+    status = device_set_profile_by_role(parent(), thrd_get_zx_handle(thread_), role_name,
                                         strlen(role_name));
     if (status != ZX_OK) {
       zxlogf(WARNING, "Failed to apply role to worker: %d", status);
