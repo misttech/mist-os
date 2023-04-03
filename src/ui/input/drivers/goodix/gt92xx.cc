@@ -165,8 +165,9 @@ zx_status_t Gt92xxDevice::Create(zx_device_t* device) {
   // Set scheduler role for device thread.
   {
     const char* role_name = "fuchsia.ui.input.drivers.goodix.gt92xx.device";
-    status = device_set_profile_by_role(
-        goodix_dev->zxdev(), thrd_get_zx_handle(goodix_dev->thread_), role_name, strlen(role_name));
+    status =
+        device_set_profile_by_role(goodix_dev->parent(), thrd_get_zx_handle(goodix_dev->thread_),
+                                   role_name, strlen(role_name));
     if (status != ZX_OK) {
       zxlogf(WARNING, "Gt92xxDevice::Create: Failed to apply role: %s",
              zx_status_get_string(status));
