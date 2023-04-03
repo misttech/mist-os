@@ -119,7 +119,7 @@ int SynDhub::Thread() {
   const char* role_name = "fuchsia.devices.audio.as370.dma";
   const size_t role_name_size = strlen(role_name);
   const zx_status_t status =
-      device_set_profile_by_role(zxdev(), zx_thread_self(), role_name, role_name_size);
+      device_set_profile_by_role(parent(), zx_thread_self(), role_name, role_name_size);
   if (status != ZX_OK) {
     zxlogf(WARNING, "Failed to apply role \"%s\" to the AS370 DMA (dHub) thread\n", role_name);
   }
