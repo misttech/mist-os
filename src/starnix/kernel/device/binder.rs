@@ -791,8 +791,8 @@ impl<'a> BinderProcessGuard<'a> {
     /// Whether the driver should request that the client starts a new thread.
     fn should_request_thread(&self, thread: &Arc<BinderThread>) -> bool {
         !self.thread_requested
-            && self.thread_pool.0.len() < self.max_thread_count
-            && thread.lock().is_registered()
+            && self.thread_pool.registered_threads() < self.max_thread_count
+            && thread.lock().is_main_or_registered()
             && !self.thread_pool.has_available_thread()
     }
 
@@ -1086,6 +1086,11 @@ impl ThreadPool {
         for t in self.0.values() {
             t.lock().command_queue.notify_all();
         }
+    }
+
+    /// The number of registered thread in the pool. This doesn't count the main thread.
+    fn registered_threads(&self) -> usize {
+        self.0.values().filter(|t| t.lock().is_registered()).count()
     }
 }
 
@@ -1422,12 +1427,16 @@ impl BinderThreadState {
         }
     }
 
-    pub fn is_registered(&self) -> bool {
+    pub fn is_main_or_registered(&self) -> bool {
         self.registration.intersects(RegistrationState::MAIN | RegistrationState::REGISTERED)
     }
 
+    pub fn is_registered(&self) -> bool {
+        self.registration.intersects(RegistrationState::REGISTERED)
+    }
+
     pub fn is_available(&self) -> bool {
-        if !self.is_registered() {
+        if !self.is_main_or_registered() {
             log_trace!("thread {:?} not registered {:?}", self.tid, self.registration);
             return false;
         }
@@ -1453,7 +1462,7 @@ impl BinderThreadState {
         binder_process: &mut BinderProcessGuard<'_>,
         registration: RegistrationState,
     ) -> Result<(), Errno> {
-        if self.is_registered() {
+        if self.is_main_or_registered() {
             // This thread is already registered.
             error!(EINVAL)
         } else {
