@@ -95,7 +95,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             device_ip_address: Optional[str] = None) -> None:
         super().__init__(
             device_name, ssh_private_key, ssh_user, device_ip_address)
-        self._start_sl4f_server()
+        self.start_sl4f_server()
 
     # List all the persistent properties in alphabetical order
     @properties.PersistentProperty
@@ -198,6 +198,20 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             device_name=self.name, sl4f=self)
 
     # List all the public methods in alphabetical order
+    def check_sl4f_connection(self) -> None:
+        """Checks SL4F connection by sending a SL4F request to device.
+
+        Raises:
+            errors.FuchsiaDeviceError: If SL4F connection is not successful.
+        """
+        get_device_name_resp: Dict[str, Any] = self.send_sl4f_command(
+            method=_SL4F_METHODS["GetDeviceName"])
+        device_name: str = get_device_name_resp["result"]
+
+        if device_name != self.name:
+            raise errors.FuchsiaDeviceError(
+                f"Failed to start SL4F server on '{self.name}'.")
+
     def close(self) -> None:
         """Clean up method."""
         return
@@ -365,21 +379,19 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         _LOGGER.info("Snapshot file has been saved @ '%s'", snapshot_file_path)
         return snapshot_file_path
 
-    # List all private methods in alphabetical order
-    def _check_sl4f_connection(self):
-        """Checks SL4F connection by sending a SL4F request to device.
+    def start_sl4f_server(self) -> None:
+        """Starts the SL4F server on fuchsia device.
 
         Raises:
-            errors.FuchsiaDeviceError: If SL4F connection is not successful.
+            errors.FuchsiaDeviceError: Failed to start the SL4F server.
         """
-        get_device_name_resp = self.send_sl4f_command(
-            method=_SL4F_METHODS["GetDeviceName"])
-        device_name = get_device_name_resp["result"]
+        _LOGGER.info("Starting SL4F server on %s...", self.name)
+        self._run_ssh_command_on_host(command=_CMDS["START_SL4F"])
 
-        if device_name != self.name:
-            raise errors.FuchsiaDeviceError(
-                f"Failed to start SL4F server on '{self.name}'.")
+        # verify the device is responsive to SL4F requests
+        self.check_sl4f_connection()
 
+    # List all private methods in alphabetical order
     def _check_ssh_connection_to_device(self, timeout: float):
         """Checks the SSH connection from host to Fuchsia device.
 
@@ -491,18 +503,6 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         except Exception as err:  # pylint: disable=broad-except
             raise errors.SSHCommandError(err) from err
 
-    def _start_sl4f_server(self) -> None:
-        """Starts the SL4F server on fuchsia device.
-
-        Raises:
-            errors.FuchsiaDeviceError: Failed to start the SL4F server.
-        """
-        _LOGGER.info("Starting SL4F server on %s...", self.name)
-        self._run_ssh_command_on_host(command=_CMDS["START_SL4F"])
-
-        # verify the device is responsive to SL4F requests
-        self._check_sl4f_connection()
-
     def _wait_for_bootup_complete(
             self, timeout: float = _TIMEOUTS["BOOT_UP_COMPLETE"]) -> None:
         """Wait for Fuchsia device to complete the boot.
@@ -527,7 +527,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         self._check_ssh_connection_to_device(remaining_timeout)
 
         # Restart SL4F server on the device
-        self._start_sl4f_server()
+        self.start_sl4f_server()
 
         # If applicable, initialize bluetooth stack
         if "qemu" not in self.device_type:

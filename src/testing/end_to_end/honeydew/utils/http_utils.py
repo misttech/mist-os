@@ -90,8 +90,9 @@ def send_http_request(
 
             if attempt < attempts:
                 _LOGGER.warning(
-                    "Send HTTP request failed with error: '%s' on iteration "
-                    "%s/%s", err, attempt, attempts)
+                    "Send HTTP request to url=%s with data=%s and headers=%s "
+                    "failed with error: '%s' on iteration %s/%s", url, data,
+                    headers, err, attempt, attempts)
                 continue
             raise errors.HttpRequestError(err_msg) from err
     raise errors.HttpRequestError(err_msg)

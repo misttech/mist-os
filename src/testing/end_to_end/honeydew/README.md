@@ -1,5 +1,7 @@
 # HoneyDew
 
+[TOC]
+
 HoneyDew is a test framework agnostic device controller written in Python that
 provides Host-(Fuchsia)Target interaction.
 
@@ -9,8 +11,6 @@ Supported host operating systems:
 Assumptions:
 * FFX CLI is present on the host and is included in `$PATH` environmental
   variable.
-
-[TOC]
 
 ## Usage
 

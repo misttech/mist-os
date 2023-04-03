@@ -275,6 +275,22 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             self.fd_obj, method=fuchsia_device_base._SL4F_METHODS["GetVersion"])
 
     # List all the tests related to public methods in alphabetical order
+    # Note - Test case for FuchsiaDeviceBase.start_sl4f_server() is covered in
+    # test_fuchsia_device_base_init
+
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "send_sl4f_command",
+        return_value={"result": _MOCK_ARGS["device_name"]},
+        autospec=True)
+    def test_check_sl4f_connection(self, mock_send_sl4f_command):
+        """Testcase for FuchsiaDeviceBase.check_sl4f_connection()"""
+        self.fd_obj.check_sl4f_connection()
+
+        mock_send_sl4f_command.assert_called_once_with(
+            self.fd_obj,
+            method=fuchsia_device_base._SL4F_METHODS["GetDeviceName"])
+
     def test_close(self):
         """Testcase for FuchsiaDeviceBase.close()"""
         self.fd_obj.close()
@@ -424,22 +440,6 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             self.fd_obj, method=fuchsia_device_base._SL4F_METHODS["Snapshot"])
 
     # List all the tests related to private methods in alphabetical order
-
-    # Note - Test case for FuchsiaDeviceBase._start_sl4f_server() is covered in
-    # test_fuchsia_device_base_init
-
-    @mock.patch.object(
-        fuchsia_device_base.FuchsiaDeviceBase,
-        "send_sl4f_command",
-        return_value={"result": _MOCK_ARGS["device_name"]},
-        autospec=True)
-    def test_check_sl4f_connection(self, mock_send_sl4f_command):
-        """Testcase for FuchsiaDeviceBase._check_sl4f_connection()"""
-        self.fd_obj._check_sl4f_connection()
-
-        mock_send_sl4f_command.assert_called_once_with(
-            self.fd_obj,
-            method=fuchsia_device_base._SL4F_METHODS["GetDeviceName"])
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
@@ -661,7 +661,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         return_value="x64")
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
-        "_start_sl4f_server",
+        "start_sl4f_server",
         autospec=True)
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,

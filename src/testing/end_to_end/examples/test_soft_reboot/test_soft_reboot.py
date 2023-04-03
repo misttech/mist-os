@@ -19,6 +19,9 @@ class SoftRebootTest(fuchsia_base_test.FuchsiaBaseTest):
 
     Attributes:
         dut: FuchsiaDevice object.
+
+    Required Mobly Test Params:
+        num_reboots (int): Number of times reboot test need to be executed.
     """
 
     def pre_run(self) -> None:

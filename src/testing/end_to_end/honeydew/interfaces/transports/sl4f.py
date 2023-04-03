@@ -12,6 +12,13 @@ class SL4F(abc.ABC):
     """Abstract base class for SL4F transport."""
 
     # List all the public methods in alphabetical order
+    @abc.abstractmethod
+    def check_sl4f_connection(self) -> None:
+        """Checks SL4F connection by sending a SL4F request to device.
+
+        Raises:
+            errors.FuchsiaDeviceError: If SL4F connection is not successful.
+        """
 
     @abc.abstractmethod
     def send_sl4f_command(
@@ -40,4 +47,12 @@ class SL4F(abc.ABC):
 
         Raises:
             errors.FuchsiaDeviceError: On failure.
+        """
+
+    @abc.abstractmethod
+    def start_sl4f_server(self) -> None:
+        """Starts the SL4F server on fuchsia device.
+
+        Raises:
+            errors.FuchsiaDeviceError: Failed to start the SL4F server.
         """

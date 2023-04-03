@@ -30,7 +30,7 @@ class InitTests(unittest.TestCase):
     # List all the tests related to public methods in alphabetical order
     @mock.patch.object(
         generic_fuchsia_device.fuchsia_device_base.FuchsiaDeviceBase,
-        "_start_sl4f_server",
+        "start_sl4f_server",
         autospec=True)
     @mock.patch.object(
         honeydew.fuchsia_device.ffx_cli,
@@ -59,7 +59,7 @@ class InitTests(unittest.TestCase):
 
     @mock.patch.object(
         x64.fuchsia_device_base.FuchsiaDeviceBase,
-        "_start_sl4f_server",
+        "start_sl4f_server",
         autospec=True)
     @mock.patch.object(
         honeydew.fuchsia_device.ffx_cli,

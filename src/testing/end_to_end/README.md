@@ -1,5 +1,7 @@
 # End to end test framework
 
+[TOC]
+
 Lacewing is Fuchsia's python end-to-end multi-device testing framework.
 
 This framework can be used for authoring host-driven E2E tests that interact
@@ -129,17 +131,15 @@ $ head -1 $FUCHSIA_DIR/.fx-ssh-path
 Every Lacewing Mobly test follows the simple scaffolding below:
 
 ```py
-from mobly import base_test
+from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
 
-from honeydew.mobly_controller import fuchsia_device
 
-
-class MyFirstLacewingTest(base_test.BaseTestClass):
+class MyFirstLacewingTest(fuchsia_base_test.FuchsiaBaseTest):
     def setup_class(self):
         """Initialize all DUT(s)"""
-        fuchsia_duts = self.register_controller(fuchsia_device)
-        self.fuchsia_dut = fuchsia_duts[0]
+        super().setup_class()
+        self.fuchsia_dut = self.fuchsia_devices[0]
 
     def test_my_first_testcase(self):
         # Test logic goes here.
