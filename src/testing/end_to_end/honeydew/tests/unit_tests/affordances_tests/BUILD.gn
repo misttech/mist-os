@@ -5,6 +5,16 @@
 import("//build/python/python_host_test.gni")
 
 if (is_host) {
+  python_host_test("bluetooth_default_test") {
+    main_source = "bluetooth_default_test.py"
+    libraries = [
+      "//src/testing/end_to_end/honeydew",
+      "//third_party/parameterized",
+    ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
+
   python_host_test("component_default_test") {
     main_source = "component_default_test.py"
     libraries = [
@@ -14,14 +24,8 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
-
-  python_host_test("bluetooth_default_test") {
-    main_source = "bluetooth_default_test.py"
-    libraries = [ "//src/testing/end_to_end/honeydew" ]
-    main_callable = "unittest.main"
-    extra_args = [ "-v" ]
-  }
 }
+
 group("tests") {
   testonly = true
   public_deps = [

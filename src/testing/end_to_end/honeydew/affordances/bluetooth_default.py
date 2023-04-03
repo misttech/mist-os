@@ -8,6 +8,7 @@ from honeydew.interfaces.affordances import bluetooth
 from honeydew.interfaces.transports import sl4f as sl4f_transport
 
 _SL4F_METHODS = {
+    "BluetoothInitSys": "bt_sys_facade.BluetoothInitSys",
     "BluetoothRequestDiscovery": "bt_sys_facade.BluetoothRequestDiscovery",
 }
 
@@ -23,6 +24,21 @@ class BluetoothDefault(bluetooth.Bluetooth):
     def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
         self._name = device_name
         self._sl4f = sl4f
+
+        # Initialize the bluetooth stack
+        self.sys_init()
+
+    def sys_init(self) -> None:
+        """Initializes bluetooth stack.
+
+        Note: This method is called automatically:
+            1. During this class initialization
+            2. After the device reboot
+
+        Raises:
+            errors.FuchsiaDeviceError: On failure.
+        """
+        self._sl4f.send_sl4f_command(method=_SL4F_METHODS["BluetoothInitSys"])
 
     def request_discovery(self, discovery: bool) -> None:
         """Requests Bluetooth Discovery on Bluetooth capable device.

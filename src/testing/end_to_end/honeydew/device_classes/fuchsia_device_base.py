@@ -529,6 +529,10 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         # Restart SL4F server on the device
         self._start_sl4f_server()
 
+        # If applicable, initialize bluetooth stack
+        if "qemu" not in self.device_type:
+            self.bluetooth.sys_init()
+
     def _wait_for_offline(self, timeout: float = _TIMEOUTS["OFFLINE"]) -> None:
         """Wait for Fuchsia device to go offline.
 

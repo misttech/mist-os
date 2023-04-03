@@ -10,7 +10,7 @@ if (is_host) {
 
     libraries = [ "//src/testing/end_to_end/honeydew" ]
 
-    local_config_source = "../../testbeds/One-GoogleDevice.yaml"
+    local_config_source = "../../testbeds/One-X64.yaml"
 
     # Used for infra Swarming bot allocation.
     environments = [

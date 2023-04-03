@@ -651,6 +651,15 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_send_http_request.assert_called_once()
 
     @mock.patch.object(
+        fuchsia_device_base.bluetooth_default.BluetoothDefault,
+        "sys_init",
+        autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "device_type",
+        new_callable=mock.PropertyMock,
+        return_value="x64")
+    @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
         "_start_sl4f_server",
         autospec=True)
@@ -668,7 +677,8 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_wait_for_bootup_complete(
             self, mock_get_device_ip_address, mock_wait_for_online,
-            mock_check_ssh_connection_to_device, mock_start_sl4f_server):
+            mock_check_ssh_connection_to_device, mock_start_sl4f_server,
+            mock_device_type, mock_bluetooth_sys_init):
         """Testcase for FuchsiaDeviceBase._wait_for_bootup_complete()"""
         self.fd_obj._wait_for_bootup_complete(timeout=10)
 
@@ -676,6 +686,8 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_wait_for_online.assert_called_once()
         mock_check_ssh_connection_to_device.assert_called_once()
         mock_start_sl4f_server.assert_called_once()
+        mock_device_type.assert_called_once()
+        mock_bluetooth_sys_init.assert_called()
 
     @mock.patch("time.sleep", autospec=True)
     @mock.patch.object(
