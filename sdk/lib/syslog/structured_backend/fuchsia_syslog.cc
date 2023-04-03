@@ -12,10 +12,6 @@
 #include <lib/zx/socket.h>
 #include <lib/zx/time.h>
 
-#include <fstream>
-#include <iostream>
-#include <sstream>
-
 namespace {
 
 // Represents a byte offset that has no alignment guarantees.
