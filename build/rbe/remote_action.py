@@ -185,6 +185,7 @@ class RemoteAction(object):
         save_temps: bool = False,
         auto_reproxy: bool = False,
         remote_log: str = "",
+        fsatrace_path: str = "",
     ):
         """RemoteAction constructor.
 
@@ -212,6 +213,13 @@ class RemoteAction(object):
                 name the log "rbe-action-output.remote-log"
             else:
               use the given name appended with ".remote-log"
+          fsatrace_path: Given a path to an fsatrace tool
+              (located under exec_root), this will wrap the remote command
+              to trace and log remote file access.
+              if there is at least one remote output file:
+                the trace name is "${output_files[0]}.remote-fsatrace"
+              else:
+                the trace name "rbe-action-output.remote-fsatrace"
         """
         self._rewrapper = rewrapper
         self._save_temps = save_temps
@@ -241,18 +249,27 @@ class RemoteAction(object):
             self._output_files.append(self._remote_log_name)
             self._inputs.append(self._remote_log_script_path)
 
+        self._fsatrace_path = fsatrace_path  # relative to working dir
+        if self._fsatrace_path:
+            self._inputs.extend([self._fsatrace_path, self._fsatrace_so])
+            self._output_files.append(self._fsatrace_remote_log)
+
         self._cleanup_files = []
 
     @property
     def exec_root(self) -> str:
         return self._exec_root
 
+    @property
+    def _default_auxiliary_file_basename(self) -> str:
+        if self._output_files:
+            return self._output_files[0]
+        else:  # pick something arbitrary, but deterministic
+            return 'rbe-action-output'
+
     def _name_remote_log(self, remote_log) -> str:
         if remote_log == '<AUTO>':
-            if self._output_files:
-                return self._output_files[0] + '.remote-log'
-            else:  # pick something arbitrary, but deterministic
-                return 'rbe-action-output.remote-log'
+            return self._default_auxiliary_file_basename + '.remote-log'
 
         if remote_log:
             return remote_log + '.remote-log'
@@ -262,6 +279,19 @@ class RemoteAction(object):
     @property
     def _remote_log_script_path(self) -> str:
         return os.path.join(self.exec_root_rel, _REMOTE_LOG_SCRIPT)
+
+    @property
+    def _fsatrace_local_log(self) -> str:
+        return self._default_auxiliary_file_basename + '.local-fsatrace'
+
+    @property
+    def _fsatrace_remote_log(self) -> str:
+        return self._default_auxiliary_file_basename + '.remote-fsatrace'
+
+    @property
+    def _fsatrace_so(self) -> str:
+        # fsatrace needs the corresponding .so to work
+        return self._fsatrace_path + '.so'
 
     @property
     def local_command(self) -> Sequence[str]:
@@ -290,12 +320,14 @@ class RemoteAction(object):
     def remote_disable(self) -> bool:
         return self._remote_disable
 
-    def _relativize_to_exec_root(self, paths: Sequence[str]) -> Sequence[str]:
-        return [
-            relativize_to_exec_root(
-                os.path.normpath(os.path.join(self.working_dir, path)),
-                start=self.exec_root) for path in paths
-        ]
+    def _relativize_path_to_exec_root(self, path: str) -> str:
+        return relativize_to_exec_root(
+            os.path.normpath(os.path.join(self.working_dir, path)),
+            start=self.exec_root)
+
+    def _relativize_paths_to_exec_root(self,
+                                       paths: Sequence[str]) -> Sequence[str]:
+        return [self._relativize_path_to_exec_root(path) for path in paths]
 
     @property
     def exec_root_rel(self) -> str:
@@ -320,17 +352,17 @@ class RemoteAction(object):
 
     @property
     def inputs_relative_to_project_root(self) -> Sequence[str]:
-        return self._relativize_to_exec_root(
+        return self._relativize_paths_to_exec_root(
             self.inputs_relative_to_working_dir)
 
     @property
     def output_files_relative_to_project_root(self) -> Sequence[str]:
-        return self._relativize_to_exec_root(
+        return self._relativize_paths_to_exec_root(
             self.output_files_relative_to_working_dir)
 
     @property
     def output_dirs_relative_to_project_root(self) -> Sequence[str]:
-        return self._relativize_to_exec_root(
+        return self._relativize_paths_to_exec_root(
             self.output_dirs_relative_to_working_dir)
 
     def _inputs_list_file(self) -> str:
@@ -361,6 +393,25 @@ class RemoteAction(object):
             output_dirs = ','.join(self.output_dirs_relative_to_project_root)
             yield f"--output_directories={output_dirs}"
 
+    @property
+    def _remote_log_command_prefix(self) -> Sequence[str]:
+        return [
+            self._remote_log_script_path,
+            '--log',
+            self._remote_log_name,
+            '--',
+        ]
+
+    def _fsatrace_command_prefix(self, log: str) -> Sequence[str]:
+        return [
+            _ENV,
+            'FSAT_BUF_SIZE=5000000',
+            self._fsatrace_path,
+            'erwdtmq',
+            log,
+            '--',
+        ]
+
     def _generate_command(self) -> Iterable[str]:
         """Generates the rewrapper command, one token at a time."""
         if not self._remote_disable:
@@ -373,12 +424,21 @@ class RemoteAction(object):
             yield '--'
 
             if self._remote_log_name:
-                yield from [
-                    self._remote_log_script_path,
-                    '--log',
-                    self._remote_log_name,
-                    '--',
-                ]
+                yield from self._remote_log_command_prefix
+
+            # When requesting both remote logging and fsatrace,
+            # use fsatrace as the inner wrapper because the user is not
+            # likely to be interested in fsatrace entries attributed
+            # to the logging wrapper.
+            if self._fsatrace_path:
+                yield from self._fsatrace_command_prefix(
+                    self._fsatrace_remote_log)
+        else:
+            # When requesting fsatrace, log to a different file than the
+            # remote log, so they can be compared.
+            if self._fsatrace_path:
+                yield from self._fsatrace_command_prefix(
+                    self._fsatrace_local_log)
 
         yield from self.local_command
 
@@ -392,7 +452,6 @@ class RemoteAction(object):
         return ' '.join(shlex.quote(t) for t in self.command)
 
     # features to port over from fuchsia-rbe-action.sh:
-    # TODO(http://fxbug.dev/96250): implement fsatrace mutator
     # TODO(http://fxbug.dev/123178): facilitate delayed downloads using --action_log
 
     def _cleanup(self):
@@ -530,6 +589,7 @@ def inherit_main_arg_parser_flags(
         "--bindir",
         type=str,
         default=default_bindir,
+        metavar="PATH",
         help="Path to reclient tools like rewrapper, reproxy.",
     )
     group.add_argument(
@@ -556,11 +616,11 @@ def inherit_main_arg_parser_flags(
         dest="remote_log",
         const="<AUTO>",  # pick name based on ${output_files[0]}
         default="",  # blank means to not log
+        metavar="BASE",
         nargs='?',
         help="""Capture remote execution's stdout/stderr to a log file.
 If a name argument BASE is given, the output will be 'BASE.remote-log'.
-Otherwise, BASE will default to the first output file named.
-        """,
+Otherwise, BASE will default to the first output file named.""",
     )
     group.add_argument(
         "--save-temps",
@@ -573,6 +633,13 @@ Otherwise, BASE will default to the first output file named.
         action="store_true",
         default=False,
         help="Startup and shutdown reproxy around the rewrapper invocation.",
+    )
+    group.add_argument(
+        "--fsatrace-path",
+        type=str,
+        default="",  # blank means do not trace
+        metavar="PATH",
+        help="""Given a path to an fsatrace tool (located under exec_root), this will trace a remote execution's file accesses.  This is useful for diagnosing unexpected differences between local and remote builds.  The trace file will be named '{output_files[0]}.remote-fsatrace' (if there is at least one output), otherwise 'remote-action-output.remote-fsatrace'.""",
     )
     # Positional args are the command and arguments to run.
     parser.add_argument(
@@ -606,6 +673,7 @@ def remote_action_from_args(
         save_temps=main_args.save_temps,
         auto_reproxy=main_args.auto_reproxy,
         remote_log=main_args.remote_log,
+        fsatrace_path=main_args.fsatrace_path,
         **kwargs,
     )
 

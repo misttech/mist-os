@@ -272,9 +272,10 @@ class RemoteActionMainParserTests(unittest.TestCase):
         build_dir = 'build-out'
         working_dir = os.path.join(exec_root, build_dir)
         output = 'hello.txt'
+        log_base = 'debug'
         p = self._make_main_parser()
         main_args, other = p.parse_known_args(
-            ['--log', 'debug', '--', 'touch', output])
+            ['--log', log_base, '--', 'touch', output])
         action = remote_action.remote_action_from_args(
             main_args,
             output_files=[output],
@@ -288,7 +289,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(
             {
                 os.path.join(build_dir, output),
-                os.path.join(build_dir, 'debug.remote-log')
+                os.path.join(build_dir, log_base + '.remote-log')
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
         full_command = action.command
@@ -299,8 +300,96 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(
             remote_command[:next_ddash], [
                 os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
-                'debug.remote-log'
+                log_base + '.remote-log'
             ])
+
+    def test_remote_fsatrace_from_main_args(self):
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        fake_fsatrace = 'tools/debug/fsatrace'
+        fake_fsatrace_rel = f'../{fake_fsatrace}'
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--fsatrace-path', fake_fsatrace_rel, '--', 'touch', output])
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        self.assertEqual(
+            {fake_fsatrace, fake_fsatrace + '.so'},
+            set(action.inputs_relative_to_project_root))
+        self.assertEqual(
+            {
+                os.path.join(build_dir, output),
+                os.path.join(build_dir, output + '.remote-fsatrace')
+            }, set(action.output_files_relative_to_project_root))
+        # Ignore the rewrapper portion of the command
+        full_command = action.command
+        first_ddash = full_command.index('--')
+        # Confirm that the remote command is wrapped with fsatrace
+        remote_command = full_command[first_ddash + 1:]
+        next_ddash = remote_command.index('--')
+        self.assertIn(fake_fsatrace_rel, remote_command[:next_ddash])
+        self.assertEqual(
+            remote_command[:next_ddash + 1],
+            action._fsatrace_command_prefix(output + '.remote-fsatrace'))
+        self.assertEqual(remote_command[next_ddash + 1:], ['touch', output])
+
+    def test_remote_log_and_fsatrace_from_main_args(self):
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        fake_fsatrace = 'tools/debug/fsatrace'
+        fake_fsatrace_rel = f'../{fake_fsatrace}'
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            [
+                '--fsatrace-path', fake_fsatrace_rel, '--log', '--', 'touch',
+                output
+            ])
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        self.assertEqual(
+            {
+                remote_action._REMOTE_LOG_SCRIPT,
+                fake_fsatrace,
+                fake_fsatrace + '.so',
+            }, set(action.inputs_relative_to_project_root))
+        self.assertEqual(
+            {
+                os.path.join(build_dir, output),
+                os.path.join(build_dir, output + '.remote-log'),
+                os.path.join(build_dir, output + '.remote-fsatrace'),
+            }, set(action.output_files_relative_to_project_root))
+        # Ignore the rewrapper portion of the command
+        full_command = action.command
+        first_ddash = full_command.index('--')
+        # Confirm that the outer wrapper is for logging
+        remote_command = full_command[first_ddash + 1:]
+        second_ddash = remote_command.index('--')
+        self.assertEqual(
+            remote_command[:second_ddash], [
+                os.path.join('..', remote_action._REMOTE_LOG_SCRIPT), '--log',
+                output + '.remote-log'
+            ])
+        # Confirm that the inner wrapper is for fsatrace
+        logged_command = remote_command[second_ddash + 1:]
+        third_ddash = logged_command.index('--')
+        self.assertEqual(
+            logged_command[:third_ddash + 1],
+            action._fsatrace_command_prefix(output + '.remote-fsatrace'))
+        self.assertEqual(logged_command[third_ddash + 1:], ['touch', output])
 
 
 class RemoteActionFlagParserTests(unittest.TestCase):
