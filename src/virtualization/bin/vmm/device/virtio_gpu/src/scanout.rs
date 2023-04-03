@@ -147,11 +147,9 @@ impl Scanout for FlatlandScanout {
         }
     }
 
-    // TODO(fxbug.dev/90290): Currently there is no way to hide or modify the mouse cursor drawn by
-    // scene_manager for a particular view. Once there is we will need to update this code to
-    // utilize the new APIs. Until then we just ignore the problem and draw the cursor as specified
-    // by the guest into our view. To avoid seeing multiple different cursors one can globally hide
-    // the system cursor by entering "immersive mode" with the shortcut alt-shift-I.
+    // Note: Currently there is no way to hide or modify the mouse cursor drawn
+    // by scene_manager for a particular view, so we just ignore the problem
+    // and draw the cursor as specified by the guest into our view.
     fn update_cursor_resource<'a>(
         &mut self,
         resource: Option<&Resource2D<'a>>,

@@ -30,9 +30,6 @@ use {
     tracing::warn,
 };
 
-// TODO(fxbug.dev/91061): Make this larger when we have a protocol to
-// determine the hotspot and the cursor component knows how to produce
-// output that doesn't occupy the full viewport.
 const _CURSOR_SIZE: (u32, u32) = (18, 29);
 const CURSOR_HOTSPOT: (u32, u32) = (2, 4);
 

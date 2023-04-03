@@ -22,7 +22,6 @@ use {
     std::{convert::From, rc::Rc},
 };
 
-// TODO(fxbug.dev/90290): Remove this handler when we have a proper cursor API.
 pub struct ImmersiveModeShortcutHandler;
 
 #[async_trait(?Send)]

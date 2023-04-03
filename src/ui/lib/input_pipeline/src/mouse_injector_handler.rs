@@ -147,8 +147,6 @@ impl InputHandler for MouseInjectorHandler {
                 trace_id: _,
             } => {
                 // Hide the cursor on touch input.
-                // TODO(fxbug.dev/90290): Remove this workaround when we have a
-                // proper cursor API.
                 let visible = false;
                 if let Err(e) = self.update_cursor_visibility(visible).await {
                     tracing::error!("update_cursor_visibility failed: {}", e);
@@ -167,9 +165,6 @@ impl InputHandler for MouseInjectorHandler {
                 // Immersive mode hides the cursor and is a temporary workaround
                 // until we have a cursor API that makes it possible for UI
                 // components to control the appearance of the cursor.
-                //
-                // TODO(fxbug.dev/90290): Remove this workaround when we have a
-                // proper cursor API.
                 if let Err(e) = self.toggle_immersive_mode().await {
                     tracing::error!("update_cursor_visibility failed: {}", e);
                 }
