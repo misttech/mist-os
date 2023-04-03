@@ -396,7 +396,6 @@
                 "MountTest.ActiveSubmountBusy",
                 "MountTest.MountTmpfsMagicValIgnored",
                 "MountTest.MountReadonly",
-                "MountTest.MountNoAtime",
                 "MountTest.MountNoExec",
                 "MountTest.MountInfo",
                 "MountTest.TmpfsSizeRoundUpSinglePageSize",

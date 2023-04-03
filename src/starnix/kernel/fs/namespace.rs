@@ -883,7 +883,7 @@ impl NamespaceNode {
                             return error!(ELOOP);
                         }
                         context.remaining_follows -= 1;
-                        child = match child.entry.node.readlink(current_task)? {
+                        child = match child.readlink(current_task)? {
                             SymlinkTarget::Path(link_target) => {
                                 let link_directory = if link_target[0] == b'/' {
                                     current_task.fs().root()
@@ -1014,6 +1014,23 @@ impl NamespaceNode {
 
     fn mount_hash_key(&self) -> &ArcKey<DirEntry> {
         ArcKey::ref_cast(&self.entry)
+    }
+
+    pub fn update_atime(&self) {
+        // Do not update the atime of this node if it is not mounted
+        // or is mounted with the NOATIME flag.
+        if let Some(mount) = &self.mount {
+            if !mount.flags.contains(MountFlags::NOATIME) {
+                let mut info = self.entry.node.info_write();
+                let now = fuchsia_runtime::utc_time();
+                info.time_access = now;
+            }
+        }
+    }
+
+    pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
+        self.update_atime();
+        self.entry.node.readlink(current_task)
     }
 }
 

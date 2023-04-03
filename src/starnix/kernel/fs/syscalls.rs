@@ -576,9 +576,9 @@ pub fn sys_readlinkat(
     buffer: UserAddress,
     buffer_size: usize,
 ) -> Result<usize, Errno> {
-    let entry = lookup_at(current_task, dir_fd, user_path, LookupFlags::no_follow())?.entry;
+    let name = lookup_at(current_task, dir_fd, user_path, LookupFlags::no_follow())?;
 
-    let target = match entry.node.readlink(current_task)? {
+    let target = match name.readlink(current_task)? {
         SymlinkTarget::Path(path) => path,
         SymlinkTarget::Node(node) => node.path(),
     };

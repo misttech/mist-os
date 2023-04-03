@@ -690,9 +690,10 @@ impl FsNode {
         self.ops().create_symlink(self, name, target, owner)
     }
 
+    // This method does not attempt to update the atime of the node.
+    // Use `NamespaceNode::readlink` which checks the mount flags and updates the atime accordingly.
     pub fn readlink(&self, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
         // TODO(qsr): Is there a permission check here?
-        self.update_atime();
         self.ops().readlink(self, current_task)
     }
 
@@ -1022,13 +1023,6 @@ impl FsNode {
         let mut info = self.info.write();
         let now = fuchsia_runtime::utc_time();
         info.time_status_change = now;
-    }
-
-    // Update the atime of a file to now.
-    pub fn update_atime(&self) {
-        let mut info = self.info.write();
-        let now = fuchsia_runtime::utc_time();
-        info.time_access = now;
     }
 }
 

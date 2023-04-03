@@ -384,7 +384,7 @@ mod test {
             test_dir.lookup_child(&current_task, &mut context, b"symlink").expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =
-            test_symlink.entry.node.readlink(&current_task).expect("readlink failed")
+            test_symlink.readlink(&current_task).expect("readlink failed")
         {
             assert_eq!(&target, b"file");
         } else {

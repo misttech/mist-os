@@ -689,7 +689,7 @@ impl FileObject {
 
         // TODO(steveaustin) - omit updating time_access to allow info to be immutable
         // and thus allow simultaneous reads.
-        self.node().update_atime();
+        self.name.update_atime();
         Ok(bytes_read)
     }
 
@@ -805,7 +805,7 @@ impl FileObject {
             result => result,
         }?;
 
-        self.node().update_atime();
+        self.name.update_atime();
         Ok(())
     }
 
