@@ -12,7 +12,7 @@
 #include <iostream>
 #include <sstream>
 
-#include "lib/syslog/cpp/host_encoder.h"
+#include "lib/syslog/cpp/host/encoder.h"
 
 namespace syslog_backend {
 

@@ -16,7 +16,7 @@
 
 #include "lib/syslog/cpp/log_level.h"
 #ifndef __Fuchsia__
-#include "host_encoder.h"
+#include "host/encoder.h"
 #endif
 #include "src/lib/files/file.h"
 #include "src/lib/files/scoped_temp_dir.h"
