@@ -11,18 +11,4 @@
         binary: "driver/rebind_parent.so",
         bind: "meta/bind/rebind_parent.bindbc",
     },
-    capabilities: [
-        { service: 'fuchsia.driver.compat.Service' },
-        { service: "fuchsia.test.rebind.ParentService" },
-    ],
-    use: [
-        { protocol: "fuchsia.device.fs.Exporter" },
-        { service: "fuchsia.driver.compat.Service" },
-    ],
-    expose: [
-        {
-            service: 'fuchsia.driver.compat.Service',
-            from: 'self',
-        },
-    ],
 }

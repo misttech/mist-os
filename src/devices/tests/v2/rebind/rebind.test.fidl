@@ -6,21 +6,9 @@ library fuchsia.rebind.test;
 
 using zx;
 
-const MAX_STRING_LENGTH uint64 = 32;
-
-@discoverable
 protocol RebindParent {
     AddChild() -> () error zx.status;
     RemoveChild() -> () error zx.status;
 };
 
-@discoverable
 protocol RebindChild {};
-
-service ParentService {
-    rebind_parent client_end:RebindParent;
-};
-
-service ChildService {
-    rebind_child client_end:RebindChild;
-};

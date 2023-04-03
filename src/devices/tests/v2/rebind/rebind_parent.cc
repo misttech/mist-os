@@ -19,14 +19,13 @@
 namespace rebind_parent {
 
 const std::string kDriverName = "rebind-parent";
-const std::string kChildNodeName = "rebind-child";
+const std::string kChildNodeName = "added-child";
 
 class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent> {
  public:
   RebindParentServer(async_dispatcher_t* dispatcher,
-                     std::shared_ptr<compat::DeviceServer> device_server,
-                     fidl::WireSyncClient<fuchsia_driver_framework::Node> node, fdf::Logger* logger)
-      : node_(std::move(node)), device_server_(std::move(device_server)), logger_(logger) {}
+                     fidl::ClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger* logger)
+      : node_(std::move(node)), logger_(logger) {}
 
  private:
   void RemoveChild(RemoveChildCompleter::Sync& completer) override {
@@ -36,7 +35,7 @@ class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent
       return;
     }
 
-    auto status = (*node_controller_)->Remove();
+    auto status = node_controller_.value()->Remove();
     if (status.status() != ZX_OK) {
       FDF_SLOG(ERROR, "Failed to remove node", KV("status", status.status_string()));
       completer.Reply(fit::error(status.status()));
@@ -46,21 +45,13 @@ class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent
   }
 
   void AddChild(AddChildCompleter::Sync& completer) override {
-    if (device_server_ == nullptr) {
-      FDF_LOG(ERROR, "Device server is null");
-      completer.Reply(fit::error(ZX_ERR_BAD_STATE));
-      return;
-    }
     fidl::Arena arena;
-    // Offer `fuchsia.driver.compat.Service` to the driver that binds to the node.
-    auto offers = device_server_->CreateOffers(arena);
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
     properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, 1234);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, kChildNodeName)
-                    .offers(offers)
                     .properties(properties)
                     .Build();
 
@@ -82,7 +73,6 @@ class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent
   }
 
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  std::shared_ptr<compat::DeviceServer> device_server_;
   std::optional<fidl::WireSyncClient<fuchsia_driver_framework::NodeController>> node_controller_;
   fdf::Logger* logger_;
 };
@@ -95,89 +85,50 @@ class RebindParent : public fdf::DriverBase {
         devfs_connector_(fit::bind_member<&RebindParent::Serve>(this)) {}
 
   zx::result<> Start() override {
-    zx::result result = GetTopologicalPath();
-    if (result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to get topological path", KV("status", result.status_string()));
-      return result.take_error();
-    }
-    auto toplogical_path = std::move(*result);
-
-    device_server_ =
-        std::make_shared<compat::DeviceServer>(std::string(name()), 0, toplogical_path);
-    auto status = device_server_->Serve(dispatcher(), &context().outgoing()->component());
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to serve compat device server: %s", zx_status_get_string(status));
-      return zx::error_result(status);
+    // Export ourselves to devfs.
+    fidl::Arena arena;
+    zx::result connector = devfs_connector_.Bind(dispatcher());
+    if (connector.is_error()) {
+      return connector.take_error();
     }
 
-    if (zx::result result = ExportToDevfs(toplogical_path); result.is_error()) {
-      FDF_LOG(ERROR, "Failed to export device to devfs: %s", result.status_string());
-      return result.take_error();
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
+        std::move(connector.value()));
+
+    auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                    .name(arena, name())
+                    .devfs_args(devfs.Build())
+                    .Build();
+
+    // Create endpoints of the `NodeController` for the node.
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+
+    zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+    ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+
+    fidl::WireResult result = fidl::WireCall(node())->AddChild(
+        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+    if (!result.ok()) {
+      FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
+      return zx::error(result.status());
     }
+    controller_.Bind(std::move(controller_endpoints->client));
+    server_.emplace(dispatcher(), std::move(node_endpoints->client), &logger());
 
     return zx::ok();
   }
 
  private:
-  zx::result<std::string> GetTopologicalPath() {
-    auto svc_dir = context().incoming()->svc_dir();
-    auto result = component::OpenServiceAt<fuchsia_driver_compat::Service>(svc_dir, "default");
-    if (result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to open service", KV("status", result.status_string()));
-      return result.take_error();
-    }
-    auto parent_client = result.value().connect_device();
-    fidl::SyncClient parent{std::move(parent_client.value())};
-
-    auto getTopoRes = parent->GetTopologicalPath();
-    if (getTopoRes.is_error()) {
-      const auto& error = getTopoRes.error_value();
-      FDF_SLOG(ERROR, "Failed to topological path of parent", KV("status", error.status_string()));
-      return zx::error(error.status());
-    }
-
-    return zx::ok(getTopoRes->path().append("/").append(name()));
-  }
-
-  zx::result<> ExportToDevfs(const std::string& devfs_path) {
-    zx::result connection = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
-    if (connection.is_error()) {
-      FDF_SLOG(ERROR, "Failed to connect to devfs exporter",
-               KV("status", connection.status_string()));
-      return connection.take_error();
-    }
-    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
-
-    zx::result connector = devfs_connector_.Bind(dispatcher());
-    if (connector.is_error()) {
-      FDF_SLOG(ERROR, "Failed to bind devfs connector", KV("status", connector.status_string()));
-      return connector.take_error();
-    }
-    fidl::WireResult result =
-        devfs_exporter->Export(std::move(connector.value()),
-                               fidl::StringView::FromExternal(devfs_path), fidl::StringView());
-    if (!result.ok()) {
-      FDF_SLOG(ERROR, "Failed to send FIDL request to export to devfs",
-               KV("status", result.status_string()));
-      return zx::error(result.status());
-    }
-    if (result.value().is_error()) {
-      FDF_SLOG(ERROR, "Failed to export to devfs", KV("status", result.status_string()));
-      return result.value().take_error();
-    }
-    return zx::ok();
-  }
-
   void Serve(fidl::ServerEnd<fuchsia_rebind_test::RebindParent> server) {
-    ZX_ASSERT_MSG(!server_.has_value(), "Connection to rebind parent already established.");
-    auto node_client = fidl::WireSyncClient(std::move(node()));
-    server_.emplace(dispatcher(), device_server_, std::move(node_client), &logger());
     fidl::BindServer(dispatcher(), std::move(server), &server_.value());
   }
 
-  std::shared_ptr<compat::DeviceServer> device_server_;
-  driver_devfs::Connector<fuchsia_rebind_test::RebindParent> devfs_connector_;
   std::optional<RebindParentServer> server_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_rebind_test::RebindParent> devfs_connector_;
 };
 
 }  // namespace rebind_parent

@@ -30,7 +30,7 @@ async fn start_driver_test_realm() -> Result<RealmInstance> {
 }
 
 const PARENT_DEV_PATH: &str = "sys/test/rebind-parent";
-const CHILD_DEV_PATH: &str = "sys/test/rebind-parent/rebind-child";
+const CHILD_DEV_PATH: &str = "sys/test/rebind-parent/added-child/rebind-child";
 
 // Tests that a node will succesfully bind to a driver after the node has
 // already been bound to that driver, then shutdown, then re-added.

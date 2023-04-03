@@ -8,8 +8,4 @@
         binary: 'driver/rebind_child.so',
         bind: 'meta/bind/rebind_child.bindbc',
     },
-    use: [
-        { protocol: 'fuchsia.device.fs.Exporter' },
-        { service: 'fuchsia.driver.compat.Service' },
-    ],
 }
