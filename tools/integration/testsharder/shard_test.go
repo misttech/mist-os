@@ -196,32 +196,6 @@ func TestMakeShards(t *testing.T) {
 		assertEqual(t, expected, actual)
 	})
 
-	t.Run("envs with extra env name keys get different shards", func(t *testing.T) {
-		withEnvNameKeys := func(env build.Environment, keys []string) build.Environment {
-			env2 := env
-			env2.ExtraEnvNameKeys = keys
-			return env2
-		}
-
-		keys := []string{"extra"}
-		actual := MakeShards(
-			[]build.TestSpec{
-				spec(1, env1),
-				spec(2, withEnvNameKeys(env1, keys)),
-			},
-			nil,
-			basicOpts,
-		)
-		expected := []*Shard{
-			fuchsiaShard(env1, 1),
-			fuchsiaShard(withEnvNameKeys(env1, keys), 2),
-		}
-		assertEqual(t, expected, actual)
-		if actual[0].Name == actual[1].Name {
-			t.Errorf("both shards have the same name: %s", actual[0].Name)
-		}
-	})
-
 	t.Run("isolated tests are in separate shards", func(t *testing.T) {
 		isolate := func(test build.TestSpec) build.TestSpec {
 			test.Test.Isolated = true

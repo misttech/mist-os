@@ -96,9 +96,6 @@ type Environment struct {
 	// Netboot tells whether to "netboot" instead of paving before running the tests.
 	Netboot bool `json:"netboot,omitempty"`
 
-	// ExtraEnvNameKeys are keys to further distinguish a unique environment by.
-	ExtraEnvNameKeys []string `json:"extra_env_name_keys,omitempty"`
-
 	// ImageOverrides is a map of the images to override the default values in
 	// images.json used to boot a target. The key should be an ImageOverrideType
 	// and the value should be the name of the image to override with as defined

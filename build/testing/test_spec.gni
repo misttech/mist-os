@@ -69,10 +69,6 @@ _max_severity_allowed_val = [
 #         the Infrastructure team. Labels are used as an escape hatch from the
 #         default testing pipeline for special tests or environments.
 #
-#       extra_env_name_keys (optional)
-#         [list of strings] keys on which to further distinguish a unique
-#         environment by.
-#
 #       image_overrides (optional)
 #         [scope] Images to use instead of the defaults in images.json. This should
 #         only be used by boot_test() defined in //build/testing/zbi_test.gni

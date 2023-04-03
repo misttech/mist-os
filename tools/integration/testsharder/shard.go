@@ -255,9 +255,6 @@ func environmentName(env build.Environment) string {
 	if env.Netboot {
 		addToken("netboot")
 	}
-	for _, name := range env.ExtraEnvNameKeys {
-		addToken(name)
-	}
 	return strings.Join(tokens, "-")
 }
 
