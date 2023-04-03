@@ -11,7 +11,7 @@ use zerocopy::{AsBytes, FromBytes};
 
 use super::UserBuffer;
 use crate::mm::vmo::round_up_to_increment;
-use crate::types::Errno;
+use crate::types::{error, Errno};
 
 #[derive(Clone, Copy, Eq, PartialEq, Hash, Ord, PartialOrd, AsBytes, FromBytes)]
 #[repr(transparent)]
@@ -157,14 +157,6 @@ impl<T> UserRef<T> {
         Self { addr, phantom: PhantomData }
     }
 
-    /// Returns None if the buffer is too small for the type.
-    pub fn from_buf(buf: UserBuffer) -> Option<Self> {
-        if buf.length < mem::size_of::<T>() {
-            return None;
-        }
-        Some(Self::new(buf.address))
-    }
-
     pub fn addr(&self) -> UserAddress {
         self.addr
     }
@@ -185,6 +177,18 @@ impl<T> UserRef<T> {
 impl<T> From<UserAddress> for UserRef<T> {
     fn from(user_address: UserAddress) -> Self {
         Self::new(user_address)
+    }
+}
+
+impl<T> TryFrom<UserBuffer> for UserRef<T> {
+    type Error = Errno;
+
+    /// Returns EINVAL if the buffer is too small for the type.
+    fn try_from(buf: UserBuffer) -> Result<Self, Errno> {
+        if buf.length < mem::size_of::<T>() {
+            return error!(EINVAL);
+        }
+        Ok(Self::new(buf.address))
     }
 }
 

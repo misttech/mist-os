@@ -206,6 +206,9 @@ struct SocketState {
 
     /// The value for SO_SNDTIMEO.
     send_timeout: Option<zx::Duration>,
+
+    /// The socket's mark. Can get and set with SO_MARK.
+    mark: u32,
 }
 
 pub type SocketHandle = Arc<Socket>;
@@ -300,8 +303,7 @@ impl Socket {
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
         let read_timeval = || {
-            let timeval_ref =
-                UserRef::<timeval>::from_buf(user_opt).ok_or_else(|| errno!(EINVAL))?;
+            let timeval_ref = user_opt.try_into()?;
             let duration = duration_from_timeval(task.mm.read_object(timeval_ref)?)?;
             Ok(if duration == zx::Duration::default() { None } else { Some(duration) })
         };
@@ -310,6 +312,9 @@ impl Socket {
             SOL_SOCKET => match optname {
                 SO_RCVTIMEO => self.state.lock().receive_timeout = read_timeval()?,
                 SO_SNDTIMEO => self.state.lock().send_timeout = read_timeval()?,
+                SO_MARK => {
+                    self.state.lock().mark = task.mm.read_object(user_opt.try_into()?)?;
+                }
                 _ => self.ops.setsockopt(self, task, level, optname, user_opt)?,
             },
             _ => self.ops.setsockopt(self, task, level, optname, user_opt)?,
@@ -336,6 +341,7 @@ impl Socket {
                     let duration = self.send_timeout().unwrap_or_default();
                     timeval_from_duration(duration).as_bytes().to_owned()
                 }
+                SO_MARK => self.state.lock().mark.as_bytes().to_owned(),
                 _ => self.ops.getsockopt(self, level, optname, optlen)?,
             },
             _ => self.ops.getsockopt(self, level, optname, optlen)?,

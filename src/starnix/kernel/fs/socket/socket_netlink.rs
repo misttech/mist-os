@@ -273,45 +273,41 @@ impl NetlinkSocketInner {
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        fn read<T: Default + AsBytes + FromBytes>(
-            task: &Task,
-            user_opt: UserBuffer,
-        ) -> Result<T, Errno> {
-            let user_ref = UserRef::<T>::from_buf(user_opt).ok_or_else(|| errno!(EINVAL))?;
-            task.mm.read_object(user_ref)
-        }
-
         match level {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.set_capacity(requested_capacity * 2);
+                    let requested_capacity: socklen_t =
+                        task.mm.read_object(user_opt.try_into()?)?;
+                    self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.set_capacity(requested_capacity);
+                    let requested_capacity: socklen_t =
+                        task.mm.read_object(user_opt.try_into()?)?;
+                    self.set_capacity(requested_capacity as usize);
                 }
                 SO_PASSCRED => {
-                    let passcred = read::<u32>(task, user_opt)?;
+                    let passcred: u32 = task.mm.read_object(user_opt.try_into()?)?;
                     self.passcred = passcred != 0;
                 }
                 SO_TIMESTAMP => {
-                    let timestamp = read::<u32>(task, user_opt)?;
+                    let timestamp: u32 = task.mm.read_object(user_opt.try_into()?)?;
                     self.timestamp = timestamp != 0;
                 }
                 SO_SNDBUFFORCE => {
                     if !task.creds().has_capability(CAP_NET_ADMIN) {
                         return error!(EPERM);
                     }
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.set_capacity(requested_capacity * 2);
+                    let requested_capacity: socklen_t =
+                        task.mm.read_object(user_opt.try_into()?)?;
+                    self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUFFORCE => {
                     if !task.creds().has_capability(CAP_NET_ADMIN) {
                         return error!(EPERM);
                     }
-                    let requested_capacity = read::<socklen_t>(task, user_opt)? as usize;
-                    self.set_capacity(requested_capacity);
+                    let requested_capacity: socklen_t =
+                        task.mm.read_object(user_opt.try_into()?)?;
+                    self.set_capacity(requested_capacity as usize);
                 }
                 _ => return error!(ENOSYS),
             },
