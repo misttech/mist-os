@@ -705,8 +705,10 @@ block *
         'template.bazelrc',
         default_platform=f'fuchsia_{args.target_arch}',
         host_platform=host_tag_alt,
-        log_file=os.path.join(logs_dir, 'workspace-events.log'),
-        config_file=os.path.join(topdir, 'download_config_file'),
+        log_file=os.path.relpath(
+            os.path.join(logs_dir, 'workspace-events.log'), workspace_dir),
+        config_file=os.path.relpath(
+            os.path.join(topdir, 'download_config_file'), workspace_dir),
         remote_instance_name=build_config['rbe_instance_name'],
         rbe_project=build_config['rbe_project'],
     )
@@ -729,15 +731,15 @@ common --experimental_enable_bzlmod
     # Generate wrapper script in topdir/bazel that invokes Bazel with the right --output_base.
     bazel_launcher_content = expand_template_file(
         'template.bazel.sh',
-        ninja_output_dir=os.path.abspath(gn_output_dir),
-        ninja_prebuilt=os.path.abspath(ninja_binary),
-        bazel_bin_path=os.path.abspath(bazel_bin),
-        logs_dir=os.path.abspath(logs_dir),
-        python_prebuilt_dir=os.path.abspath(python_prebuilt_dir),
-        download_config_file='download_config_file',
+        ninja_output_dir=os.path.relpath(gn_output_dir, topdir),
+        ninja_prebuilt=os.path.relpath(ninja_binary, topdir),
         workspace=os.path.relpath(workspace_dir, topdir),
+        bazel_bin_path=os.path.relpath(bazel_bin, topdir),
+        logs_dir=os.path.relpath(logs_dir, topdir),
+        python_prebuilt_dir=os.path.relpath(python_prebuilt_dir, topdir),
         output_base=os.path.relpath(output_base_dir, topdir),
         output_user_root=os.path.relpath(output_user_root, topdir),
+        download_config_file='download_config_file',
     )
     generated.add_file('bazel', bazel_launcher_content, executable=True)
 

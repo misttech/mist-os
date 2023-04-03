@@ -10,17 +10,19 @@ readonly _DOWNLOAD_CONFIG_FILE=${{_SCRIPT_DIR}}/{download_config_file}
 readonly _WORKSPACE_DIR="${{_SCRIPT_DIR}}/{workspace}"
 readonly _OUTPUT_BASE="${{_SCRIPT_DIR}}/{output_base}"
 readonly _OUTPUT_USER_ROOT="${{_SCRIPT_DIR}}/{output_user_root}"
-readonly _LOG_DIR="{logs_dir}"
+readonly _LOG_DIR="${{_SCRIPT_DIR}}/{logs_dir}"
+readonly _BAZEL_BIN="${{_SCRIPT_DIR}}/{bazel_bin_path}"
+readonly _PYTHON_PREBUILT_DIR="${{_SCRIPT_DIR}}/{python_prebuilt_dir}"
 
 # Exported explicitly to be used by repository rules to reference the
 # Ninja output directory and binary.
-export BAZEL_FUCHSIA_NINJA_OUTPUT_DIR="{ninja_output_dir}"
-export BAZEL_FUCHSIA_NINJA_PREBUILT="{ninja_prebuilt}"
+export BAZEL_FUCHSIA_NINJA_OUTPUT_DIR="${{_SCRIPT_DIR}}/{ninja_output_dir}"
+export BAZEL_FUCHSIA_NINJA_PREBUILT="${{_SCRIPT_DIR}}/{ninja_prebuilt}"
 
 # Ensure our prebuilt Python3 executable is in the PATH to run repository
 # rules that invoke Python programs correctly in containers or jails that
 # do not expose the system-installed one.
-export PATH={python_prebuilt_dir}/bin:${{PATH}}
+export PATH="${{_PYTHON_PREBUILT_DIR}}/bin:${{PATH}}"
 
 # An undocumented, but widely used, environment variable that tells Bazel to
 # not auto-detect the host C++ installation. This makes workspace setup faster
@@ -86,7 +88,7 @@ done
 #  --output_base: Ensure the output base is in the Ninja output directory, not under $HOME.
 #  --output_user_root: Ensure the output user root is in the Ninja output directory, not under $HOME.
 _user="${{USER:-unused-bazel-build-user}}"
-cd "${{_WORKSPACE_DIR}}" && USER="$_user" {bazel_bin_path} \
+cd "${{_WORKSPACE_DIR}}" && USER="$_user" "${{_BAZEL_BIN}}"\
       --nohome_rc \
       --output_base="${{_OUTPUT_BASE}}" \
       --output_user_root="${{_OUTPUT_USER_ROOT}}" \
