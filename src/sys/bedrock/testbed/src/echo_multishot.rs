@@ -73,12 +73,8 @@ impl Start for EchoServer {
             info!("started EchoServer");
 
             let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-            let echo_cap = incoming
-                .entries
-                .lock()
-                .await
-                .remove(ECHO_CAP_NAME)
-                .context("no echo cap in incoming")?;
+            let echo_cap =
+                incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
 
             let echo_receiver = echo_cap
                 .downcast::<cap::multishot::Receiver>()
@@ -117,8 +113,8 @@ impl Start for EchoClient {
             info!("started EchoClient");
 
             let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-            let mut entries = incoming.entries.lock().await;
-            let echo_cap = entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
+            let echo_cap =
+                incoming.entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
 
             let echo_sender = echo_cap
                 .downcast_mut::<cap::multishot::Sender>()
@@ -154,12 +150,12 @@ impl Start for EchoClient {
 async fn test_echo_multishot() -> Result<(), Error> {
     let (echo_sender, echo_receiver) = cap::multishot();
 
-    let server_incoming = Box::new(cap::Dict::new());
-    server_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_receiver));
+    let mut server_incoming = Box::new(cap::Dict::new());
+    server_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_receiver));
     let server = EchoServer::new(server_incoming);
 
-    let client_incoming = Box::new(cap::Dict::new());
-    client_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_sender));
+    let mut client_incoming = Box::new(cap::Dict::new());
+    client_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_sender));
     let client = EchoClient::new(client_incoming);
 
     // Start the server in the background. Run the client to completion.

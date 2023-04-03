@@ -52,12 +52,8 @@ impl Start for EchoServer {
             info!("started EchoServer");
 
             let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-            let echo_cap = incoming
-                .entries
-                .lock()
-                .await
-                .remove(ECHO_CAP_NAME)
-                .context("no echo cap in incoming")?;
+            let echo_cap =
+                incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
             let echo_handle = echo_cap
                 .downcast::<cap::Handle>()
                 .map_err(|_| anyhow!("echo cap is not a Handle"))?;
@@ -113,12 +109,8 @@ impl Start for EchoClient {
         create_task(async move {
             info!("started EchoClient");
             let incoming = self.incoming.downcast_mut::<cap::Dict>().context("not a Dict")?;
-            let echo_cap = incoming
-                .entries
-                .lock()
-                .await
-                .remove(ECHO_CAP_NAME)
-                .context("no echo cap in incoming")?;
+            let echo_cap =
+                incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
             let echo_handle = echo_cap
                 .downcast::<cap::Handle>()
                 .map_err(|_| anyhow!("echo cap is not a Handle"))?;
@@ -151,12 +143,12 @@ async fn test_echo_oneshot_channel() -> Result<(), Error> {
     let echo_server_cap = cap::Handle::from(zx::Handle::from(echo_server_end));
     let echo_client_cap = cap::Handle::from(zx::Handle::from(echo_client_end));
 
-    let server_incoming = Box::new(cap::Dict::new());
-    server_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_server_cap));
+    let mut server_incoming = Box::new(cap::Dict::new());
+    server_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_server_cap));
     let server = EchoServer::new(server_incoming);
 
-    let client_incoming = Box::new(cap::Dict::new());
-    client_incoming.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_client_cap));
+    let mut client_incoming = Box::new(cap::Dict::new());
+    client_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_client_cap));
     let client = EchoClient::new(client_incoming);
 
     let _server_task = server.start().await?;

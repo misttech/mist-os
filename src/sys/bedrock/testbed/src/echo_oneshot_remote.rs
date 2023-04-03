@@ -53,8 +53,8 @@ async fn test_echo_oneshot_remote() -> Result<(), Error> {
 
     let echo_server_cap = cap::Handle::from(zx::Handle::from(echo_server_end));
 
-    let server_dict = Box::new(cap::Dict::new());
-    server_dict.entries.lock().await.insert(ECHO_CAP_NAME.into(), Box::new(echo_server_cap));
+    let mut server_dict = Box::new(cap::Dict::new());
+    server_dict.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_server_cap));
 
     // Convert the `Dict` to a Zircon handle that we can pass to the `echo_server_cap` process.
     let (server_dict_handle, server_dict_fut) = server_dict.to_zx_handle();
