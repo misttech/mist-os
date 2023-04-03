@@ -1403,10 +1403,10 @@ mod tests {
             DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
         FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
     {
-        let devices =
-            DeviceIpDeviceContext::<I, _>::with_devices(&mut Locked::new(sync_ctx), |devices| {
-                devices.collect::<Vec<_>>()
-            });
+        let devices = DeviceIpDeviceContext::<I, _>::with_devices_and_state(
+            &mut Locked::new(sync_ctx),
+            |devices, _ctx| devices.collect::<Vec<_>>(),
+        );
         for device in devices {
             let subnets = crate::ip::device::with_assigned_addr_subnets::<I, FakeNonSyncCtx, _, _, _>(
                 &mut Locked::new(sync_ctx),

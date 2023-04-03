@@ -371,10 +371,6 @@ where
     ) -> O;
 
     /// Calls the function with an [`Iterator`] of IDs for all initialized
-    /// devices.
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O;
-
-    /// Calls the function with an [`Iterator`] of IDs for all initialized
     /// devices and an accessor for device state.
     fn with_devices_and_state<
         O,

@@ -479,14 +479,6 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayer
         })
     }
 
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
-        let mut locked = self.cast_with(|s| &s.state.device);
-        let Devices { ethernet, loopback } =
-            &*locked.read_lock::<crate::lock_ordering::DeviceLayerState>();
-
-        cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() })
-    }
-
     fn with_devices_and_state<
         O,
         F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
@@ -699,13 +691,6 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayer
         })
     }
 
-    fn with_devices<O, F: FnOnce(Self::DevicesIter<'_>) -> O>(&mut self, cb: F) -> O {
-        let mut locked = self.cast_with(|s| &s.state.device);
-        let Devices { ethernet, loopback } =
-            &*locked.read_lock::<crate::lock_ordering::DeviceLayerState>();
-
-        cb(DevicesIter { ethernet: ethernet.iter(), loopback: loopback.iter() })
-    }
     fn with_devices_and_state<
         O,
         F: for<'a> FnOnce(Self::DevicesIter<'a>, Self::DeviceStateAccessor<'a>) -> O,
@@ -1965,10 +1950,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        testutil::{
-            FakeEventDispatcherConfig, FakeSyncCtx, TestIpExt as _, DEFAULT_INTERFACE_METRIC,
-            FAKE_CONFIG_V4, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
-        },
+        testutil::{TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
         Ctx,
     };
 
@@ -1981,52 +1963,6 @@ mod tests {
             assert_eq!(tracker, OriginTracker::new());
         }
         assert_eq!(tracker.clone(), tracker);
-    }
-
-    #[test]
-    fn test_iter_devices() {
-        let Ctx { sync_ctx, non_sync_ctx: _ } = crate::testutil::FakeCtx::default();
-        let mut sync_ctx = &sync_ctx;
-
-        fn check(sync_ctx: &FakeSyncCtx, expected: &[DeviceId<crate::testutil::FakeNonSyncCtx>]) {
-            let mut sync_ctx = Locked::new(sync_ctx);
-            assert_eq!(
-                IpDeviceContext::<Ipv4, _>::with_devices(&mut sync_ctx, |devices| devices
-                    .collect::<Vec<_>>()),
-                expected
-            );
-            assert_eq!(
-                IpDeviceContext::<Ipv6, _>::with_devices(&mut sync_ctx, |devices| devices
-                    .collect::<Vec<_>>()),
-                expected
-            );
-        }
-        check(sync_ctx, &[][..]);
-
-        let loopback_device: DeviceId<_> = crate::device::add_loopback_device(
-            &mut sync_ctx,
-            Mtu::new(55),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .expect("error adding loopback device")
-        .into();
-        check(sync_ctx, &[loopback_device.clone()][..]);
-
-        let FakeEventDispatcherConfig {
-            subnet: _,
-            local_ip: _,
-            local_mac,
-            remote_ip: _,
-            remote_mac: _,
-        } = FAKE_CONFIG_V4;
-        let ethernet_device = crate::device::add_ethernet_device(
-            &mut sync_ctx,
-            local_mac,
-            ethernet::MaxFrameSize::MIN,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
-        check(sync_ctx, &[ethernet_device, loopback_device][..]);
     }
 
     #[test]
