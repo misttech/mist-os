@@ -9,11 +9,13 @@ pub mod serve;
 #[cfg(test)]
 pub mod test_utils;
 
-use fidl_fuchsia_wlan_common as fidl_common;
-use fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent};
-use futures::channel::mpsc;
-use thiserror::Error;
-use wlan_common::{sink::UnboundedSink, timer::TimedEvent};
+use {
+    fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_mlme::{self as fidl_mlme, MlmeEvent},
+    futures::channel::mpsc,
+    thiserror::Error,
+    wlan_common::{sink::UnboundedSink, timer::TimedEvent},
+};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq, Ord, PartialOrd)]
 pub struct Config {
@@ -54,6 +56,11 @@ pub enum MlmeRequest {
     MeshPeeringEstablished(fidl_mlme::MeshPeeringParams),
     GetIfaceCounterStats(responder::Responder<fidl_mlme::GetIfaceCounterStatsResponse>),
     GetIfaceHistogramStats(responder::Responder<fidl_mlme::GetIfaceHistogramStatsResponse>),
+    ListMinstrelPeers(responder::Responder<fidl_mlme::MinstrelListResponse>),
+    GetMinstrelStats(
+        fidl_mlme::MinstrelStatsRequest,
+        responder::Responder<fidl_mlme::MinstrelStatsResponse>,
+    ),
     SaeHandshakeResp(fidl_mlme::SaeHandshakeResponse),
     SaeFrameTx(fidl_mlme::SaeFrame),
     WmmStatusReq,
@@ -63,6 +70,43 @@ pub enum MlmeRequest {
     QueryMacSublayerSupport(responder::Responder<fidl_common::MacSublayerSupport>),
     QuerySecuritySupport(responder::Responder<fidl_common::SecuritySupport>),
     QuerySpectrumManagementSupport(responder::Responder<fidl_common::SpectrumManagementSupport>),
+}
+
+impl MlmeRequest {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::Scan(_) => "Scan",
+            Self::AuthResponse(_) => "AuthResponse",
+            Self::AssocResponse(_) => "AssocResponse",
+            Self::Connect(_) => "Connect",
+            Self::Reconnect(_) => "Reconnect",
+            Self::Deauthenticate(_) => "Deauthenticate",
+            Self::Disassociate(_) => "Disassociate",
+            Self::Eapol(_) => "Eapol",
+            Self::SetKeys(_) => "SetKeys",
+            Self::DeleteKeys(_) => "DeleteKeys",
+            Self::SetCtrlPort(_) => "SetCtrlPort",
+            Self::Reset(_) => "Reset",
+            Self::Start(_) => "Start",
+            Self::Stop(_) => "Stop",
+            Self::SendMpOpenAction(_) => "SendMpOpenAction",
+            Self::SendMpConfirmAction(_) => "SendMpConfirmAction",
+            Self::MeshPeeringEstablished(_) => "MeshPeeringEstablished",
+            Self::GetIfaceCounterStats(_) => "GetIfaceCounterStats",
+            Self::GetIfaceHistogramStats(_) => "GetIfaceHistogramStats",
+            Self::ListMinstrelPeers(_) => "ListMinstrelPeers",
+            Self::GetMinstrelStats(_, _) => "GetMinstrelStats",
+            Self::SaeHandshakeResp(_) => "SaeHandshakeResp",
+            Self::SaeFrameTx(_) => "SaeFrameTx",
+            Self::WmmStatusReq => "WmmStatusReq",
+            Self::FinalizeAssociation(_) => "FinalizeAssociation",
+            Self::QueryDeviceInfo(_) => "QueryDeviceInfo",
+            Self::QueryDiscoverySupport(_) => "QueryDiscoverySupport",
+            Self::QueryMacSublayerSupport(_) => "QueryMacSublayerSupport",
+            Self::QuerySecuritySupport(_) => "QuerySecuritySupport",
+            Self::QuerySpectrumManagementSupport(_) => "QuerySpectrumManagementSupport",
+        }
+    }
 }
 
 pub trait Station {

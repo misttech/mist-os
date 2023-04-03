@@ -90,6 +90,8 @@ exclude = [
 "WlanTxStatus" = "wlan_tx_status_t"
 "WlanWmmParams" = "wlan_wmm_params_t"
 
+# fuchsia-zircon types
+"Vmo" = "zx_handle_t"
 
 # This struct is used for void* context fields in protocol ops.
 "DriverEventSink" = "void"

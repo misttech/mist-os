@@ -32,8 +32,7 @@ group("_packages_common") {
 group("packages") {
   deps = [
     ":_packages_common",
-    "wlandevicemonitor:wlandevicemonitor-legacy-wlanstack",
-    "wlanstack:wlanstack",
+    "wlandevicemonitor:wlandevicemonitor",
   ]
 }
 

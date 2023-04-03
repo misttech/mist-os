@@ -24,8 +24,9 @@ use {
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_internal as banjo_internal,
     banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     channel_switch::ChannelState,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_minstrel as fidl_minstrel,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_minstrel as fidl_minstrel, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddr, Ssid},
     log::{error, warn},
     scanner::Scanner,
@@ -47,6 +48,7 @@ use {
         wmm,
     },
     wlan_frame_writer::{write_frame, write_frame_with_dynamic_buf, write_frame_with_fixed_buf},
+    wlan_sme,
     zerocopy::ByteSlice,
 };
 
@@ -124,8 +126,8 @@ impl crate::MlmeImpl for ClientMlme {
     ) -> Self {
         Self::new(config, device, buf_provider, timer)
     }
-    fn handle_mlme_message(&mut self, msg: fidl_mlme::MlmeRequest) -> Result<(), anyhow::Error> {
-        Self::handle_mlme_msg(self, msg).map_err(|e| e.into())
+    fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), anyhow::Error> {
+        Self::handle_mlme_req(self, req).map_err(|e| e.into())
     }
     fn handle_mac_frame_rx(
         &mut self,
@@ -235,53 +237,47 @@ impl ClientMlme {
         }
     }
 
-    pub fn handle_mlme_msg(&mut self, msg: fidl_mlme::MlmeRequest) -> Result<(), Error> {
-        use fidl_mlme::MlmeRequest as MlmeMsg;
+    pub fn handle_mlme_req(&mut self, req: wlan_sme::MlmeRequest) -> Result<(), Error> {
+        use wlan_sme::MlmeRequest as Req;
 
-        match msg {
+        match req {
             // Handle non station specific MLME messages first (Join, Scan, etc.)
-            MlmeMsg::StartScan { req, .. } => Ok(self.on_sme_scan(req)),
-            MlmeMsg::ConnectReq { req, .. } => self.on_sme_connect(req),
-            MlmeMsg::GetIfaceCounterStats { responder } => {
-                self.on_sme_get_iface_counter_stats(responder)
-            }
-            MlmeMsg::GetIfaceHistogramStats { responder } => {
+            Req::Scan(req) => Ok(self.on_sme_scan(req)),
+            Req::Connect(req) => self.on_sme_connect(req),
+            Req::GetIfaceCounterStats(responder) => self.on_sme_get_iface_counter_stats(responder),
+            Req::GetIfaceHistogramStats(responder) => {
                 self.on_sme_get_iface_histogram_stats(responder)
             }
-            MlmeMsg::QueryDeviceInfo { responder } => self.on_sme_query_device_info(responder),
-            MlmeMsg::QueryDiscoverySupport { responder } => {
-                self.on_sme_query_discovery_support(responder)
-            }
-            MlmeMsg::QueryMacSublayerSupport { responder } => {
+            Req::QueryDeviceInfo(responder) => self.on_sme_query_device_info(responder),
+            Req::QueryDiscoverySupport(responder) => self.on_sme_query_discovery_support(responder),
+            Req::QueryMacSublayerSupport(responder) => {
                 self.on_sme_query_mac_sublayer_support(responder)
             }
-            MlmeMsg::QuerySecuritySupport { responder } => {
-                self.on_sme_query_security_support(responder)
-            }
-            MlmeMsg::QuerySpectrumManagementSupport { responder } => {
+            Req::QuerySecuritySupport(responder) => self.on_sme_query_security_support(responder),
+            Req::QuerySpectrumManagementSupport(responder) => {
                 self.on_sme_query_spectrum_management_support(responder)
             }
-            MlmeMsg::ListMinstrelPeers { responder } => self.on_sme_list_minstrel_peers(responder),
-            MlmeMsg::GetMinstrelStats { responder, req } => {
+            Req::ListMinstrelPeers(responder) => self.on_sme_list_minstrel_peers(responder),
+            Req::GetMinstrelStats(req, responder) => {
                 self.on_sme_get_minstrel_stats(responder, &req.peer_addr)
             }
             other_message => match &mut self.sta {
                 None => {
-                    if let MlmeMsg::ReconnectReq { req, .. } = other_message {
-                        self.ctx.device.mlme_control_handle().send_connect_conf(
-                            &mut fidl_mlme::ConnectConfirm {
+                    if let Req::Reconnect(req) = other_message {
+                        self.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::ConnectConf {
+                            resp: fidl_mlme::ConnectConfirm {
                                 peer_sta_address: req.peer_sta_address,
                                 result_code: fidl_ieee80211::StatusCode::DeniedNoAssociationExists,
                                 association_id: 0,
                                 association_ies: vec![],
                             },
-                        )?;
+                        })?;
                     }
                     Err(Error::Status(format!("No client sta."), zx::Status::BAD_STATE))
                 }
                 Some(sta) => Ok(sta
                     .bind(&mut self.ctx, &mut self.scanner, &mut self.channel_state)
-                    .handle_mlme_msg(other_message)),
+                    .handle_mlme_req(other_message)),
             },
         }
     }
@@ -294,14 +290,12 @@ impl ClientMlme {
                 Error::ScanError(scan_error) => scan_error.into(),
                 _ => fidl_mlme::ScanResultCode::InternalError,
             };
-            let _ = self
-                .ctx
+            self.ctx
                 .device
-                .mlme_control_handle()
-                .send_on_scan_end(&mut fidl_mlme::ScanEnd { txn_id, code })
-                .map_err(|e| {
-                    error!("error sending MLME ScanEnd: {}", e);
-                });
+                .send_mlme_event(fidl_mlme::MlmeEvent::OnScanEnd {
+                    end: fidl_mlme::ScanEnd { txn_id, code },
+                })
+                .unwrap_or_else(|e| error!("error sending MLME ScanEnd: {}", e));
         });
     }
 
@@ -352,14 +346,14 @@ impl ClientMlme {
                 error!("Error setting up device for join: {}", e);
                 // TODO(fxbug.dev/44317): Only one failure code defined in IEEE 802.11-2016 6.3.4.3
                 // Can we do better?
-                self.ctx.device.mlme_control_handle().send_connect_conf(
-                    &mut fidl_mlme::ConnectConfirm {
+                self.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::ConnectConf {
+                    resp: fidl_mlme::ConnectConfirm {
                         peer_sta_address: bssid,
                         result_code: fidl_ieee80211::StatusCode::JoinFailure,
                         association_id: 0,
                         association_ies: vec![],
                     },
-                )?;
+                })?;
                 Err(e)
             }
         }
@@ -402,92 +396,100 @@ impl ClientMlme {
 
     fn on_sme_get_iface_counter_stats(
         &self,
-        responder: fidl_mlme::MlmeGetIfaceCounterStatsResponder,
+        responder: wlan_sme::responder::Responder<fidl_mlme::GetIfaceCounterStatsResponse>,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/43456): Implement stats
-        let mut resp =
+        let resp =
             fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED);
-        responder.send(&mut resp).map_err(|e| e.into())
+        responder.respond(resp);
+        Ok(())
     }
 
     fn on_sme_get_iface_histogram_stats(
         &self,
-        responder: fidl_mlme::MlmeGetIfaceHistogramStatsResponder,
+        responder: wlan_sme::responder::Responder<fidl_mlme::GetIfaceHistogramStatsResponse>,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/43456): Implement stats
-        let mut resp =
+        let resp =
             fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED);
-        responder.send(&mut resp).map_err(|e| e.into())
+        responder.respond(resp);
+        Ok(())
     }
 
     fn on_sme_query_device_info(
         &self,
-        responder: fidl_mlme::MlmeQueryDeviceInfoResponder,
+        responder: wlan_sme::responder::Responder<fidl_mlme::DeviceInfo>,
     ) -> Result<(), Error> {
         let wlan_softmac_query_response = self.ctx.device.wlan_softmac_query_response();
-        let mut info = crate::ddk_converter::device_info_from_wlan_softmac_query_response(
+        let info = crate::ddk_converter::device_info_from_wlan_softmac_query_response(
             wlan_softmac_query_response,
         )?;
-        responder.send(&mut info).map_err(|e| e.into())
+        responder.respond(info);
+        Ok(())
     }
 
     fn on_sme_query_discovery_support(
         &self,
-        responder: fidl_mlme::MlmeQueryDiscoverySupportResponder,
+        responder: wlan_sme::responder::Responder<fidl_common::DiscoverySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.discovery_support();
-        let mut support = crate::ddk_converter::convert_ddk_discovery_support(ddk_support)?;
-        responder.send(&mut support).map_err(|e| e.into())
+        let support = crate::ddk_converter::convert_ddk_discovery_support(ddk_support)?;
+        responder.respond(support);
+        Ok(())
     }
 
     fn on_sme_query_mac_sublayer_support(
         &self,
-        responder: fidl_mlme::MlmeQueryMacSublayerSupportResponder,
+        responder: wlan_sme::responder::Responder<fidl_common::MacSublayerSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.mac_sublayer_support();
-        let mut support = crate::ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
-        responder.send(&mut support).map_err(|e| e.into())
+        let support = crate::ddk_converter::convert_ddk_mac_sublayer_support(ddk_support)?;
+        responder.respond(support);
+        Ok(())
     }
 
     fn on_sme_query_security_support(
         &self,
-        responder: fidl_mlme::MlmeQuerySecuritySupportResponder,
+        responder: wlan_sme::responder::Responder<fidl_common::SecuritySupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.security_support();
-        let mut support = crate::ddk_converter::convert_ddk_security_support(ddk_support)?;
-        responder.send(&mut support).map_err(|e| e.into())
+        let support = crate::ddk_converter::convert_ddk_security_support(ddk_support)?;
+        responder.respond(support);
+        Ok(())
     }
 
     fn on_sme_query_spectrum_management_support(
         &self,
-        responder: fidl_mlme::MlmeQuerySpectrumManagementSupportResponder,
+        responder: wlan_sme::responder::Responder<fidl_common::SpectrumManagementSupport>,
     ) -> Result<(), Error> {
         let ddk_support = self.ctx.device.spectrum_management_support();
-        let mut support =
-            crate::ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
-        responder.send(&mut support).map_err(|e| e.into())
+        let support = crate::ddk_converter::convert_ddk_spectrum_management_support(ddk_support)?;
+        responder.respond(support);
+        Ok(())
     }
 
     fn on_sme_list_minstrel_peers(
         &self,
-        responder: fidl_mlme::MlmeListMinstrelPeersResponder,
+        responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelListResponse>,
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
         error!("ListMinstrelPeers is not supported.");
         let peers = fidl_minstrel::Peers { addrs: vec![] };
-        let mut resp = fidl_mlme::MinstrelListResponse { peers };
-        responder.send(&mut resp).map_err(|e| e.into())
+        let resp = fidl_mlme::MinstrelListResponse { peers };
+        responder.respond(resp);
+        Ok(())
     }
 
     fn on_sme_get_minstrel_stats(
         &self,
-        responder: fidl_mlme::MlmeGetMinstrelStatsResponder,
+        responder: wlan_sme::responder::Responder<fidl_mlme::MinstrelStatsResponse>,
         _addr: &[u8; 6],
     ) -> Result<(), Error> {
         // TODO(fxbug.dev/79543): Implement once Minstrel is in Rust.
         error!("GetMinstrelStats is not supported.");
-        let mut resp = fidl_mlme::MinstrelStatsResponse { peer: None };
-        responder.send(&mut resp).map_err(|e| e.into())
+        let resp = fidl_mlme::MinstrelStatsResponse { peer: None };
+        responder.respond(resp);
+        Ok(())
     }
 
     pub fn on_eth_frame_tx<B: ByteSlice>(&mut self, bytes: B) -> Result<(), Error> {
@@ -928,11 +930,8 @@ impl<'a> BoundClient<'a> {
         }
         self.ctx
             .device
-            .mlme_control_handle()
-            .send_eapol_ind(&mut fidl_mlme::EapolIndication {
-                src_addr,
-                dst_addr,
-                data: eapol_frame.to_vec(),
+            .send_mlme_event(fidl_mlme::MlmeEvent::EapolInd {
+                ind: fidl_mlme::EapolIndication { src_addr, dst_addr, data: eapol_frame.to_vec() },
             })
             .map_err(|e| e.into())
     }
@@ -965,14 +964,12 @@ impl<'a> BoundClient<'a> {
         };
 
         // Report transmission result to SME.
-        let result = self
-            .ctx
+        self.ctx
             .device
-            .mlme_control_handle()
-            .send_eapol_conf(&mut fidl_mlme::EapolConfirm { result_code, dst_addr: dst });
-        if let Err(e) = result {
-            error!("error sending MLME-EAPOL.confirm message: {}", e);
-        }
+            .send_mlme_event(fidl_mlme::MlmeEvent::EapolConf {
+                resp: fidl_mlme::EapolConfirm { result_code, dst_addr: dst },
+            })
+            .unwrap_or_else(|e| error!("error sending MLME-EAPOL.confirm message: {}", e));
     }
 
     pub fn send_ps_poll_frame(&mut self, aid: Aid) -> Result<(), Error> {
@@ -1026,9 +1023,9 @@ impl<'a> BoundClient<'a> {
         self.sta.state.replace(next_state);
     }
 
-    pub fn handle_mlme_msg(&mut self, msg: fidl_mlme::MlmeRequest) {
+    pub fn handle_mlme_req(&mut self, msg: wlan_sme::MlmeRequest) {
         // Safe: |state| is never None and always replaced with Some(..).
-        let next_state = self.sta.state.take().unwrap().handle_mlme_msg(self, msg);
+        let next_state = self.sta.state.take().unwrap().handle_mlme_req(self, msg);
         self.sta.state.replace(next_state);
     }
 
@@ -1045,30 +1042,30 @@ impl<'a> BoundClient<'a> {
         bssid: [u8; 6],
         result_code: fidl_ieee80211::StatusCode,
     ) {
-        let mut connect_conf = fidl_mlme::ConnectConfirm {
+        let connect_conf = fidl_mlme::ConnectConfirm {
             peer_sta_address: bssid,
             result_code,
             association_id: 0,
             association_ies: vec![],
         };
-        let result = self.ctx.device.mlme_control_handle().send_connect_conf(&mut connect_conf);
-        if let Err(e) = result {
-            error!("error sending MLME-CONNECT.confirm: {}", e);
-        }
+        self.ctx
+            .device
+            .send_mlme_event(fidl_mlme::MlmeEvent::ConnectConf { resp: connect_conf })
+            .unwrap_or_else(|e| error!("error sending MLME-CONNECT.confirm: {}", e));
     }
 
     fn send_connect_conf_success(&mut self, association_id: u16, association_ies: &[u8]) {
         self.sta.connect_timeout.take();
-        let mut connect_conf = fidl_mlme::ConnectConfirm {
+        let connect_conf = fidl_mlme::ConnectConfirm {
             peer_sta_address: self.sta.connect_req.selected_bss.bssid.0,
             result_code: fidl_ieee80211::StatusCode::Success,
             association_id,
             association_ies: association_ies.to_vec(),
         };
-        let result = self.ctx.device.mlme_control_handle().send_connect_conf(&mut connect_conf);
-        if let Err(e) = result {
-            error!("error sending MLME-CONNECT.confirm: {}", e);
-        }
+        self.ctx
+            .device
+            .send_mlme_event(fidl_mlme::MlmeEvent::ConnectConf { resp: connect_conf })
+            .unwrap_or_else(|e| error!("error sending MLME-CONNECT.confirm: {}", e));
     }
 
     /// Sends an MLME-DEAUTHENTICATE.indication message to the joined BSS.
@@ -1080,16 +1077,16 @@ impl<'a> BoundClient<'a> {
         // Clear main_channel since there is no "main channel" after deauthenticating
         self.channel_state.bind(&mut self.ctx, &mut self.scanner).clear_main_channel();
 
-        let result = self.ctx.device.mlme_control_handle().send_deauthenticate_ind(
-            &mut fidl_mlme::DeauthenticateIndication {
-                peer_sta_address: self.sta.bssid().0,
-                reason_code,
-                locally_initiated: locally_initiated.0,
-            },
-        );
-        if let Err(e) = result {
-            error!("error sending MLME-DEAUTHENTICATE.indication: {}", e);
-        }
+        self.ctx
+            .device
+            .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateInd {
+                ind: fidl_mlme::DeauthenticateIndication {
+                    peer_sta_address: self.sta.bssid().0,
+                    reason_code,
+                    locally_initiated: locally_initiated.0,
+                },
+            })
+            .unwrap_or_else(|e| error!("error sending MLME-DEAUTHENTICATE.indication: {}", e));
     }
 
     /// Sends an MLME-DISASSOCIATE.indication message to the joined BSS.
@@ -1098,16 +1095,16 @@ impl<'a> BoundClient<'a> {
         reason_code: fidl_ieee80211::ReasonCode,
         locally_initiated: LocallyInitiated,
     ) {
-        let result = self.ctx.device.mlme_control_handle().send_disassociate_ind(
-            &mut fidl_mlme::DisassociateIndication {
-                peer_sta_address: self.sta.bssid().0,
-                reason_code: reason_code,
-                locally_initiated: locally_initiated.0,
-            },
-        );
-        if let Err(e) = result {
-            error!("error sending MLME-DEAUTHENTICATE.indication: {}", e);
-        }
+        self.ctx
+            .device
+            .send_mlme_event(fidl_mlme::MlmeEvent::DisassociateInd {
+                ind: fidl_mlme::DisassociateIndication {
+                    peer_sta_address: self.sta.bssid().0,
+                    reason_code: reason_code,
+                    locally_initiated: locally_initiated.0,
+                },
+            })
+            .unwrap_or_else(|e| error!("error sending MLME-DISASSOCIATE.indication: {}", e));
     }
 
     /// Sends an sae frame rx message to the SME.
@@ -1117,25 +1114,26 @@ impl<'a> BoundClient<'a> {
         status_code: fidl_ieee80211::StatusCode,
         sae_fields: Vec<u8>,
     ) {
-        let result =
-            self.ctx.device.mlme_control_handle().send_on_sae_frame_rx(&mut fidl_mlme::SaeFrame {
-                peer_sta_address: self.sta.bssid().0,
-                seq_num,
-                status_code,
-                sae_fields,
-            });
-        if let Err(e) = result {
-            error!("error sending OnSaeFrameRx: {}", e);
-        }
+        self.ctx
+            .device
+            .send_mlme_event(fidl_mlme::MlmeEvent::OnSaeFrameRx {
+                frame: fidl_mlme::SaeFrame {
+                    peer_sta_address: self.sta.bssid().0,
+                    seq_num,
+                    status_code,
+                    sae_fields,
+                },
+            })
+            .unwrap_or_else(|e| error!("error sending OnSaeFrameRx: {}", e));
     }
 
     fn forward_sae_handshake_ind(&mut self) {
-        let result = self.ctx.device.mlme_control_handle().send_on_sae_handshake_ind(
-            &mut fidl_mlme::SaeHandshakeIndication { peer_sta_address: self.sta.bssid().0 },
-        );
-        if let Err(e) = result {
-            error!("error sending OnSaeHandshakeInd: {}", e);
-        }
+        self.ctx
+            .device
+            .send_mlme_event(fidl_mlme::MlmeEvent::OnSaeHandshakeInd {
+                ind: fidl_mlme::SaeHandshakeIndication { peer_sta_address: self.sta.bssid().0 },
+            })
+            .unwrap_or_else(|e| error!("error sending OnSaeHandshakeInd: {}", e));
     }
 
     fn send_mgmt_or_ctrl_frame(&mut self, out_buf: OutBuf) -> Result<(), zx::Status> {
@@ -1268,13 +1266,11 @@ mod tests {
             buffer::FakeBufferProvider,
             client::{lost_bss::LostBssCounter, test_utils::drain_timeouts},
             device::{FakeDevice, LinkStatus},
-            test_utils::{fake_control_handle, fake_wlan_channel, MockWlanRxInfo},
-            MlmeImpl,
+            test_utils::{fake_wlan_channel, MockWlanRxInfo},
         },
-        fidl::endpoints::create_proxy_and_stream,
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_internal as fidl_internal,
         fuchsia_async as fasync,
-        futures::{task::Poll, StreamExt},
+        futures::task::Poll,
         std::convert::TryFrom,
         wlan_common::{
             assert_variant,
@@ -1285,6 +1281,7 @@ mod tests {
             test_utils::{fake_capabilities::fake_client_capabilities, fake_frames::*},
             timer::{create_timer, TimeStream},
         },
+        wlan_sme::responder::Responder,
         wlan_statemachine::*,
     };
     const BSSID: Bssid = Bssid([6u8; 6]);
@@ -1429,15 +1426,13 @@ mod tests {
             self.sta.state.replace(state);
         }
 
-        fn close_controlled_port(&mut self, exec: &fasync::TestExecutor) {
-            let (control_handle, _) = fake_control_handle(exec);
-            self.handle_mlme_msg(fidl_mlme::MlmeRequest::SetControlledPort {
-                req: fidl_mlme::SetControlledPortRequest {
+        fn close_controlled_port(&mut self) {
+            self.handle_mlme_req(wlan_sme::MlmeRequest::SetCtrlPort(
+                fidl_mlme::SetControlledPortRequest {
                     peer_sta_address: BSSID.0,
                     state: fidl_mlme::ControlledPortState::Closed,
                 },
-                control_handle,
-            });
+            ));
         }
     }
 
@@ -2060,7 +2055,7 @@ mod tests {
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
-        client.close_controlled_port(&exec);
+        client.close_controlled_port();
 
         client.on_mac_frame(&data_frame[..], mock_rx_info(&client));
 
@@ -2081,7 +2076,7 @@ mod tests {
         me.make_client_station_protected();
         let mut client = me.get_bound_client().expect("client should be present");
         client.move_to_associated_state();
-        client.close_controlled_port(&exec);
+        client.close_controlled_port();
 
         client.on_mac_frame(&eapol_frame[..], mock_rx_info(&client));
 
@@ -2242,7 +2237,7 @@ mod tests {
         client.move_to_associated_state();
 
         assert!(m.fake_device.keys.is_empty());
-        client.handle_mlme_msg(crate::test_utils::fake_mlme_set_keys_req(&exec, BSSID.0));
+        client.handle_mlme_req(crate::test_utils::fake_set_keys_req(BSSID.0));
         assert_eq!(m.fake_device.keys.len(), 1);
 
         let sent_key = crate::test_utils::fake_key(BSSID.0);
@@ -2521,20 +2516,15 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut query_fut = mlme_proxy.query_device_info();
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::QueryDeviceInfo { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let info = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDeviceInfo(responder)),
+            Ok(())
+        );
+        let info = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         let expected =
             crate::ddk_converter::device_info_from_wlan_softmac_query_response(m.fake_device.info)
-                .expect("Failed to convert DDK WlanSoftmacQueryResponse");
+                .expect("Failed to convert DDK WlanSoftmacInfo");
         assert_eq!(info, expected);
     }
 
@@ -2544,17 +2534,12 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut query_fut = mlme_proxy.query_discovery_support();
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::QueryDiscoverySupport { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let resp = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::QueryDiscoverySupport(responder)),
+            Ok(())
+        );
+        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.scan_offload.supported, true);
         assert_eq!(resp.probe_response_offload.supported, false);
     }
@@ -2565,17 +2550,12 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut query_fut = mlme_proxy.query_mac_sublayer_support();
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::QueryMacSublayerSupport { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let resp = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::QueryMacSublayerSupport(responder)),
+            Ok(())
+        );
+        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.rate_selection_offload.supported, false);
         assert_eq!(resp.data_plane.data_plane_type, fidl_common::DataPlaneType::EthernetDevice);
         assert_eq!(resp.device.is_synthetic, true);
@@ -2592,17 +2572,12 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut query_fut = mlme_proxy.query_security_support();
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::QuerySecuritySupport { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let resp = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySecuritySupport(responder)),
+            Ok(())
+        );
+        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.mfp.supported, false);
         assert_eq!(resp.sae.driver_handler_supported, false);
         assert_eq!(resp.sae.sme_handler_supported, false);
@@ -2614,17 +2589,12 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut query_fut = mlme_proxy.query_spectrum_management_support();
-        assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::QuerySpectrumManagementSupport { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let resp = assert_variant!(exec.run_until_stalled(&mut query_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::QuerySpectrumManagementSupport(responder)),
+            Ok(())
+        );
+        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         assert_eq!(resp.dfs.supported, true);
     }
 
@@ -2633,7 +2603,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
-        let (control_handle, _) = fake_control_handle(&exec);
         let channel = Channel::new(6, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open,
@@ -2647,10 +2616,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         };
-        let result = me.handle_mlme_msg(fidl_mlme::MlmeRequest::ConnectReq {
-            req: connect_req,
-            control_handle,
-        });
+        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
         assert_variant!(result, Ok(()));
 
         // Verify an event was queued up in the timer.
@@ -2789,7 +2755,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
-        let (control_handle, _) = fake_control_handle(&exec);
         let channel = Channel::new(6, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Wpa2,
@@ -2809,10 +2774,7 @@ mod tests {
                 1, 0, 0x00, 0x0F, 0xAC, 2, // 1 AKM: PSK
             ],
         };
-        let result = me.handle_mlme_msg(fidl_mlme::MlmeRequest::ConnectReq {
-            req: connect_req,
-            control_handle,
-        });
+        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
         assert_variant!(result, Ok(()));
 
         // Verify an event was queued up in the timer.
@@ -2961,14 +2923,12 @@ mod tests {
         assert_eq!(m.fake_device.link_status, LinkStatus::DOWN);
 
         // Send a request to open controlled port
-        let (control_handle, _) = fake_control_handle(&exec);
-        me.handle_mlme_message(fidl_mlme::MlmeRequest::SetControlledPort {
-            req: fidl_mlme::SetControlledPortRequest {
+        me.handle_mlme_req(wlan_sme::MlmeRequest::SetCtrlPort(
+            fidl_mlme::SetControlledPortRequest {
                 peer_sta_address: BSSID.0,
                 state: fidl_mlme::ControlledPortState::Open,
             },
-            control_handle,
-        })
+        ))
         .expect("expect sending msg to succeed");
 
         // Verify that link is now up
@@ -2980,7 +2940,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
-        let (control_handle, _) = fake_control_handle(&exec);
         let channel = Channel::new(36, Cbw::Cbw40);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open,
@@ -2994,10 +2953,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         };
-        let result = me.handle_mlme_msg(fidl_mlme::MlmeRequest::ConnectReq {
-            req: connect_req,
-            control_handle,
-        });
+        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
         assert_variant!(result, Ok(()));
 
         // Verify an event was queued up in the timer.
@@ -3064,7 +3020,6 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
-        let (control_handle, _) = fake_control_handle(&exec);
         let connect_req = fidl_mlme::ConnectRequest {
             selected_bss: fake_fidl_bss_description!(Open, bssid: BSSID.0),
             connect_failure_timeout: 100,
@@ -3073,10 +3028,7 @@ mod tests {
             wep_key: None,
             security_ie: vec![],
         };
-        let result = me.handle_mlme_msg(fidl_mlme::MlmeRequest::ConnectReq {
-            req: connect_req,
-            control_handle,
-        });
+        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Connect(connect_req));
         assert_variant!(result, Ok(()));
 
         // Verify an event was queued up in the timer.
@@ -3110,13 +3062,9 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
-        let (control_handle, _) = fake_control_handle(&exec);
 
         let reconnect_req = fidl_mlme::ReconnectRequest { peer_sta_address: [1, 2, 3, 4, 5, 6] };
-        let result = me.handle_mlme_msg(fidl_mlme::MlmeRequest::ReconnectReq {
-            req: reconnect_req,
-            control_handle,
-        });
+        let result = me.handle_mlme_req(wlan_sme::MlmeRequest::Reconnect(reconnect_req));
         assert_variant!(result, Err(Error::Status(_, zx::Status::BAD_STATE)));
 
         // Verify a connect confirm message was sent
@@ -3138,17 +3086,12 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut stats_fut = mlme_proxy.get_iface_counter_stats();
-        assert_variant!(exec.run_until_stalled(&mut stats_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::GetIfaceCounterStats { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let resp = assert_variant!(exec.run_until_stalled(&mut stats_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceCounterStats(responder)),
+            Ok(())
+        );
+        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         assert_eq!(
             resp,
             fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)
@@ -3161,17 +3104,12 @@ mod tests {
         let mut m = MockObjects::new(&exec);
         let mut me = m.make_mlme();
 
-        let (mlme_proxy, mut mlme_req_stream) = create_proxy_and_stream::<fidl_mlme::MlmeMarker>()
-            .expect("failed to create Mlme proxy");
-        let mut stats_fut = mlme_proxy.get_iface_histogram_stats();
-        assert_variant!(exec.run_until_stalled(&mut stats_fut), Poll::Pending);
-        let mlme_req = assert_variant!(exec.run_until_stalled(&mut mlme_req_stream.next()), Poll::Ready(Some(Ok(req))) => match req {
-            fidl_mlme::MlmeRequest::GetIfaceHistogramStats { .. } => req,
-            other => panic!("unexpected MlmeRequest: {:?}", other),
-        });
-
-        assert_variant!(me.handle_mlme_msg(mlme_req), Ok(()));
-        let resp = assert_variant!(exec.run_until_stalled(&mut stats_fut), Poll::Ready(Ok(r)) => r);
+        let (responder, mut receiver) = Responder::new();
+        assert_variant!(
+            me.handle_mlme_req(wlan_sme::MlmeRequest::GetIfaceHistogramStats(responder)),
+            Ok(())
+        );
+        let resp = assert_variant!(exec.run_until_stalled(&mut receiver), Poll::Ready(Ok(r)) => r);
         assert_eq!(
             resp,
             fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED)

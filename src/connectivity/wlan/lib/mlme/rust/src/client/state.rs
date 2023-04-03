@@ -749,11 +749,11 @@ impl Associated {
                 }
             })
             .collect();
-        let _ = sta
-            .ctx
-            .device
-            .mlme_control_handle()
-            .send_set_keys_conf(&mut fidl_mlme::SetKeysConfirm { results });
+        if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::SetKeysConf {
+            conf: fidl_mlme::SetKeysConfirm { results },
+        }) {
+            error!("Error sending SetKeysConfirm: {}", e);
+        }
     }
 
     fn on_sme_set_controlled_port(
@@ -772,7 +772,7 @@ impl Associated {
         self.0.controlled_port_open = should_open_controlled_port;
         if let Err(e) = sta.ctx.device.set_eth_link(req.state.into()) {
             error!(
-                "Error settting Ethernet port to {}: {}",
+                "Error setting Ethernet port to {}: {}",
                 if should_open_controlled_port { "OPEN" } else { "CLOSED" },
                 e
             );
@@ -794,9 +794,9 @@ impl Associated {
             error!("Error clearing association in vendor driver: {}", e);
         }
 
-        if let Err(e) = sta.ctx.device.mlme_control_handle().send_deauthenticate_conf(
-            &mut fidl_mlme::DeauthenticateConfirm { peer_sta_address: sta.sta.bssid().0 },
-        ) {
+        if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
+            resp: fidl_mlme::DeauthenticateConfirm { peer_sta_address: sta.sta.bssid().0 },
+        }) {
             error!("Error sending MLME-DEAUTHENTICATE.confirm: {}", e)
         }
     }
@@ -818,12 +818,12 @@ impl Associated {
             return false;
         }
         self.0.status_check_timeout.next_id.take();
-        if let Err(e) = sta.ctx.device.mlme_control_handle().send_signal_report(
-            &mut fidl_internal::SignalReportIndication {
+        if let Err(e) = sta.ctx.device.send_mlme_event(fidl_mlme::MlmeEvent::SignalReport {
+            ind: fidl_internal::SignalReportIndication {
                 rssi_dbm: self.0.signal_strength_average.avg_dbm().0,
                 snr_db: 0,
             },
-        ) {
+        }) {
             error!("Error sending MLME-SignalReport: {}", e)
         }
 
@@ -1163,16 +1163,16 @@ impl States {
         }
     }
 
-    pub fn handle_mlme_msg(self, sta: &mut BoundClient<'_>, msg: fidl_mlme::MlmeRequest) -> States {
-        use fidl_mlme::MlmeRequest as MlmeMsg;
+    pub fn handle_mlme_req(self, sta: &mut BoundClient<'_>, req: wlan_sme::MlmeRequest) -> States {
+        use wlan_sme::MlmeRequest as MlmeReq;
 
         match self {
-            States::Joined(mut state) => match msg {
-                MlmeMsg::DeauthenticateReq { .. } => {
+            States::Joined(mut state) => match req {
+                MlmeReq::Deauthenticate(_) => {
                     state.on_sme_deauthenticate(sta);
                     state.into()
                 }
-                MlmeMsg::ReconnectReq { req, .. } => {
+                MlmeReq::Reconnect(req) => {
                     sta.send_connect_conf_failure_with_bssid(
                         req.peer_sta_address,
                         fidl_ieee80211::StatusCode::DeniedNoAssociationExists,
@@ -1181,22 +1181,22 @@ impl States {
                 }
                 _ => state.into(),
             },
-            States::Authenticating(mut state) => match msg {
-                MlmeMsg::SaeHandshakeResp { resp, .. } => match state.on_sme_sae_resp(sta, resp) {
+            States::Authenticating(mut state) => match req {
+                MlmeReq::SaeHandshakeResp(resp) => match state.on_sme_sae_resp(sta, resp) {
                     AuthProgress::Complete => state.transition_to(Associating::default()).into(),
                     AuthProgress::InProgress => state.into(),
                     AuthProgress::Failed => state.transition_to(Joined).into(),
                 },
-                MlmeMsg::SaeFrameTx { frame, .. } => match state.on_sme_sae_tx(sta, frame) {
+                MlmeReq::SaeFrameTx(frame) => match state.on_sme_sae_tx(sta, frame) {
                     AuthProgress::Complete => state.transition_to(Associating::default()).into(),
                     AuthProgress::InProgress => state.into(),
                     AuthProgress::Failed => state.transition_to(Joined).into(),
                 },
-                MlmeMsg::DeauthenticateReq { .. } => {
+                MlmeReq::Deauthenticate(_) => {
                     state.on_sme_deauthenticate(sta);
                     state.transition_to(Joined).into()
                 }
-                MlmeMsg::ReconnectReq { req, .. } => {
+                MlmeReq::Reconnect(req) => {
                     sta.send_connect_conf_failure_with_bssid(
                         req.peer_sta_address,
                         fidl_ieee80211::StatusCode::DeniedNoAssociationExists,
@@ -1205,8 +1205,8 @@ impl States {
                 }
                 _ => state.into(),
             },
-            States::Authenticated(state) => match msg {
-                MlmeMsg::ReconnectReq { req, .. } => match state.on_sme_reconnect(sta, req) {
+            States::Authenticated(state) => match req {
+                MlmeReq::Reconnect(req) => match state.on_sme_reconnect(sta, req) {
                     Ok(timeout) => {
                         state.transition_to(Associating { reconnect_timeout: Some(timeout) }).into()
                     }
@@ -1214,12 +1214,12 @@ impl States {
                 },
                 _ => state.into(),
             },
-            States::Associating(mut state) => match msg {
-                MlmeMsg::DeauthenticateReq { .. } => {
+            States::Associating(mut state) => match req {
+                MlmeReq::Deauthenticate(_) => {
                     state.on_sme_deauthenticate(sta);
                     state.transition_to(Joined).into()
                 }
-                MlmeMsg::ReconnectReq { req, .. } => {
+                MlmeReq::Reconnect(req) => {
                     if req.peer_sta_address != sta.sta.connect_req.selected_bss.bssid.0 {
                         sta.send_connect_conf_failure_with_bssid(
                             req.peer_sta_address,
@@ -1230,24 +1230,24 @@ impl States {
                 }
                 _ => state.into(),
             },
-            States::Associated(mut state) => match msg {
-                MlmeMsg::EapolReq { req, .. } => {
+            States::Associated(mut state) => match req {
+                MlmeReq::Eapol(req) => {
                     state.on_sme_eapol(sta, req);
                     state.into()
                 }
-                MlmeMsg::SetKeysReq { req, .. } => {
+                MlmeReq::SetKeys(req) => {
                     state.on_sme_set_keys(sta, req);
                     state.into()
                 }
-                MlmeMsg::SetControlledPort { req, .. } => {
+                MlmeReq::SetCtrlPort(req) => {
                     state.on_sme_set_controlled_port(sta, req);
                     state.into()
                 }
-                MlmeMsg::DeauthenticateReq { req, .. } => {
+                MlmeReq::Deauthenticate(req) => {
                     state.on_sme_deauthenticate(sta, req);
                     state.transition_to(Joined).into()
                 }
-                MlmeMsg::ReconnectReq { req, .. } => {
+                MlmeReq::Reconnect(req) => {
                     if req.peer_sta_address != sta.sta.connect_req.selected_bss.bssid.0 {
                         sta.send_connect_conf_failure_with_bssid(
                             req.peer_sta_address,
@@ -1343,9 +1343,7 @@ mod tests {
                 Context, ParsedConnectRequest, TimedEventClass,
             },
             device::{Device, FakeDevice},
-            test_utils::{
-                fake_control_handle, fake_mlme_set_keys_req, fake_wlan_channel, MockWlanRxInfo,
-            },
+            test_utils::{fake_set_keys_req, fake_wlan_channel, MockWlanRxInfo},
         },
         akm::AkmAlgorithm,
         banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
@@ -1506,15 +1504,11 @@ mod tests {
         )
     }
 
-    fn fake_mlme_deauth_req(exec: &fasync::TestExecutor) -> fidl_mlme::MlmeRequest {
-        let (control_handle, _) = fake_control_handle(exec);
-        fidl_mlme::MlmeRequest::DeauthenticateReq {
-            req: fidl_mlme::DeauthenticateRequest {
-                peer_sta_address: BSSID.0,
-                reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
-            },
-            control_handle,
-        }
+    fn fake_deauth_req() -> wlan_sme::MlmeRequest {
+        wlan_sme::MlmeRequest::Deauthenticate(fidl_mlme::DeauthenticateRequest {
+            peer_sta_address: BSSID.0,
+            reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
+        })
     }
 
     fn open_authenticating(sta: &mut BoundClient<'_>) -> Authenticating {
@@ -2347,12 +2341,10 @@ mod tests {
         let mut state = States::from(statemachine::testing::new_state(Joined));
 
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: [1, 2, 3, 4, 5, 6] },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: [1, 2, 3, 4, 5, 6],
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
 
         assert_variant!(state, States::Joined(_), "not in joined state");
 
@@ -2522,12 +2514,10 @@ mod tests {
             States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
 
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: [1, 2, 3, 4, 5, 6] },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: [1, 2, 3, 4, 5, 6],
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
 
         assert_variant!(state, States::Authenticating(_), "not in authenticating state");
 
@@ -2684,12 +2674,10 @@ mod tests {
 
         assert!(m.fake_device.join_bss_request.is_some());
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: BSSID.0 },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: BSSID.0,
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associating(_), "not in associating state");
         assert!(m.fake_device.join_bss_request.is_some());
 
@@ -2710,13 +2698,11 @@ mod tests {
 
         assert!(m.fake_device.join_bss_request.is_some());
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
         let sus_bssid = [b's', b'u', b's', b'r', b'e', b'q'];
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: sus_bssid },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: sus_bssid,
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associating(_), "not in associating state");
         assert!(m.fake_device.join_bss_request.is_some());
 
@@ -2780,12 +2766,10 @@ mod tests {
         );
 
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: BSSID.0 },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: BSSID.0,
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associating(_), "not in associating state");
 
         // Verify associate request frame was sent
@@ -2877,12 +2861,10 @@ mod tests {
             .expect("error reading Disassociate.ind");
 
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: BSSID.0 },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: BSSID.0,
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associating(_), "not in associating state");
 
         // Verify an event was queued up in the timer.
@@ -2948,13 +2930,11 @@ mod tests {
             .expect("error reading Disassociate.ind");
 
         // (sme->mlme) Send a reconnect request with a different BSSID
-        let (control_handle, _) = fake_control_handle(&exec);
         let sus_bssid = [b's', b'u', b's', b'r', b'e', b'q'];
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: sus_bssid },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: sus_bssid,
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Authenticated(_), "not in auth'd state");
 
         // Verify a connect conf was sent
@@ -2993,12 +2973,10 @@ mod tests {
         assert!(m.fake_device.join_bss_request.is_some());
 
         // (sme->mlme) Send a reconnect request
-        let (control_handle, _) = fake_control_handle(&exec);
-        let reconnect_req = fidl_mlme::MlmeRequest::ReconnectReq {
-            req: fidl_mlme::ReconnectRequest { peer_sta_address: BSSID.0 },
-            control_handle,
-        };
-        state = state.handle_mlme_msg(&mut sta, reconnect_req);
+        let reconnect_req = wlan_sme::MlmeRequest::Reconnect(fidl_mlme::ReconnectRequest {
+            peer_sta_address: BSSID.0,
+        });
+        state = state.handle_mlme_req(&mut sta, reconnect_req);
         assert_variant!(state, States::Associated(_), "not in associated state");
         assert!(m.fake_device.join_bss_request.is_some());
 
@@ -3223,7 +3201,7 @@ mod tests {
         let state = States::from(statemachine::testing::new_state(Joined));
 
         assert!(m.fake_device.join_bss_request.is_some());
-        let state = state.handle_mlme_msg(&mut sta, fake_mlme_deauth_req(&exec));
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
         assert_variant!(state, States::Joined(_), "Joined should stay in Joined");
         // No MLME message was sent because MLME already deauthenticated.
         m.fake_device
@@ -3242,7 +3220,7 @@ mod tests {
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
 
         assert!(m.fake_device.join_bss_request.is_some());
-        let state = state.handle_mlme_msg(&mut sta, fake_mlme_deauth_req(&exec));
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
 
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
@@ -3263,7 +3241,7 @@ mod tests {
         let state = States::from(statemachine::testing::new_state(Associating::default()));
 
         assert!(m.fake_device.join_bss_request.is_some());
-        let state = state.handle_mlme_msg(&mut sta, fake_mlme_deauth_req(&exec));
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
 
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
@@ -3295,7 +3273,7 @@ mod tests {
         sta.ctx.device.set_eth_link_up().expect("should succeed");
         assert_eq!(crate::device::LinkStatus::UP, m.fake_device.link_status);
 
-        let state = state.handle_mlme_msg(&mut sta, fake_mlme_deauth_req(&exec));
+        let state = state.handle_mlme_req(&mut sta, fake_deauth_req());
         assert_variant!(state, States::Joined(_), "should transition to Joined");
 
         // Should accept the deauthentication request and send back confirm.
@@ -3314,16 +3292,12 @@ mod tests {
         assert!(m.fake_device.join_bss_request.is_none());
     }
 
-    fn fake_mlme_eapol_req(exec: &fasync::TestExecutor) -> fidl_mlme::MlmeRequest {
-        let (control_handle, _) = fake_control_handle(exec);
-        fidl_mlme::MlmeRequest::EapolReq {
-            req: fidl_mlme::EapolRequest {
-                dst_addr: BSSID.0,
-                src_addr: IFACE_MAC,
-                data: vec![1, 2, 3, 4],
-            },
-            control_handle,
-        }
+    fn fake_eapol_req() -> wlan_sme::MlmeRequest {
+        wlan_sme::MlmeRequest::Eapol(fidl_mlme::EapolRequest {
+            dst_addr: BSSID.0,
+            src_addr: IFACE_MAC,
+            data: vec![1, 2, 3, 4],
+        })
     }
 
     #[test]
@@ -3336,16 +3310,16 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = States::from(statemachine::testing::new_state(Joined));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_eapol_req(&exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
         assert_eq!(m.fake_device.wlan_queue.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
         m.fake_device.wlan_queue.clear();
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_eapol_req(&exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
         assert_eq!(m.fake_device.wlan_queue.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_eapol_req(&exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
         assert_eq!(m.fake_device.wlan_queue.len(), 0);
     }
 
@@ -3360,7 +3334,7 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_eapol_req(&exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
         assert_eq!(m.fake_device.wlan_queue.len(), 0);
     }
 
@@ -3375,7 +3349,7 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_eapol_req(&exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_eapol_req());
         assert_eq!(m.fake_device.wlan_queue.len(), 1);
         assert_eq!(
             &m.fake_device.wlan_queue[0].0[..],
@@ -3406,15 +3380,15 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = States::from(statemachine::testing::new_state(Joined));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_keys_req(&exec, BSSID.0));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
         assert_eq!(m.fake_device.keys.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_keys_req(&exec, BSSID.0));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
         assert_eq!(m.fake_device.keys.len(), 0);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_keys_req(&exec, BSSID.0));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
         assert_eq!(m.fake_device.keys.len(), 0);
     }
 
@@ -3429,7 +3403,7 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_keys_req(&exec, BSSID.0));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
         assert_eq!(m.fake_device.keys.len(), 0);
     }
 
@@ -3444,7 +3418,7 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_keys_req(&exec, BSSID.0));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_keys_req(BSSID.0));
         assert_eq!(m.fake_device.keys.len(), 1);
         let conf = assert_variant!(m.fake_device.next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
         assert_eq!(conf.results.len(), 1);
@@ -3483,15 +3457,15 @@ mod tests {
         m.fake_device.set_key_results.push(zx::Status::BAD_STATE);
         m.fake_device.set_key_results.push(zx::Status::OK);
         // Create a SetKeysReq with one success and one failure.
-        let mut set_keys_req = fake_mlme_set_keys_req(&exec, BSSID.0);
+        let mut set_keys_req = fake_set_keys_req(BSSID.0);
         match &mut set_keys_req {
-            fidl_mlme::MlmeRequest::SetKeysReq { req, .. } => {
+            wlan_sme::MlmeRequest::SetKeys(req) => {
                 req.keylist
                     .push(fidl_mlme::SetKeyDescriptor { key_id: 4, ..req.keylist[0].clone() });
             }
             _ => panic!(),
         }
-        let _state = state.handle_mlme_msg(&mut sta, set_keys_req);
+        let _state = state.handle_mlme_req(&mut sta, set_keys_req);
         let conf = assert_variant!(m.fake_device.next_mlme_msg::<fidl_mlme::SetKeysConfirm>(), Ok(conf) => conf);
         assert_eq!(conf.results.len(), 2);
         assert_eq!(
@@ -3504,21 +3478,14 @@ mod tests {
         );
     }
 
-    fn fake_mlme_set_ctrl_port_open(
-        open: bool,
-        exec: &fasync::TestExecutor,
-    ) -> fidl_mlme::MlmeRequest {
-        let (control_handle, _) = fake_control_handle(&exec);
-        fidl_mlme::MlmeRequest::SetControlledPort {
-            req: fidl_mlme::SetControlledPortRequest {
-                peer_sta_address: BSSID.0,
-                state: match open {
-                    true => fidl_mlme::ControlledPortState::Open,
-                    false => fidl_mlme::ControlledPortState::Closed,
-                },
+    fn fake_set_ctrl_port_open(open: bool) -> wlan_sme::MlmeRequest {
+        wlan_sme::MlmeRequest::SetCtrlPort(fidl_mlme::SetControlledPortRequest {
+            peer_sta_address: BSSID.0,
+            state: match open {
+                true => fidl_mlme::ControlledPortState::Open,
+                false => fidl_mlme::ControlledPortState::Closed,
             },
-            control_handle,
-        }
+        })
     }
 
     #[test]
@@ -3530,15 +3497,15 @@ mod tests {
         let mut sta = sta.bind(&mut ctx, &mut m.scanner, &mut m.channel_state);
 
         let state = States::from(statemachine::testing::new_state(Joined));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_ctrl_port_open(true, &exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
 
         let state = States::from(statemachine::testing::new_state(open_authenticating(&mut sta)));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_ctrl_port_open(true, &exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
 
         let state = States::from(statemachine::testing::new_state(Associating::default()));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_ctrl_port_open(true, &exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
     }
 
@@ -3552,7 +3519,7 @@ mod tests {
 
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_ctrl_port_open(true, &exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
     }
 
@@ -3567,9 +3534,9 @@ mod tests {
         let state =
             States::from(statemachine::testing::new_state(Associated(empty_association(&mut sta))));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
-        let state = state.handle_mlme_msg(&mut sta, fake_mlme_set_ctrl_port_open(true, &exec));
+        let state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(true));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::UP);
-        let _state = state.handle_mlme_msg(&mut sta, fake_mlme_set_ctrl_port_open(false, &exec));
+        let _state = state.handle_mlme_req(&mut sta, fake_set_ctrl_port_open(false));
         assert_eq!(m.fake_device.link_status, crate::device::LinkStatus::DOWN);
     }
 

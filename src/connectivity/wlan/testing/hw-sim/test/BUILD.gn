@@ -124,16 +124,15 @@ fuchsia_component("autoconnect-idle-iface") {
   manifest = "meta/autoconnect_idle_iface.cml"
   deps = [ "autoconnect_idle_iface" ]
 }
-shared_deps = [
+shared_deps_without_wlandevicemonitor = [
   "//sdk/lib/driver_test_realm/simple",
   "//src/connectivity/location/regulatory_region:regulatory_region_component",
   "//src/connectivity/wlan/testing:wlan_test_driver_deps",
   "//src/connectivity/wlan/wlancfg:service",
-  "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-wlanstack-values",
   "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor_component",
-  "//src/connectivity/wlan/wlanstack:wlanstack-comp",
   "//src/sys/stash:stash_secure_v2",
 ]
+shared_deps = [ "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-legacy-privacy-values" ] + shared_deps_without_wlandevicemonitor
 
 hw_sim_test_components_for_all_privacies = [
   ":autoconnect-idle-iface",
@@ -162,8 +161,9 @@ fuchsia_test_package("wlan-hw-sim-contemporary-privacy-tests") {
   }
   test_components = [ ":scan-contemporary-privacy" ]
   test_components += hw_sim_test_components_for_all_privacies
-  deps = [ "//src/connectivity/wlan/wlanstack:wlanstack-values" ]
-  deps += shared_deps
+  deps =
+      [ "//src/connectivity/wlan/wlandevicemonitor:wlandevicemonitor-values" ]
+  deps += shared_deps_without_wlandevicemonitor
 }
 
 fuchsia_test_package("wlan-hw-sim-legacy-privacy-tests") {

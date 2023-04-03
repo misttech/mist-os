@@ -399,6 +399,8 @@ impl FullmacMlme {
             GetIfaceHistogramStats(responder) => {
                 responder.respond(self.device.get_iface_histogram_stats())
             }
+            GetMinstrelStats(_, _) => info!("GetMinstrelStats is unsupported"),
+            ListMinstrelPeers(_) => info!("ListMinstrelPeers is unsupported"),
             SaeHandshakeResp(resp) => {
                 self.device.sae_handshake_resp(convert_sae_handshake_response(&resp))
             }

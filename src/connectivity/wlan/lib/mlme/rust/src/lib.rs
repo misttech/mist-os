@@ -29,7 +29,7 @@ mod probe_sequence;
 pub use {ddk_converter::*, wlan_common as common};
 
 use {
-    anyhow::{anyhow, bail, Error},
+    anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     device::{Device, DeviceInterface},
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
@@ -41,6 +41,7 @@ use {
     parking_lot::Mutex,
     std::sync::Arc,
     std::time::Duration,
+    wlan_sme,
 };
 
 pub trait MlmeImpl {
@@ -52,7 +53,7 @@ pub trait MlmeImpl {
         buf_provider: buffer::BufferProvider,
         scheduler: common::timer::Timer<Self::TimerEvent>,
     ) -> Self;
-    fn handle_mlme_message(&mut self, msg: fidl_mlme::MlmeRequest) -> Result<(), Error>;
+    fn handle_mlme_request(&mut self, msg: wlan_sme::MlmeRequest) -> Result<(), Error>;
     fn handle_mac_frame_rx(&mut self, bytes: &[u8], rx_info: banjo_wlan_softmac::WlanRxInfo);
     fn handle_eth_frame_tx(&mut self, bytes: &[u8]) -> Result<(), Error>;
     fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64);
@@ -81,7 +82,7 @@ type MinstrelWrapper = Arc<Mutex<minstrel::MinstrelRateSelector<MinstrelTimer>>>
 // and sent through this sink, where they can then be handled serially. Multiple copies of
 // DriverEventSink may be safely passed between threads, including one that is used by our
 // vendor driver as the context for wlan_softmac_ifc_protocol_ops.
-struct DriverEventSink(pub mpsc::UnboundedSender<DriverEvent>);
+pub struct DriverEventSink(pub mpsc::UnboundedSender<DriverEvent>);
 
 // TODO(fxbug.dev/29063): Remove copies from MacFrame and EthFrame.
 pub enum DriverEvent {
@@ -117,35 +118,11 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     config: T::Config,
     device: DeviceInterface,
     buf_provider: buffer::BufferProvider,
-    driver_event_sink: mpsc::UnboundedSender<DriverEvent>,
+    mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
+    mlme_event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
     driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
     startup_sender: oneshot::Sender<Result<(), Error>>,
 ) {
-    let mut driver_event_sink = Box::new(DriverEventSink(driver_event_sink));
-    let ifc = device::WlanSoftmacIfcProtocol::new(driver_event_sink.as_mut());
-    // Indicate to the vendor driver that we can start sending and receiving info. Any messages received from the
-    // driver before we start our MLME will be safely buffered in our driver_event_sink.
-    // Note that device.start will copy relevant fields out of ifc, so dropping it after this is fine.
-    // The returned value is the MLME server end of the channel wlanmevicemonitor created to connect MLME and SME.
-    let mlme_protocol_handle_via_iface_creation = match device.start(&ifc) {
-        Ok(handle) => handle,
-        Err(e) => {
-            // Failure to unwrap indicates a critical failure in the driver init thread.
-            startup_sender.send(Err(anyhow!("device.start failed: {}", e))).unwrap();
-            return;
-        }
-    };
-    let channel = zx::Channel::from(mlme_protocol_handle_via_iface_creation);
-    let server = fidl::endpoints::ServerEnd::<fidl_mlme::MlmeMarker>::new(channel);
-    let (mlme_request_stream, control_handle) = match server.into_stream_and_control_handle() {
-        Ok(res) => res,
-        Err(e) => {
-            // Failure to unwrap indicates a critical failure in the driver init thread.
-            startup_sender.send(Err(anyhow!("Failed to get MLME request stream: {}", e))).unwrap();
-            return;
-        }
-    };
-
     let device_mac_sublayer_support = device.mac_sublayer_support();
     let (minstrel_timer, minstrel_time_stream) = common::timer::create_timer();
     let update_interval = if device_mac_sublayer_support.device.is_synthetic {
@@ -164,7 +141,7 @@ pub async fn mlme_main_loop<T: MlmeImpl>(
     } else {
         None
     };
-    let new_device = Device::new(device, minstrel.clone(), control_handle);
+    let new_device = Device::new(device, minstrel.clone(), mlme_event_sink);
     let (timer, time_stream) = common::timer::create_timer();
 
     let mlme_impl = T::new(config, new_device, buf_provider, timer);
@@ -195,7 +172,7 @@ async fn main_loop_impl<T: MlmeImpl>(
     mut mlme_impl: T,
     minstrel: Option<MinstrelWrapper>,
     // A stream of requests coming from the parent SME of this MLME.
-    mut mlme_request_stream: fidl_mlme::MlmeRequestStream,
+    mut mlme_request_stream: mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>,
     // A stream of events initiated by C++ device drivers and then buffered here
     // by our MlmeHandle.
     mut driver_event_stream: mpsc::UnboundedReceiver<DriverEvent>,
@@ -210,19 +187,11 @@ async fn main_loop_impl<T: MlmeImpl>(
             // Process requests from SME.
             mlme_request = mlme_request_stream.next() => match mlme_request {
                 Some(req) => {
-                    match req {
-                        Ok(req) => {
-                            let method_name = req.method_name();
-                            if let Err(e) = mlme_impl.handle_mlme_message(req) {
-                                info!("Failed to handle mlme {} request: {}", method_name, e);
-                            }
-                        }
-                        Err(e) => {
-                            info!("Failure while receiving mlme request: {}", e);
-                        }
+                    let method_name = req.name();
+                    if let Err(e) = mlme_impl.handle_mlme_request(req) {
+                        info!("Failed to handle mlme {} request: {}", method_name, e);
                     }
-
-                }
+                },
                 None => bail!("MLME request stream terminated unexpectedly."),
             },
             // Process requests from our C++ drivers.
@@ -269,8 +238,7 @@ async fn main_loop_impl<T: MlmeImpl>(
 pub mod test_utils {
     use {
         super::*, banjo_fuchsia_hardware_wlan_associnfo as banjo_wlan_associnfo,
-        banjo_fuchsia_wlan_common as banjo_common, fidl::endpoints::RequestStream,
-        fuchsia_async as fasync, wlan_common::channel,
+        banjo_fuchsia_wlan_common as banjo_common, wlan_common::channel,
     };
 
     pub struct FakeMlme {
@@ -291,9 +259,9 @@ pub mod test_utils {
             Self { device }
         }
 
-        fn handle_mlme_message(
+        fn handle_mlme_request(
             &mut self,
-            _msg: fidl_mlme::MlmeRequest,
+            _msg: wlan_sme::MlmeRequest,
         ) -> Result<(), anyhow::Error> {
             unimplemented!()
         }
@@ -374,17 +342,6 @@ pub mod test_utils {
         }
     }
 
-    pub(crate) fn fake_control_handle(
-        // We use this unused parameter to ensure that an executor exists.
-        _exec: &fuchsia_async::TestExecutor,
-    ) -> (fidl_mlme::MlmeControlHandle, fuchsia_zircon::Channel) {
-        let (c1, c2) = fuchsia_zircon::Channel::create();
-        let async_c1 = fidl::AsyncChannel::from_channel(c1).unwrap();
-        let request_stream = fidl_mlme::MlmeRequestStream::from_channel(async_c1);
-        let control_handle = request_stream.control_handle();
-        (control_handle, c2)
-    }
-
     pub(crate) fn fake_key(address: [u8; 6]) -> fidl_mlme::SetKeyDescriptor {
         fidl_mlme::SetKeyDescriptor {
             cipher_suite_oui: [1, 2, 3],
@@ -397,15 +354,10 @@ pub mod test_utils {
         }
     }
 
-    pub(crate) fn fake_mlme_set_keys_req(
-        exec: &fasync::TestExecutor,
-        address: [u8; 6],
-    ) -> fidl_mlme::MlmeRequest {
-        let (control_handle, _) = fake_control_handle(&exec);
-        fidl_mlme::MlmeRequest::SetKeysReq {
-            req: fidl_mlme::SetKeysRequest { keylist: vec![fake_key(address)] },
-            control_handle,
-        }
+    pub(crate) fn fake_set_keys_req(address: [u8; 6]) -> wlan_sme::MlmeRequest {
+        wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest {
+            keylist: vec![fake_key(address)],
+        })
     }
 }
 
@@ -424,21 +376,24 @@ mod tests {
         let mut exec = TestExecutor::new();
         let mut device = FakeDevice::new(&exec);
         let buf_provider = FakeBufferProvider::new();
-        let (sink, stream) = mpsc::unbounded();
+        let (device_sink, device_stream) = mpsc::unbounded();
         let (startup_sender, mut startup_receiver) = oneshot::channel();
+        let (_mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
+        let (mlme_event_sink, _mlme_event_stream) = mpsc::unbounded();
         let mut main_loop = Box::pin(mlme_main_loop::<FakeMlme>(
             (),
             device.as_raw_device(),
             buf_provider,
-            sink.clone(),
-            stream,
+            mlme_request_stream,
+            mlme_event_sink,
+            device_stream,
             startup_sender,
         ));
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Pending);
         assert_variant!(startup_receiver.try_recv(), Ok(Some(Ok(()))));
 
-        sink.unbounded_send(DriverEvent::Stop).expect("Failed to send stop event");
+        device_sink.unbounded_send(DriverEvent::Stop).expect("Failed to send stop event");
         assert_variant!(exec.run_until_stalled(&mut main_loop), Poll::Ready(()));
-        assert!(sink.is_closed());
+        assert!(device_sink.is_closed());
     }
 }

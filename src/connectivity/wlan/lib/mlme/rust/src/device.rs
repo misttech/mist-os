@@ -13,6 +13,7 @@ use {
         WlanTxPacket,
     },
     fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
+    futures::channel::mpsc,
     ieee80211::MacAddr,
     std::{ffi::c_void, marker::PhantomData},
     wlan_common::{mac::FrameControl, tx_vector, TimeUnit},
@@ -40,7 +41,7 @@ impl From<fidl_mlme::ControlledPortState> for LinkStatus {
 pub struct Device {
     raw_device: DeviceInterface,
     minstrel: Option<crate::MinstrelWrapper>,
-    control_handle: fidl_mlme::MlmeControlHandle,
+    event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
 }
 
 const REQUIRED_WLAN_HEADER_LEN: usize = 10;
@@ -50,12 +51,13 @@ impl Device {
     pub fn new(
         raw_device: DeviceInterface,
         minstrel: Option<crate::MinstrelWrapper>,
-        control_handle: fidl_mlme::MlmeControlHandle,
+        event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
     ) -> Self {
-        Self { raw_device, minstrel, control_handle }
+        Self { raw_device, minstrel, event_sink }
     }
-    pub fn mlme_control_handle(&self) -> &fidl_mlme::MlmeControlHandle {
-        &self.control_handle
+
+    pub fn send_mlme_event(&self, event: fidl_mlme::MlmeEvent) -> Result<(), anyhow::Error> {
+        self.event_sink.unbounded_send(event).map_err(|e| e.into())
     }
 
     pub fn deliver_eth_frame(&self, slice: &[u8]) -> Result<(), zx::Status> {
@@ -278,7 +280,7 @@ const PROTOCOL_OPS: WlanSoftmacIfcProtocolOps = WlanSoftmacIfcProtocolOps {
 };
 
 impl<'a> WlanSoftmacIfcProtocol<'a> {
-    pub(crate) fn new(sink: &'a mut crate::DriverEventSink) -> Self {
+    pub fn new(sink: &'a mut crate::DriverEventSink) -> Self {
         // Const reference has 'static lifetime, so it's safe to pass down to the driver.
         let ops = &PROTOCOL_OPS;
         Self { ops, ctx: sink }
@@ -619,10 +621,11 @@ pub mod test_utils {
         banjo_fuchsia_wlan_common as banjo_common,
         banjo_fuchsia_wlan_ieee80211::*,
         banjo_fuchsia_wlan_internal as banjo_wlan_internal,
-        fidl::endpoints::RequestStream,
+        fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_sme as fidl_sme,
         fuchsia_async as fasync,
         fuchsia_zircon::AsHandleRef,
         std::convert::TryInto,
+        wlan_sme,
     };
 
     pub struct CapturedWlanSoftmacStartPassiveScanRequest {
@@ -657,11 +660,107 @@ pub mod test_utils {
         }
     }
 
+    pub trait FromMlmeEvent {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self>
+        where
+            Self: std::marker::Sized;
+    }
+
+    impl FromMlmeEvent for fidl_mlme::AuthenticateIndication {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_authenticate_ind()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::AssociateIndication {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_associate_ind()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::ConnectConfirm {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_connect_conf()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::StartConfirm {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_start_conf()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::StopConfirm {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_stop_conf()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::ScanResult {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_on_scan_result()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::ScanEnd {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_on_scan_end()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::EapolConfirm {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_eapol_conf()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::EapolIndication {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_eapol_ind()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::DeauthenticateConfirm {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_deauthenticate_conf()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::DeauthenticateIndication {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_deauthenticate_ind()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::DisassociateIndication {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_disassociate_ind()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_mlme::SetKeysConfirm {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_set_keys_conf()
+        }
+    }
+
+    impl FromMlmeEvent for fidl_internal::SignalReportIndication {
+        fn from_event(event: fidl_mlme::MlmeEvent) -> Option<Self> {
+            event.into_signal_report()
+        }
+    }
+
     pub struct FakeDevice {
         pub eth_queue: Vec<Vec<u8>>,
         pub wlan_queue: Vec<(Vec<u8>, u32)>,
-        pub mlme_proxy_channel: zx::Channel,
-        pub mlme_request_stream_channel: Option<zx::Channel>,
+        pub mlme_event_sink: mpsc::UnboundedSender<fidl_mlme::MlmeEvent>,
+        pub mlme_event_stream: Option<mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>>,
+        pub mlme_request_sink: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
+        pub mlme_request_stream: Option<mpsc::UnboundedReceiver<wlan_sme::MlmeRequest>>,
+        pub usme_bootstrap_client_end:
+            Option<fidl::endpoints::ClientEnd<fidl_sme::UsmeBootstrapMarker>>,
+        pub usme_bootstrap_server_end:
+            Option<fidl::endpoints::ServerEnd<fidl_sme::UsmeBootstrapMarker>>,
         pub wlan_channel: banjo_common::WlanChannel,
         pub keys: Vec<banjo_wlan_softmac::WlanKeyConfiguration>,
         pub keys_vec: Vec<Vec<u8>>,
@@ -686,15 +785,22 @@ pub mod test_utils {
     impl FakeDevice {
         pub fn new(_executor: &fasync::TestExecutor) -> Self {
             // Create a channel for SME requests, to be surfaced by start().
-            let (mlme_proxy_channel, mlme_request_stream_channel) = zx::Channel::create();
+            let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
+                fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
+            let (mlme_event_sink, mlme_event_stream) = mpsc::unbounded();
+            let (mlme_request_sink, mlme_request_stream) = mpsc::unbounded();
             let mut supported_phys: Vec<banjo_common::WlanPhyType> = Vec::new();
             let mut band_caps: Vec<banjo_wlan_softmac::WlanSoftmacBandCapability> = Vec::new();
 
             Self {
                 eth_queue: vec![],
                 wlan_queue: vec![],
-                mlme_proxy_channel,
-                mlme_request_stream_channel: Some(mlme_request_stream_channel),
+                mlme_event_sink,
+                mlme_event_stream: Some(mlme_event_stream),
+                mlme_request_sink,
+                mlme_request_stream: Some(mlme_request_stream),
+                usme_bootstrap_client_end: Some(usme_bootstrap_client_end),
+                usme_bootstrap_server_end: Some(usme_bootstrap_server_end),
                 wlan_channel: banjo_common::WlanChannel {
                     primary: 0,
                     cbw: banjo_common::ChannelBandwidth::CBW20,
@@ -729,10 +835,10 @@ pub mod test_utils {
             out_sme_channel: *mut zx::sys::zx_handle_t,
         ) -> i32 {
             let device = unsafe { &mut *(device as *mut Self) };
-            let mlme_request_stream_handle =
-                device.mlme_request_stream_channel.as_ref().unwrap().raw_handle();
+            let usme_bootstrap_server_end_handle =
+                device.usme_bootstrap_server_end.as_ref().unwrap().channel().raw_handle();
             unsafe {
-                *out_sme_channel = mlme_request_stream_handle;
+                *out_sme_channel = usme_bootstrap_server_end_handle;
             }
             device.info =
                 fake_wlan_softmac_query_response(&mut device.supported_phys, &mut device.band_caps);
@@ -973,20 +1079,17 @@ pub mod test_utils {
         }
 
         #[track_caller]
-        pub fn next_mlme_msg<T: fidl::encoding::TypeMarker>(&mut self) -> Result<T::Owned, Error> {
-            use fidl::encoding::{decode_transaction_header, Decode, Decoder};
-
-            let mut buf = zx::MessageBuf::new();
-            let () = self
-                .mlme_proxy_channel
-                .read(&mut buf)
-                .map_err(|status| Error::Status(format!("error reading MLME message"), status))?;
-
-            let (header, tail): (_, &[u8]) = decode_transaction_header(buf.bytes())?;
-            let mut msg = T::Owned::new_empty();
-            Decoder::decode_into::<T>(&header, tail, &mut [], &mut msg)
-                .expect("error decoding MLME message");
-            Ok(msg)
+        pub fn next_mlme_msg<T: FromMlmeEvent>(&mut self) -> Result<T, Error> {
+            self.mlme_event_stream
+                .as_mut()
+                .expect("no mlme event stream available")
+                .try_next()
+                .map_err(|e| anyhow::format_err!("Failed to read mlme event stream: {}", e))
+                .and_then(|opt_next| opt_next.ok_or(anyhow::format_err!("No message available")))
+                .and_then(|evt| {
+                    T::from_event(evt).ok_or(anyhow::format_err!("Unexpected mlme event"))
+                })
+                .map_err(|e| e.into())
         }
 
         pub fn reset(&mut self) {
@@ -1023,11 +1126,11 @@ pub mod test_utils {
 
         /// Note: It is not safe to call this function if the FakeDevice is passed into an MLME.
         pub fn as_device(&mut self) -> Device {
-            let channel = self.mlme_request_stream_channel.take().unwrap();
-            let async_channel = fidl::AsyncChannel::from_channel(channel).unwrap();
-            let request_stream = fidl_mlme::MlmeRequestStream::from_channel(async_channel);
-            let control_handle = request_stream.control_handle();
-            Device { raw_device: self.as_raw_device(), minstrel: None, control_handle }
+            Device {
+                raw_device: self.as_raw_device(),
+                minstrel: None,
+                event_sink: self.mlme_event_sink.clone(),
+            }
         }
 
         pub fn as_device_fail_wlan_tx(&mut self) -> Device {
@@ -1224,9 +1327,10 @@ mod tests {
         let exec = fasync::TestExecutor::new();
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
-        dev.mlme_control_handle()
-            .send_deauthenticate_conf(&mut make_deauth_confirm_msg())
-            .expect("error sending MLME message");
+        dev.send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
+            resp: make_deauth_confirm_msg(),
+        })
+        .expect("error sending MLME message");
 
         // Read message from channel.
         let msg = fake_device
@@ -1241,12 +1345,12 @@ mod tests {
         let mut fake_device = FakeDevice::new(&exec);
         let dev = fake_device.as_device();
 
-        drop(fake_device.mlme_proxy_channel);
+        drop(fake_device.mlme_event_stream);
 
-        // FIDL does not expose PEER_CLOSED from channel writes, to avoid races.
-        dev.mlme_control_handle()
-            .send_deauthenticate_conf(&mut make_deauth_confirm_msg())
-            .expect("error sending MLME message");
+        dev.send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateConf {
+            resp: make_deauth_confirm_msg(),
+        })
+        .expect_err("Mlme event should fail");
     }
 
     #[test]

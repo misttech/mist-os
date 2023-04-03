@@ -63,16 +63,18 @@ impl Context {
         result_code: fidl_mlme::StartResultCode,
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_start_conf(&mut fidl_mlme::StartConfirm { result_code })
+            .send_mlme_event(fidl_mlme::MlmeEvent::StartConf {
+                resp: fidl_mlme::StartConfirm { result_code },
+            })
             .map_err(|e| e.into())
     }
 
     /// Sends MLME-STOP.confirm to the SME.
     pub fn send_mlme_stop_conf(&self, result_code: fidl_mlme::StopResultCode) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_stop_conf(&mut fidl_mlme::StopConfirm { result_code })
+            .send_mlme_event(fidl_mlme::MlmeEvent::StopConf {
+                resp: fidl_mlme::StopConfirm { result_code },
+            })
             .map_err(|e| e.into())
     }
 
@@ -83,8 +85,9 @@ impl Context {
         dst_addr: MacAddr,
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_eapol_conf(&mut fidl_mlme::EapolConfirm { result_code, dst_addr })
+            .send_mlme_event(fidl_mlme::MlmeEvent::EapolConf {
+                resp: fidl_mlme::EapolConfirm { result_code, dst_addr },
+            })
             .map_err(|e| e.into())
     }
 
@@ -95,10 +98,8 @@ impl Context {
         auth_type: fidl_mlme::AuthenticationTypes,
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_authenticate_ind(&mut fidl_mlme::AuthenticateIndication {
-                peer_sta_address,
-                auth_type,
+            .send_mlme_event(fidl_mlme::MlmeEvent::AuthenticateInd {
+                ind: fidl_mlme::AuthenticateIndication { peer_sta_address, auth_type },
             })
             .map_err(|e| e.into())
     }
@@ -111,11 +112,12 @@ impl Context {
         locally_initiated: LocallyInitiated,
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_deauthenticate_ind(&mut fidl_mlme::DeauthenticateIndication {
-                peer_sta_address,
-                reason_code,
-                locally_initiated: locally_initiated.0,
+            .send_mlme_event(fidl_mlme::MlmeEvent::DeauthenticateInd {
+                ind: fidl_mlme::DeauthenticateIndication {
+                    peer_sta_address,
+                    reason_code,
+                    locally_initiated: locally_initiated.0,
+                },
             })
             .map_err(|e| e.into())
     }
@@ -131,15 +133,16 @@ impl Context {
         rsne: Option<Vec<u8>>,
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_associate_ind(&mut fidl_mlme::AssociateIndication {
-                peer_sta_address,
-                listen_interval,
-                ssid: ssid.map(|s| s.into()),
-                capability_info: capabilities.raw(),
-                rates: rates.iter().map(|r| r.0).collect(),
-                rsne,
-                // TODO(fxbug.dev/37891): Send everything else (e.g. HT capabilities).
+            .send_mlme_event(fidl_mlme::MlmeEvent::AssociateInd {
+                ind: fidl_mlme::AssociateIndication {
+                    peer_sta_address,
+                    listen_interval,
+                    ssid: ssid.map(|s| s.into()),
+                    capability_info: capabilities.raw(),
+                    rates: rates.iter().map(|r| r.0).collect(),
+                    rsne,
+                    // TODO(fxbug.dev/37891): Send everything else (e.g. HT capabilities).
+                },
             })
             .map_err(|e| e.into())
     }
@@ -152,11 +155,12 @@ impl Context {
         locally_initiated: LocallyInitiated,
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_disassociate_ind(&mut fidl_mlme::DisassociateIndication {
-                peer_sta_address,
-                reason_code,
-                locally_initiated: locally_initiated.0,
+            .send_mlme_event(fidl_mlme::MlmeEvent::DisassociateInd {
+                ind: fidl_mlme::DisassociateIndication {
+                    peer_sta_address,
+                    reason_code,
+                    locally_initiated: locally_initiated.0,
+                },
             })
             .map_err(|e| e.into())
     }
@@ -169,11 +173,8 @@ impl Context {
         data: &[u8],
     ) -> Result<(), Error> {
         self.device
-            .mlme_control_handle()
-            .send_eapol_ind(&mut fidl_mlme::EapolIndication {
-                dst_addr,
-                src_addr,
-                data: data.to_vec(),
+            .send_mlme_event(fidl_mlme::MlmeEvent::EapolInd {
+                ind: fidl_mlme::EapolIndication { dst_addr, src_addr, data: data.to_vec() },
             })
             .map_err(|e| e.into())
     }

@@ -316,14 +316,12 @@ impl<'a> BoundScanner<'a> {
     pub fn handle_scan_complete(&mut self, status: zx::Status, scan_id: u64) {
         macro_rules! send_on_scan_end {
             ($mlme_txn_id: ident, $code:expr) => {
-                let _ = self
-                    .ctx
+                self.ctx
                     .device
-                    .mlme_control_handle()
-                    .send_on_scan_end(&mut fidl_mlme::ScanEnd { txn_id: $mlme_txn_id, code: $code })
-                    .map_err(|e| {
-                        error!("error sending MLME ScanEnd: {}", e);
-                    });
+                    .send_mlme_event(fidl_mlme::MlmeEvent::OnScanEnd {
+                        end: fidl_mlme::ScanEnd { txn_id: $mlme_txn_id, code: $code },
+                    })
+                    .unwrap_or_else(|e| error!("error sending MLME ScanEnd: {}", e));
             };
         }
 
@@ -497,14 +495,15 @@ fn active_scan_args_series(
 }
 
 fn send_scan_result(txn_id: u64, bss: fidl_internal::BssDescription, device: &mut Device) {
-    let result = device.mlme_control_handle().send_on_scan_result(&mut fidl_mlme::ScanResult {
-        txn_id,
-        timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
-        bss,
-    });
-    if let Err(e) = result {
-        error!("error sending MLME ScanResult: {}", e);
-    }
+    device
+        .send_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
+            result: fidl_mlme::ScanResult {
+                txn_id,
+                timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+                bss,
+            },
+        })
+        .unwrap_or_else(|e| error!("error sending MLME ScanResult: {}", e));
 }
 
 #[cfg(test)]

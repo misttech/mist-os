@@ -222,8 +222,10 @@ async fn forward_mlme_request(
         }
         MlmeRequest::Disassociate(..)
         | wlan_sme::MlmeRequest::DeleteKeys(..)
-        | wlan_sme::MlmeRequest::Reset(..) => {
-            info!("Disassociate, DeleteKeys, and Reset are unimplemented");
+        | wlan_sme::MlmeRequest::Reset(..)
+        | wlan_sme::MlmeRequest::GetMinstrelStats(..)
+        | wlan_sme::MlmeRequest::ListMinstrelPeers(..) => {
+            info!("Disassociate, DeleteKeys, Reset, and Minstrel APIs are unimplemented");
             Ok(())
         }
     }

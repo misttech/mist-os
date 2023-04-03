@@ -203,7 +203,7 @@ mod tests {
             data: ptr::null_mut(),
             len: 10,
         };
-        assert_eq!(buf.as_slice(), []);
+        assert!(buf.as_slice().is_empty());
     }
 
     #[test]
@@ -227,7 +227,7 @@ mod tests {
             data: ptr::null_mut(),
             len: 10,
         };
-        assert_eq!(buf.as_mut_slice(), []);
+        assert!(buf.as_mut_slice().is_empty());
     }
 
     #[test]

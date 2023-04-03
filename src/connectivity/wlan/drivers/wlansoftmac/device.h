@@ -14,6 +14,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/fdf/cpp/channel_read.h>
 #include <lib/fdf/cpp/dispatcher.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/channel.h>
 #include <zircon/compiler.h>
 
@@ -46,6 +47,7 @@ class WlanSoftmacHandle {
   zx_status_t Init();
   zx_status_t StopMainLoop();
   zx_status_t QueueEthFrameTx(std::unique_ptr<Packet> pkt);
+  std::optional<zx_handle_t> DuplicateInspectVmo();
 
  private:
   DeviceInterface* device_;

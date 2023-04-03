@@ -323,7 +323,7 @@ impl InfraBss {
                 for (id, ie_body) in ie::Reader::new(&body[..]) {
                     match id {
                         ie::Id::SSID => {
-                            if ie_body != &[][..] && ie_body != &self.ssid[..] {
+                            if !ie_body.is_empty() && ie_body != &self.ssid[..] {
                                 // Frame is not for this BSS.
                                 return Err(Rejection::OtherBss);
                             }
