@@ -30,7 +30,7 @@ use crate::{
     error::{ExistsError, NotFoundError, NotSupportedError},
     ip::{
         device::{
-            dad::{DadHandler, DadTimerId},
+            dad::{DadEvent, DadHandler, DadTimerId},
             nud::NudIpHandler,
             route_discovery::{Ipv6DiscoveredRouteTimerId, RouteDiscoveryHandler},
             router_solicitation::{RsHandler, RsTimerId},
@@ -271,6 +271,23 @@ pub enum IpDeviceEvent<DeviceId, I: Ip> {
         /// `true` if IP was enabled on the device; `false` if IP was disabled.
         ip_enabled: bool,
     },
+}
+
+impl<DeviceId, C: EventContext<IpDeviceEvent<DeviceId, Ipv6>>> EventContext<DadEvent<DeviceId>>
+    for C
+{
+    fn on_event(&mut self, event: DadEvent<DeviceId>) {
+        match event {
+            DadEvent::AddressAssigned { device, addr } => C::on_event(
+                self,
+                IpDeviceEvent::AddressStateChanged {
+                    device,
+                    addr: addr.into_specified(),
+                    state: IpAddressState::Assigned,
+                },
+            ),
+        }
+    }
 }
 
 pub(crate) struct DualStackDeviceStateRef<'a, I: Instant> {

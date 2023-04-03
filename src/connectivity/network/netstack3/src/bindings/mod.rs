@@ -497,26 +497,6 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
     }
 }
 
-impl EventContext<netstack3_core::ip::device::dad::DadEvent<DeviceId<BindingsNonSyncCtxImpl>>>
-    for BindingsNonSyncCtxImpl
-{
-    fn on_event(
-        &mut self,
-        event: netstack3_core::ip::device::dad::DadEvent<DeviceId<BindingsNonSyncCtxImpl>>,
-    ) {
-        match event {
-            netstack3_core::ip::device::dad::DadEvent::AddressAssigned { device, addr } => self
-                .on_event(
-                    netstack3_core::ip::device::IpDeviceEvent::<_, Ipv6>::AddressStateChanged {
-                        device,
-                        addr: addr.into_specified(),
-                        state: netstack3_core::ip::device::IpAddressState::Assigned,
-                    },
-                ),
-        }
-    }
-}
-
 impl
     EventContext<
         netstack3_core::ip::device::route_discovery::Ipv6RouteDiscoveryEvent<

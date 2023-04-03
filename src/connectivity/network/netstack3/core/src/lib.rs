@@ -222,7 +222,6 @@ pub trait NonSyncContext:
     + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6>>
     + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
     + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-    + EventContext<ip::device::dad::DadEvent<DeviceId<Self>>>
     + EventContext<ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self>>>
     + transport::udp::NonSyncContext<Ipv4>
     + transport::udp::NonSyncContext<Ipv6>
@@ -244,7 +243,6 @@ impl<
             + EventContext<ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6>>
             + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
             + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-            + EventContext<ip::device::dad::DadEvent<DeviceId<Self>>>
             + EventContext<ip::device::route_discovery::Ipv6RouteDiscoveryEvent<DeviceId<Self>>>
             + transport::udp::NonSyncContext<Ipv4>
             + transport::udp::NonSyncContext<Ipv6>

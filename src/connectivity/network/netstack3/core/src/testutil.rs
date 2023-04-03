@@ -31,7 +31,7 @@ use crate::{
         DeviceSendFrameError, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId,
     },
     ip::{
-        device::{dad::DadEvent, route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
+        device::{route_discovery::Ipv6RouteDiscoveryEvent, IpDeviceEvent},
         icmp::{BufferIcmpContext, IcmpConnId, IcmpContext, IcmpIpExt},
         types::{AddableEntryEither, AddableMetric, Entry, RawMetric},
         IpLayerEvent, SendIpPacketMeta,
@@ -869,24 +869,11 @@ pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNon
 /// Wraps all events emitted by Core into a single enum type.
 #[derive(Debug, Eq, PartialEq, Hash)]
 pub(crate) enum DispatchedEvent {
-    Dad(DadEvent<WeakDeviceId<FakeNonSyncCtx>>),
     IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
     IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
     IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
     IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
     Ipv6RouteDiscovery(Ipv6RouteDiscoveryEvent<WeakDeviceId<FakeNonSyncCtx>>),
-}
-
-impl From<DadEvent<DeviceId<FakeNonSyncCtx>>> for DispatchedEvent {
-    fn from(e: DadEvent<DeviceId<FakeNonSyncCtx>>) -> DispatchedEvent {
-        let e = match e {
-            DadEvent::AddressAssigned { device, addr } => {
-                DadEvent::AddressAssigned { device: device.downgrade(), addr }
-            }
-        };
-
-        DispatchedEvent::Dad(e.into())
-    }
 }
 
 impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I>>
@@ -1000,13 +987,6 @@ impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for FakeNonSync
 
 impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSyncCtx {
     fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) {
-        let Self(this) = self;
-        this.on_event(DispatchedEvent::from(event))
-    }
-}
-
-impl EventContext<DadEvent<DeviceId<FakeNonSyncCtx>>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: DadEvent<DeviceId<FakeNonSyncCtx>>) {
         let Self(this) = self;
         this.on_event(DispatchedEvent::from(event))
     }
