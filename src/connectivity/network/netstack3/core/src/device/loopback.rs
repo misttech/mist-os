@@ -495,23 +495,28 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
 mod tests {
     use alloc::vec::Vec;
 
-    use lock_order::Locked;
-    use net_types::{
-        ip::{AddrSubnet, Ipv4, Ipv6},
-        SpecifiedAddr,
-    };
+    use ip_test_macro::ip_test;
+    use lock_order::{Locked, Unlocked};
+    use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6};
 
     use crate::{
+        context::testutil::FakeInstant,
         device::{DeviceId, Mtu},
         error::NotFoundError,
-        ip::device::state::{AssignedAddress, IpDeviceStateIpExt},
-        testutil::{FakeEventDispatcherConfig, TestIpExt, DEFAULT_INTERFACE_METRIC},
-        Ctx, NonSyncContext, SyncCtx,
+        ip::device::{
+            state::{AssignedAddress, IpDeviceState},
+            IpDeviceIpExt, IpDeviceStateAccessor,
+        },
+        testutil::{
+            FakeEventDispatcherConfig, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
+        },
+        Ctx, SyncCtx,
     };
 
+    const MTU: Mtu = Mtu::new(66);
+
     #[test]
-    fn test_loopback_methods() {
-        const MTU: Mtu = Mtu::new(66);
+    fn loopback_mtu() {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
         let device =
@@ -528,53 +533,58 @@ mod tests {
             crate::ip::IpDeviceContext::<Ipv6, _>::get_mtu(&mut Locked::new(sync_ctx), &device),
             MTU
         );
+    }
 
-        fn test<I: TestIpExt + IpDeviceStateIpExt, NonSyncCtx: NonSyncContext>(
-            sync_ctx: &mut &SyncCtx<NonSyncCtx>,
-            ctx: &mut NonSyncCtx,
-            device: &DeviceId<NonSyncCtx>,
-            get_addrs: fn(
-                &mut &SyncCtx<NonSyncCtx>,
-                &DeviceId<NonSyncCtx>,
-            ) -> Vec<SpecifiedAddr<I::Addr>>,
-        ) {
-            assert_eq!(get_addrs(sync_ctx, device), []);
+    #[ip_test]
+    fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpDeviceIpExt>()
+    where
+        for<'a> Locked<'a, SyncCtx<FakeNonSyncCtx>, Unlocked>:
+            IpDeviceStateAccessor<I, FakeInstant, DeviceId = DeviceId<FakeNonSyncCtx>>,
+    {
+        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let mut sync_ctx = &sync_ctx;
+        let device =
+            crate::device::add_loopback_device(&mut sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+                .expect("error adding loopback device")
+                .into();
+        crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
-            let FakeEventDispatcherConfig {
-                subnet,
-                local_ip,
-                local_mac: _,
-                remote_ip: _,
-                remote_mac: _,
-            } = I::FAKE_CONFIG;
-            let addr = AddrSubnet::from_witness(local_ip, subnet.prefix())
-                .expect("error creating AddrSubnet");
-            assert_eq!(crate::device::add_ip_addr_subnet(sync_ctx, ctx, device, addr), Ok(()));
-            let addr = addr.addr();
-            assert_eq!(&get_addrs(sync_ctx, device)[..], [addr]);
-
-            assert_eq!(crate::device::del_ip_addr(sync_ctx, ctx, device, &addr), Ok(()));
-            assert_eq!(get_addrs(sync_ctx, device), []);
-
-            assert_eq!(
-                crate::device::del_ip_addr(sync_ctx, ctx, device, &addr),
-                Err(NotFoundError)
-            );
-        }
-
-        test::<Ipv4, _>(&mut sync_ctx, &mut non_sync_ctx, &device, |sync_ctx, device| {
-            crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
-                &mut Locked::new(*sync_ctx),
-                device,
-                |state| state.ip_state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>(),
+        let get_addrs = || {
+            crate::ip::device::IpDeviceStateAccessor::<I, _>::with_ip_device_state(
+                &mut Locked::new(sync_ctx),
+                &device,
+                |state| {
+                    let state: &IpDeviceState<_, _> = state.as_ref();
+                    state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>()
+                },
             )
-        });
-        test::<Ipv6, _>(&mut sync_ctx, &mut non_sync_ctx, &device, |sync_ctx, device| {
-            crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
-                &mut Locked::new(*sync_ctx),
-                device,
-                |state| state.ip_state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>(),
-            )
-        });
+        };
+
+        let FakeEventDispatcherConfig {
+            subnet,
+            local_ip,
+            local_mac: _,
+            remote_ip: _,
+            remote_mac: _,
+        } = I::FAKE_CONFIG;
+        let addr =
+            AddrSubnet::from_witness(local_ip, subnet.prefix()).expect("error creating AddrSubnet");
+
+        assert_eq!(get_addrs(), []);
+
+        assert_eq!(
+            crate::device::add_ip_addr_subnet(sync_ctx, &mut non_sync_ctx, &device, addr),
+            Ok(())
+        );
+        let addr = addr.addr();
+        assert_eq!(&get_addrs()[..], [addr]);
+
+        assert_eq!(crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, &addr), Ok(()));
+        assert_eq!(get_addrs(), []);
+
+        assert_eq!(
+            crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, &addr),
+            Err(NotFoundError)
+        );
     }
 }
