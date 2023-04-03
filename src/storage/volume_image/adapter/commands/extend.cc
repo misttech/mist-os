@@ -59,6 +59,10 @@ fpromise::result<void, std::string> Extend(const ExtendParams& params) {
   }
 
   if (params.length.value() < static_cast<uint64_t>(block_info_or.value().st_size)) {
+    if (params.should_use_max_partition_size) {
+      // Truncating an image is a NOP when this flag is set.
+      return fpromise::ok();
+    }
     return fpromise::error("|length|(" + std::to_string(params.length.value()) +
                            ") must be greater or equal than |disk_size|(" +
                            std::to_string(block_info_or.value().st_size) + " bytes)");
