@@ -10,6 +10,7 @@
 
 #include <iomanip>
 #include <limits>
+#include <utility>
 
 #include "src/media/audio/audio_core/shared/mixer/mixer.h"
 #include "src/media/audio/audio_core/shared/pin_executable_memory.h"
@@ -21,7 +22,7 @@ namespace media::audio {
 
 namespace {
 void DumpStageMetrics(std::ostringstream& os, const StageMetrics& metrics) {
-  os << std::string_view(metrics.name) << ": "
+  os << metrics.name.c_str() << ": "
      << "wall_time = " << metrics.wall_time.to_nsecs() << " ns, "
      << "cpu_time = " << metrics.cpu_time.to_nsecs() << " ns, "
      << "queue_time = " << metrics.queue_time.to_nsecs() << " ns, "
@@ -40,8 +41,8 @@ AudioOutput::AudioOutput(const std::string& name, const DeviceConfig& config,
                          LinkMatrix* link_matrix,
                          std::shared_ptr<AudioCoreClockFactory> clock_factory,
                          EffectsLoaderV2* effects_loader_v2, std::unique_ptr<AudioDriver> driver)
-    : AudioDevice(Type::Output, name, config, threading_model, registry, link_matrix, clock_factory,
-                  std::move(driver)),
+    : AudioDevice(Type::Output, name, config, threading_model, registry, link_matrix,
+                  std::move(clock_factory), std::move(driver)),
       reporter_(Reporter::Singleton().CreateOutputDevice(name, mix_domain().name())),
       effects_loader_v2_(effects_loader_v2) {
   SetNextSchedTimeMono(async::Now(mix_domain().dispatcher()));
@@ -205,7 +206,7 @@ std::shared_ptr<OutputPipeline> AudioOutput::CreateOutputPipeline(
     TimelineFunction device_reference_clock_to_fractional_frame, std::shared_ptr<Clock> ref_clock) {
   auto pipeline = std::make_unique<OutputPipelineImpl>(
       config, volume_curve, effects_loader_v2_, max_block_size_frames,
-      device_reference_clock_to_fractional_frame, ref_clock);
+      device_reference_clock_to_fractional_frame, std::move(ref_clock));
   pipeline->SetPresentationDelay(presentation_delay());
   return pipeline;
 }

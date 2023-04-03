@@ -127,7 +127,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
   }
 
   // Return the index of the peak sample, relative to the first frame in the slice.
-  Peak FindPeak(AudioBufferSlice<ASF::FLOAT> slice) {
+  static Peak FindPeak(AudioBufferSlice<ASF::FLOAT> slice) {
     EXPECT_TRUE(slice.format().channels() == 1) << "Channels must match";
     EXPECT_TRUE(slice.NumFrames() >= 1) << "Slice must contain data";
     int64_t peak_idx = 0;

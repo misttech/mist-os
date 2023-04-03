@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <utility>
 
 #include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/reporter.h"
@@ -72,7 +73,7 @@ DriverOutput::DriverOutput(const std::string& name, const DeviceConfig& config,
                            LinkMatrix* link_matrix,
                            std::shared_ptr<AudioCoreClockFactory> clock_factory,
                            EffectsLoaderV2* effects_loader_v2)
-    : AudioOutput(name, config, threading_model, registry, link_matrix, clock_factory,
+    : AudioOutput(name, config, threading_model, registry, link_matrix, std::move(clock_factory),
                   effects_loader_v2, std::make_unique<AudioDriver>(this)),
       low_water_duration_(mix_profile_config.period),
       high_water_duration_(low_water_duration_ + mix_profile_config.period),
@@ -237,13 +238,11 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
       frames_sent_ = fill_target;
       ScheduleNextLowWaterWakeup();
       return std::nullopt;
-    } else {
-      // Looks like we recovered.  Log and go back to mixing.
-      FX_LOGS(WARNING) << "OUTPUT UNDERFLOW: Recovered after "
-                       << (mono_time - underflow_start_time_mono_).to_msecs() << " ms.";
-      underflow_start_time_mono_ = zx::time(0);
-      underflow_cooldown_deadline_mono_ = zx::time(0);
-    }
+    }  // Looks like we recovered.  Log and go back to mixing.
+    FX_LOGS(WARNING) << "OUTPUT UNDERFLOW: Recovered after "
+                     << (mono_time - underflow_start_time_mono_).to_msecs() << " ms.";
+    underflow_start_time_mono_ = zx::time(0);
+    underflow_cooldown_deadline_mono_ = zx::time(0);
   }
 
   // Compute the number of frames which are currently "in flight".  We define

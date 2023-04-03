@@ -65,12 +65,13 @@ class AudioAdminTest : public HermeticAudioTest {
         fuchsia::media::LoopbackAudioCapturerConfiguration()));
   }
 
-  std::pair<zx::time, zx::time> ComputePlayAndCaptureTimes(
+  static std::pair<zx::time, zx::time> ComputePlayAndCaptureTimes(
       std::initializer_list<AudioRendererShim<kSampleFormat>*> renderers);
 
   // Expect that the given packet contains nothing but the given samples.
-  void ExpectPacketContains(std::string label, const AudioBuffer<kSampleFormat>& packet,
-                            int64_t expected_frames_per_packet, int16_t expected_data);
+  static void ExpectPacketContains(const std::string& label,
+                                   const AudioBuffer<kSampleFormat>& packet,
+                                   int64_t expected_frames_per_packet, int16_t expected_data);
 
   void TestCaptureMuteRender(bool set_usage_to_disable);
 
@@ -113,8 +114,8 @@ void AudioAdminTest::SetUpVirtualAudioInput() {
   auto input = CreateInput(kUniqueId, kFormat, kRingBufferFrames);
 
   AudioBuffer buf(kFormat, kRingBufferFrames);
-  for (auto k = 0u; k < buf.samples().size(); k++) {
-    buf.samples()[k] = kVirtualInputSampleValue;
+  for (decltype(buf)::SampleT& k : buf.samples()) {
+    k = kVirtualInputSampleValue;
   }
   input->WriteRingBufferAt(0, &buf);
 }
@@ -127,8 +128,8 @@ AudioRendererShim<kSampleFormat>* AudioAdminTest::SetUpRenderer(
   auto r = CreateAudioRenderer(kFormat, kRingBufferFrames, usage);
 
   AudioBuffer buf(kFormat, kRingBufferFrames);
-  for (auto k = 0u; k < buf.samples().size(); k++) {
-    buf.samples()[k] = data;
+  for (decltype(buf)::SampleT& k : buf.samples()) {
+    k = data;
   }
   r->payload().Append(AudioBufferSlice(&buf));
   return r;
@@ -168,7 +169,7 @@ std::pair<zx::time, zx::time> AudioAdminTest::ComputePlayAndCaptureTimes(
   return std::make_pair(play_time, capture_time);
 }
 
-void AudioAdminTest::ExpectPacketContains(std::string label,
+void AudioAdminTest::ExpectPacketContains(const std::string& label,
                                           const AudioBuffer<kSampleFormat>& packet,
                                           int64_t expected_frames_per_packet,
                                           int16_t expected_data) {

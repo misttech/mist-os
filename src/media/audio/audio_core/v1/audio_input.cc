@@ -7,6 +7,7 @@
 #include <lib/trace/event.h>
 
 #include <algorithm>
+#include <utility>
 
 #include "src/media/audio/audio_core/v1/audio_driver.h"
 
@@ -30,8 +31,8 @@ AudioInput::AudioInput(const std::string& name, const DeviceConfig& config,
                        ThreadingModel* threading_model, DeviceRegistry* registry,
                        LinkMatrix* link_matrix,
                        std::shared_ptr<AudioCoreClockFactory> clock_factory)
-    : AudioDevice(Type::Input, name, config, threading_model, registry, link_matrix, clock_factory,
-                  std::make_unique<AudioDriver>(this)),
+    : AudioDevice(Type::Input, name, config, threading_model, registry, link_matrix,
+                  std::move(clock_factory), std::make_unique<AudioDriver>(this)),
       initial_stream_channel_(stream_config.TakeChannel()),
       reporter_(Reporter::Singleton().CreateInputDevice(name, mix_domain().name())) {}
 

@@ -11,7 +11,7 @@ namespace media::audio::testing {
 
 class FakePlugDetector : public PlugDetector {
  public:
-  virtual ~FakePlugDetector() = default;
+  ~FakePlugDetector() override = default;
 
   // |media::audio::PlugDetector|
   zx_status_t Start(Observer o) override {

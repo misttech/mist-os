@@ -46,7 +46,8 @@ class AudioLoopbackStressTest : public HermeticAudioTest {
   // Represents a pointer to a specific frame in a vector of packets.
   using PacketAndFrameIdx = std::pair<std::vector<CapturedPacket>::const_iterator, size_t>;
 
-  std::optional<PacketAndFrameIdx> FirstNonSilentFrame(const std::vector<CapturedPacket>& packets) {
+  static std::optional<PacketAndFrameIdx> FirstNonSilentFrame(
+      const std::vector<CapturedPacket>& packets) {
     for (auto p = packets.begin(); p != packets.end(); p++) {
       for (auto f = 0; f < p->data.NumFrames(); f++) {
         if (p->data.SampleAt(f, 0)) {
@@ -139,7 +140,7 @@ TEST_F(AudioLoopbackStressTest, SingleLongCapture) {
   auto end_time = start_time + zx::nsec(ns_per_frame.Scale(input.NumFrames() + 1));
 
   RunLoopUntil([&captured_packets, end_time]() {
-    return captured_packets.size() > 0 && captured_packets.back().pts > end_time.get();
+    return !captured_packets.empty() && captured_packets.back().pts > end_time.get();
   });
 
   // Stop the capturer so we don't overflow while doing the following checks.

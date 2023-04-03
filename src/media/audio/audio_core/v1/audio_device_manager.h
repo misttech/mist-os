@@ -37,7 +37,7 @@ class AudioDeviceManager : public fuchsia::media::AudioDeviceEnumerator, public 
                      LinkMatrix& link_matrix, ProcessConfig& process_config,
                      std::shared_ptr<AudioCoreClockFactory> clock_factory,
                      DeviceRouter& device_router, EffectsLoaderV2* effects_loader_v2);
-  ~AudioDeviceManager();
+  ~AudioDeviceManager() override;
 
   fidl::InterfaceRequestHandler<fuchsia::media::AudioDeviceEnumerator> GetFidlRequestHandler() {
     return bindings_.GetHandler(this);
@@ -98,7 +98,7 @@ class AudioDeviceManager : public fuchsia::media::AudioDeviceEnumerator, public 
   void GetDefaultOutputDevice(GetDefaultOutputDeviceCallback cbk) final;
   void AddDeviceByChannel(
       std::string device_name, bool is_input,
-      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel) final;
+      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) final;
 
  private:
   // Find the most-recently plugged device (per type: input or output) excluding throttle_output. If

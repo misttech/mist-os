@@ -145,8 +145,8 @@ class AudioDevice : public AudioObject, public std::enable_shared_from_this<Audi
   }
 
  protected:
-  AudioDevice(Type type, const std::string& name, const DeviceConfig& config,
-              ThreadingModel* threading_model, DeviceRegistry* registry, LinkMatrix* link_matrix,
+  AudioDevice(Type type, std::string name, DeviceConfig config, ThreadingModel* threading_model,
+              DeviceRegistry* registry, LinkMatrix* link_matrix,
               std::shared_ptr<AudioCoreClockFactory> clock_factory,
               std::unique_ptr<AudioDriver> driver);
 
@@ -229,7 +229,7 @@ class AudioDevice : public AudioObject, public std::enable_shared_from_this<Audi
       FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token()) {
     TRACE_DURATION("audio", "AudioDevice::OnDriverPlugStateChange");
     threading_model().FidlDomain().PostTask([output = shared_from_this(), plugged, plug_time]() {
-      output->device_registry().OnPlugStateChanged(std::move(output), plugged, plug_time);
+      output->device_registry().OnPlugStateChanged(output, plugged, plug_time);
     });
   }
 

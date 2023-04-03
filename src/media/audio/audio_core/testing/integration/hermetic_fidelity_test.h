@@ -92,7 +92,7 @@ class HermeticFidelityTest : public HermeticPipelineTest {
     std::vector<EffectConfig> effect_configs;
   };
 
-  static const std::array<double, HermeticFidelityTest::kNumReferenceFreqs> FillArray(double val);
+  static std::array<double, HermeticFidelityTest::kNumReferenceFreqs> FillArray(double val);
 
   void SetUp() override;
 
@@ -130,7 +130,7 @@ class HermeticFidelityTest : public HermeticPipelineTest {
     HermeticPipelineTest::TearDown();
   }
 
-  int32_t FrequencyToPeriods(int32_t device_frame_rate, int32_t frequency);
+  static int32_t FrequencyToPeriods(int32_t device_frame_rate, int32_t frequency);
   template <fuchsia::media::AudioSampleFormat InputFormat,
             fuchsia::media::AudioSampleFormat OutputFormat>
   std::vector<Frequency> GetTestFrequencies(

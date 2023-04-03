@@ -7,6 +7,8 @@
 #include <lib/fpromise/bridge.h>
 #include <lib/trace/event.h>
 
+#include <utility>
+
 #include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/shared/logging_flags.h"
 #include "src/media/audio/audio_core/shared/select_best_format.h"
@@ -35,28 +37,27 @@ const DeviceConfig::DeviceProfile& AudioDevice::profile() const {
     }
     const auto& device_id = driver_->persistent_unique_id();
     return config_.output_device_profile(device_id);
-  } else {
-    if (!driver_) {
-      return config_.default_input_device_profile();
-    }
-    const auto& device_id = driver_->persistent_unique_id();
-    return config_.input_device_profile(device_id);
   }
+  if (!driver_) {
+    return config_.default_input_device_profile();
+  }
+  const auto& device_id = driver_->persistent_unique_id();
+  return config_.input_device_profile(device_id);
 }
 
-AudioDevice::AudioDevice(AudioObject::Type type, const std::string& name,
-                         const DeviceConfig& config, ThreadingModel* threading_model,
-                         DeviceRegistry* registry, LinkMatrix* link_matrix,
+AudioDevice::AudioDevice(AudioObject::Type type, std::string name, DeviceConfig config,
+                         ThreadingModel* threading_model, DeviceRegistry* registry,
+                         LinkMatrix* link_matrix,
                          std::shared_ptr<AudioCoreClockFactory> clock_factory,
                          std::unique_ptr<AudioDriver> driver)
     : AudioObject(type),
-      name_(name),
-      clock_factory_(clock_factory),
+      name_(std::move(name)),
+      clock_factory_(std::move(clock_factory)),
       device_registry_(*registry),
       threading_model_(*threading_model),
       mix_domain_(threading_model->AcquireMixDomain(type == Type::Input ? "input-device"
                                                                         : "output-device")),
-      config_(config),
+      config_(std::move(config)),
       driver_(std::move(driver)),
       link_matrix_(*link_matrix) {
   FX_DCHECK(registry);
@@ -112,7 +113,7 @@ void AudioDevice::SetSoftwareGainInfo(const fuchsia::media::AudioGainInfo& info)
   } else {
     // For inputs, change the gain of all links where it is the source.
     FX_DCHECK(is_input());
-    link_matrix_.ForEachDestLink(*this, [&info, muted](LinkMatrix::LinkHandle link) {
+    link_matrix_.ForEachDestLink(*this, [&info, muted](const LinkMatrix::LinkHandle& link) {
       if (link.object->type() == AudioObject::Type::AudioCapturer) {
         if constexpr (kLogSetDeviceGainMuteActions) {
           if (muted) {
@@ -190,7 +191,7 @@ void AudioDevice::ActivateSelf() {
 
     // Now poke our manager.
     threading_model().FidlDomain().PostTask(
-        [self = shared_from_this()]() { self->device_registry().ActivateDevice(std::move(self)); });
+        [self = shared_from_this()]() { self->device_registry().ActivateDevice(self); });
   }
 }
 

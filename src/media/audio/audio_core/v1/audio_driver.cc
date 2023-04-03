@@ -248,14 +248,13 @@ bool AudioDriver::ValidatePcmSupportedFormats(
       FX_LOGS(WARNING) << (is_input ? " Input" : "Output") << " PcmSupportedFormats["
                        << format_index << "].frame_rates contains no entries";
       return false;
-    } else {
-      if constexpr (kLogAudioDriverFormats) {
-        std::ostringstream out;
-        for (const auto rate : formats[format_index].frame_rates()) {
-          out << rate << " ";
-        }
-        FX_LOGS(INFO) << " frame_rates: [ " << out.str() << "]";
+    }
+    if constexpr (kLogAudioDriverFormats) {
+      std::ostringstream out;
+      for (const auto rate : formats[format_index].frame_rates()) {
+        out << rate << " ";
       }
+      FX_LOGS(INFO) << " frame_rates: [ " << out.str() << "]";
     }
 
     auto& channel_sets = formats[format_index].channel_sets();
@@ -349,14 +348,11 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
       if (chan_set_attribs.size() != channels) {
         continue;
       }
-      for (size_t channel_index = 0u; channel_index < chan_set_attribs.size(); ++channel_index) {
+      for (const auto& chan_set_attrib : chan_set_attribs) {
         // If a frequency range doesn't specify min or max, assume it extends to the boundary.
-        channel_config.push_back({chan_set_attribs[channel_index].has_min_frequency()
-                                      ? chan_set_attribs[channel_index].min_frequency()
-                                      : 0u,
-                                  chan_set_attribs[channel_index].has_max_frequency()
-                                      ? chan_set_attribs[channel_index].max_frequency()
-                                      : (max_rate / 2)});
+        channel_config.emplace_back(
+            chan_set_attrib.has_min_frequency() ? chan_set_attrib.min_frequency() : 0u,
+            chan_set_attrib.has_max_frequency() ? chan_set_attrib.max_frequency() : (max_rate / 2));
       }
       found_channel_set_match = true;
       break;
@@ -412,7 +408,7 @@ zx_status_t AudioDriver::Configure(const Format& format, zx::duration min_ring_b
   pcm.valid_bits_per_sample = format.valid_bits_per_channel();
   pcm.frame_rate = frames_per_second;
   pcm.sample_format = driver_format.sample_format;
-  fidl_format.set_pcm_format(std::move(pcm));
+  fidl_format.set_pcm_format(pcm);
 
   if (!stream_config_fidl_.is_bound()) {
     FX_LOGS(ERROR) << "Stream channel lost";

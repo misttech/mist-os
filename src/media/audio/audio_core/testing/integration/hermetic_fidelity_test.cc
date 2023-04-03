@@ -17,6 +17,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <utility>
 
 #include <test/thermal/cpp/fidl.h>
 
@@ -124,7 +125,7 @@ constexpr double kMaxFrequencyResponse = 0.0;
 constexpr double kMaxSignalToNoiseAndDistortion = 160.0;
 
 // static
-const std::array<double, HermeticFidelityTest::kNumReferenceFreqs> HermeticFidelityTest::FillArray(
+std::array<double, HermeticFidelityTest::kNumReferenceFreqs> HermeticFidelityTest::FillArray(
     double val) {
   std::array<double, HermeticFidelityTest::kNumReferenceFreqs> arr;
   arr.fill(val);
@@ -140,7 +141,7 @@ std::array<double, HermeticFidelityTest::kNumReferenceFreqs>& HermeticFidelityTe
       new std::map<ResultsIndex, std::array<double, HermeticFidelityTest::kNumReferenceFreqs>>();
 
   ResultsIndex index{
-      .test_name = test_name,
+      .test_name = std::move(test_name),
       .channel = channel,
   };
   if (results_level_db->find(index) == results_level_db->end()) {
@@ -161,7 +162,7 @@ std::array<double, HermeticFidelityTest::kNumReferenceFreqs>& HermeticFidelityTe
       new std::map<ResultsIndex, std::array<double, HermeticFidelityTest::kNumReferenceFreqs>>();
 
   ResultsIndex index{
-      .test_name = test_name,
+      .test_name = std::move(test_name),
       .channel = channel,
   };
   if (results_sinad_db->find(index) == results_sinad_db->end()) {
@@ -449,7 +450,7 @@ void HermeticFidelityTest::DisplaySummaryResults(
     const TestCase<InputFormat, OutputFormat>& test_case,
     const std::vector<HermeticFidelityTest::Frequency>& frequencies_to_display) {
   // Loop by channel, displaying summary results, in a separate loop from checking each result.
-  std::string single_freq_info{""};
+  std::string single_freq_info;
   if (frequencies_to_display.size() == 1) {
     single_freq_info =
         fxl::Concatenate({" source ", std::to_string(frequencies_to_display[0].display_val),
@@ -618,7 +619,7 @@ void HermeticFidelityTest::Run(
     }
   }
 
-  for (auto effect_config : tc.effect_configs) {
+  for (const auto& effect_config : tc.effect_configs) {
     fuchsia::media::audio::EffectsController_UpdateEffect_Result result;
     auto status =
         effects_controller()->UpdateEffect(effect_config.name, effect_config.config, &result);

@@ -1065,10 +1065,10 @@ class AudioRendererEffectsV1Test : public AudioRendererPipelineTestInt16 {
     realm().Connect(effects_controller_.NewRequest());
   }
 
-  void RunInversionFilter(AudioBuffer<ASF::SIGNED_16>* audio_buffer_ptr) {
+  static void RunInversionFilter(AudioBuffer<ASF::SIGNED_16>* audio_buffer_ptr) {
     auto& samples = audio_buffer_ptr->samples();
-    for (auto sample = 0u; sample < samples.size(); sample++) {
-      samples[sample] = -samples[sample];
+    for (std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT& sample : samples) {
+      sample = -sample;
     }
   }
 
@@ -1220,7 +1220,7 @@ class AudioRendererEffectsV2Test : public AudioRendererPipelineTestFloat {
     });
   }
 
-  static zx_status_t Invert(uint64_t num_frames, float* input, float* output,
+  static zx_status_t Invert(uint64_t num_frames, const float* input, float* output,
                             float total_applied_gain_for_input,
                             std::vector<fuchsia_audio_effects::wire::ProcessMetrics>& metrics) {
     for (uint64_t k = 0; k < num_frames; k++) {
@@ -1259,7 +1259,7 @@ TEST_F(AudioRendererEffectsV2Test, RenderWithEffects) {
 
   // Simulate running the effect on the input buffer.
   std::vector<fuchsia_audio_effects::wire::ProcessMetrics> effects_metrics;
-  Invert(input_buffer.NumFrames(), &input_buffer.samples()[0], &input_buffer.samples()[0], 0,
+  Invert(input_buffer.NumFrames(), input_buffer.samples().data(), input_buffer.samples().data(), 0,
          effects_metrics);
 
   // The ring buffer should match the transformed input buffer for the first num_packets.
@@ -1320,10 +1320,10 @@ class AudioRendererPipelineTuningTest : public AudioRendererPipelineTestInt16 {
     realm().Connect(audio_tuner_.NewRequest());
   }
 
-  void RunInversionFilter(AudioBuffer<ASF::SIGNED_16>* audio_buffer_ptr) {
+  static void RunInversionFilter(AudioBuffer<ASF::SIGNED_16>* audio_buffer_ptr) {
     auto& samples = audio_buffer_ptr->samples();
-    for (auto sample = 0u; sample < samples.size(); sample++) {
-      samples[sample] = -samples[sample];
+    for (std::remove_pointer_t<decltype(audio_buffer_ptr)>::SampleT& sample : samples) {
+      sample = -sample;
     }
   }
 

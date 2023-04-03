@@ -33,7 +33,7 @@ class DriverOutput : public AudioOutput {
                LinkMatrix* link_matrix, std::shared_ptr<AudioCoreClockFactory> clock_factory,
                EffectsLoaderV2* effects_loader_v2);
 
-  ~DriverOutput();
+  ~DriverOutput() override;
 
   const PipelineConfig* pipeline_config() const override;
 
@@ -48,7 +48,7 @@ class DriverOutput : public AudioOutput {
   void OnWakeup() FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token()) override;
   std::optional<AudioOutput::FrameSpan> StartMixJob(zx::time ref_time)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token()) override;
-  void WriteMixOutput(int64_t start, int64_t length, const float* payload)
+  void WriteMixOutput(int64_t start, int64_t frames_left, const float* buffer)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token()) override;
   void FinishMixJob(const AudioOutput::FrameSpan& span)
       FXL_EXCLUSIVE_LOCKS_REQUIRED(mix_domain().token()) override;

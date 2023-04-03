@@ -34,7 +34,7 @@ class TraceDispatcher {
   async::Loop loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   trace::TraceProviderWithFdio trace_provider_;
 };
-static TraceDispatcher* const trace_dispatcher = new TraceDispatcher;
+TraceDispatcher const trace_dispatcher;
 }  // namespace
 
 namespace media::audio::test {
@@ -153,7 +153,7 @@ void HermeticAudioTest::SetUp() {
   //
   // Here, any devices missed by OnDeviceAdded are accounted for; OnDefaultDeviceChanged processes
   // the most recent pending_default_device_token_ once initial_devices_received_.
-  audio_dev_enum_->GetDevices([this](std::vector<fuchsia::media::AudioDeviceInfo> devices) {
+  audio_dev_enum_->GetDevices([this](const std::vector<fuchsia::media::AudioDeviceInfo>& devices) {
     for (const auto& info : devices) {
       if (token_to_unique_id_.count(info.token_id) == 0) {
         OnDeviceAdded(info);
@@ -338,7 +338,7 @@ void HermeticAudioTest::Unbind(RendererShimImpl* renderer) {
 }
 
 void HermeticAudioTest::WatchForDeviceArrivals() {
-  audio_dev_enum_.events().OnDeviceAdded = [this](fuchsia::media::AudioDeviceInfo info) {
+  audio_dev_enum_.events().OnDeviceAdded = [this](const fuchsia::media::AudioDeviceInfo& info) {
     if (token_to_unique_id_.count(info.token_id) > 0) {
       FAIL() << "Device with token " << info.token_id << " already exists";
     }
@@ -380,7 +380,7 @@ void HermeticAudioTest::WatchForDeviceArrivals() {
 }
 
 void HermeticAudioTest::WaitForDeviceDepartures() {
-  audio_dev_enum_.events().OnDeviceAdded = [](fuchsia::media::AudioDeviceInfo device) {
+  audio_dev_enum_.events().OnDeviceAdded = [](const fuchsia::media::AudioDeviceInfo& device) {
     ADD_FAILURE() << "Unexpected device " << device.unique_id << " added during shutdown";
   };
 
@@ -405,12 +405,8 @@ void HermeticAudioTest::WaitForDeviceDepartures() {
   };
 
   RunLoopUntil([this]() {
-    for (auto& it : devices_) {
-      if (!it.second.is_removed) {
-        return false;
-      }
-    }
-    return true;
+    return std::all_of(std::begin(devices_), std::end(devices_),
+                       [](const auto& it) { return it.second.is_removed; });
   });
 
   // Mute events, to avoid flakes from "unbind triggers an event elsewhere".
@@ -569,12 +565,11 @@ void HermeticAudioTest::ExpectNoCapturerOverflows() {
 
 void HermeticAudioTest::ExpectInspectMetrics(VirtualDevice* virtual_device,
                                              const ExpectedInspectProperties& props) {
+  std::string id = fxl::StringPrintf("%03lu", virtual_device->inspect_id());
   if (virtual_device->is_input()) {
-    ExpectInspectMetrics(
-        {"input devices", fxl::StringPrintf("%03lu", virtual_device->inspect_id())}, props);
+    ExpectInspectMetrics({"input devices", id}, props);
   } else {
-    ExpectInspectMetrics(
-        {"output devices", fxl::StringPrintf("%03lu", virtual_device->inspect_id())}, props);
+    ExpectInspectMetrics({"output devices", id}, props);
   }
 }
 
@@ -603,7 +598,7 @@ void HermeticAudioTest::ExpectInspectMetrics(const std::vector<std::string>& pat
 template <fuchsia::media::AudioSampleFormat OutputFormat>
 bool HermeticAudioTest::DeviceHasUnderflows(VirtualOutput<OutputFormat>* virtual_device) {
   auto root = realm_->ReadInspect(HermeticAudioRealm::kAudioCore);
-  for (auto kind : {"device underflows", "pipeline underflows"}) {
+  for (const char* kind : {"device underflows", "pipeline underflows"}) {
     std::vector<std::string> path = {
         "output devices",
         fxl::StringPrintf("%03lu", virtual_device->inspect_id()),

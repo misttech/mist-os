@@ -153,7 +153,7 @@ RendererShimImpl::PacketVector RendererShimImpl::AppendPackets(
     });
 
     // Copy the slice data.
-    memmove(&pending_packets_.back().slice_bytes[0],
+    memmove(pending_packets_.back().slice_bytes.data(),
             &slice.buf()->samples()[slice.SampleIndex(0, 0)], slice.NumBytes());
   }
 
@@ -251,12 +251,7 @@ void RendererShimImpl::WaitForPackets(TestFixture* fixture,
   // executed yet.
   fixture->RunLoopWithTimeout(timeout);
   fixture->RunLoopUntil([packets]() {
-    for (auto& p : packets) {
-      if (!p->returned) {
-        return false;
-      }
-    }
-    return true;
+    return std::all_of(packets.begin(), packets.end(), [](const auto& p) { return p->returned; });
   });
   fixture->ExpectNoUnexpectedErrors("during WaitForPackets");
 }
@@ -264,7 +259,7 @@ void RendererShimImpl::WaitForPackets(TestFixture* fixture,
 // Explicitly instantiate all possible implementations.
 #define INSTANTIATE(T)                                                                          \
   template RendererShimImpl::PacketVector RendererShimImpl::AppendPackets<T>(                   \
-      const std::vector<AudioBufferSlice<T>>&, int64_t);                                        \
+      const std::vector<AudioBufferSlice<(T)>>&, int64_t);                                      \
   template RendererShimImpl::PacketVector RendererShimImpl::AppendSlice<T>(AudioBufferSlice<T>, \
                                                                            int64_t, int64_t);
 
