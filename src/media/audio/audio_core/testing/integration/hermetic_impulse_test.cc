@@ -10,6 +10,7 @@
 #include "src/lib/files/file.h"
 #include "src/lib/files/path.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"
 #include "src/media/audio/lib/analysis/analysis.h"
 #include "src/media/audio/lib/analysis/generators.h"
@@ -80,7 +81,7 @@ void HermeticImpulseTest::Run(const HermeticImpulseTest::TestCase<InputFormat, O
   auto ring_buffer = device->SnapshotRingBuffer();
   // If underflows occurred during our testing, SKIP (don't pass or fail).
   // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-  if (DeviceHasUnderflows(device)) {
+  if (DeviceHasUnderflows(DeviceUniqueIdToString(AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS))) {
     GTEST_SKIP() << "Skipping impulse position checks due to underflows";
     __builtin_unreachable();
   }

@@ -14,6 +14,7 @@
 #include <set>
 #include <vector>
 
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/analysis/generators.h"
 #include "src/media/audio/lib/test/comparators.h"
@@ -75,9 +76,10 @@ TEST_F(AudioLoopbackStressTest, SingleLongCapture) {
   // is larger than all buffers inside audio_core, which are typically <= 1s. Hence, 10s
   // should be sufficient here.
   constexpr auto kInputDurationSeconds = 10;
+  constexpr audio_stream_unique_id_t kUniqueId{{0xff, 0x00}};
 
   // The output device, renderers, and capturer can each store exactly 1s of audio data.
-  auto output = CreateOutput({{0xff, 0x00}}, kFormat, kPayloadFrames);
+  [[maybe_unused]] auto output = CreateOutput(kUniqueId, kFormat, kPayloadFrames);
   auto renderer = CreateAudioRenderer(kFormat, kPayloadFrames);
   auto capturer = CreateAudioCapturer(kFormat, kPayloadFrames,
                                       fuchsia::media::AudioCapturerConfiguration::WithLoopback(
@@ -151,7 +153,7 @@ TEST_F(AudioLoopbackStressTest, SingleLongCapture) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }

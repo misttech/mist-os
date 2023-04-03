@@ -201,7 +201,7 @@ VirtualOutput<SampleFormat>* HermeticAudioTest::CreateOutput(
 
   auto ptr = std::make_unique<VirtualOutput<SampleFormat>>(
       static_cast<TestFixture*>(this), realm_.get(), device_id, format, frame_count,
-      virtual_output_next_inspect_id_++, plug_properties, device_gain_db, device_clock_properties);
+      plug_properties, device_gain_db, device_clock_properties);
   auto out = ptr.get();
   auto id = DeviceUniqueIdToString(device_id);
   devices_[id].virtual_device = std::move(ptr);
@@ -226,7 +226,7 @@ VirtualInput<SampleFormat>* HermeticAudioTest::CreateInput(
 
   auto ptr = std::make_unique<VirtualInput<SampleFormat>>(
       static_cast<TestFixture*>(this), realm_.get(), device_id, format, frame_count,
-      virtual_input_next_inspect_id_++, plug_properties, device_gain_db, device_clock_properties);
+      plug_properties, device_gain_db, device_clock_properties);
   auto out = ptr.get();
   auto id = DeviceUniqueIdToString(device_id);
   devices_[id].virtual_device = std::move(ptr);
@@ -246,7 +246,7 @@ AudioRendererShim<SampleFormat>* HermeticAudioTest::CreateAudioRenderer(
     std::optional<zx::clock> reference_clock, std::optional<float> initial_gain_db) {
   auto ptr = std::make_unique<AudioRendererShim<SampleFormat>>(
       static_cast<TestFixture*>(this), audio_core_, format, frame_count, usage,
-      renderer_shim_next_inspect_id_++, std::move(reference_clock), initial_gain_db);
+      next_renderer_name_++, std::move(reference_clock), initial_gain_db);
   auto out = ptr.get();
   renderers_.push_back(std::move(ptr));
 
@@ -261,7 +261,7 @@ AudioCapturerShim<SampleFormat>* HermeticAudioTest::CreateAudioCapturer(
     fuchsia::media::AudioCapturerConfiguration config) {
   auto ptr = std::make_unique<AudioCapturerShim<SampleFormat>>(
       static_cast<TestFixture*>(this), audio_core_, format, frame_count, std::move(config),
-      capturer_shim_next_inspect_id_++);
+      next_capturer_name_++);
   auto out = ptr.get();
   capturers_.push_back(std::move(ptr));
   return out;
@@ -272,7 +272,7 @@ UltrasoundRendererShim<SampleFormat>* HermeticAudioTest::CreateUltrasoundRendere
     TypedFormat<SampleFormat> format, int64_t frame_count, bool wait_for_creation) {
   auto ptr = std::make_unique<UltrasoundRendererShim<SampleFormat>>(
       static_cast<TestFixture*>(this), ultrasound_factory_, format, frame_count,
-      renderer_shim_next_inspect_id_++);
+      next_renderer_name_++);
   auto out = ptr.get();
   renderers_.push_back(std::move(ptr));
 
@@ -287,7 +287,7 @@ UltrasoundCapturerShim<SampleFormat>* HermeticAudioTest::CreateUltrasoundCapture
     TypedFormat<SampleFormat> format, int64_t frame_count, bool wait_for_creation) {
   auto ptr = std::make_unique<UltrasoundCapturerShim<SampleFormat>>(
       static_cast<TestFixture*>(this), ultrasound_factory_, format, frame_count,
-      capturer_shim_next_inspect_id_++);
+      next_capturer_name_++);
   auto out = ptr.get();
   capturers_.push_back(std::move(ptr));
   if (wait_for_creation) {
@@ -522,9 +522,9 @@ void HermeticAudioTest::ExpectNoOverflowsOrUnderflows() {
 
 // Fail if data was lost because we awoke too late to provide data.
 void HermeticAudioTest::ExpectNoOutputUnderflows() {
-  for (auto& [_, device] : devices_) {
+  for (auto& [id, device] : devices_) {
     if (!device.virtual_device->is_input()) {
-      ExpectInspectMetrics(device.virtual_device.get(),
+      ExpectInspectMetrics(device.virtual_device.get(), id,
                            {.children = {
                                 {"device underflows", {.uints = {{"count", 0}}}},
                             }});
@@ -535,9 +535,9 @@ void HermeticAudioTest::ExpectNoOutputUnderflows() {
 // Fail if pipeline processing took longer than expected (for now this includes cases where the
 // time overrun did not necessarily result in data loss).
 void HermeticAudioTest::ExpectNoPipelineUnderflows() {
-  for (auto& [_, device] : devices_) {
+  for (auto& [id, device] : devices_) {
     if (!device.virtual_device->is_input()) {
-      ExpectInspectMetrics(device.virtual_device.get(),
+      ExpectInspectMetrics(device.virtual_device.get(), id,
                            {.children = {
                                 {"pipeline underflows", {.uints = {{"count", 0}}}},
                             }});
@@ -564,23 +564,23 @@ void HermeticAudioTest::ExpectNoCapturerOverflows() {
 }
 
 void HermeticAudioTest::ExpectInspectMetrics(VirtualDevice* virtual_device,
+                                             const std::string& unique_id,
                                              const ExpectedInspectProperties& props) {
-  std::string id = fxl::StringPrintf("%03lu", virtual_device->inspect_id());
   if (virtual_device->is_input()) {
-    ExpectInspectMetrics({"input devices", id}, props);
+    ExpectInspectMetrics({"input devices", unique_id}, props);
   } else {
-    ExpectInspectMetrics({"output devices", id}, props);
+    ExpectInspectMetrics({"output devices", unique_id}, props);
   }
 }
 
 void HermeticAudioTest::ExpectInspectMetrics(RendererShimImpl* renderer,
                                              const ExpectedInspectProperties& props) {
-  ExpectInspectMetrics({"renderers", fxl::StringPrintf("%lu", renderer->inspect_id())}, props);
+  ExpectInspectMetrics({"renderers", renderer->name()}, props);
 }
 
 void HermeticAudioTest::ExpectInspectMetrics(CapturerShimImpl* capturer,
                                              const ExpectedInspectProperties& props) {
-  ExpectInspectMetrics({"capturers", fxl::StringPrintf("%lu", capturer->inspect_id())}, props);
+  ExpectInspectMetrics({"capturers", capturer->name()}, props);
 }
 
 void HermeticAudioTest::ExpectInspectMetrics(const std::vector<std::string>& path,
@@ -595,13 +595,12 @@ void HermeticAudioTest::ExpectInspectMetrics(const std::vector<std::string>& pat
   ExpectedInspectProperties::Check(props, path_string, *h);
 }
 
-template <fuchsia::media::AudioSampleFormat OutputFormat>
-bool HermeticAudioTest::DeviceHasUnderflows(VirtualOutput<OutputFormat>* virtual_device) {
+bool HermeticAudioTest::DeviceHasUnderflows(const std::string& unique_id) {
   auto root = realm_->ReadInspect(HermeticAudioRealm::kAudioCore);
   for (const char* kind : {"device underflows", "pipeline underflows"}) {
     std::vector<std::string> path = {
         "output devices",
-        fxl::StringPrintf("%03lu", virtual_device->inspect_id()),
+        unique_id,
         kind,
     };
     auto path_string = fxl::JoinStrings(path, "/");
@@ -643,8 +642,7 @@ bool HermeticAudioTest::DeviceHasUnderflows(VirtualOutput<OutputFormat>* virtual
   template UltrasoundCapturerShim<T>* HermeticAudioTest::CreateUltrasoundCapturer<T>(      \
       TypedFormat<T>, int64_t, bool);                                                      \
   template void HermeticAudioTest::Unbind<T>(AudioRendererShim<T> * renderer);             \
-  template void HermeticAudioTest::Unbind<T>(UltrasoundRendererShim<T> * renderer);        \
-  template bool HermeticAudioTest::DeviceHasUnderflows(VirtualOutput<T>* virtual_device);
+  template void HermeticAudioTest::Unbind<T>(UltrasoundRendererShim<T> * renderer);
 
 INSTANTIATE_FOR_ALL_FORMATS(INSTANTIATE)
 

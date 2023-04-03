@@ -8,6 +8,7 @@
 #include <zircon/device/audio.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"
 
@@ -97,13 +98,13 @@ void AudioAdminTest::TearDown() {
   HermeticAudioTest::TearDown();
 }
 
+constexpr audio_stream_unique_id_t kUniqueId{{0x4a, 0x41, 0x49, 0x4a, 0x4a, 0x41, 0x49, 0x4a, 0x4a,
+                                              0x41, 0x49, 0x4a, 0x4a, 0x41, 0x49, 0x4a}};
+
 // SetUpVirtualAudioOutput
 //
 // For loopback tests, setup the required audio output, using virtualaudio.
 void AudioAdminTest::SetUpVirtualAudioOutput() {
-  const audio_stream_unique_id_t kUniqueId{{0x4a, 0x41, 0x49, 0x4a, 0x4a, 0x41, 0x49, 0x4a, 0x4a,
-                                            0x41, 0x49, 0x4a, 0x4a, 0x41, 0x49, 0x4a}};
-
   output_ = CreateOutput(kUniqueId, kFormat, kRingBufferFrames);
 }
 
@@ -233,7 +234,7 @@ TEST_F(AudioAdminTest, SingleRenderStream) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -291,7 +292,7 @@ TEST_F(AudioAdminTest, RenderMuteCapture) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -362,7 +363,7 @@ void AudioAdminTest::TestCaptureMuteRender(bool set_usage_to_disable) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -434,7 +435,7 @@ TEST_F(AudioAdminTest, DualRenderStreamMix) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -511,7 +512,7 @@ TEST_F(AudioAdminTest, DualRenderStreamDucking) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -578,7 +579,7 @@ TEST_F(AudioAdminTest, DualRenderStreamMute) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -648,7 +649,7 @@ TEST_F(AudioAdminTest, DualCaptureStreamNone) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }
@@ -721,7 +722,7 @@ TEST_F(AudioAdminTest, DISABLED_DualCaptureStreamMute) {
   if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
     // In case of underflows, exit NOW (don't assess this buffer).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(output_)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
       GTEST_SKIP() << "Skipping data checks due to underflows";
       __builtin_unreachable();
     }

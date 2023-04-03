@@ -23,6 +23,7 @@
 
 #include "src/lib/fxl/strings/concatenate.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"
 #include "src/media/audio/lib/analysis/analysis.h"
 #include "src/media/audio/lib/analysis/generators.h"
@@ -746,7 +747,7 @@ void HermeticFidelityTest::Run(
 
     // In case of underflows, exit NOW (don't assess this buffer or run other frequencies).
     // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-    if (DeviceHasUnderflows(device)) {
+    if (DeviceHasUnderflows(DeviceUniqueIdToString(device_id))) {
       FX_LOGS(INFO) << "Test case will exit early: underflows were detected";
       break;
     }
@@ -893,7 +894,7 @@ void HermeticFidelityTest::Run(
   // Only check results and pass/fail if we made a complete set of measurements without underflows.
   // If there were underflows, SKIP (don't fail) so it won't look like a fidelity regression.
   // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-  if (DeviceHasUnderflows(device)) {
+  if (DeviceHasUnderflows(DeviceUniqueIdToString(device_id))) {
     GTEST_SKIP() << "Skipping threshold checks due to underflows";
     __builtin_unreachable();
   }

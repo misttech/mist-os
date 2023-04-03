@@ -43,7 +43,6 @@ AudioOutput::AudioOutput(const std::string& name, const DeviceConfig& config,
                          EffectsLoaderV2* effects_loader_v2, std::unique_ptr<AudioDriver> driver)
     : AudioDevice(Type::Output, name, config, threading_model, registry, link_matrix,
                   std::move(clock_factory), std::move(driver)),
-      reporter_(Reporter::Singleton().CreateOutputDevice(name, mix_domain().name())),
       effects_loader_v2_(effects_loader_v2) {
   SetNextSchedTimeMono(async::Now(mix_domain().dispatcher()));
 }
@@ -98,7 +97,8 @@ void AudioOutput::Process() {
                      << " ms. Detailed metrics:\n"
                      << os.str();
 
-      reporter().PipelineUnderflow(mono_now + MixDeadline(), mono_end);
+      ZX_DEBUG_ASSERT(reporter_.has_value());
+      reporter_.value()->PipelineUnderflow(mono_now + MixDeadline(), mono_end);
     }
   }
 
@@ -280,7 +280,8 @@ fpromise::promise<void, zx_status_t> AudioOutput::UpdateDeviceProfile(
 
 void AudioOutput::SetGainInfo(const fuchsia::media::AudioGainInfo& info,
                               fuchsia::media::AudioGainValidFlags set_flags) {
-  reporter_->SetGainInfo(info, set_flags);
+  ZX_DEBUG_ASSERT(reporter_.has_value());
+  reporter_.value()->SetGainInfo(info, set_flags);
   AudioDevice::SetGainInfo(info, set_flags);
 }
 

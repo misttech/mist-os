@@ -62,17 +62,14 @@ class VirtualDevice {
   // buffer offset is given by absolute_frame_number % ring_buffer_size.
   int64_t RingBufferFrameAtTimestamp(zx::time ref_time) const;
 
-  // For validating properties exported by inspect.
-  size_t inspect_id() const { return inspect_id_; }
-
   // Reports whether this is an input device.
   bool is_input() const { return is_input_; }
 
  protected:
   VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bool is_input,
                 const audio_stream_unique_id_t& device_id, Format format, int64_t frame_count,
-                size_t inspect_id, std::optional<PlugProperties> plug_properties,
-                float expected_gain_db, std::optional<ClockProperties> device_clock_properties);
+                std::optional<PlugProperties> plug_properties, float expected_gain_db,
+                std::optional<ClockProperties> device_clock_properties);
 
   VmoBackedBuffer& rb() { return rb_; }
 
@@ -83,7 +80,6 @@ class VirtualDevice {
   const bool is_input_;
   const Format format_;
   int64_t frame_count_;
-  const size_t inspect_id_;
   const float expected_gain_db_;
 
   fidl::InterfacePtr<fuchsia::virtualaudio::Device> fidl_;
@@ -114,10 +110,10 @@ class VirtualOutput : public VirtualDevice {
   // appropriately bound into the test realm.
   VirtualOutput(TestFixture* fixture, HermeticAudioRealm* realm,
                 const audio_stream_unique_id_t& device_id, Format format, int64_t frame_count,
-                size_t inspect_id, std::optional<PlugProperties> plug_properties,
-                float expected_gain_db, std::optional<ClockProperties> device_clock_properties)
+                std::optional<PlugProperties> plug_properties, float expected_gain_db,
+                std::optional<ClockProperties> device_clock_properties)
       : VirtualDevice(fixture, realm, /*is_input=*/false, device_id, format, frame_count,
-                      inspect_id, plug_properties, expected_gain_db, device_clock_properties) {}
+                      plug_properties, expected_gain_db, device_clock_properties) {}
 };
 
 template <fuchsia::media::AudioSampleFormat SampleFormat>
@@ -134,9 +130,9 @@ class VirtualInput : public VirtualDevice {
   // appropriately bound into the test realm.
   VirtualInput(TestFixture* fixture, HermeticAudioRealm* realm,
                const audio_stream_unique_id_t& device_id, Format format, int64_t frame_count,
-               size_t inspect_id, std::optional<PlugProperties> plug_properties,
-               float expected_gain_db, std::optional<ClockProperties> device_clock_properties)
-      : VirtualDevice(fixture, realm, /*is_input=*/true, device_id, format, frame_count, inspect_id,
+               std::optional<PlugProperties> plug_properties, float expected_gain_db,
+               std::optional<ClockProperties> device_clock_properties)
+      : VirtualDevice(fixture, realm, /*is_input=*/true, device_id, format, frame_count,
                       plug_properties, expected_gain_db, device_clock_properties) {}
 };
 

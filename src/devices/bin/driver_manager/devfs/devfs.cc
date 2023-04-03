@@ -480,10 +480,6 @@ Devfs::Devfs(std::optional<Devnode>& root,
       // TODO(https://fxbug.dev/113717): Remove.
       "aml-ram",
 
-      // TODO(https://fxbug.dev/113680): Remove these.
-      "audio-input",
-      "audio-output",
-
       // TODO(https://fxbug.dev/113718): Remove.
       // TODO(https://fxbug.dev/113842): Remove.
       "backlight",

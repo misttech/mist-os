@@ -106,7 +106,8 @@ class HermeticAudioTest : public TestFixture {
                                                                  bool wait_for_creation = true);
 
   // Validate inspect metrics.
-  void ExpectInspectMetrics(VirtualDevice* device, const ExpectedInspectProperties& props);
+  void ExpectInspectMetrics(VirtualDevice* device, const std::string& unique_id,
+                            const ExpectedInspectProperties& props);
   void ExpectInspectMetrics(RendererShimImpl* renderer, const ExpectedInspectProperties& props);
   void ExpectInspectMetrics(CapturerShimImpl* capturer, const ExpectedInspectProperties& props);
 
@@ -122,8 +123,7 @@ class HermeticAudioTest : public TestFixture {
   void ExpectNoRendererUnderflows();
   void ExpectNoCapturerOverflows();
 
-  template <fuchsia::media::AudioSampleFormat OutputFormat>
-  bool DeviceHasUnderflows(VirtualOutput<OutputFormat>* device);
+  bool DeviceHasUnderflows(const std::string& unique_id);
 
   // Unbind and forget about the given object.
   void Unbind(VirtualDevice* device);
@@ -199,10 +199,8 @@ class HermeticAudioTest : public TestFixture {
   fuchsia::ultrasound::FactoryPtr ultrasound_factory_;
   fuchsia::media::audio::EffectsControllerSyncPtr effects_controller_;
 
-  size_t capturer_shim_next_inspect_id_ = 1;
-  size_t renderer_shim_next_inspect_id_ = 1;
-  size_t virtual_output_next_inspect_id_ = 0;
-  size_t virtual_input_next_inspect_id_ = 0;
+  size_t next_capturer_name_ = 1;
+  size_t next_renderer_name_ = 1;
 };
 
 }  // namespace media::audio::test

@@ -14,6 +14,7 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_realm.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/audio_core/testing/integration/virtual_device.h"
@@ -127,7 +128,9 @@ class VirtioSoundGuestTest : public HermeticAudioTest {
 
   AudioBuffer<kSampleFormat> GetOutputRingBuffer() { return output_->SnapshotRingBuffer(); }
 
-  bool OutputHasUnderflows() { return DeviceHasUnderflows(output_); }
+  bool OutputHasUnderflows() {
+    return DeviceHasUnderflows(media::audio::DeviceUniqueIdToString(kOutputId));
+  }
 
  private:
   std::optional<GuestType> enclosed_guest_;

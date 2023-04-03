@@ -104,10 +104,10 @@ class RendererShimImpl {
   void ClearPayload() { payload_buffer_.Clear(); }
 
   // For validating properties exported by inspect.
-  size_t inspect_id() const { return inspect_id_; }
+  const std::string& name() const { return name_; }
 
  protected:
-  RendererShimImpl(Format format, int64_t payload_frame_count, size_t inspect_id);
+  RendererShimImpl(Format format, int64_t payload_frame_count, size_t name);
 
   void SetReferenceClock(TestFixture* fixture, const zx::clock& clock);
   void RetrieveReferenceClock(TestFixture* fixture);
@@ -129,7 +129,7 @@ class RendererShimImpl {
 
   const Format format_;
   const int64_t payload_frame_count_;
-  const size_t inspect_id_;
+  const std::string name_;
 
   zx::clock reference_clock_;
 
@@ -173,9 +173,9 @@ class AudioRendererShim : public RendererShimImpl {
   // appropriately bound into the test environment.
   AudioRendererShim(TestFixture* fixture, fuchsia::media::AudioCorePtr& audio_core, Format fmt,
                     int64_t payload_frame_count, fuchsia::media::AudioRenderUsage usage,
-                    size_t inspect_id, std::optional<zx::clock> reference_clock,
+                    size_t name, std::optional<zx::clock> reference_clock,
                     std::optional<float> initial_gain_db)
-      : RendererShimImpl(fmt, payload_frame_count, inspect_id) {
+      : RendererShimImpl(fmt, payload_frame_count, name) {
     audio_core->CreateAudioRenderer(fidl().NewRequest());
     fixture->AddErrorHandler(fidl(), "AudioRenderer");
     WatchEvents();
@@ -228,8 +228,8 @@ class UltrasoundRendererShim : public RendererShimImpl {
   // Don't call this directly. Use HermeticAudioTest::CreateUltrasoundRenderer so the object is
   // appropriately bound into the test environment.
   UltrasoundRendererShim(TestFixture* fixture, fuchsia::ultrasound::FactoryPtr& ultrasound_factory,
-                         Format fmt, int64_t payload_frame_count, size_t inspect_id)
-      : RendererShimImpl(fmt, payload_frame_count, inspect_id), fixture_(fixture) {
+                         Format fmt, int64_t payload_frame_count, size_t name)
+      : RendererShimImpl(fmt, payload_frame_count, name), fixture_(fixture) {
     ultrasound_factory->CreateRenderer(fidl().NewRequest(), [this](auto ref_clock,
                                                                    auto stream_type) {
       created_ = true;

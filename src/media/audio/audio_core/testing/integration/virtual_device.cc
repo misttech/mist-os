@@ -13,13 +13,12 @@ namespace media::audio::test {
 
 VirtualDevice::VirtualDevice(TestFixture* fixture, HermeticAudioRealm* realm, bool is_input,
                              const audio_stream_unique_id_t& device_id, Format format,
-                             int64_t frame_count, size_t inspect_id,
-                             std::optional<PlugProperties> plug_properties, float expected_gain_db,
+                             int64_t frame_count, std::optional<PlugProperties> plug_properties,
+                             float expected_gain_db,
                              std::optional<ClockProperties> device_clock_properties)
     : is_input_(is_input),
       format_(format),
       frame_count_(frame_count),
-      inspect_id_(inspect_id),
       expected_gain_db_(expected_gain_db),
       rb_(format, frame_count) {
   // Setup the device's configuration.

@@ -7,6 +7,7 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/testing/integration/renderer_shim.h"
 #include "src/media/audio/lib/format/audio_buffer.h"
 #include "src/media/audio/lib/wav/wav_writer.h"
@@ -91,7 +92,7 @@ void HermeticStepTest::Run(const HermeticStepTest::TestCase<InputFormat, OutputF
   auto ring_buffer = device->SnapshotRingBuffer();
   // If underflows occurred during our testing, SKIP (don't pass or fail).
   // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-  if (DeviceHasUnderflows(device)) {
+  if (DeviceHasUnderflows(DeviceUniqueIdToString(AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS))) {
     GTEST_SKIP() << "Skipping step magnitude checks due to underflows";
     __builtin_unreachable();
   }

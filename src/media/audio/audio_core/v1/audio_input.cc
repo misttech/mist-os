@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/v1/audio_driver.h"
 
 namespace media::audio {
@@ -33,8 +34,7 @@ AudioInput::AudioInput(const std::string& name, const DeviceConfig& config,
                        std::shared_ptr<AudioCoreClockFactory> clock_factory)
     : AudioDevice(Type::Input, name, config, threading_model, registry, link_matrix,
                   std::move(clock_factory), std::make_unique<AudioDriver>(this)),
-      initial_stream_channel_(stream_config.TakeChannel()),
-      reporter_(Reporter::Singleton().CreateInputDevice(name, mix_domain().name())) {}
+      initial_stream_channel_(stream_config.TakeChannel()) {}
 
 zx_status_t AudioInput::Init() {
   TRACE_DURATION("audio", "AudioInput::Init");
@@ -149,8 +149,10 @@ void AudioInput::OnDriverStartComplete() {
   if (!driver()->plugged()) {
     driver()->Stop();
   }
-
-  reporter_->SetDriverInfo(driver()->info_for_reporter());
+  reporter_
+      .emplace(Reporter::Singleton().CreateInputDevice(
+          DeviceUniqueIdToString(driver()->persistent_unique_id()), mix_domain().name()))
+      ->SetDriverInfo(driver()->info_for_reporter());
 }
 
 void AudioInput::OnDriverStopComplete() {
@@ -219,7 +221,8 @@ void AudioInput::ApplyGainLimits(fuchsia::media::AudioGainInfo* in_out_info,
 
 void AudioInput::SetGainInfo(const fuchsia::media::AudioGainInfo& info,
                              fuchsia::media::AudioGainValidFlags set_flags) {
-  reporter_->SetGainInfo(info, set_flags);
+  ZX_DEBUG_ASSERT(reporter_.has_value());
+  reporter_.value()->SetGainInfo(info, set_flags);
   AudioDevice::SetGainInfo(info, set_flags);
 }
 

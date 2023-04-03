@@ -4,6 +4,7 @@
 
 #include <string>
 
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/shared/mix_profile_config.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_pipeline_test.h"
 #include "src/media/audio/lib/analysis/generators.h"
@@ -135,7 +136,7 @@ class AudioCoreThermalTest : public HermeticPipelineTest {
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
       // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-      if (DeviceHasUnderflows(device)) {
+      if (DeviceHasUnderflows(DeviceUniqueIdToString(AUDIO_STREAM_UNIQUE_ID_BUILTIN_SPEAKERS))) {
         GTEST_SKIP() << "Skipping step magnitude checks due to underflows";
       }
     }

@@ -48,7 +48,8 @@ class AudioOutput : public AudioDevice {
               std::shared_ptr<AudioCoreClockFactory> clock_factory,
               EffectsLoaderV2* effects_loader_v2, std::unique_ptr<AudioDriver>);
 
-  Reporter::OutputDevice& reporter() { return *reporter_; }
+  std::optional<Reporter::Container<Reporter::OutputDevice, Reporter::kObjectsToCache>::Ptr>
+      reporter_;
   EffectsLoaderV2* effects_loader_v2() const { return effects_loader_v2_; }
 
   // |media::audio::AudioObject|
@@ -136,7 +137,6 @@ class AudioOutput : public AudioDevice {
   size_t max_block_size_frames_;
 
   std::shared_ptr<OutputPipeline> pipeline_;
-  Reporter::Container<Reporter::OutputDevice, Reporter::kObjectsToCache>::Ptr reporter_;
   EffectsLoaderV2* effects_loader_v2_;
 };
 

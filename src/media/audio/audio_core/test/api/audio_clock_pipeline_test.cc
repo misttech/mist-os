@@ -20,6 +20,7 @@
 
 #include <gmock/gmock.h>
 
+#include "src/media/audio/audio_core/shared/device_id.h"
 #include "src/media/audio/audio_core/shared/mixer/mixer.h"
 #include "src/media/audio/audio_core/testing/integration/hermetic_audio_test.h"
 #include "src/media/audio/lib/analysis/analysis.h"
@@ -43,6 +44,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
   static constexpr int32_t kFrameRate = 96000;
   static constexpr int64_t kPayloadFrames = 2 * kFrameRate;         // 2sec ring buffer
   static constexpr int64_t kPacketFrames = kFrameRate * 10 / 1000;  // 10ms packets
+  static constexpr audio_stream_unique_id_t kUniqueId{{0xff, 0x00}};
   static_assert((kFrameRate * 10) % 1000 == 0);
 
   ClockSyncPipelineTest() : format_(Format::Create<ASF::FLOAT>(1, kFrameRate).value()) {}
@@ -208,7 +210,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
       // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-      if (DeviceHasUnderflows(output_)) {
+      if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
         GTEST_SKIP() << "Skipping impulse checks due to underflows";
       }
     }
@@ -281,7 +283,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
       // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-      if (DeviceHasUnderflows(output_)) {
+      if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
         GTEST_SKIP() << "Skipping data checks due to underflows";
       }
     }
@@ -412,7 +414,7 @@ class ClockSyncPipelineTest : public HermeticAudioTest {
     if constexpr (!kEnableAllOverflowAndUnderflowChecksInRealtimeTests) {
       // In case of underflows, exit NOW (don't assess this buffer).
       // TODO(fxbug.dev/80003): Remove workarounds when underflow conditions are fixed.
-      if (DeviceHasUnderflows(output_)) {
+      if (DeviceHasUnderflows(DeviceUniqueIdToString(kUniqueId))) {
         GTEST_SKIP() << "Skipping data checks due to underflows";
       }
     }
@@ -527,7 +529,7 @@ class MicroSrcPipelineTest : public ClockSyncPipelineTest {
         ref_clock, ZX_RIGHT_DUPLICATE | ZX_RIGHT_TRANSFER | ZX_RIGHT_READ);
 
     // Buffer up to 2s of data.
-    output_ = CreateOutput({{0xff, 0x00}}, format_, kPayloadFrames);
+    output_ = CreateOutput(kUniqueId, format_, kPayloadFrames);
     renderer_ = CreateAudioRenderer(format_, kPayloadFrames,
                                     fuchsia::media::AudioRenderUsage::MEDIA, std::move(ref_clock));
 
@@ -559,8 +561,7 @@ class AdjustableClockPipelineTest : public ClockSyncPipelineTest {
     };
 
     // Buffer up to 2s of data.
-    output_ =
-        CreateOutput({{0xff, 0x00}}, format_, kPayloadFrames, std::nullopt, 0.0, clock_properties);
+    output_ = CreateOutput(kUniqueId, format_, kPayloadFrames, std::nullopt, 0.0, clock_properties);
 
     // With this uninitialized clock, instruct AudioRenderer to use AudioCore's clock.
     renderer_ = CreateAudioRenderer(format_, kPayloadFrames,
