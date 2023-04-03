@@ -4,11 +4,11 @@
 
 //! Duplicate Address Detection.
 
-use core::{num::NonZeroU8, time::Duration};
+use core::num::NonZeroU8;
 
 use log::debug;
 use net_types::{ip::Ipv6Addr, MulticastAddr, UnicastAddr, Witness as _};
-use packet_formats::icmp::ndp::NeighborSolicitation;
+use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
 
 use crate::{
     context::{EventContext, TimerContext},
@@ -23,15 +23,20 @@ pub(crate) struct DadTimerId<DeviceId> {
     pub(crate) addr: UnicastAddr<Ipv6Addr>,
 }
 
+/// Holds references to state associated with duplicate address detection.
+pub(super) struct DadStateRef<'a> {
+    /// A mutable reference to an address' state.
+    ///
+    /// `None` if the address is not recognized.
+    pub(super) address_state: Option<&'a mut AddressState>,
+    /// The time between DAD message retransmissions.
+    pub(super) retrans_timer: &'a NonZeroDuration,
+}
+
 /// The IP device context provided to DAD.
 pub(super) trait Ipv6DeviceDadContext<C>: DeviceIdContext<AnyDevice> {
-    /// Calls the callback function with a mutable reference to the address's
-    /// state and the NDP retransmission timer configured on the device if the
-    /// address exists on the interface.
-    fn with_address_state_and_retrans_timer<
-        O,
-        F: FnOnce(Option<(&mut AddressState, Duration)>) -> O,
-    >(
+    /// Calls the function with the DAD state associated with the address.
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
@@ -129,10 +134,10 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
     ) {
-        let send_msg = self.with_address_state_and_retrans_timer(device_id, addr, |state| {
-            let (state, retrans_timer) = state.unwrap_or_else(|| panic!("expected address to exist; addr={}", addr));
+        let send_msg = self.with_dad_state(device_id, addr, |DadStateRef { address_state, retrans_timer }| {
+            let address_state = address_state.unwrap_or_else(|| panic!("expected address to exist; addr={}", addr));
 
-            let remaining = match state {
+            let remaining = match address_state {
                 AddressState::Tentative { dad_transmits_remaining } => dad_transmits_remaining,
                 AddressState::Assigned => {
                     panic!("expected address to be tentative; addr={}", addr)
@@ -141,7 +146,7 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
 
             match remaining {
                 None => {
-                    *state = AddressState::Assigned;
+                    *address_state = AddressState::Assigned;
                     ctx.on_event(DadEvent::AddressAssigned { device: device_id.clone(), addr });
                     false
                 }
@@ -161,7 +166,7 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
                     //      Solicitation before ending the Duplicate Address Detection
                     //      process.
                     assert_eq!(
-                        ctx.schedule_timer(retrans_timer, DadTimerId { device_id: device_id.clone(), addr }),
+                        ctx.schedule_timer(retrans_timer.get(), DadTimerId { device_id: device_id.clone(), addr }),
                         None,
                         "Should not have a DAD timer set when performing DAD work; addr={}, device_id={}",
                         addr,
@@ -217,6 +222,8 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
 
 #[cfg(test)]
 mod tests {
+    use core::time::Duration;
+
     use packet::EmptyBuf;
     use packet_formats::icmp::ndp::Options;
 
@@ -233,7 +240,7 @@ mod tests {
     struct FakeDadContext {
         addr: UnicastAddr<Ipv6Addr>,
         state: AddressState,
-        retrans_timer: Duration,
+        retrans_timer: NonZeroDuration,
         ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
     }
 
@@ -254,17 +261,17 @@ mod tests {
     type FakeCtxImpl = FakeSyncCtx<FakeDadContext, DadMessageMeta, FakeDeviceId>;
 
     impl Ipv6DeviceDadContext<FakeNonSyncCtxImpl> for FakeCtxImpl {
-        fn with_address_state_and_retrans_timer<
-            O,
-            F: FnOnce(Option<(&mut AddressState, Duration)>) -> O,
-        >(
+        fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
             request_addr: UnicastAddr<Ipv6Addr>,
             cb: F,
         ) -> O {
             let FakeDadContext { addr, state, retrans_timer, ip_device_id_ctx: _ } = self.get_mut();
-            cb((*addr == request_addr).then(|| (state, *retrans_timer)))
+            cb(DadStateRef {
+                address_state: (*addr == request_addr).then(|| state),
+                retrans_timer: retrans_timer,
+            })
         }
     }
 
@@ -281,6 +288,8 @@ mod tests {
         }
     }
 
+    const RETRANS_TIMER: NonZeroDuration =
+        unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
     const DAD_ADDRESS: UnicastAddr<Ipv6Addr> =
         unsafe { UnicastAddr::new_unchecked(Ipv6Addr::new([0xa, 0, 0, 0, 0, 0, 0, 1])) };
     const OTHER_ADDRESS: UnicastAddr<Ipv6Addr> =
@@ -293,7 +302,7 @@ mod tests {
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
                 state: AddressState::Tentative { dad_transmits_remaining: None },
-                retrans_timer: Duration::default(),
+                retrans_timer: RETRANS_TIMER,
                 ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
@@ -311,7 +320,7 @@ mod tests {
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
                 state: AddressState::Assigned,
-                retrans_timer: Duration::default(),
+                retrans_timer: RETRANS_TIMER,
                 ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
@@ -328,7 +337,7 @@ mod tests {
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
                 state: AddressState::Tentative { dad_transmits_remaining: None },
-                retrans_timer: Duration::default(),
+                retrans_timer: RETRANS_TIMER,
                 ip_device_id_ctx: Default::default(),
             }));
         DadHandler::do_duplicate_address_detection(
@@ -354,7 +363,7 @@ mod tests {
         non_sync_ctx: &FakeNonSyncCtxImpl,
         frames_len: usize,
         dad_transmits_remaining: Option<NonZeroU8>,
-        retrans_timer: Duration,
+        retrans_timer: NonZeroDuration,
     ) {
         let FakeDadContext { addr: _, state, retrans_timer: _, ip_device_id_ctx: _ } =
             sync_ctx.get_ref();
@@ -371,13 +380,14 @@ mod tests {
         assert_eq!(options.iter().count(), 0);
         non_sync_ctx
             .timer_ctx()
-            .assert_timers_installed([(DAD_TIMER_ID, non_sync_ctx.now() + retrans_timer)]);
+            .assert_timers_installed([(DAD_TIMER_ID, non_sync_ctx.now() + retrans_timer.get())]);
     }
 
     #[test]
     fn perform_dad() {
         const DAD_TRANSMITS_REQUIRED: u8 = 2;
-        const RETRANS_TIMER: Duration = Duration::from_secs(1);
+        const RETRANS_TIMER: NonZeroDuration =
+            unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(1)) };
 
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
@@ -420,7 +430,8 @@ mod tests {
     #[test]
     fn stop_dad() {
         const DAD_TRANSMITS_REQUIRED: u8 = 2;
-        const RETRANS_TIMER: Duration = Duration::from_secs(2);
+        const RETRANS_TIMER: NonZeroDuration =
+            unsafe { NonZeroDuration::new_unchecked(Duration::from_secs(2)) };
 
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {

@@ -5,7 +5,7 @@
 //! The integrations for protocols built on top of an IP device.
 
 use alloc::boxed::Box;
-use core::{marker::PhantomData, num::NonZeroU8, time::Duration};
+use core::{marker::PhantomData, num::NonZeroU8};
 
 use net_types::{
     ip::{AddrSubnet, GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
@@ -24,7 +24,7 @@ use crate::{
         self,
         device::{
             self, add_ipv6_addr_subnet,
-            dad::{DadHandler, Ipv6DeviceDadContext, Ipv6LayerDadContext},
+            dad::{DadHandler, DadStateRef, Ipv6DeviceDadContext, Ipv6LayerDadContext},
             del_ipv6_addr, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
             is_ip_routing_enabled,
             route_discovery::{Ipv6RouteDiscoveryState, Ipv6RouteDiscoveryStateContext},
@@ -334,22 +334,20 @@ impl<
 impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContext<C>>
     Ipv6DeviceDadContext<C> for SC
 {
-    fn with_address_state_and_retrans_timer<
-        O,
-        F: FnOnce(Option<(&mut AddressState, Duration)>) -> O,
-    >(
+    fn with_dad_state<O, F: FnOnce(DadStateRef<'_>) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
         cb: F,
     ) -> O {
         self.with_ip_device_state_mut(device_id, |state| {
-            let retrans_timer = state.retrans_timer.get();
-            cb(state.ip_state.find_addr_mut(&addr).map(
-                |Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| {
-                    (state, retrans_timer)
-                },
-            ))
+            cb(DadStateRef {
+                address_state: state
+                    .ip_state
+                    .find_addr_mut(&addr)
+                    .map(|Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| state),
+                retrans_timer: &state.retrans_timer,
+            })
         })
     }
 }
