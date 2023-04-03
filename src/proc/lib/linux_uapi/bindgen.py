@@ -90,6 +90,7 @@ INCLUDE_DIRS = [
     'third_party/android/platform/bionic/libc/kernel/uapi',
     'third_party/android/platform/bionic/libc/kernel/android/uapi',
     'src/proc/lib/linux_uapi/stub',
+    'src/starnix/kernel/vdso',
 ]
 
 RAW_LINES = """// Copyright 2022 The Fuchsia Authors. All rights reserved.

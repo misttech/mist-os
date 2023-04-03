@@ -4,11 +4,16 @@
 
 #define EXPORT __attribute__((visibility("default")))
 #define WEAK __attribute__((weak, visibility("default")))
+#define __LOCAL __attribute__((__visibility__("hidden")))
 
 #include <inttypes.h>
 #include <sys/syscall.h>
 #include <sys/time.h>
 #include <time.h>
+
+#include "vdso-constants.h"
+
+extern __LOCAL struct vdso_constants DATA_CONSTANTS;
 
 extern "C" int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, intptr_t arg3) {
   int ret;
@@ -20,8 +25,21 @@ extern "C" int syscall(intptr_t syscall_number, intptr_t arg1, intptr_t arg2, in
 }
 
 extern "C" EXPORT int __vdso_clock_gettime(int clock_id, struct timespec* tp) {
-  int ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
-                    reinterpret_cast<intptr_t>(tp), 0);
+  int ret = 0;
+  const int64_t NSEC_PER_SEC = 1'000'000'000;
+  if ((clock_id == CLOCK_MONOTONIC) || (clock_id == CLOCK_MONOTONIC_RAW) ||
+      (clock_id == CLOCK_MONOTONIC_COARSE) || (clock_id == CLOCK_BOOTTIME)) {
+    uint64_t raw_ticks = __rdtsc();
+    uint64_t ticks = raw_ticks + DATA_CONSTANTS.raw_ticks_to_ticks_offset;
+    // TODO(mariagl): This could potentially overflow; Find a way to avoid this.
+    uint64_t monot_nsec =
+        ticks * DATA_CONSTANTS.ticks_to_mono_numerator / DATA_CONSTANTS.ticks_to_mono_denominator;
+    tp->tv_sec = monot_nsec / NSEC_PER_SEC;
+    tp->tv_nsec = monot_nsec % NSEC_PER_SEC;
+  } else {
+    ret = syscall(__NR_clock_gettime, static_cast<intptr_t>(clock_id),
+                  reinterpret_cast<intptr_t>(tp), 0);
+  }
   return ret;
 }
 

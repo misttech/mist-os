@@ -1,5 +1,8 @@
 SECTIONS {
   . = SIZEOF_HEADERS;
+  .rodata : {
+    *(.rodata*)
+   } :load
   .text : { *(.text*) } :load
   .note : { *(.note.gnu.build-id) } :load :note
   .hash : { *(.hash) } :load
@@ -14,6 +17,9 @@ SECTIONS {
   }
 
 }
+/* Entry point should not normally be used directly in vDSO, so here it is used to store
+   the offset at which vDSO constants are located, for easy reference. */
+ENTRY(DATA_CONSTANTS)
 
 PHDRS {
   /* The LOAD section must include at least FILEHDR so that it covers the start of the file.

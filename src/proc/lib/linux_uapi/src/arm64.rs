@@ -3832,6 +3832,8 @@ pub const XATTR_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"posix_acl_default\0") };
 pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr =
     unsafe { std::ffi::CStr::from_bytes_with_nul_unchecked(b"system.posix_acl_default\0") };
+pub const VDSO_CONSTANTS_ALIGN: u32 = 8;
+pub const VDSO_CONSTANTS_SIZE: u32 = 16;
 pub type wchar_t = crate::arm64_types::c_uint;
 #[repr(C)]
 #[repr(align(16))]
@@ -9259,6 +9261,13 @@ impl Default for iovec {
             s.assume_init()
         }
     }
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)]
+pub struct vdso_constants {
+    pub raw_ticks_to_ticks_offset: i64,
+    pub ticks_to_mono_numerator: u32,
+    pub ticks_to_mono_denominator: u32,
 }
 pub const _TIOCSPTLCK: __u32 = 1074025521;
 pub const TIOCSPTLCK: __u32 = 1074025521;
