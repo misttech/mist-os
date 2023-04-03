@@ -29,6 +29,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         "-o",
         type=str,
         dest="output",
+        metavar="FILE",
         help="compiler output",
         required=True,
     )
@@ -51,6 +52,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         type=str,
         dest="profile_list",
         default="",
+        metavar="FILE",
         help="profile list",
     )
     parser.add_argument(
@@ -58,6 +60,7 @@ def _cxx_command_scanner() -> argparse.ArgumentParser:
         type=str,
         dest="crash_diagnostics_dir",
         default="",
+        metavar="DIR",
         help="additional directory where clang produces crash reports",
     )
     return parser
@@ -141,6 +144,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         dest="includes",
         action='append',
         default=[],
+        metavar="DIR",
         help="preprocessing include paths",
     )
     parser.add_argument(
@@ -149,6 +153,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         dest="libdirs",
         action='append',
         default=[],
+        metavar="DIR",
         help="linking search paths",
     )
     parser.add_argument(
@@ -164,6 +169,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         type=str,
         action='append',
         default=[],
+        metavar="DIR",
         help="system include paths",
     )
     parser.add_argument(
@@ -181,6 +187,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         type=str,
         action='append',
         default=[],
+        metavar="FILE",
         help="prepend include file",
     )
     parser.add_argument(
@@ -223,6 +230,7 @@ def _c_preprocess_arg_parser() -> argparse.ArgumentParser:
         "-MF",
         type=str,
         help="name depfile",
+        metavar="DEPFILE",
     )
     parser.add_argument(
         "-MT",

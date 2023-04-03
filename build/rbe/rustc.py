@@ -46,12 +46,14 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
         type=str,
         dest="output",
         default="",
+        metavar="FILE",
         help="compiler output",
     )
     parser.add_argument(
         "--crate-type",
         type=str,
         default="",
+        metavar="TYPE",
         help="Rust compiler output crate type",
     )
     parser.add_argument(
@@ -77,6 +79,7 @@ def _rustc_command_scanner() -> argparse.ArgumentParser:
         "--extern",
         action='append',
         default=[],
+        metavar="LIB:PATH",
         help="Specify where transitive dependencies can be found",
     )
     for f in _RUSTC_FUSED_FLAGS:

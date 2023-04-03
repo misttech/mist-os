@@ -5,9 +5,11 @@
 """Tests for rustc_remote_wrapper."""
 
 import contextlib
+import io
 import os
 import parameterized
 import subprocess
+import sys
 import unittest
 
 from parameterized import parameterized
@@ -462,6 +464,33 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 run_status = r.run()
             mock_rewrite.assert_called_with()
 
+class MainTests(unittest.TestCase):
+
+    def test_help_implicit(self):
+        # Just make sure help exits successfully, without any exceptions
+        # due to argument parsing.
+        with mock.patch.object(sys, 'stdout',
+                               new_callable=io.StringIO) as mock_stdout:
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                # Normally, the following would not be reached due to exit(),
+                # but for testing it needs to be mocked out.
+                with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
+                                       'run', return_value=0):
+                    self.assertEqual(rustc_remote_wrapper.main([]), 0)
+            mock_exit.assert_called_with(0)
+
+    def test_help_flag(self):
+        # Just make sure help exits successfully, without any exceptions
+        # due to argument parsing.
+        with mock.patch.object(sys, 'stdout',
+                               new_callable=io.StringIO) as mock_stdout:
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                # Normally, the following would not be reached due to exit(),
+                # but for testing it needs to be mocked out.
+                with mock.patch.object(rustc_remote_wrapper.RustRemoteAction,
+                                       'run', return_value=0):
+                    self.assertEqual(rustc_remote_wrapper.main(['--help']), 0)
+            mock_exit.assert_called_with(0)
 
 if __name__ == '__main__':
     unittest.main()

@@ -15,6 +15,7 @@ import argparse
 import os
 import subprocess
 import shlex
+import sys
 
 import fuchsia
 import cl_utils
@@ -412,44 +413,55 @@ class RemoteAction(object):
             '--',
         ]
 
-    def _generate_command(self) -> Iterable[str]:
-        """Generates the rewrapper command, one token at a time."""
-        if not self._remote_disable:
-            # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment
-            if self._auto_reproxy:
-                yield fuchsia.REPROXY_WRAP
-                yield '--'
-
-            yield from self._generate_rewrapper_command_prefix()
+    def _generate_remote_launch_command(self) -> Iterable[str]:
+        # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment
+        if self._auto_reproxy:
+            yield fuchsia.REPROXY_WRAP
             yield '--'
 
-            if self._remote_log_name:
-                yield from self._remote_log_command_prefix
+        yield from self._generate_rewrapper_command_prefix()
+        yield '--'
 
-            # When requesting both remote logging and fsatrace,
-            # use fsatrace as the inner wrapper because the user is not
-            # likely to be interested in fsatrace entries attributed
-            # to the logging wrapper.
-            if self._fsatrace_path:
-                yield from self._fsatrace_command_prefix(
-                    self._fsatrace_remote_log)
-        else:
-            # When requesting fsatrace, log to a different file than the
-            # remote log, so they can be compared.
-            if self._fsatrace_path:
-                yield from self._fsatrace_command_prefix(
-                    self._fsatrace_local_log)
+        if self._remote_log_name:
+            yield from self._remote_log_command_prefix
+
+        # When requesting both remote logging and fsatrace,
+        # use fsatrace as the inner wrapper because the user is not
+        # likely to be interested in fsatrace entries attributed
+        # to the logging wrapper.
+        if self._fsatrace_path:
+            yield from self._fsatrace_command_prefix(self._fsatrace_remote_log)
 
         yield from self.local_command
 
+    def _generate_local_launch_command(self) -> Iterable[str]:
+        # When requesting fsatrace, log to a different file than the
+        # remote log, so they can be compared.
+        if self._fsatrace_path:
+            yield from self._fsatrace_command_prefix(self._fsatrace_local_log)
+
+        yield from self.local_command
+
+    def _generate_launch_command(self) -> Iterable[str]:
+        """Generates the rewrapper command, one token at a time."""
+        if not self._remote_disable:
+            yield from self._generate_remote_launch_command()
+        else:
+            yield from self._generate_local_launch_command()
+
     @property
-    def command(self) -> Sequence[str]:
-        """This is the fully constructed rewrapper command executed on the host."""
-        return list(self._generate_command())
+    def launch_command(self) -> Sequence[str]:
+        """This is the fully constructed command to be executed on the host.
+
+        In remote enabled mode, this is a rewrapper command wrapped around
+        the original command.
+        In remote disabled mode, this is just the original command.
+        """
+        return list(self._generate_launch_command())
 
     @property
     def command_quoted_str(self) -> str:
-        return ' '.join(shlex.quote(t) for t in self.command)
+        return ' '.join(shlex.quote(t) for t in self.launch_command)
 
     # features to port over from fuchsia-rbe-action.sh:
     # TODO(http://fxbug.dev/123178): facilitate delayed downloads using --action_log
@@ -469,7 +481,7 @@ class RemoteAction(object):
         try:
             # TODO(http://fxbug.dev/96250): handle some re-client error cases
             #   and in some cases, retry once
-            return subprocess.call(self.command, cwd=self.working_dir)
+            return subprocess.call(self.launch_command, cwd=self.working_dir)
         finally:
             if not self._save_temps:
                 self._cleanup()
@@ -508,6 +520,7 @@ def _rewrapper_arg_parser() -> argparse.ArgumentParser:
         "--exec_root",
         type=str,
         default="",
+        metavar="ABSPATH",
         help="Root directory from which all inputs/outputs are contained.",
     )
     return parser
@@ -534,30 +547,34 @@ def _remote_flag_arg_parser() -> argparse.ArgumentParser:
         dest='inputs',
         action='append',
         default=[],
+        metavar="PATHS",
         help=
-        "Specify additional remote inputs, relative to the current working dir.",
+        "Specify additional remote inputs, comma-separated, relative to the current working dir (repeatable, cumulative).",
     )
     parser.add_argument(
         "--remote-outputs",  # TODO: rename this to --remote-output-files
         dest='output_files',
         action='append',
         default=[],
-        help="Specify additional remote output files, relative to the current working dir (repeatable).",
+        metavar="FILE",
+        help="Specify additional remote output files, comma-separated, relative to the current working dir (repeatable, cumulative).",
     )
     parser.add_argument(
         "--remote-output-dirs",
         action='append',
         dest='output_dirs',
         default=[],
+        metavar="DIR",
         help=
-        "Specify additional remote output directories, relative to the current working dir (repeatable).",
+        "Specify additional remote output directories, comma-separated, relative to the current working dir (repeatable, cumulative).",
     )
     parser.add_argument(
         "--remote-flag",
         action='append',
         dest='flags',
         default=[],
-        help="Forward these flags to the rewrapper (repeatable).",
+        metavar="FLAG",
+        help="Forward these flags to the rewrapper (repeatable, cumulative).",
     )
     return parser
 
@@ -678,7 +695,7 @@ def remote_action_from_args(
     )
 
 
-def main(argv: Sequence[str]) -> None:
+def main(argv: Sequence[str]) -> int:
     main_args, other_remote_options = _MAIN_ARG_PARSER.parse_known_args(argv)
     # forward all unknown flags to rewrapper
     # forwarded rewrapper options with values must be written as '--flag=value',

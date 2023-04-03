@@ -153,13 +153,13 @@ class RustRemoteAction(object):
             exec_root or remote_action.PROJECT_ROOT)
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
-        ddash = argv.index('--')
-        if ddash is None:
-            raise argparse.ArgumentError(
-                "Missing '--'.  A '--' is required for separating remote options from the command to be remotely executed."
-            )
-        remote_prefix = argv[:ddash]
-        unfiltered_command = argv[ddash + 1:]
+        try:
+            ddash = argv.index('--')
+            remote_prefix = argv[:ddash]
+            unfiltered_command = argv[ddash + 1:]
+        except ValueError:  # '--' not found
+            remote_prefix = argv + ['--help']  # Trigger help and exit
+            unfiltered_command = []
 
         # Propagate --remote-flag=... options to the remote prefix,
         # as if they appeared before '--'.
@@ -170,8 +170,12 @@ class RustRemoteAction(object):
             unfiltered_command)
 
         # Forward all unknown flags to rewrapper
+        # --help here will result in early exit()
         self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
             remote_prefix + self._forwarded_remote_args.flags)
+
+        if not filtered_command:  # there is no command, bail out early
+            return
 
         self._rust_action = rustc.RustAction(command=filtered_command)
 

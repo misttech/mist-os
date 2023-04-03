@@ -48,6 +48,7 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         type=str,
         choices=['auto', 'local', 'integrated'],
         default='auto',
+        metavar='STRATEGY',
         help="""Configure how C-preprocessing is done.
     integrated: preprocess and compile in a single step,
     local: preprocess locally, compile remotely,
@@ -90,13 +91,13 @@ class CxxRemoteAction(object):
             exec_root or remote_action.PROJECT_ROOT)
         self._host_platform = host_platform or fuchsia.HOST_PREBUILT_PLATFORM
 
-        ddash = argv.index('--')
-        if ddash is None:
-            raise argparse.ArgumentError(
-                "Missing '--'.  A '--' is required for separating remote options from the command to be remotely executed."
-            )
-        remote_prefix = argv[:ddash]
-        unfiltered_command = argv[ddash + 1:]
+        try:
+            ddash = argv.index('--')
+            remote_prefix = argv[:ddash]
+            unfiltered_command = argv[ddash + 1:]
+        except ValueError:  # '--' not found
+            remote_prefix = argv + ['--help']  # Trigger help and exit
+            unfiltered_command = []
 
         # Propagate --remote-flag=... options to the remote prefix,
         # as if they appeared before '--'.
@@ -107,14 +108,18 @@ class CxxRemoteAction(object):
             unfiltered_command)
 
         # forward all unknown flags to rewrapper
+        # --help here will result in early exit()
         self._main_args, self._main_remote_options = _MAIN_ARG_PARSER.parse_known_args(
             remote_prefix + self._forwarded_remote_args.flags)
 
+        if not filtered_command:  # there is no command, bail out early
+            return
         self._cxx_action = cxx.CxxAction(command=filtered_command)
 
         # Determine whether this action can be done remotely.
         self._local_only = False
-        if self._cxx_action.sources[0].file.endswith('.S'):
+        if self._cxx_action.sources and self._cxx_action.sources[
+                0].file.endswith('.S'):
             # Compiling un-preprocessed assembly is not supported remotely.
             self._local_only = True
 
@@ -124,7 +129,6 @@ class CxxRemoteAction(object):
         self._prepare_status = None
         self._cleanup_files = []
         self._remote_action = None
-        self.check_preconditions()
 
     def check_preconditions(self):
         if not self._cxx_action.target and self._cxx_action.compiler_is_clang:
@@ -145,6 +149,8 @@ class CxxRemoteAction(object):
         """Setup everything ahead of remote execution."""
         if self._prepare_status is not None:
             return self._prepare_status
+
+        self.check_preconditions()
 
         remote_inputs = self._forwarded_remote_args.inputs.copy()
         if self.cpp_strategy == 'local':

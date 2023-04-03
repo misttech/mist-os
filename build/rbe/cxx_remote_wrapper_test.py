@@ -3,8 +3,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import io
 import os
 import subprocess
+import sys
 
 import unittest
 from unittest import mock
@@ -22,12 +24,10 @@ class CxxRemoteActionTests(unittest.TestCase):
             'clang++', '--target=riscv64-apple-darwin21', '-c', 'hello.cc',
             '-o', 'hello.o'
         ]
-        with mock.patch.object(cxx_remote_wrapper,
-                               'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(
-                ['--'] + command,
-                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
-            )
+        c = cxx_remote_wrapper.CxxRemoteAction(
+            ['--'] + command,
+            host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+        )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
         self.assertEqual(c.cxx_action.compiler.tool, 'clang++')
@@ -38,7 +38,9 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.original_compile_command, command)
         self.assertFalse(c.local_only)
 
-        self.assertEqual(c.prepare(), 0)
+        with mock.patch.object(cxx_remote_wrapper,
+                               'check_missing_remote_tools') as mock_check:
+            self.assertEqual(c.prepare(), 0)
         # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root, [])
@@ -52,12 +54,12 @@ class CxxRemoteActionTests(unittest.TestCase):
             'clang++', '--target=riscv64-apple-darwin21', '-c', 'hello.S', '-o',
             'hello.o'
         ]
+        c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
+        self.assertTrue(c.local_only)
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(['--'] + command)
-        self.assertTrue(c.local_only)
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
-            exit_code = c.run()
+            with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+                exit_code = c.run()
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_with(command)  # ran locally
 
@@ -118,28 +120,27 @@ class CxxRemoteActionTests(unittest.TestCase):
             'clang++', '--target=riscv64-apple-darwin21', '-c', 'hello.cc',
             '-o', 'hello.o'
         ]
+
+        c = cxx_remote_wrapper.CxxRemoteAction(
+            ['--'] + command,
+            host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+        )
+
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(
-                ['--'] + command,
-                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
-            )
-
-        self.assertEqual(c.prepare(), 0)
+            self.assertEqual(c.prepare(), 0)
         # check that rewrapper option sees --foo=bar
-        remote_action_command = c.remote_compile_action.command
+        remote_action_command = c.remote_compile_action.launch_command
         ddash = remote_action_command.index('--')
         self.assertIn('--foo=bar', remote_action_command[:ddash])
         self.assertEqual(remote_action_command[ddash + 1:], filtered_command)
 
     def test_gcc_cxx(self):
         command = ['g++', '-c', 'hello.cc', '-o', 'hello.o']
-        with mock.patch.object(cxx_remote_wrapper,
-                               'check_missing_remote_tools') as mock_check:
-            c = cxx_remote_wrapper.CxxRemoteAction(
-                ['--'] + command,
-                host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
-            )
+        c = cxx_remote_wrapper.CxxRemoteAction(
+            ['--'] + command,
+            host_platform=fuchsia.REMOTE_PLATFORM,  # host = remote exec
+        )
         self.assertFalse(c.verbose)
         self.assertFalse(c.dry_run)
         self.assertEqual(c.cxx_action.compiler.tool, 'g++')
@@ -149,7 +150,9 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertEqual(c.original_compile_command, command)
         self.assertFalse(c.local_only)
 
-        self.assertEqual(c.prepare(), 0)
+        with mock.patch.object(cxx_remote_wrapper,
+                               'check_missing_remote_tools') as mock_check:
+            self.assertEqual(c.prepare(), 0)
         # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root, [])
@@ -170,27 +173,28 @@ class CxxRemoteActionTests(unittest.TestCase):
             'hello.cc', '-o', 'hello.o'
         ]
         with mock.patch.object(cxx_remote_wrapper,
-                               'check_missing_remote_tools') as mock_check:
+                               'REMOTE_COMPILER_SWAPPER',
+                               os.path.join(fake_root,
+                                            'scripts/swapperoo.sh')):
+            c = cxx_remote_wrapper.CxxRemoteAction(
+                [f'--exec_root={fake_root}', '--'] + command,
+                working_dir=fake_cwd,
+                # Pretend host != 'linux-x64' to cross-compile
+                host_platform='mac-arm64',
+            )
             with mock.patch.object(cxx_remote_wrapper,
-                                   'REMOTE_COMPILER_SWAPPER',
-                                   os.path.join(fake_root,
-                                                'scripts/swapperoo.sh')):
-                c = cxx_remote_wrapper.CxxRemoteAction(
-                    [f'--exec_root={fake_root}', '--'] + command,
-                    working_dir=fake_cwd,
-                    # Pretend host != 'linux-x64' to cross-compile
-                    host_platform='mac-arm64',
-                )
+                                   'check_missing_remote_tools') as mock_check:
                 self.assertEqual(c.prepare(), 0)
-                self.assertEqual(c.remote_compiler, remote_compiler_relpath)
-                self.assertEqual(
-                    c.remote_compile_action.inputs_relative_to_project_root,
-                    ['path/to/clang/linux-x64/clang++'])
-                remote_compile_command = c.remote_compile_action.command
-                ddash = remote_compile_command.index('--')
-                rewrapper_prefix = remote_compile_command[:ddash]
-                self.assertIn(
-                    '--remote_wrapper=../scripts/swapperoo.sh',
+
+            self.assertEqual(c.remote_compiler, remote_compiler_relpath)
+            self.assertEqual(
+                c.remote_compile_action.inputs_relative_to_project_root,
+                ['path/to/clang/linux-x64/clang++'])
+            remote_compile_command = c.remote_compile_action.launch_command
+            ddash = remote_compile_command.index('--')
+            rewrapper_prefix = remote_compile_command[:ddash]
+            self.assertIn(
+                '--remote_wrapper=../scripts/swapperoo.sh',
                     rewrapper_prefix)
 
     def test_remote_cross_compile_gcc(self):
@@ -221,13 +225,40 @@ class CxxRemoteActionTests(unittest.TestCase):
                 self.assertEqual(
                     c.remote_compile_action.inputs_relative_to_project_root,
                     ['path/to/gcc/linux-x64/g++'])
-                remote_compile_command = c.remote_compile_action.command
+                remote_compile_command = c.remote_compile_action.launch_command
                 ddash = remote_compile_command.index('--')
                 rewrapper_prefix = remote_compile_command[:ddash]
                 self.assertIn(
                     '--remote_wrapper=../scripts/swapperoo.sh',
                     rewrapper_prefix)
 
+class MainTests(unittest.TestCase):
+
+    def test_help_implicit(self):
+        # Just make sure help exits successfully, without any exceptions
+        # due to argument parsing.
+        with mock.patch.object(sys, 'stdout',
+                               new_callable=io.StringIO) as mock_stdout:
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                # Normally, the following would not be reached due to exit(),
+                # but for testing it needs to be mocked out.
+                with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                       'run', return_value=0):
+                    self.assertEqual(cxx_remote_wrapper.main([]), 0)
+            mock_exit.assert_called_with(0)
+
+    def test_help_flag(self):
+        # Just make sure help exits successfully, without any exceptions
+        # due to argument parsing.
+        with mock.patch.object(sys, 'stdout',
+                               new_callable=io.StringIO) as mock_stdout:
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                # Normally, the following would not be reached due to exit(),
+                # but for testing it needs to be mocked out.
+                with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                                       'run', return_value=0):
+                    self.assertEqual(cxx_remote_wrapper.main(['--help']), 0)
+            mock_exit.assert_called_with(0)
 
 if __name__ == '__main__':
     unittest.main()

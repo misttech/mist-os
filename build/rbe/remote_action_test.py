@@ -4,8 +4,10 @@
 # found in the LICENSE file.
 
 import argparse
+import io
 import os
 import subprocess
+import sys
 import unittest
 from unittest import mock
 
@@ -206,7 +208,8 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertTrue(main_args.auto_reproxy)
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(action.local_command, ['echo'])
-        self.assertEqual(action.command[:2], ['/path/to/reproxy-wrap.sh', '--'])
+        self.assertEqual(
+            action.launch_command[:2], ['/path/to/reproxy-wrap.sh', '--'])
 
     def test_save_temps(self):
         p = self._make_main_parser()
@@ -256,7 +259,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 os.path.join(build_dir, output + '.remote-log')
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
-        full_command = action.command
+        full_command = action.launch_command
         first_ddash = full_command.index('--')
         # Confirm that the remote command is wrapped with the logger script.
         remote_command = full_command[first_ddash + 1:]
@@ -292,7 +295,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 os.path.join(build_dir, log_base + '.remote-log')
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
-        full_command = action.command
+        full_command = action.launch_command
         first_ddash = full_command.index('--')
         # Confirm that the remote command is wrapped with the logger script.
         remote_command = full_command[first_ddash + 1:]
@@ -329,7 +332,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 os.path.join(build_dir, output + '.remote-fsatrace')
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
-        full_command = action.command
+        full_command = action.launch_command
         first_ddash = full_command.index('--')
         # Confirm that the remote command is wrapped with fsatrace
         remote_command = full_command[first_ddash + 1:]
@@ -373,7 +376,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 os.path.join(build_dir, output + '.remote-fsatrace'),
             }, set(action.output_files_relative_to_project_root))
         # Ignore the rewrapper portion of the command
-        full_command = action.command
+        full_command = action.launch_command
         first_ddash = full_command.index('--')
         # Confirm that the outer wrapper is for logging
         remote_command = full_command[first_ddash + 1:]
@@ -505,7 +508,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertFalse(action.remote_disable)
         self.assertEqual(action.build_subdir, 'build_dir')
         self.assertEqual(
-            action.command,
+            action.launch_command,
             [rewrapper, f'--exec_root={self._PROJECT_ROOT}', '--'] + command)
 
     def test_path_setup_implicit(self):
@@ -561,7 +564,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
                 remote_action.RemoteAction, '_inputs_list_file',
                 return_value='obj/woof.txt.inputs') as mock_input_list_file:
             self.assertEqual(
-                action.command, [
+                action.launch_command, [
                     '/path/to/rewrapper',
                     f'--exec_root={self._PROJECT_ROOT}',
                     '--input_list_paths=obj/woof.txt.inputs',
@@ -610,6 +613,22 @@ class RemoteActionConstructionTests(unittest.TestCase):
         )
         self.assertEqual(action.local_command, ['cat', '../src/cow/moo.txt'])
         self.assertEqual(action.options, ['--exec_strategy=racing'])
+
+
+class MainTests(unittest.TestCase):
+
+    def test_help_flag(self):
+        # Just make sure help exits successfully, without any exceptions
+        # due to argument parsing.
+        with mock.patch.object(sys, 'stdout',
+                               new_callable=io.StringIO) as mock_stdout:
+            with mock.patch.object(sys, 'exit') as mock_exit:
+                # Normally, the following would not be reached due to exit(),
+                # but for testing it needs to be mocked out.
+                with mock.patch.object(remote_action.RemoteAction,
+                                       'run_with_main_args', return_value=0):
+                    self.assertEqual(remote_action.main(['--help']), 0)
+            mock_exit.assert_called_with(0)
 
 
 if __name__ == '__main__':
