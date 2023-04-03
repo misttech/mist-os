@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Result},
+    anyhow::{anyhow, Context as _, Result},
     fidl::{endpoints::Proxy, AsHandleRef},
     fidl_fuchsia_ldsvc::LoaderProxy,
     fidl_fuchsia_process::{ResolverMarker, MAX_RESOLVE_NAME_SIZE},
@@ -41,8 +41,7 @@ pub struct Process {
 impl Process {
     /// Run the initial thread.
     pub fn run(&self) -> Result<()> {
-        run_thread(&self.vcpu, &self.guest, &vmar_root_self())?;
-        Ok(())
+        run_thread(&self.vcpu, &self.guest, &vmar_root_self())
     }
 }
 
@@ -336,10 +335,10 @@ fn load_vcpu_state(stack_pointer: u64, arg1: u64, arg2: u64) -> zx_vcpu_state_t 
 // Do not allocate in this function, as the thread has not been set up by host
 // user-space.
 fn thread_entry(args: &VcpuArgs<'_>, _arg2: usize) {
-    let _res = || -> Result<(), Status> {
+    let _res = || -> Result<()> {
         let vcpu = Vcpu::create(args.guest, args.entry)?;
         let vcpu_state = load_vcpu_state(args.stack_pointer, args.arg1, args.arg2);
-        vcpu.write_state(&vcpu_state)?;
+        let () = vcpu.write_state(&vcpu_state)?;
         run_thread(&vcpu, args.guest, args.root_vmar)
     }();
     unsafe {
@@ -416,11 +415,12 @@ unsafe fn load_thread<'a>(
 // Note: This function **can not** allocate. We may enter this function from a
 // thread that was created within the guest. This means that the allocator was
 // not setup for the host. Without that setup, any allocations will fail.
-fn run_thread(vcpu: &Vcpu, guest: &Guest, root_vmar: &Vmar) -> Result<(), Status> {
+fn run_thread(vcpu: &Vcpu, guest: &Guest, root_vmar: &Vmar) -> Result<()> {
     loop {
-        let packet = match vcpu.enter()?.contents() {
+        let packet = vcpu.enter().context("vcpu.enter()")?;
+        let packet = match packet.contents() {
             GuestVcpu(packet) => packet,
-            _ => return Err(Status::BAD_STATE),
+            contents => return Err(anyhow!("unexpected packet contents: {:?}", contents)),
         };
         match packet.contents() {
             VcpuContents::Startup { .. } => {
@@ -448,7 +448,9 @@ fn run_thread(vcpu: &Vcpu, guest: &Guest, root_vmar: &Vmar) -> Result<(), Status
                 )?;
             }
             VcpuContents::Exit { .. } => return Ok(()),
-            _ => return Err(Status::BAD_STATE),
+            interrupt @ VcpuContents::Interrupt { .. } => {
+                return Err(anyhow!("unexpected interrupt: {:?}", interrupt))
+            }
         };
     }
 }

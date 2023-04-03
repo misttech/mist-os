@@ -53,12 +53,23 @@ bool ContextSwitchTest(perftest::RepeatState* state, size_t number_of_switches) 
   zx::job job;
   ASSERT_OK(zx::job::create(*zx::job::default_job(), 0, &job));
   zx::handle process;
-  zx_handle_t server_handle = chan2.release();
-  fdio_spawn_action_t actions[1] = {
-      {.action = FDIO_SPAWN_ACTION_ADD_HANDLE, .h = {.id = PA_USER0, .handle = server_handle}}};
-  ASSERT_OK(fdio_spawn_etc(job.get(), FDIO_SPAWN_CLONE_ALL, kPath, argv, nullptr /* environ */,
-                           1 /* action count */, actions, process.reset_and_get_address(),
-                           nullptr /* err message out */));
+  fdio_spawn_action_t actions[] = {
+      {
+          .action = FDIO_SPAWN_ACTION_ADD_HANDLE,
+          .h =
+              {
+                  .id = PA_USER0,
+                  .handle = chan2.release(),
+              },
+      },
+  };
+  char err_msg_out[FDIO_SPAWN_ERR_MSG_MAX_LENGTH] = {};
+  if (zx_status_t status =
+          fdio_spawn_etc(job.get(), FDIO_SPAWN_CLONE_ALL, kPath, argv, nullptr /* environ */,
+                         std::size(actions), actions, process.reset_and_get_address(), err_msg_out);
+      status != ZX_OK) {
+    ZX_PANIC("fdio_spawn_etc(): %s; %s", zx_status_get_string(status), err_msg_out);
+  }
 
   char out[1024];
   uint32_t len;

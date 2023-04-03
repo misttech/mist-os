@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{anyhow, Result},
+    anyhow::{anyhow, Context as _, Result},
     direct_mode::{get_ld_from_bin, ProcessLoader},
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel,
     fuchsia_component::client::connect_to_protocol,
@@ -39,28 +39,39 @@ pub async fn start(
     mut handles: Vec<StartupHandle>,
 ) -> Result<()> {
     // Create the guest.
-    let hypervisor = connect_to_protocol::<fkernel::HypervisorResourceMarker>()?;
-    let (guest, guest_vmar) = Guest::direct(&hypervisor.get().await?)?;
+    let hypervisor = connect_to_protocol::<fkernel::HypervisorResourceMarker>()
+        .context("connect to hypervisor resource")?;
+    let resource = hypervisor.get().await.context("get hypervisor resource")?;
+    let (guest, guest_vmar) = Guest::direct(&resource).context("create guest")?;
     if vars.iter().any(|x| x.as_bytes() == b"DIRECT_MODE=use_guest") {
+        let handle =
+            guest.duplicate_handle(Rights::SAME_RIGHTS).context("duplicate guest handle")?;
         handles.push(StartupHandle {
-            handle: guest.duplicate_handle(Rights::SAME_RIGHTS)?.into_handle(),
+            handle: handle.into(),
             info: HandleInfo::new(HandleType::User0, 0),
         });
     }
 
+    let name = args.first().ok_or_else(|| anyhow!("first process argument"))?;
+    let name = name.to_str().context("first process argument as string")?;
+
     // Load the binary.
     let mut bin_vmo = open_in_namespace(
-        args.first().ok_or(anyhow!("No process arguments provided"))?.to_str()?,
-        fio::OpenFlags::RIGHT_READABLE
-            | fio::OpenFlags::RIGHT_EXECUTABLE
-            | fio::OpenFlags::NOT_DIRECTORY,
-    )?
+        name,
+        fio::OpenFlags::NOT_DIRECTORY
+            | fio::OpenFlags::RIGHT_READABLE
+            | fio::OpenFlags::RIGHT_EXECUTABLE,
+    )
+    .with_context(|| format!("{}: open", name))?
     .get_backing_memory(fio::VmoFlags::READ | fio::VmoFlags::EXECUTE)
-    .await?
-    .map_err(|err| Status::from_raw(err))?;
+    .await
+    .with_context(|| format!("{}: get backing memory call", name))?
+    .map_err(Status::from_raw)
+    .with_context(|| format!("{}: get backing memory response", name))?;
 
     // Load the linker
-    let (ld_vmo, loader) = get_ld_from_bin(&mut bin_vmo).await?;
+    let (ld_vmo, loader) =
+        get_ld_from_bin(&mut bin_vmo).await.with_context(|| format!("{}: get ld", name))?;
 
     // Load the process.
     let process = ProcessLoader::new(guest, guest_vmar)
@@ -73,8 +84,8 @@ pub async fn start(
         .paths(paths)
         .handles(handles)
         .load()
-        .or_else(|e| Err(anyhow!("Failed to load the process: {}", e)))?;
+        .context("load")?;
 
     // Run the process.
-    process.run().or_else(|e| Err(anyhow!("Failed to run the process: {}", e)))
+    process.run().context("run")
 }
