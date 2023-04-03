@@ -79,7 +79,9 @@ int main(int argc, char** argv) {
       gigaboot::GetRebootMode().value_or(gigaboot::RebootMode::kNormal);
 
   bool enter_fastboot = reboot_mode == gigaboot::RebootMode::kBootloader;
-  if (!enter_fastboot) {
+  if (enter_fastboot) {
+    printf("Your BIOS instructs Gigaboot to directly enter fastboot and skip normal boot.\n");
+  } else {
     printf("Auto boot in 2 seconds. Press f to enter fastboot.\n");
     // If time out, the first char in the `valid_keys` argument will be returned. Thus
     // we put a random different char here, so that we don't always drop to fastboot.
