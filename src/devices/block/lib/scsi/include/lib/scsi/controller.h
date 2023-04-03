@@ -123,6 +123,19 @@ struct RequestSenseCDB {
 
 static_assert(sizeof(RequestSenseCDB) == 6, "Request Sense CDB must be 6 bytes");
 
+struct SenseDataHeader {
+  uint8_t response_code;
+  uint8_t sense_key;
+  uint8_t additional_sense_code;
+  uint8_t additional_sense_code_qualifier;
+  uint8_t sdat_ovfl;
+  uint8_t reserved[2];
+  uint8_t additional_sense_length;
+  // Sense data descriptors follow after 8 bytes.
+} __PACKED;
+
+static_assert(sizeof(SenseDataHeader) == 8, "Sense data header must be 8 bytes");
+
 struct ModeSense6CDB {
   static constexpr uint8_t kCachingPageCode = 0x08;
   static constexpr uint8_t kAllPageCode = 0x3F;
