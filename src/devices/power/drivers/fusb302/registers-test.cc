@@ -14,6 +14,8 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/devices/power/drivers/fusb302/usb-pd-defs.h"
+
 namespace fusb302 {
 
 namespace {

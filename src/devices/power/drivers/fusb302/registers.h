@@ -15,6 +15,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <cstdint>
@@ -48,13 +49,12 @@
 //
 // The FUSB302B also has the following digital functional units.
 //
-// * Power role detector - implements a subset of the state machines in Section
-//   4.5 "Configuration Channel (CC)" of the USB Type C spec; these should not
-//   be confused with the USB PD state machines, which must be implemented in
-//   the driver
+// * Power role detector - implements a subset of the state machines in typec2.2
+//   4.5 "Configuration Channel (CC)"; these should not be confused with the USB
+//   PD state machines, which must be implemented in the driver
 // * PD (USB Type C Power Delivery) Protocol Layer - implements a subset of the
-//   state machines described in Section 6.12.2.2 "Protocol Layer Message
-//   Transmission" of the USB PD spec
+//   state machines described in usbpd3.1 6.12.2.2 "Protocol Layer Message
+//   Transmission"
 // * Interrupt block - functional units signal specific conditions by asserting
 //   interrupts; the interrupt block tracks asserted interrupts (in the
 //   Interrupt/InterruptA/InterruptB registers) until software acknowledges
@@ -68,7 +68,7 @@ namespace fusb302 {
 template <class RegType>
 class Fusb302Register : public hwreg::I2cRegisterBase<RegType, uint8_t, 1> {
  public:
-  static RegType ReadFrom(const fidl::ClientEnd<fuchsia_hardware_i2c::Device>& i2c) {
+  static RegType ReadFrom(fidl::ClientEnd<fuchsia_hardware_i2c::Device>& i2c) {
     auto reg = RegType::Get().FromValue(0);
     ZX_ASSERT(reg.I2cRegisterBase::ReadFrom(i2c) == ZX_OK);
     return reg;
@@ -79,7 +79,7 @@ class Fusb302Register : public hwreg::I2cRegisterBase<RegType, uint8_t, 1> {
   // Usage:
   //     zx::result<> result = Control0Reg::ReadModifyWrite(
   //           i2c_, [&](Control0Reg& control0) {
-  //       control0.set_flush_transmitter_fifo(true);
+  //       control0.set_tx_flush(true);
   //     });
   //     if (result.is_ok()) {
   //        ...
@@ -1151,7 +1151,7 @@ class TransmitToken {
 
   // Turns on the Tx (transmitter) driver in the BMC PHY.
   //
-  // This is an alternative to setting the `start_transmitter` field in
+  // This is an alternative to setting the `tx_start` field in
   // `Control0Reg` to true. This alternative results in less I2C communication,
   // assuming the driver uses burst I2C writes to fill the FIFO.
   //
@@ -1174,17 +1174,22 @@ class TransmitToken {
 
 // FIFOS (Transmit and Receive FIFOs)
 //
-// Writing to this register enqueues data into the transmit FIFO. Writing
-// multiple bytes must be done without address auto-increment.
+// This "register" is an I2C FIFO-based interface to the BMC PHY's internal
+// Tx (transmit) and Rx (receive) buffers, which are conceptually equivalent to
+// ring buffers.
 //
-// Reading from this register dequeues data from the receive FIFO. Reading must
-// be done without address auto-increment.
+// Writing to this register enqueues data into the 48-byte transmit buffer.
+// Writing multiple bytes must be done without address auto-increment. The
+// driver is responsible for not issuing more writes when the buffer is full.
+//
+// Reading from this register dequeues data from the 80-byte receive buffer.
+// Reading must be done without address auto-increment.
 //
 // The Rev 5 datasheet is unclear as to whether it's possible to queue up
 // multiple messages (such as a GoodCRC and a control / data message) in the
-// transmit FIFO. Experiments with a FUSB302BMPX indicate that this optimization
-// is not supported, and the chip may either silently drop one of the two
-// messages, or take a long time to carry out the I2C writes.
+// transmit buffer. Experiments with a FUSB302BMPX indicate that this
+// optimization is not supported, and the chip may either silently drop one of
+// the two messages, or take a long time to carry out the I2C writes.
 //
 // Rev 5 datasheet: Table 40 page 28
 class FifosReg : public Fusb302Register<FifosReg> {
