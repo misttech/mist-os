@@ -18,8 +18,6 @@ core_realm_shards = [
   "//src/sys/pkg/bin/system-updater:system-updater-core-shard",
 ]
 
-core_realm_restrict_persistent_storage = true
-
 legacy_base_package_labels += [
   # TODO(http://fxb/91760): remove once build_info is supported in assembly_input_bundle()
   "//build/info:build-info",

@@ -259,7 +259,6 @@ if (is_fuchsia) {
   core_realm_definition("core_realm") {
     deps = core_realm_shards + board_core_realm_shards +
            fuchsia_base.extra_core_realm_shards
-    restrict_persistent_storage = core_realm_restrict_persistent_storage
     restrict_core_env_to_base = !auto_update_packages
   }
 

@@ -28,7 +28,6 @@ declare_args() {
   # each field means.
   # TODO: redo comments
   core_realm_shards = []
-  core_realm_restrict_persistent_storage = true
 
   # Determines whether the fuchsia_async library used by many Rust targets will be compiled
   # with TRACE level log statements that increase binary size a measurable amount.

@@ -146,14 +146,11 @@ if (is_fuchsia) {
       ]
 
   core_realm_definition("core") {
-    restrict_persistent_storage = false
     deps = _core_realm_deps +
            [ "//src/recovery/system:system_recovery_fdr_core_shard" ]
   }
 
   core_realm_definition("core-eng") {
-    restrict_persistent_storage = false
-
     # TODO(fxbug.dev/102390): deprecate appmgr from this product config
     deps =
         _core_realm_deps + appmgr_core_shards + core_realm_eng_aib_shards +
@@ -170,7 +167,6 @@ if (is_fuchsia) {
   }
 
   core_realm_definition("core-installer") {
-    restrict_persistent_storage = false
     deps = _core_realm_deps +
            [ "//src/recovery/system:system_recovery_installer_core_shard" ]
   }

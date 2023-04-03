@@ -17,11 +17,6 @@ import("//tools/cmc/build/cmc.gni")
 #
 # Parameters
 #
-#   restrict_persistent_storage (optional)
-#     If true, only components listed in the component ID index may use the
-#     persistent `data` storage capability. If false, any component which is
-#     offered the `data` storage capability may use it. Default is true.
-#
 #   restrict_core_env_to_base (optional)
 #     If true, must use the base resolver to resolve packages. If false, the
 #     component has access to the package resolver and can auto-update.
@@ -35,17 +30,6 @@ template("core_realm_definition") {
     shard_deps = invoker.deps
   } else {
     shard_deps = []
-  }
-
-  restrict_persistent_storage = true
-  if (defined(invoker.restrict_persistent_storage)) {
-    restrict_persistent_storage = invoker.restrict_persistent_storage
-  }
-
-  if (restrict_persistent_storage) {
-    shard_deps += [ "//src/sys/core:core-storage-restricted" ]
-  } else {
-    shard_deps += [ "//src/sys/core:core-storage-unrestricted" ]
   }
 
   restrict_core_env_to_base = true
