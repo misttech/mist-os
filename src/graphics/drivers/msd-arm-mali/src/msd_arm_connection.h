@@ -226,6 +226,8 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   msd::NotificationHandler* notification_handler_{};
   std::shared_ptr<MsdArmAtom> outstanding_atoms_[256];
   std::atomic<uint32_t> context_count_{0};
+  std::atomic<uint64_t> received_atom_count_{0};
+  std::atomic<uint64_t> notified_atom_count_{0};
 
   std::shared_ptr<ConnectionPerfCountManager> perf_count_manager_;
 };

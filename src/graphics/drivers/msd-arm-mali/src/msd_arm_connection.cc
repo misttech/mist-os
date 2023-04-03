@@ -67,6 +67,7 @@ bool MsdArmConnection::ExecuteAtom(
     size_t* remaining_data_size_in_out, magma_arm_mali_atom* atom,
     std::deque<std::shared_ptr<magma::PlatformSemaphore>>* semaphores) {
   TRACE_DURATION("magma", "Connection::ExecuteAtom");
+  received_atom_count_++;
   if (*remaining_data_size_in_out < atom->size) {
     MAGMA_LOG(WARNING, "Client %" PRIu64 ": Submitted too-small atom", client_id_);
     return false;
@@ -121,6 +122,7 @@ bool MsdArmConnection::ExecuteAtom(
       jit_allocator_ = magma::SimpleAllocator::Create(
           allocate_info->address, allocate_info->va_page_count * magma::page_size());
       // Don't notify on completion, since this is not a real atom.
+      received_atom_count_--;
       return true;
     }
 
@@ -933,11 +935,19 @@ void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
   status.data = atom->user_data();
 
   notification_handler_->NotificationChannelSend(GetStatusSpan(&status));
+  notified_atom_count_++;
 }
 
 void MsdArmConnection::MarkDestroyed() {
   owner_->SetCurrentThreadToDefaultPriority();
   owner_->CancelAtoms(shared_from_this());
+  uint64_t received_atom_count = received_atom_count_;
+  uint64_t notified_atom_count = notified_atom_count_;
+  if (received_atom_count != notified_atom_count) {
+    // To help determine the cause of fxbug.dev/118466
+    MAGMA_LOG(WARNING, "Connection %ld received %ld atoms and notified %ld\n", client_id(),
+              received_atom_count, notified_atom_count);
+  }
 
   std::lock_guard<std::mutex> lock(callback_lock_);
   if (!notification_handler_)

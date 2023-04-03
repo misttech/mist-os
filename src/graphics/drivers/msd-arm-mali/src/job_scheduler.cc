@@ -261,6 +261,8 @@ void JobScheduler::TryToSchedule() {
 }
 
 void JobScheduler::CancelAtomsForConnection(std::shared_ptr<MsdArmConnection> connection) {
+  msd_client_id_t connection_id = connection ? connection->client_id() : 0u;
+  MAGMA_LOG(INFO, "Canceling all atoms while tearing down connection %ld", connection_id);
   const char* atom_type = nullptr;
   auto removal_function = [connection, &atom_type](auto it) {
     auto locked = it->connection().lock();
@@ -286,6 +288,20 @@ void JobScheduler::CancelAtomsForConnection(std::shared_ptr<MsdArmConnection> co
   atom_type = "Runnable";
   for (auto& runnable_list : runnable_atoms_)
     runnable_list.remove_if(removal_function);
+  for (size_t i = 0; i < executing_atoms_.size(); i++) {
+    auto& atom = executing_atoms_[i];
+    if (!atom) {
+      continue;
+    }
+    auto locked = atom->connection().lock();
+    if (!locked || locked == connection) {
+      std::vector<std::string> result = atom->DumpInformation();
+      MAGMA_LOG(WARNING, "Atom on slot %lu still running", i);
+      for (std::string& line : result) {
+        MAGMA_LOG(WARNING, "%s", line.c_str());
+      }
+    }
+  }
 
   ValidateCanSwitchProtected();
 }
