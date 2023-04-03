@@ -442,3 +442,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0212_package_sets.md
   - title: 'RFC-0213: Removing Devfs FIDL Multiplexing'
     path: /docs/contribute/governance/rfcs/0213_removing_devfs_fidl_multiplexing.md
+  - title: "RFC-0214: Fuchsia churn policy"
+    path: /docs/contribute/governance/rfcs/0214_fuchsia_churn_policy.md

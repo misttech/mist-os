@@ -2788,3 +2788,16 @@
   reviewers: ['abarth@google.com', 'cja@google.com', 'csuter@google.com', 'jfsulliv@google.com', 'surajmalhotra@google.com', 'tamird@google.com', 'yifeit@google.com',  ]
   submitted: '2023-03-28'
   reviewed: '2023-03-17'
+
+- name: 'RFC-0214'
+  title: 'Fuchsia churn policy'
+  short_description: 'Enumerate rights and responsibilities to reduce engineering time spent on change.'
+  authors: ['rlb@google.com']
+  file: '0214_fuchsia_churn_policy.md'
+  area: ['General', 'Governance']
+  issue: ['114568']
+  gerrit_change_id: ['781865']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'keir@google.com', 'shayba@google.com']
+  submitted: '2022-12-22'
+  reviewed: '2023-04-03'
