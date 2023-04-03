@@ -34,7 +34,13 @@ impl FileBackedDevice {
     /// the Device.
     pub fn new(file: std::fs::File, block_size: u32) -> Self {
         let size = file.metadata().unwrap().len();
-        let block_count = size / block_size as u64;
+        Self::new_with_block_count(file, block_size, size / block_size as u64)
+    }
+
+    /// Creates a new FileBackedDevice over |file| using an explicit size.  The underlying file will
+    /// only be written to at offsets which are actually used by clients of the device, making this
+    /// suitable for image generation where the final size of the image is unknown.
+    pub fn new_with_block_count(file: std::fs::File, block_size: u32, block_count: u64) -> Self {
         // TODO(jfsulliv): If file is S_ISBLK, we should use its block size. Rust does not appear to
         // expose this information in a portable way, so we may need to dip into non-portable code
         // to do so.

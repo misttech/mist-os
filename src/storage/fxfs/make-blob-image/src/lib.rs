@@ -54,12 +54,18 @@ pub async fn make_blob_image(
         .create(true)
         .truncate(true)
         .open(output_image_path)?;
-    // TODO(fxbug.dev/122056): This should be parametrized.
-    output_image.set_len(512 * 1024 * 1024).context("Failed to extend output image")?;
-
     let blobs = parse_manifest(manifest_path).context("Failed to parse manifest")?;
 
-    let device = DeviceHolder::new(FileBackedDevice::new(output_image, 4096));
+    // Arbitrarily set the maximum image size to 64GiB.  The actual image size will be determined
+    // by the greatest offset Fxfs writes to (which, when using a sequential allocator, results in
+    // an optimally sized image).
+    const BLOCK_SIZE: u32 = 4096;
+    const BLOCK_COUNT: u64 = 1024 * 1024 * 16;
+    let device = DeviceHolder::new(FileBackedDevice::new_with_block_count(
+        output_image,
+        BLOCK_SIZE,
+        BLOCK_COUNT,
+    ));
     let filesystem = FxFilesystem::new_empty(device).await.context("Faile to format filesystem")?;
     let blobs_json = install_blobs(filesystem.clone(), "blob", &blobs[..]).await?;
     filesystem.close().await?;
