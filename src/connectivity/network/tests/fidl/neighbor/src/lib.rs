@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 #![cfg(test)]
+#![allow(dead_code, unused_variables, unreachable_code)]
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::convert::From as _;
 
 use anyhow::Context as _;
+use assert_matches::assert_matches;
 use futures::{stream, FutureExt as _, StreamExt as _, TryStreamExt as _};
-use net_declare::{fidl_ip, fidl_mac};
+use net_declare::{fidl_ip, fidl_ip_v4_with_prefix, fidl_mac};
 use net_types::SpecifiedAddress;
 use netemul::{RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSandbox};
 use netstack_testing_common::realms::{Netstack2, TestRealmExt as _, TestSandboxExt as _};
@@ -1270,4 +1272,108 @@ async fn remove_device_clears_neighbors(name: &str) {
         })],
     )
     .await;
+}
+
+#[netstack_test]
+// Verify that the `fuchsia.net.neighbor/EntryIterator` connection "survives"
+// a large burst of neighbor events. In particular, when a neighbor with many
+// addresses disconnects.
+async fn neighbor_with_many_addresses_disconnects(name: &str) {
+    // Use the three /24 `TEST-NET` IPv4 subnets, for a total of 768 addresses.
+    const NEIGHBOR_SUBNETS: [fidl_fuchsia_net::Ipv4AddressWithPrefix; 3] = [
+        fidl_ip_v4_with_prefix!("192.0.2.0/24"),
+        fidl_ip_v4_with_prefix!("198.51.100.0/24"),
+        fidl_ip_v4_with_prefix!("203.0.113.0/24"),
+    ];
+
+    let sandbox = TestSandbox::new().expect("failed to create sandbox");
+    let network = sandbox.create_network("net").await.expect("failed to create network");
+
+    let NeighborRealm { realm, ep, ipv6: _, loopback_id: _ } = create_realm(
+        &sandbox,
+        &network,
+        name,
+        "alice",
+        fidl_fuchsia_net::Subnet { addr: ALICE_IP, prefix_len: SUBNET_PREFIX },
+        ALICE_MAC,
+    )
+    .await;
+    let iface_id = ep.id();
+
+    let mut iter =
+        get_entry_iterator(&realm, fidl_fuchsia_net_neighbor::EntryIteratorOptions::EMPTY);
+    assert_entries(&mut iter, [ItemMatch::Idle]).await;
+
+    let controller = realm
+        .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
+        .expect("failed to connect to Controller");
+
+    let mut all_addrs = HashSet::new();
+    for subnet in NEIGHBOR_SUBNETS {
+        let num_addrs = 1u32 << 32u8.checked_sub(subnet.prefix_len).unwrap();
+        all_addrs.reserve(num_addrs.try_into().unwrap());
+        for host_bits in 0..num_addrs {
+            // Compute the addr at offset `host_bits` within the subnet.
+            let network_u32 = u32::from_be_bytes(subnet.addr.addr);
+            let addr_u32 = u32::checked_add(network_u32, host_bits).unwrap();
+            let mut addr = fidl_fuchsia_net::IpAddress::Ipv4(fidl_fuchsia_net::Ipv4Address {
+                addr: addr_u32.to_be_bytes(),
+            });
+            assert!(all_addrs.insert(addr.clone()));
+
+            // Add the addr as a static neighbor associated with BOB's MAC.
+            controller
+                .add_entry(ep.id(), &mut addr, &mut BOB_MAC.clone())
+                .await
+                .expect("add_entry FIDL error")
+                .map_err(fuchsia_zircon::Status::from_raw)
+                .expect("add_entry failed");
+            assert_entries(
+                &mut iter,
+                [ItemMatch::Added(EntryMatch {
+                    interface: iface_id,
+                    neighbor: addr,
+                    state: fidl_fuchsia_net_neighbor::EntryState::Static,
+                    mac: Some(BOB_MAC),
+                })],
+            )
+            .await;
+        }
+    }
+
+    // Remove the interface, which should cause all neighbor entries to be
+    // simultaneously removed.
+    ep.control().remove().await.expect("request sent").expect("remove initiated successfully");
+    assert_eq!(
+        ep.wait_removal().await.expect("wait for removal"),
+        fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::User
+    );
+
+    let del_addrs = iter
+        .map(|item| match item {
+            fidl_fuchsia_net_neighbor::EntryIteratorItem::Removed(entry) => {
+                let fidl_fuchsia_net_neighbor::Entry {
+                    interface,
+                    state,
+                    mac,
+                    neighbor,
+                    updated_at: _,
+                    ..
+                } = entry;
+                assert_eq!(interface, Some(iface_id));
+                assert_eq!(state, Some(fidl_fuchsia_net_neighbor::EntryState::Static));
+                assert_eq!(mac, Some(BOB_MAC));
+                assert_matches!(neighbor, Some(addr) => addr)
+            }
+            e @ fidl_fuchsia_net_neighbor::EntryIteratorItem::Existing(_)
+            | e @ fidl_fuchsia_net_neighbor::EntryIteratorItem::Added(_)
+            | e @ fidl_fuchsia_net_neighbor::EntryIteratorItem::Changed(_)
+            | e @ fidl_fuchsia_net_neighbor::EntryIteratorItem::Idle(_) => {
+                panic!("unexpected event in neighbor stream: {:?}", e)
+            }
+        })
+        .take(all_addrs.len())
+        .collect::<HashSet<_>>()
+        .await;
+    assert_eq!(del_addrs, all_addrs);
 }
