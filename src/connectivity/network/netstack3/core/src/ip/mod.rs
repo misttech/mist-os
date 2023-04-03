@@ -573,8 +573,8 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice>
         device_id: &Self::DeviceId,
     ) -> AddressStatus<I::AddressStatus>;
 
-    /// Returns true iff the device has routing enabled.
-    fn is_device_routing_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
+    /// Returns true iff the device has forwarding enabled.
+    fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
     /// Returns the hop limit.
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
@@ -2301,7 +2301,7 @@ fn receive_ip_packet_action_common<
     device_id: &SC::DeviceId,
 ) -> ReceivePacketAction<I::Addr, SC::DeviceId> {
     // The packet is not destined locally, so we attempt to forward it.
-    if !sync_ctx.is_device_routing_enabled(device_id) {
+    if !sync_ctx.is_device_forwarding_enabled(device_id) {
         // Forwarding is disabled; we are operating only as a host.
         //
         // For IPv4, per RFC 1122 Section 3.2.1.3, "A host MUST silently discard
@@ -2990,7 +2990,7 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
-        device::{self, testutil::set_routing_enabled, FrameDestination, WeakDeviceId},
+        device::{self, testutil::set_forwarding_enabled, FrameDestination, WeakDeviceId},
         ip::{
             testutil::is_in_ip_multicast,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Metric, RawMetric},
@@ -3569,7 +3569,7 @@ mod tests {
             FakeEventDispatcherBuilder::from_config(fake_config.swap()).build();
         {
             let Ctx { sync_ctx, non_sync_ctx } = &mut alice;
-            set_routing_enabled::<_, I>(
+            set_forwarding_enabled::<_, I>(
                 sync_ctx,
                 non_sync_ctx,
                 &alice_device_ids[0].clone().into(),
@@ -3686,7 +3686,7 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = dispatcher_builder.build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_routing_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         let frame_dst = FrameDestination::Unicast;
 
@@ -4604,9 +4604,9 @@ mod tests {
 
         // Receive packet destined to a remote address when forwarding is
         // enabled both globally and on the inbound device.
-        set_routing_enabled::<_, Ipv4>(sync_ctx, &mut non_sync_ctx, &v4_dev, true)
+        set_forwarding_enabled::<_, Ipv4>(sync_ctx, &mut non_sync_ctx, &v4_dev, true)
             .expect("error setting routing enabled");
-        set_routing_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &v6_dev, true)
+        set_forwarding_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &v6_dev, true)
             .expect("error setting routing enabled");
         assert_eq!(
             receive_ipv4_packet_action(

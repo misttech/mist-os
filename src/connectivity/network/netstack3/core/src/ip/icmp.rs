@@ -3014,7 +3014,7 @@ mod tests {
     use crate::{
         context::testutil::{FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
         device::{
-            testutil::{set_routing_enabled, FakeDeviceId, FakeWeakDeviceId},
+            testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId, FrameDestination,
         },
         ip::{
@@ -3158,7 +3158,7 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
 
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_routing_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
         match I::VERSION {
             IpVersion::V4 => receive_ip_packet::<_, _, Ipv4>(

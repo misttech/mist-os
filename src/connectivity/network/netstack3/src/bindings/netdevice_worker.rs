@@ -355,7 +355,7 @@ impl DeviceHandler {
                     ip_config: IpDeviceConfiguration {
                         ip_enabled: false,
                         gmp_enabled: true,
-                        routing_enabled: false,
+                        forwarding_enabled: false,
                     },
                 };
             },

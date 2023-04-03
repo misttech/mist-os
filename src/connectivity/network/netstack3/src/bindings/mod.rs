@@ -823,7 +823,7 @@ impl Netstack {
                     ip_config: IpDeviceConfiguration {
                         ip_enabled: true,
                         gmp_enabled: false,
-                        routing_enabled: false,
+                        forwarding_enabled: false,
                     },
                 };
             },
@@ -844,7 +844,7 @@ impl Netstack {
                     ip_config: IpDeviceConfiguration {
                         ip_enabled: true,
                         gmp_enabled: false,
-                        routing_enabled: false,
+                        forwarding_enabled: false,
                     },
                 };
             },

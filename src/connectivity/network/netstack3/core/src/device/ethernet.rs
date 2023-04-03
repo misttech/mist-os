@@ -1160,7 +1160,7 @@ mod tests {
     use crate::{
         context::testutil::FakeFrameCtx,
         device::{
-            testutil::{set_routing_enabled, FakeDeviceId, FakeWeakDeviceId},
+            testutil::{set_forwarding_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
         error::{ExistsError, NotFoundError},
@@ -1562,30 +1562,30 @@ mod tests {
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
     }
 
-    fn is_routing_enabled<I: Ip>(
+    fn is_forwarding_enabled<I: Ip>(
         sync_ctx: &mut &crate::testutil::FakeSyncCtx,
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> bool {
         match I::VERSION {
             IpVersion::V4 => {
-                crate::device::testutil::is_routing_enabled::<_, Ipv4>(sync_ctx, device)
+                crate::device::testutil::is_forwarding_enabled::<_, Ipv4>(sync_ctx, device)
             }
             IpVersion::V6 => {
-                crate::device::testutil::is_routing_enabled::<_, Ipv6>(sync_ctx, device)
+                crate::device::testutil::is_forwarding_enabled::<_, Ipv6>(sync_ctx, device)
             }
         }
     }
 
     #[ip_test]
     fn test_set_ip_routing<I: Ip + TestIpExt>() {
-        fn check_other_is_routing_enabled<I: Ip>(
+        fn check_other_is_forwarding_enabled<I: Ip>(
             sync_ctx: &mut &crate::testutil::FakeSyncCtx,
             device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
             expected: bool,
         ) {
             let enabled = match I::VERSION {
-                IpVersion::V4 => is_routing_enabled::<Ipv6>(sync_ctx, device),
-                IpVersion::V6 => is_routing_enabled::<Ipv4>(sync_ctx, device),
+                IpVersion::V4 => is_forwarding_enabled::<Ipv6>(sync_ctx, device),
+                IpVersion::V6 => is_forwarding_enabled::<Ipv4>(sync_ctx, device),
             };
 
             assert_eq!(enabled, expected);
@@ -1642,8 +1642,8 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
 
         // Should not be a router (default).
-        assert!(!is_routing_enabled::<I>(&mut sync_ctx, &device));
-        check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);
+        assert!(!is_forwarding_enabled::<I>(&mut sync_ctx, &device));
+        check_other_is_forwarding_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Receiving a packet not destined for the node should only result in a
         // dest unreachable message if routing is enabled.
@@ -1657,11 +1657,11 @@ mod tests {
         assert_empty(non_sync_ctx.frames_sent().iter());
 
         // Set routing and expect packets to be forwarded.
-        set_routing_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
-        assert!(is_routing_enabled::<I>(&mut sync_ctx, &device));
+        assert!(is_forwarding_enabled::<I>(&mut sync_ctx, &device));
         // Should not update other Ip routing status.
-        check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);
+        check_other_is_forwarding_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Should route the packet since routing fully enabled (netstack &
         // device).
@@ -1706,10 +1706,10 @@ mod tests {
         check_icmp::<I>(&non_sync_ctx.frames_sent()[1].1);
 
         // Attempt to unset router
-        set_routing_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
+        set_forwarding_enabled::<_, I>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting routing enabled");
-        assert!(!is_routing_enabled::<I>(&mut sync_ctx, &device));
-        check_other_is_routing_enabled::<I>(&mut sync_ctx, &device, false);
+        assert!(!is_forwarding_enabled::<I>(&mut sync_ctx, &device));
+        check_other_is_forwarding_enabled::<I>(&mut sync_ctx, &device, false);
 
         // Should not route packets anymore
         receive_ip_packet::<_, _, I>(

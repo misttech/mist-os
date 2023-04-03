@@ -866,9 +866,9 @@ async fn set_configuration(
                         non_sync_ctx,
                         &core_id,
                         |config| {
-                            let routing_enabled = &mut config.ip_config.routing_enabled;
-                            let prev = *routing_enabled;
-                            *routing_enabled = enable;
+                            let forwarding_enabled = &mut config.ip_config.forwarding_enabled;
+                            let prev = *forwarding_enabled;
+                            *forwarding_enabled = enable;
                             prev
                         },
                     )
@@ -885,9 +885,9 @@ async fn set_configuration(
                         non_sync_ctx,
                         &core_id,
                         |config| {
-                            let routing_enabled = &mut config.ip_config.routing_enabled;
-                            let prev = *routing_enabled;
-                            *routing_enabled = enable;
+                            let forwarding_enabled = &mut config.ip_config.forwarding_enabled;
+                            let prev = *forwarding_enabled;
+                            *forwarding_enabled = enable;
                             prev
                         },
                     )
@@ -916,7 +916,7 @@ async fn get_configuration(
             forwarding: Some(
                 netstack3_core::device::get_ipv4_configuration(&sync_ctx, &core_id)
                     .ip_config
-                    .routing_enabled,
+                    .forwarding_enabled,
             ),
             ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
         }),
@@ -924,7 +924,7 @@ async fn get_configuration(
             forwarding: Some(
                 netstack3_core::device::get_ipv6_configuration(&sync_ctx, &core_id)
                     .ip_config
-                    .routing_enabled,
+                    .forwarding_enabled,
             ),
             ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
         }),

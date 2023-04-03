@@ -462,7 +462,7 @@ impl<I: IpDeviceIpExt, C: IpDeviceNonSyncContext<I, SC::DeviceId>, SC: IpDeviceC
     IpDeviceHandler<I, C> for SC
 {
     fn is_router_device(&mut self, device_id: &Self::DeviceId) -> bool {
-        is_ip_routing_enabled(self, device_id)
+        is_ip_forwarding_enabled(self, device_id)
     }
 
     fn set_default_hop_limit(&mut self, device_id: &Self::DeviceId, hop_limit: NonZeroU8) {
@@ -613,7 +613,12 @@ fn enable_ipv6_device<
                         dad_transmits,
                         max_router_solicitations: _,
                         slaac_config: _,
-                        ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, routing_enabled: _ },
+                        ip_config:
+                            IpDeviceConfiguration {
+                                ip_enabled: _,
+                                gmp_enabled: _,
+                                forwarding_enabled: _,
+                            },
                     },
                 retrans_timer: _,
                 router_soliciations_remaining: _,
@@ -675,7 +680,7 @@ fn enable_ipv6_device<
     //    address.
     //
     // If we are operating as a router, we do not solicit routers.
-    if !is_ip_routing_enabled(sync_ctx, device_id) {
+    if !is_ip_forwarding_enabled(sync_ctx, device_id) {
         RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
     }
 }
@@ -839,8 +844,8 @@ pub(crate) fn get_ipv6_hop_limit<
     sync_ctx.with_ip_device_state(device, |state| state.ip_state.default_hop_limit)
 }
 
-/// Is IP packet routing enabled?
-pub(crate) fn is_ip_routing_enabled<
+/// Is IP packet forwarding enabled?
+pub(crate) fn is_ip_forwarding_enabled<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, SC::DeviceId>,
     SC: IpDeviceContext<I, C>,
@@ -849,7 +854,7 @@ pub(crate) fn is_ip_routing_enabled<
     device_id: &SC::DeviceId,
 ) -> bool {
     sync_ctx.with_ip_device_state(device_id, |state| {
-        AsRef::<IpDeviceConfiguration>::as_ref(state).routing_enabled
+        AsRef::<IpDeviceConfiguration>::as_ref(state).forwarding_enabled
     })
 }
 
@@ -968,7 +973,7 @@ pub(crate) fn add_ipv6_addr_subnet<
                         dad_transmits,
                         max_router_solicitations: _,
                         slaac_config: _,
-                        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _, routing_enabled: _ },
+                        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _, forwarding_enabled: _ },
                     },
                 retrans_timer: _,
                 router_soliciations_remaining: _,
@@ -1150,10 +1155,11 @@ pub(crate) fn update_ipv4_configuration<
 
         if device_id.is_loopback() {
             let Ipv4DeviceConfiguration {
-                ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, routing_enabled },
+                ip_config:
+                    IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, forwarding_enabled },
             } = config;
 
-            if *routing_enabled {
+            if *forwarding_enabled {
                 *config = prev_config;
                 return Err(NotSupportedError);
             }
@@ -1167,7 +1173,7 @@ pub(crate) fn update_ipv4_configuration<
             IpDeviceConfiguration {
                 ip_enabled: prev_ip_enabled,
                 gmp_enabled: prev_gmp_enabled,
-                routing_enabled: _,
+                forwarding_enabled: _,
             },
     } = prev_config;
     let Ipv4DeviceConfiguration {
@@ -1175,7 +1181,7 @@ pub(crate) fn update_ipv4_configuration<
             IpDeviceConfiguration {
                 ip_enabled: next_ip_enabled,
                 gmp_enabled: next_gmp_enabled,
-                routing_enabled: _,
+                forwarding_enabled: _,
             },
     } = new_config;
 
@@ -1247,10 +1253,11 @@ pub(crate) fn update_ipv6_configuration<
                 dad_transmits: _,
                 max_router_solicitations: _,
                 slaac_config: _,
-                ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, routing_enabled },
+                ip_config:
+                    IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, forwarding_enabled },
             } = config;
 
-            if *routing_enabled {
+            if *forwarding_enabled {
                 *config = prev_config;
                 return Err(NotSupportedError);
             }
@@ -1267,7 +1274,7 @@ pub(crate) fn update_ipv6_configuration<
             IpDeviceConfiguration {
                 ip_enabled: prev_ip_enabled,
                 gmp_enabled: prev_gmp_enabled,
-                routing_enabled: prev_routing_enabled,
+                forwarding_enabled: prev_forwarding_enabled,
             },
     } = prev_config;
     let Ipv6DeviceConfiguration {
@@ -1278,7 +1285,7 @@ pub(crate) fn update_ipv6_configuration<
             IpDeviceConfiguration {
                 ip_enabled: next_ip_enabled,
                 gmp_enabled: next_gmp_enabled,
-                routing_enabled: next_routing_enabled,
+                forwarding_enabled: next_forwarding_enabled,
             },
     } = new_config;
 
@@ -1303,8 +1310,8 @@ pub(crate) fn update_ipv6_configuration<
         }
     }
 
-    if prev_routing_enabled != next_routing_enabled {
-        if next_routing_enabled {
+    if prev_forwarding_enabled != next_forwarding_enabled {
+        if next_forwarding_enabled {
             RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
             join_ip_multicast(
                 sync_ctx,
@@ -1335,7 +1342,7 @@ pub(crate) fn clear_ipv4_device_state<
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ } = sync_ctx
+    let IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ } = sync_ctx
         .with_ip_device_state(device_id, |state| {
             let Ipv4DeviceState { ip_state: _, config: Ipv4DeviceConfiguration { ip_config } } =
                 state;
@@ -1364,7 +1371,7 @@ pub(crate) fn clear_ipv6_device_state<
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ } = sync_ctx
+    let IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ } = sync_ctx
         .with_ip_device_state(device_id, |state| {
             let Ipv6DeviceState {
                 ip_state: _,
@@ -2032,7 +2039,7 @@ mod tests {
                     let config = config.as_mut();
                     config.ip_enabled = !config.ip_enabled;
                     config.gmp_enabled = !config.gmp_enabled;
-                    config.routing_enabled = true;
+                    config.forwarding_enabled = true;
                 }
             ),
             Err(NotSupportedError),

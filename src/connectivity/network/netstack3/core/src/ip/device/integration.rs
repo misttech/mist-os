@@ -26,7 +26,7 @@ use crate::{
             self, add_ipv6_addr_subnet,
             dad::{DadHandler, DadStateRef, Ipv6DeviceDadContext, Ipv6LayerDadContext},
             del_ipv6_addr, get_ipv4_addr_subnet, get_ipv6_hop_limit, is_ip_device_enabled,
-            is_ip_routing_enabled,
+            is_ip_forwarding_enabled,
             route_discovery::{Ipv6RouteDiscoveryState, Ipv6RouteDiscoveryStateContext},
             router_solicitation::{Ipv6DeviceRsContext, Ipv6LayerRsContext},
             send_ip_frame,
@@ -262,7 +262,7 @@ impl<
                 config:
                     Ipv4DeviceConfiguration {
                         ip_config:
-                            IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ },
+                            IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
                     },
             } = state;
 
@@ -324,7 +324,7 @@ impl<
                         max_router_solicitations: _,
                         slaac_config: _,
                         ip_config:
-                            IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ },
+                            IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
                     },
             } = state;
             let enabled = *ip_enabled && *gmp_enabled;
@@ -526,8 +526,8 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         self.with_ip_device_state(device_id, |state| assignment_state_v4(dst_ip, &state.ip_state))
     }
 
-    fn is_device_routing_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
-        is_ip_routing_enabled(self, device_id)
+    fn is_device_forwarding_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
+        is_ip_forwarding_enabled(self, device_id)
     }
 
     fn get_hop_limit(&mut self, _device_id: &SC::DeviceId) -> NonZeroU8 {
@@ -587,8 +587,8 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         self.with_ip_device_state(device_id, |state| assignment_state_v6(addr, &state.ip_state))
     }
 
-    fn is_device_routing_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
-        is_ip_routing_enabled(self, device_id)
+    fn is_device_forwarding_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
+        is_ip_forwarding_enabled(self, device_id)
     }
 
     fn get_hop_limit(&mut self, device_id: &SC::DeviceId) -> NonZeroU8 {

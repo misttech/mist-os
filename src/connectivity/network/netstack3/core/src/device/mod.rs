@@ -1889,7 +1889,7 @@ pub(crate) mod testutil {
     }
 
     /// Enables or disables IP packet routing on `device`.
-    pub(crate) fn set_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
+    pub(crate) fn set_forwarding_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
         sync_ctx: &SyncCtx<NonSyncCtx>,
         ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
@@ -1897,11 +1897,11 @@ pub(crate) mod testutil {
     ) -> Result<(), NotSupportedError> {
         match I::VERSION {
             IpVersion::V4 => update_ipv4_configuration(sync_ctx, ctx, device, |config| {
-                config.ip_config.routing_enabled = enabled;
+                config.ip_config.forwarding_enabled = enabled;
             })
             .unwrap(),
             IpVersion::V6 => update_ipv6_configuration(sync_ctx, ctx, device, |config| {
-                config.ip_config.routing_enabled = enabled;
+                config.ip_config.forwarding_enabled = enabled;
             })
             .unwrap(),
         }
@@ -1910,17 +1910,17 @@ pub(crate) mod testutil {
     }
 
     /// Returns whether IP packet routing is enabled on `device`.
-    pub(crate) fn is_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
+    pub(crate) fn is_forwarding_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
         sync_ctx: &SyncCtx<NonSyncCtx>,
         device: &DeviceId<NonSyncCtx>,
     ) -> bool {
         let mut sync_ctx = Locked::new(sync_ctx);
         match I::VERSION {
             IpVersion::V4 => {
-                crate::ip::device::is_ip_routing_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
+                crate::ip::device::is_ip_forwarding_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
             }
             IpVersion::V6 => {
-                crate::ip::device::is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, device)
+                crate::ip::device::is_ip_forwarding_enabled::<Ipv6, _, _>(&mut sync_ctx, device)
             }
         }
     }

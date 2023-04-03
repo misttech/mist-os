@@ -238,20 +238,18 @@ pub struct IpDeviceConfiguration {
     /// Default: `false`.
     pub gmp_enabled: bool,
 
-    /// A flag indicating whether routing of IP packets not destined for this
+    /// A flag indicating whether forwarding of IP packets not destined for this
     /// device is enabled.
     ///
-    /// This flag controls whether or not packets can be routed from this
+    /// This flag controls whether or not packets can be forwarded from this
     /// device. That is, when a packet arrives at a device it is not destined
-    /// for, the packet can only be routed if the device it arrived at has
-    /// routing enabled and there exists another device that has a path to the
-    /// packet's destination, regardless of the other device's routing ability.
+    /// for, the packet can only be forwarded if the device it arrived at has
+    /// forwarding enabled and there exists another device that has a path to
+    /// the packet's destination, regardless of the other device's forwarding
+    /// ability.
     ///
     /// Default: `false`.
-    // TODO(https://fxbug.dev/85682): Rename this flag to something like
-    // `forwarding_enabled`, and make it control only forwarding. Make
-    // participation in Router NDP a separate flag owned by the `ndp` module.
-    pub routing_enabled: bool,
+    pub forwarding_enabled: bool,
 }
 
 /// Configuration common to all IPv4 devices.

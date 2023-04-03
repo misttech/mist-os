@@ -70,7 +70,7 @@ mod tests {
         device::{
             add_ip_addr_subnet, del_ip_addr, ethernet,
             link::LinkAddress,
-            testutil::{is_routing_enabled, receive_frame, set_routing_enabled},
+            testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
             DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, Mtu,
         },
         ip::{
@@ -1389,7 +1389,7 @@ mod tests {
     }
 
     #[test]
-    fn test_router_solicitation_on_routing_enabled_changes() {
+    fn test_router_solicitation_on_forwarding_enabled_changes() {
         // Make sure that when an interface goes from host -> router, it stops
         // sending Router Solicitations, and starts sending them when it goes
         // form router -> host as routers should not send Router Solicitation
@@ -1451,9 +1451,9 @@ mod tests {
         non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
         // Enable routing on device.
-        set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
-        assert!(is_routing_enabled::<_, Ipv6>(&mut sync_ctx, &device));
+        assert!(is_forwarding_enabled::<_, Ipv6>(&mut sync_ctx, &device));
 
         // Should have not sent any new packets, but unset the router
         // solicitation timer.
@@ -1461,9 +1461,9 @@ mod tests {
         assert_empty(non_sync_ctx.timer_ctx().timers().iter().filter(|x| &x.1 == &timer_id));
 
         // Unsetting routing should succeed.
-        set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
+        set_forwarding_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting routing enabled");
-        assert!(!is_routing_enabled::<_, Ipv6>(&mut sync_ctx, &device));
+        assert!(!is_forwarding_enabled::<_, Ipv6>(&mut sync_ctx, &device));
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         non_sync_ctx.timer_ctx().assert_timers_installed([(timer_id.clone(), ..)]);
 
@@ -1666,7 +1666,7 @@ mod tests {
         )
         .into();
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
-        set_routing_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
+        set_forwarding_enabled::<_, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
 
         let src_mac = config.remote_mac;
