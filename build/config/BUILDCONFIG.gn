@@ -1025,11 +1025,7 @@ foreach(_target_type,
       # If the action is either setting that it doesn't have hermetic_deps, or
       # if it's using the hermetic_action_ignored_prefixes, make sure that it's
       # in the non-hermetic targets allow-list.
-      if (!hermetic_deps ||
-          (defined(hermetic_action_ignored_prefixes) &&
-           # Ignoring only //prebuilt subdirs is specially exempted.
-           filter_exclude(hermetic_action_ignored_prefixes,
-                          [ "//prebuilt/*" ]) != [])) {
+      if (!hermetic_deps || defined(hermetic_action_ignored_prefixes)) {
         deps += [ "//build:non_hermetic_deps" ]
       }
       if (!hermetic_deps) {

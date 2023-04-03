@@ -2,20 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/toolchain/zircon/clang.gni")
-import("//build/toolchain/zircon/gcc.gni")
-
-_clang_only_utils = [ "ifs" ]
-_clang_utils = {
-  dir = clang_tool_dir
-  prefix = "llvm-"
-  cc = "clang"
-}
-_gcc_utils = {
-  dir = gcc_tool_dir
-  prefix = "$clang_cpu-elf-"
-  cc = "${prefix}gcc"
-}
+import("//build/config/clang/clang.gni")
 
 # Like action() but using utility binaries from the C/C++ toolchain.
 # This is the way to use `nm`, `objcopy`, etc.
@@ -65,36 +52,20 @@ template("toolchain_utils_action") {
   assert(defined(invoker.utils),
          "toolchain_utils_action(\"$target_name\") requires `utils`")
 
-  utils_dirs = []
   utils_inputs = []
   utils_paths = []
+
+  # The GN build only supports prebuilt Clang at the moment.
   foreach(util, invoker.utils) {
-    # Clear from any previous iteration.
-    use_utils = {
-    }
-
-    # Select the set of tools to use for the current toolchain.  GNU binutils
-    # doesn't have all tools LLVM does, so sometimes use LLVM even if is_gcc.
-    if (is_gcc &&
-        _clang_only_utils + [ util ] - [ util ] == _clang_only_utils) {
-      use_utils = _gcc_utils
-    } else {
-      use_utils = _clang_utils
-    }
-
     if (util == "cc") {
-      util = use_utils.cc
+      util = "clang"
     } else {
-      util = use_utils.prefix + util
+      util = "llvm-${util}"
     }
-    util = "${use_utils.dir}/$util"
-    utils_inputs += [ util ]
-    utils_paths += [ rebase_path(util, root_build_dir) ]
 
-    # Add to the list, but don't duplicate.
-    utils_dirs += [ use_utils.dir ]
-    utils_dirs -= [ use_utils.dir ]
-    utils_dirs += [ use_utils.dir ]
+    util_path = "${clang_prefix}/${util}"
+    utils_inputs += [ util_path ]
+    utils_paths += [ rebase_path(util_path, root_build_dir) ]
   }
 
   action(target_name) {
@@ -130,16 +101,6 @@ template("toolchain_utils_action") {
           utils_paths == [ utils_paths[0] ],
           "toolchain_utils_action(\"$target_name\") without `script` must have exactly one element in `utils`")
       args = invoker.args
-    }
-
-    # The utilities might access other parts of their own installation.
-    if (!defined(hermetic_action_ignored_prefixes)) {
-      hermetic_action_ignored_prefixes = []
-    }
-    foreach(dir, utils_dirs) {
-      # The dir is the bin/ directory but its tools will look in ../... too.
-      dir = get_path_info(dir, "dir")
-      hermetic_action_ignored_prefixes += [ dir ]
     }
   }
 }
