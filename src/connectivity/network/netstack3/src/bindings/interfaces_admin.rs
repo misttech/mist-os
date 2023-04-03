@@ -818,7 +818,7 @@ async fn set_configuration(
     }) = ipv4.as_ref()
     {
         if let Some(_) = igmp {
-            todo!("https://fxbug.dev/120293 support enable/disable igmp")
+            log::warn!("TODO(https://fxbug.dev/120293): support IGMP configuration changes")
         }
         if let Some(_) = multicast_forwarding {
             log::warn!(
@@ -841,7 +841,7 @@ async fn set_configuration(
     }) = ipv6.as_ref()
     {
         if let Some(_) = mld {
-            todo!("https://fxbug.dev/120293 support enable/disable mld")
+            log::warn!("TODO(https://fxbug.dev/120293): support MLD configuration changes")
         }
         if let Some(_) = multicast_forwarding {
             log::warn!(
