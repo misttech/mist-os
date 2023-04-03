@@ -33,6 +33,7 @@ group("termina_core_shards") {
 }
 
 group("debian") {
+  testonly = true
   deps = [
     "//src/virtualization/bin/guest",
     "//src/virtualization/bin/guest_manager:debian_guest_manager",
