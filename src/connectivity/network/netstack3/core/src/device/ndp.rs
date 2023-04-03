@@ -68,9 +68,10 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr, ethernet, is_routing_enabled, link::LinkAddress,
-            set_routing_enabled, testutil::receive_frame, DeviceId, EthernetDeviceId,
-            EthernetWeakDeviceId, FrameDestination, Mtu,
+            add_ip_addr_subnet, del_ip_addr, ethernet,
+            link::LinkAddress,
+            testutil::{is_routing_enabled, receive_frame, set_routing_enabled},
+            DeviceId, EthernetDeviceId, EthernetWeakDeviceId, FrameDestination, Mtu,
         },
         ip::{
             device::{
@@ -337,7 +338,8 @@ mod tests {
                 non_sync_ctx,
                 &local_device_id,
                 update,
-            );
+            )
+            .unwrap();
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
         net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
@@ -346,7 +348,8 @@ mod tests {
                 non_sync_ctx,
                 &remote_device_id,
                 update,
-            );
+            )
+            .unwrap();
             assert_eq!(non_sync_ctx.frames_sent().len(), 1);
         });
 
@@ -417,7 +420,8 @@ mod tests {
                 non_sync_ctx,
                 &local_device_id,
                 update,
-            );
+            )
+            .unwrap();
             add_ip_addr_subnet(sync_ctx, non_sync_ctx, &local_device_id, addr).unwrap();
         });
         net.with_context("remote", |Ctx { sync_ctx, non_sync_ctx }| {
@@ -426,7 +430,8 @@ mod tests {
                 non_sync_ctx,
                 &remote_device_id,
                 update,
-            );
+            )
+            .unwrap();
         });
 
         // Only local should be in the solicited node multicast group.
@@ -496,7 +501,8 @@ mod tests {
                 config.ip_config.ip_enabled = true;
                 config.dad_transmits = NonZeroU8::new(1);
             },
-        );
+        )
+        .unwrap();
         let addr = local_ip();
         add_ip_addr_subnet(
             &mut sync_ctx,
@@ -547,7 +553,8 @@ mod tests {
                 config.ip_config.ip_enabled = true;
                 config.dad_transmits = NonZeroU8::new(3);
             },
-        );
+        )
+        .unwrap();
         add_ip_addr_subnet(
             &mut sync_ctx,
             &mut non_sync_ctx,
@@ -585,7 +592,8 @@ mod tests {
                 non_sync_ctx,
                 &local_device_id,
                 update,
-            );
+            )
+            .unwrap();
 
             add_ip_addr_subnet(
                 sync_ctx,
@@ -601,7 +609,8 @@ mod tests {
                 non_sync_ctx,
                 &remote_device_id,
                 update,
-            );
+            )
+            .unwrap();
         });
 
         let expected_timer_id = dad_timer_id(local_eth_device_id, local_ip());
@@ -696,7 +705,8 @@ mod tests {
                 ipv6_config.dad_transmits = NonZeroU8::new(3);
                 ipv6_config.max_router_solicitations = None;
             },
-        );
+        )
+        .unwrap();
 
         // Add an IP.
         add_ip_addr_subnet(
@@ -810,7 +820,8 @@ mod tests {
                 ipv6_config.dad_transmits = NonZeroU8::new(3);
                 ipv6_config.max_router_solicitations = None;
             },
-        );
+        )
+        .unwrap();
 
         assert_empty(non_sync_ctx.frames_sent());
 
@@ -1247,7 +1258,8 @@ mod tests {
                 // Test expects to send 3 RSs.
                 config.max_router_solicitations = NonZeroU8::new(3);
             },
-        );
+        )
+        .unwrap();
         assert_empty(non_sync_ctx.frames_sent());
 
         let time = non_sync_ctx.now();
@@ -1338,7 +1350,8 @@ mod tests {
                 config.ip_config.ip_enabled = true;
                 config.max_router_solicitations = NonZeroU8::new(2);
             },
-        );
+        )
+        .unwrap();
         assert_empty(non_sync_ctx.frames_sent());
 
         let time = non_sync_ctx.now();
@@ -1412,7 +1425,8 @@ mod tests {
                 // solicitations.
                 config.max_router_solicitations = NonZeroU8::new(2);
             },
-        );
+        )
+        .unwrap();
         let timer_id: TimerId<_> =
             rs_timer_id(device.clone().try_into().expect("expected ethernet ID")).into();
 
@@ -1519,7 +1533,8 @@ mod tests {
                 ipv6_config.ip_config.ip_enabled = true;
                 ipv6_config.dad_transmits = NonZeroU8::new(DUP_ADDR_DETECT_TRANSMITS);
             },
-        );
+        )
+        .unwrap();
 
         // Updating the IP should start the DAD process.
         add_ip_addr_subnet(
@@ -1550,7 +1565,8 @@ mod tests {
             |ipv6_config| {
                 ipv6_config.dad_transmits = None;
             },
-        );
+        )
+        .unwrap();
         let expected_timer_id = dad_timer_id(device_id, fake_config.remote_ip.try_into().unwrap());
         // Allow already started DAD to complete (2 more more NS, 3 more timers).
         assert_eq!(
@@ -1812,7 +1828,8 @@ mod tests {
             |ipv6_config| {
                 ipv6_config.slaac_config = slaac_config;
             },
-        );
+        )
+        .unwrap();
         (ctx, device, slaac_config)
     }
 
@@ -1828,7 +1845,8 @@ mod tests {
             |config| {
                 config.slaac_config.enable_stable_addresses = true;
             },
-        );
+        )
+        .unwrap();
 
         let prefix1 = TestSlaacPrefix {
             prefix: subnet_v6!("1:2:3:4::/64"),
@@ -2180,7 +2198,8 @@ mod tests {
                 // Doesn't matter as long as we perform DAD.
                 config.dad_transmits = NonZeroU8::new(1);
             },
-        );
+        )
+        .unwrap();
 
         // Set the retransmit timer between neighbor solicitations to be greater
         // than the preferred lifetime of the prefix.
@@ -2396,7 +2415,8 @@ mod tests {
                 config.ip_config.ip_enabled = true;
                 config.slaac_config.enable_stable_addresses = true;
             },
-        );
+        )
+        .unwrap();
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();
@@ -2639,7 +2659,8 @@ mod tests {
                 // Doesn't matter as long as we perform DAD.
                 ipv6_config.dad_transmits = NonZeroU8::new(1);
             },
-        );
+        )
+        .unwrap();
 
         // Send an update with lifetimes that are smaller than the ones specified in the preferences.
         let valid_lifetime = 10000;
@@ -2793,7 +2814,8 @@ mod tests {
                 // Doesn't matter as long as we perform DAD.
                 ipv6_config.dad_transmits = NonZeroU8::new(1);
             },
-        );
+        )
+        .unwrap();
 
         receive_prefix_update(
             &mut sync_ctx,
@@ -2923,7 +2945,8 @@ mod tests {
                 ipv6_config.slaac_config = slaac_config;
                 ipv6_config.ip_config.ip_enabled = true;
             },
-        );
+        )
+        .unwrap();
 
         // The prefix updates contains a shorter preferred lifetime than
         // the preferences allow.
@@ -3090,7 +3113,8 @@ mod tests {
                 ipv6_config.dad_transmits = None;
                 ipv6_config.ip_config.ip_enabled = true;
             },
-        );
+        )
+        .unwrap();
 
         let router_mac = config.remote_mac;
         let router_ip = router_mac.to_ipv6_link_local().addr().get();
@@ -3118,7 +3142,8 @@ mod tests {
                 ipv6_config.dad_transmits = NonZeroU8::new(1);
                 ipv6_config.slaac_config = slaac_config;
             },
-        );
+        )
+        .unwrap();
 
         // Set a large value for the retransmit period. This forces
         // REGEN_ADVANCE to be large, which increases the window between when an
@@ -3193,7 +3218,8 @@ mod tests {
             |ipv6_config| {
                 ipv6_config.slaac_config = slaac_config;
             },
-        );
+        )
+        .unwrap();
 
         // Receiving this update should result in requiring a regen time that is
         // before the current time. The address should be regenerated
@@ -3389,7 +3415,8 @@ mod tests {
             |config| {
                 config.slaac_config = slaac_config;
             },
-        );
+        )
+        .unwrap();
         // The new valid time is measured from the time at which the address was created (`start`),
         // not the current time (`now`). That means the max valid lifetime takes precedence over
         // the router's advertised valid lifetime.
@@ -3444,7 +3471,8 @@ mod tests {
                 config.ip_config.ip_enabled = true;
                 config.slaac_config.enable_stable_addresses = true;
             },
-        );
+        )
+        .unwrap();
 
         let src_mac = config.remote_mac;
         let src_ip = src_mac.to_ipv6_link_local().addr().get();

@@ -1212,7 +1212,8 @@ mod tests {
                     config.ip_config.ip_enabled = ip_enabled;
                     config.ip_config.gmp_enabled = gmp_enabled;
                 },
-            );
+            )
+            .unwrap();
         };
         let check_sent_report = |non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
                                  specified_source: bool| {

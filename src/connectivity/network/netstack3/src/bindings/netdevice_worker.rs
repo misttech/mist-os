@@ -352,10 +352,15 @@ impl DeviceHandler {
                             TemporarySlaacAddressConfiguration::default_with_secret_key(secret_key),
                         ),
                     },
-                    ip_config: IpDeviceConfiguration { ip_enabled: false, gmp_enabled: true },
+                    ip_config: IpDeviceConfiguration {
+                        ip_enabled: false,
+                        gmp_enabled: true,
+                        routing_enabled: false,
+                    },
                 };
             },
-        );
+        )
+        .unwrap();
         netstack3_core::device::update_ipv4_configuration(
             sync_ctx,
             non_sync_ctx,
@@ -363,7 +368,8 @@ impl DeviceHandler {
             |config| {
                 config.ip_config.gmp_enabled = true;
             },
-        );
+        )
+        .unwrap();
 
         non_sync_ctx.devices.add_device(binding_id, core_id.clone());
 

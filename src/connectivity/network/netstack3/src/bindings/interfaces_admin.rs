@@ -861,18 +861,18 @@ async fn set_configuration(
         ipv4: ipv4.map(|fnet_interfaces_admin::Ipv4Configuration { forwarding, .. }| {
             fnet_interfaces_admin::Ipv4Configuration {
                 forwarding: forwarding.map(|enable| {
-                    let was_enabled = netstack3_core::device::is_routing_enabled::<
-                        _,
-                        net_types::ip::Ipv4,
-                    >(&sync_ctx, &core_id);
-                    netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv4>(
+                    netstack3_core::device::update_ipv4_configuration(
                         sync_ctx,
                         non_sync_ctx,
                         &core_id,
-                        enable,
+                        |config| {
+                            let routing_enabled = &mut config.ip_config.routing_enabled;
+                            let prev = *routing_enabled;
+                            *routing_enabled = enable;
+                            prev
+                        },
                     )
-                    .expect("checked supported configuration before calling");
-                    was_enabled
+                    .expect("checked supported configuration before calling")
                 }),
                 ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
             }
@@ -880,18 +880,18 @@ async fn set_configuration(
         ipv6: ipv6.map(|fnet_interfaces_admin::Ipv6Configuration { forwarding, .. }| {
             fnet_interfaces_admin::Ipv6Configuration {
                 forwarding: forwarding.map(|enable| {
-                    let was_enabled = netstack3_core::device::is_routing_enabled::<
-                        _,
-                        net_types::ip::Ipv6,
-                    >(&sync_ctx, &core_id);
-                    netstack3_core::device::set_routing_enabled::<_, net_types::ip::Ipv6>(
+                    netstack3_core::device::update_ipv6_configuration(
                         sync_ctx,
                         non_sync_ctx,
                         &core_id,
-                        enable,
+                        |config| {
+                            let routing_enabled = &mut config.ip_config.routing_enabled;
+                            let prev = *routing_enabled;
+                            *routing_enabled = enable;
+                            prev
+                        },
                     )
-                    .expect("checked supported configuration before calling");
-                    was_enabled
+                    .expect("checked supported configuration before calling")
                 }),
                 ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
             }
@@ -913,15 +913,19 @@ async fn get_configuration(
         .expect("device lifetime should be tied to channel lifetime");
     fnet_interfaces_admin::Configuration {
         ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-            forwarding: Some(netstack3_core::device::is_routing_enabled::<_, net_types::ip::Ipv4>(
-                &sync_ctx, &core_id,
-            )),
+            forwarding: Some(
+                netstack3_core::device::get_ipv4_configuration(&sync_ctx, &core_id)
+                    .ip_config
+                    .routing_enabled,
+            ),
             ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
         }),
         ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-            forwarding: Some(netstack3_core::device::is_routing_enabled::<_, net_types::ip::Ipv6>(
-                &sync_ctx, &core_id,
-            )),
+            forwarding: Some(
+                netstack3_core::device::get_ipv6_configuration(&sync_ctx, &core_id)
+                    .ip_config
+                    .routing_enabled,
+            ),
             ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
         }),
         ..fnet_interfaces_admin::Configuration::EMPTY

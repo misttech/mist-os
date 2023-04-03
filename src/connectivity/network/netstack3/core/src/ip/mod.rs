@@ -2990,9 +2990,8 @@ mod tests {
     use super::*;
     use crate::{
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
-        device::{self, FrameDestination, WeakDeviceId},
+        device::{self, testutil::set_routing_enabled, FrameDestination, WeakDeviceId},
         ip::{
-            device::set_routing_enabled,
             testutil::is_in_ip_multicast,
             types::{AddableEntry, AddableEntryEither, AddableMetric, Metric, RawMetric},
         },
@@ -3570,8 +3569,8 @@ mod tests {
             FakeEventDispatcherBuilder::from_config(fake_config.swap()).build();
         {
             let Ctx { sync_ctx, non_sync_ctx } = &mut alice;
-            set_routing_enabled::<_, _, I>(
-                &mut Locked::new(&*sync_ctx),
+            set_routing_enabled::<_, I>(
+                sync_ctx,
                 non_sync_ctx,
                 &alice_device_ids[0].clone().into(),
                 true,
@@ -3687,13 +3686,8 @@ mod tests {
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = dispatcher_builder.build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        set_routing_enabled::<_, _, Ipv6>(
-            &mut Locked::new(sync_ctx),
-            &mut non_sync_ctx,
-            &device,
-            true,
-        )
-        .expect("error setting routing enabled");
+        set_routing_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &device, true)
+            .expect("error setting routing enabled");
         let frame_dst = FrameDestination::Unicast;
 
         // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
@@ -4326,7 +4320,8 @@ mod tests {
                 // Doesn't matter as long as DAD is enabled.
                 config.dad_transmits = NonZeroU8::new(1);
             },
-        );
+        )
+        .unwrap();
 
         let frame_dst = FrameDestination::Unicast;
 
@@ -4462,14 +4457,14 @@ mod tests {
             AddrSubnet::from_witness(v6_config.local_ip, 64).unwrap().subnet(),
         );
         let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.clone().build();
-        let mut sync_ctx = Locked::new(&sync_ctx);
+        let sync_ctx = &sync_ctx;
         let v4_dev: DeviceId<_> = device_ids[dev_idx0].clone().into();
         let v6_dev: DeviceId<_> = device_ids[dev_idx1].clone().into();
 
         // Receive packet addressed to us.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 v4_config.local_ip
@@ -4478,7 +4473,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v6_dev,
                 v6_config.local_ip
@@ -4489,7 +4484,7 @@ mod tests {
         // Receive packet addressed to the IPv4 subnet broadcast address.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 SpecifiedAddr::new(v4_subnet.broadcast()).unwrap()
@@ -4500,7 +4495,7 @@ mod tests {
         // Receive packet addressed to the IPv4 limited broadcast address.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 Ipv4::LIMITED_BROADCAST_ADDRESS
@@ -4510,14 +4505,14 @@ mod tests {
 
         // Receive packet addressed to a multicast address we're subscribed to.
         crate::ip::device::join_ip_multicast::<Ipv4, _, _>(
-            &mut sync_ctx,
+            &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &v4_dev,
             Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS,
         );
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 Ipv4::ALL_ROUTERS_MULTICAST_ADDRESS.into_specified()
@@ -4528,7 +4523,7 @@ mod tests {
         // Receive packet addressed to the all-nodes multicast address.
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v6_dev,
                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified()
@@ -4539,7 +4534,7 @@ mod tests {
         // Receive packet addressed to a multicast address we're subscribed to.
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v6_dev,
                 v6_config.local_ip.to_solicited_node_address().into_specified(),
@@ -4572,7 +4567,8 @@ mod tests {
                     // Doesn't matter as long as DAD is enabled.
                     config.dad_transmits = NonZeroU8::new(1);
                 },
-            );
+            )
+            .unwrap();
             let tentative: UnicastAddr<Ipv6Addr> = local_mac.to_ipv6_link_local().addr().get();
             assert_eq!(
                 receive_ipv6_packet_action(
@@ -4589,7 +4585,7 @@ mod tests {
         // disabled on the inbound interface.
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -4598,7 +4594,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -4608,13 +4604,13 @@ mod tests {
 
         // Receive packet destined to a remote address when forwarding is
         // enabled both globally and on the inbound device.
-        set_routing_enabled::<_, _, Ipv4>(&mut sync_ctx, &mut non_sync_ctx, &v4_dev, true)
+        set_routing_enabled::<_, Ipv4>(sync_ctx, &mut non_sync_ctx, &v4_dev, true)
             .expect("error setting routing enabled");
-        set_routing_enabled::<_, _, Ipv6>(&mut sync_ctx, &mut non_sync_ctx, &v6_dev, true)
+        set_routing_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &v6_dev, true)
             .expect("error setting routing enabled");
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -4625,7 +4621,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v6_dev,
                 v6_config.remote_ip
@@ -4637,13 +4633,11 @@ mod tests {
 
         // Receive packet destined to a host with no route when forwarding is
         // enabled both globally and on the inbound device.
-        *sync_ctx.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv4>>() =
-            Default::default();
-        *sync_ctx.write_lock::<crate::lock_ordering::IpStateRoutingTable<Ipv6>>() =
-            Default::default();
+        *sync_ctx.state.ipv4.inner.table.write() = Default::default();
+        *sync_ctx.state.ipv6.inner.table.write() = Default::default();
         assert_eq!(
             receive_ipv4_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v4_dev,
                 v4_config.remote_ip
@@ -4652,7 +4646,7 @@ mod tests {
         );
         assert_eq!(
             receive_ipv6_packet_action(
-                &mut sync_ctx,
+                &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &v6_dev,
                 v6_config.remote_ip

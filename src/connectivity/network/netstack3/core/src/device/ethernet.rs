@@ -1160,8 +1160,7 @@ mod tests {
     use crate::{
         context::testutil::FakeFrameCtx,
         device::{
-            set_routing_enabled,
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
+            testutil::{set_routing_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId,
         },
         error::{ExistsError, NotFoundError},
@@ -1568,8 +1567,12 @@ mod tests {
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
     ) -> bool {
         match I::VERSION {
-            IpVersion::V4 => crate::device::is_routing_enabled::<_, Ipv4>(sync_ctx, device),
-            IpVersion::V6 => crate::device::is_routing_enabled::<_, Ipv6>(sync_ctx, device),
+            IpVersion::V4 => {
+                crate::device::testutil::is_routing_enabled::<_, Ipv4>(sync_ctx, device)
+            }
+            IpVersion::V6 => {
+                crate::device::testutil::is_routing_enabled::<_, Ipv6>(sync_ctx, device)
+            }
         }
     }
 

@@ -613,7 +613,8 @@ mod tests {
             |config| {
                 config.ip_config.ip_enabled = true;
             },
-        );
+        )
+        .unwrap();
 
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
@@ -987,7 +988,8 @@ mod tests {
             |config| {
                 config.ip_config.ip_enabled = false;
             },
-        );
+        )
+        .unwrap();
         assert_eq!(
             take_route_discovery_events(&mut non_sync_ctx),
             HashSet::from([

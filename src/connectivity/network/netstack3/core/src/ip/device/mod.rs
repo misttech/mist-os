@@ -15,7 +15,6 @@ pub mod state;
 use alloc::{boxed::Box, vec::Vec};
 use core::num::NonZeroU8;
 
-use net_types::ip::IpVersion;
 use net_types::{
     ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddress as _, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     MulticastAddr, SpecifiedAddr, UnicastAddr,
@@ -597,7 +596,7 @@ fn enable_ipv6_device<
                         dad_transmits,
                         max_router_solicitations: _,
                         slaac_config: _,
-                        ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _ },
+                        ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, routing_enabled: _ },
                     },
                 retrans_timer: _,
                 router_soliciations_remaining: _,
@@ -833,90 +832,8 @@ pub(crate) fn is_ip_routing_enabled<
     device_id: &SC::DeviceId,
 ) -> bool {
     sync_ctx.with_ip_device_state(device_id, |state| {
-        AsRef::<IpDeviceState<_, _>>::as_ref(state).routing_enabled
+        AsRef::<IpDeviceConfiguration>::as_ref(state).routing_enabled
     })
-}
-
-/// Enables or disables IP packet routing on `device`.
-pub(crate) fn set_routing_enabled<
-    C: IpDeviceNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>
-        + IpDeviceNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C> + Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + RsHandler<C>,
-    I: Ip,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    device: &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
-    enabled: bool,
-) -> Result<(), NotSupportedError> {
-    match I::VERSION {
-        IpVersion::V4 => set_ipv4_routing_enabled(sync_ctx, ctx, device, enabled),
-        IpVersion::V6 => set_ipv6_routing_enabled(sync_ctx, ctx, device, enabled),
-    }
-}
-
-/// Enables or disables IPv4 packet routing on `device_id`.
-fn set_ipv4_routing_enabled<
-    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-    SC: IpDeviceContext<Ipv4, C>,
->(
-    sync_ctx: &mut SC,
-    _ctx: &mut C,
-    device_id: &SC::DeviceId,
-    enabled: bool,
-) -> Result<(), NotSupportedError> {
-    if device_id.is_loopback() {
-        return Err(NotSupportedError);
-    }
-
-    sync_ctx.with_ip_device_state_mut(device_id, |state| state.ip_state.routing_enabled = enabled);
-    Ok(())
-}
-
-/// Enables or disables IPv4 packet routing on `device_id`.
-///
-/// When routing is enabled/disabled, the interface will leave/join the all
-/// routers link-local multicast group and stop/start soliciting routers.
-///
-/// Does nothing if the routing status does not change as a consequence of this
-/// call.
-pub(crate) fn set_ipv6_routing_enabled<
-    C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: Ipv6DeviceContext<C> + GmpHandler<Ipv6, C> + RsHandler<C>,
->(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    device_id: &SC::DeviceId,
-    enabled: bool,
-) -> Result<(), NotSupportedError> {
-    if device_id.is_loopback() {
-        return Err(NotSupportedError);
-    }
-
-    let prev = sync_ctx.with_ip_device_state_mut(device_id, |state| {
-        let prev = state.ip_state.routing_enabled;
-        state.ip_state.routing_enabled = enabled;
-        prev
-    });
-
-    if prev == enabled {
-        return Ok(());
-    }
-
-    if enabled {
-        RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
-        join_ip_multicast(sync_ctx, ctx, device_id, Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS);
-    } else {
-        leave_ip_multicast(
-            sync_ctx,
-            ctx,
-            device_id,
-            Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
-        );
-        RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
-    }
-
-    Ok(())
 }
 
 /// Adds `device_id` to a multicast group `multicast_addr`.
@@ -1034,7 +951,7 @@ pub(crate) fn add_ipv6_addr_subnet<
                         dad_transmits,
                         max_router_solicitations: _,
                         slaac_config: _,
-                        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _ },
+                        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _, routing_enabled: _ },
                     },
                 retrans_timer: _,
                 router_soliciations_remaining: _,
@@ -1195,50 +1112,78 @@ pub(crate) fn get_ipv6_configuration<
 }
 
 /// Updates the IPv4 Configuration for the device.
+///
+/// The device's configuration will be left unchanged when `Err(_)` is returned.
 pub(crate) fn update_ipv4_configuration<
     C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
     SC: IpDeviceContext<Ipv4, C> + GmpHandler<Ipv4, C> + NudIpHandler<Ipv4, C>,
-    F: FnOnce(&mut Ipv4DeviceConfiguration),
+    O,
+    F: FnOnce(&mut Ipv4DeviceConfiguration) -> O,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
     update_cb: F,
-) {
-    let (prev_config, new_config) = sync_ctx.with_ip_device_state_mut(device_id, |state| {
+) -> Result<O, NotSupportedError> {
+    let (ret, prev_config, new_config) = sync_ctx.with_ip_device_state_mut(device_id, |state| {
         let config = &mut state.config;
         let prev_config = *config;
 
-        update_cb(config);
+        let ret = update_cb(config);
 
-        (prev_config, *config)
-    });
+        if device_id.is_loopback() {
+            let Ipv4DeviceConfiguration {
+                ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, routing_enabled },
+            } = config;
+
+            if *routing_enabled {
+                *config = prev_config;
+                return Err(NotSupportedError);
+            }
+        }
+
+        Ok((ret, prev_config, *config))
+    })?;
 
     let Ipv4DeviceConfiguration {
         ip_config:
-            IpDeviceConfiguration { ip_enabled: prev_ip_enabled, gmp_enabled: prev_gmp_enabled },
+            IpDeviceConfiguration {
+                ip_enabled: prev_ip_enabled,
+                gmp_enabled: prev_gmp_enabled,
+                routing_enabled: _,
+            },
     } = prev_config;
     let Ipv4DeviceConfiguration {
         ip_config:
-            IpDeviceConfiguration { ip_enabled: next_ip_enabled, gmp_enabled: next_gmp_enabled },
+            IpDeviceConfiguration {
+                ip_enabled: next_ip_enabled,
+                gmp_enabled: next_gmp_enabled,
+                routing_enabled: _,
+            },
     } = new_config;
 
-    if !prev_ip_enabled && next_ip_enabled {
-        ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: true });
-        enable_ipv4_device(sync_ctx, ctx, device_id);
-    } else if prev_ip_enabled && !next_ip_enabled {
-        disable_ipv4_device(sync_ctx, ctx, device_id);
+    if prev_ip_enabled != next_ip_enabled {
+        if next_ip_enabled {
+            enable_ipv4_device(sync_ctx, ctx, device_id);
+        } else {
+            disable_ipv4_device(sync_ctx, ctx, device_id);
+        }
+
         ctx.on_event(IpDeviceEvent::EnabledChanged {
             device: device_id.clone(),
-            ip_enabled: false,
+            ip_enabled: next_ip_enabled,
         });
     }
 
-    if !prev_gmp_enabled && next_gmp_enabled {
-        GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-    } else if prev_gmp_enabled && !next_gmp_enabled {
-        GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+    if prev_gmp_enabled != next_gmp_enabled {
+        if next_gmp_enabled {
+            GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
+        } else {
+            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+        }
     }
+
+    Ok(ret)
 }
 
 pub(super) fn is_ip_device_enabled<
@@ -1255,6 +1200,8 @@ pub(super) fn is_ip_device_enabled<
 }
 
 /// Updates the IPv6 Configuration for the device.
+///
+/// The device's configuration will be left unchanged when `Err(_)` is returned.
 pub(crate) fn update_ipv6_configuration<
     C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
     SC: Ipv6DeviceContext<C>
@@ -1264,53 +1211,102 @@ pub(crate) fn update_ipv6_configuration<
         + RouteDiscoveryHandler<C>
         + SlaacHandler<C>
         + NudIpHandler<Ipv6, C>,
-    F: FnOnce(&mut Ipv6DeviceConfiguration),
+    O,
+    F: FnOnce(&mut Ipv6DeviceConfiguration) -> O,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
     update_cb: F,
-) {
-    let (prev_config, new_config) = sync_ctx.with_ip_device_state_mut(device_id, |state| {
+) -> Result<O, NotSupportedError> {
+    let (ret, prev_config, new_config) = sync_ctx.with_ip_device_state_mut(device_id, |state| {
         let config = &mut state.config;
         let prev_config = *config;
 
-        update_cb(config);
+        let ret = update_cb(config);
 
-        (prev_config, *config)
-    });
+        if device_id.is_loopback() {
+            let Ipv6DeviceConfiguration {
+                dad_transmits: _,
+                max_router_solicitations: _,
+                slaac_config: _,
+                ip_config: IpDeviceConfiguration { ip_enabled: _, gmp_enabled: _, routing_enabled },
+            } = config;
+
+            if *routing_enabled {
+                *config = prev_config;
+                return Err(NotSupportedError);
+            }
+        }
+
+        Ok((ret, prev_config, *config))
+    })?;
 
     let Ipv6DeviceConfiguration {
         dad_transmits: _,
         max_router_solicitations: _,
         slaac_config: _,
         ip_config:
-            IpDeviceConfiguration { ip_enabled: prev_ip_enabled, gmp_enabled: prev_gmp_enabled },
+            IpDeviceConfiguration {
+                ip_enabled: prev_ip_enabled,
+                gmp_enabled: prev_gmp_enabled,
+                routing_enabled: prev_routing_enabled,
+            },
     } = prev_config;
     let Ipv6DeviceConfiguration {
         dad_transmits: _,
         max_router_solicitations: _,
         slaac_config: _,
         ip_config:
-            IpDeviceConfiguration { ip_enabled: next_ip_enabled, gmp_enabled: next_gmp_enabled },
+            IpDeviceConfiguration {
+                ip_enabled: next_ip_enabled,
+                gmp_enabled: next_gmp_enabled,
+                routing_enabled: next_routing_enabled,
+            },
     } = new_config;
 
-    if !prev_ip_enabled && next_ip_enabled {
-        enable_ipv6_device(sync_ctx, ctx, device_id);
-        ctx.on_event(IpDeviceEvent::EnabledChanged { device: device_id.clone(), ip_enabled: true });
-    } else if prev_ip_enabled && !next_ip_enabled {
-        disable_ipv6_device(sync_ctx, ctx, device_id);
+    if prev_ip_enabled != next_ip_enabled {
+        if next_ip_enabled {
+            enable_ipv6_device(sync_ctx, ctx, device_id);
+        } else {
+            disable_ipv6_device(sync_ctx, ctx, device_id);
+        }
+
         ctx.on_event(IpDeviceEvent::EnabledChanged {
             device: device_id.clone(),
-            ip_enabled: false,
+            ip_enabled: next_ip_enabled,
         });
     }
 
-    if !prev_gmp_enabled && next_gmp_enabled {
-        GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
-    } else if prev_gmp_enabled && !next_gmp_enabled {
-        GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+    if prev_gmp_enabled != next_gmp_enabled {
+        if next_gmp_enabled {
+            GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
+        } else {
+            GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
+        }
     }
+
+    if prev_routing_enabled != next_routing_enabled {
+        if next_routing_enabled {
+            RsHandler::stop_router_solicitation(sync_ctx, ctx, device_id);
+            join_ip_multicast(
+                sync_ctx,
+                ctx,
+                device_id,
+                Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+            );
+        } else {
+            leave_ip_multicast(
+                sync_ctx,
+                ctx,
+                device_id,
+                Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS,
+            );
+            RsHandler::start_router_solicitation(sync_ctx, ctx, device_id);
+        }
+    }
+
+    Ok(ret)
 }
 
 /// Removes IPv4 state for the device without emitting events.
@@ -1322,8 +1318,8 @@ pub(crate) fn clear_ipv4_device_state<
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let IpDeviceConfiguration { ip_enabled, gmp_enabled } =
-        sync_ctx.with_ip_device_state(device_id, |state| {
+    let IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ } = sync_ctx
+        .with_ip_device_state(device_id, |state| {
             let Ipv4DeviceState { ip_state: _, config: Ipv4DeviceConfiguration { ip_config } } =
                 state;
             *ip_config
@@ -1351,8 +1347,8 @@ pub(crate) fn clear_ipv6_device_state<
     ctx: &mut C,
     device_id: &SC::DeviceId,
 ) {
-    let IpDeviceConfiguration { ip_enabled, gmp_enabled } =
-        sync_ctx.with_ip_device_state(device_id, |state| {
+    let IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ } = sync_ctx
+        .with_ip_device_state(device_id, |state| {
             let Ipv6DeviceState {
                 ip_state: _,
                 config:
@@ -1442,7 +1438,9 @@ mod tests {
     use super::*;
 
     use alloc::vec;
+    use core::fmt::Debug;
     use fakealloc::collections::HashSet;
+    use ip_test_macro::ip_test;
 
     use lock_order::Locked;
     use net_declare::net_ip_v6;
@@ -1477,7 +1475,8 @@ mod tests {
 
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
-        });
+        })
+        .unwrap();
         let weak_device_id = device_id.downgrade();
         assert_eq!(
             non_sync_ctx.take_events()[..],
@@ -1489,7 +1488,8 @@ mod tests {
 
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false
-        });
+        })
+        .unwrap();
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
@@ -1517,30 +1517,33 @@ mod tests {
 
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
-        });
+        })
+        .unwrap();
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
-                DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                    device: weak_device_id.clone(),
-                    ip_enabled: true,
-                }),
                 DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::AddressStateChanged {
                     device: weak_device_id.clone(),
                     addr: ipv4_addr_subnet.addr().into(),
                     state: IpAddressState::Assigned,
+                }),
+                DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                    device: weak_device_id.clone(),
+                    ip_enabled: true,
                 }),
             ]
         );
         // Verify that a redundant "enable" does not generate any events.
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true
-        });
+        })
+        .unwrap();
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false
-        });
+        })
+        .unwrap();
         assert_eq!(
             non_sync_ctx.take_events()[..],
             [
@@ -1558,7 +1561,8 @@ mod tests {
         // Verify that a redundant "disable" does not generate any events.
         update_ipv4_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false
-        });
+        })
+        .unwrap();
         assert_eq!(non_sync_ctx.take_events()[..], []);
     }
 
@@ -1570,7 +1574,8 @@ mod tests {
     ) {
         update_ipv6_configuration(sync_ctx, non_sync_ctx, device_id, |config| {
             config.ip_config.ip_enabled = true;
-        });
+        })
+        .unwrap();
         assert_eq!(
             IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
                 &mut Locked::new(*sync_ctx),
@@ -1612,7 +1617,8 @@ mod tests {
             // solicitation.
             config.dad_transmits = NonZeroU8::new(1);
             config.max_router_solicitations = NonZeroU8::new(1);
-        });
+        })
+        .unwrap();
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         assert_eq!(non_sync_ctx.take_events()[..], []);
 
@@ -1681,7 +1687,8 @@ mod tests {
             |sync_ctx: &mut &FakeSyncCtx, non_sync_ctx: &mut FakeNonSyncCtx| {
                 update_ipv6_configuration(sync_ctx, non_sync_ctx, &device_id, |config| {
                     config.ip_config.ip_enabled = false;
-                });
+                })
+                .unwrap();
                 non_sync_ctx.timer_ctx().assert_no_timers_installed();
             };
         test_disable_device(&mut sync_ctx, &mut non_sync_ctx);
@@ -1848,7 +1855,8 @@ mod tests {
 
             config.ip_config.gmp_enabled = true;
             config.max_router_solicitations = NonZeroU8::new(1);
-        });
+        })
+        .unwrap();
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
         let ll_addr = local_mac.to_ipv6_link_local();
 
@@ -1926,5 +1934,92 @@ mod tests {
             HashSet::from([ll_addr.ipv6_unicast_addr()]),
             "manual addresses should be removed on DAD failure"
         );
+    }
+
+    trait UpdateIpDeviceConfigurationTestIpExt: Ip {
+        type IpDeviceConfiguration: AsMut<IpDeviceConfiguration> + PartialEq + Debug;
+
+        fn get_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+        ) -> Self::IpDeviceConfiguration;
+
+        fn update_ip_configuration<F: FnOnce(&mut Self::IpDeviceConfiguration)>(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            cb: F,
+        ) -> Result<(), NotSupportedError>;
+    }
+
+    impl UpdateIpDeviceConfigurationTestIpExt for Ipv4 {
+        type IpDeviceConfiguration = Ipv4DeviceConfiguration;
+
+        fn get_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+        ) -> Self::IpDeviceConfiguration {
+            crate::device::get_ipv4_configuration(sync_ctx, device)
+        }
+
+        fn update_ip_configuration<F: FnOnce(&mut Self::IpDeviceConfiguration)>(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            cb: F,
+        ) -> Result<(), NotSupportedError> {
+            crate::device::update_ipv4_configuration(sync_ctx, ctx, device, cb)
+        }
+    }
+
+    impl UpdateIpDeviceConfigurationTestIpExt for Ipv6 {
+        type IpDeviceConfiguration = Ipv6DeviceConfiguration;
+
+        fn get_ip_configuration(
+            sync_ctx: &FakeSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+        ) -> Self::IpDeviceConfiguration {
+            crate::device::get_ipv6_configuration(sync_ctx, device)
+        }
+
+        fn update_ip_configuration<F: FnOnce(&mut Self::IpDeviceConfiguration)>(
+            sync_ctx: &FakeSyncCtx,
+            ctx: &mut FakeNonSyncCtx,
+            device: &DeviceId<FakeNonSyncCtx>,
+            cb: F,
+        ) -> Result<(), NotSupportedError> {
+            crate::device::update_ipv6_configuration(sync_ctx, ctx, device, cb)
+        }
+    }
+
+    #[ip_test]
+    fn update_ip_device_configuration_err<I: Ip + UpdateIpDeviceConfigurationTestIpExt>() {
+        let FakeCtx { sync_ctx, mut non_sync_ctx } = FakeCtx::default();
+        let sync_ctx = &sync_ctx;
+
+        let loopback_device_id = crate::device::add_loopback_device(
+            sync_ctx,
+            Mtu::new(u16::MAX as u32),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .expect("create the loopback interface")
+        .into();
+
+        let original_state = I::get_ip_configuration(sync_ctx, &loopback_device_id);
+        assert_eq!(
+            I::update_ip_configuration(
+                sync_ctx,
+                &mut non_sync_ctx,
+                &loopback_device_id,
+                |config| {
+                    let config = config.as_mut();
+                    config.ip_enabled = !config.ip_enabled;
+                    config.gmp_enabled = !config.gmp_enabled;
+                    config.routing_enabled = true;
+                }
+            ),
+            Err(NotSupportedError),
+        );
+        assert_eq!(original_state, I::get_ip_configuration(sync_ctx, &loopback_device_id));
     }
 }

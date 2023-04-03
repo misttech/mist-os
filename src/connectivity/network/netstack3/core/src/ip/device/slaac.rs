@@ -2686,7 +2686,8 @@ mod tests {
                     }),
                 };
             },
-        );
+        )
+        .unwrap();
 
         let set_ip_enabled = |sync_ctx: &mut &crate::testutil::FakeSyncCtx,
                               non_sync_ctx: &mut crate::testutil::FakeNonSyncCtx,
@@ -2694,6 +2695,7 @@ mod tests {
             crate::device::update_ipv6_configuration(sync_ctx, non_sync_ctx, &device_id, |config| {
                 config.ip_config.ip_enabled = enabled;
             })
+            .unwrap()
         };
         set_ip_enabled(&mut sync_ctx, &mut non_sync_ctx, true /* enabled */);
         non_sync_ctx.timer_ctx().assert_no_timers_installed();

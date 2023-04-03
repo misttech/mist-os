@@ -261,7 +261,8 @@ impl<
                 ip_state,
                 config:
                     Ipv4DeviceConfiguration {
-                        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled },
+                        ip_config:
+                            IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ },
                     },
             } = state;
 
@@ -322,7 +323,8 @@ impl<
                         dad_transmits: _,
                         max_router_solicitations: _,
                         slaac_config: _,
-                        ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled },
+                        ip_config:
+                            IpDeviceConfiguration { ip_enabled, gmp_enabled, routing_enabled: _ },
                     },
             } = state;
             let enabled = *ip_enabled && *gmp_enabled;

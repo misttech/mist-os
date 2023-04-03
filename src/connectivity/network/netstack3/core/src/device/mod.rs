@@ -30,8 +30,7 @@ use log::{debug, trace};
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, IpVersion, Ipv4, Ipv4Addr, Ipv6,
-        Ipv6Addr, Mtu,
+        AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
     },
     MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
@@ -1633,37 +1632,6 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
     }
 }
 
-/// Enables or disables IP packet routing on `device`.
-pub fn set_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
-    device: &DeviceId<NonSyncCtx>,
-    enabled: bool,
-) -> Result<(), NotSupportedError> {
-    crate::ip::device::set_routing_enabled::<_, _, I>(
-        &mut Locked::new(sync_ctx),
-        ctx,
-        device,
-        enabled,
-    )
-}
-
-/// Returns whether IP packet routing is enabled on `device`.
-pub fn is_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    device: &DeviceId<NonSyncCtx>,
-) -> bool {
-    let mut sync_ctx = Locked::new(sync_ctx);
-    match I::VERSION {
-        IpVersion::V4 => {
-            crate::ip::device::is_ip_routing_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
-        }
-        IpVersion::V6 => {
-            crate::ip::device::is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, device)
-        }
-    }
-}
-
 /// Adds an IP address and associated subnet to this device.
 ///
 /// For IPv6, this function also joins the solicited-node multicast group and
@@ -1806,34 +1774,43 @@ pub fn get_ipv6_configuration<NonSyncCtx: NonSyncContext>(
 }
 
 /// Updates the IPv4 Configuration for a `device`.
+///
+/// The device's configuration will be left unchanged when `Err(_)` is returned.
 pub fn update_ipv4_configuration<
     NonSyncCtx: NonSyncContext,
-    F: FnOnce(&mut Ipv4DeviceConfiguration),
+    O,
+    F: FnOnce(&mut Ipv4DeviceConfiguration) -> O,
 >(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     update_cb: F,
-) {
+) -> Result<O, NotSupportedError> {
     crate::ip::device::update_ipv4_configuration(&mut Locked::new(sync_ctx), ctx, device, update_cb)
 }
 
 /// Updates the IPv6 Configuration for a `device`.
+///
+/// The device's configuration will be left unchanged when `Err(_)` is returned.
 pub fn update_ipv6_configuration<
     NonSyncCtx: NonSyncContext,
-    F: FnOnce(&mut Ipv6DeviceConfiguration),
+    O,
+    F: FnOnce(&mut Ipv6DeviceConfiguration) -> O,
 >(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
     update_cb: F,
-) {
+) -> Result<O, NotSupportedError> {
     crate::ip::device::update_ipv6_configuration(&mut Locked::new(sync_ctx), ctx, device, update_cb)
 }
 
 #[cfg(test)]
 pub(crate) mod testutil {
     use super::*;
+
+    use net_types::ip::IpVersion;
+
     use crate::Ctx;
 
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
@@ -1903,10 +1880,49 @@ pub(crate) mod testutil {
     ) {
         update_ipv4_configuration(sync_ctx, ctx, device, |config| {
             config.ip_config.ip_enabled = true;
-        });
+        })
+        .unwrap();
         update_ipv6_configuration(sync_ctx, ctx, device, |config| {
             config.ip_config.ip_enabled = true;
-        });
+        })
+        .unwrap();
+    }
+
+    /// Enables or disables IP packet routing on `device`.
+    pub(crate) fn set_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
+        sync_ctx: &SyncCtx<NonSyncCtx>,
+        ctx: &mut NonSyncCtx,
+        device: &DeviceId<NonSyncCtx>,
+        enabled: bool,
+    ) -> Result<(), NotSupportedError> {
+        match I::VERSION {
+            IpVersion::V4 => update_ipv4_configuration(sync_ctx, ctx, device, |config| {
+                config.ip_config.routing_enabled = enabled;
+            })
+            .unwrap(),
+            IpVersion::V6 => update_ipv6_configuration(sync_ctx, ctx, device, |config| {
+                config.ip_config.routing_enabled = enabled;
+            })
+            .unwrap(),
+        }
+
+        Ok(())
+    }
+
+    /// Returns whether IP packet routing is enabled on `device`.
+    pub(crate) fn is_routing_enabled<NonSyncCtx: NonSyncContext, I: Ip>(
+        sync_ctx: &SyncCtx<NonSyncCtx>,
+        device: &DeviceId<NonSyncCtx>,
+    ) -> bool {
+        let mut sync_ctx = Locked::new(sync_ctx);
+        match I::VERSION {
+            IpVersion::V4 => {
+                crate::ip::device::is_ip_routing_enabled::<Ipv4, _, _>(&mut sync_ctx, device)
+            }
+            IpVersion::V6 => {
+                crate::ip::device::is_ip_routing_enabled::<Ipv6, _, _>(&mut sync_ctx, device)
+            }
+        }
     }
 
     /// A device ID type that supports identifying more than one distinct
@@ -2009,7 +2025,8 @@ mod tests {
                     state.ip_config.ip_enabled = true;
                     state.ip_config.gmp_enabled = true;
                 },
-            );
+            )
+            .unwrap();
             crate::device::update_ipv6_configuration(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
@@ -2020,7 +2037,8 @@ mod tests {
                     state.max_router_solicitations = Some(nonzero!(2u8));
                     state.slaac_config.enable_stable_addresses = true;
                 },
-            );
+            )
+            .unwrap();
         }
 
         crate::device::remove_ethernet_device(&mut sync_ctx, &mut non_sync_ctx, ethernet_device);
@@ -2127,7 +2145,8 @@ mod tests {
                 // message immediately on interface enable.
                 state.dad_transmits = Some(nonzero!(1u8));
             },
-        );
+        )
+        .unwrap();
 
         if with_tx_queue {
             check_transmitted(&mut non_sync_ctx, &device, 0);

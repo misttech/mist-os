@@ -631,10 +631,12 @@ fn set_interface_enabled(
 
     netstack3_core::device::update_ipv4_configuration(sync_ctx, non_sync_ctx, &core_id, |config| {
         config.ip_config.ip_enabled = should_enable;
-    });
+    })
+    .expect("changing ip_enabled should never fail");
     netstack3_core::device::update_ipv6_configuration(sync_ctx, non_sync_ctx, &core_id, |config| {
         config.ip_config.ip_enabled = should_enable;
-    });
+    })
+    .expect("changing ip_enabled should never fail");
 
     Ok(())
 }
@@ -838,10 +840,15 @@ impl Netstack {
             &loopback,
             |config| {
                 *config = Ipv4DeviceConfiguration {
-                    ip_config: IpDeviceConfiguration { ip_enabled: true, gmp_enabled: false },
+                    ip_config: IpDeviceConfiguration {
+                        ip_enabled: true,
+                        gmp_enabled: false,
+                        routing_enabled: false,
+                    },
                 };
             },
-        );
+        )
+        .unwrap();
         netstack3_core::device::update_ipv6_configuration(
             sync_ctx,
             non_sync_ctx,
@@ -854,10 +861,15 @@ impl Netstack {
                         enable_stable_addresses: true,
                         temporary_address_configuration: None,
                     },
-                    ip_config: IpDeviceConfiguration { ip_enabled: true, gmp_enabled: false },
+                    ip_config: IpDeviceConfiguration {
+                        ip_enabled: true,
+                        gmp_enabled: false,
+                        routing_enabled: false,
+                    },
                 };
             },
-        );
+        )
+        .unwrap();
         add_loopback_ip_addrs(sync_ctx, non_sync_ctx, &loopback)
             .expect("error adding loopback addresses");
         add_loopback_routes(sync_ctx, non_sync_ctx, &loopback)

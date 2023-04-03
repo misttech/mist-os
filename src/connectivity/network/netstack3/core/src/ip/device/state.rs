@@ -122,24 +122,6 @@ pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIp
     /// The default TTL (IPv4) or hop limit (IPv6) for outbound packets sent
     /// over this device.
     pub default_hop_limit: NonZeroU8,
-
-    // TODO(https://fxbug.dev/85682): Rename this flag to something like
-    // `forwarding_enabled`, and make it control only forwarding. Make
-    // participation in Router NDP a separate flag owned by the `ndp` module.
-    //
-    // TODO(joshlf): The `routing_enabled` field probably doesn't make sense for
-    // loopback devices.
-    /// A flag indicating whether routing of IP packets not destined for this
-    /// device is enabled.
-    ///
-    /// This flag controls whether or not packets can be routed from this
-    /// device. That is, when a packet arrives at a device it is not destined
-    /// for, the packet can only be routed if the device it arrived at has
-    /// routing enabled and there exists another device that has a path to the
-    /// packet's destination, regardless of the other device's routing ability.
-    ///
-    /// Default: `false`.
-    pub routing_enabled: bool,
 }
 
 impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<Instant, I> {
@@ -148,7 +130,6 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<I
             addrs: Vec::default(),
             multicast_groups: MulticastGroupSet::default(),
             default_hop_limit: DEFAULT_HOP_LIMIT,
-            routing_enabled: false,
         }
     }
 }
@@ -243,7 +224,7 @@ impl<I: Instant> AsRef<IpDeviceConfiguration> for Ipv4DeviceState<I> {
 }
 
 /// Configurations common to all IP devices.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct IpDeviceConfiguration {
     /// Is IP enabled for this device.
     pub ip_enabled: bool,
@@ -256,17 +237,44 @@ pub struct IpDeviceConfiguration {
     ///
     /// Default: `false`.
     pub gmp_enabled: bool,
+
+    /// A flag indicating whether routing of IP packets not destined for this
+    /// device is enabled.
+    ///
+    /// This flag controls whether or not packets can be routed from this
+    /// device. That is, when a packet arrives at a device it is not destined
+    /// for, the packet can only be routed if the device it arrived at has
+    /// routing enabled and there exists another device that has a path to the
+    /// packet's destination, regardless of the other device's routing ability.
+    ///
+    /// Default: `false`.
+    // TODO(https://fxbug.dev/85682): Rename this flag to something like
+    // `forwarding_enabled`, and make it control only forwarding. Make
+    // participation in Router NDP a separate flag owned by the `ndp` module.
+    pub routing_enabled: bool,
 }
 
 /// Configuration common to all IPv4 devices.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Ipv4DeviceConfiguration {
     /// The configuration common to all IP devices.
     pub ip_config: IpDeviceConfiguration,
 }
 
+impl AsRef<IpDeviceConfiguration> for Ipv4DeviceConfiguration {
+    fn as_ref(&self) -> &IpDeviceConfiguration {
+        &self.ip_config
+    }
+}
+
+impl AsMut<IpDeviceConfiguration> for Ipv4DeviceConfiguration {
+    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
+        &mut self.ip_config
+    }
+}
+
 /// Configuration common to all IPv6 devices.
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Ipv6DeviceConfiguration {
     /// The value for NDP's DupAddrDetectTransmits parameter as defined by
     /// [RFC 4862 section 5.1].
@@ -303,6 +311,18 @@ impl Ipv6DeviceConfiguration {
     ///
     /// [RFC 4862 Section 5.1]: https://www.rfc-editor.org/rfc/rfc4862#section-5.1
     pub const DEFAULT_DUPLICATE_ADDRESS_DETECTION_TRANSMITS: NonZeroU8 = nonzero!(1u8);
+}
+
+impl AsRef<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
+    fn as_ref(&self) -> &IpDeviceConfiguration {
+        &self.ip_config
+    }
+}
+
+impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
+    fn as_mut(&mut self) -> &mut IpDeviceConfiguration {
+        &mut self.ip_config
+    }
 }
 
 /// The state common to all IPv6 devices.

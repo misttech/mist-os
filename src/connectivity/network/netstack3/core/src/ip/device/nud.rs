@@ -1198,7 +1198,8 @@ mod tests {
         .into();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true;
-        });
+        })
+        .unwrap();
 
         let remote_mac_bytes = remote_mac.bytes();
         let options = vec![NdpOptionBuilder::SourceLinkLayerAddress(&remote_mac_bytes[..])];
@@ -1282,7 +1283,8 @@ mod tests {
         let device_id = eth_device_id.clone().into();
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = true;
-        });
+        })
+        .unwrap();
 
         let remote_mac_bytes = remote_mac.bytes();
 
@@ -1424,7 +1426,8 @@ mod tests {
         // Disabling the device should clear the neighbor table.
         update_ipv6_configuration(&mut sync_ctx, &mut non_sync_ctx, &device_id, |config| {
             config.ip_config.ip_enabled = false;
-        });
+        })
+        .unwrap();
         assert_neighbors::<Ipv6, _>(&mut sync_ctx, &link_device_id, HashMap::new());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }

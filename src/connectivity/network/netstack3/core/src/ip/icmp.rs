@@ -3014,8 +3014,7 @@ mod tests {
     use crate::{
         context::testutil::{FakeCtx, FakeInstant, FakeNonSyncCtx, FakeSyncCtx},
         device::{
-            set_routing_enabled,
-            testutil::{FakeDeviceId, FakeWeakDeviceId},
+            testutil::{set_routing_enabled, FakeDeviceId, FakeWeakDeviceId},
             DeviceId, FrameDestination,
         },
         ip::{

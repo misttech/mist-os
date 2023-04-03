@@ -45,7 +45,7 @@ pub enum NetstackError {
 }
 
 /// Error when something is not supported.
-#[derive(Debug, Error)]
+#[derive(Debug, PartialEq, Eq, Error)]
 #[error("Not supported")]
 pub struct NotSupportedError;
 

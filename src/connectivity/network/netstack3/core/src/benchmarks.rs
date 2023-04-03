@@ -56,8 +56,13 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
     let mut sync_ctx = &sync_ctx;
     let eth_device = idx_to_device_id[0].clone();
     let device: DeviceId<_> = eth_device.clone().into();
-    crate::device::set_routing_enabled::<_, Ipv4>(&mut sync_ctx, &mut non_sync_ctx, &device, true)
-        .expect("error setting routing enabled");
+    crate::device::testutil::set_routing_enabled::<_, Ipv4>(
+        &mut sync_ctx,
+        &mut non_sync_ctx,
+        &device,
+        true,
+    )
+    .expect("error setting routing enabled");
 
     assert!(
         frame_size

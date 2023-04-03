@@ -454,6 +454,7 @@ impl TestSetupBuilder {
                         update_ipv6_configuration(sync_ctx, non_sync_ctx, &device, |config| {
                             config.dad_transmits = None
                         })
+                        .unwrap()
                     })
                     .await;
                 if let Some(addr) = addr {
@@ -839,20 +840,19 @@ async fn get_slaac_secret<'s>(
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
     test_stack
         .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
-            let mut secret = None;
             let device = AsRef::<Devices<_>>::as_ref(non_sync_ctx).get_core_id(if_id).unwrap();
             netstack3_core::device::update_ipv6_configuration(
                 sync_ctx,
                 non_sync_ctx,
                 &device,
                 |config| {
-                    secret = config
+                    config
                         .slaac_config
                         .temporary_address_configuration
                         .map(|t| t.secret_key.clone())
                 },
-            );
-            secret
+            )
+            .unwrap()
         })
         .await
 }
