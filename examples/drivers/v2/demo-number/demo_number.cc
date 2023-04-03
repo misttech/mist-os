@@ -13,37 +13,6 @@
 
 #include <unordered_map>
 
-namespace {
-
-// Connect to parent device node using fuchsia.driver.compat.Service
-zx::result<fidl::ClientEnd<fuchsia_driver_compat::Device>> ConnectToParentDevice(
-    fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir, std::string_view name) {
-  auto result = component::OpenServiceAt<fuchsia_driver_compat::Service>(svc_dir, name);
-  if (result.is_error()) {
-    return result.take_error();
-  }
-  return result.value().connect_device();
-}
-
-// Return the topological path of the parent device node.
-zx::result<std::string> GetTopologicalPath(fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir) {
-  auto parent_client = ConnectToParentDevice(svc_dir, "default");
-  if (parent_client.is_error()) {
-    return parent_client.take_error();
-  }
-  fidl::SyncClient parent{std::move(parent_client.value())};
-
-  auto result = parent->GetTopologicalPath();
-  if (result.is_error()) {
-    const auto& error = result.error_value();
-    return zx::error(error.status());
-  }
-
-  return zx::ok(result->path());
-}
-
-}  // namespace
-
 namespace demo_number {
 
 const std::string kDriverName = "demo_number";
@@ -89,34 +58,37 @@ class DemoNumber : public fdf::DriverBase {
       return result.take_error();
     }
 
-    // Construct a devfs path that matches the device nodes topological path
-    auto path_result = GetTopologicalPath(context().incoming()->svc_dir());
-    if (path_result.is_error()) {
-      FDF_SLOG(ERROR, "Failed to get topological path", KV("status", path_result.status_string()));
-      return path_result.take_error();
-    }
-    auto devfs_path = path_result.value().append("/").append(kDriverName);
-    FDF_LOG(INFO, "Exporting device to: %s", devfs_path.c_str());
-
-    zx::result connection = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
-    if (connection.is_error()) {
-      return connection.take_error();
-    }
-    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
-
+    // Create a node for devfs.
+    fidl::Arena arena;
     zx::result connector = devfs_connector_.Bind(dispatcher());
     if (connector.is_error()) {
       return connector.take_error();
     }
-    fidl::WireResult result =
-        devfs_exporter->Export(std::move(connector.value()),
-                               fidl::StringView::FromExternal(devfs_path), fidl::StringView());
+
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena).connector(
+        std::move(connector.value()));
+
+    auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                    .name(arena, name())
+                    .devfs_args(devfs.Build())
+                    .Build();
+
+    // Create endpoints of the `NodeController` for the node.
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed: %s", controller_endpoints.status_string());
+
+    zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+    ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed: %s", node_endpoints.status_string());
+
+    fidl::WireResult result = fidl::WireCall(node())->AddChild(
+        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
     if (!result.ok()) {
+      FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
       return zx::error(result.status());
     }
-    if (result.value().is_error()) {
-      return result.value().take_error();
-    }
+    controller_.Bind(std::move(controller_endpoints->client));
+    node_.Bind(std::move(node_endpoints->client));
 
     return zx::ok();
   }
@@ -138,8 +110,11 @@ class DemoNumber : public fdf::DriverBase {
     ZX_ASSERT_MSG(inserted, "Failed to insert connection with key: %d", key);
   }
 
-  driver_devfs::Connector<fuchsia_hardware_demo::Demo> devfs_connector_;
   std::unordered_map<zx_handle_t, DemoNumberConnection> servers_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  driver_devfs::Connector<fuchsia_hardware_demo::Demo> devfs_connector_;
 };
 
 }  // namespace demo_number

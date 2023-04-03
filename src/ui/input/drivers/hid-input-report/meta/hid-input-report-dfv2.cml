@@ -12,8 +12,4 @@
         bind: "meta/bind/hid-input-report.bindbc",
         colocate: "true",
     },
-    use: [
-        { protocol: "fuchsia.device.fs.Exporter" },
-        { service: "fuchsia.driver.compat.Service" },
-    ],
 }

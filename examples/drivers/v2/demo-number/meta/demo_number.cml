@@ -17,12 +17,6 @@
         { service: "fuchsia.hardware.demo.Service" },
     ],
 
-    // Capabilities required from the parent device.
-    use: [
-        { protocol: "fuchsia.device.fs.Exporter" },
-        { service: "fuchsia.driver.compat.Service" },
-    ],
-
     // Provide the demo capability to other components.
     expose: [
         {

@@ -51,9 +51,6 @@ class Driver : public fdf::DriverBase {
   zx::result<std::string> GetVariable(const char* name);
 
   Device& GetDevice() { return device_; }
-  const fidl::WireSharedClient<fuchsia_device_fs::Exporter>& devfs_exporter() const {
-    return devfs_exporter_;
-  }
 
   // These accessors are used by other classes in the compat driver so we want to expose
   // them publicly since they are protected in DriverBase.
@@ -117,7 +114,6 @@ class Driver : public fdf::DriverBase {
   async::Executor executor_;
   std::string driver_path_;
 
-  fidl::WireSharedClient<fuchsia_device_fs::Exporter> devfs_exporter_;
   std::string node_name_;
 
   std::unique_ptr<fdf::Logger> inner_logger_;

@@ -65,50 +65,49 @@ class InputReportDriver : public fdf::DriverBase {
       return status.take_error();
     }
 
-    // Create our compat context, and serve our device when it's created.
-    compat::Context::ConnectAndCreate(
-        &context(), dispatcher(),
-        fit::bind_member(this, &InputReportDriver::CreateAndExportDevice));
+    if (zx::result result = CreateDevfsNode(); result.is_error()) {
+      return result.take_error();
+    }
+
     return zx::ok();
   }
 
  private:
-  void CreateAndExportDevice(zx::result<std::shared_ptr<compat::Context>> context) {
-    if (!context.is_ok()) {
-      FDF_LOG(ERROR, "Call to Context::ConnectAndCreate failed: %s", context.status_string());
-      return ScheduleStop();
-    }
-    compat_context_ = std::move(*context);
-
-    // Export to devfs.
-    zx::result connection = this->context().incoming()->Connect<fuchsia_device_fs::Exporter>();
-    if (connection.is_error()) {
-      FDF_SLOG(ERROR, "Failed to connect to fuchsia_device_fs::Exporter",
-               KV("status", connection.status_string()));
-      return ScheduleStop();
-    }
-
-    fidl::WireSyncClient devfs_exporter{std::move(connection.value())};
-
+  zx::result<> CreateDevfsNode() {
+    fidl::Arena arena;
     zx::result connector = devfs_connector_.Bind(dispatcher());
     if (connector.is_error()) {
-      FDF_SLOG(ERROR, "Failed to bind devfs_connector: %s",
-               KV("status", connector.status_string()));
-      return ScheduleStop();
+      return connector.take_error();
     }
-    fidl::WireResult export_result = devfs_exporter->Export(
-        std::move(connector.value()),
-        fidl::StringView::FromExternal(compat_context_->TopologicalPath(kDeviceName)),
-        fidl::StringView::FromExternal("input-report"));
-    if (!export_result.ok()) {
-      FDF_SLOG(ERROR, "Failed to export to devfs: %s", KV("status", export_result.status_string()));
-      return ScheduleStop();
+
+    auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
+                     .connector(std::move(connector.value()))
+                     .class_name("input-report");
+
+    auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                    .name(arena, kDeviceName)
+                    .devfs_args(devfs.Build())
+                    .Build();
+
+    // Create endpoints of the `NodeController` for the node.
+    zx::result controller_endpoints =
+        fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+    ZX_ASSERT_MSG(controller_endpoints.is_ok(), "Failed to create endpoints: %s",
+                  controller_endpoints.status_string());
+
+    zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+    ZX_ASSERT_MSG(node_endpoints.is_ok(), "Failed to create endpoints: %s",
+                  node_endpoints.status_string());
+
+    fidl::WireResult result = fidl::WireCall(node())->AddChild(
+        args, std::move(controller_endpoints->server), std::move(node_endpoints->server));
+    if (!result.ok()) {
+      FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
+      return zx::error(result.status());
     }
-    if (export_result.value().is_error()) {
-      FDF_SLOG(ERROR, "Failed to export to devfs: %s",
-               KV("status", zx_status_get_string(export_result.value().error_value())));
-      return ScheduleStop();
-    }
+    controller_.Bind(std::move(controller_endpoints->client));
+    node_.Bind(std::move(node_endpoints->client));
+    return zx::ok();
   }
 
   void Serve(fidl::ServerEnd<fuchsia_input_report::InputDevice> server) {
@@ -123,7 +122,9 @@ class InputReportDriver : public fdf::DriverBase {
   std::optional<hid_input_report_dev::InputReport> input_report_;
   fidl::ServerBindingGroup<fuchsia_input_report::InputDevice> input_report_bindings_;
   std::optional<inspect::ComponentInspector> exposed_inspector_;
-  std::shared_ptr<compat::Context> compat_context_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_input_report::InputDevice> devfs_connector_;
 };
 

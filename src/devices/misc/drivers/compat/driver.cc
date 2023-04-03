@@ -149,15 +149,6 @@ Driver::~Driver() {
 }
 
 zx::result<> Driver::Start() {
-  // Connect to devfs exporter.
-  {
-    zx::result result = context().incoming()->Connect<fuchsia_device_fs::Exporter>();
-    if (result.is_error()) {
-      return result.take_error();
-    }
-    devfs_exporter_ = fidl::WireSharedClient(std::move(result.value()), dispatcher());
-  }
-
   // Serve the diagnostics directory.
   if (zx_status_t status = ServeDiagnosticsDir(); status != ZX_OK) {
     return zx::error(status);

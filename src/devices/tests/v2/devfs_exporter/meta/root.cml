@@ -11,7 +11,4 @@
         binary: "driver/devfs_exporter_root.so",
         bind: "meta/bind/root.bindbc",
     },
-    use: [
-        { protocol: "fuchsia.device.fs.Exporter" },
-    ],
 }
