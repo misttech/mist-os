@@ -60,6 +60,9 @@ class DiagnosticsData {
   std::string name_;
 };
 
+// TODO(https://fxbug.dev/77979): Remove after migration
+using InspectData = DiagnosticsData;
+
 // ArchiveReader supports reading Inspect data from an Archive.
 class ArchiveReader {
  public:
