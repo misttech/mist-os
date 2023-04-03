@@ -4166,6 +4166,11 @@ void brcmf_sdio_reset(struct brcmf_sdio* bus) {
   bus->datawork.Cancel();
   bus->brcmf_wq->Flush();
 
+  // bus->txglom has to be reset because firmware is not able to handle glommed tx frames on
+  // startup. We enable tx glomming in the firmware and set bus->txglom to true after we send the
+  // "bus:rxglom" iovar to the firmware in brcmf_sdio_bus_preinit().
+  bus->txglom = false;
+
   // Restart watchdog timer
   brcmf_sdio_wd_timer(bus, true);
 }
