@@ -15,12 +15,9 @@ use {
     fidl::endpoints::{DiscoverableProtocolMarker as _, ServerEnd},
     fidl_fuchsia_hardware_tee::{DeviceConnectorMarker, DeviceConnectorProxy},
     fidl_fuchsia_tee::{self as fuchsia_tee, DeviceInfoMarker},
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_fs::directory as vfs,
     fuchsia_fs::OpenFlags,
-    fuchsia_syslog as syslog,
-    fuchsia_syslog::macros::*,
     futures::{prelude::*, select, stream::FusedStream},
     std::path::{Path, PathBuf},
     uuid::Uuid,
@@ -33,10 +30,8 @@ enum IncomingRequest {
     DeviceInfo(ServerEnd<fuchsia_tee::DeviceInfoMarker>),
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["tee_manager"])]
 async fn main() -> Result<(), Error> {
-    syslog::init_with_tags(&["tee_manager"])?;
-
     let device_list = enumerate_tee_devices().await?;
 
     let path = match device_list.as_slice() {
@@ -65,14 +60,14 @@ async fn main() -> Result<(), Error> {
         Ok(config) => {
             for app_uuid in config.application_uuids {
                 let service_name = format!("fuchsia.tee.Application.{}", app_uuid.as_hyphenated());
-                fx_log_debug!("Serving {}", service_name);
+                tracing::debug!("Serving {}", service_name);
                 let fidl_uuid = uuid_to_fuchsia_tee_uuid(&app_uuid);
                 fs.dir("svc").add_service_at(service_name, move |channel| {
                     Some(IncomingRequest::Application(ServerEnd::new(channel), fidl_uuid))
                 });
             }
         }
-        Err(error) => fx_log_warn!("Unable to serve applications: {:?}", error),
+        Err(error) => tracing::warn!("Unable to serve applications: {:?}", error),
     }
 
     fs.take_and_serve_directory_handle()?;
@@ -89,14 +84,14 @@ async fn serve(
         service_stream.for_each_concurrent(None, |request: IncomingRequest| async {
             match request {
                 IncomingRequest::Application(channel, uuid) => {
-                    fx_log_trace!("Connecting application: {:?}", uuid);
+                    tracing::trace!("Connecting application: {:?}", uuid);
                     serve_application_passthrough(uuid, dev_connector_proxy.clone(), channel).await
                 }
                 IncomingRequest::DeviceInfo(channel) => {
                     serve_device_info_passthrough(dev_connector_proxy.clone(), channel).await
                 }
             }
-            .unwrap_or_else(|e| fx_log_err!("{:?}", e));
+            .unwrap_or_else(|e| tracing::error!("{:?}", e));
         });
 
     select! {
@@ -156,6 +151,7 @@ mod tests {
         fidl_fuchsia_io as fio,
         fidl_fuchsia_tee::ApplicationMarker,
         fidl_fuchsia_tee_manager::ProviderProxy,
+        fuchsia_async as fasync,
         fuchsia_zircon_status::Status,
         futures::channel::mpsc,
     };
