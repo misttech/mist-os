@@ -26,9 +26,9 @@ fit::result<std::string> PipedCommand::StartArgv(cpp20::span<const char*> argv) 
   }
 
   char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
-  zx_status_t status = fdio_spawn_etc(zx::job::default_job()->get(), FDIO_SPAWN_CLONE_ALL, argv[0],
-                                      argv.data(), environ, actions.size(), actions.data(),
-                                      process_.reset_and_get_address(), err_msg);
+  zx_status_t status =
+      fdio_spawn_etc(zx::job::default_job()->get(), spawn_flags_, argv[0], argv.data(), environ,
+                     actions.size(), actions.data(), process_.reset_and_get_address(), err_msg);
   if (status != ZX_OK) {
     return fit::error{err_msg};
   }
