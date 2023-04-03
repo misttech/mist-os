@@ -122,6 +122,7 @@ test("intel-i915-test") {
     "registers-ddi-unittest.cc",
     "registers-dpll-unittest.cc",
     "registers-gmbus-unittest.cc",
+    "registers-memory-controller-unittest.cc",
     "registers-pipe-scaler-unittest.cc",
     "registers-pipe-unittest.cc",
     "registers-transcoder-unittest.cc",
