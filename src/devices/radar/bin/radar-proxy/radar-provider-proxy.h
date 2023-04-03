@@ -7,6 +7,9 @@
 
 #include <lib/async/dispatcher.h>
 
+#include <tuple>
+#include <vector>
+
 #include "radar-proxy.h"
 
 namespace radar {
@@ -17,6 +20,7 @@ class RadarProviderProxy
  public:
   RadarProviderProxy(async_dispatcher_t* dispatcher, RadarDeviceConnector* connector)
       : dispatcher_(dispatcher), connector_(connector) {}
+  ~RadarProviderProxy() override;
 
   void Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) override;
 
@@ -26,9 +30,17 @@ class RadarProviderProxy
   void on_fidl_error(fidl::UnbindInfo info) override;
 
  private:
+  bool ConnectToRadarDevice(
+      fidl::ClientEnd<fuchsia_hardware_radar::RadarBurstReaderProvider> client_end);
+  void ConnectClient(fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReader> server,
+                     ConnectCompleter::Async completer);
+
   async_dispatcher_t* const dispatcher_;
   RadarDeviceConnector* const connector_;
   fidl::Client<fuchsia_hardware_radar::RadarBurstReaderProvider> radar_client_;
+  std::vector<std::tuple<fidl::ServerEnd<fuchsia_hardware_radar::RadarBurstReader>,
+                         ConnectCompleter::Async>>
+      connect_requests_;
 };
 
 }  // namespace radar

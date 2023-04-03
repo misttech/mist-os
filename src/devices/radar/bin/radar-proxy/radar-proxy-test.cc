@@ -210,5 +210,44 @@ TEST_F(RadarProxyTest, Reconnect) {
   }
 }
 
+TEST_F(RadarProxyTest, DelayedConnect) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
+  fidl::Client<fuchsia_hardware_radar::RadarBurstReaderProvider> service_client(
+      service_client_.TakeClientEnd(), loop.dispatcher());
+
+  zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_radar::RadarBurstReader>();
+  ASSERT_TRUE(endpoints.is_ok());
+
+  fidl::Client<fuchsia_hardware_radar::RadarBurstReader> radar_client(std::move(endpoints->client),
+                                                                      loop.dispatcher());
+
+  // Attempt to connect before a radar device is available. Our request should be put in a queue and
+  // completed when a device is added.
+  service_client->Connect(std::move(endpoints->server)).Then([&](auto result) {
+    EXPECT_TRUE(result.is_ok());
+  });
+
+  uint32_t burst_size = 0;
+  radar_client->GetBurstSize().Then([&](auto& result) {
+    ASSERT_TRUE(result.is_ok());
+    burst_size = result->burst_size();
+    loop.Quit();
+  });
+
+  loop.RunUntilIdle();
+
+  // Signal to the proxy that a device was added. This should cause it to process any connect
+  // requests that came in before this point.
+  EXPECT_TRUE(fdf::RunOnDispatcherSync(loop_.dispatcher(), [&]() {
+                proxy_.DeviceAdded(kInvalidDir, "000");
+              }).is_ok());
+
+  // The loop will be stopped after the burst size call completes.
+  loop.Run();
+
+  EXPECT_EQ(burst_size, 12345);
+}
+
 }  // namespace
 }  // namespace radar
