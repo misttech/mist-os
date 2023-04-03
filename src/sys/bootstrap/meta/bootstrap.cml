@@ -1240,9 +1240,6 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.FeedbackArchiveAccessor",
                 "fuchsia.diagnostics.LegacyMetricsArchiveAccessor",
-
-                // TODO(fxbug.dev/121763): remove this.
-                "fuchsia.diagnostics.LogSettings",
                 "fuchsia.diagnostics.LoWPANArchiveAccessor",
                 "fuchsia.logger.Log",
                 "fuchsia.logger.LogSink",
