@@ -427,7 +427,7 @@ __EXPORT zx_status_t device_add_composite(zx_device_t* dev, const char* name,
 __EXPORT bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_log_severity_t flag) {
   if (drv != nullptr) {
     fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-    return fx_logger_get_min_severity(drv->logger()) <= flag;
+    return drv->logger().GetSeverity() <= flag;
   } else {
     // If we have been invoked outside of the context of a driver, return true.
     // Typically, this is due to being run within a test.
@@ -435,7 +435,7 @@ __EXPORT bool driver_log_severity_enabled_internal(const zx_driver_t* drv, fx_lo
   }
 }
 
-__EXPORT zx_status_t driver_log_set_tags_internal(const zx_driver_t* drv, const char* const* tags,
+__EXPORT zx_status_t driver_log_set_tags_internal(zx_driver_t* drv, const char* const* tags,
                                                   size_t num_tags) {
   if (drv != nullptr) {
     fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
@@ -449,7 +449,7 @@ __EXPORT void driver_logvf_internal(const zx_driver_t* drv, fx_log_severity_t fl
                                     const char* file, int line, const char* msg, va_list args) {
   if (drv != nullptr && flag != DDK_LOG_SERIAL) {
     fbl::AutoLock lock(&internal::ContextForApi()->api_lock());
-    fx_logger_logvf_with_source(drv->logger(), flag, tag, file, line, msg, args);
+    drv->logger().VLogWrite(flag, tag, msg, args, file, line);
   } else {
     // If we have been invoked outside of the context of a driver, or if |flag|
     // is DDK_LOG_SERIAL, use vfprintf.

@@ -501,7 +501,7 @@ void zx_device::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& 
     completer.Reply(ZX_ERR_UNAVAILABLE, fuchsia_logger::wire::LogLevelFilter::kNone);
     return;
   }
-  fx_log_severity_t severity = fx_logger_get_min_severity(zx_driver()->logger());
+  fx_log_severity_t severity = zx_driver()->logger().GetSeverity();
   completer.Reply(ZX_OK, static_cast<fuchsia_logger::wire::LogLevelFilter>(severity));
 }
 

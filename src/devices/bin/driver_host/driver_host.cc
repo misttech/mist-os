@@ -228,38 +228,32 @@ zx_status_t zx_driver::Create(std::string_view libname, InspectNodeCollection& d
                               fbl::RefPtr<zx_driver>* out_driver) {
   char process_name[ZX_MAX_NAME_LEN] = {};
   zx::process::self()->get_property(ZX_PROP_NAME, process_name, sizeof(process_name));
-  const char* tags[] = {process_name, "driver"};
-  fx_logger_config_t config = {
-      .min_severity = FX_LOG_SEVERITY_DEFAULT,
-      .tags = tags,
-      .num_tags = std::size(tags),
-  };
-  fx_logger_t* logger;
-  zx_status_t status = fx_logger_create(&config, &logger);
-  if (status != ZX_OK) {
-    return status;
+  auto logger = driver_logger::CreateLogger();
+  if (logger.is_error()) {
+    return logger.error_value();
   }
+  logger->AddTag(process_name).AddTag("driver").SetSeverity(FX_LOG_SEVERITY_DEFAULT);
 
-  *out_driver = fbl::AdoptRef(new zx_driver(logger, libname, drivers));
+  *out_driver = fbl::AdoptRef(new zx_driver(std::move(*logger), libname, drivers));
   return ZX_OK;
 }
 
-zx_driver::zx_driver(fx_logger_t* logger, std::string_view libname, InspectNodeCollection& drivers)
-    : logger_(logger), libname_(libname), inspect_(drivers, std::string(libname)) {}
+zx_driver::zx_driver(driver_logger::Logger logger, std::string_view libname,
+                     InspectNodeCollection& drivers)
+    : logger_(std::move(logger)), libname_(libname), inspect_(drivers, std::string(libname)) {}
 
-zx_driver::~zx_driver() { fx_logger_destroy(logger_); }
+zx_driver::~zx_driver() {}
 
-zx_status_t zx_driver::ReconfigureLogger(cpp20::span<const char* const> tags) const {
+zx_status_t zx_driver::ReconfigureLogger(cpp20::span<const char* const> tags) {
   char process_name[ZX_MAX_NAME_LEN] = {};
   zx::process::self()->get_property(ZX_PROP_NAME, process_name, sizeof(process_name));
-  std::vector<const char*> new_tags = {name(), process_name, "driver"};
-  new_tags.insert(new_tags.end(), tags.begin(), tags.end());
-  fx_logger_config_t config = {
-      .min_severity = FX_LOG_SEVERITY_DEFAULT,
-      .tags = std::data(new_tags),
-      .num_tags = std::size(new_tags),
-  };
-  return fx_logger_reconfigure(logger(), &config);
+  auto logger = driver_logger::CreateLogger();
+  if (logger.is_error()) {
+    return logger.error_value();
+  }
+  logger->AddTag(name()).AddTag(process_name).AddTag("driver").SetSeverity(FUCHSIA_LOG_INFO);
+  logger_ = std::move(*logger);
+  return ZX_OK;
 }
 
 void DriverHostContext::SetupDriverHostController(
@@ -531,7 +525,7 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
   const char* flag_value = getenv(flag_name.data());
   if (flag_value != nullptr) {
     fx_log_severity_t min_severity = log_min_severity(new_driver->name(), flag_value);
-    status = fx_logger_set_min_severity(new_driver->logger(), min_severity);
+    new_driver->set_driver_min_log_severity(min_severity);
     if (status != ZX_OK) {
       LOGF(ERROR, "Failed to set minimum log severity for driver '%s': %s", new_driver->name(),
            zx_status_get_string(status));
@@ -847,18 +841,12 @@ void DriverHostControllerConnection::Bind(
 int main(int argc, char** argv) {
   char process_name[ZX_MAX_NAME_LEN] = {};
   zx::process::self()->get_property(ZX_PROP_NAME, process_name, sizeof(process_name));
-  const char* tags[] = {process_name, "device"};
-  fx_logger_config_t config = {
-      .min_severity = getenv_bool("devmgr.verbose", false)
-                          ? std::numeric_limits<fx_log_severity_t>::min()
-                          : FX_LOG_SEVERITY_DEFAULT,
-      .tags = tags,
-      .num_tags = std::size(tags),
-  };
-  zx_status_t status = fx_log_reconfigure(&config);
-  if (status != ZX_OK) {
-    return status;
-  }
+  driver_logger::GetLogger()
+      .SetSeverity(getenv_bool("devmgr.verbose", false)
+                       ? std::numeric_limits<FuchsiaLogSeverity>::min()
+                       : FUCHSIA_LOG_INFO)
+      .AddTag(process_name)
+      .AddTag("device");
 
   if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
     LOGF(ERROR, "Failed to create the initial dispatcher thread");
@@ -886,7 +874,7 @@ int main(int argc, char** argv) {
 
   RegisterContextForApi(&ctx);
 
-  status = connect_scheduler_profile_provider();
+  zx_status_t status = connect_scheduler_profile_provider();
   if (status != ZX_OK) {
     LOGF(INFO, "Failed to connect to profile provider: %s", zx_status_get_string(status));
     return status;

@@ -18,6 +18,7 @@
 #include <fbl/string_buffer.h>
 
 #include "src/devices/bin/driver_host/inspect.h"
+#include "src/devices/lib/log/log.h"
 
 class DriverInspect;
 struct InspectNodeCollection;
@@ -76,12 +77,13 @@ struct zx_driver : fbl::DoublyLinkedListable<fbl::RefPtr<zx_driver>>, fbl::RefCo
     inspect_.set_status(status);
   }
 
-  zx_status_t set_driver_min_log_severity(fx_log_severity_t severity) {
+  zx_status_t set_driver_min_log_severity(FuchsiaLogSeverity severity) {
     inspect_.set_driver_min_log_severity(severity);
-    return fx_logger_set_min_severity(logger(), severity);
+    logger_.SetSeverity(severity);
+    return ZX_OK;
   }
 
-  fx_logger_t* logger() const { return logger_; }
+  const driver_logger::Logger& logger() const { return logger_; }
 
   DriverInspect& inspect() { return inspect_; }
 
@@ -110,18 +112,18 @@ struct zx_driver : fbl::DoublyLinkedListable<fbl::RefPtr<zx_driver>>, fbl::RefCo
   bool RunUnitTestsOp(const fbl::RefPtr<zx_device_t>& parent, const fbl::RefPtr<Driver>& driver,
                       zx::channel test_output) const;
 
-  zx_status_t ReconfigureLogger(cpp20::span<const char* const> tags) const;
+  zx_status_t ReconfigureLogger(cpp20::span<const char* const> tags);
 
  private:
   friend std::unique_ptr<zx_driver> std::make_unique<zx_driver>();
-  zx_driver(fx_logger_t* logger, std::string_view libname, InspectNodeCollection& drivers);
+  zx_driver(driver_logger::Logger logger, std::string_view libname, InspectNodeCollection& drivers);
 
   const char* name_ = nullptr;
   zx_driver_rec_t* driver_rec_ = nullptr;
   const zx_driver_ops_t* ops_ = nullptr;
   void* ctx_ = nullptr;
 
-  fx_logger_t* logger_;
+  driver_logger::Logger logger_;
   fbl::String libname_;
   zx_status_t status_ = ZX_OK;
 

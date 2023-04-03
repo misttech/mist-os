@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_BIN_DRIVER_HOST_LOG_H_
 #define SRC_DEVICES_BIN_DRIVER_HOST_LOG_H_
 
-#include <lib/syslog/global.h>
+#include "src/devices/lib/log/log.h"
 
 #define LOGD(severity, dev, message...)                                   \
   do {                                                                    \

@@ -110,6 +110,19 @@ zx::result<zx::resource> get_mexec_resource() {
   return zx::ok(std::move(result.value().resource));
 }
 
+// Sets the logging process name. Needed to redirect output
+// to serial.
+static void SetLoggingProcessName() {
+  char process_name[ZX_MAX_NAME_LEN] = "";
+
+  zx_status_t name_status =
+      zx::process::self()->get_property(ZX_PROP_NAME, process_name, sizeof(process_name));
+  if (name_status != ZX_OK) {
+    process_name[0] = '\0';
+  }
+  driver_logger::GetLogger().AddTag(process_name);
+}
+
 int main(int argc, char** argv) {
   zx_status_t status = StdoutToDebuglog::Init();
   if (status != ZX_OK) {
@@ -125,11 +138,10 @@ int main(int argc, char** argv) {
   auto config = driver_manager_config::Config::TakeFromStartupHandle();
 
   if (config.verbose()) {
-    fx_logger_t* logger = fx_log_get_logger();
-    if (logger) {
-      fx_logger_set_min_severity(logger, std::numeric_limits<fx_log_severity_t>::min());
-    }
+    driver_logger::GetLogger().SetSeverity(std::numeric_limits<FuchsiaLogSeverity>::min());
   }
+
+  SetLoggingProcessName();
 
   auto boot_args = fidl::WireSyncClient<fuchsia_boot::Arguments>{std::move(*args_result)};
   if (config.use_driver_framework_v2()) {
