@@ -12,7 +12,6 @@
 
 #include "src/developer/forensics/utils/errors.h"
 #include "src/developer/forensics/utils/fidl_oneshot.h"
-#include "src/lib/fxl/macros.h"
 #include "src/lib/fxl/strings/join_strings.h"
 
 namespace forensics {

@@ -5,7 +5,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
 #include "src/developer/forensics/testing/gmatchers.h"
 #include "src/developer/forensics/testing/gpretty_printers.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"

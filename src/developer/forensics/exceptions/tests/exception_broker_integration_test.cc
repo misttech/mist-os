@@ -10,7 +10,6 @@
 
 #include <gtest/gtest.h>
 
-#include "src/developer/forensics/exceptions/exception_broker.h"
 #include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
 
 namespace forensics {

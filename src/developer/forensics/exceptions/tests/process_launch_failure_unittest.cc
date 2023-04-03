@@ -6,7 +6,6 @@
 #include <gtest/gtest.h>
 
 #include "src/developer/forensics/exceptions/handler_manager.h"
-#include "src/developer/forensics/exceptions/tests/crasher_wrapper.h"
 #include "src/developer/forensics/testing/unit_test_fixture.h"
 
 namespace forensics {

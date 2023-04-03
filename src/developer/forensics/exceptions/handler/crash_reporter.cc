@@ -20,7 +20,6 @@
 #include "src/developer/forensics/exceptions/handler/report_builder.h"
 #include "src/developer/forensics/utils/fidl_oneshot.h"
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/lib/fxl/strings/join_strings.h"
 
 namespace forensics {
 namespace exceptions {

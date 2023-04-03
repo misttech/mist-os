@@ -11,7 +11,6 @@
 #include <string>
 
 #include "src/developer/forensics/exceptions/json_utils.h"
-#include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 
 namespace forensics {

@@ -10,7 +10,6 @@
 
 #include "src/developer/forensics/exceptions/constants.h"
 #include "src/lib/fsl/handles/object_info.h"
-#include "src/lib/fxl/strings/join_strings.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
