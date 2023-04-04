@@ -226,6 +226,18 @@ struct property_lookup_user_data {
 
 static bool PropertyLookupDescForeach(const AvbDescriptor* header, void* user_data);
 
+static bool UnlockIgnorableError(AvbSlotVerifyResult result) {
+  switch (result) {
+    case AVB_SLOT_VERIFY_RESULT_OK:
+    case AVB_SLOT_VERIFY_RESULT_ERROR_VERIFICATION:
+    case AVB_SLOT_VERIFY_RESULT_ERROR_ROLLBACK_INDEX:
+    case AVB_SLOT_VERIFY_RESULT_ERROR_PUBLIC_KEY_REJECTED:
+      return true;
+    default:
+      return false;
+  }
+}
+
 static bool ZirconVBootSlotVerifyInternal(ZirconBootOps* zb_ops, zbi_header_t* image,
                                           size_t capacity, const char* ab_suffix,
                                           bool has_successfully_booted,
@@ -248,12 +260,14 @@ static bool ZirconVBootSlotVerifyInternal(ZirconBootOps* zb_ops, zbi_header_t* i
 
   AvbSlotVerifyFlags flag =
       unlocked ? AVB_SLOT_VERIFY_FLAGS_ALLOW_VERIFICATION_ERROR : AVB_SLOT_VERIFY_FLAGS_NONE;
-  AvbSlotVerifyResult result = avb_slot_verify(&avb_ops, requested_partitions, ab_suffix, flag,
-                                               AVB_HASHTREE_ERROR_MODE_EIO, ptr_verify_data);
+  AvbHashtreeErrorMode error_mode =
+      unlocked ? AVB_HASHTREE_ERROR_MODE_LOGGING : AVB_HASHTREE_ERROR_MODE_EIO;
+  AvbSlotVerifyResult result =
+      avb_slot_verify(&avb_ops, requested_partitions, ab_suffix, flag, error_mode, ptr_verify_data);
 
   AvbSlotVerifyData* verify_data = *ptr_verify_data;
   // Copy zbi items within vbmeta regardless of lock state.
-  if (result == AVB_SLOT_VERIFY_RESULT_OK) {
+  if (result == AVB_SLOT_VERIFY_RESULT_OK || (unlocked && UnlockIgnorableError(result))) {
     struct property_lookup_user_data lookup_data = {.zbi = image, .capacity = capacity};
 
     for (size_t i = 0; i < verify_data->num_vbmeta_images; ++i) {

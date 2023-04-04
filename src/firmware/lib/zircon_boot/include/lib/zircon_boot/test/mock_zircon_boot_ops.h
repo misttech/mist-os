@@ -103,7 +103,7 @@ class MockZirconBootOps {
                                 uint64_t* out_rollback_index);
   static bool WriteRollbackIndex(ZirconBootOps* ops, size_t rollback_index_location,
                                  uint64_t rollback_index);
-  static bool ReadIsDeivceLocked(ZirconBootOps* ops, bool* out_is_locked);
+  static bool ReadIsDeviceLocked(ZirconBootOps* ops, bool* out_is_locked);
   static bool ReadPermanentAttributes(ZirconBootOps* ops, AvbAtxPermanentAttributes* attribute);
   static bool ReadPermanentAttributesHash(ZirconBootOps* ops, uint8_t hash[AVB_SHA256_DIGEST_SIZE]);
 

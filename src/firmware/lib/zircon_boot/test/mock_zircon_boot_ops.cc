@@ -210,7 +210,7 @@ bool MockZirconBootOps::WriteRollbackIndex(ZirconBootOps* ops, size_t rollback_i
   return true;
 }
 
-bool MockZirconBootOps::ReadIsDeivceLocked(ZirconBootOps* ops, bool* out_is_locked) {
+bool MockZirconBootOps::ReadIsDeviceLocked(ZirconBootOps* ops, bool* out_is_locked) {
   MockZirconBootOps* dev = static_cast<MockZirconBootOps*>(ops->context);
   *out_is_locked = dev->GetDeviceLockStatus() == MockZirconBootOps::LockStatus::kLocked;
   return true;
@@ -262,7 +262,7 @@ ZirconBootOps MockZirconBootOps::GetZirconBootOpsWithAvb() {
   zircon_boot_ops.verified_boot_get_partition_size = GetPartitionSize;
   zircon_boot_ops.verified_boot_read_rollback_index = ReadRollbackIndex;
   zircon_boot_ops.verified_boot_write_rollback_index = WriteRollbackIndex;
-  zircon_boot_ops.verified_boot_read_is_device_locked = ReadIsDeivceLocked;
+  zircon_boot_ops.verified_boot_read_is_device_locked = ReadIsDeviceLocked;
   zircon_boot_ops.verified_boot_read_permanent_attributes = ReadPermanentAttributes;
   zircon_boot_ops.verified_boot_read_permanent_attributes_hash = ReadPermanentAttributesHash;
   return zircon_boot_ops;

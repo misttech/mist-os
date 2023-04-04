@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/abr/data.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zbi/zbi.h>
 #include <lib/zircon_boot/android_boot_image.h>
 #include <lib/zircon_boot/test/mock_zircon_boot_ops.h>
@@ -10,19 +11,71 @@
 #include <zircon/hw/gpt.h>
 
 #include <set>
-#include <span>
 #include <vector>
 
 #include <zxtest/zxtest.h>
 
+#include "lib/abr/abr.h"
 #include "test_data/test_images.h"
 
 namespace {
 
+constexpr bool operator<(const cpp20::span<const char>& lhs,
+                         const cpp20::span<const char>& rhs) noexcept {
+  auto l = lhs.begin();
+  auto r = rhs.begin();
+  for (; l != lhs.end() && r != rhs.end(); ++l, ++r) {
+    if (*l < *r) {
+      return true;
+    }
+  }
+
+  return (lhs.size() < rhs.size());
+}
+
+constexpr bool operator==(const cpp20::span<const char>& lhs,
+                          const cpp20::span<const char>& rhs) noexcept {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+
+  auto l = lhs.begin();
+  auto r = rhs.begin();
+  for (; l != lhs.end() && r != rhs.end(); ++l, ++r) {
+    if (*l != *r) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+struct NormalizedZbiItem {
+  uint32_t type;
+  uint32_t extra;
+  cpp20::span<const char> payload;
+};
+
+constexpr bool operator<(const NormalizedZbiItem& lhs, const NormalizedZbiItem& rhs) noexcept {
+  if (lhs.type != rhs.type) {
+    return lhs.type < rhs.type;
+  }
+
+  if (lhs.extra != rhs.extra) {
+    return lhs.extra < rhs.extra;
+  }
+
+  return lhs.payload < rhs.payload;
+}
+
+constexpr bool operator==(const NormalizedZbiItem& lhs, const NormalizedZbiItem& rhs) noexcept {
+  return lhs.type == rhs.type && lhs.extra == rhs.extra && lhs.payload == rhs.payload;
+}
+
 constexpr size_t kZirconPartitionSize = 128 * 1024;
 constexpr size_t kVbmetaPartitionSize = 64 * 1024;
 
-const char kTestCmdline[] = "foo=bar";
+constexpr cpp20::span<const char> kTestCmdline = "foo=bar";
 
 void CreateMockZirconBootOps(std::unique_ptr<MockZirconBootOps>* out) {
   auto device = std::make_unique<MockZirconBootOps>();
@@ -60,18 +113,18 @@ void CreateMockZirconBootOps(std::unique_ptr<MockZirconBootOps>* out) {
 
   device->AddPartition(GPT_DURABLE_BOOT_NAME, sizeof(AbrData));
 
-  device->SetAddDeviceZbiItemsMethod(
-      [](zbi_header_t* image, size_t capacity, const AbrSlotIndex* slot) {
-        if (slot && AppendCurrentSlotZbiItem(image, capacity, *slot) != ZBI_RESULT_OK) {
-          return false;
-        }
+  device->SetAddDeviceZbiItemsMethod([](zbi_header_t* image, size_t capacity,
+                                        const AbrSlotIndex* slot) {
+    if (slot && AppendCurrentSlotZbiItem(image, capacity, *slot) != ZBI_RESULT_OK) {
+      return false;
+    }
 
-        if (zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_CMDLINE, 0, 0, kTestCmdline,
-                                          sizeof(kTestCmdline)) != ZBI_RESULT_OK) {
-          return false;
-        }
-        return true;
-      });
+    if (zbi_create_entry_with_payload(image, capacity, ZBI_TYPE_CMDLINE, 0, 0, kTestCmdline.data(),
+                                      kTestCmdline.size()) != ZBI_RESULT_OK) {
+      return false;
+    }
+    return true;
+  });
 
   AvbAtxPermanentAttributes permanent_attributes;
   memcpy(&permanent_attributes, kPermanentAttributes, sizeof(permanent_attributes));
@@ -99,21 +152,13 @@ void MarkSlotActive(MockZirconBootOps* dev, AbrSlotIndex slot) {
   }
 }
 
-// We only care about |type|, |extra| and |payload|
-// Use std::tuple for the built-in comparison operator.
-using NormalizedZbiItem = std::tuple<uint32_t, uint32_t, std::vector<uint8_t>>;
-NormalizedZbiItem NormalizeZbiItem(uint32_t type, uint32_t extra, const void* payload,
-                                   size_t size) {
-  const uint8_t* start = static_cast<const uint8_t*>(payload);
-  return {type, extra, std::vector<uint8_t>(start, start + size)};
-}
-
 zbi_result_t ExtractAndSortZbiItemsCallback(zbi_header_t* hdr, void* payload, void* cookie) {
   std::multiset<NormalizedZbiItem>* out = static_cast<std::multiset<NormalizedZbiItem>*>(cookie);
   if (hdr->type == ZBI_TYPE_KERNEL_ARM64) {
     return ZBI_RESULT_OK;
   }
-  out->insert(NormalizeZbiItem(hdr->type, hdr->extra, payload, hdr->length));
+  out->insert(NormalizedZbiItem{
+      hdr->type, hdr->extra, {reinterpret_cast<const char*>(payload), hdr->length}});
   return ZBI_RESULT_OK;
 }
 
@@ -129,16 +174,18 @@ void ValidateBootedSlot(const MockZirconBootOps* dev, std::optional<AbrSlotIndex
   std::multiset<NormalizedZbiItem> zbi_items_added;
   ASSERT_NO_FAILURES(ExtractAndSortZbiItems(dev->GetBootedImage().data(), &zbi_items_added));
 
-  std::multiset<NormalizedZbiItem> zbi_items_expected = {
-      // Verify that the additional cmdline item is appended.
-      NormalizeZbiItem(ZBI_TYPE_CMDLINE, 0, kTestCmdline, sizeof(kTestCmdline)),
-  };
+  std::multiset<NormalizedZbiItem> zbi_items_expected;
+  std::string current_slot;
   if (expected_slot) {
     // Verify that the current slot item is appended for A/B/R boots (plus 1 for null terminator).
-    std::string current_slot = "zvb.current_slot=" + std::string(AbrGetSlotSuffix(*expected_slot));
+    current_slot = "zvb.current_slot=" + std::string(AbrGetSlotSuffix(*expected_slot));
     zbi_items_expected.insert(
-        NormalizeZbiItem(ZBI_TYPE_CMDLINE, 0, current_slot.data(), current_slot.size() + 1));
+        NormalizedZbiItem{ZBI_TYPE_CMDLINE, 0, {current_slot.data(), current_slot.size() + 1}});
   }
+
+  // Verify that the additional cmdline item is appended.
+  zbi_items_expected.insert({ZBI_TYPE_CMDLINE, 0, kTestCmdline});
+
   // Exactly the above items are appended. No more, no less.
   EXPECT_EQ(zbi_items_added, zbi_items_expected);
 }
@@ -410,8 +457,6 @@ void ValidateVerifiedBootedSlot(const MockZirconBootOps* dev,
   std::string slot_suffix = expected_slot ? AbrGetSlotSuffix(*expected_slot) : "_slotless";
 
   std::vector<std::string> expected_cmdlines{
-      // Device zbi item
-      kTestCmdline,
       // cmdline "vb_arg_1=foo_{slot}" from vbmeta property. See "generate_test_data.py"
       "vb_arg_1=foo" + slot_suffix,
       // cmdline "vb_arg_2=bar_{slot}" from vbmeta property. See "generate_test_data.py"
@@ -421,9 +466,11 @@ void ValidateVerifiedBootedSlot(const MockZirconBootOps* dev,
     // Current slot item is added by MockZirconBootOps::AddDeviceZbiItems for A/B/R boots.
     expected_cmdlines.push_back("zvb.current_slot=" + slot_suffix);
   }
+  expected_cmdlines.emplace_back(kTestCmdline.begin(), kTestCmdline.end() - 1);
+
   std::multiset<NormalizedZbiItem> zbi_items_expected;
   for (auto& str : expected_cmdlines) {
-    zbi_items_expected.insert(NormalizeZbiItem(ZBI_TYPE_CMDLINE, 0, str.data(), str.size() + 1));
+    zbi_items_expected.insert(NormalizedZbiItem{ZBI_TYPE_CMDLINE, 0, {str.data(), str.size() + 1}});
   }
   // Exactly the above items are appended. No more no less.
   EXPECT_EQ(zbi_items_added, zbi_items_expected);
@@ -511,7 +558,7 @@ INSTANTIATE_TEST_SUITE_P(
 // Nullopt slot means corrupt the slotless image.
 void CorruptSlot(MockZirconBootOps* dev, std::optional<AbrSlotIndex> slot) {
   std::vector<uint8_t> buffer(kZirconPartitionSize);
-  const char* part = GetSlotPartitionName(slot ? &slot.value() : NULL);
+  const char* part = GetSlotPartitionName(slot ? &slot.value() : nullptr);
   ASSERT_OK(dev->ReadFromPartition(part, 0, buffer.size(), buffer.data()));
   buffer[2 * sizeof(zbi_header_t)]++;
   ASSERT_OK(dev->WriteToPartition(part, 0, buffer.size(), buffer.data()));
@@ -522,6 +569,71 @@ void CorruptSlots(MockZirconBootOps* dev, const std::vector<AbrSlotIndex>& corru
   for (auto slot : corrupted_slots) {
     CorruptSlot(dev, slot);
   }
+}
+
+void CorruptVbmetaHash(MockZirconBootOps& dev, std::optional<AbrSlotIndex> slot) {
+  AvbVBMetaImageHeader header;
+  std::array<uint8_t, sizeof(header)> buffer;
+  std::string part = std::string("vbmeta").append(slot ? AbrGetSlotSuffix(*slot) : "");
+  ASSERT_OK(dev.ReadFromPartition(part.c_str(), 0, buffer.size(), buffer.data()));
+
+  avb_vbmeta_image_header_to_host_byte_order(reinterpret_cast<AvbVBMetaImageHeader*>(buffer.data()),
+                                             &header);
+
+  size_t hash_offset = sizeof(header) + header.hash_offset;
+  ASSERT_OK(dev.ReadFromPartition(part.c_str(), hash_offset, 1, buffer.data()));
+
+  buffer[0]++;
+  ASSERT_OK(dev.WriteToPartition(part.c_str(), hash_offset, 1, buffer.data()));
+}
+
+void CorruptAllVbmetaHashes(MockZirconBootOps& dev) {
+  constexpr std::optional<AbrSlotIndex> slots[] = {
+      kAbrSlotIndexA,
+      kAbrSlotIndexB,
+      kAbrSlotIndexR,
+      std::nullopt,
+  };
+  for (auto slot : slots) {
+    CorruptVbmetaHash(dev, slot);
+  }
+}
+
+TEST(VerifiedBootOsVbmetaTest, TestUnlockedCorruptedVbmetaAllowed) {
+  std::unique_ptr<MockZirconBootOps> dev;
+  ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+  dev->SetDeviceLockStatus(MockZirconBootOps::LockStatus::kUnlocked);
+  ZirconBootOps ops = dev->GetZirconBootOpsWithAvb();
+  ops.firmware_can_boot_kernel_slot = nullptr;
+  MarkSlotActive(dev.get(), kAbrSlotIndexA);
+
+  CorruptAllVbmetaHashes(*dev);
+
+  ASSERT_EQ(LoadAndBoot(&ops, kZirconBootModeAbr), kBootResultBootReturn);
+  std::multiset<NormalizedZbiItem> zbi_items_added;
+  ASSERT_NO_FAILURES(ExtractAndSortZbiItems(dev->GetBootedImage().data(), &zbi_items_added));
+
+  std::multiset<NormalizedZbiItem> expected_items = {
+      {ZBI_TYPE_CMDLINE, 0, "vb_arg_1=foo_a"},
+      {ZBI_TYPE_CMDLINE, 0, "vb_arg_2=bar_a"},
+      {ZBI_TYPE_CMDLINE, 0, "zvb.current_slot=_a"},
+      {ZBI_TYPE_CMDLINE, 0, kTestCmdline},
+  };
+
+  ASSERT_EQ(zbi_items_added, expected_items);
+}
+
+TEST(VerifiedBootOsVbmetaTest, TestLockedCorruptedVbmetaUnallowed) {
+  std::unique_ptr<MockZirconBootOps> dev;
+  ASSERT_NO_FATAL_FAILURE(CreateMockZirconBootOps(&dev));
+  dev->SetDeviceLockStatus(MockZirconBootOps::LockStatus::kLocked);
+  ZirconBootOps ops = dev->GetZirconBootOpsWithAvb();
+  ops.firmware_can_boot_kernel_slot = nullptr;
+  MarkSlotActive(dev.get(), kAbrSlotIndexA);
+
+  CorruptAllVbmetaHashes(*dev);
+
+  ASSERT_EQ(LoadAndBoot(&ops, kZirconBootModeAbr), kBootResultErrorNoValidSlot);
 }
 
 void VerifySlotMetadataUnbootable(MockZirconBootOps* dev, const std::vector<AbrSlotIndex>& slots) {
@@ -655,7 +767,7 @@ TEST(BootTests, VerificationResultNotCheckedWhenUnlocked) {
   MarkSlotActive(dev.get(), kAbrSlotIndexA);
   // Boot should succeed.
   ASSERT_EQ(LoadAndBoot(&ops, kZirconBootModeAbr), kBootResultBootReturn);
-  ASSERT_NO_FATAL_FAILURE(ValidateBootedSlot(dev.get(), active_slot));
+  ASSERT_NO_FATAL_FAILURE(ValidateVerifiedBootedSlot(dev.get(), active_slot));
 }
 
 TEST(BootTests, VerificationResultNotCheckedWhenUnlockedSlotless) {
@@ -669,7 +781,7 @@ TEST(BootTests, VerificationResultNotCheckedWhenUnlockedSlotless) {
   ASSERT_NO_FATAL_FAILURE(CorruptSlot(dev.get(), std::nullopt));
   // Boot should succeed.
   ASSERT_EQ(LoadAndBoot(&ops, kZirconBootModeSlotless), kBootResultBootReturn);
-  ASSERT_NO_FATAL_FAILURE(ValidateBootedSlot(dev.get(), std::nullopt));
+  ASSERT_NO_FATAL_FAILURE(ValidateVerifiedBootedSlot(dev.get(), std::nullopt));
 }
 
 TEST(BootTests, RollbackIndexUpdatedOnSuccessfulSlot) {
