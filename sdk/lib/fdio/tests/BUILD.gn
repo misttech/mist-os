@@ -198,6 +198,7 @@ executable("null-namespace-child") {
   sources = [ "fdio_null_namespace_child.cc" ]
   deps = [
     "//sdk/lib/fdio",
+    "//sdk/lib/fit",
     "//src/zircon/lib/zircon",
   ]
 }

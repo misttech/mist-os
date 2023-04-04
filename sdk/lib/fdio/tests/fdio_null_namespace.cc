@@ -10,22 +10,17 @@
 
 #include <zxtest/zxtest.h>
 
-static int64_t join(const zx::process& process) {
-  zx_status_t status = process.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr);
-  EXPECT_OK(status);
-  zx_info_process_t proc_info{};
-  status = process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr);
-  EXPECT_OK(status);
-  return proc_info.return_code;
-}
+namespace {
 
 TEST(NullNamespaceTest, NullNamespace) {
-  zx::process process;
-  zx_status_t status;
-
   const char* argv[] = {"/pkg/bin/null-namespace-child", nullptr};
-  status = fdio_spawn(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_STDIO | FDIO_SPAWN_DEFAULT_LDSVC, argv[0],
-                      argv, process.reset_and_get_address());
-  ASSERT_OK(status);
-  EXPECT_EQ(0, join(process));
+  zx::process process;
+  ASSERT_OK(fdio_spawn(/*job=*/ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_STDIO | FDIO_SPAWN_DEFAULT_LDSVC,
+                       argv[0], argv, process.reset_and_get_address()));
+  ASSERT_OK(process.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr));
+  zx_info_process_t proc_info;
+  ASSERT_OK(process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr));
+  ASSERT_EQ(0, proc_info.return_code);
 }
+
+}  // namespace
