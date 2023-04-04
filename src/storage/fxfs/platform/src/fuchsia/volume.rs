@@ -194,10 +194,10 @@ impl FxVolume {
                         )
                         .await?,
                     ) as Arc<dyn FxNode>,
-                    ObjectDescriptor::Directory => {
-                        Arc::new(FxDirectory::new(parent, Directory::open(self, object_id).await?))
-                            as Arc<dyn FxNode>
-                    }
+                    ObjectDescriptor::Directory => Arc::new(FxDirectory::new(
+                        parent,
+                        Directory::open_unchecked(self.clone(), object_id),
+                    )) as Arc<dyn FxNode>,
                     _ => bail!(FxfsError::Inconsistent),
                 };
                 placeholder.commit(&node);

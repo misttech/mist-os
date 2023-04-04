@@ -105,6 +105,12 @@ impl<S: HandleOwner> Directory<S> {
         }
     }
 
+    /// Opens a directory. The caller is responsible for ensuring that the object exists and is a
+    /// directory.
+    pub fn open_unchecked(owner: Arc<S>, object_id: u64) -> Self {
+        Self::new(owner, object_id)
+    }
+
     /// Acquires a transaction with the appropriate locks to replace |name|. Returns the
     /// transaction, as well as the ID and type of the child. If the child doesn't exist then a
     /// transaction is returned with a lock only on the parent and None for the target info so that
