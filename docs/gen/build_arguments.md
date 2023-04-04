@@ -61,7 +61,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1813
+From //build/config/BUILDCONFIG.gn:1809
 
 ### allow_legacy_data_partition_names
 
@@ -1223,12 +1223,6 @@ Tells openweave to include files that require heap access.
 **Current value (from the default):** `true`
 
 From //third_party/openweave-core/config.gni:32
-
-### core_realm_restrict_persistent_storage
-
-**Current value (from the default):** `true`
-
-From //build/product.gni:31
 
 ### core_realm_shards
 
@@ -2567,7 +2561,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:79
+From //zircon/kernel/params.gni:81
 
 ### dont_profile_source_files
 
@@ -2590,7 +2584,7 @@ From //build/config/compiler.gni:66
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:49
+From //build/product.gni:48
 
 ### emu_window_size_width
 
@@ -2598,7 +2592,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:48
+From //build/product.gni:47
 
 ### enable_api_diff
 
@@ -2645,7 +2639,7 @@ Enable kernel lock dependency tracking.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:38
+From //zircon/kernel/params.gni:40
 
 ### enable_lock_dep_tests
 
@@ -2656,7 +2650,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:151
+From //zircon/kernel/params.gni:153
 
 ### enable_mdns_trace
 
@@ -2908,7 +2902,7 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:103
+From //zircon/kernel/params.gni:105
 
 ### ermine_app_entries
 
@@ -3071,7 +3065,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1560
+From //build/config/BUILDCONFIG.gn:1556
 
 ### extra_vbmeta_descriptors
 
@@ -3373,7 +3367,7 @@ TODO(fxbug.dev/80742) move this to a toolchain to allow multiple products to bui
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:36
+From //build/product.gni:35
 
 ### fuchsia_product_assembly_config_label
 
@@ -3381,7 +3375,7 @@ The product assembly config used to configure the main Fuchsia image.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:39
+From //build/product.gni:38
 
 ### fuchsia_route_sources_config
 
@@ -3535,7 +3529,7 @@ Enables kernel tracing of futex interactions
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:61
+From //zircon/kernel/params.gni:63
 
 ### fvm_emmc_partition_size
 
@@ -4230,25 +4224,25 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:120
+From //zircon/kernel/params.gni:122
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:121
+From //zircon/kernel/params.gni:123
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:122
+From //zircon/kernel/params.gni:124
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:123
+From //zircon/kernel/params.gni:125
 
 ### kernel_base
 
@@ -4263,7 +4257,7 @@ on ProcessDispatcher creation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:127
+From //zircon/kernel/params.gni:129
 
 ### kernel_debug_level
 
@@ -4276,7 +4270,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:91
+From //zircon/kernel/params.gni:93
 
 ### kernel_debug_print_level
 
@@ -4288,7 +4282,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:98
+From //zircon/kernel/params.gni:100
 
 ### kernel_extra_defines
 
@@ -4297,7 +4291,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:83
+From //zircon/kernel/params.gni:85
 
 ### kernel_no_userabi
 
@@ -4305,7 +4299,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:130
+From //zircon/kernel/params.gni:132
 
 ### kernel_version_string
 
@@ -4491,7 +4485,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1374
+From //build/config/BUILDCONFIG.gn:1370
 
 ### legacy_base_driver_package_labels
 
@@ -4605,7 +4599,7 @@ Enable lock contention tracing.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:41
+From //zircon/kernel/params.gni:43
 
 ### log_startup_sleep
 
@@ -5547,7 +5541,7 @@ in testing but disable for production.
 
 **Current value (from the default):** `true`
 
-From //zircon/kernel/params.gni:143
+From //zircon/kernel/params.gni:145
 
 ### partitions_config_contents
 
@@ -5670,7 +5664,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:110
+From //zircon/kernel/params.gni:112
 
 ### platform_enable_user_pci
 
@@ -5837,7 +5831,7 @@ Example JNI include paths for a Linux system:
 
 **Current value (from the default):** `[]`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:313
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:304
 
 ### pw_arduino_build_BOARD
 
@@ -6300,7 +6294,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_log_tokenized/BUILD.gn:30
+From //third_party/pigweed/src/pw_log_tokenized/BUILD.gn:29
 
 ### pw_log_tokenized_HANDLER_BACKEND
 
@@ -6636,7 +6630,7 @@ Set to true to disable the asserts.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:31
+From //third_party/pigweed/src/pw_thread/backend.gni:34
 
 ### pw_thread_SLEEP_BACKEND
 
@@ -6645,6 +6639,14 @@ Backend for the pw_thread module's pw::thread::sleep_{for,until}.
 **Current value (from the default):** `""`
 
 From //third_party/pigweed/src/pw_thread/backend.gni:20
+
+### pw_thread_TEST_THREAD_CONTEXT_BACKEND
+
+Backend for the pw_thread module's pw::thread::test_thread_context.
+
+**Current value (from the default):** `""`
+
+From //third_party/pigweed/src/pw_thread/backend.gni:29
 
 ### pw_thread_THREAD_BACKEND
 
@@ -6660,7 +6662,7 @@ Backend for the pw_thread module's pw::thread::thread_iteration.
 
 **Current value (from the default):** `""`
 
-From //third_party/pigweed/src/pw_thread/backend.gni:34
+From //third_party/pigweed/src/pw_thread/backend.gni:37
 
 ### pw_thread_YIELD_BACKEND
 
@@ -6678,18 +6680,7 @@ public config (which may -include a file or add defines directly).
 
 **Current value (from the default):** `"//third_party/pigweed/src/pw_build:empty"`
 
-From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:31
-
-### pw_tokenizer_GLOBAL_HANDLER_WITH_PAYLOAD_BACKEND
-
-This variable is deprecated. It is only used for pw_log_tokenized, and is
-provided for backwards compatibility. Set pw_log_tokenized_HANDLER_BACKEND
-instead.
-TODO(hepler): Remove this variable after migrating projects.
-
-**Current value (from the default):** `""`
-
-From //third_party/pigweed/src/pw_tokenizer/backend.gni:20
+From //third_party/pigweed/src/pw_tokenizer/BUILD.gn:30
 
 ### pw_toolchain_CLANG_PREFIX
 
@@ -6705,9 +6696,11 @@ pw_test targets.
 For example, the static analysis toolchains that run `clang-tidy` instead
 of the test binary itself cannot generate coverage reports.
 
+This is typically set by individual toolchains and not by GN args.
+
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:29
+From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:31
 
 ### pw_toolchain_FUZZING_ENABLED
 
@@ -6716,7 +6709,7 @@ set by individual toolchains and not by GN args.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:33
+From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:35
 
 ### pw_toolchain_OSS_FUZZ_ENABLED
 
@@ -6726,7 +6719,7 @@ should only be used for OSS-Fuzz.
 
 **Current value (from the default):** `false`
 
-From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:38
+From //third_party/pigweed/src/pw_toolchain/host_clang/toolchains.gni:40
 
 ### pw_toolchain_RBE_DEBUG
 
@@ -6743,7 +6736,7 @@ From //third_party/pigweed/src/pw_toolchain/clang_tools.gni:33
 ### pw_toolchain_SANITIZERS
 
 Sets the sanitizer to pass to clang. Valid values are "address", "memory",
-"thread", "undefined", "undefined_heuristic", and "coverage".
+"thread", "undefined", "undefined_heuristic".
 
 **Current value (from the default):** `[]`
 
@@ -7407,7 +7400,7 @@ debugging changes to the scheduler's behavior.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:58
+From //zircon/kernel/params.gni:60
 
 ### scheduler_queue_tracing_enabled
 
@@ -7416,7 +7409,7 @@ analysis.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:54
+From //zircon/kernel/params.gni:56
 
 ### scheduler_tracing_level
 
@@ -7430,7 +7423,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:50
+From //zircon/kernel/params.gni:52
 
 ### scudo_default_options
 
@@ -7564,7 +7557,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1803
+From //build/config/BUILDCONFIG.gn:1799
 
 ### select_variant_canonical
 
@@ -7574,7 +7567,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1808
+From //build/config/BUILDCONFIG.gn:1804
 
 ### select_variant_shortcuts
 
@@ -7626,7 +7619,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1606
+From //build/config/BUILDCONFIG.gn:1602
 
 ### size_checker_input
 
@@ -8062,7 +8055,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1590
+From //build/config/BUILDCONFIG.gn:1586
 
 ### universe_package_labels
 
@@ -8232,7 +8225,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:133
+From //zircon/kernel/params.gni:135
 
 ### use_flatland_by_default
 
@@ -8550,7 +8543,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:45
+From //build/product.gni:44
 
 ### vm_tracing_level
 
@@ -8564,7 +8557,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:75
+From //zircon/kernel/params.gni:77
 
 ### vulkan_host_runtime_dir
 
@@ -8603,7 +8596,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:66
+From //zircon/kernel/params.gni:68
 
 ### warn_on_sdk_changes
 
