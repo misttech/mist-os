@@ -73,7 +73,7 @@ fn with_iter_slaac_addrs_mut<
     cb: F,
 ) -> O {
     SC::with_ip_device_state_mut(sync_ctx, device_id, |state| {
-        cb(Box::new(state.ip_state.iter_addrs_mut().filter_map(
+        cb(Box::new(state.ip_state.addrs.iter_mut().filter_map(
             |Ipv6AddressEntry { addr_sub, state: _, config, deprecated }| match config {
                 AddrConfig::Slaac(config) => {
                     Some(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
@@ -110,7 +110,7 @@ impl<
     ) -> O {
         let SlaacAddrs { sync_ctx, device_id, _marker } = self;
         sync_ctx.with_ip_device_state(device_id, |state| {
-            cb(Box::new(state.ip_state.iter_addrs().cloned().filter_map(
+            cb(Box::new(state.ip_state.addrs.iter().cloned().filter_map(
                 |Ipv6AddressEntry { addr_sub, state: _, config, deprecated }| match config {
                     AddrConfig::Slaac(config) => {
                         Some(SlaacAddressEntry { addr_sub, config, deprecated })
@@ -297,7 +297,7 @@ impl<
         device: &SC::DeviceId,
     ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
         self.with_ip_device_state(device, |state| {
-            state.ip_state.iter_addrs().find_map(|a| {
+            state.ip_state.addrs.iter().find_map(|a| {
                 if a.state.is_assigned() {
                     LinkLocalUnicastAddr::new(a.addr_sub().addr())
                 } else {
@@ -346,7 +346,8 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContex
             cb(DadStateRef {
                 address_state: state
                     .ip_state
-                    .find_addr_mut(&addr)
+                    .addrs
+                    .find_mut(&addr)
                     .map(|Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| state),
                 retrans_timer: &state.retrans_timer,
             })
@@ -423,7 +424,7 @@ impl<
             crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
                 dst_ip,
                 device_id,
-                state.ip_state.iter_addrs().map(move |a| (a, device_id.clone())),
+                state.ip_state.addrs.iter().map(move |a| (a, device_id.clone())),
             )
         });
         crate::ip::icmp::send_ndp_packet(
@@ -496,7 +497,7 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         _remote: SpecifiedAddr<Ipv4Addr>,
     ) -> Option<SpecifiedAddr<Ipv4Addr>> {
         self.with_ip_device_state(device_id, |state| {
-            state.ip_state.iter_addrs().next().map(|subnet| subnet.addr())
+            state.ip_state.addrs.iter().next().map(|subnet| subnet.addr())
         })
     }
 
@@ -559,7 +560,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
             crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
                 remote,
                 device_id,
-                state.ip_state.iter_addrs().map(move |a| (a, device_id.clone())),
+                state.ip_state.addrs.iter().map(move |a| (a, device_id.clone())),
             )
             .map(|a| a.into_specified())
         })
@@ -635,7 +636,8 @@ fn assignment_state_v4<Instant: crate::Instant>(
     }
 
     dev_state
-        .iter_addrs()
+        .addrs
+        .iter()
         .find_map(|dev_addr| {
             let (dev_addr, subnet) = dev_addr.addr_subnet();
 
@@ -659,7 +661,7 @@ fn assignment_state_v6<Instant: crate::Instant>(
     {
         AddressStatus::Present(Ipv6PresentAddressStatus::Multicast)
     } else {
-        dev_state.find_addr(&*addr).map(|addr| addr.state).map_or(
+        dev_state.addrs.find(&*addr).map(|addr| addr.state).map_or(
             AddressStatus::Unassigned,
             |state| match state {
                 AddressState::Assigned => {

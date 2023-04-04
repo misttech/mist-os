@@ -591,7 +591,7 @@ mod tests {
                 &device,
                 |state| {
                     let state: &IpDeviceState<_, _> = state.as_ref();
-                    state.iter_addrs().map(AssignedAddress::addr).collect::<Vec<_>>()
+                    state.addrs.iter().map(AssignedAddress::addr).collect::<Vec<_>>()
                 },
             )
         };

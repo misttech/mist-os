@@ -3392,7 +3392,8 @@ mod tests {
             let mut device_state = IpDeviceState::default();
             for addr in addrs {
                 device_state
-                    .add_addr(AddrSubnet::new(addr, prefix).unwrap())
+                    .addrs
+                    .add(AddrSubnet::new(addr, prefix).unwrap())
                     .expect("failed to add address");
             }
             device_state
@@ -3411,7 +3412,8 @@ mod tests {
             let mut device_state = IpDeviceState::default();
             for addr in addrs {
                 device_state
-                    .add_addr(Ipv6AddressEntry::new(
+                    .addrs
+                    .add(Ipv6AddressEntry::new(
                         AddrSubnet::new(addr, prefix).unwrap(),
                         AddressState::Assigned,
                         AddrConfig::Manual,

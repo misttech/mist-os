@@ -325,11 +325,13 @@ impl<C: DualStackDeviceNonSyncContext, SC: DualStackDeviceContext<C>> DualStackD
         self.with_dual_stack_device_state(device_id, |DualStackDeviceStateRef { ipv4, ipv6 }| {
             let addrs_v4 = ipv4
                 .ip_state
-                .iter_addrs()
+                .addrs
+                .iter()
                 .filter_map(<Ipv4 as IpDeviceStateIpExt>::assigned_addr::<C::Instant>);
             let addrs_v6 = ipv6
                 .ip_state
-                .iter_addrs()
+                .addrs
+                .iter()
                 .filter_map(<Ipv6 as IpDeviceStateIpExt>::assigned_addr::<C::Instant>);
 
             addrs_v4.map(AddrSubnetEither::V4).chain(addrs_v6.map(AddrSubnetEither::V6)).collect()
@@ -541,7 +543,7 @@ impl<
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<AddressState> {
         let address_state = self.with_ip_device_state(device_id, |state| {
-            state.ip_state.iter_addrs().find_map(
+            state.ip_state.addrs.iter().find_map(
                 |Ipv6AddressEntry { addr_sub, state: address_state, config: _, deprecated: _ }| {
                     (addr_sub.addr() == addr).then(|| *address_state)
                 },
@@ -627,7 +629,8 @@ fn enable_ipv6_device<
             let dad_transmits = *dad_transmits;
 
             ip_state
-                .iter_addrs_mut()
+                .addrs
+                .iter_mut()
                 .map(|Ipv6AddressEntry { addr_sub, state, config: _, deprecated: _ }| {
                     *state = AddressState::Tentative { dad_transmits_remaining: dad_transmits };
                     addr_sub.ipv6_unicast_addr()
@@ -713,7 +716,8 @@ fn disable_ipv6_device<
         .with_ip_device_state(device_id, |state| {
             state
                 .ip_state
-                .iter_addrs()
+                .addrs
+                .iter()
                 .map(|Ipv6AddressEntry { addr_sub, state: _, config, deprecated: _ }| {
                     (addr_sub.ipv6_unicast_addr(), *config)
                 })
@@ -756,7 +760,7 @@ fn enable_ipv4_device<
     join_ip_multicast(sync_ctx, ctx, device_id, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS);
     GmpHandler::gmp_handle_maybe_enabled(sync_ctx, ctx, device_id);
     sync_ctx.with_ip_device_state(device_id, |state| {
-        state.ip_state.iter_addrs().for_each(|addr| {
+        state.ip_state.addrs.iter().for_each(|addr| {
             ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
                 addr: addr.addr(),
@@ -778,7 +782,7 @@ fn disable_ipv4_device<
     GmpHandler::gmp_handle_disabled(sync_ctx, ctx, device_id);
     leave_ip_multicast(sync_ctx, ctx, device_id, Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS);
     sync_ctx.with_ip_device_state(device_id, |state| {
-        state.ip_state.iter_addrs().for_each(|addr| {
+        state.ip_state.addrs.iter().for_each(|addr| {
             ctx.on_event(IpDeviceEvent::AddressStateChanged {
                 device: device_id.clone(),
                 addr: addr.addr(),
@@ -801,7 +805,7 @@ pub(crate) fn with_assigned_addr_subnets<
 ) -> O {
     sync_ctx.with_ip_device_state(device_id, |state| {
         cb(Box::new(
-            AsRef::<IpDeviceState<_, I>>::as_ref(state).iter_addrs().filter_map(I::assigned_addr),
+            AsRef::<IpDeviceState<_, I>>::as_ref(state).addrs.iter().filter_map(I::assigned_addr),
         ))
     })
 }
@@ -937,7 +941,7 @@ pub(crate) fn add_ipv4_addr_subnet<
             true => IpAddressState::Assigned,
             false => IpAddressState::Unavailable,
         };
-        ip_state.add_addr(addr_sub).map(|()| {
+        ip_state.addrs.add(addr_sub).map(|()| {
             ctx.on_event(IpDeviceEvent::AddressAdded {
                 device: device_id.clone(),
                 addr: addr_sub,
@@ -981,7 +985,8 @@ pub(crate) fn add_ipv6_addr_subnet<
             } = state;
 
             ip_state
-                .add_addr(Ipv6AddressEntry::new(
+                .addrs
+                .add(Ipv6AddressEntry::new(
                     addr_sub,
                     AddressState::Tentative { dad_transmits_remaining: *dad_transmits },
                     config,
@@ -1038,7 +1043,7 @@ pub(crate) fn del_ipv4_addr<
     addr: &SpecifiedAddr<Ipv4Addr>,
 ) -> Result<(), NotFoundError> {
     sync_ctx.with_ip_device_state_mut(device_id, |state| {
-        state.ip_state.remove_addr(&addr).map(|addr| {
+        state.ip_state.addrs.remove(&addr).map(|addr| {
             ctx.on_event(IpDeviceEvent::AddressRemoved {
                 device: device_id.clone(),
                 addr: addr.addr(),
@@ -1059,7 +1064,7 @@ fn del_ipv6_addr<
     reason: RemovedReason,
 ) -> Result<Ipv6AddressEntry<C::Instant>, NotFoundError> {
     let entry =
-        sync_ctx.with_ip_device_state_mut(device_id, |state| state.ip_state.remove_addr(&addr))?;
+        sync_ctx.with_ip_device_state_mut(device_id, |state| state.ip_state.addrs.remove(&addr))?;
     let addr = entry.addr_sub.addr();
     DadHandler::stop_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
     leave_ip_multicast(sync_ctx, ctx, device_id, addr.to_solicited_node_address());
@@ -1415,7 +1420,8 @@ pub(crate) mod testutil {
             |state| {
                 state
                     .ip_state
-                    .iter_addrs()
+                    .addrs
+                    .iter()
                     .filter(|entry| match entry.addr_sub.addr().scope() {
                         Ipv6Scope::Global => true,
                         Ipv6Scope::InterfaceLocal
@@ -1607,7 +1613,8 @@ mod tests {
                 |state| {
                     state
                         .ip_state
-                        .iter_addrs()
+                        .addrs
+                        .iter()
                         .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
@@ -1735,7 +1742,7 @@ mod tests {
             &mut Locked::new(sync_ctx),
             &device_id,
             |state| {
-                assert_empty(state.ip_state.iter_addrs());
+                assert_empty(state.ip_state.addrs.iter());
             },
         );
 
@@ -1761,7 +1768,8 @@ mod tests {
                 |state| {
                     state
                         .ip_state
-                        .iter_addrs()
+                        .addrs
+                        .iter()
                         .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
@@ -1822,7 +1830,8 @@ mod tests {
                 |state| {
                     state
                         .ip_state
-                        .iter_addrs()
+                        .addrs
+                        .iter()
                         .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })
@@ -1948,7 +1957,8 @@ mod tests {
                 |state| {
                     state
                         .ip_state
-                        .iter_addrs()
+                        .addrs
+                        .iter()
                         .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
                             addr_sub.ipv6_unicast_addr()
                         })

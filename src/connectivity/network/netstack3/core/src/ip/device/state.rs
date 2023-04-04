@@ -114,7 +114,7 @@ pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIp
     /// Detection).
     ///
     /// Does not contain any duplicates.
-    addrs: Vec<I::AssignedAddress<Instant>>,
+    pub addrs: IpDeviceAddresses<Instant, I>,
 
     /// Multicast groups this device has joined.
     pub multicast_groups: MulticastGroupSet<I::Addr, I::GmpState<Instant>>,
@@ -127,19 +127,26 @@ pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIp
 impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<Instant, I> {
     fn default() -> IpDeviceState<Instant, I> {
         IpDeviceState {
-            addrs: Vec::default(),
+            addrs: Default::default(),
             multicast_groups: MulticastGroupSet::default(),
             default_hop_limit: DEFAULT_HOP_LIMIT,
         }
     }
 }
 
+#[derive(Derivative)]
+#[derivative(Default(bound = ""))]
+#[cfg_attr(test, derive(Debug))]
+pub(crate) struct IpDeviceAddresses<Instant: crate::Instant, I: Ip + IpDeviceStateIpExt> {
+    addrs: Vec<I::AssignedAddress<Instant>>,
+}
+
 // TODO(https://fxbug.dev/84871): Once we figure out what invariants we want to
 // hold regarding the set of IP addresses assigned to a device, ensure that all
-// of the methods on `IpDeviceState` uphold those invariants.
-impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceState<Instant, I> {
+// of the methods on `IpDeviceAddresses` uphold those invariants.
+impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, I> {
     /// Iterates over the addresses assigned to this device.
-    pub(crate) fn iter_addrs(
+    pub(crate) fn iter(
         &self,
     ) -> impl ExactSizeIterator<Item = &I::AssignedAddress<Instant>> + ExactSizeIterator + Clone
     {
@@ -147,31 +154,28 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceState<Instant, I> {
     }
 
     /// Iterates mutably over the addresses assigned to this device.
-    pub(crate) fn iter_addrs_mut(
+    pub(crate) fn iter_mut(
         &mut self,
     ) -> impl ExactSizeIterator<Item = &mut I::AssignedAddress<Instant>> + ExactSizeIterator {
         self.addrs.iter_mut()
     }
 
     /// Finds the entry for `addr` if any.
-    pub(crate) fn find_addr(&self, addr: &I::Addr) -> Option<&I::AssignedAddress<Instant>> {
+    pub(crate) fn find(&self, addr: &I::Addr) -> Option<&I::AssignedAddress<Instant>> {
         self.addrs.iter().find(|entry| &entry.addr().get() == addr)
     }
 
     /// Finds the mutable entry for `addr` if any.
-    pub(crate) fn find_addr_mut(
-        &mut self,
-        addr: &I::Addr,
-    ) -> Option<&mut I::AssignedAddress<Instant>> {
+    pub(crate) fn find_mut(&mut self, addr: &I::Addr) -> Option<&mut I::AssignedAddress<Instant>> {
         self.addrs.iter_mut().find(|entry| &entry.addr().get() == addr)
     }
 
     /// Adds an IP address to this interface.
-    pub(crate) fn add_addr(
+    pub(crate) fn add(
         &mut self,
         addr: I::AssignedAddress<Instant>,
     ) -> Result<(), crate::error::ExistsError> {
-        if self.iter_addrs().any(|a| a.addr() == addr.addr()) {
+        if self.iter().any(|a| a.addr() == addr.addr()) {
             return Err(crate::error::ExistsError);
         }
 
@@ -179,7 +183,7 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceState<Instant, I> {
     }
 
     /// Removes the address.
-    pub(crate) fn remove_addr(
+    pub(crate) fn remove(
         &mut self,
         addr: &I::Addr,
     ) -> Result<I::AssignedAddress<Instant>, crate::error::NotFoundError> {
@@ -505,14 +509,11 @@ mod tests {
         const ADDRESS: Ipv4Addr = Ipv4Addr::new([1, 2, 3, 4]);
         const PREFIX_LEN: u8 = 8;
 
-        let mut ipv4 = IpDeviceState::<FakeInstant, Ipv4>::default();
+        let mut ipv4 = IpDeviceAddresses::<FakeInstant, Ipv4>::default();
 
-        assert_eq!(ipv4.add_addr(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap()), Ok(()));
+        assert_eq!(ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap()), Ok(()));
         // Adding the same address with different prefix should fail.
-        assert_eq!(
-            ipv4.add_addr(AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap()),
-            Err(ExistsError)
-        );
+        assert_eq!(ipv4.add(AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap()), Err(ExistsError));
     }
 
     #[test]
@@ -521,10 +522,10 @@ mod tests {
             Ipv6Addr::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6]);
         const PREFIX_LEN: u8 = 8;
 
-        let mut ipv6 = IpDeviceState::<FakeInstant, Ipv6>::default();
+        let mut ipv6 = IpDeviceAddresses::<FakeInstant, Ipv6>::default();
 
         assert_eq!(
-            ipv6.add_addr(Ipv6AddressEntry::new(
+            ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
                 AddressState::Tentative { dad_transmits_remaining: None },
                 AddrConfig::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite }),
@@ -534,7 +535,7 @@ mod tests {
         // Adding the same address with different prefix and configuration
         // should fail.
         assert_eq!(
-            ipv6.add_addr(Ipv6AddressEntry::new(
+            ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
                 AddressState::Assigned,
                 AddrConfig::Manual,

@@ -1052,7 +1052,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
         with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
             let ipv4 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
-            let ret = ipv4.ip_state.iter_addrs().next().cloned().map(|addr| addr.addr().get());
+            let ret = ipv4.ip_state.addrs.iter().next().cloned().map(|addr| addr.addr().get());
             ret
         })
     }
@@ -1386,14 +1386,14 @@ mod tests {
                 crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |state| state.ip_state.iter_addrs().any(|a| a.addr() == addr),
+                    |state| state.ip_state.addrs.iter().any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
                 crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |state| state.ip_state.iter_addrs().any(|a| a.addr() == addr),
+                    |state| state.ip_state.addrs.iter().any(|a| a.addr() == addr),
                 )
             }
         }
@@ -2307,7 +2307,8 @@ mod tests {
                 .ipv6
                 .read()
                 .ip_state
-                .iter_addrs()
+                .addrs
+                .iter()
                 .map(|entry| entry.addr_sub().addr())
                 .collect::<Vec<_>>(),
             [config.local_mac.to_ipv6_link_local().addr().get()]
@@ -2332,7 +2333,8 @@ mod tests {
             .ipv6
             .read()
             .ip_state
-            .iter_addrs()
+            .addrs
+            .iter()
             .map(|entry| entry.addr_sub().addr().get())
             .collect();
         assert_eq!(

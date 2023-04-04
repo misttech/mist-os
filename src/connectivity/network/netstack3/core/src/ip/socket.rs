@@ -1005,7 +1005,8 @@ pub(crate) mod testutil {
                         device_state
                             .get(&device)
                             .unwrap()
-                            .iter_addrs()
+                            .addrs
+                            .iter()
                             .map(|e| e.addr())
                             .next()
                             .ok_or(IpSockRouteError::NoLocalAddrAvailable)
@@ -1014,7 +1015,8 @@ pub(crate) mod testutil {
                         device_state
                             .get(&device)
                             .unwrap()
-                            .iter_addrs()
+                            .addrs
+                            .iter()
                             .any(|e| e.addr() == local_ip)
                             .then(|| local_ip)
                             .ok_or(IpSockUnroutableError::LocalAddrNotAssigned.into())
@@ -1125,7 +1127,7 @@ pub(crate) mod testutil {
         ) -> impl Iterator<Item = D> + '_ {
             let Self { table: _, device_state, ip_device_id_ctx: _ } = self;
             Box::new(device_state.iter().filter_map(move |(device, state)| {
-                state.find_addr(&addr).map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
+                state.addrs.find(&addr).map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
             }))
         }
 
@@ -1273,12 +1275,14 @@ pub(crate) mod testutil {
                             (&mut device_state, ip),
                             |(device_state, ip)| {
                                 device_state
-                                    .add_addr(AddrSubnet::new(ip.get(), 32).unwrap())
+                                    .addrs
+                                    .add(AddrSubnet::new(ip.get(), 32).unwrap())
                                     .expect("add address")
                             },
                             |(device_state, ip)| {
                                 device_state
-                                    .add_addr(Ipv6AddressEntry::new(
+                                    .addrs
+                                    .add(Ipv6AddressEntry::new(
                                         AddrSubnet::new(ip.get(), 128).unwrap(),
                                         AddressState::Assigned,
                                         AddrConfig::Manual,

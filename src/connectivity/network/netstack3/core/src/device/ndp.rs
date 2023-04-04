@@ -677,7 +677,7 @@ mod tests {
         crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
             &mut Locked::new(sync_ctx),
             device,
-            |state| state.ip_state.find_addr(&addr).map(|a| a.state),
+            |state| state.ip_state.addrs.find(&addr).map(|a| a.state),
         )
     }
 
