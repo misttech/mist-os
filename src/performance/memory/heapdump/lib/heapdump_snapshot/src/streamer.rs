@@ -101,6 +101,7 @@ mod tests {
         result
     }
 
+    const FAKE_TIMESTAMP: i64 = 12345678;
     const FAKE_STACK_TRACE_ADDRESSES: [u64; 3] = [11111, 22222, 33333];
     const FAKE_STACK_TRACE_KEY: u64 = 1234;
     const FAKE_REGION_ADDRESS: u64 = 8192;
@@ -149,6 +150,7 @@ mod tests {
                         address: Some(*address),
                         size: Some(*size),
                         stack_trace_key: Some(FAKE_STACK_TRACE_KEY),
+                        timestamp: Some(FAKE_TIMESTAMP),
                         ..fheapdump_client::Allocation::EMPTY
                     },
                 ))
@@ -164,6 +166,7 @@ mod tests {
             let allocation = received_snapshot.allocations.remove(address).unwrap();
             assert_eq!(allocation.size, *size);
             assert_eq!(allocation.stack_trace.program_addresses, FAKE_STACK_TRACE_ADDRESSES);
+            assert_eq!(allocation.timestamp, FAKE_TIMESTAMP);
         }
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         let region = received_snapshot.executable_regions.remove(&FAKE_REGION_ADDRESS).unwrap();

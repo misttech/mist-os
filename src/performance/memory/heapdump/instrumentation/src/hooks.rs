@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_zircon as zx;
 use heapdump_vmo::stack_trace_compression;
 use std::ffi::c_void;
 
@@ -18,6 +19,9 @@ extern "C" {
 
 #[no_mangle]
 pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
+    // Collect the timestamp as early as possible.
+    let timestamp = zx::Time::get_monotonic();
+
     // Collect stack trace outside of the recursion guard to avoid including it in the stack trace.
     let mut stack_buf = [0; STACK_TRACE_MAXIMUM_DEPTH];
     let stack_len =
@@ -38,6 +42,7 @@ pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
                 ptr as u64,
                 size as u64,
                 compressed_stack,
+                timestamp.into_nanos(),
             );
         });
     });

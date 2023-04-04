@@ -248,6 +248,7 @@ mod tests {
     const FAKE_ALLOCATION_SIZE: u64 = 8;
     const FAKE_ALLOCATION_STACK_TRACE: [u64; 6] = [11111, 22222, 33333, 22222, 44444, 55555];
     const FAKE_ALLOCATION_STACK_TRACE_KEY: u64 = 9876;
+    const FAKE_ALLOCATION_TIMESTAMP: i64 = 123456789;
 
     #[async_trait]
     impl Snapshot for FakeSnapshot {
@@ -261,6 +262,7 @@ mod tests {
                         address: Some(FAKE_ALLOCATION_ADDRESS),
                         size: Some(FAKE_ALLOCATION_SIZE),
                         stack_trace_key: Some(FAKE_ALLOCATION_STACK_TRACE_KEY),
+                        timestamp: Some(FAKE_ALLOCATION_TIMESTAMP),
                         ..fheapdump_client::Allocation::EMPTY
                     }),
                     fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -291,6 +293,7 @@ mod tests {
                 received_snapshot.allocations.remove(&FAKE_ALLOCATION_ADDRESS).unwrap();
             assert_eq!(allocation.size, FAKE_ALLOCATION_SIZE);
             assert_eq!(allocation.stack_trace.program_addresses, FAKE_ALLOCATION_STACK_TRACE);
+            assert_eq!(allocation.timestamp, FAKE_ALLOCATION_TIMESTAMP);
 
             assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         }

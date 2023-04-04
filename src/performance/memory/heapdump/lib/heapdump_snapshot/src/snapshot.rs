@@ -27,6 +27,9 @@ pub struct Allocation {
 
     /// The stack trace of the allocation site.
     pub stack_trace: Rc<StackTrace>,
+
+    /// Allocation timestamp, in nanoseconds.
+    pub timestamp: i64,
 }
 
 /// A stack trace.
@@ -77,7 +80,7 @@ impl Snapshot {
     pub async fn receive_from(
         mut stream: fheapdump_client::SnapshotReceiverRequestStream,
     ) -> Result<Snapshot, Error> {
-        let mut allocations: HashMap<u64, (u64, u64)> = HashMap::new();
+        let mut allocations: HashMap<u64, (u64, u64, i64)> = HashMap::new();
         let mut stack_traces: HashMap<u64, Vec<u64>> = HashMap::new();
         let mut executable_regions: HashMap<u64, ExecutableRegion> = HashMap::new();
 
@@ -95,9 +98,13 @@ impl Snapshot {
                         fheapdump_client::SnapshotElement::Allocation(allocation) => {
                             let address = read_field!(allocation => Allocation, address)?;
                             let size = read_field!(allocation => Allocation, size)?;
+                            let timestamp = read_field!(allocation => Allocation, timestamp)?;
                             let stack_trace_key =
                                 read_field!(allocation => Allocation, stack_trace_key)?;
-                            if allocations.insert(address, (size, stack_trace_key)).is_some() {
+                            if allocations
+                                .insert(address, (size, stack_trace_key, timestamp))
+                                .is_some()
+                            {
                                 return Err(Error::ConflictingElement {
                                     element_type: "Allocation",
                                 });
@@ -138,12 +145,12 @@ impl Snapshot {
                     })
                     .collect();
                 let mut final_allocations = HashMap::new();
-                for (address, (size, stack_trace_key)) in allocations {
+                for (address, (size, stack_trace_key, timestamp)) in allocations {
                     let stack_trace = final_stack_traces
                         .get(&stack_trace_key)
                         .ok_or(Error::InvalidCrossReference { element_type: "StackTrace" })?
                         .clone();
-                    final_allocations.insert(address, Allocation { size, stack_trace });
+                    final_allocations.insert(address, Allocation { size, stack_trace, timestamp });
                 }
 
                 return Ok(Snapshot { allocations: final_allocations, executable_regions });
@@ -165,8 +172,10 @@ mod tests {
     // Constants used by some of the tests below:
     const FAKE_ALLOCATION_1_ADDRESS: u64 = 1234;
     const FAKE_ALLOCATION_1_SIZE: u64 = 8;
+    const FAKE_ALLOCATION_1_TIMESTAMP: i64 = 888888888;
     const FAKE_ALLOCATION_2_ADDRESS: u64 = 5678;
     const FAKE_ALLOCATION_2_SIZE: u64 = 4;
+    const FAKE_ALLOCATION_2_TIMESTAMP: i64 = -777777777; // test negative value too
     const FAKE_STACK_TRACE_1_ADDRESSES: [u64; 6] = [11111, 22222, 33333, 22222, 44444, 55555];
     const FAKE_STACK_TRACE_1_KEY: u64 = 9876;
     const FAKE_STACK_TRACE_2_ADDRESSES: [u64; 4] = [11111, 22222, 11111, 66666];
@@ -226,6 +235,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
@@ -243,6 +253,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_2_ADDRESS),
                     size: Some(FAKE_ALLOCATION_2_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -264,9 +275,11 @@ mod tests {
         let allocation1 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_1_ADDRESS).unwrap();
         assert_eq!(allocation1.size, FAKE_ALLOCATION_1_SIZE);
         assert_eq!(allocation1.stack_trace.program_addresses, FAKE_STACK_TRACE_2_ADDRESSES);
+        assert_eq!(allocation1.timestamp, FAKE_ALLOCATION_1_TIMESTAMP);
         let allocation2 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_2_ADDRESS).unwrap();
         assert_eq!(allocation2.size, FAKE_ALLOCATION_2_SIZE);
         assert_eq!(allocation2.stack_trace.program_addresses, FAKE_STACK_TRACE_1_ADDRESSES);
+        assert_eq!(allocation2.timestamp, FAKE_ALLOCATION_2_TIMESTAMP);
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         let region1 = received_snapshot.executable_regions.remove(&FAKE_REGION_1_ADDRESS).unwrap();
         assert_eq!(region1.size, FAKE_REGION_1_SIZE);
@@ -303,6 +316,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_2_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -322,6 +336,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_2_ADDRESS),
                     size: Some(FAKE_ALLOCATION_2_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_2_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::ExecutableRegion(
@@ -354,9 +369,11 @@ mod tests {
         let allocation1 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_1_ADDRESS).unwrap();
         assert_eq!(allocation1.size, FAKE_ALLOCATION_1_SIZE);
         assert_eq!(allocation1.stack_trace.program_addresses, FAKE_STACK_TRACE_2_ADDRESSES);
+        assert_eq!(allocation1.timestamp, FAKE_ALLOCATION_1_TIMESTAMP);
         let allocation2 = received_snapshot.allocations.remove(&FAKE_ALLOCATION_2_ADDRESS).unwrap();
         assert_eq!(allocation2.size, FAKE_ALLOCATION_2_SIZE);
         assert_eq!(allocation2.stack_trace.program_addresses, FAKE_STACK_TRACE_1_ADDRESSES);
+        assert_eq!(allocation2.timestamp, FAKE_ALLOCATION_2_TIMESTAMP);
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
         let region1 = received_snapshot.executable_regions.remove(&FAKE_REGION_1_ADDRESS).unwrap();
         assert_eq!(region1.size, FAKE_REGION_1_SIZE);
@@ -375,6 +392,8 @@ mod tests {
         Err(Error::MissingField { container: "Allocation", field: "size" }) ; "size")]
     #[test_case(|allocation| allocation.stack_trace_key = None => matches
         Err(Error::MissingField { container: "Allocation", field: "stack_trace_key" }) ; "stack_trace_key")]
+    #[test_case(|allocation| allocation.timestamp = None => matches
+        Err(Error::MissingField { container: "Allocation", field: "timestamp" }) ; "timestamp")]
     #[test_case(|_| () /* if we do not set any field to None, the result should be Ok */ => matches
         Ok(_) ; "success")]
     #[fasync::run_singlethreaded(test)]
@@ -390,6 +409,7 @@ mod tests {
             address: Some(FAKE_ALLOCATION_1_ADDRESS),
             size: Some(FAKE_ALLOCATION_1_SIZE),
             stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+            timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
             ..fheapdump_client::Allocation::EMPTY
         };
 
@@ -511,12 +531,14 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::Allocation(fheapdump_client::Allocation {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -600,6 +622,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -635,6 +658,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {
@@ -681,6 +705,7 @@ mod tests {
                     address: Some(FAKE_ALLOCATION_1_ADDRESS),
                     size: Some(FAKE_ALLOCATION_1_SIZE),
                     stack_trace_key: Some(FAKE_STACK_TRACE_1_KEY),
+                    timestamp: Some(FAKE_ALLOCATION_1_TIMESTAMP),
                     ..fheapdump_client::Allocation::EMPTY
                 }),
                 fheapdump_client::SnapshotElement::StackTrace(fheapdump_client::StackTrace {

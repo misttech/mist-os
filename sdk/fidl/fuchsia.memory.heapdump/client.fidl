@@ -42,6 +42,9 @@ type Allocation = table {
 
     /// The stack trace of the allocation site.
     3: stack_trace_key uint64;
+
+    /// Allocation timestamp.
+    4: timestamp zx.time;
 };
 
 /// A stack trace.

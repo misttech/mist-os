@@ -86,10 +86,11 @@ impl Profiler {
         address: u64,
         size: u64,
         compressed_stack_trace: &[u8],
+        timestamp: i64,
     ) {
         let mut inner = self.inner.lock().unwrap();
         let stack_trace_key = inner.resources_table.intern_stack_trace(compressed_stack_trace);
-        inner.allocations_table.record_allocation(address, size, stack_trace_key);
+        inner.allocations_table.record_allocation(address, size, stack_trace_key, timestamp);
 
         inner.global_stats.total_allocated_bytes += size;
         thread_data.local_stats.total_allocated_bytes += size;

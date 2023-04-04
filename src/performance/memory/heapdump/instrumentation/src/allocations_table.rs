@@ -35,9 +35,17 @@ impl AllocationsTable {
         self.vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("failed to share allocations VMO")
     }
 
-    pub fn record_allocation(&mut self, address: u64, size: u64, stack_trace_key: ResourceKey) {
-        let inserted =
-            self.writer.insert_allocation(address, size, stack_trace_key).expect("out of space");
+    pub fn record_allocation(
+        &mut self,
+        address: u64,
+        size: u64,
+        stack_trace_key: ResourceKey,
+        timestamp: i64,
+    ) {
+        let inserted = self
+            .writer
+            .insert_allocation(address, size, stack_trace_key, timestamp)
+            .expect("out of space");
         assert!(inserted, "Block 0x{:x} was already allocated", address);
     }
 

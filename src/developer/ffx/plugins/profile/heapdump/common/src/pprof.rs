@@ -81,6 +81,12 @@ fn build_profile(snapshot: &Snapshot) -> Result<pprof::Profile> {
                     num_unit: st.intern("bytes"),
                     ..Default::default()
                 },
+                pprof::Label {
+                    key: st.intern("timestamp"),
+                    num: info.timestamp,
+                    num_unit: st.intern("nanoseconds"),
+                    ..Default::default()
+                },
             ],
             ..Default::default()
         });
@@ -125,9 +131,11 @@ mod tests {
     const ALLOC_1_ADDRESS: u64 = 0x611000;
     const ALLOC_1_SIZE: i64 = 0x1800;
     const ALLOC_1_STACK: &[u64] = &[LOC_1_ADDRESS, LOC_2_ADDRESS, LOC_3_ADDRESS];
+    const ALLOC_1_TIMESTAMP: i64 = 8777777777778;
     const ALLOC_2_ADDRESS: u64 = 0x624000;
     const ALLOC_2_SIZE: i64 = 0x30;
     const ALLOC_2_STACK: &[u64] = &[LOC_1_ADDRESS, LOC_4_ADDRESS, LOC_5_ADDRESS];
+    const ALLOC_2_TIMESTAMP: i64 = 9333333333333;
 
     fn generate_fake_snapshot() -> Snapshot {
         Snapshot {
@@ -135,10 +143,12 @@ mod tests {
                 ALLOC_1_ADDRESS => Allocation {
                     size: ALLOC_1_SIZE.try_into().unwrap(),
                     stack_trace: Rc::new(StackTrace { program_addresses: ALLOC_1_STACK.to_vec() }),
+                    timestamp: ALLOC_1_TIMESTAMP,
                 },
                 ALLOC_2_ADDRESS => Allocation {
                     size: ALLOC_2_SIZE.try_into().unwrap(),
                     stack_trace: Rc::new(StackTrace { program_addresses: ALLOC_2_STACK.to_vec() }),
+                    timestamp: ALLOC_2_TIMESTAMP,
                 },
             ],
             executable_regions: hashmap![
@@ -174,10 +184,12 @@ mod tests {
         assert_eq!(st(profile.sample_type[1].unit), "bytes");
         for sample in &profile.sample {
             assert_eq!(sample.value.len(), profile.sample_type.len());
-            assert_eq!(sample.label.len(), 2);
+            assert_eq!(sample.label.len(), 3);
             assert_eq!(st(sample.label[0].key), "address");
             assert_eq!(st(sample.label[1].key), "bytes");
             assert_eq!(st(sample.label[1].num_unit), "bytes");
+            assert_eq!(st(sample.label[2].key), "timestamp");
+            assert_eq!(st(sample.label[2].num_unit), "nanoseconds");
         }
 
         // Identify the two allocations from their sizes (which are unique in our sample snapshot)
@@ -191,6 +203,7 @@ mod tests {
         assert_eq!(loc(allocation1.location_id[0]).address, ALLOC_1_STACK[0]);
         assert_eq!(loc(allocation1.location_id[1]).address, ALLOC_1_STACK[1]);
         assert_eq!(loc(allocation1.location_id[2]).address, ALLOC_1_STACK[2]);
+        assert_eq!(allocation1.label[2].num, ALLOC_1_TIMESTAMP);
         let allocation2 = profile.sample.iter().find(|s| s.label[1].num == ALLOC_2_SIZE).unwrap();
         assert_eq!(allocation2.value[0], 1);
         assert_eq!(allocation2.value[1], ALLOC_2_SIZE);
@@ -198,6 +211,7 @@ mod tests {
         assert_eq!(allocation2.location_id.len(), ALLOC_2_STACK.len());
         assert_eq!(loc(allocation2.location_id[0]).address, ALLOC_2_STACK[0]);
         assert_eq!(loc(allocation2.location_id[1]).address, ALLOC_2_STACK[1]);
+        assert_eq!(allocation2.label[2].num, ALLOC_2_TIMESTAMP);
 
         // Identify the mappings from their addresses and verify them.
         assert_eq!(profile.mapping.len(), 2);

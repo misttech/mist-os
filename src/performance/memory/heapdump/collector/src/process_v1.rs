@@ -122,6 +122,7 @@ impl Snapshot for SnapshotV1 {
                         address: Some(block.address),
                         size: Some(block.size),
                         stack_trace_key: Some(block.stack_trace_key.into_raw() as u64),
+                        timestamp: Some(block.timestamp),
                         ..fheapdump_client::Allocation::EMPTY
                     },
                 ))
@@ -297,11 +298,17 @@ mod tests {
         let foobar_address = foobar.as_ptr() as u64;
         let foobar_size = foobar.len() as u64;
         let foobar_stack_trace = generate_fake_long_stack_trace();
+        let foobar_timestamp = 123456789;
         let (foobar_stack_trace_key, _) = resources_writer
             .intern_compressed_stack_trace(&stack_trace_compression::compress(&foobar_stack_trace))
             .unwrap();
         allocations_writer
-            .insert_allocation(foobar_address, foobar_size, foobar_stack_trace_key)
+            .insert_allocation(
+                foobar_address,
+                foobar_size,
+                foobar_stack_trace_key,
+                foobar_timestamp,
+            )
             .unwrap();
 
         // Take a live snapshot.
@@ -322,6 +329,7 @@ mod tests {
         let foobar_allocation = received_snapshot.allocations.remove(&foobar_address).unwrap();
         assert_eq!(foobar_allocation.size, foobar_size);
         assert_eq!(foobar_allocation.stack_trace.program_addresses, foobar_stack_trace);
+        assert_eq!(foobar_allocation.timestamp, foobar_timestamp);
 
         assert!(received_snapshot.allocations.is_empty(), "all the entries have been removed");
 
