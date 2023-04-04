@@ -172,8 +172,10 @@ impl Isolate {
         // falling back to writing into /tmp. In our CI environment /tmp is
         // extremely limited, whereas invocations of tests are provided
         // dedicated temporary areas.
+        // We should propagate PATH to children, because it may contain
+        // changes e.g. that point to vendored binaries.
         for (var, val) in std::env::vars() {
-            if var.contains("TEMP") || var.contains("TMP") {
+            if var.contains("TEMP") || var.contains("TMP") || var == "PATH" {
                 let _ = env_vars.insert(var, val);
             }
         }
