@@ -9,7 +9,7 @@ use {
     fidl::encoding::MAX_HANDLES,
     fidl::Event,
     fidl::{endpoints::ServerEnd, Channel},
-    fidl_fidl_rust_test_external::{
+    fidl_test_external::{
         LargeMessageTable, LargeMessageUnion, LargeMessageUnionUnknown, OverflowingProtocolEvent,
         OverflowingProtocolMarker, OverflowingProtocolProxy, OverflowingProtocolRequest,
         OverflowingProtocolSynchronousProxy, OverflowingProtocolTwoWayRequestOnlyResponse,

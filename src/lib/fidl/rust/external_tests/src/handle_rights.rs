@@ -15,7 +15,7 @@
 
 use {
     fidl::{endpoints::ServerEnd, AsHandleRef, Channel, Event},
-    fidl_fidl_rust_test_external::{
+    fidl_test_external::{
         EchoHandleProtocolMarker, EchoHandleProtocolProxy, EchoHandleProtocolRequest,
         EchoHandleProtocolSynchronousProxy, ErrorSyntaxProtocolMarker, ErrorSyntaxProtocolProxy,
         ErrorSyntaxProtocolRequest, ErrorSyntaxProtocolSynchronousProxy,
@@ -30,17 +30,17 @@ use {
     std::io::prelude::*,
 };
 
-const SEND_HANDLE_REDUCED_RIGHTS_ORDINAL: u64 = 0x512ec95c01c56f7b;
-const SEND_HANDLE_SAME_RIGHTS_ORDINAL: u64 = 0x2dc4c33fd1a11b37;
+const SEND_HANDLE_REDUCED_RIGHTS_ORDINAL: u64 = 0x7675407e0eb5f825;
+const SEND_HANDLE_SAME_RIGHTS_ORDINAL: u64 = 0x1d43414e5560333a;
 
-const ECHO_HANDLE_REQUEST_REDUCED_RIGHTS_ORDINAL: u64 = 0x739e45ebdf6ad12b;
-const ECHO_HANDLE_REQUEST_SAME_RIGHTS_ORDINAL: u64 = 0xa2095fc3413e815;
+const ECHO_HANDLE_REQUEST_REDUCED_RIGHTS_ORDINAL: u64 = 0x6f73455d31eb2f42;
+const ECHO_HANDLE_REQUEST_SAME_RIGHTS_ORDINAL: u64 = 0x7bd6b869de1eb0b7;
 
-const ECHO_HANDLE_RESPONSE_REDUCED_RIGHTS_ORDINAL: u64 = 0x6d976f877db1bb8f;
-const ECHO_HANDLE_RESPONSE_SAME_RIGHTS_ORDINAL: u64 = 0x2958e01fc423982;
+const ECHO_HANDLE_RESPONSE_REDUCED_RIGHTS_ORDINAL: u64 = 0x458d1c6d39e34f1e;
+const ECHO_HANDLE_RESPONSE_SAME_RIGHTS_ORDINAL: u64 = 0x57334c827816fe5;
 
-const PUSH_EVENT_REDUCED_RIGHTS_ORDINAL: u64 = 0x3b8aa447b0d3514c;
-const PUSH_EVENT_SAME_RIGHTS_ORDINAL: u64 = 0x33824de8c5cc3490;
+const PUSH_EVENT_REDUCED_RIGHTS_ORDINAL: u64 = 0x6f5a2e2e57c07079;
+const PUSH_EVENT_SAME_RIGHTS_ORDINAL: u64 = 0x4fca4ce8755a1967;
 
 // A channel where the data may be transformed during transit.
 trait TransformableChannel {

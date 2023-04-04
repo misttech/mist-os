@@ -5,7 +5,7 @@
 //! This file tests FIDL's persistent encoding/decoding API.
 
 use fidl::encoding::{persist, standalone_decode, standalone_encode, unpersist};
-use fidl_fidl_rust_test_external::{Coordinate, FlexibleValueThing, ValueRecord};
+use fidl_test_external::{Coordinate, FlexibleValueThing, ValueRecord};
 
 // TODO(fxbug.dev/45252): Remove this.
 fn transform_new_to_old_header(buf: &mut Vec<u8>) {
@@ -65,7 +65,7 @@ fn standalone_encode_decode_value() {
 mod zx {
     use super::*;
     use fidl::{encoding::convert_handle_dispositions_to_infos, AsHandleRef};
-    use fidl_fidl_rust_test_external::StructWithHandles;
+    use fidl_test_external::StructWithHandles;
     use fuchsia_zircon as zx;
 
     #[test]
