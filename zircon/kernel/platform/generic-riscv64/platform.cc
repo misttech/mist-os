@@ -60,7 +60,6 @@
 #include <kernel/thread.h>
 #endif
 
-// #include <lib/zbitl/error_stdio.h>
 #include <lib/zbitl/image.h>
 #include <lib/zbitl/memory.h>
 #include <zircon/boot/image.h>
@@ -76,9 +75,6 @@
 zx_paddr_t gAcpiRsdp = 0;
 zx_paddr_t gSmbiosPhys = 0;
 #endif
-
-// Defined in start.S.
-extern paddr_t kernel_secondary_entry_paddr;
 
 static void* ramdisk_base;
 static size_t ramdisk_size;
@@ -144,7 +140,12 @@ void* platform_get_ramdisk(size_t* size) {
 void platform_halt_cpu(void) {}
 
 static zx_status_t platform_start_cpu(cpu_num_t cpu_num, uint64_t hart_id) {
+  // TODO-rvbringup: consider moving to arch code
+  PANIC_UNIMPLEMENTED;
+#if 0
   vaddr_t sp = 0;
+
+  TRACEF("cpun_num %u, hart_id %lu\n", cpu_num, hart_id);
 
   zx_status_t status = riscv64_create_secondary_stack(cpu_num, &sp);
   if (status != ZX_OK) {
@@ -163,9 +164,10 @@ static zx_status_t platform_start_cpu(cpu_num_t cpu_num, uint64_t hart_id) {
     return ZX_ERR_INTERNAL;
   }
   return ZX_OK;
+#endif
 }
 
-static void topology_cpu_init(void) {
+static void topology_cpu_init() {
   for (auto* node : system_topology::GetSystemTopology().processors()) {
     if (node->entity_type != ZBI_TOPOLOGY_ENTITY_PROCESSOR ||
         node->entity.processor.architecture != ZBI_TOPOLOGY_ARCH_RISCV) {
@@ -210,20 +212,32 @@ static void topology_cpu_init(void) {
   warning_thread->DetachAndResume();
 }
 
+// clang-format off
 static constexpr zbi_topology_node_t fallback_topology = {
-    .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
-    .parent_index = ZBI_TOPOLOGY_NO_PARENT,
-    .entity = {.processor = {.logical_ids = {0},
-                             .logical_id_count = 1,
-                             .flags = 0,
-                             .architecture = ZBI_TOPOLOGY_ARCH_RISCV}}};
+  .entity_type = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+  .entity = {
+    .processor = {
+      .logical_ids = {0},
+      .logical_id_count = 1,
+      .flags = ZBI_TOPOLOGY_PROCESSOR_PRIMARY,
+      .architecture = ZBI_TOPOLOGY_ARCH_RISCV,
+      .architecture_info = {
+        .riscv = {
+          .hart_id = 0,
+        }
+      }
+    }
+  }
+};
+// clang-format on
 
 static void init_topology(uint level) {
   ktl::span handoff = gPhysHandoff->cpu_topology.get();
 
   auto result = system_topology::Graph::InitializeSystemTopology(handoff.data(), handoff.size());
   if (result != ZX_OK) {
-    printf("Failed to initialize system topology! error: %d\n", result);
+    printf("Failed to initialize system topology! error: %d, using fallback topology\n", result);
 
     // Try to fallback to a topology of just this processor.
     result = system_topology::Graph::InitializeSystemTopology(&fallback_topology, 1);
@@ -235,9 +249,8 @@ static void init_topology(uint level) {
   // TODO(fxbug.dev/32903) Print the whole topology of the system.
   if (DPRINTF_ENABLED_FOR_LEVEL(INFO)) {
     for (auto* proc : system_topology::GetSystemTopology().processors()) {
-      auto& info = proc->entity.processor.architecture_info.arm;
-      dprintf(INFO, "System topology: CPU %u:%u:%u:%u\n", info.cluster_3_id, info.cluster_2_id,
-              info.cluster_1_id, info.cpu_id);
+      auto& info = proc->entity.processor.architecture_info.riscv;
+      dprintf(INFO, "System topology: CPU Hart %lu\n", info.hart_id);
     }
   }
 }
@@ -323,119 +336,6 @@ static void allocate_persistent_ram(paddr_t pa, size_t length) {
   }
 }
 
-#if 0
-// Called during platform_init_early, the heap is not yet present.
-void ProcessZbiEarly(zbi_header_t* zbi) {
-  DEBUG_ASSERT(zbi);
-
-  // Writable bytes, as we will need to edit CMDLINE items (see below).
-  ktl::span span{reinterpret_cast<ktl::byte*>(zbi), SIZE_MAX};
-  zbitl::View view(span);
-
-  for (auto it = view.begin(); it != view.end(); ++it) {
-    auto [header, payload] = *it;
-    switch (header->type) {
-      case ZBI_TYPE_STORAGE_KERNEL: {
-        gPhysHandoff = PhysHandoff::FromPayload(payload);
-        break;
-      }
-      case ZBI_TYPE_KERNEL_DRIVER:
-      case ZBI_TYPE_PLATFORM_ID:
-        break;
-      case ZBI_TYPE_CMDLINE: {
-        if (payload.empty()) {
-          break;
-        }
-        payload.back() = ktl::byte{'\0'};
-
-        ParseBootOptions(
-            ktl::string_view{reinterpret_cast<const char*>(payload.data()), payload.size()});
-
-        // The CMDLINE might include entropy for the zircon cprng.
-        // We don't want that information to be accesible after it has
-        // been added to the kernel cmdline.
-        // Editing the header of a ktl::span will not result in an error.
-        // TODO(fxbug.dev/64272): Inline the following once the GCC bug is fixed.
-        static_cast<void>(view.EditHeader(it, zbi_header_t{
-                                          .type = ZBI_TYPE_DISCARD,
-                                      }));
-        mandatory_memset(payload.data(), 0, payload.size());
-        break;
-      }
-      case ZBI_TYPE_MEM_CONFIG: {
-        zbi_mem_range_t* mem_range = reinterpret_cast<zbi_mem_range_t*>(payload.data());
-        size_t count = payload.size() / sizeof(zbi_mem_range_t);
-        for (size_t i = 0; i < count; i++) {
-          process_mem_range(mem_range++);
-        }
-        break;
-      }
-      case ZBI_TYPE_NVRAM: {
-        zbi_nvram_t info;
-        memcpy(&info, payload.data(), sizeof(info));
-
-        dprintf(INFO, "boot reserve NVRAM range: phys base %#" PRIx64 " length %#" PRIx64 "\n",
-                info.base, info.length);
-
-        allocate_persistent_ram(info.base, info.length);
-        boot_reserve_add_range(info.base, info.length);
-        break;
-      }
-      case ZBI_TYPE_HW_REBOOT_REASON: {
-        zbi_hw_reboot_reason_t reason;
-        memcpy(&reason, payload.data(), sizeof(reason));
-        platform_set_hw_reboot_reason(reason);
-        break;
-      }
-      case ZBI_TYPE_CPU_TOPOLOGY: {
-        const size_t node_count = payload.size() / static_cast<size_t>(header->extra);
-        const auto* nodes = reinterpret_cast<const zbi_topology_node_t*>(payload.data());
-        for (int i = 0; i < (int)node_count; i ++) {
-          if (nodes[i].entity_type == ZBI_TOPOLOGY_ENTITY_PROCESSOR &&
-              nodes[i].entity.processor.architecture == ZBI_TOPOLOGY_ARCH_RISCV &&
-              nodes[i].entity.processor.flags == ZBI_TOPOLOGY_PROCESSOR_PRIMARY) {
-            uint boot_hart_id = (uint)nodes[i].entity.processor.architecture_info.riscv.hart_id;
-            riscv64_read_percpu_ptr()->hart_id = boot_hart_id;
-            arch_register_hart(0, boot_hart_id);
-            break;
-          }
-        }
-        break;
-      }
-    };
-  }
-
-  if (auto result = view.take_error(); result.is_error()) {
-    printf("ProcessZbiEarly: encountered error iterating through data ZBI: ");
-    zbitl::PrintViewError(result.error_value());
-  }
-}
-
-// Called after the heap is up, but before multithreading.
-void ProcessZbiLate(const zbi_header_t* zbi) {
-  DEBUG_ASSERT(zbi);
-
-  zbitl::View view(zbitl::AsBytes(zbi, SIZE_MAX));
-
-  for (auto it = view.begin(); it != view.end(); ++it) {
-    auto [header, payload] = *it;
-    switch (header->type) {
-      case ZBI_TYPE_CPU_TOPOLOGY: {
-        const size_t node_count = payload.size() / static_cast<size_t>(header->extra);
-        const auto* nodes = reinterpret_cast<const zbi_topology_node_t*>(payload.data());
-        init_topology(nodes, node_count);
-        break;
-      }
-    };
-  }
-
-  if (auto result = view.take_error(); result.is_error()) {
-    printf("ProcessZbiLate: encountered error iterating through data ZBI: ");
-    zbitl::PrintViewError(result.error_value());
-  }
-}
-#endif
-
 static void process_mem_ranges(ktl::span<const zbi_mem_range_t> ranges) {
   // First process all the reserved ranges. We do this in case there are reserved regions that
   // overlap with the RAM regions that occur later in the list. If we didn't process the reserved
@@ -493,18 +393,18 @@ static void ProcessPhysHandoff() {
 }
 
 void platform_early_init(void) {
+  // is the cmdline option to bypass dlog set ?
+  dlog_bypass_init();
+
   // initialize the boot memory reservation system
   boot_reserve_init();
 
   ProcessPhysHandoff();
 
-  // is the cmdline option to bypass dlog set ?
-  dlog_bypass_init();
-
-  // Serial port should be active now
-
   // Check if serial should be enabled
   ktl::visit([](const auto& uart) { uart_disabled = uart.extra() == 0; }, gBootOptions->serial);
+
+  // Serial port should be active now
 
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
@@ -563,21 +463,21 @@ static void platform_init_postvm(uint level) {}
 
 LK_INIT_HOOK(platform_postvm, platform_init_postvm, LK_INIT_LEVEL_VM)
 
-void platform_dputs_thread(const char* str, size_t len) {
+void legacy_platform_dputs_thread(const char* str, size_t len) {
   if (uart_disabled) {
     return;
   }
   uart_puts(str, len, true);
 }
 
-void platform_dputs_irq(const char* str, size_t len) {
+void legacy_platform_dputs_irq(const char* str, size_t len) {
   if (uart_disabled) {
     return;
   }
   uart_puts(str, len, false);
 }
 
-int platform_dgetc(char* c, bool wait) {
+int legacy_platform_dgetc(char* c, bool wait) {
   if (uart_disabled) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -591,14 +491,14 @@ int platform_dgetc(char* c, bool wait) {
   return 1;
 }
 
-void platform_pputc(char c) {
+void legacy_platform_pputc(char c) {
   if (uart_disabled) {
     return;
   }
   uart_pputc(c);
 }
 
-int platform_pgetc(char* c, bool wait) {
+int legacy_platform_pgetc(char* c) {
   if (uart_disabled) {
     return ZX_ERR_NOT_SUPPORTED;
   }
@@ -616,18 +516,59 @@ zx_status_t display_get_info(struct display_info* info) { return ZX_ERR_NOT_FOUN
 
 void platform_specific_halt(platform_halt_action suggested_action, zircon_crash_reason_t reason,
                             bool halt_on_panic) {
-  sbi_call(SBI_SHUTDOWN);
-  __UNREACHABLE;
+  TRACEF("suggested_action %u, reason %u, halt_on_panic %d\n", suggested_action, reason,
+         halt_on_panic);
+  if (suggested_action == HALT_ACTION_REBOOT) {
+    power_reboot(REBOOT_NORMAL);
+    printf("reboot failed\n");
+  } else if (suggested_action == HALT_ACTION_REBOOT_BOOTLOADER) {
+    power_reboot(REBOOT_BOOTLOADER);
+    printf("reboot-bootloader failed\n");
+  } else if (suggested_action == HALT_ACTION_REBOOT_RECOVERY) {
+    power_reboot(REBOOT_RECOVERY);
+    printf("reboot-recovery failed\n");
+  } else if (suggested_action == HALT_ACTION_SHUTDOWN) {
+    power_shutdown();
+
+    // TODO-rvbringup: remove this call here and have SBI register via the power pdev
+    sbi_call(SBI_SHUTDOWN);
+  }
+
+  if (reason == ZirconCrashReason::Panic) {
+    Backtrace bt;
+    Thread::Current::GetBacktrace(bt);
+    bt.Print();
+    if (!halt_on_panic) {
+      power_reboot(REBOOT_NORMAL);
+      printf("reboot failed\n");
+    }
+#if ENABLE_PANIC_SHELL
+    dprintf(ALWAYS, "CRASH: starting debug shell... (reason = %d)\n", static_cast<int>(reason));
+    arch_disable_ints();
+    panic_shell_start();
+#endif  // ENABLE_PANIC_SHELL
+  }
+
+  dprintf(ALWAYS, "HALT: spinning forever... (reason = %d)\n", static_cast<int>(reason));
+
+  // catch all fallthrough cases
+  arch_disable_ints();
+
+  for (;;) {
+    arch::Yield();
+  }
 }
 
-zx_status_t platform_mexec_patch_zbi(uint8_t* zbi, const size_t len) { return ZX_OK; }
+zx_status_t platform_mexec_patch_zbi(uint8_t* zbi, const size_t len) { PANIC_UNIMPLEMENTED; }
 
-void platform_mexec_prep(uintptr_t new_bootimage_addr, size_t new_bootimage_len) {}
+void platform_mexec_prep(uintptr_t new_bootimage_addr, size_t new_bootimage_len) {
+  PANIC_UNIMPLEMENTED;
+}
 
 void platform_mexec(mexec_asm_func mexec_assembly, memmov_ops_t* ops, uintptr_t new_bootimage_addr,
-                    size_t new_bootimage_len, uintptr_t entry64_addr) {}
-
-bool platform_serial_enabled(void) { return !uart_disabled; }
+                    size_t new_bootimage_len, uintptr_t entry64_addr) {
+  PANIC_UNIMPLEMENTED;
+}
 
 bool platform_early_console_enabled() { return false; }
 
@@ -672,3 +613,9 @@ zx_status_t platform_mp_prep_cpu_unplug(cpu_num_t cpu_id) {
 zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug(cpu_id); }
 
 zx_status_t platform_append_mexec_data(ktl::span<ktl::byte> data_zbi) { return ZX_OK; }
+
+uint32_t PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
+
+volatile void* PlatformUartMapMmio(paddr_t paddr) {
+  return reinterpret_cast<volatile void*>(paddr_to_physmap(paddr));
+}

@@ -153,6 +153,10 @@ zx_status_t Graph::Initialize(Graph* graph, const zbi_topology_node_t* flat_node
 }
 
 zx_status_t Graph::InitializeSystemTopology(const zbi_topology_node_t* nodes, size_t count) {
+  if (count == 0) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   Graph graph;
   const auto status = Graph::Initialize(&graph, nodes, count);
   if (status != ZX_OK) {
