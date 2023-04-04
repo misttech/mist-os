@@ -211,8 +211,8 @@ std::optional<AudioOutput::FrameSpan> DriverOutput::StartMixJob(zx::time ref_tim
                      << ") ms. Cooling down for " << kUnderflowCooldown.to_msecs()
                      << " milliseconds.";
 
-      ZX_DEBUG_ASSERT(reporter_.has_value());
-      reporter_.value()->DeviceUnderflow(mono_time, mono_time + output_underflow_duration);
+      ZX_DEBUG_ASSERT(reporter().has_value());
+      reporter().value()->DeviceUnderflow(mono_time, mono_time + output_underflow_duration);
 
       underflow_start_time_mono_ = mono_time;
       output_producer_->FillWithSilence(rb.virt(), rb.frames());
@@ -582,7 +582,7 @@ void DriverOutput::OnDriverStartComplete() {
     return;
   }
 
-  reporter_
+  reporter()
       .emplace(Reporter::Singleton().CreateOutputDevice(
           DeviceUniqueIdToString(this->driver()->persistent_unique_id()), mix_domain().name()))
       ->SetDriverInfo(driver()->info_for_reporter());
@@ -631,8 +631,8 @@ void DriverOutput::OnDriverStartComplete() {
                   << " mSec)";
   }
 
-  ZX_DEBUG_ASSERT(reporter_.has_value());
-  reporter_.value()->StartSession(zx::clock::get_monotonic());
+  ZX_DEBUG_ASSERT(reporter().has_value());
+  reporter().value()->StartSession(zx::clock::get_monotonic());
   state_ = State::Started;
 
   // Once we are Started, begin the device-startup idle countdown

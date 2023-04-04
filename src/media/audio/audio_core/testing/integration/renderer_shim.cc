@@ -15,10 +15,10 @@
 
 namespace media::audio::test {
 
-RendererShimImpl::RendererShimImpl(Format format, int64_t payload_frame_count, size_t name)
+RendererShimImpl::RendererShimImpl(Format format, int64_t payload_frame_count, size_t reporting_id)
     : format_(format),
       payload_frame_count_(payload_frame_count),
-      name_(std::to_string(name)),
+      reporting_id_(reporting_id),
       payload_buffer_(format, payload_frame_count) {
   // Start with a single slot covering the entire payload.
   // We'll subdivide this later.

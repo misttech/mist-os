@@ -199,8 +199,8 @@ class HermeticAudioTest : public TestFixture {
   fuchsia::ultrasound::FactoryPtr ultrasound_factory_;
   fuchsia::media::audio::EffectsControllerSyncPtr effects_controller_;
 
-  size_t next_capturer_name_ = 1;
-  size_t next_renderer_name_ = 1;
+  size_t next_capturer_reporting_id_ = 1;
+  size_t next_renderer_reporting_id_ = 1;
 };
 
 }  // namespace media::audio::test

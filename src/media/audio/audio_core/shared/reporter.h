@@ -306,30 +306,30 @@ class Reporter {
     // These could be guarded by Reporter::mutex_, but clang's thread safety
     // analysis cannot represent that relationship.
     std::mutex mutex;
-    uint64_t next_renderer_name FXL_GUARDED_BY(mutex) = 0;
-    uint64_t next_capturer_name FXL_GUARDED_BY(mutex) = 0;
-    uint64_t next_thermal_transition_name FXL_GUARDED_BY(mutex) = 0;
-    uint64_t next_volume_control_name FXL_GUARDED_BY(mutex) = 0;
+    uint64_t next_renderer_id FXL_GUARDED_BY(mutex) = 0;
+    uint64_t next_capturer_id FXL_GUARDED_BY(mutex) = 0;
+    uint64_t next_thermal_transition_id FXL_GUARDED_BY(mutex) = 0;
+    uint64_t next_volume_control_id FXL_GUARDED_BY(mutex) = 0;
 
     Impl(sys::ComponentContext& cc, async_dispatcher_t* fidl_dispatcher,
          async_dispatcher_t* io_dispatcher);
     ~Impl();
 
-    std::string NextRendererName() {
+    std::string NextRendererIdStr() {
       std::lock_guard<std::mutex> lock(mutex);
-      return std::to_string(++next_renderer_name);
+      return std::to_string(++next_renderer_id);
     }
-    std::string NextCapturerName() {
+    std::string NextCapturerIdStr() {
       std::lock_guard<std::mutex> lock(mutex);
-      return std::to_string(++next_capturer_name);
+      return std::to_string(++next_capturer_id);
     }
-    std::string NextThermalTransitionName() {
+    std::string NextThermalTransitionIdStr() {
       std::lock_guard<std::mutex> lock(mutex);
-      return std::to_string(++next_thermal_transition_name);
+      return std::to_string(++next_thermal_transition_id);
     }
-    std::string NextVolumeControlName() {
+    std::string NextVolumeControlIdStr() {
       std::lock_guard<std::mutex> lock(mutex);
-      return std::to_string(++next_volume_control_name);
+      return std::to_string(++next_volume_control_id);
     }
   };
 

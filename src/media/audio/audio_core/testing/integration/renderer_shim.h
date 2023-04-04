@@ -103,11 +103,13 @@ class RendererShimImpl {
   // Reset the payload buffer to all zeros and seek back to the start.
   void ClearPayload() { payload_buffer_.Clear(); }
 
-  // For validating properties exported by inspect.
-  const std::string& name() const { return name_; }
+  // For validating properties exported by inspect. This mirrors what is done by class Reporter.
+  // Reporter assigns a distinct 'id' to each renderer (see `next_renderer_id` in reporter.h),
+  // reduces it to a string, and uses it as the node name for metrics reporting purposes.
+  std::string reporting_id_str() const { return std::to_string(reporting_id_); }
 
  protected:
-  RendererShimImpl(Format format, int64_t payload_frame_count, size_t name);
+  RendererShimImpl(Format format, int64_t payload_frame_count, size_t reporting_id);
 
   void SetReferenceClock(TestFixture* fixture, const zx::clock& clock);
   void RetrieveReferenceClock(TestFixture* fixture);
@@ -129,7 +131,7 @@ class RendererShimImpl {
 
   const Format format_;
   const int64_t payload_frame_count_;
-  const std::string name_;
+  const size_t reporting_id_;
 
   zx::clock reference_clock_;
 
@@ -173,9 +175,9 @@ class AudioRendererShim : public RendererShimImpl {
   // appropriately bound into the test environment.
   AudioRendererShim(TestFixture* fixture, fuchsia::media::AudioCorePtr& audio_core, Format fmt,
                     int64_t payload_frame_count, fuchsia::media::AudioRenderUsage usage,
-                    size_t name, std::optional<zx::clock> reference_clock,
+                    size_t reporting_id, std::optional<zx::clock> reference_clock,
                     std::optional<float> initial_gain_db)
-      : RendererShimImpl(fmt, payload_frame_count, name) {
+      : RendererShimImpl(fmt, payload_frame_count, reporting_id) {
     audio_core->CreateAudioRenderer(fidl().NewRequest());
     fixture->AddErrorHandler(fidl(), "AudioRenderer");
     WatchEvents();
@@ -228,8 +230,8 @@ class UltrasoundRendererShim : public RendererShimImpl {
   // Don't call this directly. Use HermeticAudioTest::CreateUltrasoundRenderer so the object is
   // appropriately bound into the test environment.
   UltrasoundRendererShim(TestFixture* fixture, fuchsia::ultrasound::FactoryPtr& ultrasound_factory,
-                         Format fmt, int64_t payload_frame_count, size_t name)
-      : RendererShimImpl(fmt, payload_frame_count, name), fixture_(fixture) {
+                         Format fmt, int64_t payload_frame_count, size_t reporting_id)
+      : RendererShimImpl(fmt, payload_frame_count, reporting_id), fixture_(fixture) {
     ultrasound_factory->CreateRenderer(fidl().NewRequest(), [this](auto ref_clock,
                                                                    auto stream_type) {
       created_ = true;

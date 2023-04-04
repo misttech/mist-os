@@ -502,7 +502,7 @@ class Reporter::ThermalStateTracker {
   async::TaskClosureMethod<ThermalStateTracker, &ThermalStateTracker::ResetInterval>
       restart_interval_timer_ FXL_GUARDED_BY(mutex_){this};
 
-  uint64_t next_thermal_transition_name_ FXL_GUARDED_BY(mutex_) = 0;
+  uint64_t next_thermal_transition_id_ FXL_GUARDED_BY(mutex_) = 0;
   Container<ThermalStateTransition, kThermalStatesToCache>::Ptr last_transition_
       FXL_GUARDED_BY(mutex_);
 };
@@ -562,7 +562,7 @@ class Reporter::ActiveUsagePolicyTracker {
         duck_gain_(node_.CreateDouble("duck gain db", 0.0)),
         mute_gain_(node_.CreateDouble("mute gain db", 0.0)),
         last_policy_(active_usage_policies_.New(new ActiveUsagePolicy(
-            node_, std::to_string(++next_active_usage_policy_name_),
+            node_, std::to_string(++next_active_usage_policy_id_),
             std::vector<fuchsia::media::Usage>(), AudioAdmin::RendererPolicies(),
             AudioAdmin::CapturerPolicies()))) {}
 
@@ -577,8 +577,8 @@ class Reporter::ActiveUsagePolicyTracker {
                                const AudioAdmin::CapturerPolicies& capturer_policies) {
     std::lock_guard<std::mutex> lock(mutex_);
     last_policy_ = active_usage_policies_.New(
-        new ActiveUsagePolicy(node_, std::to_string(++next_active_usage_policy_name_),
-                              active_usages, renderer_policies, capturer_policies));
+        new ActiveUsagePolicy(node_, std::to_string(++next_active_usage_policy_id_), active_usages,
+                              renderer_policies, capturer_policies));
   }
 
  private:
@@ -590,7 +590,7 @@ class Reporter::ActiveUsagePolicyTracker {
   Container<ActiveUsagePolicy, kActiveUsagePoliciesToCache> active_usage_policies_;
 
   std::mutex mutex_;
-  uint64_t next_active_usage_policy_name_ FXL_GUARDED_BY(mutex_) = 0;
+  uint64_t next_active_usage_policy_id_ FXL_GUARDED_BY(mutex_) = 0;
   Container<ActiveUsagePolicy, kActiveUsagePoliciesToCache>::Ptr last_policy_
       FXL_GUARDED_BY(mutex_);
 };
@@ -615,19 +615,19 @@ class Reporter::VolumeSetting {
 class Reporter::VolumeControlImpl : public Reporter::VolumeControl {
  public:
   VolumeControlImpl(Reporter::Impl& impl)
-      : node_(impl.volume_controls_node.CreateChild(impl.NextVolumeControlName())),
+      : node_(impl.volume_controls_node.CreateChild(impl.NextVolumeControlIdStr())),
         volume_settings_node_(node_.CreateChild("volume settings")),
         name_(node_.CreateString("name", "unknown - no clients")),
         client_count_(node_.CreateUint("client count", 0)),
         last_volume_setting_(volume_settings_.New(new VolumeSetting(
-            volume_settings_node_, std::to_string(++next_volume_setting_name_), 0.0, false))) {}
+            volume_settings_node_, std::to_string(++next_volume_setting_id_), 0.0, false))) {}
 
   void Destroy() override {}
 
   void SetVolumeMute(float volume, bool mute) override {
     std::lock_guard<std::mutex> lock(mutex_);
     last_volume_setting_ = volume_settings_.New(new VolumeSetting(
-        volume_settings_node_, std::to_string(++next_volume_setting_name_), volume, mute));
+        volume_settings_node_, std::to_string(++next_volume_setting_id_), volume, mute));
   }
 
   void AddBinding(std::string name) override {
@@ -646,7 +646,7 @@ class Reporter::VolumeControlImpl : public Reporter::VolumeControl {
   Container<VolumeSetting, kVolumeSettingsToCache> volume_settings_;
 
   std::mutex mutex_;
-  uint64_t next_volume_setting_name_ FXL_GUARDED_BY(mutex_) = 0;
+  uint64_t next_volume_setting_id_ FXL_GUARDED_BY(mutex_) = 0;
   Container<VolumeSetting, kVolumeSettingsToCache>::Ptr last_volume_setting_ FXL_GUARDED_BY(mutex_);
 };
 
@@ -835,7 +835,7 @@ class Reporter::ClientPort {
 class Reporter::RendererImpl : public Reporter::Renderer {
  public:
   RendererImpl(Reporter::Impl& impl)
-      : node_(impl.renderers_node.CreateChild(impl.NextRendererName())),
+      : node_(impl.renderers_node.CreateChild(impl.NextRendererIdStr())),
         client_port_(
             node_,
             ObjectTracker(impl, AudioObjectsCreatedMigratedMetricDimensionObjectType::Renderer)),
@@ -917,7 +917,7 @@ class Reporter::RendererImpl : public Reporter::Renderer {
 class Reporter::CapturerImpl : public Reporter::Capturer {
  public:
   CapturerImpl(Reporter::Impl& impl, const std::string& thread_name)
-      : node_(impl.capturers_node.CreateChild(impl.NextCapturerName())),
+      : node_(impl.capturers_node.CreateChild(impl.NextCapturerIdStr())),
         client_port_(
             node_,
             ObjectTracker(impl, AudioObjectsCreatedMigratedMetricDimensionObjectType::Capturer)),
@@ -1320,7 +1320,7 @@ Reporter::ThermalStateTracker::ThermalStateTracker(Reporter::Impl& impl)
       transitions_node_(impl.inspector->root().CreateChild("thermal state transitions")),
       active_state_(0),
       last_transition_(thermal_state_transitions_.New(new ThermalStateTransition(
-          transitions_node_, std::to_string(++next_thermal_transition_name_), active_state_))) {
+          transitions_node_, std::to_string(++next_thermal_transition_id_), active_state_))) {
   if (active_state_ >= kCobaltStateTransitions.size()) {
     FX_LOGS(ERROR) << "active_state_ is out of range: kCobaltStateTransitions must be updated.";
   }
@@ -1349,7 +1349,7 @@ void Reporter::ThermalStateTracker::SetThermalState(uint32_t state) {
   }
   states_[state].Activate();
   last_transition_ = thermal_state_transitions_.New(new ThermalStateTransition(
-      transitions_node_, std::to_string(++next_thermal_transition_name_), state));
+      transitions_node_, std::to_string(++next_thermal_transition_id_), state));
   LogCobaltStateTransition(states_[state], kCobaltStateTransitions[state]);
   LogCobaltStateDuration(states_[active_state_], states_[state]);
 

@@ -32,21 +32,23 @@ class CapturerShimImpl {
   size_t num_payload_samples() const { return payload_frame_count_ * format_.channels(); }
   size_t num_payload_bytes() const { return payload_frame_count_ * format_.bytes_per_frame(); }
 
-  // For validating properties exported by inspect.
-  const std::string& name() const { return name_; }
+  // For validating properties exported by inspect. This mirrors what is done by class Reporter.
+  // Reporter assigns a distinct 'id' to each capturer (see `next_capturer_id` in reporter.h),
+  // reduces it to a string, and uses it as the node name for metrics reporting purposes.
+  std::string reporting_id_str() const { return std::to_string(reporting_id_); }
 
  protected:
-  CapturerShimImpl(Format format, size_t payload_frame_count, size_t name)
+  CapturerShimImpl(Format format, size_t payload_frame_count, size_t reporting_id)
       : format_(format),
         payload_frame_count_(payload_frame_count),
-        name_(std::to_string(name)),
+        reporting_id_(reporting_id),
         payload_buffer_(format, payload_frame_count) {}
 
   void CreatePayloadBuffer();
 
   const Format format_;
   const size_t payload_frame_count_;
-  const std::string name_;
+  const size_t reporting_id_;
 
   fuchsia::media::AudioCapturerPtr fidl_;
   VmoBackedBuffer payload_buffer_;
@@ -67,8 +69,8 @@ class AudioCapturerShim : public CapturerShimImpl {
   // appropriately bound into the test environment.
   AudioCapturerShim(TestFixture* fixture, fuchsia::media::AudioCorePtr& audio_core, Format format,
                     size_t payload_frame_count, fuchsia::media::AudioCapturerConfiguration config,
-                    size_t name)
-      : CapturerShimImpl(format, payload_frame_count, name) {
+                    size_t reporting_id)
+      : CapturerShimImpl(format, payload_frame_count, reporting_id) {
     audio_core->CreateAudioCapturerWithConfiguration(format.stream_type(), std::move(config),
                                                      fidl_.NewRequest());
     fixture->AddErrorHandler(fidl_, "AudioCapturer");
@@ -97,8 +99,8 @@ class UltrasoundCapturerShim : public CapturerShimImpl {
   // Don't call this directly. Use HermeticAudioTest::CreateUltrasoundCapturer so the object is
   // appropriately bound into the test environment.
   UltrasoundCapturerShim(TestFixture* fixture, fuchsia::ultrasound::FactoryPtr& ultrasound_factory,
-                         Format format, size_t payload_frame_count, size_t name)
-      : CapturerShimImpl(format, payload_frame_count, name), fixture_(fixture) {
+                         Format format, size_t payload_frame_count, size_t reporting_id)
+      : CapturerShimImpl(format, payload_frame_count, reporting_id), fixture_(fixture) {
     auto vmo = payload_buffer_.CreateAndMapVmo(true);
     ultrasound_factory->CreateCapturer(
         fidl_.NewRequest(), [this, vmo = std::move(vmo)](auto ref_clock, auto stream_type) mutable {

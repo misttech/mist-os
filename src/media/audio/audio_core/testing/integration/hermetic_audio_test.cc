@@ -246,7 +246,7 @@ AudioRendererShim<SampleFormat>* HermeticAudioTest::CreateAudioRenderer(
     std::optional<zx::clock> reference_clock, std::optional<float> initial_gain_db) {
   auto ptr = std::make_unique<AudioRendererShim<SampleFormat>>(
       static_cast<TestFixture*>(this), audio_core_, format, frame_count, usage,
-      next_renderer_name_++, std::move(reference_clock), initial_gain_db);
+      next_renderer_reporting_id_++, std::move(reference_clock), initial_gain_db);
   auto out = ptr.get();
   renderers_.push_back(std::move(ptr));
 
@@ -261,7 +261,7 @@ AudioCapturerShim<SampleFormat>* HermeticAudioTest::CreateAudioCapturer(
     fuchsia::media::AudioCapturerConfiguration config) {
   auto ptr = std::make_unique<AudioCapturerShim<SampleFormat>>(
       static_cast<TestFixture*>(this), audio_core_, format, frame_count, std::move(config),
-      next_capturer_name_++);
+      next_capturer_reporting_id_++);
   auto out = ptr.get();
   capturers_.push_back(std::move(ptr));
   return out;
@@ -272,7 +272,7 @@ UltrasoundRendererShim<SampleFormat>* HermeticAudioTest::CreateUltrasoundRendere
     TypedFormat<SampleFormat> format, int64_t frame_count, bool wait_for_creation) {
   auto ptr = std::make_unique<UltrasoundRendererShim<SampleFormat>>(
       static_cast<TestFixture*>(this), ultrasound_factory_, format, frame_count,
-      next_renderer_name_++);
+      next_renderer_reporting_id_++);
   auto out = ptr.get();
   renderers_.push_back(std::move(ptr));
 
@@ -287,7 +287,7 @@ UltrasoundCapturerShim<SampleFormat>* HermeticAudioTest::CreateUltrasoundCapture
     TypedFormat<SampleFormat> format, int64_t frame_count, bool wait_for_creation) {
   auto ptr = std::make_unique<UltrasoundCapturerShim<SampleFormat>>(
       static_cast<TestFixture*>(this), ultrasound_factory_, format, frame_count,
-      next_capturer_name_++);
+      next_capturer_reporting_id_++);
   auto out = ptr.get();
   capturers_.push_back(std::move(ptr));
   if (wait_for_creation) {
@@ -522,9 +522,9 @@ void HermeticAudioTest::ExpectNoOverflowsOrUnderflows() {
 
 // Fail if data was lost because we awoke too late to provide data.
 void HermeticAudioTest::ExpectNoOutputUnderflows() {
-  for (auto& [id, device] : devices_) {
+  for (auto& [unique_id, device] : devices_) {
     if (!device.virtual_device->is_input()) {
-      ExpectInspectMetrics(device.virtual_device.get(), id,
+      ExpectInspectMetrics(device.virtual_device.get(), unique_id,
                            {.children = {
                                 {"device underflows", {.uints = {{"count", 0}}}},
                             }});
@@ -535,9 +535,9 @@ void HermeticAudioTest::ExpectNoOutputUnderflows() {
 // Fail if pipeline processing took longer than expected (for now this includes cases where the
 // time overrun did not necessarily result in data loss).
 void HermeticAudioTest::ExpectNoPipelineUnderflows() {
-  for (auto& [id, device] : devices_) {
+  for (auto& [unique_id, device] : devices_) {
     if (!device.virtual_device->is_input()) {
-      ExpectInspectMetrics(device.virtual_device.get(), id,
+      ExpectInspectMetrics(device.virtual_device.get(), unique_id,
                            {.children = {
                                 {"pipeline underflows", {.uints = {{"count", 0}}}},
                             }});
@@ -575,12 +575,12 @@ void HermeticAudioTest::ExpectInspectMetrics(VirtualDevice* virtual_device,
 
 void HermeticAudioTest::ExpectInspectMetrics(RendererShimImpl* renderer,
                                              const ExpectedInspectProperties& props) {
-  ExpectInspectMetrics({"renderers", renderer->name()}, props);
+  ExpectInspectMetrics({"renderers", renderer->reporting_id_str()}, props);
 }
 
 void HermeticAudioTest::ExpectInspectMetrics(CapturerShimImpl* capturer,
                                              const ExpectedInspectProperties& props) {
-  ExpectInspectMetrics({"capturers", capturer->name()}, props);
+  ExpectInspectMetrics({"capturers", capturer->reporting_id_str()}, props);
 }
 
 void HermeticAudioTest::ExpectInspectMetrics(const std::vector<std::string>& path,
