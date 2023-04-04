@@ -176,17 +176,13 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 	metadataDir := path.Join(repo, metadataDirName)
 	keyDir := path.Join(repo, keyDirName)
 	blobDir := path.Join(metadataDir, blobDirName)
+	blobManifestPath := path.Join(buildDir, blobManifestName)
 	targetDir := path.Join(metadataDir, targetDirName)
 	packageNamespaceDir := path.Join(cmd.namespace, packageDirName)
 	imageNamespaceDir := path.Join(cmd.namespace, imageDirName)
 	licenseNamespaceDir := path.Join(cmd.namespace, licenseDirName)
 
 	uploads := []artifactory.Upload{
-		{
-			Source:      blobDir,
-			Destination: blobDirName,
-			Deduplicate: true,
-		},
 		{
 			Source:      metadataDir,
 			Destination: path.Join(packageNamespaceDir, metadataDirName),
@@ -204,7 +200,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 			Recursive:   true,
 		},
 		{
-			Source:      path.Join(buildDir, blobManifestName),
+			Source:      blobManifestPath,
 			Destination: path.Join(packageNamespaceDir, blobManifestName),
 			Compress:    true,
 		},
@@ -226,6 +222,12 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 			Destination: path.Join(cmd.namespace, ctsPlasaReportName),
 		},
 	}
+
+	blobs, err := artifactory.BlobsUploads(blobManifestPath, blobDir, blobDirName)
+	if err != nil {
+		return err
+	}
+	uploads = append(uploads, blobs...)
 
 	images, err := artifactory.ImageUploads(m, imageNamespaceDir)
 	if err != nil {

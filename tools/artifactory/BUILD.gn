@@ -46,6 +46,8 @@ go_library("lib") {
     "assembly_manifests_test.go",
     "binaries.go",
     "binaries_test.go",
+    "blobs.go",
+    "blobs_test.go",
     "images.go",
     "images_test.go",
     "licenses.go",
