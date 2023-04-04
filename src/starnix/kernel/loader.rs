@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, HandleBased};
+use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use process_builder::{elf_load, elf_parse};
 use std::ffi::{CStr, CString};
 use std::sync::Arc;
@@ -182,26 +182,6 @@ pub struct ThreadStartInfo {
 
     /// The address of the DT_DEBUG entry.
     pub dt_debug_address: Option<UserAddress>,
-}
-
-impl ThreadStartInfo {
-    #[cfg(target_arch = "x86_64")]
-    pub fn to_registers(&self) -> zx_thread_state_general_regs_t {
-        zx_thread_state_general_regs_t {
-            rip: self.entry.ptr() as u64,
-            rsp: self.stack.ptr() as u64,
-            ..Default::default()
-        }
-    }
-
-    #[cfg(target_arch = "aarch64")]
-    pub fn to_registers(&self) -> zx_thread_state_general_regs_t {
-        zx_thread_state_general_regs_t {
-            pc: self.entry.ptr() as u64,
-            sp: self.stack.ptr() as u64,
-            ..Default::default()
-        }
-    }
 }
 
 /// Holds a resolved ELF VMO and associated parameters necessary for an execve call.

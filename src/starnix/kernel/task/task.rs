@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef, Signals};
+use fuchsia_zircon::{self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals};
 use once_cell::sync::OnceCell;
 use std::cmp;
 use std::convert::TryFrom;
@@ -1272,8 +1272,9 @@ impl CurrentTask {
             .exec(resolved_elf.file.name.clone())
             .map_err(|status| from_status_like_fdio!(status))?;
         let start_info = load_executable(self, resolved_elf, &path)?;
-        self.registers = start_info.to_registers().into();
         self.dt_debug_address = start_info.dt_debug_address;
+        let regs: zx_thread_state_general_regs_t = start_info.into();
+        self.registers = regs.into();
 
         {
             let mut state = self.write();
