@@ -32,12 +32,13 @@ void PositionTest::RequestPositionNotification() {
 
 void PositionTest::PositionNotificationCallback(
     fuchsia::hardware::audio::RingBufferPositionInfo position_info) {
+  zx::time now = zx::clock::get_monotonic();
+  zx::time position_time = zx::time(position_info.timestamp);
+
   AdminTest::PositionNotificationCallback(position_info);
 
   EXPECT_TRUE(position_notification_is_expected_);
 
-  zx::time now = zx::clock::get_monotonic();
-  zx::time position_time = zx::time(position_info.timestamp);
   EXPECT_LT(start_time(), now);
   EXPECT_LT(position_time, now);
 
@@ -57,6 +58,14 @@ void PositionTest::PositionNotificationCallback(
   // If we don't need to update our running stats on position, exit now.
   if (!record_position_info_) {
     return;
+  }
+
+  if constexpr (kLogDetailedPositionInfo) {
+    notifications_.push_back({
+        .position = position_info.position,
+        .timestamp = position_info.timestamp,
+        .arrival_time = now.get(),
+    });
   }
 
   ++position_notification_count_;
@@ -111,15 +120,45 @@ void PositionTest::ValidatePositionInfo() {
   auto min_allowed_timestamp = expected_timestamp - timestamp_tolerance;
   auto max_allowed_timestamp = expected_timestamp + timestamp_tolerance;
 
-  EXPECT_GE(notification_timestamp, min_allowed_timestamp)
-      << notification_timestamp.to_nsecs() << " less than min " << min_allowed_timestamp.to_nsecs()
-      << ". Notification rate too high. Device clock rate too fast?";
-  EXPECT_LE(notification_timestamp, max_allowed_timestamp)
-      << notification_timestamp.to_nsecs() << " exceeds max " << max_allowed_timestamp.to_nsecs()
-      << ". Notification rate too low. Device clock rate too slow?";
+  EXPECT_GT(notification_timestamp.to_nsecs(), min_allowed_timestamp.to_nsecs())
+      << "Expected timestamp " << expected_timestamp.to_nsecs() << " (allow > "
+      << min_allowed_timestamp.to_nsecs() << "); actual " << notification_timestamp.to_nsecs()
+      << ". Notifications arriving too rapidly.";
+  EXPECT_LT(notification_timestamp.to_nsecs(), max_allowed_timestamp.to_nsecs())
+      << "Expected timestamp " << expected_timestamp.to_nsecs() << " (allow < "
+      << max_allowed_timestamp.to_nsecs() << "); actual " << notification_timestamp.to_nsecs()
+      << ". Notification arriving too slowly.";
 
   // Also validate when the notification was actually received (not just the timestamp).
   EXPECT_GT(observed_timestamp, min_allowed_timestamp);
+
+  if constexpr (kLogDetailedPositionInfo) {
+    auto ring_buffer_bytes = ring_buffer_frames() * frame_size();
+    FX_LOGS(INFO) << "Received " << position_notification_count_ << " notifications; RingBuffer "
+                  << ring_buffer_frames() << " frames (" << ring_buffer_bytes
+                  << " bytes); start time " << start_time().get();
+    FX_LOGS(INFO) << "    Notif    Position / Delta"
+                  << "           Timestamp  /  Delta   "
+                  << "             Arrival  /  Delta";
+    for (auto idx = 0u; idx < notifications_.size(); ++idx) {
+      uint32_t position_delta = (ring_buffer_bytes + notifications_[idx].position -
+                                 (idx == 0u ? 0 : notifications_[idx - 1].position)) %
+                                ring_buffer_bytes;
+      int64_t timestamp_delta = notifications_[idx].timestamp -
+                                (idx == 0 ? start_time().get() : notifications_[idx - 1].timestamp);
+      int64_t arrival_delta =
+          notifications_[idx].arrival_time -
+          (idx == 0 ? start_time().get() : notifications_[idx - 1].arrival_time);
+
+      FX_LOGS(INFO) << "   [ " << std::setw(2) << idx << " ]"             //
+                    << std::setw(12) << notifications_[idx].position      //
+                    << std::setw(8) << position_delta                     //
+                    << std::setw(21) << notifications_[idx].timestamp     //
+                    << std::setw(12) << timestamp_delta                   //
+                    << std::setw(21) << notifications_[idx].arrival_time  //
+                    << std::setw(12) << arrival_delta;
+    }
+  }
 }
 
 #define DEFINE_POSITION_TEST_CLASS(CLASS_NAME, CODE)                               \
@@ -130,40 +169,41 @@ void PositionTest::ValidatePositionInfo() {
   }
 
 //
-// Test cases that target each of the various admin commands
+// Test cases that target various position notification behaviors.
 //
 // Any case not ending in disconnect/error should WaitForError, in case the channel disconnects.
 
-// Verify position notifications at fast (64/sec) rate.
+// Verify position notifications at fast rate (64/sec: 32 notifs/ring in a 0.5-second buffer).
 DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
-  // Request a 0.5-second ring-buffer
+  constexpr auto kNotifsPerRingBuffer = 32u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate / 2, 32));
+  // Request a 0.5-second ring-buffer.
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate / 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
-  // After an arbitrary number of notifications, stop updating the position info but allow
-  // notifications to continue. Analyze whether the position advance meets expectations.
-  ExpectPositionNotifyCount(16u);
+  // After numerous notifications (in this case, twice around the ring), stop updating position info
+  // (but let notifications continue). Ensure that the rate of advance is within acceptable range.
+  ExpectPositionNotifyCount(kNotifsPerRingBuffer * 2);
   ValidatePositionInfo();
 
   WaitForError();
 });
 
-// Verify position notifications at slow (1/sec) rate.
+// Verify position notifications at slow rate (1/sec: 2 notifs/ring in a 2-second buffer).
 DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
-  // Request a 2-second ring-buffer
   constexpr auto kNotifsPerRingBuffer = 2u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
+  // Request a 2-second ring-buffer.
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(pcm_format().frame_rate * 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
 
-  // After an arbitrary number of notifications, stop updating the position info but allow
-  // notifications to continue. Analyze whether the position advance meets expectations.
-  ExpectPositionNotifyCount(3u);
+  // After numerous notifications (in this case, twice around the ring), stop updating position info
+  // (but let notifications continue). Ensure that the rate of advance is within acceptable range.
+  ExpectPositionNotifyCount(kNotifsPerRingBuffer * 2);
   ValidatePositionInfo();
 
   // Wait longer than the default (100 ms), as notifications are less frequent than that.
@@ -172,15 +212,21 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   WaitForError(time_per_notif);
 });
 
-// Verify no position notifications arrive after stop.
+// Verify that NO position notifications arrive after Stop is called.
 DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
+  constexpr auto kNotifsPerRingBuffer = 32u;
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 32));
+  // Set notifications to be rapid, with a small ring buffer and a large notifications-per-buffer.
+  // If the device supports 192 kHz and the driver supports a ring this small, the buffer will be
+  // 32 ms and notifications should arrive every 1 msec!
+  ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(6144, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
-  ASSERT_NO_FAILURE_OR_SKIP(ExpectPositionNotifyCount(3u));
 
+  //  After just a few position notifications, stop the ring buffer. From the Stop callback itself,
+  // register a position callback that will fail the test if any further notification occurs.
+  ASSERT_NO_FAILURE_OR_SKIP(ExpectPositionNotifyCount(3u));
   RequestStopAndExpectNoPositionNotifications();
   WaitForError();
 });
@@ -217,8 +263,8 @@ void RegisterPositionTestsForDevice(const DeviceEntry& device_entry,
   // We test a hermetic instance of the A2DP driver, so audio_core is never connected.
   if (device_entry.isA2DP() || !expect_audio_core_connected) {
     if (enable_position_tests) {
-      REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
       REGISTER_POSITION_TEST(PositionNotifySlow, device_entry);
+      REGISTER_POSITION_TEST(PositionNotifyFast, device_entry);
       REGISTER_POSITION_TEST(NoPositionNotifyAfterStop, device_entry);
       REGISTER_POSITION_TEST(PositionNotifyNone, device_entry);
     }

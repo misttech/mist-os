@@ -9,6 +9,9 @@
 
 namespace media::audio::drivers::test {
 
+// Position cases are disabled by default; when they DO run, display verbose notification info.
+inline constexpr bool kLogDetailedPositionInfo = true;
+
 class PositionTest : public AdminTest {
  public:
   explicit PositionTest(const DeviceEntry& dev_entry) : AdminTest(dev_entry) {}
@@ -34,6 +37,14 @@ class PositionTest : public AdminTest {
   bool position_notification_is_expected_ = true;
   bool record_position_info_ = false;
   uint32_t position_notification_count_ = 0;
+
+  // Only used when kLogDetailedPositionInfo is set
+  struct NotificationData {
+    uint32_t position;
+    int64_t timestamp;
+    int64_t arrival_time;
+  };
+  std::vector<NotificationData> notifications_;
 };
 
 }  // namespace media::audio::drivers::test
