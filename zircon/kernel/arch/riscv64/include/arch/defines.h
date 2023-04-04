@@ -24,8 +24,8 @@
 
 #define ARCH_DEFAULT_STACK_SIZE 8192
 
-// Map 512GB at the base of the kernel. This is the max that can be mapped with
-// a single level 1 page table using 1GB pages.
-#define ARCH_PHYSMAP_SIZE (1UL << 39)
+// Map 64GB at the base of the kernel. The entire kernel is 38 bits wide
+// with Sv39, so use some amount less than that.
+#define ARCH_PHYSMAP_SIZE (1UL << 36)
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_DEFINES_H_

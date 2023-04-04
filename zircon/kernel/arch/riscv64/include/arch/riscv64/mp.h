@@ -7,7 +7,11 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MP_H_
 
+#include <zircon/compiler.h>
+
 #include <arch/defines.h>
+#include <arch/riscv64.h>
+#include <kernel/align.h>
 #include <kernel/cpu.h>
 
 struct percpu;
@@ -18,6 +22,9 @@ struct percpu;
 struct alignas(MAX_CACHE_LINE) riscv64_percpu {
   // CPU number.
   cpu_num_t cpu_num;
+
+  // The hart id is used by other components (SBI/PLIC etc...)
+  uint hart_id;
 
   // Whether blocking is disallowed.  See arch_blocking_disallowed().
   uint32_t blocking_disallowed;
@@ -43,6 +50,10 @@ struct alignas(MAX_CACHE_LINE) riscv64_percpu {
 // macros), but it gives the compiler the option.
 register riscv64_percpu* riscv64_percpu_ptr __asm__("gp");
 
+inline void riscv64_set_percpu(struct riscv64_percpu* ptr) {
+  __asm__ volatile("mv gp, %0" ::"r"(ptr), "m"(*ptr));
+}
+
 inline riscv64_percpu* riscv64_read_percpu_ptr() { return riscv64_percpu_ptr; }
 
 // Mark as volatile to force a read of the field to make sure the compiler
@@ -67,12 +78,30 @@ template <typename T, size_t Offset>
   (riscv64_write_percpu_field<uint32_t, offsetof(riscv64_percpu, field)>(value))
 
 // Return a pointer to the high-level percpu struct for the calling CPU.
-inline percpu* arch_get_curr_percpu() { return riscv64_read_percpu_ptr()->high_level_percpu; }
+inline struct percpu* arch_get_curr_percpu() {
+  return riscv64_read_percpu_ptr()->high_level_percpu;
+}
+//
+// This needs to be set very early (before arch_init).
+inline void arch_set_num_cpus(uint cpu_count) {
+  extern uint riscv64_num_cpus;
+  riscv64_num_cpus = cpu_count;
+}
 
-inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD32(cpu_num); }
+inline uint arch_max_num_cpus() {
+  extern uint riscv64_num_cpus;
+
+  return riscv64_num_cpus;
+}
+
+void riscv64_init_percpu_early(uint hart_id, uint cpu_num);
+void arch_register_hart(uint cpu_num, uint64_t hart_id);
 
 // Setup the high-level percpu struct pointer for |cpu_num|.
 void arch_setup_percpu(cpu_num_t cpu_num, percpu* percpu);
+
+inline cpu_num_t arch_curr_cpu_num() { return READ_PERCPU_FIELD32(cpu_num); }
+inline cpu_num_t riscv64_curr_hart_id() { return READ_PERCPU_FIELD32(hart_id); }
 
 // TODO(travisg): implement
 inline void arch_set_restricted_flag(bool restricted) {}

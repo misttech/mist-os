@@ -23,6 +23,11 @@ struct arch_thread {
     char thread_pointer_location;
     vaddr_t sp;
   };
+
+  // If non-NULL, address to return to on data fault.
+  uint64_t data_fault_resume;
+
+  // TODO: fpu/vector state goes here
 };
 
 #define thread_pointer_offsetof(field)        \

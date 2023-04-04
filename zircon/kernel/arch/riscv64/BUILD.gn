@@ -50,6 +50,9 @@ if (toolchain_base_environment == "kernel") {
         # regardless of the compiler's default.
         "-fno-sanitize=safe-stack",
         "-fsanitize=shadow-call-stack",
+
+        # TODO-rvbringup: add support for stack protector logic
+        "-fno-stack-protector",
       ]
     }
 
@@ -66,6 +69,38 @@ if (toolchain_base_environment == "kernel") {
   }
 
   source_set("riscv64") {
-    sources = [ "crashlog.cc" ]
+    sources = [
+      "arch.cc",
+      "asid_allocator.cc",
+      "asm.S",
+      "boot-mmu.cc",
+      "cache.cc",
+      "crashlog.cc",
+      "debugger.cc",
+      "exceptions_c.cc",
+      "mmu.cc",
+      "mp.cc",
+      "spinlock.cc",
+      "start.S",
+      "thread.cc",
+      "timer.cc",
+      "user_copy_c.cc",
+    ]
+    deps = [
+      "//zircon/kernel/dev/iommu/dummy",
+      "//zircon/kernel/lib/arch",
+      "//zircon/kernel/lib/console",
+      "//zircon/kernel/lib/counters",
+      "//zircon/kernel/lib/crashlog",
+      "//zircon/kernel/lib/init",
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/syscalls",
+      "//zircon/kernel/lib/unittest",
+      "//zircon/kernel/object",
+      "//zircon/kernel/vm",
+      "//zircon/system/ulib/affine",
+      "//zircon/system/ulib/bitmap",
+      "//zircon/system/ulib/pretty",
+    ]
   }
 }

@@ -14,13 +14,17 @@
 
 #include <stdint.h>
 
+#include <arch/riscv64.h>
 #include <ktl/atomic.h>
 
-using interrupt_saved_state_t = uint64_t;
+using interrupt_saved_state_t = bool;
+
+constexpr interrupt_saved_state_t kNoopInterruptSavedState = false;
 
 [[nodiscard]] inline interrupt_saved_state_t arch_interrupt_save() {
   interrupt_saved_state_t old_state;
-  __asm__ volatile("csrrw %0, sie, zero" : "=r"(old_state));
+  old_state =
+      riscv64_csr_read_clear(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_IE) & RISCV64_CSR_SSTATUS_IE;
   if (old_state) {
     ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
   }
@@ -28,24 +32,21 @@ using interrupt_saved_state_t = uint64_t;
 }
 
 static inline void arch_interrupt_restore(interrupt_saved_state_t old_state) {
-  __asm__ volatile("csrw sie, %0" : : "Kr"(old_state));
+  riscv64_csr_set(RISCV64_CSR_SSTATUS, old_state ? RISCV64_CSR_SSTATUS_IE : 0);
 }
 
 inline void arch_disable_ints() {
-  __asm__ volatile("csrw sie, zero" ::: "memory");
+  riscv64_csr_clear(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_IE);
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
 }
 
 inline void arch_enable_ints() {
-  constexpr uint64_t kAllInts = -1;
   ktl::atomic_signal_fence(ktl::memory_order_seq_cst);
-  __asm__ volatile("csrw sie, %0" : : "Kr"(kAllInts) : "memory");
+  riscv64_csr_set(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_IE);
 }
 
 inline bool arch_ints_disabled() {
-  uint64_t sie;
-  __asm__ volatile("csrr %0, sie" : "=r"(sie));
-  return sie == 0;
+  return (riscv64_csr_read(RISCV64_CSR_SSTATUS) & RISCV64_CSR_SSTATUS_IE) == 0;
 }
 
 #endif  // !__ASSEMBLER__

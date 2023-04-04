@@ -12,7 +12,10 @@
 
 // Virtual address where the kernel address space begins.
 // Below this is the user address space.
-#define KERNEL_ASPACE_BASE 0xffffff4000000000UL
+// riscv64 with sv39 means a page-based 39-bit virtual memory space.  The
+// base kernel address is chosen so that kernel addresses have a 1 in the
+// most significant bit whereas user addresses have a 0.
+#define KERNEL_ASPACE_BASE 0xffffffc000000000UL
 #define KERNEL_ASPACE_SIZE (1UL << 38)
 
 // Virtual address where the user-accessible address space begins.
