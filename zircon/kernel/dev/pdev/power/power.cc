@@ -7,15 +7,25 @@
 #include <lib/arch/intrin.h>
 
 #include <dev/power.h>
-#include <dev/psci.h>
 #include <pdev/power.h>
 
+// TODO-rvbringup: remove this implicit setup and have the PSCI driver register properly
+// TODO-rvbringup: have the SBI driver register like the PSCI one
+#if defined(__aarch64__)
+#include <dev/psci.h>
 static const struct pdev_power_ops default_ops = {
     .reboot = psci_system_reset,
     .shutdown = psci_system_off,
     .cpu_off = psci_cpu_off,
     .cpu_on = psci_cpu_on,
 };
+#else
+static const struct pdev_power_ops default_ops = {
+    .reboot = [](reboot_flags flags) {},
+    .shutdown = []() {},
+    .cpu_off = []() -> uint32_t { return 0; },
+    .cpu_on = [](uint64_t mpid, paddr_t entry) -> uint32_t { return 0; }};
+#endif
 
 static const struct pdev_power_ops* power_ops = &default_ops;
 
