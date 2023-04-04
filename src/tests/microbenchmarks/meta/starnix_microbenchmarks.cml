@@ -9,7 +9,7 @@
         "syslog/client.shard.cml",
     ],
     program: {
-        binary: "data/tests/fuchsia_microbenchmarks",
+        binary: "data/tests/starnix_microbenchmarks",
         environ: [ "TEST_SUITE_LABEL=fuchsia.microbenchmarks.starnix" ],
     },
     use: [

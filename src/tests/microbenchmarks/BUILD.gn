@@ -248,9 +248,16 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     deps = [ ":no_op_executable" ]
   }
 
+  executable("starnix_microbenchmarks_bin") {
+    output_name = "starnix_microbenchmarks"
+    testonly = true
+    sources = fuchsia_microbenchmark_sources + [ "starnix_filesystem.cc" ]
+    deps = fuchsia_microbenchmark_deps
+  }
+
   starnix_host_test_component("starnix_microbenchmarks_component") {
-    test_label = ":fuchsia_microbenchmarks_bin"
-    test_binary = "fuchsia_microbenchmarks"
+    test_label = ":starnix_microbenchmarks_bin"
+    test_binary = "starnix_microbenchmarks"
 
     manifest = "meta/starnix_microbenchmarks.cml"
     component_name = "starnix_microbenchmarks"
