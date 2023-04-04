@@ -50,7 +50,7 @@
 //! impl Stop for Execution {
 //!     type Error = ();
 //!
-//!     async fn stop(&self) -> Result<(), Self::Error> {
+//!     async fn stop(&mut self) -> Result<(), Self::Error> {
 //!         Ok(())
 //!     }
 //! }
@@ -78,7 +78,7 @@
 //! impl Stop for Restartable {
 //!     type Error = ();
 //!
-//!     async fn stop(&self) -> Result<(), Self::Error> {
+//!     async fn stop(&mut self) -> Result<(), Self::Error> {
 //!         Ok(())
 //!     }
 //! }
