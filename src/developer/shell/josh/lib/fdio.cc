@@ -114,9 +114,6 @@ JSValue NsGetElements(JSContext *ctx, JSValueConst this_val, int argc, JSValueCo
                           zx::HandleCreate(ctx, ns->handle[i], ZX_OBJ_TYPE_NONE)) < 0) {
       return JS_EXCEPTION;
     }
-    if (JS_SetPropertyStr(ctx, val, "type", JS_NewInt32(ctx, ns->type[i])) < 0) {
-      return JS_EXCEPTION;
-    }
     if (JS_SetPropertyStr(ctx, dirents, ns->path[i], val) < 0) {
       return JS_EXCEPTION;
     }

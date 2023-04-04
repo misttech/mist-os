@@ -691,7 +691,6 @@ void filter_flat_namespace(fdio_flat_namespace_t* flat,
     if (should_clone_namespace(flat->path[read], prefixes)) {
       if (read != write) {
         flat->handle[write] = flat->handle[read];
-        flat->type[write] = flat->type[read];
         const_cast<const char**>(flat->path)[write] = flat->path[read];
       }
       write++;

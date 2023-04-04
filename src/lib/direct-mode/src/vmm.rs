@@ -4,13 +4,13 @@
 
 use {
     anyhow::{anyhow, Context as _, Result},
-    direct_mode::{get_ld_from_bin, ProcessLoader},
+    direct_mode::{get_ld_from_bin, Process},
     fidl_fuchsia_io as fio, fidl_fuchsia_kernel as fkernel,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_fs::file::open_in_namespace,
     fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType},
     fuchsia_zircon::{Guest, HandleBased, Rights, Status, Vmo},
-    process_builder::StartupHandle,
+    process_builder::{NamespaceEntry, StartupHandle},
     std::ffi::CString,
 };
 
@@ -35,7 +35,7 @@ pub async fn start(
     vdso_vmo: Vmo,
     args: Vec<CString>,
     vars: Vec<CString>,
-    paths: Vec<CString>,
+    namespace_entries: Vec<NamespaceEntry>,
     mut handles: Vec<StartupHandle>,
 ) -> Result<()> {
     // Create the guest.
@@ -74,17 +74,19 @@ pub async fn start(
         get_ld_from_bin(&mut bin_vmo).await.with_context(|| format!("{}: get ld", name))?;
 
     // Load the process.
-    let process = ProcessLoader::new(guest, guest_vmar)
-        .vdso(vdso_vmo)?
-        .bin(bin_vmo)
-        .ld(ld_vmo)
-        .loader(loader)
-        .args(args)
-        .vars(vars)
-        .paths(paths)
-        .handles(handles)
-        .load()
-        .context("load")?;
+    let process = Process::new(
+        guest,
+        guest_vmar,
+        vdso_vmo,
+        bin_vmo,
+        ld_vmo,
+        loader,
+        args,
+        vars,
+        namespace_entries,
+        handles,
+    )
+    .context("create process")?;
 
     // Run the process.
     process.run().context("run")

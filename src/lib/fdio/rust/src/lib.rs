@@ -13,7 +13,6 @@ pub use spawn_builder::{Error as SpawnBuilderError, SpawnBuilder};
 use {
     bitflags::bitflags,
     fidl_fuchsia_io as fio,
-    fuchsia_runtime::{HandleInfo, HandleInfoError},
     fuchsia_zircon::{self as zx, AsHandleRef as _, HandleBased as _},
     std::{
         convert::TryInto as _,
@@ -703,7 +702,7 @@ impl Namespace {
     unsafe fn export_entries(
         flat: *mut fdio_sys::fdio_flat_namespace_t,
     ) -> Result<Vec<NamespaceEntry>, zx::Status> {
-        let fdio_sys::fdio_flat_namespace_t { count, handle, type_, path } = *flat;
+        let fdio_sys::fdio_flat_namespace_t { count, handle, path } = *flat;
         let len: isize = count.try_into().map_err(|_: TryFromIntError| zx::Status::INVALID_ARGS)?;
         let mut entries = Vec::with_capacity(count);
         for i in 0..len {
@@ -714,9 +713,6 @@ impl Namespace {
             ));
             entries.push(NamespaceEntry {
                 handle,
-                info: (*type_.offset(i))
-                    .try_into()
-                    .map_err(|_: HandleInfoError| zx::Status::INVALID_ARGS)?,
                 path: CStr::from_ptr(*path.offset(i))
                     .to_str()
                     .map_err(|_: Utf8Error| zx::Status::INVALID_ARGS)?
@@ -736,7 +732,6 @@ impl Namespace {
 #[derive(Debug)]
 pub struct NamespaceEntry {
     pub handle: zx::Handle,
-    pub info: HandleInfo,
     pub path: String,
 }
 

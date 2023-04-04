@@ -134,14 +134,6 @@ typedef struct fdio_flat_namespace {
   // handle[i] is the zx_handle_t representing that element in the namespace.
   zx_handle_t* handle;
 
-  // type[i] is a handle info entry as defined in zircon/processargs.h by PA_HND.
-  //
-  // Note: when PA_HND_TYPE of this field is PA_NS_DIR, PA_HND_ARG of this field is the value used
-  // to index into `path`. This means that special care must be taken when manipulating these values
-  // e.g. when combining multiple namespaces or reordering entries therein. In effect PA_HND_ARG of
-  // this field is redundant with `path` at the same offset.
-  uint32_t* type;
-
   // path[i] is the user-readable name of that element (e.g., "/bin").
   const char* const* path;
 } fdio_flat_namespace_t ZX_AVAILABLE_SINCE(1);

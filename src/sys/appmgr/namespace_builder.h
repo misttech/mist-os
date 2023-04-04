@@ -79,7 +79,6 @@ class NamespaceBuilder {
                                 fidl::InterfaceHandle<fuchsia::io::Directory> channel);
   void Release();
 
-  std::vector<uint32_t> types_;
   std::vector<zx_handle_t> handles_;
   std::vector<std::string> paths_;
 

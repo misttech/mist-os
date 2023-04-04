@@ -195,7 +195,6 @@ void NamespaceBuilder::PushDirectoryFromPathAsWithPermissions(std::string src_pa
 void NamespaceBuilder::PushDirectoryFromChannel(
     std::string path, fidl::InterfaceHandle<fuchsia::io::Directory> channel) {
   FX_DCHECK(std::find(paths_.begin(), paths_.end(), path) == paths_.end());
-  types_.push_back(PA_HND(PA_NS_DIR, types_.size()));
   handles_.push_back(channel.channel().get());
   paths_.push_back(std::move(path));
 
@@ -207,9 +206,8 @@ fdio_flat_namespace_t* NamespaceBuilder::Build() {
   for (size_t i = 0; i < paths_.size(); ++i)
     path_data_[i] = paths_[i].c_str();
 
-  flat_ns_.count = types_.size();
+  flat_ns_.count = handles_.size();
   flat_ns_.handle = handles_.data();
-  flat_ns_.type = types_.data();
   flat_ns_.path = path_data_.data();
   Release();
   return &flat_ns_;

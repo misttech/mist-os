@@ -25,145 +25,57 @@ use {
         calculate_initial_linker_stack_size, compute_initial_stack_pointer,
         elf_load::load_elf,
         elf_parse::{Elf64Headers, SegmentType},
-        get_dynamic_linker, Message, MessageContents, ProcessBuilderError, StartupHandle,
+        get_dynamic_linker, Message, MessageContents, NamespaceEntry, ProcessBuilderError,
+        StartupHandle,
     },
     std::ffi::CString,
     std::num::TryFromIntError,
     std::str::from_utf8,
 };
 
-/// A direct mode process loaded by the `ProcessLoader`.
+/// A direct mode process.
 pub struct Process {
     vcpu: Vcpu,
     guest: Guest,
 }
 
 impl Process {
-    /// Run the initial thread.
-    pub fn run(&self) -> Result<()> {
-        run_thread(&self.vcpu, &self.guest, &vmar_root_self())
-    }
-}
-
-/// An ELF process loader for direct mode.
-///
-/// This type is used to setup the dependencies of an ELF binary, so that we can
-/// then load it into direct mode for execution.
-pub struct ProcessLoader {
-    guest: Guest,
-    guest_vmar: Vmar,
-    vdso: Vmo,
-    bin: Vmo,
-    ld: Vmo,
-    loader: Channel,
-    args: Vec<CString>,
-    vars: Vec<CString>,
-    paths: Vec<CString>,
-    handles: Vec<StartupHandle>,
-}
-
-impl ProcessLoader {
-    /// Create a new `ProcessLoader`.
+    /// Create a new `Process`.
     ///
-    /// The `guest` and `guest_vmar` must be from a call to `Guest::direct`.
-    pub fn new(guest: Guest, guest_vmar: Vmar) -> ProcessLoader {
-        ProcessLoader {
-            guest,
-            guest_vmar,
-            vdso: Handle::invalid().into(),
-            bin: Handle::invalid().into(),
-            ld: Handle::invalid().into(),
-            loader: Handle::invalid().into(),
-            args: vec![],
-            vars: vec![],
-            paths: vec![],
-            handles: vec![],
-        }
-    }
-
-    /// Provide the vDSO VMO for the process.
+    /// `guest` and `guest_vmar` must be from a call to `Guest::direct`.
     ///
-    /// This must be the "vdso/direct" vDSO.
-    pub fn vdso(mut self, vdso: Vmo) -> Result<Self> {
-        let name = vdso.get_name()?.into_string()?;
+    /// `vdso` must be the "vdso/direct" vDSO.
+    pub fn new(
+        guest: Guest,
+        guest_vmar: Vmar,
+        vdso: Vmo,
+        bin: Vmo,
+        ld: Vmo,
+        loader: Channel,
+        args: Vec<CString>,
+        environment_vars: Vec<CString>,
+        namespace_entries: Vec<NamespaceEntry>,
+        mut handles: Vec<StartupHandle>,
+    ) -> Result<Self> {
+        let name = vdso.get_name().context("get vsdo name")?;
+        let name = name.to_str().context("convert vsdo name to utf8")?;
         if name != "vdso/direct" {
-            Err(anyhow!("Unexpected vDSO VMO: {}", name))
-        } else {
-            self.vdso = vdso;
-            Ok(self)
+            return Err(anyhow!("unexpected vDSO VMO: {}", name));
         }
-    }
-
-    /// Provide the `bin` VMO for the process.
-    ///
-    /// This is the ELF binary to load.
-    pub fn bin(mut self, bin: Vmo) -> Self {
-        self.bin = bin;
-        self
-    }
-
-    /// Provide the `ld` VMO for the process.
-    ///
-    /// This is the linker binary to load, which will act as the dynamic linker
-    /// for the ELF binary.
-    pub fn ld(mut self, ld: Vmo) -> Self {
-        self.ld = ld;
-        self
-    }
-
-    /// Provide the `loader` channel for the process.
-    ///
-    /// This is the loader service use by the dynamic linker to acquire the
-    /// additional shared libraries the ELF binary needs.
-    pub fn loader(mut self, loader: Channel) -> Self {
-        self.loader = loader;
-        self
-    }
-
-    /// Provide the arguments for the process.
-    pub fn args(mut self, args: Vec<CString>) -> Self {
-        self.args = args;
-        self
-    }
-
-    /// Provide the environment variables for the process.
-    pub fn vars(mut self, vars: Vec<CString>) -> Self {
-        self.vars = vars;
-        self
-    }
-
-    /// Provide the namespace paths for the process.
-    ///
-    /// These paths must match handles within the provided startup handles. The
-    /// handles must have the type `NamespaceDirectory`, and occur in the same
-    /// order as they do in `paths`.
-    pub fn paths(mut self, paths: Vec<CString>) -> Self {
-        self.paths = paths;
-        self
-    }
-
-    /// Provide the startup handles for the process.
-    pub fn handles(mut self, handles: Vec<StartupHandle>) -> Self {
-        self.handles = handles;
-        self
-    }
-
-    /// Load the process and return a `Process` containing the initial thread.
-    pub fn load(mut self) -> Result<Process> {
         // Setup the linker.
-        let ld_headers = Elf64Headers::from_vmo(&self.ld)?;
-        let ld_elf = load_elf(&self.ld, &ld_headers, &self.guest_vmar)?;
+        let ld_headers = Elf64Headers::from_vmo(&ld)?;
+        let ld_elf = load_elf(&ld, &ld_headers, &guest_vmar)?;
         let mut ld_msg_contents = MessageContents {
-            args: self.args.clone(),
-            environment_vars: self.vars.clone(),
+            args: args.clone(),
+            environment_vars: environment_vars.clone(),
             namespace_paths: vec![],
             handles: vec![
                 StartupHandle {
-                    handle: self.loader.into_handle(),
+                    handle: loader.into_handle(),
                     info: HandleInfo::new(HandleType::LdsvcLoader, 0),
                 },
                 StartupHandle {
-                    handle: self.bin.into_handle(),
+                    handle: bin.into_handle(),
                     info: HandleInfo::new(HandleType::ExecutableVmo, 0),
                 },
                 StartupHandle {
@@ -171,7 +83,7 @@ impl ProcessLoader {
                     info: HandleInfo::new(HandleType::LoadedVmar, 0),
                 },
                 StartupHandle {
-                    handle: self.guest_vmar.duplicate_handle(Rights::SAME_RIGHTS)?.into_handle(),
+                    handle: guest_vmar.duplicate_handle(Rights::SAME_RIGHTS)?.into_handle(),
                     info: HandleInfo::new(HandleType::RootVmar, 0),
                 },
                 StartupHandle {
@@ -191,7 +103,7 @@ impl ProcessLoader {
 
         let ld_stack_vmo = Vmo::create(ld_stack_size.try_into()?)?;
         ld_stack_vmo.set_name(&CString::new("linker stack")?)?;
-        let ld_stack_base = self.guest_vmar.map(
+        let ld_stack_base = guest_vmar.map(
             0,
             &ld_stack_vmo,
             0,
@@ -200,11 +112,11 @@ impl ProcessLoader {
         )?;
 
         // Parse the vDSO VMO.
-        let vdso_headers = Elf64Headers::from_vmo(&self.vdso)?;
-        let vdso_elf = load_elf(&self.vdso, &vdso_headers, &self.guest_vmar)?;
+        let vdso_headers = Elf64Headers::from_vmo(&vdso)?;
+        let vdso_elf = load_elf(&vdso, &vdso_headers, &guest_vmar)?;
 
         // Setup the binary.
-        let mut bin_handles = vec![
+        handles.extend([
             StartupHandle {
                 handle: job_default().duplicate(Rights::SAME_RIGHTS)?.into_handle(),
                 info: HandleInfo::new(HandleType::DefaultJob, 0),
@@ -218,11 +130,11 @@ impl ProcessLoader {
                 info: HandleInfo::new(HandleType::ThreadSelf, 0),
             },
             StartupHandle {
-                handle: self.guest_vmar.into_handle(),
+                handle: guest_vmar.into_handle(),
                 info: HandleInfo::new(HandleType::RootVmar, 0),
             },
             StartupHandle {
-                handle: self.vdso.into_handle(),
+                handle: vdso.into_handle(),
                 info: HandleInfo::new(HandleType::VdsoVmo, 0),
             },
             StartupHandle {
@@ -233,17 +145,21 @@ impl ProcessLoader {
                 handle: duplicate_utc_clock_handle(Rights::SAME_RIGHTS)?.into_handle(),
                 info: HandleInfo::new(HandleType::ClockUtc, 0),
             },
-        ];
-        bin_handles.append(&mut self.handles);
-        let bin_msg = Message::build(MessageContents {
-            args: self.args,
-            environment_vars: self.vars,
-            namespace_paths: self.paths,
-            handles: bin_handles,
-        })?;
+        ]);
+        let mut namespace_paths = Vec::with_capacity(namespace_entries.len());
+        for (arg, NamespaceEntry { path, directory }) in namespace_entries.into_iter().enumerate() {
+            let arg = arg.try_into().context("arg conversion")?;
+            namespace_paths.push(path);
+            handles.push(StartupHandle {
+                handle: directory.into_handle(),
+                info: HandleInfo::new(HandleType::NamespaceDirectory, arg),
+            });
+        }
+        let bin_msg =
+            Message::build(MessageContents { args, environment_vars, namespace_paths, handles })?;
         bin_msg.write(&bootstrap).map_err(ProcessBuilderError::WriteBootstrapMessage)?;
 
-        let vcpu = Vcpu::create(&self.guest, ld_elf.entry)?;
+        let vcpu = Vcpu::create(&guest, ld_elf.entry)?;
         let stack_pointer =
             compute_initial_stack_pointer(ld_stack_base, ld_stack_size).try_into()?;
         let arg1 = bootstrap_server.into_raw().try_into()?;
@@ -251,7 +167,13 @@ impl ProcessLoader {
         let vcpu_state = load_vcpu_state(stack_pointer, arg1, arg2);
         vcpu.write_state(&vcpu_state)?;
 
-        Ok(Process { vcpu, guest: self.guest })
+        Ok(Self { vcpu, guest })
+    }
+
+    /// Run the initial thread.
+    pub fn run(&self) -> Result<()> {
+        let Self { vcpu, guest } = self;
+        run_thread(vcpu, guest, &vmar_root_self())
     }
 }
 

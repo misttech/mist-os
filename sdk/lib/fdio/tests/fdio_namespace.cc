@@ -222,16 +222,4 @@ TEST(NamespaceTest, LocalBinding) {
   ASSERT_EQ(errno, ENOENT, "%s", strerror(errno));
 }
 
-TEST(NamespaceTest, Export) {
-  fdio_flat_namespace_t* flat;
-  ASSERT_OK(fdio_ns_export_root(&flat));
-  auto cleanup = fit::defer([flat]() { fdio_ns_free_flat_ns(flat); });
-  ASSERT_NE(0, flat->count);
-  for (size_t i = 0; i < flat->count; ++i) {
-    const uint32_t type = flat->type[i];
-    ASSERT_EQ(PA_NS_DIR, PA_HND_TYPE(type));
-    ASSERT_EQ(i, PA_HND_ARG(type));
-  }
-}
-
 }  // namespace

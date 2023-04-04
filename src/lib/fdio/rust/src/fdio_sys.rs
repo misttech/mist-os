@@ -258,7 +258,6 @@ extern "C" {
 pub struct fdio_flat_namespace {
     pub count: usize,
     pub handle: *mut zx_handle_t,
-    pub type_: *mut u32,
     pub path: *const *const ::std::os::raw::c_char,
 }
 #[test]
@@ -267,7 +266,7 @@ fn bindgen_test_layout_fdio_flat_namespace() {
     let ptr = UNINIT.as_ptr();
     assert_eq!(
         ::std::mem::size_of::<fdio_flat_namespace>(),
-        32usize,
+        24usize,
         concat!("Size of: ", stringify!(fdio_flat_namespace))
     );
     assert_eq!(
@@ -286,13 +285,8 @@ fn bindgen_test_layout_fdio_flat_namespace() {
         concat!("Offset of field: ", stringify!(fdio_flat_namespace), "::", stringify!(handle))
     );
     assert_eq!(
-        unsafe { ::std::ptr::addr_of!((*ptr).type_) as usize - ptr as usize },
-        16usize,
-        concat!("Offset of field: ", stringify!(fdio_flat_namespace), "::", stringify!(type_))
-    );
-    assert_eq!(
         unsafe { ::std::ptr::addr_of!((*ptr).path) as usize - ptr as usize },
-        24usize,
+        16usize,
         concat!("Offset of field: ", stringify!(fdio_flat_namespace), "::", stringify!(path))
     );
 }

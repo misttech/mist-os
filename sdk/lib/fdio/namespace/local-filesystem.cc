@@ -31,19 +31,6 @@ namespace fio = fuchsia_io;
 
 namespace {
 
-struct ExportState {
-  // The minimum size of flat namespace which will contain all the
-  // information about this |fdio_namespace|.
-  size_t bytes;
-  // The total number of entries (path + handle pairs) in this namespace.
-  size_t count;
-  // A (moving) pointer to start of the next path.
-  char* buffer;
-  zx_handle_t* handle;
-  uint32_t* type;
-  char** path;
-};
-
 std::pair<std::string_view, bool> FindNextPathSegment(std::string_view path) {
   auto next_slash = path.find('/');
   if (next_slash == std::string_view::npos) {
@@ -694,67 +681,77 @@ zx_status_t fdio_namespace::SetRoot(fdio_t* io) {
 }
 
 zx_status_t fdio_namespace::Export(fdio_flat_namespace_t** out) const {
-  ExportState es;
-  es.bytes = sizeof(fdio_flat_namespace_t);
-  es.count = 0;
-
   fbl::RefPtr<LocalVnode> vn = [this]() {
     fbl::AutoLock lock(&lock_);
     return root_;
   }();
 
-  auto count_callback = [&es](std::string_view path, zxio_t* remote) {
-    // Each entry needs one slot in the handle table,
-    // one slot in the type table, and one slot in the
-    // path table, plus storage for the path and NUL
-    es.bytes += sizeof(zx_handle_t) + sizeof(uint32_t) + sizeof(char**) + path.length() + 1;
-    es.count += 1;
+  size_t count = 0;
+  size_t buffer_size = 0;
+  auto count_callback = [&](std::string_view path, zxio_t* remote) {
+    count += 1;
+    buffer_size += path.size() + 1;
     return ZX_OK;
   };
   if (zx_status_t status = vn->EnumerateRemotes(count_callback); status != ZX_OK) {
     return status;
   }
+  // Allocate enough space for a hypothetical:
+  // struct {
+  //   fdio_flat_namespace_t flat;
+  //   zx_handle_t handle[count];
+  //   char* path[count];
+  //   char buffer[buffer_size];
+  // };
+  // Insert padding where needed for alignment.
+  auto padding = [](size_t offset, size_t alignment) {
+    return (alignment - (offset % alignment)) % alignment;
+  };
+  size_t offset = 0;
+  offset += sizeof(fdio_flat_namespace_t);
+  offset += padding(offset, alignof(zx_handle_t));
+  const size_t handle_offset = offset;
+  offset += sizeof(zx_handle_t) * count;
+  offset += padding(offset, alignof(char*));
+  const size_t path_offset = offset;
+  offset += sizeof(char*) * count;
+  const size_t buffer_offset = offset;
+  offset += buffer_size;
 
-  fdio_flat_namespace_t* flat = static_cast<fdio_flat_namespace_t*>(malloc(es.bytes));
-  if (flat == nullptr) {
+  std::byte* ptr = static_cast<std::byte*>(malloc(offset));
+  if (ptr == nullptr) {
     return ZX_ERR_NO_MEMORY;
   }
-  // We've allocated enough memory for the flat struct
-  // followed by count handles, followed by count types,
-  // followed by count path ptrs followed by enough bytes
-  // for all the path strings.  Point es.* at the right
-  // slices of that memory:
-  es.handle = reinterpret_cast<zx_handle_t*>(flat + 1);
-  es.type = reinterpret_cast<uint32_t*>(es.handle + es.count);
-  es.path = reinterpret_cast<char**>(es.type + es.count);
-  es.buffer = reinterpret_cast<char*>(es.path + es.count);
-  es.count = 0;
+  fdio_flat_namespace_t& flat = *reinterpret_cast<fdio_flat_namespace_t*>(ptr);
+  flat = {
+      .count = 0,
+      .handle = reinterpret_cast<zx_handle_t*>(ptr + handle_offset),
+      .path = reinterpret_cast<char**>(ptr + path_offset),
+  };
+  char* buffer = reinterpret_cast<char*>(ptr + buffer_offset);
+  auto cleanup = fit::defer([flat = &flat]() { fdio_ns_free_flat_ns(flat); });
 
-  auto export_callback = [&es](std::string_view path, zxio_t* remote) {
+  auto export_callback = [&](std::string_view path, zxio_t* remote) {
     zx::channel remote_clone;
     zx_status_t status = zxio_clone(remote, remote_clone.reset_and_get_address());
     if (status != ZX_OK) {
       return status;
     }
-    strlcpy(es.buffer, path.data(), path.length() + 1);
-    es.path[es.count] = es.buffer;
-    es.handle[es.count] = remote_clone.release();
-    es.type[es.count] = PA_HND(PA_NS_DIR, static_cast<uint32_t>(es.count));
-    es.buffer += (path.length() + 1);
-    es.count++;
+    flat.handle[flat.count] = remote_clone.release();
+    const_cast<char**>(flat.path)[flat.count] = buffer;
+    flat.count += 1;
+
+    memcpy(buffer, path.data(), path.length());
+    buffer += path.length();
+    *buffer++ = 0;
     return ZX_OK;
   };
 
   if (zx_status_t status = vn->EnumerateRemotes(export_callback); status != ZX_OK) {
-    zx_handle_close_many(es.handle, es.count);
-    free(flat);
     return status;
   }
 
-  flat->count = es.count;
-  flat->handle = es.handle;
-  flat->type = es.type;
-  flat->path = es.path;
-  *out = flat;
+  cleanup.cancel();
+  *out = &flat;
   return ZX_OK;
 }
