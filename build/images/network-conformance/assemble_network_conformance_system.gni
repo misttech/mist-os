@@ -23,8 +23,6 @@ template("assemble_network_conformance_system") {
       "//src/developer/sshd-host:core_shard",
       "//src/sys/process-resolver:core_shard",
     ]
-
-    restrict_core_env_to_base = false
   }
 
   product_assembly_configuration(target_name + ".product_assembly_config") {

@@ -9,7 +9,6 @@ import("//src/sys/core/build/core.gni")
 # Core realm definition to be used only instances of cuckoo_kernel_zbi_test()
 core_realm_definition("cuckoo-core-realm") {
   testonly = true
-  restrict_core_env_to_base = false
   deps = board_core_realm_shards
   foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
     input_group_label = "//bundles/assembly_input_groups:${input_group}"

@@ -17,11 +17,6 @@ import("//tools/cmc/build/cmc.gni")
 #
 # Parameters
 #
-#   restrict_core_env_to_base (optional)
-#     If true, must use the base resolver to resolve packages. If false, the
-#     component has access to the package resolver and can auto-update.
-#     Default is true.
-#
 #   deps
 #   testonly
 #   visibility
@@ -30,17 +25,6 @@ template("core_realm_definition") {
     shard_deps = invoker.deps
   } else {
     shard_deps = []
-  }
-
-  restrict_core_env_to_base = true
-  if (defined(invoker.restrict_core_env_to_base)) {
-    restrict_core_env_to_base = invoker.restrict_core_env_to_base
-  }
-
-  if (restrict_core_env_to_base) {
-    shard_deps += [ "//src/sys/core:core-env-base-resolver" ]
-  } else {
-    shard_deps += [ "//src/sys/core:core-env-full-resolver" ]
   }
 
   # TODO(fxbug.dev/105101): remove all dart runners when Dart is
