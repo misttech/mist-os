@@ -42,7 +42,6 @@ pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
 // common implementations once we can configure them through socket options.
 const DEFAULT_MAX_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(12_u8);
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
-pub(super) const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
 ///  ... in particular, the delay MUST be less than 0.5 seconds.
@@ -757,7 +756,13 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
         rcv_wnd: WindowSize,
         limit: u32,
         now: I,
-        SocketOptions { keep_alive, nagle_enabled, user_timeout, delayed_ack: _ }: &SocketOptions,
+        SocketOptions {
+            keep_alive,
+            nagle_enabled,
+            user_timeout,
+            delayed_ack: _,
+            fin_wait2_timeout: _,
+        }: &SocketOptions,
     ) -> Option<Segment<SendPayload<'_>>> {
         let Self {
             nxt: snd_nxt,
@@ -1350,7 +1355,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         &mut self,
         incoming: Segment<P>,
         now: I,
-        SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _, delayed_ack }: &SocketOptions,
+        SocketOptions {
+            keep_alive,
+            nagle_enabled: _,
+            user_timeout: _,
+            delayed_ack,
+            fin_wait2_timeout,
+        }: &SocketOptions,
         defunct: bool,
     ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>)
     where
@@ -1610,7 +1621,8 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                                 // If the connection is already defunct, we set
                                 // a timeout to reclaim, but otherwise, a later
                                 // `close` call should set the timer.
-                                timeout_at: defunct.then_some(now.add(DEFAULT_FIN_WAIT2_TIMEOUT)),
+                                timeout_at: fin_wait2_timeout
+                                    .and_then(|timeout| defunct.then_some(now.add(timeout))),
                             });
                         }
                     }
@@ -1898,7 +1910,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     fn poll_close(
         &mut self,
         now: I,
-        SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _, delayed_ack: _ }: &SocketOptions,
+        SocketOptions {
+            keep_alive,
+            nagle_enabled: _,
+            user_timeout: _,
+            delayed_ack: _,
+            fin_wait2_timeout: _,
+        }: &SocketOptions,
     ) -> bool {
         let alive = match self {
             State::Established(Established { snd, rcv: _ }) => snd.still_alive(now, keep_alive),
@@ -1983,7 +2001,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     /// The caller should provide the current time if this close call would make
     /// the connection defunct, so that we can reclaim defunct connections based
     /// on timeouts.
-    pub(super) fn close(&mut self, close_reason: CloseReason<I>) -> Result<(), CloseError>
+    pub(super) fn close(
+        &mut self,
+        close_reason: CloseReason<I>,
+        socket_options: &SocketOptions,
+    ) -> Result<(), CloseError>
     where
         ActiveOpen: IntoBuffers<R, S>,
     {
@@ -2070,8 +2092,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 Err(CloseError::Closing)
             }
             State::FinWait2(FinWait2 { last_seq: _, rcv: _, timeout_at }) => {
-                if let CloseReason::Close { now } = close_reason {
-                    assert_eq!(timeout_at.replace(now.add(DEFAULT_FIN_WAIT2_TIMEOUT)), None);
+                if let (CloseReason::Close { now }, Some(fin_wait2_timeout)) =
+                    (close_reason, socket_options.fin_wait2_timeout)
+                {
+                    assert_eq!(timeout_at.replace(now.add(fin_wait2_timeout)), None);
                 }
                 Err(CloseError::Closing)
             }
@@ -2291,6 +2315,7 @@ mod test {
             testutil::{
                 DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE, DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE_USIZE,
             },
+            DEFAULT_FIN_WAIT2_TIMEOUT,
         },
     };
 
@@ -3638,7 +3663,7 @@ mod test {
             )
         );
         // Then call CLOSE to transition the state machine to LastAck.
-        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
         assert_eq!(
             state,
             State::LastAck(LastAck {
@@ -3726,7 +3751,7 @@ mod test {
             buffer_sizes: Default::default(),
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
         });
-        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, FakeInstant::default()),
@@ -3763,9 +3788,12 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
-        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
         assert_matches!(state, State::FinWait1(_));
-        assert_eq!(state.close(CloseReason::Shutdown), Err(CloseError::Closing));
+        assert_eq!(
+            state.close(CloseReason::Shutdown, &SocketOptions::default()),
+            Err(CloseError::Closing)
+        );
 
         // Poll for 2 bytes.
         assert_eq!(
@@ -3976,9 +4004,12 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
-        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown, &SocketOptions::default()), Ok(()));
         assert_matches!(state, State::FinWait1(_));
-        assert_eq!(state.close(CloseReason::Shutdown), Err(CloseError::Closing));
+        assert_eq!(
+            state.close(CloseReason::Shutdown, &SocketOptions::default()),
+            Err(CloseError::Closing)
+        );
 
         let fin = state.poll_send_with_default_options(u32::MAX, clock.now());
         assert_eq!(
@@ -4960,7 +4991,10 @@ mod test {
             },
             timeout_at: None,
         });
-        assert_eq!(state.close(CloseReason::Close { now: clock.now() }), Err(CloseError::Closing));
+        assert_eq!(
+            state.close(CloseReason::Close { now: clock.now() }, &SocketOptions::default()),
+            Err(CloseError::Closing)
+        );
         assert_eq!(state.poll_send_at(), Some(clock.now().add(DEFAULT_FIN_WAIT2_TIMEOUT)));
         clock.sleep(DEFAULT_FIN_WAIT2_TIMEOUT);
         assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);

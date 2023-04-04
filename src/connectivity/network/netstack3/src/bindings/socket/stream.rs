@@ -6,7 +6,7 @@
 
 use std::{
     convert::Infallible as Never,
-    num::{NonZeroU16, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
+    num::{NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError},
     ops::{ControlFlow, DerefMut as _},
     sync::Arc,
     time::Duration,
@@ -64,8 +64,8 @@ use crate::bindings::{
         ZXSIO_SIGNAL_INCOMING,
     },
     util::{
-        ConversionContext, DeviceNotFoundError, NeedsDataNotifier, NeedsDataWatcher,
-        TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
+        ConversionContext, DeviceNotFoundError, IntoCore, IntoFidl, NeedsDataNotifier,
+        NeedsDataWatcher, TryFromFidlWithContext, TryIntoCoreWithContext, TryIntoFidlWithContext,
     },
     BindingsNonSyncCtxImpl, NetstackContext,
 };
@@ -1541,11 +1541,26 @@ where
             fposix_socket::StreamSocketRequest::GetTcpSynCount { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
             }
-            fposix_socket::StreamSocketRequest::SetTcpLinger { value_secs: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+            fposix_socket::StreamSocketRequest::SetTcpLinger { value_secs, responder } => {
+                const MAX_FIN_WAIT2_TIMEOUT_SECS: u32 = 120;
+                let fin_wait2_timeout =
+                    IntoCore::<Option<u32>>::into_core(value_secs).map(|value_secs| {
+                        NonZeroU32::new(value_secs.min(MAX_FIN_WAIT2_TIMEOUT_SECS))
+                            .map_or(tcp::DEFAULT_FIN_WAIT2_TIMEOUT, |secs| {
+                                Duration::from_secs(u64::from(secs.get()))
+                            })
+                    });
+                self.with_socket_options_mut(|so| {
+                    so.fin_wait2_timeout = fin_wait2_timeout;
+                })
+                .await;
+                responder_send!(responder, &mut Ok(()));
             }
             fposix_socket::StreamSocketRequest::GetTcpLinger { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));
+                let linger_secs =
+                    self.with_socket_options(|so| so.fin_wait2_timeout.map(|d| d.as_secs())).await;
+                let respond_value = linger_secs.map(|x| u32::try_from(x).unwrap()).into_fidl();
+                responder_send!(responder, &mut Ok(respond_value));
             }
             fposix_socket::StreamSocketRequest::SetTcpDeferAccept { value_secs: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp));

@@ -12,7 +12,10 @@ mod seqnum;
 pub mod socket;
 pub mod state;
 
-use core::num::{NonZeroU16, NonZeroU64, NonZeroU8};
+use core::{
+    num::{NonZeroU16, NonZeroU64, NonZeroU8},
+    time::Duration,
+};
 
 use const_unwrap::const_unwrap_option;
 use net_types::ip::{Ip, IpVersion};
@@ -28,6 +31,9 @@ use crate::{
         socket::{isn::IsnGenerator, Sockets},
     },
 };
+
+/// Default lifetime for a orphaned connection in FIN_WAIT2.
+pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Control flags that can alter the state of a TCP control block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -148,6 +154,9 @@ pub struct SocketOptions {
     pub user_timeout: Option<NonZeroDuration>,
     /// Switch to turn delayed ACK on/off.
     pub delayed_ack: bool,
+    /// The period of time after with a dangling FIN_WAIT2 state should be
+    /// reclaimed.
+    pub fin_wait2_timeout: Option<Duration>,
 }
 
 impl Default for SocketOptions {
@@ -170,6 +179,7 @@ impl Default for SocketOptions {
             //   default.
             // More context: https://news.ycombinator.com/item?id=10607422
             delayed_ack: false,
+            fin_wait2_timeout: Some(DEFAULT_FIN_WAIT2_TIMEOUT),
         }
     }
 }

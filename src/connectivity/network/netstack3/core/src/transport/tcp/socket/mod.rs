@@ -1435,7 +1435,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
             let (conn, _, addr): (_, SharingState, _) =
                 id.get_from_socketmap_mut(&mut sockets.socketmap);
-            match conn.state.close(CloseReason::Shutdown) {
+            match conn.state.close(CloseReason::Shutdown, &conn.socket_options) {
                 Ok(()) => Ok(do_send_inner(id.into(), conn, addr, ip_transport_ctx, ctx)),
                 Err(CloseError::NoConnection) => Err(NoConnection),
                 Err(CloseError::Closing) => Ok(()),
@@ -1448,11 +1448,13 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
             let (conn, _, addr): (_, SharingState, _) =
                 id.get_from_socketmap_mut(&mut sockets.socketmap);
             conn.defunct = true;
-            let already_closed = match conn.state.close(CloseReason::Close { now: ctx.now() }) {
-                Err(CloseError::NoConnection) => true,
-                Err(CloseError::Closing) => false,
-                Ok(()) => matches!(conn.state, State::Closed(_)),
-            };
+            let already_closed =
+                match conn.state.close(CloseReason::Close { now: ctx.now() }, &conn.socket_options)
+                {
+                    Err(CloseError::NoConnection) => true,
+                    Err(CloseError::Closing) => false,
+                    Ok(()) => matches!(conn.state, State::Closed(_)),
+                };
             if already_closed {
                 assert_matches!(sockets.socketmap.conns_mut().remove(&id.into()), Some(_));
                 let _: Option<_> = ctx.cancel_timer(TimerId::new::<I>(id.into()));
@@ -3036,8 +3038,8 @@ mod tests {
         transport::tcp::{
             buffer::{Buffer, BufferLimits, RingBuffer, SendPayload},
             segment::Payload,
-            state::{DEFAULT_FIN_WAIT2_TIMEOUT, MSL},
-            UserError,
+            state::MSL,
+            UserError, DEFAULT_FIN_WAIT2_TIMEOUT,
         },
     };
 

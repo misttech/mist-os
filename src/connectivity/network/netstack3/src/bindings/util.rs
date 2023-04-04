@@ -510,6 +510,28 @@ where
     }
 }
 
+impl TryIntoFidl<fposix_socket::OptionalUint32> for Option<u32> {
+    type Error = Never;
+
+    fn try_into_fidl(self) -> Result<fposix_socket::OptionalUint32, Self::Error> {
+        Ok(match self {
+            Some(value) => fposix_socket::OptionalUint32::Value(value),
+            None => fposix_socket::OptionalUint32::Unset(fposix_socket::Empty),
+        })
+    }
+}
+
+impl TryFromFidl<fposix_socket::OptionalUint32> for Option<u32> {
+    type Error = Never;
+
+    fn try_from_fidl(fidl: fposix_socket::OptionalUint32) -> Result<Self, Self::Error> {
+        Ok(match fidl {
+            fposix_socket::OptionalUint32::Value(value) => Some(value),
+            fposix_socket::OptionalUint32::Unset(fposix_socket::Empty) => None,
+        })
+    }
+}
+
 pub(crate) enum MulticastMembershipConversionError {
     AddrNotMulticast,
     WrongIpVersion,
