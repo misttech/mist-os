@@ -68,5 +68,8 @@ if (is_host) {
 
 group("tests") {
   testonly = true
-  public_deps = [ "tests/unit_tests:tests" ]
+  public_deps = [
+    "tests/functional_tests:tests",
+    "tests/unit_tests:tests",
+  ]
 }

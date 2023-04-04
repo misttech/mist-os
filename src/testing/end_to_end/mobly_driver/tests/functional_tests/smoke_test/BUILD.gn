@@ -31,10 +31,3 @@ if (is_host) {
     ]
   }
 }
-
-# Tests that we want to run in an FYI builder.
-# We do not want failures from these tests to break the tree.
-group("fyi") {
-  testonly = true
-  deps = [ ":smoke_test($host_toolchain)" ]
-}
