@@ -90,7 +90,10 @@ class InstanceResponderTest : public AgentTest, public Mdns::Publisher {
   void ExpectPublication(ReplyAddress reply_address, const std::string& subtype = "",
                          const std::string& host_full_name = kLocalHostFullName,
                          const std::vector<inet::IpAddress>& addresses = {},
-                         inet::IpPort port = kPort);
+                         inet::IpPort port = kPort,
+                         MdnsResourceSection ptr_section = MdnsResourceSection::kAnswer,
+                         MdnsResourceSection srv_section = MdnsResourceSection::kAdditional,
+                         MdnsResourceSection txt_section = MdnsResourceSection::kAdditional);
 
   ReplyAddress MulticastReply(Media media, IpVersions ip_versions);
 
@@ -176,29 +179,28 @@ void InstanceResponderTest::ExpectPublication(ReplyAddress reply_address,
                                               const std::string& subtype,
                                               const std::string& host_full_name,
                                               const std::vector<inet::IpAddress>& addresses,
-                                              inet::IpPort port) {
+                                              inet::IpPort port, MdnsResourceSection ptr_section,
+                                              MdnsResourceSection srv_section,
+                                              MdnsResourceSection txt_section) {
   auto message = ExpectOutboundMessage(reply_address);
 
-  auto resource = ExpectResource(message.get(), MdnsResourceSection::kAnswer, service_full_name(),
-                                 DnsType::kPtr, DnsClass::kIn, false);
+  auto resource = ExpectResource(message.get(), ptr_section, service_full_name(), DnsType::kPtr,
+                                 DnsClass::kIn, false);
   EXPECT_EQ(instance_full_name(), resource->ptr_.pointer_domain_name_.dotted_string_);
 
   if (subtype != "") {
-    resource = ExpectResource(message.get(), MdnsResourceSection::kAnswer,
-                              subtype + "._sub." + service_full_name(), DnsType::kPtr,
-                              DnsClass::kIn, false);
+    resource = ExpectResource(message.get(), ptr_section, subtype + "._sub." + service_full_name(),
+                              DnsType::kPtr, DnsClass::kIn, false);
     EXPECT_EQ(instance_full_name(), resource->ptr_.pointer_domain_name_.dotted_string_);
   }
 
-  resource = ExpectResource(message.get(), MdnsResourceSection::kAdditional, instance_full_name(),
-                            DnsType::kSrv);
+  resource = ExpectResource(message.get(), srv_section, instance_full_name(), DnsType::kSrv);
   EXPECT_EQ(0, resource->srv_.priority_);
   EXPECT_EQ(0, resource->srv_.weight_);
   EXPECT_EQ(port, resource->srv_.port_);
   EXPECT_EQ(host_full_name, resource->srv_.target_.dotted_string_);
 
-  resource = ExpectResource(message.get(), MdnsResourceSection::kAdditional, instance_full_name(),
-                            DnsType::kTxt);
+  resource = ExpectResource(message.get(), txt_section, instance_full_name(), DnsType::kTxt);
   EXPECT_TRUE(resource->txt_.strings_.empty());
 
   if (addresses.empty()) {
@@ -710,6 +712,110 @@ TEST_F(InstanceResponderTest, AltHostName) {
 
   under_test.Start(kLocalHostFullName);
   ExpectAnnouncements(Media::kBoth, IpVersions::kBoth, kAltHostFullName);
+}
+
+// Tests that a query for SRV elicits the correct response.
+TEST_F(InstanceResponderTest, SrvQuestion) {
+  InstanceResponder under_test(this, "", {}, kServiceName, kInstanceName, Media::kBoth,
+                               IpVersions::kBoth, this);
+  SetAgent(under_test);
+
+  // Normal startup.
+  under_test.Start(kLocalHostFullName);
+  ExpectAnnouncements();
+
+  ReplyAddress sender_address(inet::SocketAddress(192, 168, 1, 1, kPort),
+                              inet::IpAddress(192, 168, 1, 100), kInterfaceId, Media::kWired,
+                              IpVersions::kBoth);
+
+  auto question = DnsQuestion(instance_full_name(), DnsType::kSrv);
+  under_test.ReceiveQuestion(question, ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth),
+                             sender_address);
+  ExpectGetPublicationCall(PublicationCause::kQueryMulticastResponse, "",
+                           {sender_address.socket_address()})(Mdns::Publication::Create(kPort));
+  ExpectPublication(MulticastReply(Media::kBoth, IpVersions::kBoth), "", kLocalHostFullName, {},
+                    kPort, MdnsResourceSection::kAdditional, MdnsResourceSection::kAnswer,
+                    MdnsResourceSection::kAdditional);
+  ExpectPostTaskForTime(zx::sec(60), zx::sec(60));  // idle cleanup
+  ExpectNoOther();
+}
+
+// Tests that a query for TXT elicits the correct response.
+TEST_F(InstanceResponderTest, TxtQuestion) {
+  InstanceResponder under_test(this, "", {}, kServiceName, kInstanceName, Media::kBoth,
+                               IpVersions::kBoth, this);
+  SetAgent(under_test);
+
+  // Normal startup.
+  under_test.Start(kLocalHostFullName);
+  ExpectAnnouncements();
+
+  ReplyAddress sender_address(inet::SocketAddress(192, 168, 1, 1, kPort),
+                              inet::IpAddress(192, 168, 1, 100), kInterfaceId, Media::kWired,
+                              IpVersions::kBoth);
+
+  auto question = DnsQuestion(instance_full_name(), DnsType::kTxt);
+  under_test.ReceiveQuestion(question, ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth),
+                             sender_address);
+  ExpectGetPublicationCall(PublicationCause::kQueryMulticastResponse, "",
+                           {sender_address.socket_address()})(Mdns::Publication::Create(kPort));
+  ExpectPublication(MulticastReply(Media::kBoth, IpVersions::kBoth), "", kLocalHostFullName, {},
+                    kPort, MdnsResourceSection::kAdditional, MdnsResourceSection::kAdditional,
+                    MdnsResourceSection::kAnswer);
+  ExpectPostTaskForTime(zx::sec(60), zx::sec(60));  // idle cleanup
+  ExpectNoOther();
+}
+
+// Tests that a query for ANY for the instance elicits the correct response.
+TEST_F(InstanceResponderTest, AnyForInstanceQuestion) {
+  InstanceResponder under_test(this, "", {}, kServiceName, kInstanceName, Media::kBoth,
+                               IpVersions::kBoth, this);
+  SetAgent(under_test);
+
+  // Normal startup.
+  under_test.Start(kLocalHostFullName);
+  ExpectAnnouncements();
+
+  ReplyAddress sender_address(inet::SocketAddress(192, 168, 1, 1, kPort),
+                              inet::IpAddress(192, 168, 1, 100), kInterfaceId, Media::kWired,
+                              IpVersions::kBoth);
+
+  auto question = DnsQuestion(instance_full_name(), DnsType::kAny);
+  under_test.ReceiveQuestion(question, ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth),
+                             sender_address);
+  ExpectGetPublicationCall(PublicationCause::kQueryMulticastResponse, "",
+                           {sender_address.socket_address()})(Mdns::Publication::Create(kPort));
+  ExpectPublication(MulticastReply(Media::kBoth, IpVersions::kBoth), "", kLocalHostFullName, {},
+                    kPort, MdnsResourceSection::kAdditional, MdnsResourceSection::kAnswer,
+                    MdnsResourceSection::kAnswer);
+  ExpectPostTaskForTime(zx::sec(60), zx::sec(60));  // idle cleanup
+  ExpectNoOther();
+}
+
+// Tests that a query for ANY for the service type elicits the correct response.
+TEST_F(InstanceResponderTest, AnyForServiceTypeQuestion) {
+  InstanceResponder under_test(this, "", {}, kServiceName, kInstanceName, Media::kBoth,
+                               IpVersions::kBoth, this);
+  SetAgent(under_test);
+
+  // Normal startup.
+  under_test.Start(kLocalHostFullName);
+  ExpectAnnouncements();
+
+  ReplyAddress sender_address(inet::SocketAddress(192, 168, 1, 1, kPort),
+                              inet::IpAddress(192, 168, 1, 100), kInterfaceId, Media::kWired,
+                              IpVersions::kBoth);
+
+  auto question = DnsQuestion(service_full_name(), DnsType::kAny);
+  under_test.ReceiveQuestion(question, ReplyAddress::Multicast(Media::kBoth, IpVersions::kBoth),
+                             sender_address);
+  ExpectGetPublicationCall(PublicationCause::kQueryMulticastResponse, "",
+                           {sender_address.socket_address()})(Mdns::Publication::Create(kPort));
+  ExpectPublication(MulticastReply(Media::kBoth, IpVersions::kBoth), "", kLocalHostFullName, {},
+                    kPort, MdnsResourceSection::kAnswer, MdnsResourceSection::kAdditional,
+                    MdnsResourceSection::kAdditional);
+  ExpectPostTaskForTime(zx::sec(60), zx::sec(60));  // idle cleanup
+  ExpectNoOther();
 }
 
 }  // namespace test

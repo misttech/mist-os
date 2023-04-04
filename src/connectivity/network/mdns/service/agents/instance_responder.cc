@@ -11,6 +11,20 @@
 #include "src/connectivity/network/mdns/service/common/mdns_names.h"
 
 namespace mdns {
+namespace {
+
+// Returns the resource section in which a resource of type |answer_type| should be delivered
+// in an answer message if the type of the question was |question_type|. Returns |kAnswer| if
+// the types match or the question type was ANY, |kAdditional| otherwise.
+MdnsResourceSection AnswerResourceSection(DnsType answer_type, DnsType question_type) {
+  if (answer_type == question_type || question_type == DnsType::kAny) {
+    return MdnsResourceSection::kAnswer;
+  }
+
+  return MdnsResourceSection::kAdditional;
+}
+
+}  // namespace
 
 InstanceResponder::InstanceResponder(MdnsAgent::Owner* owner, std::string host_name,
                                      std::vector<inet::IpAddress> addresses,
@@ -68,7 +82,8 @@ void InstanceResponder::ReceiveQuestion(const DnsQuestion& question,
     case DnsType::kPtr:
       if (MdnsNames::MatchServiceName(name, instance_.service_name_, &subtype)) {
         LogSenderAddress(sender_address);
-        MaybeGetAndSendPublication(publication_cause, subtype, Constrain(reply_address));
+        MaybeGetAndSendPublication(publication_cause, subtype, Constrain(reply_address),
+                                   question.type_);
       } else if (question.name_.dotted_string_ == MdnsNames::kAnyServiceFullName) {
         SendAnyServiceResponse(Constrain(reply_address));
       }
@@ -77,14 +92,24 @@ void InstanceResponder::ReceiveQuestion(const DnsQuestion& question,
     case DnsType::kTxt:
       if (question.name_.dotted_string_ == instance_full_name_) {
         LogSenderAddress(sender_address);
-        MaybeGetAndSendPublication(publication_cause, "", Constrain(reply_address));
+        MaybeGetAndSendPublication(publication_cause, "", Constrain(reply_address), question.type_);
       }
       break;
     case DnsType::kAny:
-      if (question.name_.dotted_string_ == instance_full_name_ ||
-          MdnsNames::MatchServiceName(name, instance_.service_name_, &subtype)) {
+      if (question.name_.dotted_string_ == instance_full_name_) {
         LogSenderAddress(sender_address);
-        MaybeGetAndSendPublication(publication_cause, subtype, Constrain(reply_address));
+        // The question was for type kAny and the instance name. PTR and A/AAAA should be in the
+        // additional section, and SRV and TXT should be in the answer section. Passing the ANY
+        // question type achieves this.
+        MaybeGetAndSendPublication(publication_cause, subtype, Constrain(reply_address),
+                                   question.type_);
+      } else if (MdnsNames::MatchServiceName(name, instance_.service_name_, &subtype)) {
+        LogSenderAddress(sender_address);
+        // The question was for type kAny and the service type. PTR should be in the answer
+        // section and everything else should be in the additional section. Pretending the
+        // question was PTR achieves this.
+        MaybeGetAndSendPublication(publication_cause, subtype, Constrain(reply_address),
+                                   DnsType::kPtr);
       }
       break;
     default:
@@ -158,7 +183,7 @@ void InstanceResponder::LogSenderAddress(const ReplyAddress& sender_address) {
 }
 
 void InstanceResponder::SendAnnouncement() {
-  GetAndSendPublication(PublicationCause::kAnnouncement, "", multicast_reply());
+  GetAndSendPublication(PublicationCause::kAnnouncement, "", multicast_reply(), DnsType::kPtr);
 
   for (const std::string& subtype : subtypes_) {
     SendSubtypePtrRecord(subtype, DnsResource::kShortTimeToLive, multicast_reply());
@@ -182,7 +207,8 @@ void InstanceResponder::SendAnyServiceResponse(const ReplyAddress& reply_address
 
 void InstanceResponder::MaybeGetAndSendPublication(PublicationCause publication_cause,
                                                    const std::string& subtype,
-                                                   const ReplyAddress& reply_address) {
+                                                   const ReplyAddress& reply_address,
+                                                   DnsType question_type) {
   if (publisher_ == nullptr) {
     return;
   }
@@ -208,8 +234,8 @@ void InstanceResponder::MaybeGetAndSendPublication(PublicationCause publication_
       // currently scheduled. We need to schedule a multicast send for one second after the
       // previous one.
       PostTaskForTime(
-          [this, publication_cause, subtype, reply_address]() {
-            GetAndSendPublication(publication_cause, subtype, reply_address);
+          [this, publication_cause, subtype, reply_address, question_type]() {
+            GetAndSendPublication(publication_cause, subtype, reply_address, question_type);
           },
           throttle_state + kMinMulticastInterval);
       return;
@@ -219,12 +245,13 @@ void InstanceResponder::MaybeGetAndSendPublication(PublicationCause publication_
     // immediately.
   }
 
-  GetAndSendPublication(publication_cause, subtype, reply_address);
+  GetAndSendPublication(publication_cause, subtype, reply_address, question_type);
 }
 
 void InstanceResponder::GetAndSendPublication(PublicationCause publication_cause,
                                               const std::string& subtype,
-                                              const ReplyAddress& reply_address) {
+                                              const ReplyAddress& reply_address,
+                                              DnsType question_type) {
   if (publisher_ == nullptr) {
     return;
   }
@@ -233,9 +260,10 @@ void InstanceResponder::GetAndSendPublication(PublicationCause publication_cause
 
   publisher_->GetPublication(
       publication_cause, subtype, sender_addresses_,
-      [this, query, subtype, reply_address](std::unique_ptr<Mdns::Publication> publication) {
+      [this, query, subtype, reply_address,
+       question_type](std::unique_ptr<Mdns::Publication> publication) {
         if (publication) {
-          SendPublication(*publication, subtype, reply_address);
+          SendPublication(*publication, subtype, reply_address, question_type);
           // Make sure messages get sent immediately if this callback happens asynchronously
           // with respect to |ReceiveQuestion| or posted task execution.
           FlushSentItems();
@@ -255,7 +283,7 @@ void InstanceResponder::GetAndSendPublication(PublicationCause publication_cause
 
 void InstanceResponder::SendPublication(const Mdns::Publication& publication,
                                         const std::string& subtype,
-                                        const ReplyAddress& reply_address) {
+                                        const ReplyAddress& reply_address, DnsType question_type) {
   if (!subtype.empty()) {
     SendSubtypePtrRecord(subtype, publication.ptr_ttl_seconds_, reply_address);
   }
@@ -264,7 +292,14 @@ void InstanceResponder::SendPublication(const Mdns::Publication& publication,
       MdnsNames::ServiceFullName(instance_.service_name_), DnsType::kPtr);
   ptr_resource->time_to_live_ = publication.ptr_ttl_seconds_;
   ptr_resource->ptr_.pointer_domain_name_ = DnsName(instance_full_name_);
-  SendResource(ptr_resource, MdnsResourceSection::kAnswer, reply_address);
+  // If we get an ANY question for the instance, we want the PTR resource in the additional section
+  // (because the PTR is for the type not the instance). If we get an ANY question for the service
+  // type, we want the PTR resource in the answer section. To achieve this, the dispatching code
+  // above pretends the query for for PTR.
+  SendResource(ptr_resource,
+               question_type == DnsType::kPtr ? MdnsResourceSection::kAnswer
+                                              : MdnsResourceSection::kAdditional,
+               reply_address);
 
   auto srv_resource = std::make_shared<DnsResource>(instance_full_name_, DnsType::kSrv);
   srv_resource->time_to_live_ = publication.srv_ttl_seconds_;
@@ -272,12 +307,12 @@ void InstanceResponder::SendPublication(const Mdns::Publication& publication,
   srv_resource->srv_.weight_ = publication.srv_weight_;
   srv_resource->srv_.port_ = publication.port_;
   srv_resource->srv_.target_ = DnsName(host_full_name_);
-  SendResource(srv_resource, MdnsResourceSection::kAdditional, reply_address);
+  SendResource(srv_resource, AnswerResourceSection(DnsType::kSrv, question_type), reply_address);
 
   auto txt_resource = std::make_shared<DnsResource>(instance_full_name_, DnsType::kTxt);
   txt_resource->time_to_live_ = publication.txt_ttl_seconds_;
   txt_resource->txt_.strings_ = publication.text_;
-  SendResource(txt_resource, MdnsResourceSection::kAdditional, reply_address);
+  SendResource(txt_resource, AnswerResourceSection(DnsType::kTxt, question_type), reply_address);
 
   if (addresses_.empty()) {
     // Send local addresses. The address value in the resource is invalid, which tells the interface
@@ -349,7 +384,7 @@ void InstanceResponder::SendGoodbye() {
   publication.srv_ttl_seconds_ = 0;
   publication.txt_ttl_seconds_ = 0;
 
-  SendPublication(publication, "", multicast_reply());
+  SendPublication(publication, "", multicast_reply(), DnsType::kPtr);
 }
 
 void InstanceResponder::IdleCheck(const std::string& subtype) {
