@@ -30,7 +30,7 @@ impl<
         AtMostBytes<UPPER_BOUND_ON_SIZE_IN_BYTES, Vec<T>>,
     >
 {
-    type Error = Error;
+    type Error = (Error, Vec<T>);
 
     fn try_from(
         value: AtMostBytes<UPPER_BOUND_ON_SIZE_IN_BYTES, Vec<T>>,
@@ -38,7 +38,8 @@ impl<
         if value.len() >= LOWER_BOUND_ON_NUMBER_OF_ELEMENTS {
             Ok(AtLeast { inner: value })
         } else {
-            Err(Error::SizeConstraintViolated)
+            let AtMostBytes { inner } = value;
+            Err((Error::SizeConstraintViolated, inner))
         }
     }
 }
@@ -56,12 +57,12 @@ pub struct AtMostBytes<const UPPER_BOUND_ON_SIZE_IN_BYTES: usize, T> {
 impl<const UPPER_BOUND_ON_SIZE_IN_BYTES: usize, T> TryFrom<Vec<T>>
     for AtMostBytes<UPPER_BOUND_ON_SIZE_IN_BYTES, Vec<T>>
 {
-    type Error = Error;
+    type Error = (Error, Vec<T>);
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
         if value.size_of_contents_in_bytes() <= UPPER_BOUND_ON_SIZE_IN_BYTES {
             Ok(AtMostBytes { inner: value })
         } else {
-            Err(Error::SizeConstraintViolated)
+            Err((Error::SizeConstraintViolated, value))
         }
     }
 }
@@ -76,7 +77,7 @@ impl<
         AtMostBytes<UPPER_BOUND_ON_SIZE_IN_BYTES, Vec<T>>,
     >
 {
-    type Error = Error;
+    type Error = (Error, Vec<T>);
 
     fn try_from(value: Vec<T>) -> Result<Self, Self::Error> {
         AtLeast::try_from(AtMostBytes::try_from(value)?)
@@ -200,7 +201,7 @@ where
 {
     fn from(value: [T; N]) -> Self {
         value.into_iter().collect::<Vec<_>>().try_into().unwrap_or_else(
-            |Error::SizeConstraintViolated| {
+            |(Error::SizeConstraintViolated, _)| {
                 panic!(
                     "should be statically known that \
                  {N} >= {LOWER_BOUND_ON_NUMBER_OF_ELEMENTS} and \
@@ -235,8 +236,8 @@ mod tests {
 
         let v = std::iter::repeat(item).take(max_number_allowed + 1).collect::<Vec<_>>();
         assert_eq!(
-            AtLeast::<1, AtMostBytes<{ U8_MAX_AS_USIZE }, _>>::try_from(v),
-            Err(Error::SizeConstraintViolated),
+            AtLeast::<1, AtMostBytes<{ U8_MAX_AS_USIZE }, _>>::try_from(v.clone()),
+            Err((Error::SizeConstraintViolated, v)),
             "{max_number_allowed} instances of {} should not fit in 255 bytes",
             std::any::type_name::<T>(),
         );
@@ -253,7 +254,7 @@ mod tests {
     fn disallows_empty() {
         assert_eq!(
             AtLeast::<1, AtMostBytes<{ U8_MAX_AS_USIZE }, _>>::try_from(Vec::<u8>::new()),
-            Err(Error::SizeConstraintViolated)
+            Err((Error::SizeConstraintViolated, Vec::new()))
         )
     }
 }

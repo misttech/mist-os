@@ -19,7 +19,9 @@ use tracing::debug;
 use std::convert::Infallible as Never;
 
 mod size_constrained;
-pub use crate::size_constrained::{AtLeast, AtMostBytes, U8_MAX_AS_USIZE};
+pub use crate::size_constrained::{
+    AtLeast, AtMostBytes, Error as SizeConstrainedError, U8_MAX_AS_USIZE,
+};
 
 mod size_of_contents;
 use crate::size_of_contents::SizeOfContents as _;
@@ -828,7 +830,7 @@ impl DhcpOption {
                         ProtocolError::InvalidBufferLength(val.len())
                     })?;
                 Ok(DhcpOption::PathMtuPlateauTable(mtus.try_into().map_err(
-                    |size_constrained::Error::SizeConstraintViolated| {
+                    |(size_constrained::Error::SizeConstraintViolated, _)| {
                         ProtocolError::InvalidBufferLength(val.len())
                     },
                 )?))
@@ -905,7 +907,7 @@ impl DhcpOption {
             }
             OptionCode::VendorSpecificInformation => {
                 Ok(DhcpOption::VendorSpecificInformation(val.to_owned().try_into().map_err(
-                    |size_constrained::Error::SizeConstraintViolated| {
+                    |(size_constrained::Error::SizeConstraintViolated, _)| {
                         ProtocolError::InvalidBufferLength(val.len())
                     },
                 )?))
@@ -991,7 +993,7 @@ impl DhcpOption {
                 // interpret an invalid option the same way they interpret the absence of that
                 // option, so this is not an issue.
                 Ok(DhcpOption::ParameterRequestList(opcodes.try_into().map_err(
-                    |size_constrained::Error::SizeConstraintViolated| {
+                    |(size_constrained::Error::SizeConstraintViolated, _)| {
                         ProtocolError::InvalidBufferLength(val.len())
                     },
                 )?))
@@ -1014,7 +1016,7 @@ impl DhcpOption {
             }
             OptionCode::VendorClassIdentifier => {
                 Ok(DhcpOption::VendorClassIdentifier(val.to_owned().try_into().map_err(
-                    |size_constrained::Error::SizeConstraintViolated| {
+                    |(size_constrained::Error::SizeConstraintViolated, _)| {
                         ProtocolError::InvalidBufferLength(val.len())
                     },
                 )?))
@@ -1026,7 +1028,7 @@ impl DhcpOption {
                     return Err(ProtocolError::InvalidBufferLength(val.len()));
                 }
                 Ok(DhcpOption::ClientIdentifier(val.to_owned().try_into().map_err(
-                    |size_constrained::Error::SizeConstraintViolated| {
+                    |(size_constrained::Error::SizeConstraintViolated, _)| {
                         ProtocolError::InvalidBufferLength(val.len())
                     },
                 )?))
@@ -1574,21 +1576,21 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             fidl_fuchsia_net_dhcp::Option_::Router(v) => Ok(DhcpOption::Router({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::TimeServer(v) => Ok(DhcpOption::TimeServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::NameServer(v) => Ok(DhcpOption::NameServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
@@ -1596,36 +1598,38 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::DomainNameServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::LogServer(v) => Ok(DhcpOption::LogServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::CookieServer(v) => Ok(DhcpOption::CookieServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::LprServer(v) => Ok(DhcpOption::LprServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::ImpressServer(v) => Ok(DhcpOption::ImpressServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
@@ -1633,9 +1637,11 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::ResourceLocationServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::HostName(v) => Ok(DhcpOption::HostName(v)),
@@ -1654,7 +1660,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             fidl_fuchsia_net_dhcp::Option_::PolicyFilter(v) => Ok(DhcpOption::PolicyFilter({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
@@ -1672,9 +1678,11 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             fidl_fuchsia_net_dhcp::Option_::PathMtuPlateauTable(v) => {
                 Ok(DhcpOption::PathMtuPlateauTable({
                     let size = v.size_of_contents_in_bytes();
-                    v.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(size)
-                    })?
+                    v.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::InterfaceMtu(v) => Ok(DhcpOption::InterfaceMtu(v)),
@@ -1697,7 +1705,7 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
             fidl_fuchsia_net_dhcp::Option_::StaticRoute(v) => Ok(DhcpOption::StaticRoute({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
@@ -1728,44 +1736,54 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::NetworkInformationServers({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetworkTimeProtocolServers(v) => {
                 Ok(DhcpOption::NetworkTimeProtocolServers({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::VendorSpecificInformation(v) => {
                 Ok(DhcpOption::VendorSpecificInformation({
                     let size = v.size_of_contents_in_bytes();
-                    v.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(size)
-                    })?
+                    v.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipNameServer(v) => {
                 Ok(DhcpOption::NetBiosOverTcpipNameServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipDatagramDistributionServer(v) => {
                 Ok(DhcpOption::NetBiosOverTcpipDatagramDistributionServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetbiosOverTcpipNodeType(v) => {
@@ -1778,18 +1796,22 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::XWindowSystemFontServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::XWindowSystemDisplayManager(v) => {
                 Ok(DhcpOption::XWindowSystemDisplayManager({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::NetworkInformationServicePlusDomain(v) => {
@@ -1799,38 +1821,42 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::NetworkInformationServicePlusServers({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::MobileIpHomeAgent(v) => {
                 Ok(DhcpOption::MobileIpHomeAgent({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::SmtpServer(v) => Ok(DhcpOption::SmtpServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::Pop3Server(v) => Ok(DhcpOption::Pop3Server({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
             fidl_fuchsia_net_dhcp::Option_::NntpServer(v) => Ok(DhcpOption::NntpServer({
                 let vec = Vec::<Ipv4Addr>::from_fidl(v);
                 let size = vec.size_of_contents_in_bytes();
-                vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+                vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
                     ProtocolError::InvalidBufferLength(size)
                 })?
             })),
@@ -1838,45 +1864,55 @@ impl FidlCompatible<fidl_fuchsia_net_dhcp::Option_> for DhcpOption {
                 Ok(DhcpOption::DefaultWwwServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::DefaultFingerServer(v) => {
                 Ok(DhcpOption::DefaultFingerServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::DefaultIrcServer(v) => {
                 Ok(DhcpOption::DefaultIrcServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::StreettalkServer(v) => {
                 Ok(DhcpOption::StreetTalkServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::StreettalkDirectoryAssistanceServer(v) => {
                 Ok(DhcpOption::StreetTalkDirectoryAssistanceServer({
                     let vec = Vec::<Ipv4Addr>::from_fidl(v);
                     let vec_size = vec.size_of_contents_in_bytes();
-                    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
-                        ProtocolError::InvalidBufferLength(vec_size)
-                    })?
+                    vec.try_into().map_err(
+                        |(size_constrained::Error::SizeConstraintViolated, _)| {
+                            ProtocolError::InvalidBufferLength(vec_size)
+                        },
+                    )?
                 }))
             }
             fidl_fuchsia_net_dhcp::Option_::OptionOverload(v) => {
@@ -2168,7 +2204,7 @@ fn bytes_to_addrs<const LOWER_BOUND: usize>(
         .map(bytes_to_addr)
         .collect::<Result<Vec<Ipv4Addr>, InvalidBufferLengthError>>()
         .map_err(|InvalidBufferLengthError(_)| InvalidBufferLengthError(bytes.len()))?;
-    vec.try_into().map_err(|size_constrained::Error::SizeConstraintViolated| {
+    vec.try_into().map_err(|(size_constrained::Error::SizeConstraintViolated, _)| {
         InvalidBufferLengthError(bytes.len())
     })
 }
