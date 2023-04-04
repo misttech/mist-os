@@ -3,6 +3,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/arch/intrin.h>
 #include <lib/cbuf.h>
 #include <lib/debuglog.h>
 #include <lib/zircon-internal/macros.h>
@@ -12,7 +13,6 @@
 #include <trace.h>
 #include <zircon/boot/driver-config.h>
 
-#include <arch/arm64/periphmap.h>
 #include <dev/interrupt.h>
 #include <dev/uart.h>
 #include <dev/uart/dw8250/init.h>
@@ -21,10 +21,17 @@
 #include <pdev/uart.h>
 #include <platform/debug.h>
 
+#if __aarch64__
+#include <arch/arm64/periphmap.h>
+#endif
+#if __riscv
+#include <vm/physmap.h>
+#endif
+
 // DW8250 implementation
 
 // clang-format off
-// UART Registers
+// UART Registers using 4 byte stride
 
 #define UART_RBR                    (0x0)   // RX Buffer Register (read-only)
 #define UART_THR                    (0x0)   // TX Buffer Register (write-only)
@@ -98,6 +105,9 @@ static bool initialized = false;
 static vaddr_t uart_base = 0;
 static uint32_t uart_irq = 0;
 
+// are the registers 4 bytes wide on 4 byte intervals?
+static bool stride4 = false;
+
 static Cbuf uart_rx_buf;
 static bool uart_tx_irq_enabled = false;
 static AutounsignalEvent uart_dputc_event{true};
@@ -109,36 +119,60 @@ namespace {
 DECLARE_SINGLETON_SPINLOCK_WITH_TYPE(uart_spinlock, MonitoredSpinLock);
 }  // namespace
 
-#define UARTREG(reg) (*(volatile uint32_t*)((uart_base) + (reg)))
-
-static inline void uartreg_and_eq(ptrdiff_t reg, uint32_t flags) {
-  volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(uart_base + reg);
-  *ptr = *ptr & flags;
+static uint8_t uartreg_read(ptrdiff_t reg) {
+  if (stride4) {
+    return (*(volatile uint32_t*)((uart_base) + (reg))) & 0xff;
+  } else {
+    return (*(volatile uint8_t*)((uart_base) + (reg / 4U)));
+  }
 }
 
-static inline void uartreg_or_eq(ptrdiff_t reg, uint32_t flags) {
-  volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(uart_base + reg);
-  *ptr = *ptr | flags;
+static void uartreg_write(ptrdiff_t reg, uint8_t val) {
+  if (stride4) {
+    (*(volatile uint32_t*)((uart_base) + (reg))) = val;
+  } else {
+    (*(volatile uint8_t*)((uart_base) + (reg / 4U))) = val;
+  }
+}
+
+static void uartreg_and_eq(ptrdiff_t reg, uint8_t flags) {
+  if (stride4) {
+    volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(uart_base + reg);
+    *ptr = *ptr & flags;
+  } else {
+    volatile uint8_t* ptr = reinterpret_cast<volatile uint8_t*>(uart_base + reg / 4U);
+    *ptr = *ptr & flags;
+  }
+}
+
+static void uartreg_or_eq(ptrdiff_t reg, uint8_t flags) {
+  if (stride4) {
+    volatile uint32_t* ptr = reinterpret_cast<volatile uint32_t*>(uart_base + reg);
+    *ptr = *ptr | flags;
+  } else {
+    volatile uint8_t* ptr = reinterpret_cast<volatile uint8_t*>(uart_base + reg / 4U);
+    *ptr = *ptr | flags;
+  }
 }
 
 static void dw8250_uart_irq(void* arg) {
-  if ((UARTREG(UART_IIR) & UART_IIR_BUSY) == UART_IIR_BUSY) {
+  if ((uartreg_read(UART_IIR) & UART_IIR_BUSY) == UART_IIR_BUSY) {
     // To clear the USR (UART Status Register) we need to read it.
-    volatile uint32_t unused = UARTREG(UART_USR);
+    volatile auto unused = uartreg_read(UART_USR);
     static_cast<void>(unused);
   }
 
   // read interrupt status and mask
-  while (UARTREG(UART_LSR) & UART_LSR_DR) {
+  while (uartreg_read(UART_LSR) & UART_LSR_DR) {
     if (uart_rx_buf.Full()) {
       break;
     }
-    char c = UARTREG(UART_RBR) & 0xFF;
+    char c = uartreg_read(UART_RBR) & 0xFF;
     uart_rx_buf.WriteChar(c);
   }
 
   // Signal if anyone is waiting to TX
-  if (UARTREG(UART_LSR) & UART_LSR_THRE) {
+  if (uartreg_read(UART_LSR) & UART_LSR_THRE) {
     uartreg_and_eq(UART_IER, ~UART_IER_ETBEI);  // Disable TX interrupt
     // TODO(andresoportus): Revisit all UART drivers usage of events, from event.h:
     // 1. The reschedule flag is not supposed to be true in interrupt context.
@@ -150,16 +184,16 @@ static void dw8250_uart_irq(void* arg) {
 /* panic-time getc/putc */
 static void dw8250_uart_pputc(char c) {
   // spin while fifo is full
-  while (!(UARTREG(UART_LSR) & UART_LSR_THRE))
+  while (!(uartreg_read(UART_LSR) & UART_LSR_THRE))
     ;
-  UARTREG(UART_THR) = c;
+  uartreg_write(UART_THR, c);
 }
 
 static int dw8250_uart_pgetc() {
   // spin while fifo is empty
-  while (!(UARTREG(UART_LSR) & UART_LSR_DR))
+  while (!(uartreg_read(UART_LSR) & UART_LSR_DR))
     ;
-  return UARTREG(UART_RBR);
+  return uartreg_read(UART_RBR);
 }
 
 static int dw8250_uart_getc(bool wait) {
@@ -185,7 +219,7 @@ static void dw8250_dputs(const char* str, size_t len, bool block) {
 
   while (len > 0) {
     // is FIFO full?
-    while (!(UARTREG(UART_LSR) & UART_LSR_THRE)) {
+    while (!(uartreg_read(UART_LSR) & UART_LSR_THRE)) {
       guard.CallUnlocked([&block]() {
         if (block) {
           uartreg_or_eq(UART_IER, UART_IER_ETBEI);  // Enable TX interrupt.
@@ -250,13 +284,22 @@ static const struct pdev_uart_ops uart_ops = {
 
 extern "C" void uart_mark(unsigned char x);
 
-void Dw8250UartInitEarly(const zbi_dcfg_simple_t& config) {
+void Dw8250UartInitEarly(const zbi_dcfg_simple_t& config, size_t stride) {
   ASSERT(config.mmio_phys != 0);
   ASSERT(config.irq != 0);
 
+#if __aarch64__
   uart_base = periph_paddr_to_vaddr(config.mmio_phys);
+#elif __riscv
+  uart_base = reinterpret_cast<vaddr_t>(paddr_to_physmap(config.mmio_phys));
+#else
+#error define uart base logic for architecture
+#endif
   ASSERT(uart_base != 0);
   uart_irq = config.irq;
+
+  ASSERT(stride == 1 || stride == 4);
+  stride4 = stride == 4;
 
   pdev_register_uart(&uart_ops);
 }
