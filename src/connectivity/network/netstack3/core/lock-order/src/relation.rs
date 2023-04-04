@@ -154,7 +154,7 @@ mod test {
 
         let mut locked = Locked::new(&state);
 
-        let (a, mut locked): (_, Locked<'_, FakeLocked, A>) = locked.lock_and::<A>();
+        let (a, mut locked): (_, Locked<&FakeLocked, A>) = locked.lock_and::<A>();
         assert_eq!(a, &123);
         // Show that A: LockBefore<B> and B: LockBefore<C> => A: LockBefore<C>.
         // Otherwise this wouldn't compile:

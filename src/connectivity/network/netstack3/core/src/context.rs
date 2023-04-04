@@ -97,7 +97,7 @@ use crate::{Instant, NonSyncContext, SyncCtx};
 /// [this issue]: https://github.com/rust-lang/rust/issues/97811
 pub(crate) trait NonTestCtxMarker {}
 
-impl<NonSyncCtx: NonSyncContext, L> NonTestCtxMarker for Locked<'_, SyncCtx<NonSyncCtx>, L> {}
+impl<NonSyncCtx: NonSyncContext, L> NonTestCtxMarker for Locked<&SyncCtx<NonSyncCtx>, L> {}
 
 /// A context that provides access to a monotonic clock.
 pub trait InstantContext {

@@ -1399,7 +1399,7 @@ mod tests {
         sync_ctx: &FakeSyncCtx,
         ctx: &mut FakeNonSyncCtx,
     ) where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>:
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
             DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
         FakeNonSyncCtx: IpDeviceNonSyncContext<I, DeviceId<FakeNonSyncCtx>, Instant = FakeInstant>,
     {
@@ -1505,7 +1505,7 @@ mod tests {
         }; "new remote to local")]
     fn test_new<I: Ip + IpSocketIpExt + IpLayerIpExt + IpDeviceIpExt>(test_case: NewSocketTestCase)
     where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
             + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>
             + DeviceIpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
         FakeNonSyncCtx: TimerContext<I::Timer<DeviceId<FakeNonSyncCtx>>>
@@ -1626,7 +1626,7 @@ mod tests {
         from_addr_type: AddressType,
         to_addr_type: AddressType,
     ) where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>,
         IcmpEchoReply: IcmpMessage<I, &'static [u8], Code = IcmpUnusedCode>,
     {
@@ -1745,7 +1745,7 @@ mod tests {
     #[ip_test]
     fn test_send<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, FakeNonSyncCtx>,
         FakeNonSyncCtx: EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>,
@@ -1883,7 +1883,7 @@ mod tests {
     #[ip_test]
     fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, FakeNonSyncCtx>,
     {
@@ -2015,7 +2015,7 @@ mod tests {
     #[test_case(false; "dont remove device")]
     fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
     where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, FakeNonSyncCtx>
             + DeviceIpSocketHandler<I, FakeNonSyncCtx>,

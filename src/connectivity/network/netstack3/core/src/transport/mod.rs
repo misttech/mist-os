@@ -145,7 +145,7 @@ pub(crate) enum TransportLayerTimerId {
 
 /// Handle a timer event firing in the transport layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
+    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
     ctx: &mut NonSyncCtx,
     id: TransportLayerTimerId,
 ) {

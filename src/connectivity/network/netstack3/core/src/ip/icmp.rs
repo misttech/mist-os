@@ -755,7 +755,7 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampRe
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>>
-    InnerIcmpv4Context<C> for Locked<'_, SyncCtx<C>, L>
+    InnerIcmpv4Context<C> for Locked<&SyncCtx<C>, L>
 {
     fn should_send_timestamp_reply(&self) -> bool {
         *self.unlocked_access::<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>()

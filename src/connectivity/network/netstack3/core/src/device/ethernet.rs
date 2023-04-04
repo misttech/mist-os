@@ -132,7 +132,7 @@ pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncConte
 impl<
         NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
-    > EthernetIpLinkDeviceContext<NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    > EthernetIpLinkDeviceContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
         &mut self,
@@ -204,7 +204,7 @@ impl<
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    NudContext<Ipv6, EthernetLinkDevice, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn retrans_timer(
         &mut self,
@@ -303,7 +303,7 @@ impl<
         NonSyncCtx: BufferNonSyncContext<B>,
         L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
     > BufferNudContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx>
-    for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
@@ -585,7 +585,7 @@ impl<C: NonSyncContext>
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueTypes<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+    TransmitQueueTypes<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
     type Meta = ();
     type Allocator = BufVecU8Allocator;
@@ -593,7 +593,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
-    TransmitQueueContext<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+    TransmitQueueContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
     fn with_transmit_queue_mut<
         O,
@@ -625,9 +625,9 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxQueue>>
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
-    TransmitDequeueContext<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+    TransmitDequeueContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
-    type TransmitQueueCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::EthernetTxDequeue>;
+    type TransmitQueueCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetTxDequeue>;
 
     fn with_dequed_packets_and_tx_queue_ctx<
         O,
@@ -1042,7 +1042,7 @@ impl<
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    ArpContext<EthernetLinkDevice, C> for Locked<'_, SyncCtx<C>, L>
+    ArpContext<EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
     fn get_protocol_addr(
         &mut self,
@@ -1081,7 +1081,7 @@ impl<
         B: BufferMut,
         C: BufferNonSyncContext<B>,
         L: LockBefore<crate::lock_ordering::IpState<Ipv4>>,
-    > BufferArpContext<EthernetLinkDevice, C, B> for Locked<'_, SyncCtx<C>, L>
+    > BufferArpContext<EthernetLinkDevice, C, B> for Locked<&SyncCtx<C>, L>
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,

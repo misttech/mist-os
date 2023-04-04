@@ -1163,7 +1163,7 @@ mod tests {
         device_id: &EthernetDeviceId<C::Instant, C::EthernetDeviceState>,
         expected: HashMap<SpecifiedAddr<I::Addr>, NeighborState<Mac>>,
     ) where
-        Locked<'a, SyncCtx<C>, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, C>
+        Locked<&'a SyncCtx<C>, crate::lock_ordering::Unlocked>: NudContext<I, EthernetLinkDevice, C>
             + DeviceIdContext<
                 EthernetLinkDevice,
                 DeviceId = EthernetDeviceId<C::Instant, C::EthernetDeviceState>,

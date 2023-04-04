@@ -28,7 +28,7 @@ use crate::{
 };
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache<Ipv4>>>
-    FragmentStateContext<Ipv4, C::Instant> for Locked<'_, SyncCtx<C>, L>
+    FragmentStateContext<Ipv4, C::Instant> for Locked<&SyncCtx<C>, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv4, C::Instant>) -> O>(
         &mut self,
@@ -40,7 +40,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache<Ipv6>>>
-    FragmentStateContext<Ipv6, C::Instant> for Locked<'_, SyncCtx<C>, L>
+    FragmentStateContext<Ipv6, C::Instant> for Locked<&SyncCtx<C>, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut IpPacketFragmentCache<Ipv6, C::Instant>) -> O>(
         &mut self,
@@ -52,7 +52,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStateFragmentCache
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv4>>>
-    PmtuStateContext<Ipv4, C::Instant> for Locked<'_, SyncCtx<C>, L>
+    PmtuStateContext<Ipv4, C::Instant> for Locked<&SyncCtx<C>, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv4, C::Instant>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv4>>();
@@ -61,7 +61,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv6>>>
-    PmtuStateContext<Ipv6, C::Instant> for Locked<'_, SyncCtx<C>, L>
+    PmtuStateContext<Ipv6, C::Instant> for Locked<&SyncCtx<C>, L>
 {
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, C::Instant>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv6>>();
@@ -121,7 +121,7 @@ impl<
         I: Ip + IpDeviceIpExt,
         C: NonSyncContext + IpDeviceNonSyncContext<I, Self::DeviceId>,
         L: LockBefore<crate::lock_ordering::IpState<I>>,
-    > MulticastMembershipHandler<I, C> for Locked<'_, SyncCtx<C>, L>
+    > MulticastMembershipHandler<I, C> for Locked<&SyncCtx<C>, L>
 where
     Self: IpDeviceContext<I, C> + GmpHandler<I, C>,
 {

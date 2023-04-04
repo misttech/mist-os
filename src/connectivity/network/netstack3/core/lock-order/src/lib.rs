@@ -186,7 +186,7 @@ use crate::{
 /// `Locked` instance that mutably borrows from the original instance. This
 /// means the original instance can't be used to acquire new locks until the
 /// new instance leaves scope.
-pub struct Locked<'a, T, L>(&'a T, PhantomData<L>);
+pub struct Locked<T, L>(T, PhantomData<L>);
 
 /// "Highest" lock level
 ///
@@ -195,7 +195,7 @@ pub struct Locked<'a, T, L>(&'a T, PhantomData<L>);
 /// trees.
 pub struct Unlocked;
 
-impl<'a, T> Locked<'a, T, Unlocked> {
+impl<'a, T> Locked<&'a T, Unlocked> {
     /// Entry point for locked access.
     ///
     /// `Unlocked` is the "root" lock level and can be acquired before any lock.
@@ -204,13 +204,13 @@ impl<'a, T> Locked<'a, T, Unlocked> {
     }
 }
 
-impl<'a, T, L> Locked<'a, T, L> {
+impl<'a, T, L> Locked<&'a T, L> {
     /// Entry point for locked access.
     ///
     /// Creates a new `Locked` that restricts locking to levels after `L`. This
     /// is safe because any acquirable locks must have a total ordering, and
     /// restricting the set of locks doesn't violate that ordering.
-    pub fn new_locked(t: &'a T) -> Locked<'a, T, L> {
+    pub fn new_locked(t: &'a T) -> Locked<&'a T, L> {
         Self(t, PhantomData)
     }
 
@@ -230,7 +230,7 @@ impl<'a, T, L> Locked<'a, T, L> {
 // It's important that the lifetime on `Locked` here be anonymous. That means
 // that the lifetimes in the returned `Locked` objects below are inferred to
 // be the lifetimes of the references to self (mutable or immutable).
-impl<T, L> Locked<'_, T, L> {
+impl<T, L> Locked<&T, L> {
     /// Acquire the given lock.
     ///
     /// This requires that `M` can be locked after `L`.
@@ -239,14 +239,14 @@ impl<T, L> Locked<'_, T, L> {
         T: LockFor<M>,
         L: LockBefore<M>,
     {
-        let (data, _): (_, Locked<'_, T, M>) = self.lock_and();
+        let (data, _): (_, Locked<&T, M>) = self.lock_and();
         data
     }
 
     /// Acquire the given lock and a new locked context.
     ///
     /// This requires that `M` can be locked after `L`.
-    pub fn lock_and<M>(&mut self) -> (T::Data<'_>, Locked<'_, T, M>)
+    pub fn lock_and<M>(&mut self) -> (T::Data<'_>, Locked<&T, M>)
     where
         T: LockFor<M>,
         L: LockBefore<M>,
@@ -265,7 +265,7 @@ impl<T, L> Locked<'_, T, L> {
         T: RwLockFor<M>,
         L: LockBefore<M>,
     {
-        let (data, _): (_, Locked<'_, T, M>) = self.read_lock_and();
+        let (data, _): (_, Locked<&T, M>) = self.read_lock_and();
         data
     }
 
@@ -273,7 +273,7 @@ impl<T, L> Locked<'_, T, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn read_lock_and<M>(&mut self) -> (T::ReadData<'_>, Locked<'_, T, M>)
+    pub fn read_lock_and<M>(&mut self) -> (T::ReadData<'_>, Locked<&T, M>)
     where
         T: RwLockFor<M>,
         L: LockBefore<M>,
@@ -292,7 +292,7 @@ impl<T, L> Locked<'_, T, L> {
         T: RwLockFor<M>,
         L: LockBefore<M>,
     {
-        let (data, _): (_, Locked<'_, T, M>) = self.write_lock_and();
+        let (data, _): (_, Locked<&T, M>) = self.write_lock_and();
         data
     }
 
@@ -300,7 +300,7 @@ impl<T, L> Locked<'_, T, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn write_lock_and<M>(&mut self) -> (T::WriteData<'_>, Locked<'_, T, M>)
+    pub fn write_lock_and<M>(&mut self) -> (T::WriteData<'_>, Locked<&T, M>)
     where
         T: RwLockFor<M>,
         L: LockBefore<M>,
@@ -321,7 +321,7 @@ impl<T, L> Locked<'_, T, L> {
     ///      can't allow access to a different locking domain, and
     ///   3. the returned `Locked` instance borrows `self` mutably so it can't
     ///      be used until the new instance is dropped.
-    pub fn cast<R>(&mut self) -> Locked<'_, R, L>
+    pub fn cast<R>(&mut self) -> Locked<&R, L>
     where
         T: AsRef<R>,
     {
@@ -332,7 +332,7 @@ impl<T, L> Locked<'_, T, L> {
     ///
     /// Like `cast`, but with a callable function instead of using `AsRef`. The
     /// same safety arguments apply.
-    pub fn cast_with<R>(&mut self, f: impl FnOnce(&T) -> &R) -> Locked<'_, R, L> {
+    pub fn cast_with<R>(&mut self, f: impl FnOnce(&T) -> &R) -> Locked<&R, L> {
         let Self(t, PhantomData) = self;
         Locked(f(t), PhantomData)
     }
@@ -342,7 +342,7 @@ impl<T, L> Locked<'_, T, L> {
     /// Like `lock_and` but doesn't actually acquire the lock `M`. This is
     /// safe because any locks that could be acquired with the lock `M` held can
     /// also be acquired without `M` being held.
-    pub fn cast_locked<M>(&mut self) -> Locked<'_, T, M>
+    pub fn cast_locked<M>(&mut self) -> Locked<&T, M>
     where
         L: LockBefore<M>,
     {

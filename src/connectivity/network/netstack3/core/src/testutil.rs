@@ -1323,7 +1323,7 @@ mod tests {
         device: &DeviceId<FakeNonSyncCtx>,
     ) where
         A::Version: TestIpExt,
-        Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
+        Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
             A::Version,
             FakeNonSyncCtx,
             Buf<Vec<u8>>,
@@ -1351,7 +1351,7 @@ mod tests {
     #[ip_test]
     fn test_send_to_many<I: Ip + TestIpExt>()
     where
-        for<'a> Locked<'a, FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
             I,
             FakeNonSyncCtx,
             Buf<Vec<u8>>,

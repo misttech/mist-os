@@ -761,7 +761,7 @@ impl<
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    Ipv4StateContext<NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    Ipv4StateContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
@@ -769,10 +769,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    IpStateContext<Ipv4, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    IpStateContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type IpDeviceIdCtx<'a> =
-        Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv4>>;
+        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv4>>;
 
     fn with_ip_routing_table<
         O,
@@ -800,10 +800,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    IpStateContext<Ipv6, NonSyncCtx> for Locked<'_, SyncCtx<NonSyncCtx>, L>
+    IpStateContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type IpDeviceIdCtx<'a> =
-        Locked<'a, SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv6>>;
+        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv6>>;
 
     fn with_ip_routing_table<
         O,
@@ -891,7 +891,7 @@ impl<
         C: BufferNonSyncContext<B>,
         B: BufferMut,
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>,
-    > BufferTransportContext<Ipv4, C, B> for Locked<'_, SyncCtx<C>, L>
+    > BufferTransportContext<Ipv4, C, B> for Locked<&SyncCtx<C>, L>
 {
     fn dispatch_receive_ip_packet(
         &mut self,
@@ -948,7 +948,7 @@ impl<
         C: BufferNonSyncContext<B>,
         B: BufferMut,
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv6>>,
-    > BufferTransportContext<Ipv6, C, B> for Locked<'_, SyncCtx<C>, L>
+    > BufferTransportContext<Ipv6, C, B> for Locked<&SyncCtx<C>, L>
 {
     fn dispatch_receive_ip_packet(
         &mut self,
@@ -1265,7 +1265,7 @@ impl_timer_context!(IpLayerTimerId, PmtuTimerId<Ipv6>, IpLayerTimerId::PmtuTimeo
 
 /// Handle a timer event firing in the IP layer.
 pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &mut Locked<'_, SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
+    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, crate::lock_ordering::Unlocked>,
     ctx: &mut NonSyncCtx,
     id: IpLayerTimerId,
 ) {
@@ -2593,7 +2593,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv4>>
             + LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>
             + LockBefore<crate::lock_ordering::UdpSockets<Ipv4>>,
-    > InnerIcmpContext<Ipv4, C> for Locked<'_, SyncCtx<C>, L>
+    > InnerIcmpContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
     fn receive_icmp_error(
         &mut self,
@@ -2691,7 +2691,7 @@ impl<
         L: LockBefore<crate::lock_ordering::IcmpSockets<Ipv6>>
             + LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>
             + LockBefore<crate::lock_ordering::UdpSockets<Ipv6>>,
-    > InnerIcmpContext<Ipv6, C> for Locked<'_, SyncCtx<C>, L>
+    > InnerIcmpContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
     fn receive_icmp_error(
         &mut self,
@@ -4783,7 +4783,7 @@ mod tests {
         dest_ip: SpecifiedAddr<I::Addr>,
         expected_result: Result<IpSockRoute<I, Device>, IpSockRouteError>,
     ) where
-        for<'a> Locked<'a, SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
+        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
             IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         set_logger_for_test();

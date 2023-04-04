@@ -318,9 +318,9 @@ pub fn remove<C: crate::NonSyncContext>(sync_ctx: &SyncCtx<C>, id: SocketId) {
 }
 
 impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AnyDeviceSockets>> SyncContext<C>
-    for Locked<'_, SyncCtx<C>, L>
+    for Locked<&SyncCtx<C>, L>
 {
-    type DeviceSocketAccessor<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::AnyDeviceSockets>;
+    type DeviceSocketAccessor<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::AnyDeviceSockets>;
 
     fn with_sockets<
         F: FnOnce(&Sockets<WeakDeviceId<C>>, &mut Self::DeviceSocketAccessor<'_>) -> R,
@@ -347,7 +347,7 @@ impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::AnyDeviceSock
 }
 
 impl<C: crate::NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceSockets>>
-    DeviceSocketAccessor for Locked<'_, SyncCtx<C>, L>
+    DeviceSocketAccessor for Locked<&SyncCtx<C>, L>
 {
     fn with_device_sockets<F: FnOnce(&DeviceSockets) -> R, R>(
         &mut self,

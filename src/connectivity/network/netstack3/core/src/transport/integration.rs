@@ -23,9 +23,9 @@ use crate::{
 impl<
         C: NonSyncContext + IpDeviceNonSyncContext<Ipv4, Self::DeviceId>,
         L: LockBefore<crate::lock_ordering::TcpSockets<Ipv4>>,
-    > tcp::socket::SyncContext<Ipv4, C> for Locked<'_, SyncCtx<C>, L>
+    > tcp::socket::SyncContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpTransportCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::TcpSockets<Ipv4>>;
+    type IpTransportCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::TcpSockets<Ipv4>>;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
@@ -55,9 +55,9 @@ impl<
 impl<
         C: NonSyncContext + IpDeviceNonSyncContext<Ipv6, Self::DeviceId>,
         L: LockBefore<crate::lock_ordering::TcpSockets<Ipv6>>,
-    > tcp::socket::SyncContext<Ipv6, C> for Locked<'_, SyncCtx<C>, L>
+    > tcp::socket::SyncContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpTransportCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::TcpSockets<Ipv6>>;
+    type IpTransportCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::TcpSockets<Ipv6>>;
 
     fn with_ip_transport_ctx_isn_generator_and_tcp_sockets_mut<
         O,
@@ -85,9 +85,9 @@ impl<
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSockets<Ipv4>>>
-    udp::StateContext<Ipv4, C> for Locked<'_, SyncCtx<C>, L>
+    udp::StateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpSocketsCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::UdpSockets<Ipv4>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpSockets<Ipv4>>;
 
     fn with_sockets<
         O,
@@ -117,9 +117,9 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSockets<Ipv4>>>
 }
 
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpSockets<Ipv6>>>
-    udp::StateContext<Ipv6, C> for Locked<'_, SyncCtx<C>, L>
+    udp::StateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
-    type IpSocketsCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::UdpSockets<Ipv6>>;
+    type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpSockets<Ipv6>>;
 
     fn with_sockets<
         O,
@@ -153,7 +153,7 @@ impl<
         B: BufferMut,
         C: udp::BufferNonSyncContext<I, B> + crate::NonSyncContext,
         L: LockBefore<crate::lock_ordering::UdpSockets<I>>,
-    > udp::BufferStateContext<I, C, B> for Locked<'_, SyncCtx<C>, L>
+    > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
     Self: udp::StateContext<I, C>,
     for<'a> Self::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
