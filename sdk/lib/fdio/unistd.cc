@@ -446,7 +446,9 @@ extern "C" __EXPORT void __libc_extensions_init(uint32_t handle_count, zx_handle
       }
       case PA_NS_DIR:
         if (arg < name_count) {
-          fdio_ns_bind(fdio_root_ns, names[arg], h);
+          if (zx_status_t status = fdio_ns_bind(fdio_root_ns, names[arg], h); status != ZX_OK) {
+            ZX_PANIC("fdio_ns_bind(%s): %s", names[arg], zx_status_get_string(status));
+          }
         }
         // we always continue here to not steal the
         // handles from higher level code that may
