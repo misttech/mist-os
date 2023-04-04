@@ -10,9 +10,9 @@ ffx_env_for_build_label =
     "//src/developer/ffx/build:ffx_env_config($host_toolchain)"
 ffx_env_config = root_build_dir + "/.ffx.env"
 
-sdk_host_tools_label = "//sdk:host_tools.modular($host_toolchain)"
+sdk_host_tools_label = "//sdk:host_tools.internal($host_toolchain)"
 sdk_host_tools_manifest = get_label_info(sdk_host_tools_label, "root_out_dir") +
-                          "/sdk/manifest/host_tools.modular"
+                          "/sdk/manifest/host_tools.internal"
 
 # Executes an ffx command as an action during the build.
 #
@@ -199,7 +199,7 @@ template("ffx_action") {
       _ffx_config += [
         "sdk.root=" + rebase_path(root_build_dir, root_build_dir),
         "sdk.type=in-tree",
-        "sdk.module=host_tools.modular",
+        "sdk.module=host_tools.internal",
       ]
     }
 

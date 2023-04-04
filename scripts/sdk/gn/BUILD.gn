@@ -54,20 +54,6 @@ template("gn_sdk") {
   }
 }
 
-# Produces the modular GN SDK archive.
-#
-# Requires the `build_sdk_archives` GN arg to be set to `true` which will create
-# the input core.modular.tar.gz archive.
-#
-# To build this rule, run:
-#   fx set core.x64 --with //scripts/sdk/gn:gn.modular.tar.gz --args="build_sdk_archives=true"
-#   fx build
-gn_sdk("gn.modular.tar.gz") {
-  input_archive = "${root_out_dir}/sdk/archive/core.modular.tar.gz"
-  output_archive = "${root_out_dir}/gn.modular.tar.gz"
-  deps = [ "//sdk:core.modular($target_toolchain)" ]
-}
-
 # Only build this for host targets
 if (is_linux || is_mac) {
   # Wrapper for running the Python unit tests

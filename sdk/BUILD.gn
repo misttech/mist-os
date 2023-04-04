@@ -95,18 +95,6 @@ merged_sdk("merged") {
   ]
 }
 
-# Do not add to this group. The modular SDK is deprecated (fxbug.dev/114745).
-group("sdk.modular") {
-  testonly = true
-
-  public_deps = [
-    ":core.modular",
-    ":host_tools.all",
-    ":zircon_sysroot",
-    "//scripts/sdk/gn:gn.modular.tar.gz",
-  ]
-}
-
 group("tests_no_e2e") {
   testonly = true
   assert_no_deps = e2e_test_libs
@@ -439,34 +427,23 @@ sdk("core_testing") {
   deps = [ ":core_testing_idk" ]
 }
 
-# Do not add to this group. The modular SDK is deprecated (fxbug.dev/114745).
-sdk("core.modular") {
-  id = sdk_id
-
-  category = "partner"
-
-  api = "manifests/core.modular.manifest"
-
-  testonly = true
-
-  deps = [ ":core_idk" ]
-}
-
 group("host_tools.all") {
   public_deps = []
   if (host_os == "linux" && sdk_cross_compile_host_tools) {
     public_deps += [
-      ":host_tools.modular($host_arm64_toolchain)",
-      ":host_tools.modular($host_x64_toolchain)",
+      ":host_tools.internal($host_arm64_toolchain)",
+      ":host_tools.internal($host_x64_toolchain)",
     ]
   } else {
-    public_deps += [ ":host_tools.modular($host_toolchain)" ]
+    public_deps += [ ":host_tools.internal($host_toolchain)" ]
   }
 }
 
 if (is_host) {
-  # Do not add to this group. The modular SDK is deprecated (fxbug.dev/114745).
-  sdk("host_tools.modular") {
+  # An IDK that only contains host tools that are used by the
+  # Fuchsia build system itself. In particular, this is where
+  # `ffx` will pick companion host tools when running in-tree.
+  sdk("host_tools.internal") {
     id = sdk_id
     category = "partner"
     api = "manifests/host_tools_${current_os}_${current_cpu}.manifest"
