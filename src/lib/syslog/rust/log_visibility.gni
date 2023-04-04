@@ -31,9 +31,6 @@ third_party_rust_crate_log_visibility = [
   # Not intended to be restricted
   "//third_party/*",
 
-  # Can't be listed in more detail here (but should still be removed)
-  "//vendor/google/*",
-
   # Can't be migrated. This is a test using //third_party sources.
   "//src/sys/pkg/lib/tuf:*",
 
