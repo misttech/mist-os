@@ -9,6 +9,6 @@ source_set("pthread") {
     "pthread_c.c",
   ]
 
-  cflags_c = [ "-Wgnu-empty-initializer" ]
+  cflags_c = [ "-pedantic" ]
   deps = [ "//zircon/system/ulib/zxtest" ]
 }
