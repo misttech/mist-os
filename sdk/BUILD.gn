@@ -10,7 +10,6 @@ import("//build/fidl/toolchain.gni")
 import("//build/sdk/merged_sdk.gni")
 import("//build/sdk/sdk.gni")
 import("//build/sdk/sdk_documentation.gni")
-import("//build/sdk/version_history_sdk_element.gni")
 import("config.gni")
 
 _sdk_public_deps = [
@@ -118,13 +117,15 @@ group("tests") {
   ]
 }
 
-version_history_sdk_element("version_history_sdk_element") {
-  schema = "//build/sdk/meta/version_history-ef02ef45.json"
-  data = "version_history.json"
-}
-
-sdk_element_adapter("version_history") {
-  deps = [ ":version_history_sdk_element" ]
+sdk_atom("version_history") {
+  id = "sdk://version_history"
+  category = "partner"
+  meta = {
+    dest = "version_history.json"
+    source = "version_history.json"
+    schema = "version_history-ef02ef45"
+    type = "version_history"
+  }
 }
 
 # License/rights related information for the SDK.
