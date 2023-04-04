@@ -39,10 +39,14 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
 
   // set the stack pointer
   t->arch().sp = (vaddr_t)frame;
+
 #if __has_feature(shadow_call_stack)
   // the shadow call stack grows up
   frame->s2 = t->stack().shadow_call_base();
 #endif
+
+  // set the thread pointer that will be restored on the first context switch
+  frame->tp = reinterpret_cast<uintptr_t>(&t->arch().thread_pointer_location);
 }
 
 void arch_thread_construct_first(Thread* t) { arch_set_current_thread(t); }
@@ -52,7 +56,6 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
 
   LTRACEF("old %p (%s), new %p (%s)\n", oldthread, oldthread->name(), newthread, newthread->name());
 
-  arch_set_current_thread(newthread);
   riscv64_context_switch(&oldthread->arch().sp, newthread->arch().sp);
 }
 

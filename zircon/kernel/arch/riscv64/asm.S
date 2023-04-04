@@ -14,6 +14,7 @@ FUNCTION(riscv64_context_switch)
     /* save old frame */
     addi  sp, sp, -SIZEOF_CONTEXT_SWITCH_FRAME
     sd    ra, CONTEXT_SWITCH_FRAME_OFFSET_RA(sp)
+    sd    tp, CONTEXT_SWITCH_FRAME_OFFSET_TP(sp)
 
     sd    s0, CONTEXT_SWITCH_FRAME_OFFSET_S(0)(sp)
     sd    s1, CONTEXT_SWITCH_FRAME_OFFSET_S(1)(sp)
@@ -48,6 +49,7 @@ FUNCTION(riscv64_context_switch)
     ld    s10, CONTEXT_SWITCH_FRAME_OFFSET_S(10)(sp)
     ld    s11, CONTEXT_SWITCH_FRAME_OFFSET_S(11)(sp)
 
+    ld    tp, CONTEXT_SWITCH_FRAME_OFFSET_TP(sp)
     ld    ra, CONTEXT_SWITCH_FRAME_OFFSET_RA(sp)
     addi  sp, sp, SIZEOF_CONTEXT_SWITCH_FRAME
 

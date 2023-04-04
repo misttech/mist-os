@@ -73,8 +73,9 @@
 
 // Byte offsets corresponding to the fields of riscv64_context_switch_frame.
 #define REGOFF(x) ((x)*8)
-#define CONTEXT_SWITCH_FRAME_OFFSET_RA REGOFF(0 * 8)
-#define CONTEXT_SWITCH_FRAME_OFFSET_S(n) REGOFF(1 + n)
+#define CONTEXT_SWITCH_FRAME_OFFSET_RA REGOFF(0)
+#define CONTEXT_SWITCH_FRAME_OFFSET_TP REGOFF(1)
+#define CONTEXT_SWITCH_FRAME_OFFSET_S(n) REGOFF(2 + n)
 
 #define SIZEOF_CONTEXT_SWITCH_FRAME REGOFF(14)
 
@@ -131,6 +132,7 @@
 // Register state layout used by riscv64_context_switch().
 struct alignas(16) riscv64_context_switch_frame {
   uint64_t ra;  // return address (x1)
+  uint64_t tp;  // thread pointer
 
   uint64_t s0;  // x8-x9
   uint64_t s1;
@@ -145,11 +147,10 @@ struct alignas(16) riscv64_context_switch_frame {
   uint64_t s9;
   uint64_t s10;
   uint64_t s11;
-
-  uint64_t reserved;  // stack alignment
 };
 
 static_assert(__offsetof(riscv64_context_switch_frame, ra) == CONTEXT_SWITCH_FRAME_OFFSET_RA);
+static_assert(__offsetof(riscv64_context_switch_frame, tp) == CONTEXT_SWITCH_FRAME_OFFSET_TP);
 static_assert(__offsetof(riscv64_context_switch_frame, s0) == CONTEXT_SWITCH_FRAME_OFFSET_S(0));
 static_assert(sizeof(riscv64_context_switch_frame) == SIZEOF_CONTEXT_SWITCH_FRAME);
 static_assert(sizeof(riscv64_context_switch_frame) % 16u == 0u);
