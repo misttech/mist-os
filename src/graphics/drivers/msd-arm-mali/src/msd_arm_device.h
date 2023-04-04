@@ -219,6 +219,7 @@ class MsdArmDevice : public msd::Device,
   // Power on all GPU cores.
   void EnableAllCores();
   void HandleResetInterrupt();
+  void WatchdogTask();
 
   magma::Status ProcessDumpStatusToLog();
   magma::Status ProcessPerfCounterSampleCompleted();
@@ -284,6 +285,8 @@ class MsdArmDevice : public msd::Device,
   uint64_t job_interrupt_time_ = {};
 
   async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  // The watchdog loop runs WatchdogTask to help root-cause fxbug.dev/118466.
+  async::Loop watchdog_loop_{&kAsyncLoopConfigNeverAttachToThread};
 
   std::unique_ptr<magma::PlatformSemaphore> device_request_semaphore_;
   std::unique_ptr<magma::PlatformPort> device_port_;

@@ -5,6 +5,7 @@
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/backtrace-request/backtrace-request.h>
 #include <lib/fit/defer.h>
 
 #include <bitset>
@@ -114,6 +115,14 @@ class MsdArmDevice::TimestampRequest : public DeviceRequest {
   std::shared_ptr<magma::PlatformBuffer> buffer_;
 };
 
+class NoOpRequest : public DeviceRequest {
+ public:
+  NoOpRequest() {}
+
+ protected:
+  magma::Status Process(MsdArmDevice* device) override { return MAGMA_STATUS_OK; }
+};
+
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<MsdArmDevice> MsdArmDevice::Create(msd::DeviceHandle* device_handle,
@@ -142,6 +151,7 @@ void MsdArmDevice::Destroy() {
   CHECK_THREAD_NOT_CURRENT(device_thread_id_);
 
   loop_.Shutdown();
+  watchdog_loop_.Shutdown();
 
   DisableInterrupts();
 
@@ -194,6 +204,11 @@ bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
   zx_status_t status = loop_.StartThread("device-loop-thread");
   if (status != ZX_OK)
     return DRETF(false, "FAiled to create device loop thread");
+
+  status = watchdog_loop_.StartThread("watchdog-loop-thread");
+  if (status != ZX_OK)
+    return DRETF(false, "Failed to create watchdog loop thread");
+
   parent_device_ = std::move(platform_device);
   bus_mapper_ = std::move(bus_mapper);
   InitInspect();
@@ -509,6 +524,25 @@ void MsdArmDevice::HandleResetInterrupt() {
   reset_semaphore_->Signal();
 }
 
+void MsdArmDevice::WatchdogTask() {
+  auto request = std::make_unique<NoOpRequest>();
+  auto reply = request->GetReply();
+  EnqueueDeviceRequest(std::move(request));
+  constexpr uint64_t kTimeoutMs = 10 * 1000;
+  auto status = reply->Wait(kTimeoutMs);
+
+  if (!status.ok()) {
+    MAGMA_LOG(ERROR, "msd-arm-mali watchdog timeout");
+    backtrace_request();
+  } else {
+    // Chosen to be longer than any other driver timeouts, so it'll only happen if something is
+    // completely deadlocked.
+    constexpr auto kWatchdogTimeout = zx::sec(30);
+    async::PostDelayedTask(
+        watchdog_loop_.dispatcher(), [this]() { WatchdogTask(); }, kWatchdogTimeout);
+  }
+}
+
 int MsdArmDevice::GpuInterruptThreadLoop() {
   magma::PlatformThreadHelper::SetCurrentThreadName("Gpu InterruptThread");
   DLOG("GPU Interrupt thread started");
@@ -791,6 +825,7 @@ void MsdArmDevice::StartDeviceThread() {
   perf_counters_->SetDeviceThreadId(device_thread_.get_id());
 
   mmu_interrupt_thread_ = std::thread([this] { this->MmuInterruptThreadLoop(); });
+  async::PostTask(watchdog_loop_.dispatcher(), [this]() { WatchdogTask(); });
 }
 
 bool MsdArmDevice::InitializeInterrupts() {

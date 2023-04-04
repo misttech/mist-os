@@ -95,6 +95,7 @@ source_set("src") {
     "//src/graphics/lib/magma/src/magma_util/platform:trace",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:device",
     "//src/graphics/lib/magma/src/magma_util/platform/zircon:interrupt",
+    "//zircon/system/ulib/backtrace-request",
     "//zircon/system/ulib/fbl",
   ]
 
