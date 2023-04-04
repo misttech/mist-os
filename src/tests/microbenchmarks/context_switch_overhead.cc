@@ -6,6 +6,7 @@
 #include <lib/zx/handle.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
+#include <lib/zx/time.h>
 #include <zircon/assert.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
@@ -14,7 +15,6 @@
 #include <perftest/perftest.h>
 
 #include "assert.h"
-#include "lib/zx/time.h"
 
 namespace {
 

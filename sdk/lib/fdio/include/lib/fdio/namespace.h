@@ -135,6 +135,11 @@ typedef struct fdio_flat_namespace {
   zx_handle_t* handle;
 
   // type[i] is a handle info entry as defined in zircon/processargs.h by PA_HND.
+  //
+  // Note: when PA_HND_TYPE of this field is PA_NS_DIR, PA_HND_ARG of this field is the value used
+  // to index into `path`. This means that special care must be taken when manipulating these values
+  // e.g. when combining multiple namespaces or reordering entries therein. In effect PA_HND_ARG of
+  // this field is redundant with `path` at the same offset.
   uint32_t* type;
 
   // path[i] is the user-readable name of that element (e.g., "/bin").
