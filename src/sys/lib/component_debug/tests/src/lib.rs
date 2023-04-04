@@ -51,17 +51,14 @@ async fn show() {
 
     // The expected incoming capabilities are:
     // fidl.examples.routing.echo.Echo
-    // fuchsia.foo.Bar
     // fuchsia.logger.LogSink
     // fuchsia.sys2.RealmExplorer
     // fuchsia.sys2.RealmQuery
-    assert_eq!(resolved.incoming_capabilities.len(), 5);
+    assert_eq!(resolved.incoming_capabilities.len(), 4);
 
     // The expected exposed capabilities are:
-    // fuchsia.foo.bar
     // fuchsia.test.Suite
-    // minfs
-    assert_eq!(resolved.exposed_capabilities.len(), 3);
+    assert_eq!(resolved.exposed_capabilities.len(), 1);
 
     // This package must have a merkle root.
     assert!(resolved.merkle_root.is_some());
@@ -94,28 +91,15 @@ async fn show() {
 async fn capability() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
-    let capability::MatchingInstances { mut exposed, mut used } =
-        capability::find_instances_that_expose_or_use_capability(
-            "fuchsia.foo.Bar".to_string(),
-            &realm_query,
-        )
-        .await
-        .unwrap();
+    let mut segments =
+        capability::get_all_route_segments("data".to_string(), &realm_query).await.unwrap();
 
-    assert_eq!(exposed.len(), 1);
-    assert_eq!(used.len(), 1);
-    let exposed_component = exposed.remove(0);
-    let used_component = used.remove(0);
-    assert!(exposed_component.is_root());
-    assert!(used_component.is_root());
+    assert_eq!(segments.len(), 1);
+    let segment = segments.remove(0);
 
-    let capability::MatchingInstances { mut exposed, used } =
-        capability::find_instances_that_expose_or_use_capability("data".to_string(), &realm_query)
-            .await
-            .unwrap();
-
-    assert_eq!(exposed.len(), 1);
-    assert_eq!(used.len(), 0);
-    let exposed_component = exposed.remove(0);
-    assert!(exposed_component.is_root());
+    if let capability::RouteSegment::DeclareBy { moniker, .. } = segment {
+        assert!(moniker.is_root());
+    } else {
+        panic!("unexpected segment");
+    }
 }

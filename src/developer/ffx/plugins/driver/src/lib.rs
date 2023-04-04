@@ -55,9 +55,12 @@ impl DriverConnector {
             Ok(proxy)
         }
 
+        // Gets monikers for components that expose a capability matching the given |query|.
+        // This moniker is eventually converted into a selector and is used to connecting to
+        // the capability.
         async fn find_components_with_capability(
             rcs_proxy: &rc::RemoteControlProxy,
-            capability: &str,
+            query: &str,
         ) -> Result<Vec<String>> {
             let (query_proxy, query_server) =
                 fidl::endpoints::create_proxy::<fsys::RealmQueryMarker>()
@@ -68,15 +71,19 @@ impl DriverConnector {
                 .map_err(|i| Status::ok(i).unwrap_err())
                 .context("opening query")?;
 
-            Ok(capability::find_instances_that_expose_or_use_capability(
-                capability.to_string(),
-                &query_proxy,
-            )
-            .await?
-            .exposed
-            .iter()
-            .map(|c| c.to_string().split_off(1))
-            .collect())
+            Ok(capability::get_all_route_segments(query.to_string(), &query_proxy)
+                .await?
+                .iter()
+                .filter_map(|segment| {
+                    if let capability::RouteSegment::ExposeBy { moniker, .. } = segment {
+                        // Remove the leading `/` so it can be converted into a selector
+                        // later on.
+                        Some(moniker.to_string().split_off(1))
+                    } else {
+                        None
+                    }
+                })
+                .collect())
         }
 
         /// Find the components that expose a given capability, and let the user

@@ -10,13 +10,13 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "capability",
-    description = "Lists component instances that expose/use a capability",
-    example = "To show all components that expose/use a capability:
+    description = "Lists component instances that reference a capability",
+    example = "To show all components that reference a capability:
 
-    $ ffx component capability fuchsia.sys.Loader"
+    $ ffx component capability fuchsia.net.routes"
 )]
 pub struct ComponentCapabilityCommand {
     #[argh(positional)]
-    /// output all components that expose/use the capability
+    /// name of a capability. Partial matches allowed.
     pub capability: String,
 }

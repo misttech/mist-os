@@ -4,11 +4,14 @@
 
 use {
     crate::realm::{get_all_instances, get_manifest, GetAllInstancesError, GetManifestError},
-    cm_rust::{ComponentDecl, ExposeDecl, UseDecl},
+    cm_rust::{ComponentDecl, SourceName},
     fidl_fuchsia_sys2 as fsys,
     moniker::AbsoluteMoniker,
     thiserror::Error,
 };
+
+// Export so it is easier for others to use.
+pub use routing::mapper::RouteSegment;
 
 #[derive(Debug, Error)]
 pub enum FindInstancesError {
@@ -23,32 +26,19 @@ pub enum FindInstancesError {
     },
 }
 
-/// Component instances that use/expose a given capability, separated into two vectors (one for
-/// components that expose the capability, the other for components that use the capability).
-pub struct MatchingInstances {
-    pub exposed: Vec<AbsoluteMoniker>,
-    pub used: Vec<AbsoluteMoniker>,
-}
-
-/// Find components that expose or use a given capability. The capability must be a protocol name or
-/// a directory capability name.
-pub async fn find_instances_that_expose_or_use_capability(
-    capability: String,
+/// Find components that reference a capability matching the given |query|.
+pub async fn get_all_route_segments(
+    query: String,
     realm_query: &fsys::RealmQueryProxy,
-) -> Result<MatchingInstances, FindInstancesError> {
+) -> Result<Vec<RouteSegment>, FindInstancesError> {
     let instances = get_all_instances(realm_query).await?;
-    let mut matching_instances = MatchingInstances { exposed: vec![], used: vec![] };
+    let mut segments = vec![];
 
     for instance in instances {
         match get_manifest(&instance.moniker, realm_query).await {
             Ok(decl) => {
-                let (exposed, used) = capability_is_exposed_or_used(decl, &capability);
-                if exposed {
-                    matching_instances.exposed.push(instance.moniker.clone());
-                }
-                if used {
-                    matching_instances.used.push(instance.moniker.clone());
-                }
+                let mut component_segments = get_segments(&instance.moniker, decl, &query);
+                segments.append(&mut component_segments)
             }
             Err(GetManifestError::InstanceNotResolved(_)) => continue,
             Err(err) => {
@@ -60,51 +50,53 @@ pub async fn find_instances_that_expose_or_use_capability(
         }
     }
 
-    Ok(matching_instances)
+    Ok(segments)
 }
 
-/// Determine if |capability| is exposed or used by this component.
-fn capability_is_exposed_or_used(manifest: ComponentDecl, capability: &str) -> (bool, bool) {
-    let exposes = manifest.exposes;
-    let uses = manifest.uses;
+/// Determine if a capability matching the |query| is declared, exposed, used or offered by
+/// this component.
+fn get_segments(
+    moniker: &AbsoluteMoniker,
+    manifest: ComponentDecl,
+    query: &str,
+) -> Vec<RouteSegment> {
+    let mut segments = vec![];
 
-    let exposed = exposes.into_iter().any(|decl| {
-        let name = match decl {
-            ExposeDecl::Protocol(p) => p.target_name,
-            ExposeDecl::Directory(d) => d.target_name,
-            ExposeDecl::Service(s) => s.target_name,
-            _ => {
-                return false;
-            }
-        };
-        name.to_string() == capability
-    });
+    for capability in manifest.capabilities {
+        if capability.name().to_string().contains(query) {
+            segments.push(RouteSegment::DeclareBy { moniker: moniker.clone(), capability });
+        }
+    }
 
-    let used = uses.into_iter().any(|decl| {
-        let name = match decl {
-            UseDecl::Protocol(p) => p.source_name,
-            UseDecl::Directory(d) => d.source_name,
-            UseDecl::Storage(s) => s.source_name,
-            UseDecl::Service(s) => s.source_name,
-            _ => {
-                return false;
-            }
-        };
-        name.to_string() == capability
-    });
+    for expose in manifest.exposes {
+        if expose.source_name().to_string().contains(query) {
+            segments.push(RouteSegment::ExposeBy { moniker: moniker.clone(), capability: expose });
+        }
+    }
 
-    (exposed, used)
+    for use_ in manifest.uses {
+        if use_.source_name().to_string().contains(query) {
+            segments.push(RouteSegment::UseBy { moniker: moniker.clone(), capability: use_ });
+        }
+    }
+
+    for offer in manifest.offers {
+        if offer.source_name().to_string().contains(query) {
+            segments.push(RouteSegment::OfferBy { moniker: moniker.clone(), capability: offer });
+        }
+    }
+
+    segments
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::test_utils::*;
-    use fidl_fuchsia_component_decl as fdecl;
-    use moniker::AbsoluteMonikerBase;
+    use cm_rust::*;
     use std::collections::HashMap;
 
-    fn create_query() -> fsys::RealmQueryProxy {
+    fn create_realm_query() -> fsys::RealmQueryProxy {
         serve_realm_query(
             vec![fsys::Instance {
                 moniker: Some("./my_foo".to_string()),
@@ -119,24 +111,39 @@ mod tests {
             }],
             HashMap::from([(
                 "./my_foo".to_string(),
-                fdecl::Component {
-                    uses: Some(vec![fdecl::Use::Protocol(fdecl::UseProtocol {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
-                        source_name: Some("fuchsia.foo.bar".to_string()),
-                        target_path: Some("/svc/fuchsia.foo.bar".to_string()),
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseProtocol::EMPTY
-                    })]),
-                    exposes: Some(vec![fdecl::Expose::Protocol(fdecl::ExposeProtocol {
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef)),
-                        source_name: Some("fuchsia.bar.baz".to_string()),
-                        target: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
-                        target_name: Some("fuchsia.bar.baz".to_string()),
-                        ..fdecl::ExposeProtocol::EMPTY
-                    })]),
-                    ..fdecl::Component::EMPTY
-                },
+                ComponentDecl {
+                    uses: vec![UseDecl::Protocol(UseProtocolDecl {
+                        source: UseSource::Parent,
+                        source_name: "fuchsia.foo.bar".into(),
+                        target_path: "/svc/fuchsia.foo.bar".try_into().unwrap(),
+                        dependency_type: DependencyType::Strong,
+                        availability: Availability::Required,
+                    })],
+                    exposes: vec![ExposeDecl::Protocol(ExposeProtocolDecl {
+                        source: ExposeSource::Self_,
+                        source_name: "fuchsia.foo.bar".into(),
+                        target: ExposeTarget::Parent,
+                        target_name: "fuchsia.foo.bar".into(),
+                        availability: Availability::Required,
+                    })],
+                    offers: vec![OfferDecl::Protocol(OfferProtocolDecl {
+                        source: OfferSource::Self_,
+                        source_name: "fuchsia.foo.bar".into(),
+                        target: OfferTarget::Child(ChildRef {
+                            name: "my_bar".into(),
+                            collection: None,
+                        }),
+                        target_name: "fuchsia.foo.bar".into(),
+                        dependency_type: DependencyType::Strong,
+                        availability: Availability::Required,
+                    })],
+                    capabilities: vec![CapabilityDecl::Protocol(ProtocolDecl {
+                        name: "fuchsia.foo.bar".into(),
+                        source_path: Some("/svc/fuchsia.foo.bar".try_into().unwrap()),
+                    })],
+                    ..ComponentDecl::default()
+                }
+                .native_into_fidl(),
             )]),
             HashMap::new(),
             HashMap::new(),
@@ -144,36 +151,85 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn uses_cml() {
-        let query = create_query();
+    async fn segments() {
+        let realm_query = create_realm_query();
 
-        let instances =
-            find_instances_that_expose_or_use_capability("fuchsia.foo.bar".to_string(), &query)
-                .await
-                .unwrap();
-        let exposed = instances.exposed;
-        let mut used = instances.used;
-        assert_eq!(used.len(), 1);
-        assert!(exposed.is_empty());
+        let segments =
+            get_all_route_segments("fuchsia.foo.bar".to_string(), &realm_query).await.unwrap();
 
-        let moniker = used.remove(0);
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
-    }
+        assert_eq!(segments.len(), 4);
 
-    #[fuchsia::test]
-    async fn exposes_cml() {
-        let query = create_query();
+        let mut found_use = false;
+        let mut found_offer = false;
+        let mut found_expose = false;
+        let mut found_declaration = false;
 
-        let instances =
-            find_instances_that_expose_or_use_capability("fuchsia.bar.baz".to_string(), &query)
-                .await
-                .unwrap();
-        let mut exposed = instances.exposed;
-        let used = instances.used;
-        assert_eq!(exposed.len(), 1);
-        assert!(used.is_empty());
+        for segment in segments {
+            match segment {
+                RouteSegment::UseBy { moniker, capability } => {
+                    found_use = true;
+                    assert_eq!(moniker, "/my_foo".try_into().unwrap());
+                    assert_eq!(
+                        capability,
+                        UseDecl::Protocol(UseProtocolDecl {
+                            source: UseSource::Parent,
+                            source_name: "fuchsia.foo.bar".into(),
+                            target_path: "/svc/fuchsia.foo.bar".try_into().unwrap(),
+                            dependency_type: DependencyType::Strong,
+                            availability: Availability::Required
+                        })
+                    );
+                }
+                RouteSegment::OfferBy { moniker, capability } => {
+                    found_offer = true;
+                    assert_eq!(moniker, "/my_foo".try_into().unwrap());
+                    assert_eq!(
+                        capability,
+                        OfferDecl::Protocol(OfferProtocolDecl {
+                            source: OfferSource::Self_,
+                            source_name: "fuchsia.foo.bar".into(),
+                            target: OfferTarget::Child(ChildRef {
+                                name: "my_bar".into(),
+                                collection: None,
+                            }),
+                            target_name: "fuchsia.foo.bar".into(),
+                            dependency_type: DependencyType::Strong,
+                            availability: Availability::Required
+                        })
+                    );
+                }
+                RouteSegment::ExposeBy { moniker, capability } => {
+                    found_expose = true;
+                    assert_eq!(moniker, "/my_foo".try_into().unwrap());
+                    assert_eq!(
+                        capability,
+                        ExposeDecl::Protocol(ExposeProtocolDecl {
+                            source: ExposeSource::Self_,
+                            source_name: "fuchsia.foo.bar".into(),
+                            target: ExposeTarget::Parent,
+                            target_name: "fuchsia.foo.bar".into(),
+                            availability: Availability::Required
+                        })
+                    );
+                }
+                RouteSegment::DeclareBy { moniker, capability } => {
+                    found_declaration = true;
+                    assert_eq!(moniker, "/my_foo".try_into().unwrap());
+                    assert_eq!(
+                        capability,
+                        CapabilityDecl::Protocol(ProtocolDecl {
+                            name: "fuchsia.foo.bar".into(),
+                            source_path: Some("/svc/fuchsia.foo.bar".try_into().unwrap()),
+                        })
+                    );
+                }
+                _ => panic!("unexpected segment"),
+            }
+        }
 
-        let moniker = exposed.remove(0);
-        assert_eq!(moniker, AbsoluteMoniker::parse_str("/my_foo").unwrap());
+        assert!(found_use);
+        assert!(found_expose);
+        assert!(found_offer);
+        assert!(found_declaration);
     }
 }

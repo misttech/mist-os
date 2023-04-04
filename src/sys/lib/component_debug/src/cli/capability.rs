@@ -2,30 +2,69 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::capability::{find_instances_that_expose_or_use_capability, MatchingInstances},
-    anyhow::Result,
-    fidl_fuchsia_sys2 as fsys,
-};
+use {crate::capability::*, anyhow::Result, fidl_fuchsia_sys2 as fsys};
 
 pub async fn capability_cmd<W: std::io::Write>(
-    capability_name: String,
+    query: String,
     realm_query: fsys::RealmQueryProxy,
     mut writer: W,
 ) -> Result<()> {
-    let MatchingInstances { exposed, used } =
-        find_instances_that_expose_or_use_capability(capability_name, &realm_query).await?;
+    let segments = get_all_route_segments(query, &realm_query).await?;
 
-    if !exposed.is_empty() {
-        writeln!(writer, "Exposed:")?;
-        for component in exposed {
-            writeln!(writer, "  {}", component)?;
+    let mut decls = vec![];
+    let mut exposes = vec![];
+    let mut offers = vec![];
+    let mut uses = vec![];
+
+    for s in segments {
+        match &s {
+            RouteSegment::DeclareBy { .. } => decls.push(s),
+            RouteSegment::ExposeBy { .. } => exposes.push(s),
+            RouteSegment::OfferBy { .. } => offers.push(s),
+            RouteSegment::UseBy { .. } => uses.push(s),
+            _ => {}
         }
     }
-    if !used.is_empty() {
-        writeln!(writer, "Used:")?;
-        for component in used {
-            writeln!(writer, "  {}", component)?;
+
+    if decls.is_empty() {
+        writeln!(writer, "Declarations: None")?;
+    } else {
+        writeln!(writer, "Declarations:")?;
+        for decl in decls {
+            writeln!(writer, "  {}", decl)?;
+        }
+    }
+
+    writeln!(writer, "")?;
+
+    if exposes.is_empty() {
+        writeln!(writer, "Exposes: None")?;
+    } else {
+        writeln!(writer, "Exposes:")?;
+        for decl in exposes {
+            writeln!(writer, "  {}", decl)?;
+        }
+    }
+
+    writeln!(writer, "")?;
+
+    if offers.is_empty() {
+        writeln!(writer, "Offers: None")?;
+    } else {
+        writeln!(writer, "Offers:")?;
+        for decl in offers {
+            writeln!(writer, "  {}", decl)?;
+        }
+    }
+
+    writeln!(writer, "")?;
+
+    if uses.is_empty() {
+        writeln!(writer, "Uses: None")?;
+    } else {
+        writeln!(writer, "Uses:")?;
+        for decl in uses {
+            writeln!(writer, "  {}", decl)?;
         }
     }
 

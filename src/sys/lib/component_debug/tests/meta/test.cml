@@ -26,7 +26,6 @@
             rights: [ "rw*" ],
             path: "/data",
         },
-        { protocol: "fuchsia.foo.Bar" },
     ],
     use: [
         {
@@ -37,25 +36,9 @@
             protocol: "fuchsia.sys2.RealmQuery",
             from: "framework",
         },
-
-        // This capability isn't actually being used.
-        // `select` should still be able to find it.
-        { protocol: "fuchsia.foo.Bar" },
         {
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_server",
-        },
-    ],
-    expose: [
-        // These capabilities aren't actually being served.
-        // `select` should still be able to find them.
-        {
-            directory: "data",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.foo.Bar",
-            from: "self",
         },
     ],
 }
