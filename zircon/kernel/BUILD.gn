@@ -290,6 +290,10 @@ if (is_kernel) {
       defines += [ "WITH_KERNEL_PCIE" ]
     }
 
+    if (kernel_no_userabi) {
+      defines += [ "KERNEL_NO_USERABI" ]
+    }
+
     cflags = [ "-fpie" ]
   }
 

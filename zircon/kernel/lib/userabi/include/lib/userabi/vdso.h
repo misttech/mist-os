@@ -26,7 +26,12 @@ class VDso : public RoDso {
   static const VDso* Create(KernelHandle<VmObjectDispatcher>* vmo_kernel_handles);
 
   static bool vmo_is_vdso(const fbl::RefPtr<VmObject>& vmo) {
+#ifdef KERNEL_NO_USERABI
+    // In the nouserabi case the instance_ variable is not present
+    return false;
+#else
     return likely(instance_) && instance_->vmo_is_vdso_impl(vmo);
+#endif
   }
 
   static bool valid_code_mapping(uint64_t vmo_offset, size_t size) {

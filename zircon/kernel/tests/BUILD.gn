@@ -5,6 +5,7 @@
 # https://opensource.org/licenses/MIT
 
 import("//build/zircon/migrated_targets.gni")
+import("//zircon/kernel/params.gni")
 
 group("tests") {
   deps = [
@@ -104,7 +105,6 @@ if (toolchain_environment == "kernel") {
       "thread_tests.cc",
       "timer_tests.cc",
       "uart_tests.cc",
-      "userboot_tests.cc",
       "variant_tests.cc",
       "wait_queue_ordering_tests.cc",
     ]
@@ -125,12 +125,15 @@ if (toolchain_environment == "kernel") {
       "//zircon/kernel/lib/persistent-debuglog/tests",
       "//zircon/kernel/lib/root_resource_filter",
       "//zircon/kernel/lib/unittest",
-      "//zircon/kernel/lib/userabi",
       "//zircon/kernel/lib/zxc",
       "//zircon/kernel/object",
       "//zircon/system/ulib/affine",
       "//zircon/system/ulib/pretty",
     ]
+    if (!kernel_no_userabi) {
+      sources += [ "userboot_tests.cc" ]
+      deps += [ "//zircon/kernel/lib/userabi" ]
+    }
     public_deps = [ "//zircon/system/ulib/zx:headers" ]
   }
 }
