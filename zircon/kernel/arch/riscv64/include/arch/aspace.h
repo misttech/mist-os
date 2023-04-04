@@ -155,6 +155,12 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   // Range of address space.
   const vaddr_t base_ = 0;
   const size_t size_ = 0;
+
+  // Number of CPUs this aspace is currently active on.
+  ktl::atomic<uint32_t> num_active_cpus_ = 0;
+
+  // Whether not this has been active since |ActiveSinceLastCheck| was called.
+  ktl::atomic<bool> active_since_last_check_ = false;
 };
 
 class Riscv64VmICacheConsistencyManager final : public ArchVmICacheConsistencyManagerInterface {

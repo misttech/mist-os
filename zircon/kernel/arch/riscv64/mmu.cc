@@ -49,7 +49,8 @@
 // Static relocated base to prepare for KASLR. Used at early boot and by gdb
 // script to know the target relocated address.
 // TODO(fxbug.dev/24762): Choose it randomly.
-#if DISABLE_KASLR
+// TODO-rvbringup: undo needing to jam this on
+#if 1 || DISABLE_KASLR
 uint64_t kernel_relocated_base = KERNEL_BASE;
 #else
 uint64_t kernel_relocated_base = 0xffffffff10000000;
@@ -925,7 +926,9 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
   // TODO-rvbringup: enlarge was added, add proper support
-  PANIC_UNIMPLEMENTED;
+  if (enlarge == EnlargeOperation::Yes) {
+    PANIC_UNIMPLEMENTED;
+  }
 
   DEBUG_ASSERT(tt_virt_);
 
@@ -1007,7 +1010,7 @@ zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
                                                  TerminalAction terminal) {
   canary_.Assert();
 
-  // TODO-rvbringup: terminal was added, add proper support
+  // TODO-rvbringup: terminal action was added, add proper support
   PANIC_UNIMPLEMENTED;
 
   if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
@@ -1046,7 +1049,22 @@ zx_status_t Riscv64ArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
   return ZX_OK;
 }
 
-bool Riscv64ArchVmAspace::ActiveSinceLastCheck(bool clear) { PANIC_UNIMPLEMENTED; }
+bool Riscv64ArchVmAspace::ActiveSinceLastCheck(bool clear) {
+  // Read whether any CPUs are presently executing.
+  bool currently_active = num_active_cpus_.load(ktl::memory_order_relaxed) != 0;
+  // Exchange the current notion of active, with the previously active information. This is the only
+  // time a |false| value can potentially be written to active_since_last_check_, and doing an
+  // exchange means we can never 'lose' a |true| value.
+  bool previously_active =
+      clear ? active_since_last_check_.exchange(currently_active, ktl::memory_order_relaxed)
+            : active_since_last_check_.load(ktl::memory_order_relaxed);
+  // Return whether we had previously been active. It is not necessary to also consider whether we
+  // are currently active, since activating would also have active_since_last_check_ to true. In the
+  // scenario where we race and currently_active is true, but we observe previously_active to be
+  // false, this means that as of the start of this function ::ContextSwitch had not completed, and
+  // so this aspace is still not actually active.
+  return previously_active;
+}
 
 zx_status_t Riscv64ArchVmAspace::Init() {
   canary_.Assert();
@@ -1105,7 +1123,9 @@ zx_status_t Riscv64ArchVmAspace::Init() {
   return ZX_OK;
 }
 
-void Riscv64ArchVmAspace::DisableUpdates() { PANIC_UNIMPLEMENTED; }
+void Riscv64ArchVmAspace::DisableUpdates() {
+  // TODO-rvbringup: add machinery for this and the update checker logic
+}
 
 zx_status_t Riscv64ArchVmAspace::Destroy() {
   canary_.Assert();
@@ -1162,10 +1182,20 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
     satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
            ((uint64_t)aspace->asid_ << RISCV64_SATP_ASID_SHIFT) |
            (aspace->tt_phys_ >> PAGE_SIZE_SHIFT);
+
+    [[maybe_unused]] uint32_t prev =
+        aspace->num_active_cpus_.fetch_add(1, ktl::memory_order_relaxed);
+    DEBUG_ASSERT(prev < SMP_MAX_CPUS);
+    aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
   } else {
     // Switching to the null aspace, which means kernel address space only.
     satp = ((uint64_t)RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
            (riscv64_kernel_translation_table_phys >> PAGE_SIZE_SHIFT);
+  }
+  if (likely(old_aspace != nullptr)) {
+    [[maybe_unused]] uint32_t prev =
+        old_aspace->num_active_cpus_.fetch_sub(1, ktl::memory_order_relaxed);
+    DEBUG_ASSERT(prev > 0);
   }
   if (TRACE_CONTEXT_SWITCH) {
     TRACEF("old aspace %p aspace %p satp %#" PRIx64 "\n", old_aspace, aspace, satp);

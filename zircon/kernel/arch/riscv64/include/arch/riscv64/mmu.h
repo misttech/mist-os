@@ -31,23 +31,23 @@
 #define RISCV64_MMU_PT_LEVELS 3
 #define RISCV64_MMU_PT_SHIFT 9
 #define RISCV64_MMU_PT_ENTRIES 512  // 1 << PT_SHIFT
-#define RISCV64_MMU_CANONICAL_MASK ((1UL << 48) - 1)
+#define RISCV64_MMU_CANONICAL_MASK ((1ul << 48) - 1)
 #define RISCV64_MMU_PPN_BITS 56
 
 // page table bits
-#define RISCV64_PTE_V (1 << 0)  // valid
-#define RISCV64_PTE_R (1 << 1)  // read
-#define RISCV64_PTE_W (1 << 2)  // write
-#define RISCV64_PTE_X (1 << 3)  // execute
-#define RISCV64_PTE_PERM_MASK (0x7 << 1)
-#define RISCV64_PTE_U (1 << 4)         // user
-#define RISCV64_PTE_G (1 << 5)         // global
-#define RISCV64_PTE_A (1 << 6)         // accessed
-#define RISCV64_PTE_D (1 << 7)         // dirty
-#define RISCV64_PTE_RSW_MASK (3 << 8)  // reserved for software
+#define RISCV64_PTE_V (1ul << 0)  // valid
+#define RISCV64_PTE_R (1ul << 1)  // read
+#define RISCV64_PTE_W (1ul << 2)  // write
+#define RISCV64_PTE_X (1ul << 3)  // execute
+#define RISCV64_PTE_PERM_MASK (7ul << 1)
+#define RISCV64_PTE_U (1ul << 4)         // user
+#define RISCV64_PTE_G (1ul << 5)         // global
+#define RISCV64_PTE_A (1ul << 6)         // accessed
+#define RISCV64_PTE_D (1ul << 7)         // dirty
+#define RISCV64_PTE_RSW_MASK (3ul << 8)  // reserved for software
 #define RISCV64_PTE_PPN_SHIFT (10)
 #define RISCV64_PTE_PPN_MASK \
-  (((1UL << (RISCV64_MMU_PPN_BITS - PAGE_SIZE_SHIFT)) - 1) << RISCV64_PTE_PPN_SHIFT)
+  (((1ul << (RISCV64_MMU_PPN_BITS - PAGE_SIZE_SHIFT)) - 1) << RISCV64_PTE_PPN_SHIFT)
 
 // riscv PPN is stored shifed over 2 from the natural alignment
 #define RISCV64_PTE_IS_VALID(pte) ((pte)&RISCV64_PTE_V)
@@ -59,17 +59,17 @@
 
 // SATP register, contains the current mmu mode, address space id, and
 // pointer to root page table
-#define RISCV64_SATP_MODE_NONE (0)
-#define RISCV64_SATP_MODE_SV32 (1)
-#define RISCV64_SATP_MODE_SV39 (8)
-#define RISCV64_SATP_MODE_SV48 (9)
-#define RISCV64_SATP_MODE_SV57 (10)
-#define RISCV64_SATP_MODE_SV64 (11)
+#define RISCV64_SATP_MODE_NONE (0ul)
+#define RISCV64_SATP_MODE_SV32 (1ul)
+#define RISCV64_SATP_MODE_SV39 (8ul)
+#define RISCV64_SATP_MODE_SV48 (9ul)
+#define RISCV64_SATP_MODE_SV57 (10ul)
+#define RISCV64_SATP_MODE_SV64 (11ul)
 
 #define RISCV64_SATP_MODE_SHIFT (60)
 #define RISCV64_SATP_ASID_SHIFT (44)
 #define RISCV64_SATP_ASID_SIZE (16)
-#define RISCV64_SATP_ASID_MASK ((1UL << RISCV64_SATP_ASID_SIZE) - 1)
+#define RISCV64_SATP_ASID_MASK ((1ul << RISCV64_SATP_ASID_SIZE) - 1)
 
 #ifndef __ASSEMBLER__
 
