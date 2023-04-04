@@ -71,7 +71,7 @@ class WlanSoftmacDevice
 
   // Entry functions to access WlanSoftmacIfc protocol implementation in client_.
   void Recv(fuchsia_wlan_softmac::wire::WlanRxPacket* rx_packet);
-  void ScanComplete(zx_status_t status, uint64_t scan_id);
+  void NotifyScanComplete(zx_status_t status, uint64_t scan_id);
 
   // Serves the WlanSoftmac protocol on `server_end`.
   zx_status_t ServeWlanSoftmacProtocol(fidl::ServerEnd<fuchsia_io::Directory> server_end);

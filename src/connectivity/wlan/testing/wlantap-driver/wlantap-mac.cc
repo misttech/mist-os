@@ -271,7 +271,13 @@ struct WlantapMacImpl : WlantapMac,
   virtual void ScanComplete(uint64_t scan_id, int32_t status) override {
     std::lock_guard<std::mutex> guard(lock_);
     auto arena = fdf::Arena::Create(0, 0);
-    auto result = wlan_softmac_ifc_client_.sync().buffer(*arena)->ScanComplete(status, scan_id);
+    fidl::Arena fidl_arena;
+    auto builder =
+        fuchsia_wlan_softmac::wire::WlanSoftmacIfcNotifyScanCompleteRequest::Builder(fidl_arena);
+    builder.scan_id(scan_id);
+    builder.status(status);
+    auto result =
+        wlan_softmac_ifc_client_.sync().buffer(*arena)->NotifyScanComplete(builder.Build());
     if (!result.ok()) {
       zxlogf(ERROR, "Failed to send scan complete notification up. Status: %d\n", result.status());
     }

@@ -456,22 +456,29 @@ void WlanSoftmacDevice::Recv(fuchsia_wlan_softmac::wire::WlanRxPacket* rx_packet
   }
 }
 
-void WlanSoftmacDevice::ScanComplete(const zx_status_t status, const uint64_t scan_id) {
+void WlanSoftmacDevice::NotifyScanComplete(const zx_status_t status, const uint64_t scan_id) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     IWL_ERR(this,
-            "Failed to create Arena in WlanSoftmacDevice::ScanComplete(). "
+            "Failed to create Arena in WlanSoftmacDevice::NotifyScanComplete(). "
             "scan_id=%zu, status=%s\n",
             scan_id, zx_status_get_string(status));
     return;
   }
 
-  auto result = client_.buffer(*std::move(arena))->ScanComplete(status, scan_id);
+  fidl::Arena fidl_arena;
+  auto builder =
+      fuchsia_wlan_softmac::wire::WlanSoftmacIfcNotifyScanCompleteRequest::Builder(fidl_arena);
+  builder.status(status);
+  builder.scan_id(scan_id);
+
+  auto result = client_.buffer(*std::move(arena))->NotifyScanComplete(builder.Build());
   if (!result.ok()) {
-    IWL_ERR(this,
-            "Failed to send scan complete notification up in WlanSoftmacDevice::ScanComplete(). "
-            "result.status: %d, scan_id=%zu, status=%s\n",
-            result.status(), scan_id, zx_status_get_string(status));
+    IWL_ERR(
+        this,
+        "Failed to send scan complete notification up in WlanSoftmacDevice::NotifyScanComplete(). "
+        "result.status: %d, scan_id=%zu, status=%s\n",
+        result.status(), scan_id, zx_status_get_string(status));
   }
 }
 

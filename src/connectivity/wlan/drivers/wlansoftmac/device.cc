@@ -615,7 +615,7 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
       .status = ifc->ops->status,
       .recv = ifc->ops->recv,
       .report_tx_status = ifc->ops->report_tx_status,
-      .scan_complete = ifc->ops->scan_complete,
+      .notify_scan_complete = ifc->ops->scan_complete,
   });
 
   wlan_softmac_ifc_protocol_ = std::make_unique<wlan_softmac_ifc_protocol_t>();
@@ -1039,10 +1039,10 @@ void Device::ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena
 
   completer.buffer(arena).Reply();
 }
-void Device::ScanComplete(ScanCompleteRequestView request, fdf::Arena& arena,
-                          ScanCompleteCompleter::Sync& completer) {
-  wlan_softmac_ifc_protocol_->ops->scan_complete(wlan_softmac_ifc_protocol_->ctx, request->status,
-                                                 request->scan_id);
+void Device::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
+                                NotifyScanCompleteCompleter::Sync& completer) {
+  wlan_softmac_ifc_protocol_->ops->notify_scan_complete(wlan_softmac_ifc_protocol_->ctx,
+                                                        request->status(), request->scan_id());
   completer.buffer(arena).Reply();
 }
 

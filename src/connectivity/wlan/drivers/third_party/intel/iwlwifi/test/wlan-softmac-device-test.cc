@@ -162,8 +162,8 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     // Overriding the virtual function, not being used at this point.
     completer.buffer(arena).Reply();
   }
-  void ScanComplete(ScanCompleteRequestView request, fdf::Arena& arena,
-                    ScanCompleteCompleter::Sync& completer) override {
+  void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
+                          NotifyScanCompleteCompleter::Sync& completer) override {
     // Overriding the virtual function, not being used at this point.
     completer.buffer(arena).Reply();
   }

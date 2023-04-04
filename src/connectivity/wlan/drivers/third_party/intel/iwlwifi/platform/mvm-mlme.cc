@@ -1014,5 +1014,5 @@ void mac_ifc_recv(void* ctx, const wlan_rx_packet_t* rx_packet) {
 }
 
 void mac_ifc_scan_complete(void* ctx, const zx_status_t status, const uint64_t scan_id) {
-  static_cast<wlan::iwlwifi::WlanSoftmacDevice*>(ctx)->ScanComplete(status, scan_id);
+  static_cast<wlan::iwlwifi::WlanSoftmacDevice*>(ctx)->NotifyScanComplete(status, scan_id);
 }

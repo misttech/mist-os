@@ -111,8 +111,8 @@ class Device : public DeviceInterface,
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
   void ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
                       ReportTxStatusCompleter::Sync& completer) override;
-  void ScanComplete(ScanCompleteRequestView request, fdf::Arena& arena,
-                    ScanCompleteCompleter::Sync& completer) override;
+  void NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
+                          NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
   enum class DevicePacket : uint64_t {

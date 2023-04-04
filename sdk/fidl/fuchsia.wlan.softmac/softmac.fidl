@@ -207,7 +207,7 @@ protocol WlanSoftmacIfc {
         status uint32;
     }) -> ();
 
-    /// Submit received data to the next driver.
+    /// Forward up a packet received over the wireless medium.
     Recv(struct {
         packet WlanRxPacket;
     }) -> ();
@@ -218,12 +218,20 @@ protocol WlanSoftmacIfc {
         tx_status fuchsia.wlan.common.WlanTxStatus;
     }) -> ();
 
-    /// Reports completion of a scan associated with the unique `scan_id`. The status
-    /// `ZX_ERR_OUT_OF_RANGE` implies the scan request included a prohibited channel.
-    /// The channel may be prohibited because of the current country setting.
-    ScanComplete(struct {
-        status zx.status;
-        scan_id uint64;
+    /// Reports completion of a scan associated with the unique `scan_id`. `status`
+    /// indicates whether the scan completed successfully, failed due to an error,
+    /// or was cancelled.
+    ///
+    /// Return status indicates the reason for scan completion:
+    ///   ZX_OK: All channels were scanned successfully.
+    ///   ZX_ERR_CANCELLED: The scan was terminated by a user request, either an
+    ///       explicit WlanSoftmac.CancelScan() or the initiation of an
+    ///       incompatible request (e.g. connect).
+    ///   ZX_ERR_OUT_OF_RANGE: The scan request included a prohibited channel.
+    ///       This may be due to the current country setting.
+    NotifyScanComplete(table {
+        1: status zx.status;
+        2: scan_id uint64;
     }) -> ();
 };
 
