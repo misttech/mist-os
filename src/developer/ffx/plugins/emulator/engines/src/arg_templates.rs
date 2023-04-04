@@ -5,7 +5,7 @@
 //! Handlebars helper functions for working with an EmulatorConfiguration.
 
 use anyhow::{Context as anyhow_context, Result};
-use emulator_instance::{DataUnits, DiskImage, EmulatorConfiguration, FlagData};
+use emulator_instance::{DataUnits, EmulatorConfiguration, FlagData};
 use handlebars::{
     no_escape, Context, Handlebars, Helper, HelperDef, HelperResult, JsonRender, Output,
     RenderContext, RenderError,
@@ -110,41 +110,6 @@ impl HelperDef for UnitAbbreviationHelper {
     }
 }
 
-/// This Handlebars helper extracts a path from a DiskImage.
-///
-/// Example:
-///
-///     let path = DiskImage::Fxfs("foo.blk");
-///
-///   Template:
-///
-///     "{{path}} contains {{#diskimage path}}."  {{! output: "[object] contains foo.blk." }}
-#[derive(Clone, Copy)]
-pub struct DiskImageHelper {}
-
-impl HelperDef for DiskImageHelper {
-    fn call<'reg: 'rc, 'rc>(
-        &self,
-        h: &Helper<'reg, 'rc>,
-        _: &'reg Handlebars<'reg>,
-        _: &'rc Context,
-        _: &mut RenderContext<'reg, 'rc>,
-        out: &mut dyn Output,
-    ) -> HelperResult {
-        // Convert the serde_json::Value into a DiskImage.
-        let param =
-            h.param(0).ok_or(RenderError::new(format!("Parameter 0 is missing in {:?}", h)))?;
-
-        match serde_json::from_value::<DiskImage>(param.value().clone()) {
-            Ok(path) => out.write(
-                path.to_str().ok_or(RenderError::new(format!("Invalid path {:?}", path)))?,
-            )?,
-            Err(_) => out.write(param.value().render().as_ref())?,
-        };
-        Ok(())
-    }
-}
-
 #[derive(Clone, Copy)]
 pub struct EnvironmentHelper {}
 
@@ -221,7 +186,6 @@ fn process_flag_template_inner(
     handlebars.register_helper("env", Box::new(EnvironmentHelper {}));
     handlebars.register_helper("eq", Box::new(EqHelper {}));
     handlebars.register_helper("ua", Box::new(UnitAbbreviationHelper {}));
-    handlebars.register_helper("di", Box::new(DiskImageHelper {}));
     let json = handlebars.render_template(&template_text, &emu_config)?;
 
     // Deserialize and return the flags from the template.
@@ -243,11 +207,6 @@ mod tests {
     #[derive(Serialize)]
     struct UnitsStruct {
         pub units: DataUnits,
-    }
-
-    #[derive(Serialize)]
-    struct DiskImageStruct {
-        pub disk_image: DiskImage,
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -317,25 +276,6 @@ mod tests {
         let json = handlebars.render_template(&if_template, &string_struct);
         assert!(json.is_ok());
         assert_eq!(json.unwrap(), "no");
-    }
-
-    #[fuchsia_async::run_singlethreaded(test)]
-    async fn test_disk_image_helper() {
-        let template = r#"{{di disk_image}}"#;
-
-        let mut handlebars = Handlebars::new();
-        handlebars.set_strict_mode(true);
-        handlebars.register_helper("di", Box::new(DiskImageHelper {}));
-
-        let disk_image = DiskImageStruct { disk_image: DiskImage::Fxfs("fxfs.blk".into()) };
-        let json = handlebars.render_template(&template, &disk_image);
-        assert!(json.is_ok());
-        assert_eq!(json.unwrap(), "fxfs.blk");
-
-        let disk_image = DiskImageStruct { disk_image: DiskImage::Fvm("fvm.blk".into()) };
-        let json = handlebars.render_template(&template, &disk_image);
-        assert!(json.is_ok());
-        assert_eq!(json.unwrap(), "fvm.blk");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

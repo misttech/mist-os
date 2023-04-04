@@ -5,7 +5,7 @@
 use nix;
 pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::Deref, path::PathBuf, time::Duration};
+use std::{collections::HashMap, path::PathBuf, time::Duration};
 
 mod enumerations;
 mod instances;
@@ -71,29 +71,11 @@ pub struct FlagData {
     pub options: Vec<String>,
 }
 
-/// A pre-formatted disk image containing the base packages of the system.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub enum DiskImage {
-    Fvm(PathBuf),
-    Fxfs(PathBuf),
-}
-
-impl Deref for DiskImage {
-    type Target = PathBuf;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            DiskImage::Fvm(path) => path,
-            DiskImage::Fxfs(path) => path,
-        }
-    }
-}
-
 /// Image files and other information specific to the guest OS.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct GuestConfig {
-    /// The guest's virtual storage device.
-    pub disk_image: Option<DiskImage>,
+    /// Fuchsia Volume Manager image, this is the guest's virtual storage device.
+    pub fvm_image: Option<PathBuf>,
 
     /// The Fuchsia kernel, which loads alongside the ZBI and brings up the OS.
     pub kernel_image: PathBuf,

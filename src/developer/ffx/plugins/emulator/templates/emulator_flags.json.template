@@ -12,8 +12,6 @@
     helper calls a rust function to perform that substitution. If the parameter
     doesn't deserialize to a DataUnits, the helper just returns the usual
     serialized value of the parameter. }}
-{{! Also note the use of the "di" helper, which invokes a rust function to
-    extract the disk image path from a DiskImage object. }}
 {
     "args": [
         "-kernel",
@@ -25,8 +23,8 @@
         "-smp",
         {{! These should probably be predicated on the host CPU. }}
             "4,threads=2",
-        {{#if guest.disk_image}}
-            "-drive", "file={{di guest.disk_image}},format=raw,if=none,id=vdisk,cache=unsafe",
+        {{#if guest.fvm_image}}
+            "-drive", "file={{guest.fvm_image}},format=raw,if=none,id=vdisk,cache=unsafe",
             "-object", "iothread,id=iothread0",
             "-device", "virtio-blk-pci,drive=vdisk,iothread=iothread0",
         {{/if}}
