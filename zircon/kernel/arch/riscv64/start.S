@@ -10,61 +10,51 @@
 #include <arch/defines.h>
 #include <arch/kernel_aspace.h>
 #include <zircon/tls.h>
+#include <arch/code-patches/case-id-asm.h>
+#include <lib/code-patching/asm.h>
+#include <lib/arch/asm.h>
 
 // TODO-rvbringup: set up the shadow call stack, configure TP
-// TODO-rvbringup: consider the usage of registers here. Seems to trash a0, a1 pretty quickly
-// which we probably dont want.
-// TODO-rvbringup: might not need the fixup code and bss if phys does the setup for us.
 // TODO-rvbringup: set kernel_virtial_entry_ticks
 
 // This code is purely position-independent and generates no relocations
 // that need boot-time fixup.
 .text
 FUNCTION(_start)
+.globl PhysbootHandoff
+PhysbootHandoff = _start
+
     // collect the starting time stamp
     rdtime a2
 
-    // set the default stack
-    lla     sp, boot_cpu_kstack_end
+    // This serves as a verification that code-patching was performed before
+    // the kernel was booted; if unpatched, we would trap here and halt.
+    .code_patching.start CASE_ID_SELF_TEST
+    unimp
+    .code_patching.end
 
-    // save a0 in zbi_paddr
-    lla     t0, zbi_paddr
-    sd      a0, (t0)
-
-    // save the physical address of the secondary harts entry point for later
-    lla     t0, kernel_secondary_entry_paddr
-    lla     t1, _secondary_start
-    sd      t1, (t0)
-
-    // The fixup code appears right after the kernel image (at __data_end in
-    // our view).  Note this code overlaps with the kernel's bss!  It
-    // expects a0 to contain the desired virtual address of __code_start.
-    lla     t0, kernel_relocated_base
-    ld      s10, (t0)
-    mv      a0, s10
-    jal     __data_end
-
-    // zero bss
-1:
-    lla     t0, __bss_start
-    lla     t1, _end
-0:
-    sd      zero, (t0)
-    add     t0, t0, 8
-    bne     t0, t1, 0b
+    // save a0 (physboot handoff paddr) for later passing to lk_main
+    mv      s0, a0
 
     // save the time stamp we recorded earlier
     lla     t0, kernel_entry_ticks
     sd      a2, (t0)
 
-    // make sure the boot allocator is given a chance to figure out where we
-    // are loaded in physical memory
-    jal     boot_alloc_init
-
     // save the physical address the kernel is loaded at
-    lla     a0, __code_start
+    lla     a0, __executable_start
     lla     t0, kernel_base_phys
     sd      a0, (t0)
+
+    // set the default stack
+    lla     sp, boot_cpu_kstack_end
+
+#if __has_feature(shadow_call_stack)
+    lla     shadow_call_sp, boot_shadow_call_stack
+#endif
+
+    // make sure the boot allocator is given a chance to figure out where we
+    // are loaded in physical memory
+    call     boot_alloc_init
 
     // void riscv64_boot_map(pte_t* kernel_table0, vaddr_t vaddr, paddr_t paddr, size_t len, pte_t flags);
     lla     a0, riscv64_kernel_translation_table
@@ -75,16 +65,15 @@ FUNCTION(_start)
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
     li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
-    jal     riscv64_boot_map
+    call    riscv64_boot_map
 
     // map a large run of physical memory at the base of the kernel's address space
-    // TODO(fxb/47856): Only map the arenas.
     lla     a0, riscv64_kernel_translation_table
     li      a1, KERNEL_ASPACE_BASE
     li      a2, 0
     li      a3, ARCH_PHYSMAP_SIZE
     li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
-    jal     riscv64_boot_map
+    call    riscv64_boot_map
 
     // map the kernel to a fixed address
     // note: mapping the kernel here with full rwx, this will get locked down
@@ -92,11 +81,11 @@ FUNCTION(_start)
     lla     a0, riscv64_kernel_translation_table
     lla     t0, kernel_relocated_base
     ld      a1, (t0)
-    lla     a2, __code_start
+    lla     a2, __executable_start
     lla     a3, _end
     sub     a3, a3, a2
     li      a4, RISCV64_PTE_G | RISCV64_PTE_A | RISCV64_PTE_D | RISCV64_PTE_PERM_MASK | RISCV64_PTE_V
-    jal     riscv64_boot_map
+    call    riscv64_boot_map
 
     // ensure it's written out
     fence   w,w
@@ -115,11 +104,17 @@ FUNCTION(_start)
     // mmu is initialized and we're running out of an identity physical map
 
     // compute the delta between the old physical and newer high addresses
-    lla     t0, __code_start
-    sub     t0, s10, t0
+    lla     t0, _start
+    la      t1, _start
+    sub     t0, t1, t0
 
     // fix up the stack pointer
     add     sp, sp, t0
+
+    // fix up the shadow call pointer
+#if __has_feature(shadow_call_stack)
+    add     shadow_call_sp, shadow_call_sp, t0
+#endif
 
     // jump to high memory
     lla     t1, .Lmmu_on_vaddr
@@ -130,8 +125,16 @@ FUNCTION(_start)
     // Set up the percpu structure for the logical CPU 0
     lla     gp, riscv64_percpu_array
 
+    // save the time stamp just before entering C
+    rdtime  a0
+    lla     a1, kernel_virtual_entry_ticks
+    sd      a0, (a1)
+
+    // recover the zbi pointer
+    mv      a0, s0
+
     // Call main
-    call lk_main
+    call    lk_main
 
     // should never return here
     j       .
@@ -149,7 +152,7 @@ FUNCTION(_secondary_start)
     // Compute the relocation offset
     lla     t0, kernel_relocated_base
     ld      t1, (t0)
-    lla     t0, __code_start
+    lla     t0, __executable_start
     sub     t0, t1, t0
 
     // Jump to high memory
@@ -165,22 +168,12 @@ FUNCTION(_secondary_start)
 
     // The identity mapping is still there, we can jump to C.
     // The hart id is already in a0.
-    jal     riscv64_secondary_entry
+    call    riscv64_secondary_entry
 
     // should never return here
     j       .
 END_FUNCTION(_secondary_start)
 
-// These are logically .bss (uninitialized data).  But they're set before
-// clearing the .bss, so put them in .data so they don't get zeroed.
-.data
-    .balign 64
-DATA(zbi_paddr)
-    .quad -1
-END_DATA(zbi_paddr)
-DATA(kernel_secondary_entry_paddr)
-    .quad -1
-END_DATA(kernel_secondary_entry_paddr)
 
 .bss
 LOCAL_DATA(boot_cpu_kstack)
@@ -188,10 +181,9 @@ LOCAL_DATA(boot_cpu_kstack)
     .balign 16
 LOCAL_DATA(boot_cpu_kstack_end)
 END_DATA(boot_cpu_kstack)
-
-// This symbol is used by image.S
-.global IMAGE_ELF_ENTRY
-IMAGE_ELF_ENTRY = _start
+LOCAL_DATA(boot_shadow_call_stack)
+    .skip PAGE_SIZE
+END_DATA(boot_shadow_call_stack)
 
 // This symbol is used by gdb python to know the base of the kernel module
 .global KERNEL_BASE_ADDRESS

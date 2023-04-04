@@ -73,7 +73,6 @@ if (toolchain_base_environment == "kernel") {
       "arch.cc",
       "asid_allocator.cc",
       "asm.S",
-      "boot-mmu.cc",
       "cache.cc",
       "crashlog.cc",
       "debugger.cc",
@@ -87,6 +86,8 @@ if (toolchain_base_environment == "kernel") {
       "user_copy_c.cc",
     ]
     deps = [
+      ":boot-mmu",
+      "code-patches:headers",
       "//zircon/kernel/dev/iommu/dummy",
       "//zircon/kernel/lib/arch",
       "//zircon/kernel/lib/console",
@@ -102,5 +103,16 @@ if (toolchain_base_environment == "kernel") {
       "//zircon/system/ulib/bitmap",
       "//zircon/system/ulib/pretty",
     ]
+  }
+
+  source_set("boot-mmu") {
+    visibility = [ ":*" ]
+
+    sources = [ "boot-mmu.cc" ]
+    deps = [ "//zircon/kernel/vm" ]
+
+    # Everything in this file runs too early to use the full ABI.  Per-function
+    # attribute suppression of sanitizer modes doesn't work for C++ lambda.
+    configs += [ "//build/config/sanitizers:no_sanitizers" ]
   }
 }

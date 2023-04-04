@@ -28,6 +28,6 @@ struct ArchPhysHandoff {
 // TODO(fxbug.dev/84107): This is an arbitrary address in the upper half of
 // sv39.  It must match what the kernel's page-table bootstrapping actually
 // uses as the virtual address of the kernel load image.
-inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffc000000000;
+inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff00000000;  // -4GB
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_
