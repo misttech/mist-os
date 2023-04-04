@@ -13,6 +13,8 @@ use fidl_fuchsia_net_ext::{self as fnet_ext, IntoExt as _};
 use fidl_fuchsia_net_interfaces as fnet_interfaces;
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext;
+use fidl_fuchsia_net_routes as fnet_routes;
+use fidl_fuchsia_net_routes_ext::{self as fnet_routes_ext};
 use fidl_fuchsia_net_stack as fnet_stack;
 use fidl_fuchsia_net_stack_ext::FidlReturn as _;
 use fidl_fuchsia_net_tun as fnet_tun;
@@ -31,7 +33,8 @@ use futures::{
     Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_declare::{
-    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_subnet, net_subnet_v4, std_ip_v4, std_socket_addr,
+    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6, std_ip_v4,
+    std_socket_addr,
 };
 use net_types::{
     ip::{Ip, IpAddress as _, IpInvariant, Ipv4, Ipv6},
@@ -371,29 +374,10 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8:eeee:eeee::/64");
 }
 
-#[netstack_test]
-#[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
-#[test_case("ipv6_only_called", UdpCacheInvalidationReason::IPv6OnlyCalled)]
-#[test_case("broadcast_called", UdpCacheInvalidationReason::BroadcastCalled)]
-#[test_case("Control.Disable", UdpCacheInvalidationReason::InterfaceDisabled)]
-#[test_case("Control.RemoveAddress", UdpCacheInvalidationReason::AddressRemoved)]
-#[test_case("Control.SetConfiguration", UdpCacheInvalidationReason::SetConfigurationCalled)]
-#[test_case(
-    "Stack.SetInterfaceIpForwardingDeprecated",
-    UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled
-)]
-#[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
-#[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
-async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
-    root_name: &str,
-    test_name: &str,
-    invalidation_reason: UdpCacheInvalidationReason,
-) {
-    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
-    let realm_name = format!("{}_{}", root_name, test_name);
-    let (_net, _netstack, iface, socket) =
-        setup_fastudp_network(&realm_name, &sandbox, I::SOCKET_DOMAIN).await;
-
+async fn udp_send_msg_preflight_fidl_setup<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
+    iface: &netemul::TestInterface<'_>,
+    socket: &fposix_socket::DatagramSocketProxy,
+) -> Vec<fposix_socket::DatagramSocketSendMsgPreflightResponse> {
     iface
         .add_address_and_subnet_route(I::INSTALLED_ADDR)
         .await
@@ -419,41 +403,78 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
     .await;
     assert_eq!(successful_preflights, []);
 
-    let successful_preflights = {
-        let mut connected_addr = I::REACHABLE_ADDR1;
-        let () = socket
-            .connect(&mut connected_addr)
-            .await
-            .expect("connect fidl error")
-            .expect("connect failed");
+    let mut connected_addr = I::REACHABLE_ADDR1;
+    socket.connect(&mut connected_addr).await.expect("connect fidl error").expect("connect failed");
 
-        // We deliberately repeat an address here to ensure that the preflight can
-        // be called > 1 times with the same address.
-        let mut preflights: Vec<UdpSendMsgPreflight> =
-            vec![I::REACHABLE_ADDR1, I::REACHABLE_ADDR2, I::REACHABLE_ADDR2]
-                .iter()
-                .map(|socket_address| UdpSendMsgPreflight {
-                    to_addr: Some(*socket_address),
-                    expected_result: UdpSendMsgPreflightExpectation::Success(
-                        UdpSendMsgPreflightSuccessExpectation {
-                            expected_to_addr: ToAddrExpectation::Specified(None),
-                            expect_all_eventpairs_valid: true,
-                        },
-                    ),
-                })
-                .collect();
-        let () = preflights.push(UdpSendMsgPreflight {
-            to_addr: None,
-            expected_result: UdpSendMsgPreflightExpectation::Success(
-                UdpSendMsgPreflightSuccessExpectation {
-                    expected_to_addr: ToAddrExpectation::Specified(Some(connected_addr)),
-                    expect_all_eventpairs_valid: true,
-                },
-            ),
-        });
+    // We deliberately repeat an address here to ensure that the preflight can
+    // be called > 1 times with the same address.
+    let mut preflights: Vec<UdpSendMsgPreflight> =
+        vec![I::REACHABLE_ADDR1, I::REACHABLE_ADDR2, I::REACHABLE_ADDR2]
+            .iter()
+            .map(|socket_address| UdpSendMsgPreflight {
+                to_addr: Some(*socket_address),
+                expected_result: UdpSendMsgPreflightExpectation::Success(
+                    UdpSendMsgPreflightSuccessExpectation {
+                        expected_to_addr: ToAddrExpectation::Specified(None),
+                        expect_all_eventpairs_valid: true,
+                    },
+                ),
+            })
+            .collect();
+    preflights.push(UdpSendMsgPreflight {
+        to_addr: None,
+        expected_result: UdpSendMsgPreflightExpectation::Success(
+            UdpSendMsgPreflightSuccessExpectation {
+                expected_to_addr: ToAddrExpectation::Specified(Some(connected_addr)),
+                expect_all_eventpairs_valid: true,
+            },
+        ),
+    });
 
-        execute_and_validate_preflights(preflights, &socket).await
-    };
+    execute_and_validate_preflights(preflights, &socket).await
+}
+
+fn assert_preflights_invalidated(
+    successful_preflights: impl IntoIterator<
+        Item = fposix_socket::DatagramSocketSendMsgPreflightResponse,
+    >,
+) {
+    for successful_preflight in successful_preflights {
+        validate_send_msg_preflight_response(
+            &successful_preflight,
+            UdpSendMsgPreflightSuccessExpectation {
+                expected_to_addr: ToAddrExpectation::Unspecified,
+                expect_all_eventpairs_valid: false,
+            },
+        )
+        .expect("validate preflight response");
+    }
+}
+
+#[netstack_test]
+#[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
+#[test_case("ipv6_only_called", UdpCacheInvalidationReason::IPv6OnlyCalled)]
+#[test_case("broadcast_called", UdpCacheInvalidationReason::BroadcastCalled)]
+#[test_case("Control.Disable", UdpCacheInvalidationReason::InterfaceDisabled)]
+#[test_case("Control.RemoveAddress", UdpCacheInvalidationReason::AddressRemoved)]
+#[test_case("Control.SetConfiguration", UdpCacheInvalidationReason::SetConfigurationCalled)]
+#[test_case(
+    "Stack.SetInterfaceIpForwardingDeprecated",
+    UdpCacheInvalidationReason::SetInterfaceIpForwardingDeprecatedCalled
+)]
+#[test_case("route_removed", UdpCacheInvalidationReason::RouteRemoved)]
+#[test_case("route_added", UdpCacheInvalidationReason::RouteAdded)]
+async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
+    root_name: &str,
+    test_name: &str,
+    invalidation_reason: UdpCacheInvalidationReason,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm_name = format!("{}_{}", root_name, test_name);
+    let (_net, _netstack, iface, socket) =
+        setup_fastudp_network(&realm_name, &sandbox, I::SOCKET_DOMAIN).await;
+
+    let successful_preflights = udp_send_msg_preflight_fidl_setup::<I>(&iface, &socket).await;
 
     match invalidation_reason {
         UdpCacheInvalidationReason::ConnectCalled => {
@@ -532,16 +553,124 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
         }
     }
 
-    for successful_preflight in successful_preflights {
-        validate_send_msg_preflight_response(
-            &successful_preflight,
-            UdpSendMsgPreflightSuccessExpectation {
-                expected_to_addr: ToAddrExpectation::Unspecified,
-                expect_all_eventpairs_valid: false,
-            },
-        )
-        .expect("validate preflight response");
+    assert_preflights_invalidated(successful_preflights);
+}
+
+enum UdpCacheInvalidationReasonNdp {
+    RouterDiscovered,
+    PrefixDiscovered,
+}
+
+#[netstack_test]
+#[test_case("router_discovered", UdpCacheInvalidationReasonNdp::RouterDiscovered)]
+#[test_case("prefix_discovered", UdpCacheInvalidationReasonNdp::PrefixDiscovered)]
+async fn udp_send_msg_preflight_ndp(
+    root_name: &str,
+    test_name: &str,
+    invalidation_reason: UdpCacheInvalidationReasonNdp,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm_name = format!("{}_{}", root_name, test_name);
+    let (net, realm, iface, socket) =
+        setup_fastudp_network(&realm_name, &sandbox, Ipv6::SOCKET_DOMAIN).await;
+    let fake_ep = net.create_fake_endpoint().expect("create fake endpoint");
+
+    let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv6>(&iface, &socket).await;
+
+    match invalidation_reason {
+        UdpCacheInvalidationReasonNdp::RouterDiscovered => {
+            // Use the maximum permissible value according to [RFC 4861 section 4.2] so
+            // that the route does not get invalidated during the test.
+            //
+            // [RFC 4861 section 4.2]: https://www.rfc-editor.org/rfc/rfc4861#section-4.2.
+            const MAX_ROUTER_LIFETIME: u16 = 9000;
+            ndp::send_ra_with_router_lifetime(
+                &fake_ep,
+                MAX_ROUTER_LIFETIME,
+                &[],
+                ipv6_consts::LINK_LOCAL_ADDR,
+            )
+            .await
+            .expect("failed to fake RA message");
+
+            // Wait until a default IPv6 route is added in response to the RA.
+            let mut interface_state = fnet_interfaces_ext::InterfaceState::Unknown(iface.id());
+            fnet_interfaces_ext::wait_interface_with_id(
+                iface.get_interface_event_stream().expect("get interface event stream"),
+                &mut interface_state,
+                |fnet_interfaces_ext::Properties { has_default_ipv6_route, .. }| {
+                    has_default_ipv6_route.then_some(())
+                },
+            )
+            .await
+            .expect("failed to wait for default IPv6 route");
+        }
+        UdpCacheInvalidationReasonNdp::PrefixDiscovered => {
+            let routes_state = realm
+                .connect_to_protocol::<fnet_routes::StateV6Marker>()
+                .expect("connect to route state FIDL");
+            let event_stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&routes_state)
+                .expect("routes event stream from state");
+            futures::pin_mut!(event_stream);
+
+            // Note that the following prefix must not overlap with `<Ipv6 as
+            // UdpSendMsgPreflightTestIpExt>::INSTALLED_ADDR`, as there is already a subnet
+            // route for the installed addr and so discovering the same prefix will not cause
+            // a route to be added and induce cache invalidation.
+            //
+            // The valid and preferred lifetimes are arbitrary, and just need to be large
+            // so that the prefix is never deprecated/invalidated over the duration of this
+            // test.
+            let prefix_discovered = net_subnet_v6!("2001:db8:ffff:ffff::/64");
+            let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+                prefix_discovered.prefix(),  /* prefix_length */
+                true,                        /* on_link_flag */
+                true,                        /* autonomous_address_configuration_flag */
+                99999,                       /* valid_lifetime */
+                99999,                       /* preferred_lifetime */
+                prefix_discovered.network(), /* prefix */
+            ))];
+            // The router lifetime is set to 0 to avoid conveying router information
+            // to Netstack, as doing so induces a default route and causes this test
+            // case to be a strict superset of the router-discovered test case.
+            ndp::send_ra_with_router_lifetime(
+                &fake_ep,
+                0, /* lifetime */
+                &options,
+                ipv6_consts::LINK_LOCAL_ADDR,
+            )
+            .await
+            .expect("failed to fake RA message");
+
+            let mut routes = std::collections::HashSet::new();
+            fnet_routes_ext::wait_for_routes(event_stream, &mut routes, |routes| {
+                routes.iter().any(
+                    |fnet_routes_ext::InstalledRoute {
+                         route: fnet_routes_ext::Route { destination, action, properties: _ },
+                         effective_properties: _,
+                     }| {
+                        let route_found = *destination == prefix_discovered;
+                        if route_found {
+                            assert_eq!(
+                                *action,
+                                fnet_routes_ext::RouteAction::Forward(
+                                    fnet_routes_ext::RouteTarget {
+                                        outbound_interface: iface.id(),
+                                        next_hop: None,
+                                    }
+                                ),
+                            );
+                        }
+                        route_found
+                    },
+                )
+            })
+            .await
+            .expect("failed to wait for subnet route to appear");
+        }
     }
+
+    assert_preflights_invalidated(successful_preflights);
 }
 
 async fn connect_socket_and_validate_preflight(
