@@ -2,12 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_runtime::utc_time;
 use fuchsia_zircon::{self as zx, Task};
+use once_cell::sync::Lazy;
 
+use crate::logging::impossible_error;
 use crate::mm::MemoryAccessorExt;
 use crate::syscalls::*;
 use crate::task::*;
+
+static UTC_CLOCK: Lazy<zx::Clock> = Lazy::new(|| {
+    duplicate_utc_clock_handle(zx::Rights::SAME_RIGHTS)
+        .map_err(|status| panic!("Could not duplicate UTC clock handle: {status}"))
+        .unwrap()
+});
 
 pub fn sys_clock_getres(
     current_task: &CurrentTask,
@@ -83,7 +92,7 @@ pub fn sys_clock_nanosleep(
 ) -> Result<(), Errno> {
     let is_absolute = flags == TIMER_ABSTIME;
     // TODO(https://fxrev.dev/117507): For now, Starnix pretends that the monotonic and realtime
-    // clocks advance at the same rate and so we can treat relative realtime offsets the same way
+    // clocks advance at uniform rates and so we can treat relative realtime offsets the same way
     // that we treat relative monotonic clock offsets. At some point we'll need to monitor changes
     // to the realtime clock and adjust timers accordingly.
     let use_monotonic_clock =
@@ -97,28 +106,79 @@ pub fn sys_clock_nanosleep(
         );
         return error!(EINVAL);
     }
-
     let request = current_task.mm.read_object(user_request)?;
     log_trace!(current_task, "clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
-    let deadline = if is_absolute {
+    if which_clock == CLOCK_REALTIME {
+        return clock_nanosleep_relative_to_clock(
+            current_task,
+            &UTC_CLOCK,
+            request,
+            is_absolute,
+            user_remaining,
+        );
+    }
+
+    let monotonic_deadline = if is_absolute {
         time_from_timespec(request)?
     } else {
         zx::Time::after(duration_from_timespec(request)?)
     };
 
-    clock_nanosleep_monotonic_with_deadline(current_task, flags, deadline, user_remaining)
+    clock_nanosleep_monotonic_with_deadline(
+        current_task,
+        is_absolute,
+        monotonic_deadline,
+        user_remaining,
+    )
+}
+
+// Sleep until we've satisfied |request| relative to the specified clock which may advance at a different rate from the
+// monotonic clock by repeatdly computing a monotonic target and sleeping.
+fn clock_nanosleep_relative_to_clock(
+    current_task: &mut CurrentTask,
+    clock: &zx::Clock,
+    request: timespec,
+    is_absolute: bool,
+    user_remaining: UserRef<timespec>,
+) -> Result<(), Errno> {
+    let clock_deadline_absolute = if is_absolute {
+        time_from_timespec(request)?
+    } else {
+        clock.read().map_err(impossible_error)? + duration_from_timespec(request)?
+    };
+    loop {
+        // Compute monotonic deadline that corresponds to the clock's current transformation to monotonic.
+        // This may have changed while we were sleeping so check again on every iteration.
+        let details = clock.get_details().map_err(impossible_error)?;
+        let monotonic_deadline = details.mono_to_synthetic.apply_inverse(clock_deadline_absolute);
+        clock_nanosleep_monotonic_with_deadline(
+            current_task,
+            is_absolute,
+            monotonic_deadline,
+            user_remaining,
+        )?;
+        // Look at |clock| again and decide if we're done.
+        let clock_now = clock.read().map_err(impossible_error)?;
+        if clock_now >= clock_deadline_absolute {
+            return Ok(());
+        }
+        log_trace!(
+            "clock_nanosleep_relative_to_clock short by {:?}, sleeping again",
+            clock_deadline_absolute - clock_now
+        );
+    }
 }
 
 fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
-    flags: u32,
+    is_absolute: bool,
     deadline: zx::Time,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     match Waiter::new().wait_until(current_task, deadline) {
         Err(err) if err == ETIMEDOUT => Ok(()),
-        Err(err) if err == EINTR && flags & TIMER_ABSTIME != 0 => error!(ERESTARTNOHAND),
+        Err(err) if err == EINTR && is_absolute => error!(ERESTARTNOHAND),
         Err(err) if err == EINTR => {
             if !user_remaining.is_null() {
                 let now = zx::Time::get_monotonic();
@@ -131,7 +191,7 @@ fn clock_nanosleep_monotonic_with_deadline(
             current_task.set_syscall_restart_func(move |current_task| {
                 clock_nanosleep_monotonic_with_deadline(
                     current_task,
-                    flags,
+                    is_absolute,
                     deadline,
                     user_remaining,
                 )
@@ -381,5 +441,33 @@ mod test {
         let time3: __kernel_time_t =
             current_task.mm.read_object(address.into()).expect("read_object");
         assert_eq!(time2, time3);
+    }
+
+    #[::fuchsia::test]
+    fn test_clock_nanosleep_relative_to_slow_clock() {
+        let (_kernel, mut current_task) = create_kernel_and_task();
+
+        let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
+
+        // Slow |test_clock| down and verify that we sleep long enough.
+        let slow_clock_update = zx::ClockUpdate::builder().rate_adjust(-1000).build();
+        test_clock.update(slow_clock_update).unwrap();
+
+        let before = test_clock.read().unwrap();
+
+        let tv = timespec { tv_sec: 1, tv_nsec: 0 };
+
+        let remaining = UserRef::new(UserAddress::default());
+
+        super::clock_nanosleep_relative_to_clock(
+            &mut current_task,
+            &test_clock,
+            tv,
+            false,
+            remaining,
+        )
+        .unwrap();
+        let elapsed = test_clock.read().unwrap() - before;
+        assert!(elapsed >= zx::Duration::from_seconds(1));
     }
 }
