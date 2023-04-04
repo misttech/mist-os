@@ -182,20 +182,20 @@ mod tests {
         }
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_index_of_hit() {
         let cache = mock_cache();
         assert_eq!(cache.index_of(AssetId(1)), Some(0));
         assert_eq!(cache.index_of(AssetId(2)), Some(1));
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_index_of_miss() {
         let cache = mock_cache();
         assert!(cache.index_of(AssetId(0)).is_none());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_move_to_back() {
         let mut cache = mock_cache();
         let front_id = cache.cache.front().unwrap().id;
@@ -204,27 +204,27 @@ mod tests {
         assert_ne!(cache.cache.front().unwrap().id, front_id);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_move_to_back_out_of_bounds() {
         let mut cache = mock_cache();
         assert!(cache.move_to_back(3).is_none());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_hit() {
         let mut cache = mock_cache();
         let cached = cache.get(AssetId(1)).unwrap();
         assert_eq!(cache.cache.back().unwrap().id, cached.id);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_get_miss() {
         let mut cache = mock_cache();
         let should_be_none = cache.get(AssetId(3));
         assert!(should_be_none.is_none());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_pop() {
         let mut cache = mock_cache();
         let unused_before = cache.available;
@@ -235,7 +235,7 @@ mod tests {
         assert_eq!(cache.available, unused_before + should_be_popped_size);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_pop_empty() {
         let inspector = finspect::Inspector::default();
         let mut cache = Cache::new(10, inspector.root());
@@ -243,7 +243,7 @@ mod tests {
         assert_eq!(cache.available, 10);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_push_new() {
         let mut cache = mock_cache();
         let unused_before = cache.available;
@@ -256,7 +256,7 @@ mod tests {
         assert!(evicted.is_empty());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_push_make_space() {
         let mut cache = mock_cache();
         let to_push = mock_asset(3, 2048, 2000);
@@ -271,7 +271,7 @@ mod tests {
         assert_eq!(evicted[0].id, should_be_popped_id);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_push_cached() {
         let mut cache = mock_cache();
         let unused_before = cache.available;
@@ -285,7 +285,7 @@ mod tests {
         assert!(evicted.is_empty());
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_push_does_not_fit() {
         let mut cache = mock_cache();
         let unused_before = cache.available;
@@ -297,7 +297,7 @@ mod tests {
         assert_eq!(cache.available, unused_before);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_inspect_data() {
         let inspector = finspect::Inspector::default();
         let capacity = 3000;

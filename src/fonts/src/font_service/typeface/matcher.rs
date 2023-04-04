@@ -226,7 +226,7 @@ mod tests {
     }
 
     /// Lang score is more important than everything else.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_lang_score_over_others() {
         let better_lang_typeface =
             make_fake_typeface_and_lang_score(Width::Condensed, Slant::Italic, WEIGHT_MEDIUM, 3);
@@ -252,7 +252,7 @@ mod tests {
     }
 
     /// Generic family is more important than style.
-    #[test]
+    #[fuchsia::test]
     fn test_fallback_generic_family_over_style() {
         let serif_typeface = make_fake_typeface(
             Width::Condensed,
@@ -309,7 +309,7 @@ mod tests {
     }
 
     /// Width is more important than other style parameters.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_width_over_other_style() {
         let extra_condensed_upright_semi_bold =
             make_fake_typeface_style(Width::ExtraCondensed, Slant::Upright, WEIGHT_SEMI_BOLD);
@@ -330,7 +330,7 @@ mod tests {
     }
 
     /// Uses default width value when omitted.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_width_default() {
         let extra_condensed_upright_semi_bold =
             make_fake_typeface_style(Width::ExtraCondensed, Slant::Upright, WEIGHT_SEMI_BOLD);
@@ -369,7 +369,7 @@ mod tests {
 
     /// For requested width <= Normal (5), the priority is lower widths descending, then higher
     /// widths ascending.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_width_normal_or_condensed_prefers_lower_widths() {
         assert_eq!(
             compare_for_request(
@@ -411,7 +411,7 @@ mod tests {
 
     /// For requested width >= SemiExpanded (6), the priority is higher widths ascending, then lower
     /// widths descending.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_width_expanded_prefers_higher_widths() {
         assert_eq!(
             compare_for_request(
@@ -464,7 +464,7 @@ mod tests {
     }
 
     /// Slant is more important than weight.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_slant_vs_weight() {
         let italic_thin = make_fake_typeface_style(Width::Normal, Slant::Italic, WEIGHT_THIN);
         let upright_semi_bold =
@@ -497,7 +497,7 @@ mod tests {
     }
 
     /// Uses default slant value when omitted.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_slant_default() {
         let italic_thin = make_fake_typeface_style(Width::Normal, Slant::Italic, WEIGHT_THIN);
         let upright_semi_bold =
@@ -533,7 +533,7 @@ mod tests {
         make_fake_typeface_style(Width::Normal, slant, WEIGHT_NORMAL)
     }
 
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_slant_exact_match() {
         assert_eq!(
             compare_for_request(
@@ -573,7 +573,7 @@ mod tests {
     }
 
     /// Oblique can be substituted for italic and vice versa.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_slant_substitutes() {
         assert_eq!(
             compare_for_request(
@@ -601,7 +601,7 @@ mod tests {
     }
 
     /// Requesting upright when it's unavailable means fall through to weight.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_slant_no_upright() {
         assert_eq!(
             compare_for_request(
@@ -621,7 +621,7 @@ mod tests {
     }
 
     /// Uses default weight value when omitted.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_default() {
         assert_eq!(
             compare_for_request(
@@ -636,7 +636,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_exact_match() {
         assert_eq!(
             compare_for_request(
@@ -665,7 +665,7 @@ mod tests {
 
     /// For requested weight < `WEIGHT_NORMAL`, the priority is lower weights descending, then
     /// higher weights ascending.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_thinner_prefers_thinner() {
         assert_eq!(
             compare_for_request(
@@ -706,7 +706,7 @@ mod tests {
 
     /// For requested weight > `WEIGHT_MEDIUM`, the priority is higher weights ascending, then lower
     /// weights descending.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_thicker_prefers_thicker() {
         assert_eq!(
             compare_for_request(
@@ -735,7 +735,7 @@ mod tests {
 
     /// For requested weight `WEIGHT_NORMAL`, `WEIGHT_MEDIUM` is preferred, followed by lower
     /// weights.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_normal_prefers_medium_then_thinner() {
         assert_eq!(
             compare_for_request(
@@ -764,7 +764,7 @@ mod tests {
 
     /// For requested weight `WEIGHT_MEDIUM`, `WEIGHT_NORMAL` is preferred, followed by lower
     /// weights.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_medium_prefers_normal_then_thinner() {
         assert_eq!(
             compare_for_request(
@@ -794,7 +794,7 @@ mod tests {
     /// For requested weight between `WEIGHT_NORMAL` and `WEIGHT_MEDIUM`, inclusive, weights above
     /// the requested <= 500 are preferred, then below the requested descending, then above 500
     /// ascending.
-    #[test]
+    #[fuchsia::test]
     fn select_best_match_weight_between_normal_and_medium() {
         assert_eq!(
             compare_for_request(

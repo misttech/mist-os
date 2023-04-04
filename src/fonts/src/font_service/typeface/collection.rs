@@ -191,7 +191,7 @@ mod tests {
         )
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_font_matching_exact() -> Result<(), Error> {
         let collection = make_fake_typeface_collection(vec![
             make_fake_typeface_style(Width::ExtraCondensed, Slant::Upright, WEIGHT_SEMI_BOLD),
@@ -222,7 +222,7 @@ mod tests {
     }
 
     /// Exact style matches where the query includes only some of the style properties.
-    #[test]
+    #[fuchsia::test]
     fn test_font_matching_exact_partial() -> Result<(), Error> {
         fn exact_style_not_found() -> Error {
             format_err!("Exact style not found")
@@ -285,7 +285,7 @@ mod tests {
         .ok_or_else(|| format_err!("No typeface found for lang"))
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_font_matching_lang() -> Result<(), Error> {
         let collection = make_fake_typeface_collection(vec![
             make_fake_typeface_with_languages(&["a"]),
@@ -344,7 +344,7 @@ mod tests {
         .ok_or_else(|| format_err!("No typeface found for fallback family"))
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_font_matching_fallback_group() -> Result<(), Error> {
         let collection = make_fake_typeface_collection(vec![
             make_fake_typeface_with_fallback_family(GenericFontFamily::Serif),

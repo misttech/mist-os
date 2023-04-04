@@ -292,7 +292,7 @@ mod tests {
         maplit::btreeset,
     };
 
-    #[test]
+    #[fuchsia::test]
     fn test_typeface_new_empty_char_set_is_error() {
         let manifest_typeface = v2::Typeface {
             index: 0,
@@ -306,7 +306,7 @@ mod tests {
         assert!(Typeface::new(AssetId(0), manifest_typeface, None).is_err())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_typeface_inspect_data() {
         let inspector = finspect::Inspector::default();
 

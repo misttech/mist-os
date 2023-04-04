@@ -202,7 +202,7 @@ mod tests {
         unicase::UniCase,
     };
 
-    #[test]
+    #[fuchsia::test]
     fn test_zero_pad() {
         assert_eq!(zero_pad(0, 5), "0".to_string());
         assert_eq!(zero_pad(13, 99), "13".to_string());
@@ -237,7 +237,7 @@ mod tests {
     }
 
     #[allow(unused_variables)]
-    #[test]
+    #[fuchsia::test]
     fn test_service_inspect_data() -> Result<(), Error> {
         let inspector = finspect::Inspector::default();
 

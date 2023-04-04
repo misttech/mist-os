@@ -311,7 +311,7 @@ mod tests {
         pretty_assertions::assert_eq,
     };
 
-    #[test]
+    #[fuchsia::test]
     fn test_aliases_from_family() -> Result<(), Error> {
         let family = v2::Family {
             name: "Family A".to_string(),
@@ -403,7 +403,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_alias_inspect_data() {
         let alias = "Alif";
         let overrides = Some(Arc::new(TypefaceQueryOverrides {
@@ -428,7 +428,7 @@ mod tests {
         });
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_family_inspect_data() {
         let mut family = FontFamilyBuilder::new("Alpha", Some(GenericFontFamily::Cursive));
         family.add_typeface_once(Arc::new(Typeface {
