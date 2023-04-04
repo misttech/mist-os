@@ -20,59 +20,54 @@ use {
         range::RangeExt,
         round::round_up,
     },
-    anyhow::{self, Error},
+    anyhow::Error,
     fxfs_crypto::WrappedKeys,
     std::{
         cell::UnsafeCell,
         collections::{btree_map::BTreeMap, hash_set::HashSet},
         convert::TryInto,
         iter::Iterator,
-        ops::Bound,
+        ops::{Bound, Range},
     },
 };
 
 #[derive(Debug)]
 struct ScannedFile {
-    object_id: u64,
-    // Set when the Object record is processed for the file.  (The object might appear in another
-    // record before its Object record appears, e.g. a Child record, hence this is an Option.)
-    kind: Option<ObjectKind>,
     // A list of attribute IDs found for the file, along with their logical size.
     attributes: Vec<(u64, u64)>,
     // A list of parent object IDs for the file.  INVALID_OBJECT_ID indicates a reference from
     // outside the object store (either the graveyard, or because the object is a root object of the
     // store and probably has a reference to it in e.g. the StoreInfo or superblock).
     parents: Vec<u64>,
+    // The file's actual allocated size.
+    actual_allocated_size: u64,
     // The allocated size of the file (computed by summing up the extents for the file).
     allocated_size: u64,
     // The object is in the graveyard which means extents beyond the end of the file are allowed.
     in_graveyard: bool,
+    // The number of actual references for the file.
+    actual_refs: u64,
 }
 
 #[derive(Debug)]
 struct ScannedDir {
-    // This is stored in an UnsafeCell because we will use it later to mark the directory as visited
-    // when doing cycle detection.
-    // Safety: This is safe to access and modify as long as the reference to the ScannedDir is
-    // unique.
-    object_id: UnsafeCell<u64>,
-    // See ScannedFile::kind.
-    kind: Option<ObjectKind>,
-    // A list of all children object IDs found for the directory, and a boolean indicating if the
-    // child is a directory.
-    children: Vec<(u64, bool)>,
+    // Sub directory counts.
+    actual_sub_dirs: u64,
+    sub_dirs: u64,
     // The parent object of the directory.  See ScannedFile::parents.  Note that directories can
     // only have one parent, hence this is just an Option (not a Vec).
     parent: Option<u64>,
+    // Used to detect directory cycles.
+    visited: UnsafeCell<bool>,
 }
+
+unsafe impl Sync for ScannedDir {}
 
 #[derive(Debug)]
 enum ScannedObject {
     File(ScannedFile),
     Directory(ScannedDir),
-    // Other objects that we don't have special logic for (e.g. graveyard, volumes, ...), which
-    // we'll just track the object ID of.
-    Etc(u64),
+    Graveyard,
     // A tombstoned object, which should have no other records associated with it.
     Tombstone,
 }
@@ -153,49 +148,22 @@ impl<'a> ScannedStore<'a> {
                         }
                         self.current_file =
                             Some(CurrentFile { object_id: key.object_id, key_ids: HashSet::new() });
-                        let kind =
-                            ObjectKind::File { refs: *refs, allocated_size: *allocated_size };
-                        match self.objects.get_mut(&key.object_id) {
-                            Some(ScannedObject::File(ScannedFile { kind: obj_kind, .. })) => {
-                                // This should be the only Object record we encounter for this
-                                // object.
-                                assert!(obj_kind.is_none());
-                                *obj_kind = Some(kind);
-                            }
-                            Some(ScannedObject::Directory(..)) => {
-                                self.fsck.error(FsckError::ConflictingTypeForLink(
-                                    self.store_id,
-                                    key.object_id,
-                                    ObjectDescriptor::File.into(),
-                                    ObjectDescriptor::Directory.into(),
-                                ))?;
-                            }
-                            Some(ScannedObject::Etc(..)) => { /* NOP */ }
-                            Some(ScannedObject::Tombstone) => {
-                                self.fsck.error(FsckError::TombstonedObjectHasRecords(
-                                    self.store_id,
-                                    key.object_id,
-                                ))?;
-                            }
-                            None => {
-                                let parents = if self.root_objects.contains(&key.object_id) {
-                                    vec![INVALID_OBJECT_ID]
-                                } else {
-                                    vec![]
-                                };
-                                self.objects.insert(
-                                    key.object_id,
-                                    ScannedObject::File(ScannedFile {
-                                        object_id: key.object_id,
-                                        kind: Some(kind),
-                                        attributes: vec![],
-                                        parents,
-                                        allocated_size: 0,
-                                        in_graveyard: false,
-                                    }),
-                                );
-                            }
-                        }
+                        let parents = if self.root_objects.contains(&key.object_id) {
+                            vec![INVALID_OBJECT_ID]
+                        } else {
+                            vec![]
+                        };
+                        self.objects.insert(
+                            key.object_id,
+                            ScannedObject::File(ScannedFile {
+                                attributes: vec![],
+                                parents,
+                                actual_allocated_size: *allocated_size,
+                                allocated_size: 0,
+                                in_graveyard: false,
+                                actual_refs: *refs,
+                            }),
+                        );
                     }
                     ObjectValue::Object {
                         kind: ObjectKind::Directory { sub_dirs },
@@ -207,55 +175,25 @@ impl<'a> ScannedStore<'a> {
                             // Increment only nodes.
                             entry.1 += 1;
                         }
-                        let kind = ObjectKind::Directory { sub_dirs: *sub_dirs };
-                        match self.objects.get_mut(&key.object_id) {
-                            Some(ScannedObject::File(..)) => {
-                                self.fsck.error(FsckError::ConflictingTypeForLink(
-                                    self.store_id,
-                                    key.object_id,
-                                    ObjectDescriptor::Directory.into(),
-                                    ObjectDescriptor::File.into(),
-                                ))?;
-                            }
-                            Some(ScannedObject::Directory(ScannedDir {
-                                kind: obj_kind, ..
-                            })) => {
-                                // This should be the only Object record we encounter for this
-                                // object.
-                                assert!(obj_kind.is_none());
-                                *obj_kind = Some(kind);
-                            }
-                            Some(ScannedObject::Etc(..)) => { /* NOP */ }
-                            Some(ScannedObject::Tombstone) => {
-                                // Arguably this could also be a mismatched object type, since
-                                // directories shouldn't be tombstoned.
-                                self.fsck.error(FsckError::TombstonedObjectHasRecords(
-                                    self.store_id,
-                                    key.object_id,
-                                ))?;
-                            }
-                            None => {
-                                let parent = if self.root_objects.contains(&key.object_id) {
-                                    Some(INVALID_OBJECT_ID)
-                                } else {
-                                    None
-                                };
-                                // We've verified no duplicate keys, and Object records come first,
-                                // so this should always be the first time we encounter this object.
-                                self.objects.insert(
-                                    key.object_id,
-                                    ScannedObject::Directory(ScannedDir {
-                                        object_id: UnsafeCell::new(key.object_id),
-                                        kind: Some(kind),
-                                        children: vec![],
-                                        parent,
-                                    }),
-                                );
-                            }
-                        }
+                        let parent = if self.root_objects.contains(&key.object_id) {
+                            Some(INVALID_OBJECT_ID)
+                        } else {
+                            None
+                        };
+                        // We've verified no duplicate keys, and Object records come first,
+                        // so this should always be the first time we encounter this object.
+                        self.objects.insert(
+                            key.object_id,
+                            ScannedObject::Directory(ScannedDir {
+                                actual_sub_dirs: *sub_dirs,
+                                sub_dirs: 0,
+                                parent,
+                                visited: UnsafeCell::new(false),
+                            }),
+                        );
                     }
                     ObjectValue::Object { kind: ObjectKind::Graveyard, attributes } => {
-                        self.objects.insert(key.object_id, ScannedObject::Etc(key.object_id));
+                        self.objects.insert(key.object_id, ScannedObject::Graveyard);
                         if attributes.project_id != 0 {
                             self.fsck.error(FsckError::ProjectOnGraveyard(
                                 self.store_id,
@@ -319,7 +257,7 @@ impl<'a> ScannedStore<'a> {
                                     key.object_id,
                                 ))?;
                             }
-                            Some(ScannedObject::Etc(..)) => { /* NOP */ }
+                            Some(ScannedObject::Graveyard) => { /* NOP */ }
                             Some(ScannedObject::Tombstone) => {
                                 self.fsck.error(FsckError::TombstonedObjectHasRecords(
                                     self.store_id,
@@ -379,158 +317,35 @@ impl<'a> ScannedStore<'a> {
                     }
                 }
             }
-            ObjectKeyData::Child { name: ref _name } => {
-                match value {
-                    ObjectValue::None => {}
-                    ObjectValue::Child { object_id: child_id, object_descriptor } => {
-                        if *child_id == INVALID_OBJECT_ID {
-                            self.fsck.warning(FsckWarning::InvalidObjectIdInStore(
-                                self.store_id,
-                                key.into(),
-                                value.into(),
-                            ))?;
-                        }
-                        if self.root_objects.contains(child_id) {
-                            self.fsck.error(FsckError::RootObjectHasParent(
-                                self.store_id,
-                                *child_id,
-                                key.object_id,
-                            ))?;
-                        }
-                        match self.objects.get_mut(child_id) {
-                            Some(ScannedObject::File(ScannedFile { parents, .. })) => {
-                                match object_descriptor {
-                                    ObjectDescriptor::File => {}
-                                    ObjectDescriptor::Directory => {
-                                        self.fsck.error(FsckError::ConflictingTypeForLink(
-                                            self.store_id,
-                                            key.object_id,
-                                            ObjectDescriptor::File.into(),
-                                            ObjectDescriptor::Directory.into(),
-                                        ))?;
-                                    }
-                                    ObjectDescriptor::Volume => unreachable!(),
-                                    ObjectDescriptor::Symlink => unimplemented!(),
-                                }
-                                parents.push(key.object_id);
-                            }
-                            Some(ScannedObject::Directory(ScannedDir { parent, .. })) => {
-                                match object_descriptor {
-                                    ObjectDescriptor::File => {
-                                        self.fsck.error(FsckError::ConflictingTypeForLink(
-                                            self.store_id,
-                                            key.object_id,
-                                            ObjectDescriptor::Directory.into(),
-                                            ObjectDescriptor::File.into(),
-                                        ))?;
-                                    }
-                                    ObjectDescriptor::Directory => {}
-                                    ObjectDescriptor::Volume => unreachable!(),
-                                    ObjectDescriptor::Symlink => unimplemented!(),
-                                }
-                                if parent.is_some() {
-                                    // TODO(fxbug.dev/87381): Accumulating and reporting all parents
-                                    // might be useful.
-                                    self.fsck.error(FsckError::MultipleLinksToDirectory(
-                                        self.store_id,
-                                        *child_id,
-                                    ))?;
-                                }
-                                *parent = Some(key.object_id);
-                            }
-                            Some(ScannedObject::Etc(..)) => {
-                                // TODO(fxbug.dev/87381): Verify the ObjectDescriptor matches the
-                                // other metadata associated with the object.
-                            }
-                            Some(ScannedObject::Tombstone) => {
-                                self.fsck.error(FsckError::TombstonedObjectHasRecords(
-                                    self.store_id,
-                                    key.object_id,
-                                ))?;
-                            }
-                            None => {
-                                let node = match object_descriptor {
-                                    ObjectDescriptor::File => ScannedObject::File(ScannedFile {
-                                        object_id: *child_id,
-                                        kind: None,
-                                        attributes: vec![],
-                                        parents: vec![key.object_id],
-                                        allocated_size: 0,
-                                        in_graveyard: false,
-                                    }),
-                                    ObjectDescriptor::Directory => {
-                                        ScannedObject::Directory(ScannedDir {
-                                            object_id: UnsafeCell::new(*child_id),
-                                            kind: None,
-                                            children: vec![],
-                                            parent: Some(key.object_id),
-                                        })
-                                    }
-                                    ObjectDescriptor::Volume => {
-                                        if !self.is_root_store {
-                                            self.fsck.error(FsckError::VolumeInChildStore(
-                                                self.store_id,
-                                                *child_id,
-                                            ))?;
-                                        }
-                                        ScannedObject::Etc(*child_id)
-                                    }
-                                    ObjectDescriptor::Symlink => unimplemented!(),
-                                };
-                                self.objects.insert(*child_id, node);
-                            }
-                        };
-                        match self.objects.get_mut(&key.object_id) {
-                            Some(ScannedObject::File(..)) => {
-                                self.fsck.error(FsckError::FileHasChildren(
-                                    self.store_id,
-                                    key.object_id,
-                                ))?;
-                            }
-                            Some(ScannedObject::Directory(ScannedDir { children, .. })) => {
-                                // Sort order of records was verified in check_child_store, so this
-                                // pushes in order.
-                                // There shouldn't be any duplicates added since (a) we ensure no
-                                // dupe records are processed and (b) we check that we don't have
-                                // conflicting types for two links to a given object ID just above
-                                // here.
-                                children.push((
-                                    *child_id,
-                                    *object_descriptor == ObjectDescriptor::Directory,
-                                ));
-                            }
-                            Some(ScannedObject::Etc(..)) => { /* NOP */ }
-                            Some(ScannedObject::Tombstone) => {
-                                self.fsck.error(FsckError::TombstonedObjectHasRecords(
-                                    self.store_id,
-                                    key.object_id,
-                                ))?;
-                            }
-                            None => {
-                                self.objects.insert(
-                                    key.object_id,
-                                    ScannedObject::Directory(ScannedDir {
-                                        object_id: UnsafeCell::new(key.object_id),
-                                        kind: None,
-                                        children: vec![(
-                                            *child_id,
-                                            *object_descriptor == ObjectDescriptor::Directory,
-                                        )],
-                                        parent: None,
-                                    }),
-                                );
-                            }
-                        }
-                    }
-                    _ => {
-                        self.fsck.error(FsckError::MalformedObjectRecord(
+            ObjectKeyData::Child { name: ref _name } => match value {
+                ObjectValue::None => {}
+                ObjectValue::Child { object_id: child_id, object_descriptor } => {
+                    if *child_id == INVALID_OBJECT_ID {
+                        self.fsck.warning(FsckWarning::InvalidObjectIdInStore(
                             self.store_id,
                             key.into(),
                             value.into(),
                         ))?;
                     }
+                    if self.root_objects.contains(child_id) {
+                        self.fsck.error(FsckError::RootObjectHasParent(
+                            self.store_id,
+                            *child_id,
+                            key.object_id,
+                        ))?;
+                    }
+                    if object_descriptor == &ObjectDescriptor::Volume && !self.is_root_store {
+                        self.fsck.error(FsckError::VolumeInChildStore(self.store_id, *child_id))?;
+                    }
                 }
-            }
+                _ => {
+                    self.fsck.error(FsckError::MalformedObjectRecord(
+                        self.store_id,
+                        key.into(),
+                        value.into(),
+                    ))?;
+                }
+            },
             ObjectKeyData::Project { project_id, property: ProjectProperty::Limit } => {
                 // Should only be set on the root object store
                 if self.root_dir_id != key.object_id {
@@ -582,6 +397,163 @@ impl<'a> ScannedStore<'a> {
         Ok(())
     }
 
+    // Performs some checks on the child link and records information such as the sub-directory
+    // count that get verified later.
+    fn process_child(
+        &mut self,
+        parent_id: u64,
+        child_id: u64,
+        object_descriptor: &ObjectDescriptor,
+    ) -> Result<(), Error> {
+        match (self.objects.get_mut(&child_id), object_descriptor) {
+            (
+                Some(ScannedObject::File(ScannedFile { parents, .. })),
+                ObjectDescriptor::File | ObjectDescriptor::Volume,
+            ) => {
+                parents.push(parent_id);
+            }
+            (
+                Some(ScannedObject::Directory(ScannedDir { parent, .. })),
+                ObjectDescriptor::Directory,
+            ) => {
+                if parent.is_some() {
+                    // TODO(fxbug.dev/87381): Accumulating and reporting all parents
+                    // might be useful.
+                    self.fsck
+                        .error(FsckError::MultipleLinksToDirectory(self.store_id, child_id))?;
+                }
+                *parent = Some(parent_id);
+            }
+            (Some(ScannedObject::Tombstone), _) => {
+                self.fsck.error(FsckError::TombstonedObjectHasRecords(self.store_id, parent_id))?;
+                return Ok(());
+            }
+            (None, _) => {
+                self.fsck.error(FsckError::MissingObjectInfo(self.store_id, child_id))?;
+                return Ok(());
+            }
+            (Some(s), _) => {
+                let expected = match s {
+                    ScannedObject::Directory(_) => ObjectDescriptor::Directory,
+                    ScannedObject::File(_) | ScannedObject::Graveyard => ObjectDescriptor::File,
+                    ScannedObject::Tombstone => unreachable!(),
+                };
+                if &expected != object_descriptor {
+                    self.fsck.error(FsckError::ConflictingTypeForLink(
+                        self.store_id,
+                        child_id,
+                        expected.into(),
+                        object_descriptor.into(),
+                    ))?;
+                }
+            }
+        }
+        match self.objects.get_mut(&parent_id) {
+            Some(ScannedObject::File(..) | ScannedObject::Graveyard) => {
+                self.fsck.error(FsckError::ObjectHasChildren(self.store_id, parent_id))?;
+            }
+            Some(ScannedObject::Directory(ScannedDir { sub_dirs, .. })) => {
+                if *object_descriptor == ObjectDescriptor::Directory {
+                    *sub_dirs += 1;
+                }
+            }
+            Some(ScannedObject::Tombstone) => {
+                self.fsck.error(FsckError::TombstonedObjectHasRecords(self.store_id, parent_id))?;
+            }
+            None => self.fsck.error(FsckError::MissingObjectInfo(self.store_id, parent_id))?,
+        }
+        Ok(())
+    }
+
+    // Process an extent, performing some checks and building fsck.allocations.
+    async fn process_extent(
+        &mut self,
+        object_id: u64,
+        attribute_id: u64,
+        range: &Range<u64>,
+        device_offset: Option<u64>,
+        bs: u64,
+    ) -> Result<(), Error> {
+        if range.start % bs > 0 || range.end % bs > 0 {
+            self.fsck.error(FsckError::MisalignedExtent(
+                self.store_id,
+                object_id,
+                range.clone(),
+                0,
+            ))?;
+        }
+        if range.start >= range.end {
+            self.fsck.error(FsckError::MalformedExtent(
+                self.store_id,
+                object_id,
+                range.clone(),
+                0,
+            ))?;
+            return Ok(());
+        }
+        let len = range.end - range.start;
+        match self.objects.get_mut(&object_id) {
+            Some(ScannedObject::File(ScannedFile {
+                attributes,
+                allocated_size,
+                in_graveyard,
+                ..
+            })) => {
+                match attributes.iter().find(|(attr_id, _)| *attr_id == attribute_id) {
+                    Some((_, size)) => {
+                        if device_offset.is_some()
+                            && !*in_graveyard
+                            && range.end > round_up(*size, bs).unwrap()
+                        {
+                            self.fsck.error(FsckError::ExtentExceedsLength(
+                                self.store_id,
+                                object_id,
+                                attribute_id,
+                                *size,
+                                range.into(),
+                            ))?;
+                        }
+                    }
+                    None => {
+                        self.fsck.warning(FsckWarning::ExtentForMissingAttribute(
+                            self.store_id,
+                            object_id,
+                            attribute_id,
+                        ))?;
+                    }
+                }
+                if device_offset.is_some() {
+                    *allocated_size += len;
+                }
+            }
+            Some(ScannedObject::Directory(..)) => {
+                self.fsck.warning(FsckWarning::ExtentForDirectory(self.store_id, object_id))?;
+            }
+            Some(_) => { /* NOP */ }
+            None => {
+                self.fsck
+                    .warning(FsckWarning::ExtentForNonexistentObject(self.store_id, object_id))?;
+            }
+        }
+        if let Some(device_offset) = device_offset {
+            if device_offset % bs > 0 {
+                self.fsck.error(FsckError::MisalignedExtent(
+                    self.store_id,
+                    object_id,
+                    range.clone(),
+                    device_offset,
+                ))?;
+            }
+            let item = Item::new(
+                AllocatorKey { device_range: device_offset..device_offset + len },
+                AllocatorValue::Abs { count: 1, owner_object_id: self.store_id },
+            );
+            let lower_bound = item.key.lower_bound_for_merge_into();
+            self.fsck.allocations.merge_into(item, &lower_bound, allocator::merge::merge).await;
+        }
+        Ok(())
+    }
+
     // A graveyard entry can either be for tombstoning a file (if `tombstone` is true), or for
     // trimming a file.
     fn handle_graveyard_entry(&mut self, object_id: u64, tombstone: bool) -> Result<(), Error> {
@@ -605,18 +577,6 @@ impl<'a> ScannedStore<'a> {
         Ok(())
     }
 
-    // Returns an iterator over objects in object-id order.
-    // Note that this doesn't imply any ordering in terms of their position in the object graph.
-    fn objects(&self) -> impl Iterator<Item = &ScannedObject> {
-        self.objects.values()
-    }
-
-    // Returns an iterator over objects in BFS order (which means that orphaned objects won't be
-    // scanned).
-    fn iter_bfs(&self) -> ScannedStoreIterator<'_, 'a> {
-        ScannedStoreIterator(self, self.root_objects.clone())
-    }
-
     // Called when all items for the current file have been processed.
     fn finish_file(&mut self) -> Result<(), Error> {
         if let Some(current_file) = self.current_file.take() {
@@ -633,138 +593,48 @@ impl<'a> ScannedStore<'a> {
     }
 }
 
-// Implements a BFS iterator for a store.  Orphaned objects and graveyard objects won't be
-// processed.
-struct ScannedStoreIterator<'iter, 'a>(&'iter ScannedStore<'a>, Vec<u64>);
-
-impl<'iter, 'a> std::iter::Iterator for ScannedStoreIterator<'iter, 'a> {
-    type Item = &'iter ScannedObject;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if let Some(id) = self.1.pop() {
-            let object = self.0.objects.get(&id).unwrap();
-            match object {
-                ScannedObject::File(..) | ScannedObject::Etc(..) | ScannedObject::Tombstone => {}
-                ScannedObject::Directory(ScannedDir { children, .. }) => {
-                    self.1.extend(children.iter().map(|(oid, _)| oid));
-                }
-            }
-            Some(object)
-        } else {
-            None
-        }
-    }
-}
-
-// Scans all extents in the store, emitting synthesized allocations into |fsck.allocations| and
-// updating the sizes for files in |scanned|.
-// TODO(fxbug.dev/95475): Roll this back into main function.
-async fn scan_extents<'a>(
+// Scans extents and directory child entries in the store, emitting synthesized allocations into
+// |fsck.allocations|, updating the sizes for files in |scanned| and performing checks on directory
+// children.
+// TODO(fxbug.dev/95475): Roll the extent scanning back into main function.
+async fn scan_extents_and_directory_children<'a>(
     store: &ObjectStore,
     scanned: &mut ScannedStore<'a>,
 ) -> Result<(), Error> {
-    let store_id = store.store_object_id();
     let bs = store.block_size();
     let layer_set = store.tree().layer_set();
     let mut merger = layer_set.merger();
     let mut iter = merger.seek(Bound::Unbounded).await?;
     let mut allocated_bytes = 0;
     while let Some(itemref) = iter.get() {
-        if let ItemRef {
-            key:
-                ObjectKey {
-                    object_id,
-                    data:
-                        ObjectKeyData::Attribute(
-                            attribute_id,
-                            AttributeKey::Extent(ExtentKey { range }),
-                        ),
-                },
-            value: ObjectValue::Extent(value),
-            ..
-        } = itemref
-        {
-            if let ExtentValue::Some { device_offset, .. } = value {
-                if range.start % bs > 0 || range.end % bs > 0 {
-                    scanned.fsck.error(FsckError::MisalignedExtent(
-                        store_id,
-                        *object_id,
-                        range.clone(),
-                        0,
-                    ))?;
-                } else if range.start >= range.end {
-                    scanned.fsck.error(FsckError::MalformedExtent(
-                        store_id,
-                        *object_id,
-                        range.clone(),
-                        0,
-                    ))?;
-                }
-                allocated_bytes += range.length().unwrap();
-                if device_offset % bs > 0 {
-                    scanned.fsck.error(FsckError::MisalignedExtent(
-                        store_id,
-                        *object_id,
-                        range.clone(),
-                        *device_offset,
-                    ))?;
-                }
-                match scanned.objects.get_mut(object_id) {
-                    Some(ScannedObject::File(ScannedFile {
-                        attributes,
-                        allocated_size,
-                        in_graveyard,
-                        ..
-                    })) => {
-                        match attributes.iter().find(|(attr_id, _)| attr_id == attribute_id) {
-                            Some((_, size)) => {
-                                if !*in_graveyard && range.end > round_up(*size, bs).unwrap() {
-                                    scanned.fsck.error(FsckError::ExtentExceedsLength(
-                                        store_id,
-                                        *object_id,
-                                        *attribute_id,
-                                        *size,
-                                        range.into(),
-                                    ))?;
-                                }
-                            }
-                            None => {
-                                scanned.fsck.warning(FsckWarning::ExtentForMissingAttribute(
-                                    store.store_object_id(),
-                                    *object_id,
-                                    *attribute_id,
-                                ))?;
-                            }
-                        }
-                        *allocated_size += range.end - range.start;
-                    }
-                    Some(ScannedObject::Directory(..)) => {
-                        scanned.fsck.warning(FsckWarning::ExtentForDirectory(
-                            store.store_object_id(),
-                            *object_id,
-                        ))?;
-                    }
-                    Some(_) => { /* NOP */ }
-                    None => {
-                        scanned.fsck.warning(FsckWarning::ExtentForNonexistentObject(
-                            store.store_object_id(),
-                            *object_id,
-                        ))?;
-                    }
-                }
-                let item = Item::new(
-                    AllocatorKey {
-                        device_range: *device_offset..*device_offset + range.end - range.start,
+        match itemref {
+            ItemRef {
+                key:
+                    ObjectKey {
+                        object_id,
+                        data:
+                            ObjectKeyData::Attribute(
+                                attribute_id,
+                                AttributeKey::Extent(ExtentKey { range }),
+                            ),
                     },
-                    AllocatorValue::Abs { count: 1, owner_object_id: store_id },
-                );
-                let lower_bound = item.key.lower_bound_for_merge_into();
-                scanned
-                    .fsck
-                    .allocations
-                    .merge_into(item, &lower_bound, allocator::merge::merge)
-                    .await;
+                value: ObjectValue::Extent(extent),
+                ..
+            } => {
+                let device_offset = if let ExtentValue::Some { device_offset, .. } = extent {
+                    allocated_bytes += range.length().unwrap_or(0);
+                    Some(*device_offset)
+                } else {
+                    None
+                };
+                scanned.process_extent(*object_id, *attribute_id, range, device_offset, bs).await?
             }
+            ItemRef {
+                key: ObjectKey { object_id, data: ObjectKeyData::Child { .. } },
+                value: ObjectValue::Child { object_id: child_id, object_descriptor },
+                ..
+            } => scanned.process_child(*object_id, *child_id, object_descriptor)?,
+            _ => {}
         }
         iter.advance().await?;
     }
@@ -797,8 +667,7 @@ pub(super) async fn scan_store(
     // Scan the store for objects, attributes, and parent/child relationships.
     let layer_set = store.tree().layer_set();
     let mut merger = layer_set.merger();
-    let mut iter =
-        fsck.assert(merger.seek(Bound::Unbounded).await, FsckFatal::MalformedStore(store_id))?;
+    let mut iter = merger.seek(Bound::Unbounded).await?;
     let mut last_item: Option<Item<ObjectKey, ObjectValue>> = None;
     while let Some(item) = iter.get() {
         if let Some(last_item) = last_item {
@@ -820,7 +689,7 @@ pub(super) async fn scan_store(
         }
         scanned.process(item.key, item.value)?;
         last_item = Some(item.cloned());
-        fsck.assert(iter.advance().await, FsckFatal::MalformedStore(store_id))?;
+        iter.advance().await?;
     }
     scanned.finish_file()?;
 
@@ -869,97 +738,121 @@ pub(super) async fn scan_store(
         fsck.assert(iter.advance().await, FsckFatal::MalformedGraveyard)?;
     }
 
-    // Iterate over extents, adding them to the relevant attributes for the file.
-    scan_extents(store, &mut scanned).await?;
+    scan_extents_and_directory_children(store, &mut scanned).await?;
 
     // At this point, we've provided all of the inputs to |scanned|.
 
-    // First, iterate in object-id order, so that we check every object (and thus find orphans).
-    // It's not very efficient to scan twice, but we don't want to miss orphaned objects, so we'll
-    // have to do this without some refactoring to keep orphaned objects off to the side until
-    // they're parented (allowing us to easily also scan orphaned objects).
+    // Mark all the root directories as visited so that cycle detection below works.
+    for oid in scanned.root_objects {
+        if let Some(ScannedObject::Directory(ScannedDir { visited, .. })) =
+            scanned.objects.get_mut(&oid)
+        {
+            *visited.get_mut() = true;
+        }
+    }
+
+    // Iterate over all objects performing checks we were unable to perform earlier.
     let mut num_objects = 0;
     let mut files = 0;
     let mut directories = 0;
     let mut tombstones = 0;
     let mut other = 0;
-    for object in scanned.objects() {
+    let mut stack = Vec::new();
+    for (object_id, object) in &scanned.objects {
         num_objects += 1;
         match object {
             ScannedObject::File(ScannedFile {
-                object_id,
-                kind,
                 attributes,
                 parents,
-                allocated_size: actual_allocated_size,
+                actual_allocated_size,
+                allocated_size,
+                actual_refs,
                 ..
             }) => {
                 files += 1;
-                match kind {
-                    Some(ObjectKind::File { refs, allocated_size, .. }) => {
-                        let expected_refs = parents.len().try_into().unwrap();
-                        // expected_refs == 0 is handled separately to distinguish orphaned objects
-                        if expected_refs != *refs && expected_refs > 0 {
-                            fsck.error(FsckError::RefCountMismatch(
-                                *object_id,
-                                expected_refs,
-                                *refs,
-                            ))?;
-                        }
-                        if allocated_size != actual_allocated_size {
-                            fsck.error(FsckError::AllocatedSizeMismatch(
-                                store_id,
-                                *object_id,
-                                *allocated_size,
-                                *actual_allocated_size,
-                            ))?;
-                        }
-                        if attributes
-                            .iter()
-                            .find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID)
-                            .is_none()
-                        {
-                            fsck.error(FsckError::MissingDataAttribute(store_id, *object_id))?;
-                        }
-                    }
-                    Some(_) => unreachable!(), // Checked during tree construction
-                    None => {
-                        fsck.error(FsckError::MissingObjectInfo(store_id, *object_id))?;
-                    }
+                let expected_refs = parents.len().try_into().unwrap();
+                // expected_refs == 0 is handled separately to distinguish orphaned objects
+                if expected_refs != *actual_refs && expected_refs > 0 {
+                    fsck.error(FsckError::RefCountMismatch(
+                        *object_id,
+                        expected_refs,
+                        *actual_refs,
+                    ))?;
+                }
+                if allocated_size != actual_allocated_size {
+                    fsck.error(FsckError::AllocatedSizeMismatch(
+                        store_id,
+                        *object_id,
+                        *allocated_size,
+                        *actual_allocated_size,
+                    ))?;
+                }
+                if attributes
+                    .iter()
+                    .find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID)
+                    .is_none()
+                {
+                    fsck.error(FsckError::MissingDataAttribute(store_id, *object_id))?;
                 }
                 if parents.is_empty() {
                     fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
                 }
             }
-            ScannedObject::Directory(ScannedDir { object_id, kind, children, parent }) => {
+            ScannedObject::Directory(ScannedDir {
+                actual_sub_dirs,
+                sub_dirs,
+                parent,
+                visited,
+                ..
+            }) => {
                 directories += 1;
-                let oid = unsafe { *object_id.get() };
-                match kind {
-                    Some(ObjectKind::Directory { sub_dirs }) => {
-                        let num_dirs = children
-                            .iter()
-                            .filter(|(_, is_dir)| *is_dir)
-                            .count()
-                            .try_into()
-                            .unwrap();
-                        if num_dirs != *sub_dirs {
-                            fsck.error(FsckError::SubDirCountMismatch(
-                                store_id, oid, *sub_dirs, num_dirs,
-                            ))?;
+                if *sub_dirs != *actual_sub_dirs {
+                    fsck.error(FsckError::SubDirCountMismatch(
+                        store_id,
+                        *object_id,
+                        *sub_dirs,
+                        *actual_sub_dirs,
+                    ))?;
+                }
+                if let Some(mut oid) = parent {
+                    // Check this directory is attached to a root object.
+                    // SAFETY: This is safe because here and below are the only places that we
+                    // manipulate `visited`.
+                    if !std::mem::replace(unsafe { &mut *visited.get() }, true) {
+                        stack.push(*object_id);
+                        loop {
+                            if let Some(ScannedObject::Directory(ScannedDir {
+                                parent: Some(parent),
+                                visited,
+                                ..
+                            })) = scanned.objects.get(&oid)
+                            {
+                                stack.push(oid);
+                                oid = *parent;
+                                // SAFETY: See above.
+                                if std::mem::replace(unsafe { &mut *visited.get() }, true) {
+                                    break;
+                                }
+                            } else {
+                                // This indicates an error (e.g. missing parent), but they should be
+                                // reported elsewhere.
+                                break;
+                            }
+                        }
+                        // Check that the object we got to isn't one in our stack which would
+                        // indicate a cycle.
+                        for s in stack.drain(..) {
+                            if s == oid {
+                                fsck.error(FsckError::LinkCycle(store_id, oid))?;
+                                break;
+                            }
                         }
                     }
-                    Some(_) => unreachable!(), // Checked during tree construction
-                    None => {
-                        fsck.error(FsckError::MissingObjectInfo(store_id, oid))?;
-                    }
-                }
-                if parent.is_none() {
-                    fsck.warning(FsckWarning::OrphanedObject(store_id, oid))?;
+                } else {
+                    fsck.warning(FsckWarning::OrphanedObject(store_id, *object_id))?;
                 }
             }
-            ScannedObject::Etc(_) => {
-                other += 1;
-            }
+            ScannedObject::Graveyard => other += 1,
             ScannedObject::Tombstone => {
                 tombstones += 1;
                 num_objects -= 1;
@@ -973,27 +866,6 @@ pub(super) async fn scan_store(
         "Store {} has {} files, {} dirs, {} tombstones, {} other objects",
         store_id, files, directories, tombstones, other
     ));
-
-    // Now iterate again in BFS order, looking for cycles.
-    for object in scanned.iter_bfs() {
-        // Mark directories as visited by setting its kind to None, which we've already checked
-        // above and don't need to check any more.
-        // We don't bother looking for cycles involving non-directories since they can't have
-        // children.
-        match object {
-            ScannedObject::File(..) | ScannedObject::Etc(..) | ScannedObject::Tombstone => {}
-            ScannedObject::Directory(ScannedDir { object_id, .. }) => {
-                let oid = unsafe { *object_id.get() };
-                if oid == INVALID_OBJECT_ID {
-                    fsck.error(FsckError::LinkCycle(store_id, oid))?;
-                    // Once we've found a cycle, break out immediately since otherwise we'll spin
-                    // forever.
-                    break;
-                }
-                unsafe { *object_id.get() = INVALID_OBJECT_ID };
-            }
-        }
-    }
 
     Ok(())
 }

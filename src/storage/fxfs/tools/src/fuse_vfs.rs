@@ -348,7 +348,7 @@ impl FuseFs {
                     )
                     .await?;
                 let dir = self.open_dir(inode).await?;
-                dir.update_attributes(&mut transaction, ctime, mtime, |_| {}).await?;
+                dir.update_attributes(&mut transaction, ctime, mtime, 0).await?;
                 transaction.commit().await?;
             }
 

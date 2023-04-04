@@ -221,7 +221,7 @@ pub enum FsckError {
     ConflictingTypeForLink(u64, u64, Value, Value),
     ExtentExceedsLength(u64, u64, u64, u64, Value),
     ExtraAllocations(Vec<Allocation>),
-    FileHasChildren(u64, u64),
+    ObjectHasChildren(u64, u64),
     UnexpectedJournalFileOffset(u64),
     LinkCycle(u64, u64),
     MalformedAllocation(Allocation),
@@ -289,8 +289,8 @@ impl FsckError {
             FsckError::ExtraAllocations(allocations) => {
                 format!("Unexpected allocations {:?}", allocations)
             }
-            FsckError::FileHasChildren(store_id, object_id) => {
-                format!("Object {} in store {} has children", object_id, store_id)
+            FsckError::ObjectHasChildren(store_id, object_id) => {
+                format!("Object {} in store {} has unexpected children", object_id, store_id)
             }
             FsckError::UnexpectedJournalFileOffset(object_id) => {
                 format!(
@@ -432,8 +432,8 @@ impl FsckError {
             FsckError::ExtraAllocations(allocations) => {
                 error!(?allocations, "Unexpected allocations");
             }
-            FsckError::FileHasChildren(store_id, oid) => {
-                error!(store_id, oid, "File has children");
+            FsckError::ObjectHasChildren(store_id, oid) => {
+                error!(store_id, oid, "Object has unexpected children");
             }
             FsckError::UnexpectedJournalFileOffset(object_id) => {
                 error!(

@@ -15,8 +15,10 @@ use {
                 ObjectAttributes, ObjectItem, ObjectKey, ObjectKeyData, ObjectKind, ObjectValue,
                 Timestamp,
             },
-            transaction::{LockKey, Mutation, Options, Transaction},
-            HandleOptions, HandleOwner, ObjectStore, ObjectStoreMutation, StoreObjectHandle,
+            transaction::{
+                LockKey, Mutation, ObjectStoreMutation, Operation, Options, Transaction,
+            },
+            HandleOptions, HandleOwner, ObjectStore, StoreObjectHandle,
         },
         trace_duration,
     },
@@ -190,9 +192,9 @@ impl<S: HandleOwner> Directory<S> {
         }
     }
 
-    pub async fn create_child_dir<'a>(
+    pub async fn create_child_dir(
         &self,
-        transaction: &mut Transaction<'a>,
+        transaction: &mut Transaction<'_>,
         name: &str,
     ) -> Result<Directory<S>, Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
@@ -204,18 +206,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::Directory),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), |item| {
-            if let ObjectItem {
-                value: ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs }, .. },
-                ..
-            } = item
-            {
-                *sub_dirs = sub_dirs.saturating_add(1)
-            } else {
-                panic!("Expected directory");
-            }
-        })
-        .await?;
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 1).await?;
         self.copy_project_id_to_object_in_txn(transaction, handle.object_id())?;
         Ok(handle)
     }
@@ -234,7 +225,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(handle.object_id(), ObjectDescriptor::File),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), |_| {}).await?;
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await?;
         Ok(())
     }
 
@@ -334,7 +325,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(symlink_id, ObjectDescriptor::Symlink),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), |_| {}).await?;
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await?;
         Ok(())
     }
 
@@ -368,7 +359,7 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(store_object_id, ObjectDescriptor::Volume),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), |_| {}).await
+        self.update_attributes(transaction, None, Some(Timestamp::now()), 0).await
     }
 
     pub async fn delete_child_volume<'a>(
@@ -404,6 +395,7 @@ impl<S: HandleOwner> Directory<S> {
         descriptor: ObjectDescriptor,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
+        let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
@@ -411,45 +403,49 @@ impl<S: HandleOwner> Directory<S> {
                 ObjectValue::child(object_id, descriptor),
             ),
         );
-        self.update_attributes(transaction, None, Some(Timestamp::now()), |_| {}).await
+        self.update_attributes(transaction, None, Some(Timestamp::now()), sub_dirs_delta).await
     }
 
-    /// Updates attributes for the object.  `updater` is a callback that allows modifications to
-    /// the object's attributes beyond just creation time and modification time.
+    /// Updates attributes for the directory.
     pub async fn update_attributes<'a>(
         &self,
         transaction: &mut Transaction<'a>,
         crtime: Option<Timestamp>,
         mtime: Option<Timestamp>,
-        updater: impl FnOnce(&mut ObjectItem),
+        sub_dirs_delta: i64,
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
-        let mut item = if let Some(ObjectStoreMutation { item, .. }) = transaction
+        let (mut item, op) = if let Some(ObjectStoreMutation { item, op }) = transaction
             .get_object_mutation(self.store().store_object_id(), ObjectKey::object(self.object_id))
         {
-            item.clone()
+            (item.clone(), op.clone())
         } else {
-            self.store()
-                .tree()
-                .find(&ObjectKey::object(self.object_id))
-                .await?
-                .ok_or(anyhow!(FxfsError::NotFound))?
+            (
+                self.store()
+                    .tree()
+                    .find(&ObjectKey::object(self.object_id))
+                    .await?
+                    .ok_or(anyhow!(FxfsError::NotFound))?,
+                Operation::ReplaceOrInsert,
+            )
         };
-        if let ObjectValue::Object { ref mut attributes, .. } = item.value {
+        if let ObjectValue::Object { attributes, kind: ObjectKind::Directory { sub_dirs } } =
+            &mut item.value
+        {
             if let Some(time) = crtime {
                 attributes.creation_time = time;
             }
             if let Some(time) = mtime {
                 attributes.modification_time = time;
             }
+            *sub_dirs = sub_dirs.saturating_add_signed(sub_dirs_delta);
         } else {
             bail!(anyhow!(FxfsError::Inconsistent)
-                .context("update_attributes: Expected object value"));
+                .context("update_attributes: expected directory object"));
         };
-        updater(&mut item);
         transaction.add(
             self.store().store_object_id(),
-            Mutation::replace_or_insert_object(item.key, item.value),
+            Mutation::ObjectStore(ObjectStoreMutation { item, op }),
         );
         Ok(())
     }
@@ -603,24 +599,9 @@ pub async fn replace_child<'a, S: HandleOwner>(
         );
         let (id, descriptor) = src_dir.lookup(src_name).await?.ok_or(FxfsError::NotFound)?;
         if src_dir.object_id() != dst.0.object_id() {
+            sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
             src_dir
-                .update_attributes(transaction, None, Some(now.clone()), |item| {
-                    if let ObjectDescriptor::Directory = descriptor {
-                        if let ObjectItem {
-                            value: ObjectValue::Object {
-                                kind: ObjectKind::Directory { sub_dirs },
-                                ..
-                            },
-                            ..
-                        } = item
-                        {
-                            *sub_dirs = sub_dirs.saturating_sub(1);
-                            sub_dirs_delta += 1;
-                        } else {
-                            panic!("Expected directory");
-                        }
-                    }
-                })
+                .update_attributes(transaction, None, Some(now.clone()), -sub_dirs_delta)
                 .await?;
         }
         Some((id, descriptor))
@@ -692,25 +673,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
         store_id,
         Mutation::replace_or_insert_object(ObjectKey::child(dst.0.object_id, dst.1), new_value),
     );
-    dst.0
-        .update_attributes(transaction, None, Some(timestamp), |item| {
-            if sub_dirs_delta != 0 {
-                if let ObjectItem {
-                    value: ObjectValue::Object { kind: ObjectKind::Directory { sub_dirs }, .. },
-                    ..
-                } = item
-                {
-                    if sub_dirs_delta < 0 {
-                        *sub_dirs = sub_dirs.saturating_sub((-sub_dirs_delta) as u64);
-                    } else {
-                        *sub_dirs = sub_dirs.saturating_add(sub_dirs_delta as u64);
-                    }
-                } else {
-                    panic!("Expected directory");
-                }
-            }
-        })
-        .await?;
+    dst.0.update_attributes(transaction, None, Some(timestamp), sub_dirs_delta).await?;
     Ok(result)
 }
 
@@ -1466,7 +1429,7 @@ mod tests {
             dir.insert_child(&mut transaction, "baz", 1, ObjectDescriptor::File).await,
         );
         assert_access_denied(
-            dir.update_attributes(&mut transaction, Some(Timestamp::zero()), None, |_| {}).await,
+            dir.update_attributes(&mut transaction, Some(Timestamp::zero()), None, 0).await,
         );
         let layer_set = dir.store().tree().layer_set();
         let mut merger = layer_set.merger();
@@ -1477,7 +1440,7 @@ mod tests {
     async fn test_create_symlink() {
         let device = DeviceHolder::new(FakeDevice::new(8192, TEST_DEVICE_BLOCK_SIZE));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
-        let symlink_id = {
+        let (dir_id, symlink_id) = {
             let mut transaction = fs
                 .clone()
                 .new_transaction(&[], Options::default())
@@ -1493,24 +1456,18 @@ mod tests {
             transaction.commit().await.expect("commit failed");
 
             fs.sync(SyncOptions::default()).await.expect("sync failed");
-            symlink_id
+            (dir.object_id(), symlink_id)
         };
         fs.close().await.expect("Close failed");
         let device = fs.take_device().await;
         device.reopen(false);
         let fs = FxFilesystem::open(device).await.expect("open failed");
         {
-            let mut transaction = fs
-                .clone()
-                .new_transaction(&[], Options::default())
-                .await
-                .expect("new_transaction failed");
-            let dir =
-                Directory::create(&mut transaction, &fs.root_store()).await.expect("create failed");
-            let (object_id, object_descriptor) =
-                dir.lookup("foo").await.expect("lookup failed").expect("not found");
-            assert_eq!(object_id, symlink_id);
-            assert_eq!(object_descriptor, ObjectDescriptor::Symlink);
+            let dir = Directory::open(&fs.root_store(), dir_id).await.expect("open failed");
+            assert_eq!(
+                dir.lookup("foo").await.expect("lookup failed").expect("not found"),
+                (symlink_id, ObjectDescriptor::Symlink)
+            );
         }
         fs.close().await.expect("Close failed");
     }

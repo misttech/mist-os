@@ -724,13 +724,7 @@ async fn test_too_many_object_refs() {
 
     test.remount().await.expect("Remount failed");
     test.run(TestOptions::default()).await.expect_err("Fsck should fail");
-    assert_matches!(
-        test.errors()[..],
-        [
-            FsckIssue::Error(FsckError::RefCountMismatch(..)),
-            FsckIssue::Error(FsckError::ObjectCountMismatch(..))
-        ]
-    );
+    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::RefCountMismatch(..)),]);
 }
 
 #[fuchsia::test]
@@ -975,12 +969,12 @@ async fn test_multiple_links_to_directory() {
             )
             .await
             .expect("new_transaction failed");
-        root_directory
-            .insert_child(&mut transaction, "a", 10, ObjectDescriptor::Directory)
+        let child_dir = root_directory
+            .create_child_dir(&mut transaction, "a")
             .await
-            .expect("insert_child failed");
+            .expect("create_child_dir failed");
         root_directory
-            .insert_child(&mut transaction, "b", 10, ObjectDescriptor::Directory)
+            .insert_child(&mut transaction, "b", child_dir.object_id(), ObjectDescriptor::Directory)
             .await
             .expect("insert_child failed");
         transaction.commit().await.expect("commit transaction failed");
@@ -1015,12 +1009,12 @@ async fn test_conflicting_link_types() {
             )
             .await
             .expect("new_transaction failed");
-        root_directory
-            .insert_child(&mut transaction, "a", 10, ObjectDescriptor::Directory)
+        let child_dir = root_directory
+            .create_child_dir(&mut transaction, "a")
             .await
-            .expect("insert_child failed");
+            .expect("create_child_dir failed");
         root_directory
-            .insert_child(&mut transaction, "b", 10, ObjectDescriptor::File)
+            .insert_child(&mut transaction, "b", child_dir.object_id(), ObjectDescriptor::File)
             .await
             .expect("insert_child failed");
         transaction.commit().await.expect("commit transaction failed");
@@ -1099,7 +1093,7 @@ async fn test_children_on_file() {
             store.as_ref(),
             vec![Item::new(
                 ObjectKey::child(object_id, "foo"),
-                ObjectValue::Child { object_id: 11, object_descriptor: ObjectDescriptor::File },
+                ObjectValue::Child { object_id, object_descriptor: ObjectDescriptor::File },
             )],
         )
         .await;
@@ -1110,7 +1104,7 @@ async fn test_children_on_file() {
     test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
         .await
         .expect_err("Fsck should fail");
-    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::FileHasChildren(..)), ..]);
+    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::ObjectHasChildren(..)), ..]);
 }
 
 #[fuchsia::test]
@@ -1304,12 +1298,48 @@ async fn test_link_cycle() {
         test.errors()[..],
         [
             FsckIssue::Error(FsckError::MultipleLinksToDirectory(..)),
-            FsckIssue::Error(FsckError::SubDirCountMismatch(..)),
-            FsckIssue::Error(FsckError::ObjectCountMismatch(..)),
             FsckIssue::Error(FsckError::LinkCycle(..)),
             ..
         ]
     );
+}
+
+#[fuchsia::test]
+async fn test_orphaned_link_cycle() {
+    // This checks we catch a cycle where two directories refer to each other as children.
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        let store = fs.root_store();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                &[LockKey::object(store.store_object_id(), root_directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+
+        let dir1 = Directory::create(&mut transaction, &store).await.expect("create failed");
+        let dir2 = Directory::create(&mut transaction, &store).await.expect("create failed");
+
+        dir1.insert_child(&mut transaction, "dir2", dir2.object_id(), ObjectDescriptor::Directory)
+            .await
+            .expect("insert_child failed");
+        dir2.insert_child(&mut transaction, "dir1", dir1.object_id(), ObjectDescriptor::Directory)
+            .await
+            .expect("insert_child failed");
+
+        transaction.commit().await.expect("commit transaction failed");
+    }
+
+    test.remount().await.expect("Remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(test.errors()[..], [FsckIssue::Error(FsckError::LinkCycle(..)), ..]);
 }
 
 #[fuchsia::test]

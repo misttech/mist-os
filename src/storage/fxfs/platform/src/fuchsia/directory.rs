@@ -366,7 +366,7 @@ impl MutableDirectory for FxDirectory {
             .await
             .map_err(map_to_status)?;
         self.directory
-            .update_attributes(&mut transaction, crtime, mtime, |_| {})
+            .update_attributes(&mut transaction, crtime, mtime, 0)
             .await
             .map_err(map_to_status)?;
         transaction.commit().await.map_err(map_to_status)?;
