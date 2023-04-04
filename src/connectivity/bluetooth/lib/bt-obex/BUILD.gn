@@ -27,6 +27,7 @@ rustc_library("bt-obex") {
     "src/error.rs",
     "src/header.rs",
     "src/lib.rs",
+    "src/obex_string.rs",
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

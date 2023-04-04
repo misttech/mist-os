@@ -23,10 +23,24 @@ pub struct Uuid(uuid::Uuid);
 const BASE_UUID_FINAL_EIGHT_BYTES: [u8; 8] = [0x80, 0x00, 0x00, 0x80, 0x5F, 0x9B, 0x34, 0xFB];
 
 impl Uuid {
+    /// The standard Bluetooth UUID is 16 bytes.
+    pub const BLUETOOTH_UUID_LENGTH_BYTES: usize = 16;
+
     /// Create a new Uuid from a little-endian array of 16 bytes.
     pub const fn from_bytes(bytes_little_endian: uuid::Bytes) -> Uuid {
         let u = u128::from_le_bytes(bytes_little_endian);
         Uuid(uuid::Uuid::from_u128(u))
+    }
+
+    /// Create a new Uuid from a big-endian array of 16 bytes.
+    pub const fn from_be_bytes(bytes_big_endian: uuid::Bytes) -> Uuid {
+        let u = u128::from_be_bytes(bytes_big_endian);
+        Uuid(uuid::Uuid::from_u128(u))
+    }
+
+    pub fn as_be_bytes(&self) -> &[u8; Self::BLUETOOTH_UUID_LENGTH_BYTES] {
+        // The `uuid` crate uses Big Endian by default.
+        self.0.as_bytes()
     }
 
     pub const fn new16(value: u16) -> Uuid {

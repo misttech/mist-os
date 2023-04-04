@@ -8,3 +8,6 @@ pub use error::Error as ObexError;
 
 /// Definitions of the OBEX packet Header types.
 pub mod header;
+
+/// Definition of a OBEX-specific String type.
+mod obex_string;

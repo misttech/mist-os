@@ -4,10 +4,11 @@
 
 use chrono::NaiveDateTime;
 use fuchsia_bluetooth::types::Uuid;
-use packet_encoding::{decodable_enum, Decodable};
+use packet_encoding::{decodable_enum, Decodable, Encodable};
 use tracing::trace;
 
 use crate::error::PacketError;
+use crate::obex_string::ObexString;
 
 decodable_enum! {
     /// The Header Encoding is the upper 2 bits of the Header Identifier (HI) and describes the type
@@ -196,7 +197,6 @@ pub struct UserDefinedHeader {
     /// `HeaderIdentifier::User` for more details.
     identifier: u8,
     /// The user data.
-    #[allow(unused)]
     value: Vec<u8>,
 }
 
@@ -204,8 +204,8 @@ pub struct UserDefinedHeader {
 #[derive(Debug, PartialEq)]
 pub enum Header {
     Count(u32),
-    Name(String),
-    Type(String),
+    Name(ObexString),
+    Type(ObexString),
     /// Number of bytes.
     Length(u32),
     /// Time represented as a well-formed NaiveDateTime (no timezone). This is typically UTC.
@@ -214,7 +214,7 @@ pub enum Header {
     /// Time represented as the number of seconds elapsed since midnight UTC on January 1, 1970.
     /// This is saved as a well-formed NaiveDateTime (no timezone).
     Time4Byte(NaiveDateTime),
-    Description(String),
+    Description(ObexString),
     Target(Vec<u8>),
     Http(Vec<u8>),
     Body(Vec<u8>),
@@ -230,11 +230,11 @@ pub enum Header {
     SessionParameters(Vec<u8>),
     SessionSequenceNumber(u8),
     ActionId(u8),
-    DestName(String),
+    DestName(ObexString),
     /// 4-byte bit mask.
     Permissions(u32),
     SingleResponseMode(u8),
-    /// 1-byte quantity containing
+    /// 1-byte quantity containing the parameters for the SRM session.
     SingleResponseModeParameters(u8),
     /// User defined Header type.
     User(UserDefinedHeader),
@@ -253,6 +253,13 @@ impl Header {
     /// the time is the local time, but per OBEX 2.2.5, a suffix of "Z" can be included to indicate
     /// UTC time.
     const ISO_8601_TIME_FORMAT: &str = "%Y%m%dT%H%M%S";
+
+    /// The ISO 8601 time format used in the Time Header Packet.
+    /// The format is YYYYMMDDTHHMMSSZ, where the "Z" denotes UTC time. The format is sent as a UTF-
+    /// 16 null terminated string. There are 32 bytes for the time and 2 bytes for the terminator.
+    // TODO(fxbug.dev/120012): This encoding assumes the timezone is always UTC. Update this
+    // when `Header` supports timezones.
+    const ISO_8601_LENGTH_BYTES: usize = 34;
 
     pub fn identifier(&self) -> HeaderIdentifier {
         match &self {
@@ -284,6 +291,121 @@ impl Header {
             Self::SingleResponseModeParameters(_) => HeaderIdentifier::SingleResponseModeParameters,
             Self::User(UserDefinedHeader { identifier, .. }) => HeaderIdentifier::User(*identifier),
         }
+    }
+
+    /// Returns the length, in bytes, of the Header's payload.
+    fn data_length(&self) -> usize {
+        use Header::*;
+        match &self {
+            SessionSequenceNumber(_)
+            | ActionId(_)
+            | SingleResponseMode(_)
+            | SingleResponseModeParameters(_) => 1,
+            Count(_) | Length(_) | ConnectionId(_) | CreatorId(_) | Permissions(_)
+            | Time4Byte(_) => 4,
+            Name(s) | Type(s) | Description(s) | DestName(s) => s.len(),
+            Target(b)
+            | Http(b)
+            | Body(b)
+            | EndOfBody(b)
+            | Who(b)
+            | ApplicationParameters(b)
+            | AuthenticationChallenge(b)
+            | AuthenticationResponse(b)
+            | ObjectClass(b)
+            | SessionParameters(b) => b.len(),
+            TimeIso8601(_) => Self::ISO_8601_LENGTH_BYTES,
+            WanUuid(_) => Uuid::BLUETOOTH_UUID_LENGTH_BYTES,
+            User(UserDefinedHeader { value, .. }) => value.len(),
+        }
+    }
+}
+
+impl Encodable for Header {
+    type Error = PacketError;
+
+    fn encoded_len(&self) -> usize {
+        // Only the `Text` and `Bytes` formats encode the payload length in the buffer.
+        let payload_length_encoded_bytes = match self.identifier().encoding() {
+            HeaderEncoding::Text | HeaderEncoding::Bytes => 2,
+            _ => 0,
+        };
+        Self::MIN_HEADER_LENGTH_BYTES + payload_length_encoded_bytes + self.data_length()
+    }
+
+    fn encode(&self, buf: &mut [u8]) -> Result<(), Self::Error> {
+        if buf.len() < self.encoded_len() {
+            return Err(PacketError::BufferTooSmall);
+        }
+
+        // Encode the Header Identifier.
+        buf[0] = (&self.identifier()).into();
+
+        // Optionally encode the payload length if it is a variable length payload.
+        let start_index = match self.identifier().encoding() {
+            HeaderEncoding::Text | HeaderEncoding::Bytes => {
+                let data_length_bytes = (self.encoded_len() as u16).to_be_bytes();
+                buf[Self::MIN_HEADER_LENGTH_BYTES..Self::MIN_UNICODE_OR_BYTE_SEQ_LENGTH_BYTES]
+                    .copy_from_slice(&data_length_bytes);
+                Self::MIN_UNICODE_OR_BYTE_SEQ_LENGTH_BYTES
+            }
+            _ => Self::MIN_HEADER_LENGTH_BYTES,
+        };
+
+        // Encode the payload.
+        use Header::*;
+        match &self {
+            Count(v) | Length(v) | ConnectionId(v) | CreatorId(v) | Permissions(v) => {
+                // Encode all 4-byte value headers.
+                buf[start_index..start_index + 4].copy_from_slice(&v.to_be_bytes());
+            }
+
+            Name(str) | Type(str) | Description(str) | DestName(str) => {
+                // Encode all ObexString Headers.
+                let s = str.to_be_bytes();
+                buf[start_index..start_index + s.len()].copy_from_slice(&s);
+            }
+            Target(src)
+            | Http(src)
+            | Body(src)
+            | EndOfBody(src)
+            | Who(src)
+            | ApplicationParameters(src)
+            | AuthenticationChallenge(src)
+            | AuthenticationResponse(src)
+            | ObjectClass(src)
+            | SessionParameters(src) => {
+                // Encode all byte buffer headers.
+                let n = src.len();
+                buf[start_index..start_index + n].copy_from_slice(&src[..]);
+            }
+            ActionId(v)
+            | SessionSequenceNumber(v)
+            | SingleResponseMode(v)
+            | SingleResponseModeParameters(v) => {
+                // Encode all 1-byte value headers.
+                buf[start_index] = *v;
+            }
+            TimeIso8601(time) => {
+                let mut formatted = time.format(Self::ISO_8601_TIME_FORMAT).to_string();
+                // Always assume it's UTC.
+                // TODO(fxbug.dev/120012): Conditionally do this when we store timezones.
+                formatted.push('Z');
+                let s = ObexString::from(formatted).to_be_bytes();
+                buf[start_index..start_index + s.len()].copy_from_slice(&s);
+            }
+            Time4Byte(time) => {
+                let timestamp_bytes = (time.timestamp() as u32).to_be_bytes();
+                buf[start_index..start_index + 4].copy_from_slice(&timestamp_bytes[..])
+            }
+            WanUuid(uuid) => buf[start_index..start_index + Uuid::BLUETOOTH_UUID_LENGTH_BYTES]
+                .copy_from_slice(&uuid.as_be_bytes()[..]),
+            User(UserDefinedHeader { value, .. }) => {
+                let n = value.len();
+                buf[start_index..start_index + n].copy_from_slice(&value[..]);
+            }
+        }
+        Ok(())
     }
 }
 
@@ -331,13 +453,13 @@ impl Decodable for Header {
             HeaderIdentifier::Count => {
                 Ok(Header::Count(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
-            HeaderIdentifier::Name => Ok(Header::Name(be_bytes_to_string(data)?)),
-            HeaderIdentifier::Type => Ok(Header::Type(be_bytes_to_string(data)?)),
+            HeaderIdentifier::Name => Ok(Header::Name(ObexString::try_from(data)?)),
+            HeaderIdentifier::Type => Ok(Header::Type(ObexString::try_from(data)?)),
             HeaderIdentifier::Length => {
                 Ok(Header::Length(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
             HeaderIdentifier::TimeIso8601 => {
-                let mut time_str = be_bytes_to_string(data)?;
+                let mut time_str = ObexString::try_from(data).map(|s| s.to_string())?;
                 // TODO(fxbug.dev/120012): In some cases, the peer can send a local time instead of
                 // UTC. The timezone is not specified. Figure out how to represent this using
                 // DateTime/NaiveDateTime.
@@ -357,7 +479,7 @@ impl Decodable for Header {
                 .ok_or(PacketError::external(anyhow::format_err!("invalid timestamp")))?;
                 Ok(Header::Time4Byte(parsed))
             }
-            HeaderIdentifier::Description => Ok(Header::Description(be_bytes_to_string(data)?)),
+            HeaderIdentifier::Description => Ok(Header::Description(ObexString::try_from(data)?)),
             HeaderIdentifier::Target => {
                 out_buf.copy_from_slice(&data[..]);
                 Ok(Header::Target(out_buf))
@@ -397,9 +519,9 @@ impl Decodable for Header {
                 Ok(Header::CreatorId(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
             HeaderIdentifier::WanUuid => {
-                let bytes: [u8; 16] =
+                let bytes: [u8; Uuid::BLUETOOTH_UUID_LENGTH_BYTES] =
                     data[..].try_into().map_err(|_| PacketError::BufferTooSmall)?;
-                Ok(Header::WanUuid(Uuid::from_bytes(bytes)))
+                Ok(Header::WanUuid(Uuid::from_be_bytes(bytes)))
             }
             HeaderIdentifier::ObjectClass => {
                 out_buf.copy_from_slice(&data[..]);
@@ -413,7 +535,7 @@ impl Decodable for Header {
                 Ok(Header::SessionSequenceNumber(buf[start_idx]))
             }
             HeaderIdentifier::ActionId => Ok(Header::ActionId(buf[start_idx])),
-            HeaderIdentifier::DestName => Ok(Header::DestName(be_bytes_to_string(data)?)),
+            HeaderIdentifier::DestName => Ok(Header::DestName(ObexString::try_from(data)?)),
             HeaderIdentifier::Permissions => {
                 Ok(Header::Permissions(u32::from_be_bytes(data[..].try_into().unwrap())))
             }
@@ -429,33 +551,12 @@ impl Decodable for Header {
     }
 }
 
-/// Attempts to convert the `buf` (big-endian) to a valid UTF-16 String.
-fn be_bytes_to_string(buf: &[u8]) -> Result<String, PacketError> {
-    if buf.len() == 0 {
-        return Ok(String::new());
-    }
-
-    let unicode_array = buf
-        .chunks_exact(2)
-        .into_iter()
-        .map(|a| u16::from_be_bytes([a[0], a[1]]))
-        .collect::<Vec<u16>>();
-    let mut text = String::from_utf16(&unicode_array).map_err(PacketError::external)?;
-    // OBEX Strings are represented as null terminated Unicode text. See OBEX 1.5 Section 2.1.
-    if !text.ends_with('\0') {
-        return Err(PacketError::data("text missing null terminator"));
-    }
-
-    let _ = text.pop();
-    Ok(text)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use assert_matches::assert_matches;
-    use chrono::NaiveDate;
+    use chrono::{NaiveDate, NaiveTime};
 
     #[fuchsia::test]
     fn is_user_id() {
@@ -519,46 +620,6 @@ mod tests {
         assert_eq!(HeaderIdentifier::Count.encoding(), HeaderEncoding::FourBytes);
         assert_eq!(HeaderIdentifier::Name.encoding(), HeaderEncoding::Text);
         assert_eq!(HeaderIdentifier::Target.encoding(), HeaderEncoding::Bytes);
-    }
-
-    #[fuchsia::test]
-    fn bytes_to_string_is_ok() {
-        // Empty buf
-        let converted = be_bytes_to_string(&[]).expect("can convert to String");
-        assert_eq!(converted, "".to_string());
-
-        // Just a null terminator.
-        let buf = [0x00, 0x00];
-        let converted = be_bytes_to_string(&buf).expect("can convert to String");
-        assert_eq!(converted, "".to_string());
-
-        // "hello"
-        let buf = [0x00, 0x68, 0x00, 0x65, 0x00, 0x6c, 0x00, 0x6c, 0x00, 0x6f, 0x00, 0x00];
-        let converted = be_bytes_to_string(&buf).expect("can convert to String");
-        assert_eq!(converted, "hello".to_string());
-
-        // "bob" with two null terminators - only last is removed.
-        let buf = [0x00, 0x62, 0x00, 0x6f, 0x00, 0x62, 0x00, 0x00, 0x00, 0x00];
-        let converted = be_bytes_to_string(&buf).expect("can convert to String");
-        assert_eq!(converted, "bob\0".to_string());
-    }
-
-    #[fuchsia::test]
-    fn bytes_to_string_missing_terminator_is_error() {
-        // `foo.txt` with no null terminator.
-        let buf =
-            [0x00, 0x66, 0x00, 0x6f, 0x00, 0x6f, 0x00, 0x2e, 0x00, 0x74, 0x00, 0x78, 0x00, 0x74];
-        let converted = be_bytes_to_string(&buf);
-        assert_matches!(converted, Err(PacketError::Data(_)));
-    }
-
-    #[fuchsia::test]
-    fn invalid_utf16_bytes_to_string_is_error() {
-        // Invalid utf-16 bytes.
-        let buf =
-            [0xd8, 0x34, 0xdd, 0x1e, 0x00, 0x6d, 0x00, 0x75, 0xd8, 0x00, 0x00, 0x69, 0x00, 0x63];
-        let converted = be_bytes_to_string(&buf);
-        assert_matches!(converted, Err(PacketError::Other(_)));
     }
 
     #[fuchsia::test]
@@ -631,7 +692,7 @@ mod tests {
             0x4e, 0x00, 0x47, 0x00, 0x2e, 0x00, 0x44, 0x00, 0x4f, 0x00, 0x43, 0x00, 0x00,
         ];
         let result = Header::decode(&name_buf).expect("can decode name header");
-        assert_eq!(result, Header::Name("THING.DOC".to_string()));
+        assert_eq!(result, Header::Name("THING.DOC".into()));
 
         // Byte Sequence Header
         let object_class_buf = [
@@ -714,5 +775,146 @@ mod tests {
 
         // The timestamp Header should never produce an Error since the timestamp is bounded by
         // u32::MAX, whereas the only potential failure case in NaiveDateTime is i64::MAX.
+    }
+
+    #[fuchsia::test]
+    fn encode_user_data_header_success() {
+        // Encoding a 1-byte User Header should succeed.
+        let user = Header::User(UserDefinedHeader { identifier: 0xb3, value: vec![0x12] });
+        assert_eq!(user.encoded_len(), 2);
+        let mut buf = vec![0; user.encoded_len()];
+        user.encode(&mut buf).expect("can encode");
+        let expected_buf = [0xb3, 0x12];
+        assert_eq!(buf, expected_buf);
+
+        // Encoding a 4-byte User Header should succeed.
+        let user = Header::User(UserDefinedHeader {
+            identifier: 0xf5,
+            value: vec![0x00, 0x01, 0x02, 0x03],
+        });
+        assert_eq!(user.encoded_len(), 5);
+        let mut buf = vec![0; user.encoded_len()];
+        user.encode(&mut buf).expect("can encode");
+        let expected_buf = [0xf5, 0x00, 0x01, 0x02, 0x03];
+        assert_eq!(buf, expected_buf);
+
+        // Encoding a Text User Header should succeed.
+        let user = Header::User(UserDefinedHeader {
+            identifier: 0x38,
+            value: vec![0x00, 0x01, 0x00, 0x02, 0x00, 0x00],
+        });
+        assert_eq!(user.encoded_len(), 9);
+        let mut buf = vec![0; user.encoded_len()];
+        user.encode(&mut buf).expect("can encode");
+        let expected_buf = [0x38, 0x00, 0x09, 0x00, 0x01, 0x00, 0x02, 0x00, 0x00];
+        assert_eq!(buf, expected_buf);
+
+        // Encoding a Bytes User Header should succeed.
+        let user =
+            Header::User(UserDefinedHeader { identifier: 0x70, value: vec![0x01, 0x02, 0x03] });
+        assert_eq!(user.encoded_len(), 6);
+        let mut buf = vec![0; user.encoded_len()];
+        user.encode(&mut buf).expect("can encode");
+        let expected_buf = [0x70, 0x00, 0x06, 0x01, 0x02, 0x03];
+        assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
+    fn encode_time_header_success() {
+        // Represents the date "20150603T123456Z" - 34 bytes in UTF 16.
+        let time = Header::TimeIso8601(NaiveDateTime::new(
+            NaiveDate::from_ymd(2015, 6, 3),
+            NaiveTime::from_hms_milli(12, 34, 56, 0),
+        ));
+        // Total length should be 3 bytes (ID, Length) + 34 bytes (Time).
+        assert_eq!(time.encoded_len(), 37);
+        // Encoding with a larger buffer is OK.
+        let mut buf = vec![0; time.encoded_len() + 2];
+        time.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0x44, // Header ID = Time ISO8601
+            0x00, 0x25, // Length = 37 bytes total
+            0x00, 0x32, 0x00, 0x30, 0x00, 0x31, 0x00, 0x35, 0x00, 0x30, 0x00, 0x36, 0x00, 0x30,
+            0x00, 0x33, 0x00, 0x54, 0x00, 0x31, 0x00, 0x32, 0x00, 0x33, 0x00, 0x34, 0x00, 0x35,
+            0x00, 0x36, 0x00, 0x5a, 0x00, 0x00, // "20150603T123456Z"
+            0x00, 0x00, // Extra padding on the input `buf`.
+        ];
+        assert_eq!(buf, expected_buf);
+
+        let timestamp = Header::Time4Byte(NaiveDateTime::from_timestamp(1_000_000, 0));
+        assert_eq!(timestamp.encoded_len(), 5);
+        let mut buf = vec![0; timestamp.encoded_len()];
+        timestamp.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0xc4, // Header ID = Time 4byte
+            0x00, 0x0f, 0x42, 0x40, // Time = 1_000_000 in hex bytes, 0xf4240
+        ];
+        assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
+    fn encode_uuid_header_success() {
+        let uuid = Header::WanUuid(Uuid::new16(0x180d));
+        // Total length should be 3 bytes (ID, length) + 16 bytes (UUID).
+        assert_eq!(uuid.encoded_len(), 19);
+        let mut buf = vec![0; uuid.encoded_len()];
+        uuid.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0x50, // Header ID = WanUuid
+            0x00, 0x13, // Length = 19 bytes
+            0x00, 0x00, 0x18, 0x0d, 0x00, 0x00, 0x10, 0x00, 0x80, 0x00, 0x00, 0x80, 0x5f, 0x9b,
+            0x34, 0xfb, // UUID (stringified) = "0000180d-0000-1000-8000-00805f9b34fb"
+        ];
+        assert_eq!(buf, expected_buf);
+    }
+
+    #[fuchsia::test]
+    fn encode_valid_header_success() {
+        // Encoding a 1-byte Header should succeed.
+        let srm = Header::SingleResponseMode(0x10);
+        assert_eq!(srm.encoded_len(), 2);
+        let mut buf = vec![0; srm.encoded_len()];
+        srm.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0x97, // Header ID = SRM,
+            0x10, // SRM = 0x10
+        ];
+        assert_eq!(buf, expected_buf);
+
+        // Encoding a 4-byte Header should succeed.
+        let count = Header::Count(0x1234);
+        assert_eq!(count.encoded_len(), 5);
+        let mut buf = vec![0; count.encoded_len()];
+        count.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0xc0, // Header ID = Count
+            0x00, 0x00, 0x12, 0x34, // Count = 0x1234
+        ];
+        assert_eq!(buf, expected_buf);
+
+        // Encoding a Text Header should succeed.
+        let desc = Header::Description("obextest".into());
+        assert_eq!(desc.encoded_len(), 21);
+        let mut buf = vec![0; desc.encoded_len()];
+        desc.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0x05, // Header ID = Description
+            0x00, 0x15, // Length = 21 bytes
+            0x00, 0x6f, 0x00, 0x62, 0x00, 0x65, 0x00, 0x78, 0x00, 0x74, 0x00, 0x65, 0x00, 0x73,
+            0x00, 0x74, 0x00, 0x00, // "obextest" with null terminator
+        ];
+        assert_eq!(buf, expected_buf);
+
+        // Encoding a Bytes Header should succeed.
+        let auth_response = Header::AuthenticationResponse(vec![0x11, 0x22]);
+        assert_eq!(auth_response.encoded_len(), 5);
+        let mut buf = vec![0; auth_response.encoded_len()];
+        auth_response.encode(&mut buf).expect("can encode");
+        let expected_buf = [
+            0x4e, // Header ID = Authentication Response
+            0x00, 0x05, // Total Length = 5 bytes
+            0x11, 0x22, // Response = [0x11, 0x22]
+        ];
+        assert_eq!(buf, expected_buf);
     }
 }
