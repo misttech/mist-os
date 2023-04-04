@@ -4,16 +4,124 @@
 # found in the LICENSE file.
 
 import argparse
+import contextlib
 import io
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
 import fuchsia
 import remote_action
 import cl_utils
+
+
+def _write_file_contents(path: str, contents: str):
+    with open(path, 'w') as f:
+        f.write(contents)
+
+
+class FileMatchTests(unittest.TestCase):
+
+    def test_match(self):
+        with tempfile.TemporaryDirectory() as td:
+            f1path = os.path.join(td, 'left.txt')
+            f2path = os.path.join(td, 'right.txt')
+            _write_file_contents(f1path, 'a\n')
+            _write_file_contents(f2path, 'a\n')
+            self.assertTrue(remote_action._files_match(f1path, f2path))
+            self.assertTrue(remote_action._files_match(f2path, f1path))
+
+    def test_not_match(self):
+        with tempfile.TemporaryDirectory() as td:
+            f1path = os.path.join(td, 'left.txt')
+            f2path = os.path.join(td, 'right.txt')
+            _write_file_contents(f1path, 'a\n')
+            _write_file_contents(f2path, 'b\n')
+            self.assertFalse(remote_action._files_match(f1path, f2path))
+            self.assertFalse(remote_action._files_match(f2path, f1path))
+
+
+class DetailDiffTests(unittest.TestCase):
+
+    def test_called(self):
+        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+            self.assertEqual(
+                remote_action._detail_diff('file1.txt', 'file2.txt'), 0)
+        mock_call.assert_called_once()
+        first_call = mock_call.call_args_list[0]
+        args, unused_kwargs = first_call
+        command = args[0]
+        self.assertTrue(command[0].endswith(remote_action._DETAIL_DIFF_SCRIPT))
+
+
+class TextDiffTests(unittest.TestCase):
+
+    def test_called(self):
+        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+            self.assertEqual(
+                remote_action._text_diff('file1.txt', 'file2.txt'), 0)
+        mock_call.assert_called_once()
+        first_call = mock_call.call_args_list[0]
+        args, unused_kwargs = first_call
+        command = args[0]
+        self.assertEqual(command[0], 'diff')
+        self.assertEqual(command[-2:], ['file1.txt', 'file2.txt'])
+
+
+class FilesUnderDirTests(unittest.TestCase):
+
+    def test_walk(self):
+        with tempfile.TemporaryDirectory() as td:
+            f1path = os.path.join(td, 'left.txt')
+            subdir = os.path.join(td, 'sub')
+            os.mkdir(subdir)
+            f2path = os.path.join(subdir, 'right.txt')
+            _write_file_contents(f1path, '\n')
+            _write_file_contents(f2path, '\n')
+            self.assertEqual(
+                set(remote_action._files_under_dir(td)),
+                {'left.txt', 'sub/right.txt'})
+
+
+class CommonFilesUnderDirsTests(unittest.TestCase):
+
+    def test_none_in_common(self):
+        with mock.patch.object(remote_action, '_files_under_dir',
+                               side_effect=[iter(['a', 'b', 'c']),
+                                            iter(['d', 'e', 'f'])]) as mock_lsr:
+            self.assertEqual(
+                remote_action._common_files_under_dirs('foo-dir', 'bar-dir'),
+                set())
+
+    def test_some_in_common(self):
+        with mock.patch.object(remote_action, '_files_under_dir',
+                               side_effect=[iter(['a', 'b/x', 'c']),
+                                            iter(['d', 'c',
+                                                  'b/x'])]) as mock_lsr:
+            self.assertEqual(
+                remote_action._common_files_under_dirs('foo-dir', 'bar-dir'),
+                {'b/x', 'c'})
+
+
+class ExpandCommonFilesBetweenDirs(unittest.TestCase):
+
+    def test_common(self):
+        # Normally returns a set, but mock-return a list for deterministic
+        # ordering.
+        with mock.patch.object(remote_action, '_common_files_under_dirs',
+                               return_value=['y/z', 'x']) as mock_ls:
+            self.assertEqual(
+                list(
+                    remote_action._expand_common_files_between_dirs(
+                        [('c', 'd'), ('a', 'b')])), [
+                            ('c/x', 'd/x'),
+                            ('c/y/z', 'd/y/z'),
+                            ('a/x', 'b/x'),
+                            ('a/y/z', 'b/y/z'),
+                        ])
 
 
 class ReclientCanonicalWorkingDirTests(unittest.TestCase):
@@ -393,6 +501,163 @@ class RemoteActionMainParserTests(unittest.TestCase):
             logged_command[:third_ddash + 1],
             action._fsatrace_command_prefix(output + '.remote-fsatrace'))
         self.assertEqual(logged_command[third_ddash + 1:], ['touch', output])
+
+    def test_local_remote_compare_no_diffs_from_main_args(self):
+        # Same as test_remote_fsatrace_from_main_args, but with --compare
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        base_command = ['touch', output]
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--compare', '--'] + base_command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        unnamed_mocks = [
+            # we don't bother to check the call details of these mocks
+            mock.patch.object(os, 'rename'),
+            mock.patch.object(os.path, 'isfile', return_value=True),
+            # Pretend comparison finds no differences
+            mock.patch.object(remote_action, '_files_match', return_value=True),
+        ]
+        with contextlib.ExitStack() as stack:
+            for m in unnamed_mocks:
+                stack.enter_context(m)
+
+            # both local and remote commands succeed
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=0) as mock_call:
+                with mock.patch.object(
+                        remote_action.RemoteAction,
+                        '_compare_fsatraces') as mock_compare_traces:
+                    with mock.patch.object(os, 'remove') as mock_cleanup:
+                        exit_code = action.run_with_main_args(main_args)
+
+        self.assertEqual(exit_code, 0)  # remote success and compare success
+        mock_compare_traces.assert_not_called()
+        self.assertEqual(len(mock_call.call_args_list), 2)
+        remote_args, remote_kwargs = mock_call.call_args_list[0]
+        local_args, local_kwargs = mock_call.call_args_list[1]
+        remote_command = remote_args[0]  # subprocess.call
+        local_command = local_args[0]  # subprocess.call
+        self.assertEqual(remote_command[-2:], base_command)
+        self.assertEqual(local_command, base_command)
+        mock_cleanup.assert_called_with(output + '.remote')
+
+    def test_local_remote_compare_found_diffs_from_main_args(self):
+        # Same as test_remote_fsatrace_from_main_args, but with --compare
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        base_command = ['touch', output]
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--compare', '--'] + base_command)
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        unnamed_mocks = [
+            # we don't bother to check the call details of these mocks
+            mock.patch.object(os, 'rename'),
+            mock.patch.object(os.path, 'isfile', return_value=True),
+            # Pretend comparison finds differences
+            mock.patch.object(
+                remote_action, '_files_match', return_value=False),
+            mock.patch.object(remote_action, '_detail_diff'),
+        ]
+        with contextlib.ExitStack() as stack:
+            for m in unnamed_mocks:
+                stack.enter_context(m)
+
+            # both local and remote commands succeed
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=0) as mock_call:
+                with mock.patch.object(
+                        remote_action.RemoteAction,
+                        '_compare_fsatraces') as mock_compare_traces:
+                    exit_code = action.run_with_main_args(main_args)
+
+        self.assertEqual(exit_code, 1)  # remote success, but compare failure
+        mock_compare_traces.assert_not_called()
+        self.assertEqual(len(mock_call.call_args_list), 2)
+        remote_args, remote_kwargs = mock_call.call_args_list[0]
+        local_args, local_kwargs = mock_call.call_args_list[1]
+        remote_command = remote_args[0]  # subprocess.call
+        local_command = local_args[0]  # subprocess.call
+        self.assertEqual(remote_command[-2:], base_command)
+        self.assertEqual(local_command, base_command)
+
+    def test_local_remote_compare_with_fsatrace_from_main_args(self):
+        # Same as test_remote_fsatrace_from_main_args, but with --compare
+        exec_root = '/home/project'
+        build_dir = 'build-out'
+        working_dir = os.path.join(exec_root, build_dir)
+        output = 'hello.txt'
+        fake_fsatrace = 'tools/debug/fsatrace'
+        fake_fsatrace_rel = f'../{fake_fsatrace}'
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            [
+                '--compare', '--fsatrace-path', fake_fsatrace_rel, '--',
+                'touch', output
+            ])
+        action = remote_action.remote_action_from_args(
+            main_args,
+            output_files=[output],
+            exec_root=exec_root,
+            working_dir=working_dir,
+        )
+
+        # not repeating the same asserts from
+        #   test_remote_fsatrace_from_main_args:
+
+        unnamed_mocks = [
+            # we don't bother to check the call details of these mocks
+            mock.patch.object(os, 'rename'),
+            mock.patch.object(os.path, 'isfile', return_value=True),
+            # Pretend comparison finds differences
+            mock.patch.object(
+                remote_action, '_files_match', return_value=False),
+            mock.patch.object(remote_action, '_detail_diff'),
+            # in RemoteAction._compare_fsatraces:
+            mock.patch.object(remote_action, '_transform_file_by_lines'),
+        ]
+        with contextlib.ExitStack() as stack:
+            for m in unnamed_mocks:
+                stack.enter_context(m)
+
+            # both local and remote commands succeed
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=0) as mock_call:
+                with mock.patch.object(remote_action, '_text_diff',
+                                       return_value=0) as mock_trace_diff:
+                    exit_code = action.run_with_main_args(main_args)
+
+        self.assertEqual(exit_code, 1)  # remote success, but compare failure
+        self.assertEqual(len(mock_call.call_args_list), 2)
+        remote_args, remote_kwargs = mock_call.call_args_list[0]
+        local_args, local_kwargs = mock_call.call_args_list[1]
+        remote_command = remote_args[0]  # subprocess.call
+        local_command = local_args[0]  # subprocess.call
+        self.assertIn(fake_fsatrace_rel, remote_command)
+        self.assertIn(fake_fsatrace_rel, local_command)
+        remote_trace = output + '.remote-fsatrace'
+        local_trace = output + '.local-fsatrace'
+        self.assertIn(remote_trace, remote_command)
+        self.assertIn(local_trace, local_command)
+        mock_trace_diff.assert_called_with(
+            local_trace + '.norm', remote_trace + '.norm')
 
 
 class RemoteActionFlagParserTests(unittest.TestCase):

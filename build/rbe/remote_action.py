@@ -12,6 +12,7 @@ Usage:
 """
 
 import argparse
+import filecmp
 import os
 import subprocess
 import shlex
@@ -20,7 +21,7 @@ import sys
 import fuchsia
 import cl_utils
 
-from typing import Callable, Iterable, Optional, Sequence
+from typing import AbstractSet, Callable, Iterable, Optional, Sequence, Tuple
 
 _SCRIPT_BASENAME = os.path.basename(__file__)
 
@@ -35,12 +36,69 @@ _ENV = '/usr/bin/env'
 # This should only be used for workarounds as a last resort.
 _REMOTE_PROJECT_ROOT = '/b/f/w'
 
-# Wrapper script to capture remote stdout/stderr.
-_REMOTE_LOG_SCRIPT = 'build/rbe/log-it.sh'  # co-located with this script
+# Wrapper script to capture remote stdout/stderr, co-located with this script.
+_REMOTE_LOG_SCRIPT = os.path.join('build', 'rbe', 'log-it.sh')
+
+_DETAIL_DIFF_SCRIPT = os.path.join('build', 'rbe', 'detail-diff.sh')
 
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
+
+
+def _files_match(file1: str, file2: str) -> bool:
+    """Compares two files, returns True if they both exist and match."""
+    # filecmp.cmp does not invoke any subprocesses.
+    return filecmp.cmp(file1, file2, shallow=False)
+
+
+def _detail_diff(file1: str, file2: str, project_root_rel: str = None) -> int:
+    return subprocess.call(
+        [
+            os.path.join(
+                project_root_rel or PROJECT_ROOT_REL, _DETAIL_DIFF_SCRIPT),
+            file1,
+            file2,
+        ])
+
+
+def _text_diff(file1: str, file2: str) -> int:
+    """Display textual differences to stdout."""
+    return subprocess.call(['diff', '-u', file1, file2])
+
+
+def _files_under_dir(path: str) -> Iterable[str]:
+    """'ls -R DIR' listing files relative to DIR."""
+    yield from (
+        os.path.relpath(os.path.join(root, file), start=path)
+        for root, unused_dirs, files in os.walk(path)
+        for file in files)
+
+
+def _common_files_under_dirs(path1: str, path2: str) -> AbstractSet[str]:
+    files1 = set(_files_under_dir(path1))
+    files2 = set(_files_under_dir(path2))
+    return files1 & files2  # set intersection
+
+
+def _expand_common_files_between_dirs(
+        path_pairs: Iterable[Tuple[str, str]]) -> Iterable[Tuple[str, str]]:
+    """Expands two directories into paths to their common files.
+
+    Args:
+      path_pairs: sequence of pairs of paths to compare.
+
+    Yields:
+      stream of pairs of files to compare.  Within each directory group,
+      common sub-paths will be in sorted order.
+    """
+    for left, right in path_pairs:
+        for f in sorted(_common_files_under_dirs(left, right)):
+            yield os.path.join(left, f), os.path.join(right, f)
+
+
+def command_quoted_str(command: Iterable[str]) -> str:
+    return ' '.join(shlex.quote(t) for t in command)
 
 
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
@@ -156,18 +214,29 @@ def remove_working_dir_abspaths(line: str, build_subdir: str) -> str:
                         '').replace(canonical_working_dir + os.path.sep, '')
 
 
+def _transform_file_by_lines(
+        src: str, dest: str, line_transform: Callable[[str], str]):
+    with open(src) as f:
+        new_lines = [line_transform(line) for line in f]
+
+    with open(dest, 'w') as f:
+        for line in new_lines:
+            f.write(line)
+
+
+def _rewrite_file_by_lines_in_place(
+        path: str, line_transform: Callable[[str], str]):
+    _transform_file_by_lines(path, path, line_transform)
+
+
 def remove_working_dir_abspaths_from_depfile_in_place(
         depfile: str, build_subdir: str):
     # TODO(http://fxbug.dev/124714): This transformation would be more robust
     # if we properly lexed a depfile and operated on tokens instead of lines.
-    with open(depfile) as f:
-        new_lines = [
-            remove_working_dir_abspaths(line, build_subdir) for line in f
-        ]
-
-    with open(depfile, 'w') as f:  # overwrite
-        for line in new_lines:
-            f.write(line)
+    _rewrite_file_by_lines_in_place(
+        depfile,
+        lambda line: remove_working_dir_abspaths(line, build_subdir),
+    )
 
 
 class RemoteAction(object):
@@ -459,10 +528,6 @@ class RemoteAction(object):
         """
         return list(self._generate_launch_command())
 
-    @property
-    def command_quoted_str(self) -> str:
-        return ' '.join(shlex.quote(t) for t in self.launch_command)
-
     # features to port over from fuchsia-rbe-action.sh:
     # TODO(http://fxbug.dev/123178): facilitate delayed downloads using --action_log
 
@@ -493,12 +558,12 @@ class RemoteAction(object):
         primary execution action is RemoteAction.run().
 
         Args:
-          main_args: struct with (.verbose, .dry_run, .label)
+          main_args: struct with (.verbose, .dry_run, .label, ...)
 
         Returns:
           exit code
         """
-        command_str = self.command_quoted_str
+        command_str = command_quoted_str(self.launch_command)
         if main_args.verbose and not main_args.dry_run:
             msg(command_str)
         if main_args.dry_run:
@@ -508,7 +573,129 @@ class RemoteAction(object):
             msg(f"[dry-run only]{label_str}{command_str}")
             return 0
 
-        return self.run()
+        main_exit_code = self.run()
+
+        if main_args.compare:
+            # Also run locally, and compare outputs
+            return self._compare_against_local()
+
+        return main_exit_code
+
+    def _rewrite_local_outputs_for_comparison_workaround(self):
+        # TODO: tag each output with information about its type,
+        # rather than inferring it based on file extension.
+        for f in self.output_files_relative_to_working_dir:
+            if f.endswith('.map'):  # intended for linker map files
+                # Workaround https://fxbug.dev/89245: relative-ize absolute path of
+                # current working directory in linker map files.
+                _rewrite_file_by_lines_in_place(
+                    f,
+                    lambda line: line.replace(
+                        self.exec_root, self.exec_root_rel),
+                )
+            if f.endswith('.d'):  # intended for depfiles
+                # TEMPORARY WORKAROUND until upstream fix lands:
+                #   https://github.com/pest-parser/pest/pull/522
+                # Remove redundant occurrences of the current working dir absolute path.
+                # Paths should be relative to the root_build_dir.
+                _rewrite_file_by_lines_in_place(
+                    f,
+                    lambda line: line.replace(
+                        self.working_dir + os.path.sep, ''),
+                )
+
+    def _compare_fsatraces(self) -> int:
+        msg("Comparing local (-) vs. remote (+) file access traces.")
+        # Normalize absolute paths.
+        _transform_file_by_lines(
+            self._fsatrace_local_log,
+            self._fsatrace_local_log + '.norm',
+            lambda line: line.replace(self.exec_root + os.path.sep, ''),
+        )
+        _transform_file_by_lines(
+            self._fsatrace_remote_log,
+            self._fsatrace_remote_log + '.norm',
+            lambda line: line.replace(_REMOTE_PROJECT_ROOT + os.path.sep, ''),
+        )
+        return _text_diff(
+            self._fsatrace_local_log + '.norm',
+            self._fsatrace_remote_log + '.norm')
+
+    def _compare_against_local(self) -> int:
+        # Backup outputs from remote execution first to '.remote'.
+
+        # The fsatrace files will be handled separately because they are
+        # already named differently between their local/remote counterparts.
+        direct_compare_output_files = [
+            (f, f + '.remote')
+            for f in self.output_files_relative_to_working_dir
+            if os.path.isfile(f) and not f.endswith('.remote-fsatrace')
+        ]
+
+        # We have the option to keep the remote or local outputs in-place.
+        # Use the results from the local execution, as they are more likely
+        # to be what the user expected if something went wrong remotely.
+        for f, bkp in direct_compare_output_files:
+            os.rename(f, bkp)
+
+        compare_output_dirs = [
+            (d, d + '.remote')
+            for d in self.output_dirs_relative_to_working_dir
+            if os.path.isdir(d)
+        ]
+        for d, bkp in compare_output_dirs:
+            os.rename(d, bkp)
+
+        # Run the job locally.
+        # Local command may include an fsatrace prefix.
+        local_command = list(self._generate_local_launch_command())
+        local_command_str = command_quoted_str(local_command)
+        local_exit_code = subprocess.call(local_command)
+        if local_exit_code != 0:
+            # Presumably, we want to only compare against local successes.
+            msg(
+                f"Local command failed for comparison (exit={local_exit_code}): {local_command_str}"
+            )
+            return local_exit_code
+
+        # Apply workarounds to make comparisons more meaningful.
+        self._rewrite_local_outputs_for_comparison_workaround()
+
+        # Translate output directories into list of files.
+        all_compare_files = direct_compare_output_files + list(
+            _expand_common_files_between_dirs(compare_output_dirs))
+
+        output_diffs = []
+        # Quick file comparison first.
+        for f, remote_out in all_compare_files:
+            if _files_match(f, remote_out):
+                # reclaim space when remote output matches, keep only diffs
+                os.remove(remote_out)
+            else:
+                output_diffs.append((f, remote_out))
+
+        # Report detailed differences.
+        if output_diffs:
+            msg(
+                "*** Differences between local (-) and remote (+) build outputs found. ***"
+            )
+            for local_out, remote_out in output_diffs:
+                msg(f"  {local_out} vs. {remote_out}:")
+                _detail_diff(
+                    local_out,
+                    remote_out,
+                    project_root_rel=self.exec_root_rel,
+                )  # ignore exit status
+                msg("------------------------------------")
+
+            # Also compare file access traces, if available.
+            if self._fsatrace_path:
+                self._compare_fsatraces()
+
+            return 1
+
+        # No output content differences: success.
+        return 0
 
 
 def _rewrapper_arg_parser() -> argparse.ArgumentParser:
@@ -657,6 +844,13 @@ Otherwise, BASE will default to the first output file named.""",
         default="",  # blank means do not trace
         metavar="PATH",
         help="""Given a path to an fsatrace tool (located under exec_root), this will trace a remote execution's file accesses.  This is useful for diagnosing unexpected differences between local and remote builds.  The trace file will be named '{output_files[0]}.remote-fsatrace' (if there is at least one output), otherwise 'remote-action-output.remote-fsatrace'.""",
+    )
+    group.add_argument(
+        "--compare",
+        action="store_true",
+        default=False,
+        help=
+        "In 'compare' mode, run both locally and remotely (sequentially) and compare outputs.  Exit non-zero (failure) if any of the outputs differs between the local and remote execution, even if those executions succeeded.  When used with --fsatrace-path, also compare file access traces.",
     )
     # Positional args are the command and arguments to run.
     parser.add_argument(
