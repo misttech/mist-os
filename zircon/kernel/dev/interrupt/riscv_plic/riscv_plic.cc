@@ -51,56 +51,73 @@
 
 #define LOCAL_TRACE 0
 
+namespace {
+
 // values read from zbi
 vaddr_t plic_base = 0;
-static uint plic_max_int = 0;
+uint plic_max_int = 0;
 
-static bool plic_is_valid_interrupt(unsigned int vector, uint32_t flags) {
+bool plic_is_valid_interrupt(unsigned int vector, uint32_t flags) {
   return (vector < plic_max_int);
 }
 
-static uint32_t plic_get_base_vector() { return 0; }
+uint32_t plic_get_base_vector() { return 0; }
 
-static uint32_t plic_get_max_vector() { return plic_max_int; }
+uint32_t plic_get_max_vector() { return plic_max_int; }
 
-static void plic_init_percpu_early() {}
+void plic_init_percpu_early() {}
 
-static zx_status_t plic_mask_interrupt(unsigned int vector) {
+void plic_enable_vector(unsigned int vector, uint32_t hart_id) {
+  const uintptr_t plic_enable_reg = PLIC_ENABLE(plic_base, vector, hart_id);
+  uint32_t val = readl(plic_enable_reg);
+  val |= (1U << (vector % 32));
+  writel(val, plic_enable_reg);
+}
+
+void plic_disable_vector(unsigned int vector, uint32_t hart_id) {
+  const uintptr_t plic_enable_reg = PLIC_ENABLE(plic_base, vector, hart_id);
+  uint32_t val = readl(plic_enable_reg);
+  val &= ~(1U << (vector % 32));
+  writel(val, plic_enable_reg);
+}
+
+zx_status_t plic_mask_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= plic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  *REG32(PLIC_ENABLE(plic_base, vector, riscv64_curr_hart_id())) &= ~(1 << (vector % 32));
+  plic_disable_vector(vector, riscv64_curr_hart_id());
 
   return ZX_OK;
 }
 
-static zx_status_t plic_unmask_interrupt(unsigned int vector) {
+zx_status_t plic_unmask_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= plic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  *REG32(PLIC_ENABLE(plic_base, vector, riscv64_curr_hart_id())) |= (1 << (vector % 32));
+  plic_enable_vector(vector, riscv64_curr_hart_id());
 
   return ZX_OK;
 }
 
-static zx_status_t plic_deactivate_interrupt(unsigned int vector) {
+zx_status_t plic_deactivate_interrupt(unsigned int vector) {
   if (vector >= plic_max_int) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  // TODO(revest): deactivate
+  // TODO-rvbringup: investigate what this would do
+  PANIC_UNIMPLEMENTED;
 
   return ZX_OK;
 }
 
-static zx_status_t plic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
-                                            enum interrupt_polarity pol) {
+zx_status_t plic_configure_interrupt(unsigned int vector, enum interrupt_trigger_mode tm,
+                                     enum interrupt_polarity pol) {
   LTRACEF("vector %u, trigger mode %d, polarity %d\n", vector, tm, pol);
 
   if (vector >= plic_max_int) {
@@ -114,8 +131,8 @@ static zx_status_t plic_configure_interrupt(unsigned int vector, enum interrupt_
   return ZX_OK;
 }
 
-static zx_status_t plic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
-                                             enum interrupt_polarity* pol) {
+zx_status_t plic_get_interrupt_config(unsigned int vector, enum interrupt_trigger_mode* tm,
+                                      enum interrupt_polarity* pol) {
   LTRACEF("vector %u\n", vector);
 
   if (vector >= plic_max_int) {
@@ -132,19 +149,18 @@ static zx_status_t plic_get_interrupt_config(unsigned int vector, enum interrupt
   return ZX_OK;
 }
 
-static unsigned int plic_remap_interrupt(unsigned int vector) {
+unsigned int plic_remap_interrupt(unsigned int vector) {
   LTRACEF("vector %u\n", vector);
   return vector;
 }
 
-static void plic_handle_irq(iframe_t* frame) {
+void plic_handle_irq(iframe_t* frame) {
   // get the current vector
-  uint32_t vector = *REG32(PLIC_CLAIM(plic_base, riscv64_curr_hart_id()));
+  uint32_t vector = readl(PLIC_CLAIM(plic_base, riscv64_curr_hart_id()));
   LTRACEF_LEVEL(2, "vector %u\n", vector);
 
   if (unlikely(vector == 0)) {
     // spurious
-    // TODO check this
     return;
   }
 
@@ -159,42 +175,40 @@ static void plic_handle_irq(iframe_t* frame) {
   pdev_invoke_int_if_present(vector);
 
   // EOI
-  *REG32(PLIC_COMPLETE(plic_base, riscv64_curr_hart_id())) = vector;
+  writel(vector, PLIC_COMPLETE(plic_base, riscv64_curr_hart_id()));
 
   LTRACEF_LEVEL(2, "cpu %u exit\n", cpu);
 
   // ktrace_tiny(TAG_IRQ_EXIT, (vector << 8) | cpu);
 }
 
-static void plic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) { PANIC_UNIMPLEMENTED; }
+void plic_send_ipi(cpu_mask_t target, mp_ipi_t ipi) { PANIC_UNIMPLEMENTED; }
 
-static void plic_init_percpu() {}
+void plic_init_percpu() {}
 
-static void plic_shutdown() { PANIC_UNIMPLEMENTED; }
+void plic_shutdown() { PANIC_UNIMPLEMENTED; }
 
-static void plic_shutdown_cpu() { PANIC_UNIMPLEMENTED; }
+void plic_shutdown_cpu() { PANIC_UNIMPLEMENTED; }
 
-static bool plic_msi_is_supported() { return false; }
+bool plic_msi_is_supported() { return false; }
 
-static bool plic_msi_supports_masking() { return false; }
+bool plic_msi_supports_masking() { return false; }
 
-static void plic_msi_mask_unmask(const msi_block_t* block, uint msi_id, bool mask) {
+void plic_msi_mask_unmask(const msi_block_t* block, uint msi_id, bool mask) { PANIC_UNIMPLEMENTED; }
+
+zx_status_t plic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_msix,
+                                 msi_block_t* out_block) {
   PANIC_UNIMPLEMENTED;
 }
 
-static zx_status_t plic_msi_alloc_block(uint requested_irqs, bool can_target_64bit, bool is_msix,
-                                        msi_block_t* out_block) {
+void plic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
+
+void plic_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
+                               void* ctx) {
   PANIC_UNIMPLEMENTED;
 }
 
-static void plic_msi_free_block(msi_block_t* block) { PANIC_UNIMPLEMENTED; }
-
-static void plic_msi_register_handler(const msi_block_t* block, uint msi_id, int_handler handler,
-                                      void* ctx) {
-  PANIC_UNIMPLEMENTED;
-}
-
-static const struct pdev_interrupt_ops plic_ops = {
+const struct pdev_interrupt_ops plic_ops = {
     .mask = plic_mask_interrupt,
     .unmask = plic_unmask_interrupt,
     .deactivate = plic_deactivate_interrupt,
@@ -218,17 +232,15 @@ static const struct pdev_interrupt_ops plic_ops = {
     .msi_register_handler = plic_msi_register_handler,
 };
 
-// TODO-rvbringup: define ZBI items and hook this up
-#if 0
-static void riscv_plic_init_early(const void* driver_data, uint32_t length) {
-  ASSERT(length >= sizeof(dcfg_riscv_plic_driver_t));
-  auto driver = static_cast<const dcfg_riscv_plic_driver_t*>(driver_data);
-  ASSERT(driver->mmio_phys);
+}  //  anonymous namespace
+
+void PLICInitEarly(const zbi_dcfg_riscv_plic_driver_t& config) {
+  ASSERT(config.mmio_phys);
 
   LTRACE_ENTRY;
 
-  plic_base = (vaddr_t)paddr_to_physmap(driver->mmio_phys);
-  plic_max_int = driver->num_irqs;
+  plic_base = (vaddr_t)paddr_to_physmap(config.mmio_phys);
+  plic_max_int = config.num_irqs;
   ASSERT(plic_base && plic_max_int);
 
   pdev_register_interrupts(&plic_ops);
@@ -236,16 +248,14 @@ static void riscv_plic_init_early(const void* driver_data, uint32_t length) {
   // mask all irqs and set their priority to 1
   // TODO: mask on all the other cpus too
   for (uint i = 1; i < plic_max_int; i++) {
-    *REG32(PLIC_ENABLE(plic_base, i, riscv64_curr_hart_id())) &= ~(1 << (i % 32));
-    *REG32(PLIC_PRIORITY(plic_base, i)) = 1;
+    plic_disable_vector(i, riscv64_curr_hart_id());
+    writel(1, PLIC_PRIORITY(plic_base, i));
   }
 
   // set global priority threshold to 0
-  *REG32(PLIC_THRESHOLD(plic_base, riscv64_curr_hart_id())) = 0;
+  writel(0, PLIC_THRESHOLD(plic_base, riscv64_curr_hart_id()));
 
   LTRACE_EXIT;
 }
 
-LK_PDEV_INIT(riscv_plic_init_early, KDRV_RISCV_PLIC, riscv_plic_init_early,
-             LK_INIT_LEVEL_PLATFORM_EARLY)
-#endif
+void PLICInitLate() {}
