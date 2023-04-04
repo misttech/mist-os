@@ -213,9 +213,8 @@ int main(int argc, const char** argv) {
 
   bool use_memory_observation_store = command_line.HasOption(kUseMemoryObservationStore);
 
-  // TODO(fxbug.dev/94259): Update disk usage quotas post F7 cut.
   // Parse the max_bytes_per_observation_store
-  size_t max_bytes_per_observation_store = size_t{460} * 1024;  // 460 KiB (~45% of 1MiB)
+  size_t max_bytes_per_observation_store = size_t{210} * 1024;  // 210 KiB (~20% of 1MiB)
   flag_value.clear();
   if (command_line.GetOptionValue(kMaxBytesTotalFlagName, &flag_value)) {
     int num_bytes = std::stoi(flag_value);
@@ -226,8 +225,8 @@ int main(int argc, const char** argv) {
 
   // Parse StorageQuotas
   cobalt::StorageQuotas storage_quotas = {
-      .per_project_reserved_bytes = 1024,          // 1KiB per project (enough for 460 projects)
-      .total_capacity_bytes = int64_t{460} * 1024  // 460KiB for local aggregation (~45% of 1MiB)
+      .per_project_reserved_bytes = 1024,          // 1KiB per project (enough for 714 projects)
+      .total_capacity_bytes = int64_t{714} * 1024  // 714KiB for local aggregation (~70% of 1MiB)
   };
   flag_value.clear();
   if (command_line.GetOptionValue(kPerProjectReservedBytes, &flag_value)) {
