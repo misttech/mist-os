@@ -79,6 +79,7 @@ common_sources = [
   "src/bindings/socket/datagram.rs",
   "src/bindings/socket/mod.rs",
   "src/bindings/socket/packet.rs",
+  "src/bindings/socket/queue.rs",
   "src/bindings/socket/raw.rs",
   "src/bindings/socket/stream.rs",
   "src/bindings/socket/worker.rs",

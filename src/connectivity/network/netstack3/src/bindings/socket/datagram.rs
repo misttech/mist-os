@@ -5,7 +5,6 @@
 //! Datagram socket bindings.
 
 use std::{
-    collections::VecDeque,
     convert::TryInto as _,
     fmt::Debug,
     marker::PhantomData,
@@ -19,6 +18,7 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket as fposix_socket;
 
 use assert_matches::assert_matches;
+use derivative::Derivative;
 use explicit::ResultExt as _;
 use fidl::endpoints::RequestStream as _;
 use fidl_fuchsia_unknown::CloseableCloseResult;
@@ -26,7 +26,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use log::{error, trace, warn};
 use net_types::{
-    ip::{Ip, IpVersion, Ipv4, Ipv6},
+    ip::{Ip, IpAddress, IpVersion, Ipv4, Ipv6},
     MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
@@ -53,7 +53,10 @@ use packet_formats::{
 use thiserror::Error;
 
 use crate::bindings::{
-    socket::worker::{self, SocketWorker},
+    socket::{
+        queue::{BodyLen, MessageQueue},
+        worker::{self, SocketWorker},
+    },
     util::{
         DeviceNotFoundError, IntoCore as _, TryFromFidlWithContext, TryIntoCore,
         TryIntoCoreWithContext, TryIntoFidlWithContext,
@@ -65,18 +68,6 @@ use super::{
     IntoErrno, IpSockAddrExt, SockAddr, SocketWorkerProperties, ZXSIO_SIGNAL_INCOMING,
     ZXSIO_SIGNAL_OUTGOING,
 };
-
-// These values were picked to match Linux behavior.
-
-/// Limits the total size of messages that can be queued for an application
-/// socket to be read before we start dropping packets.
-const MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 4 * 1024 * 1024;
-/// The default value for the amount of data that can be queued for an
-/// application socket to be read before packets are dropped.
-const DEFAULT_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 208 * 1024;
-/// The minimum value for the amount of data that can be queued for an
-/// application socket to be read before packets are dropped.
-const MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE: usize = 256;
 
 /// The types of supported datagram protocols.
 #[derive(Debug)]
@@ -122,8 +113,8 @@ impl<I, T: Transport<I>> From<BoundSocketId<I, T>> for SocketId<I, T> {
 /// available and some bindings code here holds the `MessageQueue` and
 /// attempts to lock Core state via a `netstack3_core` call.
 pub(crate) struct SocketCollection<I: Ip, T: Transport<I>> {
-    conns: IdMapCollection<T::ConnId, Arc<Mutex<MessageQueue<I, T>>>>,
-    listeners: IdMapCollection<T::ListenerId, Arc<Mutex<MessageQueue<I, T>>>>,
+    conns: IdMapCollection<T::ConnId, Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>>,
+    listeners: IdMapCollection<T::ListenerId, Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>>,
 }
 
 impl<I: Ip, T: Transport<I>> Default for SocketCollection<I, T> {
@@ -697,7 +688,7 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
     ) {
         let Self { conns, listeners: _ } = self;
         let conn = conns.get(&conn).unwrap();
-        conn.lock().receive(src_ip, src_port.get(), body.as_ref())
+        conn.lock().receive(IntoAvailableMessage(src_ip, src_port.get(), body.as_ref()))
     }
 
     fn receive_udp_from_listen(
@@ -710,7 +701,11 @@ impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B> for SocketCollectio
     ) {
         let Self { conns: _, listeners } = self;
         let listeners = listeners.get(&listener).unwrap();
-        listeners.lock().receive(src_ip, src_port.map_or(0, NonZeroU16::get), body.as_ref())
+        listeners.lock().receive(IntoAvailableMessage(
+            src_ip,
+            src_port.map_or(0, NonZeroU16::get),
+            body.as_ref(),
+        ))
     }
 }
 
@@ -1214,7 +1209,7 @@ where
             Ok(body) => {
                 let Self { conns, listeners: _ } = self;
                 let available = conns.get(&conn).unwrap();
-                available.lock().receive(src_ip, id, body.as_ref())
+                available.lock().receive(IntoAvailableMessage(src_ip, id, body.as_ref()))
             }
             Err((err, serializer)) => {
                 let _: packet::serialize::Nested<B, IcmpPacketBuilder<_, _, _>> = serializer;
@@ -1229,116 +1224,34 @@ where
     }
 }
 
-#[derive(Clone, Debug)]
-struct AvailableMessage<A> {
-    source_addr: A,
+#[derive(Debug, Derivative)]
+#[derivative(Clone(bound = ""))]
+struct AvailableMessage<I: Ip, T> {
+    source_addr: I::Addr,
     source_port: u16,
     data: Vec<u8>,
-}
-
-#[derive(Debug)]
-struct AvailableMessageQueue<A> {
-    available_messages: VecDeque<AvailableMessage<A>>,
-    /// The total size of the contents of `available_messages`.
-    available_messages_size: usize,
-    /// The maximum allowed value for `available_messages_size`.
-    max_available_messages_size: usize,
-}
-
-impl<A> AvailableMessageQueue<A> {
-    fn new() -> Self {
-        Self {
-            available_messages: Default::default(),
-            available_messages_size: 0,
-            max_available_messages_size: DEFAULT_OUTSTANDING_APPLICATION_MESSAGES_SIZE,
-        }
-    }
-
-    fn push(&mut self, source_addr: A, source_port: u16, body: &[u8]) -> Result<(), NoSpace> {
-        let Self { available_messages, available_messages_size, max_available_messages_size } =
-            self;
-
-        // Respect the configured limit except if this would be the only message
-        // in the buffer. This is compatible with Linux behavior.
-        if *available_messages_size + body.len() > *max_available_messages_size
-            && !available_messages.is_empty()
-        {
-            return Err(NoSpace);
-        }
-
-        available_messages.push_back(AvailableMessage {
-            source_addr,
-            source_port,
-            data: body.to_owned(),
-        });
-        *available_messages_size += body.len();
-        Ok(())
-    }
-
-    fn pop(&mut self) -> Option<AvailableMessage<A>> {
-        let Self { available_messages, available_messages_size, max_available_messages_size: _ } =
-            self;
-
-        available_messages.pop_front().map(|msg| {
-            *available_messages_size -= msg.data.len();
-            msg
-        })
-    }
-
-    fn peek(&self) -> Option<&AvailableMessage<A>> {
-        let Self { available_messages, available_messages_size: _, max_available_messages_size: _ } =
-            self;
-        available_messages.front()
-    }
-
-    fn is_empty(&self) -> bool {
-        let Self { available_messages, available_messages_size: _, max_available_messages_size: _ } =
-            self;
-        available_messages.is_empty()
-    }
-}
-
-#[derive(Copy, Clone, Debug, Error, Eq, PartialEq)]
-#[error("application buffers are full")]
-struct NoSpace;
-
-#[derive(Debug)]
-struct MessageQueue<I: Ip, T> {
-    local_event: zx::EventPair,
-    queue: AvailableMessageQueue<I::Addr>,
     _marker: PhantomData<T>,
 }
 
-impl<I: Ip, T: Transport<I>> MessageQueue<I, T> {
-    fn peek(&self) -> Option<&AvailableMessage<I::Addr>> {
-        let Self { queue, local_event: _, _marker } = self;
-        queue.peek()
+impl<I: Ip, T> BodyLen for AvailableMessage<I, T> {
+    fn body_len(&self) -> usize {
+        self.data.len()
     }
+}
 
-    fn pop(&mut self) -> Option<AvailableMessage<I::Addr>> {
-        let Self { queue, local_event, _marker } = self;
-        let message = queue.pop();
-        if queue.is_empty() {
-            if let Err(e) = local_event.signal_peer(ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE) {
-                error!("socket failed to signal peer: {:?}", e);
-            }
-        }
-        message
+struct IntoAvailableMessage<'b, A>(A, u16, &'b [u8]);
+
+impl<A: IpAddress> BodyLen for IntoAvailableMessage<'_, A> {
+    fn body_len(&self) -> usize {
+        let IntoAvailableMessage(_, _, body) = self;
+        body.len()
     }
+}
 
-    fn receive(&mut self, addr: I::Addr, port: u16, body: &[u8]) {
-        let Self { queue, local_event, _marker } = self;
-        match queue.push(addr, port, body) {
-            Err(NoSpace) => trace!(
-                "dropping {:?} packet from {:?}:{:?} because the receive queue is full",
-                T::PROTOCOL,
-                addr,
-                port
-            ),
-            Ok(()) => local_event
-                .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-                .unwrap_or_else(|e| error!("receive_udp_from_conn failed: {:?}", e)),
-        }
+impl<I: Ip, T> From<IntoAvailableMessage<'_, I::Addr>> for AvailableMessage<I, T> {
+    fn from(value: IntoAvailableMessage<'_, I::Addr>) -> Self {
+        let IntoAvailableMessage(source_addr, source_port, body) = value;
+        Self { source_addr, source_port, data: Vec::from(body), _marker: Default::default() }
     }
 }
 
@@ -1350,7 +1263,7 @@ struct BindingData<I: Ip, T: Transport<I>> {
     ///
     /// The message queue is held here and also in the [`SocketCollection`]
     /// to which the socket belongs.
-    messages: Arc<Mutex<MessageQueue<I, T>>>,
+    messages: Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>,
 }
 
 impl<I, T> BindingData<I, T>
@@ -1385,11 +1298,7 @@ where
                 _properties: properties,
                 state: SocketState::Unbound { unbound_id },
             },
-            messages: Arc::new(Mutex::new(MessageQueue {
-                queue: AvailableMessageQueue::new(),
-                local_event,
-                _marker: PhantomData,
-            })),
+            messages: Arc::new(Mutex::new(MessageQueue::new(local_event))),
         }
     }
 }
@@ -2027,20 +1936,13 @@ where
 
     fn get_max_receive_buffer_size(&self) -> u64 {
         let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages } } = self;
-        messages.lock().queue.max_available_messages_size.try_into().unwrap_or(u64::MAX)
+        messages.lock().max_available_messages_size().try_into().unwrap_or(u64::MAX)
     }
 
     fn set_max_receive_buffer_size(&mut self, max_bytes: u64) {
-        let max_bytes = max_bytes
-            .try_into()
-            .ok_checked::<TryFromIntError>()
-            .unwrap_or(MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE);
-        let max_bytes = std::cmp::min(
-            std::cmp::max(max_bytes, MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE),
-            MAX_OUTSTANDING_APPLICATION_MESSAGES_SIZE,
-        );
+        let max_bytes = max_bytes.try_into().ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
         let Self { ctx: _, data: BindingData { peer_event: _, info: _, messages } } = self;
-        messages.lock().queue.max_available_messages_size = max_bytes
+        messages.lock().set_max_available_messages_size(max_bytes)
     }
 
     /// Handles a [POSIX socket connect request].
@@ -2171,7 +2073,7 @@ where
         sync_ctx: &SyncCtx<BindingsNonSyncCtxImpl>,
         non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         unbound_id: <T as Transport<I>>::UnboundId,
-        available_data: &Arc<Mutex<MessageQueue<I, T>>>,
+        available_data: &Arc<Mutex<MessageQueue<AvailableMessage<I, T>>>>,
         local_addr: Option<ZonedAddr<I::Addr, DeviceId<BindingsNonSyncCtxImpl>>>,
         local_port: Option<<T as TransportState<I>>::LocalIdentifier>,
     ) -> Result<<T as Transport<I>>::ListenerId, fposix::Errno> {
@@ -2501,7 +2403,7 @@ where
                 *shutdown_read = true;
                 if let Err(e) = messages
                     .lock()
-                    .local_event
+                    .local_event()
                     .signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
                 {
                     error!("Failed to signal peer when shutting down: {:?}", e);
@@ -2640,7 +2542,9 @@ mod tests {
     use fuchsia_zircon::{self as zx, AsHandleRef};
     use futures::StreamExt;
 
-    use crate::bindings::socket::testutil::TestSockAddr;
+    use crate::bindings::socket::{
+        queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE, testutil::TestSockAddr,
+    };
     use crate::bindings::{
         integration_tests::{
             test_ep_name, StackSetupBuilder, TestSetup, TestSetupBuilder, TestStack,
@@ -3638,9 +3542,8 @@ mod tests {
 
         // Wait for all packets to be delivered before changing the buffer size.
         let stack = t.get(0);
-        let has_all_delivered = |messages: &MessageQueue<_, _>| {
-            messages.queue.available_messages.len() == SENT_PACKETS.into()
-        };
+        let has_all_delivered =
+            |messages: &MessageQueue<_>| messages.available_messages().len() == SENT_PACKETS.into();
         loop {
             let all_delivered = stack
                 .with_ctx(|Ctx { sync_ctx: _, non_sync_ctx }| {

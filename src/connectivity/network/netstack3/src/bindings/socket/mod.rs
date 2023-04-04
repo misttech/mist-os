@@ -6,6 +6,7 @@
 
 pub(crate) mod datagram;
 pub(crate) mod packet;
+pub(crate) mod queue;
 pub(crate) mod raw;
 pub(crate) mod stream;
 pub(crate) mod worker;
