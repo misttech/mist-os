@@ -15,10 +15,10 @@ rustc_library("forced-fdr") {
     "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",
     "//sdk/fidl/fuchsia.update.channel:fuchsia.update.channel_rust",
     "//src/lib/fuchsia-component",
-    "//src/lib/syslog/rust:syslog",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [

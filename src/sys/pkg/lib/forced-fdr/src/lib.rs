@@ -12,12 +12,12 @@ use {
     fidl_fuchsia_recovery::{FactoryResetMarker, FactoryResetProxy},
     fidl_fuchsia_update_channel::{ProviderMarker, ProviderProxy},
     fuchsia_component::client::connect_to_protocol,
-    fuchsia_syslog::{fx_log_info, fx_log_warn},
     serde::{Deserialize, Serialize},
     std::collections::HashMap,
     std::fs,
     std::fs::File,
     std::path::PathBuf,
+    tracing::{info, warn},
 };
 
 const DEVICE_INDEX_FILE: &str = "stored-index.json";
@@ -91,9 +91,7 @@ impl ForcedFDR {
 /// where the library is unable to determine if an FDR is necessary. In
 /// all of these cases, the library will *not* FDR.
 pub async fn perform_fdr_if_necessary() {
-    perform_fdr_if_necessary_impl()
-        .await
-        .unwrap_or_else(|err| fx_log_info!(tag: "forced-fdr", "{:?}\n", err))
+    perform_fdr_if_necessary_impl().await.unwrap_or_else(|err| info!(tag = "forced-fdr", ?err))
 }
 
 async fn perform_fdr_if_necessary_impl() -> Result<(), Error> {
@@ -117,7 +115,7 @@ async fn run(fdr: ForcedFDR) -> Result<(), Error> {
     let device_index = match get_stored_index(&fdr, &current_channel) {
         Ok(index) => index,
         Err(err) => {
-            fx_log_info!("Unable to read stored index: {}", err);
+            info!(%err, "Unable to read stored index");
             // The device index is missing so it should be
             // written in preparation for the next FDR ota.
             // The index will always be missing right after
@@ -160,7 +158,7 @@ fn get_channel_index(channel_indices: &HashMap<String, i32>, channel: &String) -
 }
 
 async fn trigger_fdr(fdr: &ForcedFDR) -> Result<i32, Error> {
-    fx_log_warn!("Triggering FDR. SSH keys will be lost\n");
+    warn!("Triggering FDR. SSH keys will be lost");
     Ok(fdr.factory_reset_proxy.reset().await?)
 }
 
@@ -185,7 +183,7 @@ fn open_stored_index_file(fdr: &ForcedFDR) -> Result<File, Error> {
 }
 
 fn write_stored_index(fdr: &ForcedFDR, channel: &String, index: i32) -> Result<(), Error> {
-    fx_log_info!("Writing index {} for channel {}\n", index, channel);
+    info!("Writing index {} for channel {}", index, channel);
     let stored_index = StoredIndex::Version1 { channel: channel.to_string(), index };
     let contents = serde_json::to_string(&stored_index)?;
     fs::write(fdr.data_dir.join(DEVICE_INDEX_FILE), contents)?;
