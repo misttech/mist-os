@@ -52,6 +52,7 @@ static int cmd_crash_pmm_use_after_free(int argc, const cmd_args* argv, uint32_t
 static int cmd_crash_assert(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_thread_lock(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_pop(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -80,6 +81,8 @@ STATIC_COMMAND("crash_thread_lock", "intentionally crash while holding the threa
                &cmd_crash_thread_lock)
 STATIC_COMMAND("crash_stack_guard", "attempt to crash by overwriting the stack guard",
                &cmd_crash_stack_guard)
+STATIC_COMMAND("crash_illegal_instruction", "attempt to crash by running an illegal instruction",
+               &cmd_crash_illegal_instruction)
 STATIC_COMMAND("sleep", "sleep number of seconds", &cmd_sleep)
 STATIC_COMMAND("sleepm", "sleep number of milliseconds", &cmd_sleep)
 STATIC_COMMAND(
@@ -486,16 +489,17 @@ static int cmd_crash_user_execute(int argc, const cmd_args* argv, uint32_t flags
 NO_ASAN static uint8_t read_byte(const uint8_t* p) { return *p; }
 
 static int cmd_crash_user_read(int argc, const cmd_args* argv, uint32_t flags) {
-  // TODO(fxbug.dev/59284): Once we support PAN enable this for arm64.
 #if defined(__x86_64__)
   if (!g_x86_feature_has_smap) {
     printf("cpu does not support smap; will not crash.\n");
     return -1;
   }
-#else
-  printf("only supported on x64; will not crash.\n");
+#elif defined(__aarch64__)
+  // TODO(fxbug.dev/59284): Once we support PAN enable this for arm64.
+  printf("ARM64 currently does not support PAN; will not crash.\n");
   return -1;
 #endif
+  // RISCV implements the sstatus.sum bit, similar to x86 SMAP
 
   ktl::unique_ptr<testing::UserMemory> mem = testing::UserMemory::Create(PAGE_SIZE);
   if (mem == nullptr) {
@@ -571,6 +575,21 @@ static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags)
   char* p = static_cast<char*>(__builtin_alloca(kSize));
   memset(p, 0x45, 2 * kSize);
   return -1;
+}
+
+static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags) {
+  printf("attempting to crash with an illegal instruction\n");
+#if defined(__riscv)
+  asm("unimp");
+#elif defined(__x86_64__)
+  asm("ud2");
+#elif defined(__aarch64__)
+  asm("udf #0");
+#else
+  printf("not implemented for this architecture\n");
+#endif
+
+  return 0;
 }
 
 static int cmd_build_instrumentation(int argc, const cmd_args* argv, uint32_t flags) {
