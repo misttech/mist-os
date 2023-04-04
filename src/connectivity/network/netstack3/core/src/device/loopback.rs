@@ -13,17 +13,18 @@ use lock_order::{
     relation::LockBefore,
     Locked,
 };
-use net_types::{
-    ip::{Ip as _, IpAddress, IpVersion},
-    SpecifiedAddr,
+use log::trace;
+use net_types::{ethernet::Mac, ip::IpAddress, SpecifiedAddr};
+use packet::{Buf, BufferMut, ParseBuffer, Serializer};
+use packet_formats::ethernet::{
+    EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
-use packet::{Buf, BufferMut, Serializer};
 
 use crate::{
     device::{
         queue::{
             rx::{
-                BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequePacketContext,
+                BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeFrameContext,
                 ReceiveQueue, ReceiveQueueContext, ReceiveQueueNonSyncContext, ReceiveQueueState,
                 ReceiveQueueTypes,
             },
@@ -199,8 +200,8 @@ pub(super) struct LoopbackDeviceState {
     mtu: Mtu,
     /// The routing metric of the loopback device this state is for.
     metric: RawMetric,
-    rx_queue: ReceiveQueue<IpVersion, Buf<Vec<u8>>>,
-    tx_queue: TransmitQueue<IpVersion, Buf<Vec<u8>>, BufVecU8Allocator>,
+    rx_queue: ReceiveQueue<(), Buf<Vec<u8>>>,
+    tx_queue: TransmitQueue<(), Buf<Vec<u8>>, BufVecU8Allocator>,
     sockets: RwLock<DeviceSockets>,
 }
 
@@ -219,7 +220,7 @@ impl LoopbackDeviceState {
 impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackRxQueue>
     for IpLinkDeviceState<I, S, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, ReceiveQueueState<IpVersion, Buf<Vec<u8>>>>
+    type Data<'l> = crate::sync::LockGuard<'l, ReceiveQueueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Data<'_> {
@@ -230,7 +231,7 @@ impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackRxQueue>
 impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackRxDequeue>
     for IpLinkDeviceState<I, S, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<IpVersion, Buf<Vec<u8>>>>
+    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Data<'_> {
@@ -241,7 +242,7 @@ impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackRxDequeue>
 impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackTxQueue>
     for IpLinkDeviceState<I, S, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, TransmitQueueState<IpVersion, Buf<Vec<u8>>, BufVecU8Allocator>>
+    type Data<'l> = crate::sync::LockGuard<'l, TransmitQueueState<(), Buf<Vec<u8>>, BufVecU8Allocator>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Data<'_> {
@@ -252,7 +253,7 @@ impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackTxQueue>
 impl<I: Instant, S> LockFor<crate::lock_ordering::LoopbackTxDequeue>
     for IpLinkDeviceState<I, S, LoopbackDeviceState>
 {
-    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<IpVersion, Buf<Vec<u8>>>>
+    type Data<'l> = crate::sync::LockGuard<'l, DequeueState<(), Buf<Vec<u8>>>>
         where
             Self: 'l;
     fn lock(&self) -> Self::Data<'_> {
@@ -288,21 +289,32 @@ pub(super) fn send_ip_frame<
     ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
     _local_addr: SpecifiedAddr<A>,
-    body: S,
-) -> Result<(), S> {
+    packet: S,
+) -> Result<(), S>
+where
+    A::Version: EthernetIpExt,
+{
+    const LOOPBACK_MAC: Mac = Mac::UNSPECIFIED;
+
+    let frame = packet.encapsulate(EthernetFrameBuilder::new(
+        LOOPBACK_MAC,
+        LOOPBACK_MAC,
+        <A::Version as EthernetIpExt>::ETHER_TYPE,
+    ));
+
     match BufferTransmitQueueHandler::<LoopbackDevice, _, _>::queue_tx_frame(
         sync_ctx,
         ctx,
         device_id,
-        A::Version::VERSION,
-        body,
+        (),
+        frame,
     ) {
         Ok(()) => Ok(()),
         Err(TransmitQueueFrameError::NoQueue(_)) => {
             unreachable!("loopback never fails to send a frame")
         }
         Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {
-            Err(s)
+            Err(s.into_inner())
         }
     }
 }
@@ -335,7 +347,7 @@ impl<C: NonSyncContext>
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     ReceiveQueueTypes<LoopbackDevice, C> for Locked<'_, SyncCtx<C>, L>
 {
-    type Meta = IpVersion;
+    type Meta = ();
     type Buffer = Buf<Vec<u8>>;
 }
 
@@ -357,31 +369,52 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxQueue>>
     }
 }
 
-impl<C: NonSyncContext> ReceiveDequePacketContext<LoopbackDevice, C>
+impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
     for Locked<'_, SyncCtx<C>, crate::lock_ordering::LoopbackRxDequeue>
 {
-    fn handle_packet(
+    fn handle_frame(
         &mut self,
         ctx: &mut C,
         device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
-        meta: IpVersion,
-        buf: Buf<Vec<u8>>,
+        (): Self::Meta,
+        mut buf: Buf<Vec<u8>>,
     ) {
-        match meta {
-            IpVersion::V4 => crate::ip::receive_ipv4_packet(
+        let frame = match buf.parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
+            Err(e) => {
+                trace!("dropping invalid ethernet frame over loopback: {:?}", e);
+                return;
+            }
+            Ok(e) => e,
+        };
+
+        // TODO(https://fxbug.dev/106735): dispatch to packet sockets.
+
+        let ethertype = match frame.ethertype() {
+            Some(e) => e,
+            None => {
+                trace!("dropping ethernet frame without ethertype");
+                return;
+            }
+        };
+
+        match ethertype {
+            EtherType::Ipv4 => crate::ip::receive_ipv4_packet(
                 self,
                 ctx,
                 &device_id.clone().into(),
                 FrameDestination::Unicast,
                 buf,
             ),
-            IpVersion::V6 => crate::ip::receive_ipv6_packet(
+            EtherType::Ipv6 => crate::ip::receive_ipv6_packet(
                 self,
                 ctx,
                 &device_id.clone().into(),
                 FrameDestination::Unicast,
                 buf,
             ),
+            ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {
+                trace!("not handling loopback frame of type {:?}", ethertype)
+            }
         }
     }
 }
@@ -391,9 +424,9 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackRxDequeue>>
 {
     type ReceiveQueueCtx<'a> = Locked<'a, SyncCtx<C>, crate::lock_ordering::LoopbackRxDequeue>;
 
-    fn with_dequed_packets_and_rx_queue_ctx<
+    fn with_dequed_frames_and_rx_queue_ctx<
         O,
-        F: FnOnce(&mut DequeueState<IpVersion, Buf<Vec<u8>>>, &mut Self::ReceiveQueueCtx<'_>) -> O,
+        F: FnOnce(&mut DequeueState<(), Buf<Vec<u8>>>, &mut Self::ReceiveQueueCtx<'_>) -> O,
     >(
         &mut self,
         device_id: &LoopbackDeviceId<C::Instant, C::LoopbackDeviceState>,
@@ -421,7 +454,7 @@ impl<C: NonSyncContext>
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     TransmitQueueTypes<LoopbackDevice, C> for Locked<'_, SyncCtx<C>, L>
 {
-    type Meta = IpVersion;
+    type Meta = ();
     type Allocator = BufVecU8Allocator;
     type Buffer = Buf<Vec<u8>>;
 }
@@ -458,9 +491,9 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         // which may need to be delivered to the sending socket itself. Without
         // this decoupling of RX/TX paths, sending a packet while holding onto
         // the socket lock will result in a deadlock.
-        match BufferReceiveQueueHandler::queue_rx_packet(self, ctx, device_id, meta, buf) {
+        match BufferReceiveQueueHandler::queue_rx_frame(self, ctx, device_id, meta, buf) {
             Ok(()) => {}
-            Err(ReceiveQueueFullError((_ip_version, _frame))) => {
+            Err(ReceiveQueueFullError(((), _frame))) => {
                 // RX queue is full - there is nothing further we can do here.
                 log::error!("dropped RX frame on loopback device due to full RX queue")
             }
@@ -495,6 +528,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxDequeue>>
 mod tests {
     use alloc::vec::Vec;
 
+    use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use lock_order::{Locked, Unlocked};
     use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6};
@@ -512,6 +546,8 @@ mod tests {
         },
         Ctx, SyncCtx,
     };
+
+    use super::*;
 
     const MTU: Mtu = Mtu::new(66);
 
@@ -586,5 +622,46 @@ mod tests {
             crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, &addr),
             Err(NotFoundError)
         );
+    }
+
+    #[ip_test]
+    fn loopback_sends_ethernet<I: Ip + TestIpExt>() {
+        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let mut sync_ctx = &sync_ctx;
+        let device =
+            crate::device::add_loopback_device(&mut sync_ctx, MTU, DEFAULT_INTERFACE_METRIC)
+                .expect("error adding loopback device");
+        crate::device::testutil::enable_device(
+            &mut sync_ctx,
+            &mut non_sync_ctx,
+            &device.clone().into(),
+        );
+
+        let local_addr = I::FAKE_CONFIG.local_ip;
+        const BODY: &[u8] = b"IP body".as_slice();
+
+        let body = Buf::new(Vec::from(BODY), ..);
+        send_ip_frame(&mut Locked::new(sync_ctx), &mut non_sync_ctx, &device, local_addr, body)
+            .expect("can send");
+
+        // There is no transmit queue so the frames will immediately go into the
+        // receive queue.
+        let mut frames = ReceiveQueueContext::<LoopbackDevice, _>::with_receive_queue_mut(
+            &mut Locked::new(sync_ctx),
+            &device,
+            |queue_state| queue_state.take_frames().map(|((), frame)| frame).collect::<Vec<_>>(),
+        );
+
+        let frame = assert_matches!(frames.as_mut_slice(), [frame] => frame);
+
+        let eth = frame
+            .parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
+            .expect("is ethernet");
+        assert_eq!(eth.src_mac(), Mac::UNSPECIFIED);
+        assert_eq!(eth.dst_mac(), Mac::UNSPECIFIED);
+        assert_eq!(eth.ethertype(), Some(I::ETHER_TYPE));
+
+        // Trim the body to account for ethernet padding.
+        assert_eq!(&frame.as_ref()[..BODY.len()], BODY);
     }
 }

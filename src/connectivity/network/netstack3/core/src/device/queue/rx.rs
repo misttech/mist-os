@@ -4,6 +4,8 @@
 
 //! RX device queues.
 
+#[cfg(test)]
+use assert_matches::assert_matches;
 use derivative::Derivative;
 use packet::ParseBuffer;
 
@@ -17,13 +19,23 @@ use crate::{
     sync::Mutex,
 };
 
-/// The state used to hold a queue of received packets to be handled at a later
+/// The state used to hold a queue of received frames to be handled at a later
 /// time.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 #[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub(crate) struct ReceiveQueueState<Meta, Buffer> {
     queue: fifo::Queue<Meta, Buffer>,
+}
+
+impl<Meta, Buffer> ReceiveQueueState<Meta, Buffer> {
+    #[cfg(test)]
+    pub(crate) fn take_frames(&mut self) -> impl Iterator<Item = (Meta, Buffer)> + '_ {
+        let Self { queue } = self;
+        let mut vec = Default::default();
+        assert_matches!(queue.dequeue_into(&mut vec, usize::MAX), DequeueResult::NoMoreLeft);
+        vec.into_iter()
+    }
 }
 
 /// The non-synchonized context for the receive queue.
@@ -35,11 +47,11 @@ pub(crate) trait ReceiveQueueNonSyncContext<D: Device, DeviceId> {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct ReceiveQueue<Meta, Buffer> {
-    /// The state for dequeued packets that will be handled.
+    /// The state for dequeued frames that will be handled.
     ///
     /// See `queue` for lock ordering.
     pub(crate) deque: Mutex<DequeueState<Meta, Buffer>>,
-    /// A queue of received packets protected by a lock.
+    /// A queue of received frames protected by a lock.
     ///
     /// Lock ordering: `deque` must be locked before `queue` is locked when both
     /// are needed at the same time.
@@ -47,13 +59,10 @@ pub(crate) struct ReceiveQueue<Meta, Buffer> {
 }
 
 pub(crate) trait ReceiveQueueTypes<D: Device, C>: DeviceIdContext<D> {
-    /// Metadata associated with an RX packet.
-    ///
-    /// E.g. loopback may hold the packet's IP version in the metadata (since
-    /// loopback has no headers that may be used to identify the packet type).
+    /// Metadata associated with an RX frame.
     type Meta;
 
-    /// The type of buffer holding an RX packet.
+    /// The type of buffer holding an RX frame.
     type Buffer: ParseBuffer;
 }
 
@@ -67,9 +76,9 @@ pub(crate) trait ReceiveQueueContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     ) -> O;
 }
 
-pub(crate) trait ReceiveDequePacketContext<D: Device, C>: ReceiveQueueTypes<D, C> {
-    /// Handle a received packet.
-    fn handle_packet(
+pub(crate) trait ReceiveDequeFrameContext<D: Device, C>: ReceiveQueueTypes<D, C> {
+    /// Handle a received frame.
+    fn handle_frame(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
@@ -85,7 +94,7 @@ pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
             Meta = Self::Meta,
             Buffer = Self::Buffer,
             DeviceId = Self::DeviceId,
-        > + ReceiveDequePacketContext<
+        > + ReceiveDequeFrameContext<
             D,
             C,
             Meta = Self::Meta,
@@ -94,7 +103,7 @@ pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
         >;
 
     /// Calls the function with the RX deque state and the RX queue context.
-    fn with_dequed_packets_and_rx_queue_ctx<
+    fn with_dequed_frames_and_rx_queue_ctx<
         O,
         F: FnOnce(&mut DequeueState<Self::Meta, Self::Buffer>, &mut Self::ReceiveQueueCtx<'_>) -> O,
     >(
@@ -106,20 +115,20 @@ pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
 
 /// An implementation of a receive queue.
 pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
-    /// Handle any queued RX packets.
-    fn handle_queued_rx_packets(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
+    /// Handle any queued RX frames.
+    fn handle_queued_rx_frames(&mut self, ctx: &mut C, device_id: &Self::DeviceId);
 }
 
 /// An implementation of a receive queue, with a buffer.
 pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
     ReceiveQueueTypes<D, C>
 {
-    /// Queues a packet for reception.
+    /// Queues a frame for reception.
     ///
     /// # Errors
     ///
     /// Returns an error with the metadata and body if the queue is full.
-    fn queue_rx_packet(
+    fn queue_rx_frame(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
@@ -131,32 +140,32 @@ pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
 impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDequeContext<D, C>>
     ReceiveQueueHandler<D, C> for SC
 {
-    fn handle_queued_rx_packets(&mut self, ctx: &mut C, device_id: &SC::DeviceId) {
-        self.with_dequed_packets_and_rx_queue_ctx(
+    fn handle_queued_rx_frames(&mut self, ctx: &mut C, device_id: &SC::DeviceId) {
+        self.with_dequed_frames_and_rx_queue_ctx(
             device_id,
-            |DequeueState { dequed_packets }, rx_queue_ctx| {
+            |DequeueState { dequeued_frames }, rx_queue_ctx| {
                 assert_eq!(
-                    dequed_packets.len(),
+                    dequeued_frames.len(),
                     0,
-                    "should not keep dequeued packets across calls to this fn"
+                    "should not keep dequeued frames across calls to this fn"
                 );
 
                 let ret = rx_queue_ctx.with_receive_queue_mut(
                     device_id,
                     |ReceiveQueueState { queue }| {
-                        queue.dequeue_packets_into(dequed_packets, MAX_BATCH_SIZE)
+                        queue.dequeue_into(dequeued_frames, MAX_BATCH_SIZE)
                     },
                 );
 
-                while let Some((meta, p)) = dequed_packets.pop_front() {
-                    rx_queue_ctx.handle_packet(ctx, device_id, meta, p);
+                while let Some((meta, p)) = dequeued_frames.pop_front() {
+                    rx_queue_ctx.handle_frame(ctx, device_id, meta, p);
                 }
 
                 match ret {
-                    DequeueResult::MorePacketsStillQueued => ctx.wake_rx_task(device_id),
-                    DequeueResult::NoMorePacketsLeft => {
-                        // There are no more packets left after the batch we
-                        // just handled. When the next RX packet gets enqueued,
+                    DequeueResult::MoreStillQueued => ctx.wake_rx_task(device_id),
+                    DequeueResult::NoMoreLeft => {
+                        // There are no more frames left after the batch we
+                        // just handled. When the next RX frame gets enqueued,
                         // the RX task will be woken up again.
                     }
                 }
@@ -168,7 +177,7 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDeque
 impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueueContext<D, C>>
     BufferReceiveQueueHandler<D, SC::Buffer, C> for SC
 {
-    fn queue_rx_packet(
+    fn queue_rx_frame(
         &mut self,
         ctx: &mut C,
         device_id: &SC::DeviceId,
@@ -176,9 +185,9 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueue
         body: SC::Buffer,
     ) -> Result<(), ReceiveQueueFullError<(Self::Meta, SC::Buffer)>> {
         self.with_receive_queue_mut(device_id, |ReceiveQueueState { queue }| {
-            queue.queue_rx_packet(meta, body).map(|res| match res {
+            queue.queue_rx_frame(meta, body).map(|res| match res {
                 EnqueueResult::QueueWasPreviouslyEmpty => ctx.wake_rx_task(device_id),
-                EnqueueResult::QueuePreviouslyHadPackets => {
+                EnqueueResult::QueuePreviouslyWasOccupied => {
                     // We have already woken up the RX task when the queue was
                     // previously empty so there is no need to do it again.
                 }
@@ -199,14 +208,14 @@ mod tests {
         context::testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx},
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
-            queue::MAX_RX_QUEUED_PACKETS,
+            queue::MAX_RX_QUEUED_LEN,
         },
     };
 
     #[derive(Default)]
     struct FakeRxQueueState {
         queue: ReceiveQueueState<(), Buf<Vec<u8>>>,
-        handled_packets: Vec<Buf<Vec<u8>>>,
+        handled_frames: Vec<Buf<Vec<u8>>>,
     }
 
     #[derive(Default)]
@@ -238,22 +247,22 @@ mod tests {
         }
     }
 
-    impl ReceiveDequePacketContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
-        fn handle_packet(
+    impl ReceiveDequeFrameContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+        fn handle_frame(
             &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
             &FakeLinkDeviceId: &FakeLinkDeviceId,
             (): (),
             buf: Buf<Vec<u8>>,
         ) {
-            self.get_mut().handled_packets.push(buf)
+            self.get_mut().handled_frames.push(buf)
         }
     }
 
     impl ReceiveDequeContext<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         type ReceiveQueueCtx<'a> = Self;
 
-        fn with_dequed_packets_and_rx_queue_ctx<
+        fn with_dequed_frames_and_rx_queue_ctx<
             O,
             F: FnOnce(
                 &mut DequeueState<Self::Meta, Self::Buffer>,
@@ -274,10 +283,10 @@ mod tests {
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
         for _ in 0..2 {
-            for i in 0..MAX_RX_QUEUED_PACKETS {
+            for i in 0..MAX_RX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
-                    BufferReceiveQueueHandler::queue_rx_packet(
+                    BufferReceiveQueueHandler::queue_rx_frame(
                         &mut sync_ctx,
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
@@ -286,14 +295,14 @@ mod tests {
                     ),
                     Ok(())
                 );
-                // We should only ever be woken up once when the first packet
+                // We should only ever be woken up once when the first frame
                 // was enqueued.
                 assert_eq!(non_sync_ctx.state().woken_rx_tasks, [FakeLinkDeviceId]);
             }
 
             let body = Buf::new(vec![131], ..);
             assert_eq!(
-                BufferReceiveQueueHandler::queue_rx_packet(
+                BufferReceiveQueueHandler::queue_rx_frame(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -302,44 +311,43 @@ mod tests {
                 ),
                 Err(ReceiveQueueFullError(((), body)))
             );
-            // We should only ever be woken up once when the first packet
+            // We should only ever be woken up once when the first frame
             // was enqueued.
             assert_eq!(
                 core::mem::take(&mut non_sync_ctx.state_mut().woken_rx_tasks),
                 [FakeLinkDeviceId]
             );
 
-            assert!(MAX_RX_QUEUED_PACKETS > MAX_BATCH_SIZE);
-            for i in (0..(MAX_RX_QUEUED_PACKETS - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
-                ReceiveQueueHandler::handle_queued_rx_packets(
+            assert!(MAX_RX_QUEUED_LEN > MAX_BATCH_SIZE);
+            for i in (0..(MAX_RX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
+                ReceiveQueueHandler::handle_queued_rx_frames(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
                 );
                 assert_eq!(
-                    core::mem::take(&mut sync_ctx.get_mut().handled_packets),
+                    core::mem::take(&mut sync_ctx.get_mut().handled_frames),
                     (i..i + MAX_BATCH_SIZE)
                         .into_iter()
                         .map(|i| Buf::new(vec![i as u8], ..))
                         .collect::<Vec<_>>()
                 );
-                // We should get a wake up signal when packets remain after
-                // handling a batch of RX packets.
+                // We should get a wake up signal when frames remain after
+                // handling a batch of RX frames.
                 assert_eq!(
                     core::mem::take(&mut non_sync_ctx.state_mut().woken_rx_tasks),
                     [FakeLinkDeviceId]
                 );
             }
 
-            ReceiveQueueHandler::handle_queued_rx_packets(
+            ReceiveQueueHandler::handle_queued_rx_frames(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
             );
             assert_eq!(
-                core::mem::take(&mut sync_ctx.get_mut().handled_packets),
-                (MAX_BATCH_SIZE * (MAX_RX_QUEUED_PACKETS / MAX_BATCH_SIZE - 1)
-                    ..MAX_RX_QUEUED_PACKETS)
+                core::mem::take(&mut sync_ctx.get_mut().handled_frames),
+                (MAX_BATCH_SIZE * (MAX_RX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_RX_QUEUED_LEN)
                     .into_iter()
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()
@@ -349,7 +357,7 @@ mod tests {
             assert_eq!(core::mem::take(&mut non_sync_ctx.state_mut().woken_rx_tasks), []);
 
             // The queue should now be empty so the next iteration of queueing
-            // `MAX_RX_QUEUED_PACKETS` packets should succeed.
+            // `MAX_RX_QUEUED_LEN` frames should succeed.
         }
     }
 }

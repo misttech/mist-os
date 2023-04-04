@@ -155,7 +155,7 @@ impl<
     ) -> Result<(), DeviceSendFrameError<()>> {
         self.with_dequed_packets_and_tx_queue_ctx(
             device_id,
-            |DequeueState { dequed_packets }, tx_queue_ctx| {
+            |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
                 assert!(
                     dequed_packets.is_empty(),
                     "should never have left packets after attempting to dequeue"
@@ -164,9 +164,7 @@ impl<
                 let ret = tx_queue_ctx.with_transmit_queue_mut(
                     device_id,
                     |TransmitQueueState { allocator: _, queue }| {
-                        queue
-                            .as_mut()
-                            .map(|q| q.dequeue_packets_into(dequed_packets, MAX_BATCH_SIZE))
+                        queue.as_mut().map(|q| q.dequeue_into(dequed_packets, MAX_BATCH_SIZE))
                     },
                 );
                 let Some(ret) = ret else { return Ok(()) };
@@ -181,7 +179,7 @@ impl<
                                 device_id,
                                 |TransmitQueueState { allocator: _, queue }| {
                                     dequed_packets.push_front(x);
-                                    queue.as_mut().unwrap().requeue_packets(dequed_packets);
+                                    queue.as_mut().unwrap().requeue_items(dequed_packets);
                                 },
                             );
                             return Err(DeviceSendFrameError::DeviceNotReady(()));
@@ -190,8 +188,8 @@ impl<
                 }
 
                 match ret {
-                    DequeueResult::MorePacketsStillQueued => ctx.wake_tx_task(device_id),
-                    DequeueResult::NoMorePacketsLeft => {
+                    DequeueResult::MoreStillQueued => ctx.wake_tx_task(device_id),
+                    DequeueResult::NoMoreLeft => {
                         // There are no more frames left after the batch we
                         // just handled. When the next TX frame gets enqueued,
                         // the TX task will be woken up again.
@@ -213,7 +211,7 @@ impl<
         // dequeuing before changing the configuration.
         self.with_dequed_packets_and_tx_queue_ctx(
             device_id,
-            |DequeueState { dequed_packets }, tx_queue_ctx| {
+            |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
                 assert!(
                     dequed_packets.is_empty(),
                     "should never have left packets after attempting to dequeue"
@@ -240,7 +238,7 @@ impl<
                 let Some(mut prev_queue) = prev_queue else { return };
 
                 loop {
-                    let ret = prev_queue.dequeue_packets_into(dequed_packets, MAX_BATCH_SIZE);
+                    let ret = prev_queue.dequeue_into(dequed_packets, MAX_BATCH_SIZE);
 
                     while let Some((meta, p)) = dequed_packets.pop_front() {
                         match tx_queue_ctx.send_frame(ctx, device_id, meta, p) {
@@ -254,8 +252,8 @@ impl<
                     }
 
                     match ret {
-                        DequeueResult::NoMorePacketsLeft => break,
-                        DequeueResult::MorePacketsStillQueued => {}
+                        DequeueResult::NoMoreLeft => break,
+                        DequeueResult::MoreStillQueued => {}
                     }
                 }
             },
@@ -299,7 +297,7 @@ where
                             EnqueueResult::QueueWasPreviouslyEmpty => {
                                 ctx.wake_tx_task(device_id);
                             }
-                            EnqueueResult::QueuePreviouslyHadPackets => {}
+                            EnqueueResult::QueuePreviouslyWasOccupied => {}
                         }
 
                         EnqueueStatus::Attempted
@@ -366,7 +364,7 @@ mod tests {
         context::testutil::{FakeCtx, FakeNonSyncCtx, FakeSyncCtx},
         device::{
             link::testutil::{FakeLinkDevice, FakeLinkDeviceId},
-            queue::MAX_TX_QUEUED_FRAMES,
+            queue::MAX_TX_QUEUED_LEN,
         },
     };
 
@@ -492,7 +490,7 @@ mod tests {
         );
 
         for _ in 0..2 {
-            for i in 0..MAX_TX_QUEUED_FRAMES {
+            for i in 0..MAX_TX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
                     BufferTransmitQueueHandler::queue_tx_frame(
@@ -527,8 +525,8 @@ mod tests {
                 [FakeLinkDeviceId]
             );
 
-            assert!(MAX_TX_QUEUED_FRAMES > MAX_BATCH_SIZE);
-            for i in (0..(MAX_TX_QUEUED_FRAMES - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
+            assert!(MAX_TX_QUEUED_LEN > MAX_BATCH_SIZE);
+            for i in (0..(MAX_TX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
                 assert_eq!(
                     TransmitQueueHandler::transmit_queued_frames(
                         &mut sync_ctx,
@@ -562,8 +560,7 @@ mod tests {
             );
             assert_eq!(
                 core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
-                (MAX_BATCH_SIZE * (MAX_TX_QUEUED_FRAMES / MAX_BATCH_SIZE - 1)
-                    ..MAX_TX_QUEUED_FRAMES)
+                (MAX_BATCH_SIZE * (MAX_TX_QUEUED_LEN / MAX_BATCH_SIZE - 1)..MAX_TX_QUEUED_LEN)
                     .into_iter()
                     .map(|i| Buf::new(vec![i as u8], ..))
                     .collect::<Vec<_>>()

@@ -1495,7 +1495,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     device: &LoopbackDeviceId<NonSyncCtx::Instant, NonSyncCtx::LoopbackDeviceState>,
 ) {
-    ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_packets(
+    ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_frames(
         &mut Locked::new(sync_ctx),
         ctx,
         device,

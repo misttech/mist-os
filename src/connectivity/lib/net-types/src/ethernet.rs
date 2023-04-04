@@ -65,6 +65,9 @@ impl Mac {
     /// [`to_eui64`]: crate::ethernet::Mac::to_eui64
     pub const DEFAULT_EUI_MAGIC: [u8; 2] = [0xff, 0xfe];
 
+    /// The all-zeroes MAC address.
+    pub const UNSPECIFIED: Mac = Mac([0x00; Self::BYTES]);
+
     /// Constructs a new MAC address.
     #[inline]
     pub const fn new(bytes: [u8; Self::BYTES]) -> Mac {
