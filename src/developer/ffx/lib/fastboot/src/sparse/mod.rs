@@ -164,7 +164,11 @@ impl Chunk {
                 source.seek(SeekFrom::Start(*start))?;
                 // Read in the data
                 let mut reader = source.take(*size as u64);
-                copy(&mut reader, dest)?;
+                let n: usize = copy(&mut reader, dest).unwrap().try_into()?;
+                if n < *size {
+                    let zeroes = vec![0u8; *size - n];
+                    copy(&mut Cursor::new(zeroes), dest)?;
+                }
             }
             Self::Fill { value, .. } => {
                 // Serliaze the value,
@@ -510,7 +514,8 @@ mod test {
         process::Command,
     };
 
-    const WANT_RAW_BYTES: [u8; 17] = [193, 202, 0, 0, 1, 0, 0, 0, 17, 0, 0, 0, 49, 50, 51, 52, 53];
+    const WANT_RAW_BYTES: [u8; 22] =
+        [193, 202, 0, 0, 1, 0, 0, 0, 22, 0, 0, 0, 49, 50, 51, 52, 53, 0, 0, 0, 0, 0];
 
     const WANT_SPARSE_FILE_RAW_BYTES: [u8; 71] = [
         58, 255, 38, 237, 1, 0, 0, 0, 28, 0, 12, 0, 0, 16, 0, 0, 3, 0, 0, 0, 3, 0, 0, 0, 13, 208,
@@ -535,7 +540,7 @@ mod test {
     async fn test_raw_into_bytes() -> Result<()> {
         let source = Vec::<u8>::from(&b"12345"[..]);
         let mut dest = Vec::<u8>::new();
-        let chunk = Chunk::Raw { start: 0, size: 5 };
+        let chunk = Chunk::Raw { start: 0, size: 10 };
 
         let mut seeker = Cursor::new(source);
         chunk.write(&mut seeker, &mut dest)?;
