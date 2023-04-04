@@ -4,41 +4,13 @@
 
 import("//build/component/component_id_index.gni")
 import("//build/components.gni")
-import("//build/dist/resource.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
   testonly = true
 
   deps = [ ":core_proxy_integration_test" ]
-}
-
-# This shard declares 3 storage capabilities: data (persistent), cache, and
-# temp.
-#
-# The data (persistent) storage capability can only be used components listed
-# in the component ID index.
-group("core-storage-restricted") {
-}
-
-# This shard declares 3 storage capabilities: data (persistent), cache, and
-# temp. Any component may use these storage capabilities if they are routed to
-# them.
-group("core-storage-unrestricted") {
-}
-
-# Enabling a soft-transition, replace with actual target when complete
-# TODO(122864) Remove transitional labels
-# This shard gives components access to the PackageResolver.
-group("core-env-full-resolver") {
-}
-
-# Enabling a soft-transition, replace with actual target when complete
-# TODO(122864) Remove transitional labels
-# This shard gives components access to the base resolver.
-group("core-env-base-resolver") {
 }
 
 # This index contains component ID entries for components whose source-code
