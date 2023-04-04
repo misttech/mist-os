@@ -126,7 +126,7 @@ TEST_F(BindTestFixture, EthDataPlaneNotSupported) {
   ASSERT_EQ(device_->Bind(), ZX_ERR_NOT_SUPPORTED);
 
   // The device didn't bind because ethernet isn't supported, so we have to manually free the device
-  device_->Release();
+  device_->DdkRelease();
 }
 
 struct WlanifTestFixture : public BindTestFixture {
@@ -136,7 +136,8 @@ struct WlanifTestFixture : public BindTestFixture {
   }
 
   void TearDown() override {
-    device_->Unbind();
+    device_->DdkAsyncRemove();
+    mock_ddk::ReleaseFlaggedDevices(device_->zxdev());
     BindTestFixture::TearDown();
   }
 };

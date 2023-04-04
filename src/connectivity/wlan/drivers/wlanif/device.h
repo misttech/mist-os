@@ -13,21 +13,23 @@
 #include <memory>
 #include <mutex>
 
+#include <ddktl/device.h>
+
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "fullmac_mlme.h"
 
 namespace wlanif {
 
-class Device {
+class Device : public ddk::Device<Device, ddk::Unbindable> {
  public:
-  Device(zx_device_t* device, wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto);
+  Device(zx_device_t* parent, wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto);
   ~Device();
 
   zx_status_t Bind();
 
   // zx_protocol_device_t
-  void Unbind();
-  void Release();
+  void DdkUnbind(::ddk::UnbindTxn txn);
+  void DdkRelease();
 
   zx_status_t Start(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc, zx::channel* out_sme_channel);
 
@@ -61,9 +63,6 @@ class Device {
 
   std::mutex lock_;
   std::mutex get_iface_histogram_stats_lock_;
-
-  zx_device_t* parent_ = nullptr;
-  zx_device_t* device_ = nullptr;
 
   wlan_fullmac_impl_protocol_t wlan_fullmac_impl_;
 

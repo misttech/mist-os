@@ -29,32 +29,20 @@
 
 namespace wlanif {
 
-Device::Device(zx_device_t* device, wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto)
-    : parent_(device), wlan_fullmac_impl_(wlan_fullmac_impl_proto) {
+Device::Device(zx_device_t* parent, wlan_fullmac_impl_protocol_t wlan_fullmac_impl_proto)
+    : ddk::Device<Device, ddk::Unbindable>(parent), wlan_fullmac_impl_(wlan_fullmac_impl_proto) {
   ltrace_fn();
 }
 
 Device::~Device() { ltrace_fn(); }
 
-#define DEV(c) static_cast<Device*>(c)
-static zx_protocol_device_t device_ops = {
-    .version = DEVICE_OPS_VERSION,
-    .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
-    .release = [](void* ctx) { DEV(ctx)->Release(); },
-};
-#undef DEV
-
 zx_status_t Device::AddDevice() {
-  device_add_args_t args = {};
-  args.version = DEVICE_ADD_ARGS_VERSION;
-  args.name = "wlanif";
-  args.ctx = this;
-  args.ops = &device_ops;
-  auto vmo = mlme_->DuplicateInspectVmo();
-  if (vmo) {
-    args.inspect_vmo = *vmo;
+  auto dev_add_args = ::ddk::DeviceAddArgs("wlanif");
+  auto vmo_handle = mlme_->DuplicateInspectVmo();
+  if (vmo_handle) {
+    dev_add_args = dev_add_args.set_inspect_vmo(zx::vmo(*vmo_handle));
   }
-  return device_add(parent_, &args, &device_);
+  return DdkAdd(dev_add_args);
 }
 
 #define VERIFY_IMPL_PROTO_OP(fn)                                \
@@ -105,7 +93,6 @@ zx_status_t Device::Bind() {
   ZX_DEBUG_ASSERT(mlme_ != nullptr);
   mlme_->Init();
 
-  ZX_DEBUG_ASSERT(device_ == nullptr);
   auto status = AddDevice();
   if (status != ZX_OK) {
     lerror("could not add ethernet_impl device: %s\n", zx_status_get_string(status));
@@ -116,14 +103,14 @@ zx_status_t Device::Bind() {
 #undef VERIFY_IMPL_PROTO_OP
 #undef VERIFY_IMPL_IFC_PROTO_OP
 
-void Device::Unbind() {
+void Device::DdkUnbind(::ddk::UnbindTxn txn) {
   ltrace_fn();
   if (mlme_)
     mlme_->StopMainLoop();
-  device_unbind_reply(device_);
+  txn.Reply();
 }
 
-void Device::Release() {
+void Device::DdkRelease() {
   ltrace_fn();
   delete this;
 }
