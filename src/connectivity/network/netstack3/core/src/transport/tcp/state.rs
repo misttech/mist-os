@@ -35,13 +35,14 @@ use crate::{
 /// MSL
 ///       Maximum Segment Lifetime, the time a TCP segment can exist in
 ///       the internetwork system.  Arbitrarily defined to be 2 minutes.
-const MSL: Duration = Duration::from_secs(2 * 60);
+pub(super) const MSL: Duration = Duration::from_secs(2 * 60);
 // TODO(https://fxbug.dev/117955): With the current usage of netstack3 on mostly
 // link-local workloads, these values are large enough to accommodate most cases
 // so it can help us detect failure faster. We should make them agree with other
 // common implementations once we can configure them through socket options.
 const DEFAULT_MAX_RETRIES: NonZeroU8 = nonzero_ext::nonzero!(12_u8);
 const DEFAULT_USER_TIMEOUT: Duration = Duration::from_secs(60 * 2);
+pub(super) const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Per RFC 9293 (https://tools.ietf.org/html/rfc9293#section-3.8.6.3):
 ///  ... in particular, the delay MUST be less than 0.5 seconds.
@@ -1230,6 +1231,7 @@ pub(crate) struct FinWait1<I, R, S> {
 pub(crate) struct FinWait2<I, R> {
     last_seq: SeqNum,
     rcv: Recv<I, R>,
+    timeout_at: Option<I>,
 }
 
 #[derive(Debug)]
@@ -1296,8 +1298,7 @@ pub(crate) enum State<I, R, S, ActiveOpen> {
     TimeWait(TimeWait<I>),
 }
 
-#[derive(Debug)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
+#[derive(Debug, PartialEq, Eq)]
 /// Possible errors for closing a connection
 pub(super) enum CloseError {
     /// The connection is already being closed.
@@ -1350,6 +1351,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
         incoming: Segment<P>,
         now: I,
         SocketOptions { keep_alive, nagle_enabled: _, user_timeout: _, delayed_ack }: &SocketOptions,
+        defunct: bool,
     ) -> (Option<Segment<()>>, Option<BP::PassiveOpen>)
     where
         BP::PassiveOpen: Debug,
@@ -1438,7 +1440,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     (*last_ack, *last_wnd, snd.nxt)
                 }
                 State::FinWait1(FinWait1 { rcv, snd }) => (rcv.nxt(), rcv.wnd(), snd.nxt),
-                State::FinWait2(FinWait2 { last_seq, rcv }) => (rcv.nxt(), rcv.wnd(), *last_seq),
+                State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
+                    (rcv.nxt(), rcv.wnd(), *last_seq)
+                }
                 State::TimeWait(TimeWait { last_seq, last_ack, last_wnd, expiry: _ }) => {
                     (*last_ack, *last_wnd, *last_seq)
                 }
@@ -1600,7 +1604,14 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                             //   enter FIN-WAIT-2 and continue processing in that
                             //   state
                             let last_seq = snd.nxt;
-                            *self = State::FinWait2(FinWait2 { last_seq, rcv: rcv.take() });
+                            *self = State::FinWait2(FinWait2 {
+                                last_seq,
+                                rcv: rcv.take(),
+                                // If the connection is already defunct, we set
+                                // a timeout to reclaim, but otherwise, a later
+                                // `close` call should set the timer.
+                                timeout_at: defunct.then_some(now.add(DEFAULT_FIN_WAIT2_TIMEOUT)),
+                            });
                         }
                     }
                     State::Closing(Closing { snd, last_ack, last_wnd }) => {
@@ -1658,7 +1669,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                     }
                     State::Established(Established { snd: _, rcv })
                     | State::FinWait1(FinWait1 { snd: _, rcv })
-                    | State::FinWait2(FinWait2 { last_seq: _, rcv }) => {
+                    | State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
                         // Write the segment data in the buffer and keep track if it fills
                         // any hole in the assembler.
                         let had_out_of_order = rcv.assembler.has_out_of_order();
@@ -1762,7 +1773,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                         *self = State::Closing(Closing { snd: snd.take(), last_ack, last_wnd });
                         Some(Segment::ack(snd_nxt, last_ack, last_wnd))
                     }
-                    State::FinWait2(FinWait2 { last_seq, rcv }) => {
+                    State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
                         let last_ack = rcv.nxt() + 1;
                         let last_wnd = rcv.wnd().checked_sub(1).unwrap_or(WindowSize::ZERO);
                         *self = State::TimeWait(TimeWait {
@@ -1876,7 +1887,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             State::FinWait1(FinWait1 { snd, rcv }) => {
                 poll_rcv_then_snd(snd, rcv, limit, now, socket_options)
             }
-            State::FinWait2(FinWait2 { last_seq, rcv }) => {
+            State::FinWait2(FinWait2 { last_seq, rcv, timeout_at: _ }) => {
                 rcv.poll_send(*last_seq, now).map(Into::into)
             }
             State::Closed(_) | State::Listen(_) | State::TimeWait(_) => None,
@@ -1902,11 +1913,10 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             State::TimeWait(TimeWait { last_seq: _, last_ack: _, last_wnd: _, expiry }) => {
                 *expiry > now
             }
-            State::SynSent(_)
-            | State::SynRcvd(_)
-            | State::Closed(_)
-            | State::Listen(_)
-            | State::FinWait2(_) => true,
+            State::SynSent(_) | State::SynRcvd(_) | State::Closed(_) | State::Listen(_) => true,
+            State::FinWait2(FinWait2 { last_seq: _, rcv: _, timeout_at }) => {
+                timeout_at.map(|at| now < at).unwrap_or(true)
+            }
         };
         if !alive {
             *self = State::Closed(Closed { reason: UserError::ConnectionClosed });
@@ -1933,20 +1943,17 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
     /// `poll_send_at` and to `install_timer`/`cancel_timer` should not
     /// interleave, otherwise timers may be lost.
     pub(crate) fn poll_send_at(&self) -> Option<I> {
-        let combine_timers =
-            |snd_timer: &Option<SendTimer<I>>, rcv_timer: &Option<ReceiveTimer<I>>| match (
-                snd_timer.as_ref().map(SendTimer::expiry),
-                rcv_timer.as_ref().map(ReceiveTimer::expiry),
-            ) {
-                (None, None) => None,
-                (None, Some(rcv_timer_expiry)) => Some(rcv_timer_expiry),
-                (Some(snd_timer_expiry), None) => Some(snd_timer_expiry),
-                (Some(snd_timer_expiry), Some(rcv_timer_expiry)) => {
-                    Some(snd_timer_expiry.min(rcv_timer_expiry))
-                }
-            };
+        let combine_expiry = |e1: Option<I>, e2: Option<I>| match (e1, e2) {
+            (None, None) => None,
+            (None, Some(e2)) => Some(e2),
+            (Some(e1), None) => Some(e1),
+            (Some(e1), Some(e2)) => Some(e1.min(e2)),
+        };
         match self {
-            State::Established(Established { snd, rcv }) => combine_timers(&snd.timer, &rcv.timer),
+            State::Established(Established { snd, rcv }) => combine_expiry(
+                snd.timer.as_ref().map(SendTimer::expiry),
+                rcv.timer.as_ref().map(ReceiveTimer::expiry),
+            ),
             State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
                 Some(snd.timer?.expiry())
             }
@@ -1954,8 +1961,13 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             | State::Closing(Closing { snd, last_ack: _, last_wnd: _ }) => {
                 Some(snd.timer?.expiry())
             }
-            State::FinWait1(FinWait1 { snd, rcv }) => combine_timers(&snd.timer, &rcv.timer),
-            State::FinWait2(FinWait2 { last_seq: _, rcv }) => Some(rcv.timer?.expiry()),
+            State::FinWait1(FinWait1 { snd, rcv }) => combine_expiry(
+                snd.timer.as_ref().map(SendTimer::expiry),
+                rcv.timer.as_ref().map(ReceiveTimer::expiry),
+            ),
+            State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at }) => {
+                combine_expiry(*timeout_at, rcv.timer.as_ref().map(ReceiveTimer::expiry))
+            }
             State::SynRcvd(syn_rcvd) => Some(syn_rcvd.retrans_timer.at),
             State::SynSent(syn_sent) => Some(syn_sent.retrans_timer.at),
             State::Closed(_) | State::Listen(_) => None,
@@ -1967,7 +1979,11 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
 
     /// Corresponds to the [CLOSE](https://tools.ietf.org/html/rfc793#page-60)
     /// user call.
-    pub(super) fn close(&mut self) -> Result<(), CloseError>
+    ///
+    /// The caller should provide the current time if this close call would make
+    /// the connection defunct, so that we can reclaim defunct connections based
+    /// on timeouts.
+    pub(super) fn close(&mut self, close_reason: CloseReason<I>) -> Result<(), CloseError>
     where
         ActiveOpen: IntoBuffers<R, S>,
     {
@@ -2050,11 +2066,15 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 });
                 Ok(())
             }
-            State::LastAck(_)
-            | State::FinWait1(_)
-            | State::FinWait2(_)
-            | State::Closing(_)
-            | State::TimeWait(_) => Err(CloseError::Closing),
+            State::LastAck(_) | State::FinWait1(_) | State::Closing(_) | State::TimeWait(_) => {
+                Err(CloseError::Closing)
+            }
+            State::FinWait2(FinWait2 { last_seq: _, rcv: _, timeout_at }) => {
+                if let CloseReason::Close { now } = close_reason {
+                    assert_eq!(timeout_at.replace(now.add(DEFAULT_FIN_WAIT2_TIMEOUT)), None);
+                }
+                Err(CloseError::Closing)
+            }
         }
     }
 
@@ -2104,7 +2124,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 Some(Segment::rst_ack(snd.nxt, rcv.nxt()))
             }
             State::FinWait1(FinWait1 { snd, rcv }) => Some(Segment::rst_ack(snd.nxt, rcv.nxt())),
-            State::FinWait2(FinWait2 { rcv, last_seq }) => {
+            State::FinWait2(FinWait2 { rcv, last_seq, timeout_at: _ }) => {
                 Some(Segment::rst_ack(*last_seq, rcv.nxt()))
             }
             State::CloseWait(CloseWait { snd, last_ack, last_wnd: _ }) => {
@@ -2185,7 +2205,9 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             }) => *receive = size,
             State::Established(Established { snd: _, rcv }) => rcv.set_capacity(size),
             State::FinWait1(FinWait1 { snd: _, rcv })
-            | State::FinWait2(FinWait2 { last_seq: _, rcv }) => rcv.set_capacity(size),
+            | State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
+                rcv.set_capacity(size)
+            }
         }
     }
 
@@ -2227,7 +2249,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
                 send: Some(snd.target_capacity()),
                 receive: Some(rcv.target_capacity()),
             },
-            State::FinWait2(FinWait2 { last_seq: _, rcv }) => {
+            State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
                 OptionalBufferSizes { send: None, receive: Some(rcv.target_capacity()) }
             }
             State::Closing(Closing { snd, last_ack: _, last_wnd: _ })
@@ -2239,6 +2261,14 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug + 
             }
         }
     }
+}
+
+/// From the socket layer, both `close` and `shutdown` will result in a state
+/// machine level `close` call. We need to differentiate between the two
+/// because we may need to do extra work if it is a socket `close`.
+pub(super) enum CloseReason<I: Instant> {
+    Shutdown,
+    Close { now: I },
 }
 
 #[cfg(test)]
@@ -2384,7 +2414,12 @@ mod test {
             S: Default,
         {
             // In testing, it is convenient to disable delayed ack by default.
-            self.on_segment::<P, BP>(incoming, now, &SocketOptions::default())
+            self.on_segment::<P, BP>(
+                incoming,
+                now,
+                &SocketOptions::default(),
+                false, /* defunct */
+            )
         }
     }
 
@@ -2403,7 +2438,9 @@ mod test {
                 }
                 State::Established(e) => e.rcv.buffer.read_with(f),
                 State::FinWait1(FinWait1 { snd: _, rcv })
-                | State::FinWait2(FinWait2 { last_seq: _, rcv }) => rcv.buffer.read_with(f),
+                | State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
+                    rcv.buffer.read_with(f)
+                }
             }
         }
     }
@@ -2783,7 +2820,7 @@ mod test {
         for mut state in [
             State::Established(Established { snd: new_snd(), rcv: new_rcv() }),
             State::FinWait1(FinWait1 { snd: new_snd().queue_fin(), rcv: new_rcv() }),
-            State::FinWait2(FinWait2 { last_seq: ISS_1 + 1, rcv: new_rcv() }),
+            State::FinWait2(FinWait2 { last_seq: ISS_1 + 1, rcv: new_rcv(), timeout_at: None }),
         ] {
             assert_eq!(
                 state.on_segment_with_default_options::<_, ClientlessBufferProvider>(
@@ -3601,7 +3638,7 @@ mod test {
             )
         );
         // Then call CLOSE to transition the state machine to LastAck.
-        assert_eq!(state.close(), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
         assert_eq!(
             state,
             State::LastAck(LastAck {
@@ -3689,7 +3726,7 @@ mod test {
             buffer_sizes: Default::default(),
             smss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
         });
-        assert_eq!(state.close(), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
         assert_matches!(state, State::FinWait1(_));
         assert_eq!(
             state.poll_send_with_default_options(u32::MAX, FakeInstant::default()),
@@ -3726,9 +3763,9 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
-        assert_eq!(state.close(), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
         assert_matches!(state, State::FinWait1(_));
-        assert_eq!(state.close(), Err(CloseError::Closing));
+        assert_eq!(state.close(CloseReason::Shutdown), Err(CloseError::Closing));
 
         // Poll for 2 bytes.
         assert_eq!(
@@ -3939,9 +3976,9 @@ mod test {
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
         });
-        assert_eq!(state.close(), Ok(()));
+        assert_eq!(state.close(CloseReason::Shutdown), Ok(()));
         assert_matches!(state, State::FinWait1(_));
-        assert_eq!(state.close(), Err(CloseError::Closing));
+        assert_eq!(state.close(CloseReason::Shutdown), Err(CloseError::Closing));
 
         let fin = state.poll_send_with_default_options(u32::MAX, clock.now());
         assert_eq!(
@@ -4242,6 +4279,7 @@ mod test {
                 Segment::ack(ISS_2, ISS_1, WindowSize::DEFAULT).into(),
                 clock.now(),
                 socket_options,
+                false, /* defunct */
             ),
             (None, None),
         );
@@ -4736,6 +4774,7 @@ mod test {
                 timer: None,
                 mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
             },
+            timeout_at: None,
         }); "fin_wait_2")]
     fn delayed_ack(mut state: State<FakeInstant, RingBuffer, RingBuffer, ()>) {
         let mut clock = FakeInstantCtx::default();
@@ -4751,6 +4790,7 @@ mod test {
                 ),
                 clock.now(),
                 &socket_options,
+                false, /* defunct */
             ),
             (None, None)
         );
@@ -4780,6 +4820,7 @@ mod test {
                 ),
                 clock.now(),
                 &socket_options,
+                false, /* defunct */
             ),
             (None, None)
         );
@@ -4797,6 +4838,7 @@ mod test {
                 ),
                 clock.now(),
                 &socket_options,
+                false, /* defunct */
             ),
             (
                 Some(Segment::ack(
@@ -4853,6 +4895,7 @@ mod test {
                 ),
                 clock.now(),
                 &socket_options,
+                false, /* defunct */
             ),
             (
                 Some(Segment::ack(
@@ -4875,7 +4918,8 @@ mod test {
                     SendPayload::Contiguous(&TEST_BYTES[..1])
                 ),
                 clock.now(),
-                &socket_options
+                &socket_options,
+                false, /* defunct */
             ),
             (
                 Some(Segment::ack(
@@ -4893,6 +4937,7 @@ mod test {
                 Segment::fin(ISS_2 + 1 + TEST_BYTES.len(), ISS_1 + 1, WindowSize::DEFAULT,),
                 clock.now(),
                 &socket_options,
+                false, /* defunct */
             ),
             (
                 Some(Segment::ack(ISS_1 + 1, ISS_2 + 1 + TEST_BYTES.len() + 1, WindowSize::ZERO,)),
@@ -4900,5 +4945,25 @@ mod test {
             )
         );
         assert_eq!(state.poll_send_at(), None);
+    }
+
+    #[test]
+    fn fin_wait2_timeout() {
+        let mut clock = FakeInstantCtx::default();
+        let mut state: State<_, _, NullBuffer, ()> = State::FinWait2(FinWait2 {
+            last_seq: ISS_1,
+            rcv: Recv {
+                buffer: NullBuffer,
+                assembler: Assembler::new(ISS_2),
+                timer: None,
+                mss: DEFAULT_IPV4_MAXIMUM_SEGMENT_SIZE,
+            },
+            timeout_at: None,
+        });
+        assert_eq!(state.close(CloseReason::Close { now: clock.now() }), Err(CloseError::Closing));
+        assert_eq!(state.poll_send_at(), Some(clock.now().add(DEFAULT_FIN_WAIT2_TIMEOUT)));
+        clock.sleep(DEFAULT_FIN_WAIT2_TIMEOUT);
+        assert_eq!(state.poll_send_with_default_options(u32::MAX, clock.now()), None);
+        assert_eq!(state, State::Closed(Closed { reason: UserError::ConnectionClosed }));
     }
 }

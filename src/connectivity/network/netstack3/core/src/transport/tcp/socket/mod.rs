@@ -74,7 +74,7 @@ use crate::{
     transport::tcp::{
         buffer::{IntoBuffers, ReceiveBuffer, SendBuffer},
         socket::{demux::tcp_serialize_segment, isn::IsnGenerator},
-        state::{CloseError, Closed, Initial, State, Takeable},
+        state::{CloseError, CloseReason, Closed, Initial, State, Takeable},
         BufferSizes, Mss, OptionalBufferSizes, SocketOptions,
     },
     Instant, SyncCtx,
@@ -1435,7 +1435,7 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
         self.with_ip_transport_ctx_and_tcp_sockets_mut(|ip_transport_ctx, sockets| {
             let (conn, _, addr): (_, SharingState, _) =
                 id.get_from_socketmap_mut(&mut sockets.socketmap);
-            match conn.state.close() {
+            match conn.state.close(CloseReason::Shutdown) {
                 Ok(()) => Ok(do_send_inner(id.into(), conn, addr, ip_transport_ctx, ctx)),
                 Err(CloseError::NoConnection) => Err(NoConnection),
                 Err(CloseError::Closing) => Ok(()),
@@ -1448,9 +1448,9 @@ impl<I: IpLayerIpExt, C: NonSyncContext, SC: SyncContext<I, C>> SocketHandler<I,
             let (conn, _, addr): (_, SharingState, _) =
                 id.get_from_socketmap_mut(&mut sockets.socketmap);
             conn.defunct = true;
-            let already_closed = match conn.state.close() {
+            let already_closed = match conn.state.close(CloseReason::Close { now: ctx.now() }) {
                 Err(CloseError::NoConnection) => true,
-                Err(CloseError::Closing) => return,
+                Err(CloseError::Closing) => false,
                 Ok(()) => matches!(conn.state, State::Closed(_)),
             };
             if already_closed {
@@ -2291,6 +2291,7 @@ pub enum ListenError {
 
 /// Possible error for calling `shutdown` on a not-yet connected socket.
 #[derive(Debug, GenericOverIp)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
 pub struct NoConnection;
 
 /// Error returned when attempting to set the ReuseAddress option.
@@ -2996,7 +2997,7 @@ impl<I: Ip> Into<usize> for ConnectionId<I> {
 
 #[cfg(test)]
 mod tests {
-    use core::{cell::RefCell, fmt::Debug};
+    use core::{cell::RefCell, fmt::Debug, time::Duration};
     use fakealloc::{rc::Rc, vec};
 
     use const_unwrap::const_unwrap_option;
@@ -3012,10 +3013,13 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        context::testutil::{
-            FakeCtxWithSyncCtx, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
-            FakeNonSyncCtx, FakeSyncCtx, InstantAndData, PendingFrameData, StepResult,
-            WrappedFakeSyncCtx,
+        context::{
+            testutil::{
+                FakeCtxWithSyncCtx, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkContext,
+                FakeNonSyncCtx, FakeSyncCtx, InstantAndData, PendingFrameData, StepResult,
+                WrappedFakeSyncCtx,
+            },
+            InstantContext as _,
         },
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
@@ -3032,6 +3036,7 @@ mod tests {
         transport::tcp::{
             buffer::{Buffer, BufferLimits, RingBuffer, SendPayload},
             segment::Payload,
+            state::{DEFAULT_FIN_WAIT2_TIMEOUT, MSL},
             UserError,
         },
     };
@@ -4281,33 +4286,94 @@ mod tests {
     }
 
     #[ip_test]
-    fn connection_close<I: Ip + TcpTestIpExt>() {
+    // Assuming instant delivery of segments:
+    // - If peer calls close, then the timeout we need to wait is in
+    // TIME_WAIT, which is 2MSL.
+    #[test_case(true, 2 * MSL; "peer calls close")]
+    // - If not, we will be in the FIN_WAIT2 state and waiting for its
+    // timeout.
+    #[test_case(false, DEFAULT_FIN_WAIT2_TIMEOUT; "peer doesn't call close")]
+    fn connection_close_peer_calls_close<I: Ip + TcpTestIpExt>(
+        peer_calls_close: bool,
+        expected_time_to_close: Duration,
+    ) {
         set_logger_for_test();
         let (mut net, local, remote) =
             bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
-            SocketHandler::close_conn(sync_ctx, non_sync_ctx, remote);
+        let close_called = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
+            non_sync_ctx.now()
         });
+
+        while {
+            assert!(!net.step(handle_frame, handle_timer).is_idle());
+            let is_fin_wait_2 = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+                sync_ctx.with_tcp_sockets(|sockets| {
+                    let (conn, _, _addr) = sockets
+                        .socketmap
+                        .conns()
+                        .get_by_id(&local.into())
+                        .expect("invalid conn ID");
+                    matches!(conn.state, State::FinWait2(_))
+                })
+            });
+            !is_fin_wait_2
+        } {}
+        if peer_calls_close {
+            net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx }| {
+                SocketHandler::close_conn(sync_ctx, non_sync_ctx, remote);
+            });
+        }
         net.run_until_idle(handle_frame, handle_timer);
-        net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            assert_eq!(non_sync_ctx.now().duration_since(close_called), expected_time_to_close);
             sync_ctx.with_tcp_sockets(|sockets| {
-                let (conn, _, _addr) =
-                    sockets.socketmap.conns().get_by_id(&remote.into()).expect("invalid conn ID");
-                assert_matches!(conn.state, State::FinWait2(_));
+                assert_matches!(sockets.socketmap.conns().get_by_id(&local.into()), None);
             })
         });
+        if peer_calls_close {
+            net.with_context(REMOTE, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+                sync_ctx.with_tcp_sockets(|sockets| {
+                    assert_matches!(sockets.socketmap.conns().get_by_id(&remote.into()), None);
+                })
+            });
+        }
+    }
+
+    #[ip_test]
+    fn connection_shutdown_then_close_peer_doesnt_call_close<I: Ip + TcpTestIpExt>() {
+        set_logger_for_test();
+        let (mut net, local, _remote) =
+            bind_listen_connect_accept_inner::<I>(I::UNSPECIFIED_ADDRESS, false, 0, 0.0);
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
+            assert_eq!(SocketHandler::shutdown_conn(sync_ctx, non_sync_ctx, local), Ok(()));
+        });
+        loop {
+            assert!(!net.step(handle_frame, handle_timer).is_idle());
+            let is_fin_wait_2 = net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+                sync_ctx.with_tcp_sockets(|sockets| {
+                    let (conn, _, _addr) = sockets
+                        .socketmap
+                        .conns()
+                        .get_by_id(&local.into())
+                        .expect("invalid conn ID");
+                    matches!(conn.state, State::FinWait2(_))
+                })
+            });
+            if is_fin_wait_2 {
+                break;
+            }
+        }
         net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx }| {
             SocketHandler::close_conn(sync_ctx, non_sync_ctx, local);
         });
         net.run_until_idle(handle_frame, handle_timer);
-
-        for (name, id) in [(LOCAL, local), (REMOTE, remote)] {
-            net.with_context(name, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
-                sync_ctx.with_tcp_sockets(|sockets| {
-                    assert_matches!(sockets.socketmap.conns().get_by_id(&id.into()), None);
-                })
-            });
-        }
+        net.with_context(LOCAL, |TcpCtx { sync_ctx, non_sync_ctx: _ }| {
+            sync_ctx.with_tcp_sockets(|sockets| {
+                assert_matches!(sockets.socketmap.conns().get_by_id(&local.into()), None);
+            })
+        });
     }
 
     #[ip_test]

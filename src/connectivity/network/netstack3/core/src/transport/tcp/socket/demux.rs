@@ -321,7 +321,7 @@ where
     let prev_state = StateCategory::new(state);
 
     // Send the reply to the segment immediately.
-    let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, socket_options);
+    let (reply, passive_open) = state.on_segment::<_, C>(incoming, now, socket_options, *defunct);
 
     let current_state = StateCategory::new(state);
 
@@ -526,7 +526,7 @@ where
         socket_options.user_timeout,
     ));
     let reply = assert_matches!(
-        state.on_segment::<_, C>(incoming, now, &SocketOptions::default()),
+        state.on_segment::<_, C>(incoming, now, &SocketOptions::default(), false /* defunct */),
         (reply, None) => reply
     );
     if let Some(seg) = reply {
