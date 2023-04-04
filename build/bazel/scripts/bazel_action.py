@@ -38,6 +38,14 @@ _FUCHSIA_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, '..', '..', '..'))
 #
 _BAZEL_BUILTIN_REPOSITORIES = ('@bazel_tools//',)
 
+# Don't covert labels from these external repositories to hash files. Each entry
+# in this set should have a comment explaining the reasoning.
+_IGNORE_CONTENT_HASH_FOR_REPOSITORIES = {
+    # @prebuilt_python uses a zipped library, so we can use that directly
+    # instead of hash files.
+    '@prebuilt_python'
+}
+
 # Technical notes on input (source and build files) located in Bazel external
 # repositories.
 #
@@ -442,7 +450,7 @@ class BazelLabelMapper(object):
             # queries are always performed from the root project workspace, so
             # is equivalent to @// for this function.
             repository_dir = self._root_workspace
-            is_external_repository = False
+            use_repository_content_hash = False
         else:
             # A note on canonical repository directory names.
             #
@@ -472,7 +480,7 @@ class BazelLabelMapper(object):
                 f'Invalid repository name in source label {label}')
 
             repository_dir = os.path.join(self._external_dir, repository[1:])
-            is_external_repository = True
+            use_repository_content_hash = repository not in _IGNORE_CONTENT_HASH_FOR_REPOSITORIES
 
         package, colon, target = package_label.partition(':')
         assert colon == ':', f'Missing colon in source label {label}'
@@ -485,7 +493,7 @@ class BazelLabelMapper(object):
         real_path = os.path.realpath(path)
         if real_path != os.path.abspath(path):
             path = real_path
-        elif is_external_repository:
+        elif use_repository_content_hash:
             # If the external repository has an associated content hash file,
             # use this directly. Otherwise ignore the file.
             path = self._get_repository_content_hash(repository)
