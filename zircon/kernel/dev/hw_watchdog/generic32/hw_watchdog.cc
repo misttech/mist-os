@@ -12,13 +12,16 @@
 #include <zircon/boot/driver-config.h>
 #include <zircon/types.h>
 
-#include <arch/arm64/periphmap.h>
 #include <dev/hw_watchdog/generic32/init.h>
 #include <kernel/lockdep.h>
 #include <kernel/spinlock.h>
 #include <kernel/timer.h>
 #include <pdev/watchdog.h>
 #include <vm/physmap.h>
+
+#if defined(__aarch64__)
+#include <arch/arm64/periphmap.h>
+#endif
 
 class GenericWatchdog32 {
  public:
@@ -268,7 +271,13 @@ bool GenericWatchdog32::TranslatePAddr(uint64_t* paddr) {
     return true;
   }
 
+#if defined(__aarch64__)
   *paddr = periph_paddr_to_vaddr(static_cast<paddr_t>(*paddr));
+#elif defined(__riscv)
+  *paddr = reinterpret_cast<uint64_t>(paddr_to_physmap(static_cast<paddr_t>(*paddr)));
+#else
+#error handle this architecture
+#endif
 
   return (*paddr != 0);
 }
