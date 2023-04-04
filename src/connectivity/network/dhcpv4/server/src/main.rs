@@ -19,6 +19,7 @@ use {
     net_types::ethernet::Mac,
     packet::{serialize::InnerPacketBuilder, Serializer},
     packet_formats::{ipv4::Ipv4PacketBuilder, udp::UdpPacketBuilder},
+    sockaddr::IntoSockAddr as _,
     std::{
         cell::RefCell,
         collections::HashMap,
@@ -497,22 +498,6 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
                 sll_pkttype: 0,
             };
 
-            // TODO(https://fxbug.dev/104559): Move this unsafe code upstream into `socket2`.
-            let (_, sock_addr) = unsafe {
-                socket2::SockAddr::init(|sockaddr_storage, len_ptr| {
-                    (sockaddr_storage as *mut libc::sockaddr_ll).write(sockaddr_ll);
-                    len_ptr.write(
-                        // Should not panic: libc guarantees that `socklen_t` (which is a `u32`)
-                        // can fit the size of any socket address.
-                        std::mem::size_of::<libc::sockaddr_ll>()
-                            .try_into()
-                            .expect("convert sockaddr_ll length failed"),
-                    );
-                    Ok(())
-                })
-            }
-            .context("initialize socket address failed")?;
-
             // Create the packet socket without binding to a protocol so that
             // the packet socket is not registered for RX. This desirable since
             // the socket is only used to send packets and receiving packets
@@ -528,7 +513,7 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
                 .context("failed to wrap into fuchsia-async DatagramSocket")?;
 
             let sent = socket
-                .send_to(packet.as_ref(), sock_addr)
+                .send_to(packet.as_ref(), sockaddr_ll.into_sockaddr())
                 .await
                 .context("unable to send response")?;
             if sent != packet.as_ref().len() {
