@@ -102,7 +102,7 @@ class CodecAdapterSbcDecoder : public CodecAdapterSW<fit::deferred_action<fit::c
   uint8_t* CurrentOutputBlock();
 
   // Increment `output_offset_` and send output packet if full, clearing output state
-  void QueueAndSend(size_t bytes_read);
+  void QueueAndSend(size_t bytes_written);
 
   // If any data is queued, send it and clear output packet/buffer/offset.
   void SendQueuedOutput();

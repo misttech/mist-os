@@ -263,10 +263,12 @@ CodecAdapterSbcDecoder::InputLoopStatus CodecAdapterSbcDecoder::DecodeInput(
         OI_CODEC_SBC_DecodeFrame(&context_->context, const_cast<const OI_BYTE**>(&input_data),
                                  &bytes_left, reinterpret_cast<int16_t*>(output), &output_bytes);
     if (!OI_SUCCESS(status)) {
-      FX_LOGS(WARNING) << "decode failure " << status;
+      FX_LOGS(WARNING) << "decode failure " << status << " bytes left " << bytes_left;
       break;
     }
 
+    // Must be called for each frame to send when output_buffer is low
+    // output_bytes is the same on every call for a given stream (set from DecodeFrame)
     QueueAndSend(output_bytes);
   }
 
@@ -334,12 +336,15 @@ void CodecAdapterSbcDecoder::SendQueuedOutput() {
   output_offset_ = 0;
 }
 
-void CodecAdapterSbcDecoder::QueueAndSend(size_t bytes_read) {
-  FX_DCHECK(output_offset_ + bytes_read <= output_buffer_->size());
+void CodecAdapterSbcDecoder::QueueAndSend(size_t bytes_written) {
+  FX_DCHECK(output_offset_ + bytes_written <= output_buffer_->size());
 
-  output_offset_ += bytes_read;
+  output_offset_ += bytes_written;
 
-  if (output_offset_ == output_buffer_->size()) {
+  // Presume that the output buffer will remain the same size for the next frame,
+  // and that each frame decodes to the same number of output bytes, both of which are true for SBC.
+  // Send output packet if the next decoded frame will not fit in this buffer
+  if ((output_buffer_->size() - output_offset_) < bytes_written) {
     SendQueuedOutput();
   }
 }

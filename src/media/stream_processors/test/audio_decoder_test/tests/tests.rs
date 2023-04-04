@@ -58,6 +58,8 @@ fn sbc_decode() -> Result<()> {
         timestamps: 0..,
     });
 
+    // One output packet per input packet, the decoder queues an output packet whenever an input packet is
+    // exhausted.
     let sbc_tests = AudioDecoderTestCase {
         hash_tests: vec![AudioDecoderHashTest {
             output_file: None,
@@ -99,11 +101,13 @@ fn sbc_decode_large_input_chunk() -> Result<()> {
         timestamps: 0..,
     });
 
+    // Output space is large (min 10k) so only 2 output frames are needed (this is good) -
+    // decoder will continue filling an output frame as long as there is space
     let sbc_tests = AudioDecoderTestCase {
         hash_tests: vec![AudioDecoderHashTest {
             output_file: None,
             stream: large_input_chunk_stream,
-            output_packet_count: 23,
+            output_packet_count: 2,
             expected_digests: vec![ExpectedDigest::new(
                 "Large chunk Pcm: 44.1kHz/16bit/Mono",
                 "03b47b3ec7f7dcb41456c321377c61984966ea308b853d385194683e13f9836b",

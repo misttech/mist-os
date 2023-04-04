@@ -114,6 +114,7 @@ rustc_library("audio_decoder_test_lib") {
     ":stream_processor_decoder_factory_lib",
     ":stream_processor_test_lib",
     "//sdk/fidl/fuchsia.media:fuchsia.media_rust",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bitfield",
   ]

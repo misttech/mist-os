@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_media::*;
+use fidl_fuchsia_sysmem::{BufferCollectionConstraints, BufferMemoryConstraints};
 use std::rc::Rc;
 use stream_processor_decoder_factory::*;
 use stream_processor_test::*;
@@ -22,6 +23,18 @@ pub struct AudioDecoderHashTest {
     pub expected_digests: Vec<ExpectedDigest>,
     pub expected_output_format: FormatDetails,
 }
+
+const TEST_BUFFER_COLLECTION_CONSTRAINTS: BufferCollectionConstraints =
+    BufferCollectionConstraints {
+        has_buffer_memory_constraints: true,
+        buffer_memory_constraints: BufferMemoryConstraints {
+            // Chosen to be larger than most decoder tests requirements, and not particularly
+            // an even size of output frames (at 16 bits per sample, an odd number satisfies this)
+            min_size_bytes: 10001,
+            ..BUFFER_MEMORY_CONSTRAINTS_DEFAULT
+        },
+        ..BUFFER_COLLECTION_CONSTRAINTS_DEFAULT
+    };
 
 impl AudioDecoderTestCase {
     pub async fn run(self) -> Result<()> {
@@ -51,6 +64,8 @@ impl AudioDecoderTestCase {
                 ],
                 stream_options: Some(StreamOptions {
                     queue_format_details: false,
+                    // Set the buffer constraints slightly off-kilter to test fenceposting
+                    output_buffer_collection_constraints: Some(TEST_BUFFER_COLLECTION_CONSTRAINTS),
                     ..StreamOptions::default()
                 }),
             });
