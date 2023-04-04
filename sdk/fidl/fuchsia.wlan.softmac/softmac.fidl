@@ -592,9 +592,9 @@ protocol WlanSoftmac {
 
     /// Indicate the device of modified WiFi Multimedia (WMM) parameters for a
     /// particular access category (AC).
-    UpdateWmmParameters(struct {
-        ac fuchsia.hardware.wlan.associnfo.WlanAccessCategory;
-        params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
+    UpdateWmmParameters(table {
+        1: ac fuchsia.hardware.wlan.associnfo.WlanAccessCategory;
+        2: params fuchsia.hardware.wlan.associnfo.WlanWmmParameters;
     }) -> () error zx.status;
 };
 
