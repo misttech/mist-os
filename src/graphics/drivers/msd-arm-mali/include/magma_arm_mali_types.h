@@ -9,7 +9,7 @@
 
 #include <cstdint>
 
-#define MAGMA_VENDOR_VERSION_ARM 1
+#define MAGMA_VENDOR_VERSION_ARM 2
 
 // These flags can be specified to magma_map_buffer.
 enum MagmaArmMaliGpuMapFlags {
@@ -230,6 +230,19 @@ struct magma_arm_mali_device_timestamp_return {
   uint64_t device_timestamp;
   uint64_t device_cycle_count;
   uint64_t monotonic_raw_timestamp_after;
+} __attribute__((packed));
+
+// Returned by kMsdArmVendorQueryDeviceProperties.
+struct magma_arm_mali_device_properties_return_header {
+  // Size of the header struct. Entries will immediately follow the header.
+  uint64_t header_size;
+  // Number of entries following the header. Entries are sorted low to high by id.
+  uint64_t entry_count;
+} __attribute__((packed));
+
+struct magma_arm_mali_device_properties_return_entry {
+  uint64_t id;
+  uint64_t value;
 } __attribute__((packed));
 
 #endif

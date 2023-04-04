@@ -207,6 +207,7 @@ class MsdArmDevice : public msd::Device,
   void EnableInterrupts();
   void DisableInterrupts();
   bool InitializeHardware();
+  bool InitializeDevicePropertiesBuffer();
   void EnqueueDeviceRequest(std::unique_ptr<DeviceRequest> request, bool enqueue_front = false);
   static void InitializeHardwareQuirks(GpuFeatures* features, mali::RegisterIo* registers);
   bool PowerDownL2();
@@ -311,6 +312,7 @@ class MsdArmDevice : public msd::Device,
   mali_properties_t mali_properties_{};
   GpuFeatures gpu_features_;
   ArmMaliCacheCoherencyStatus cache_coherency_status_ = kArmMaliCacheCoherencyNone;
+  std::unique_ptr<magma::PlatformBuffer> device_properties_buffer_;
 
   std::unique_ptr<PowerManager> power_manager_;
   std::unique_ptr<AddressManager> address_manager_;

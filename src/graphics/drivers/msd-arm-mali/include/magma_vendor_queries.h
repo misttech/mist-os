@@ -25,6 +25,8 @@ enum MsdArmVendorQuery {
   kMsdArmVendorQuerySupportsProtectedMode = MAGMA_QUERY_VENDOR_PARAM_0 + 12,
   // Returns a buffer result.
   kMsdArmVendorQueryDeviceTimestamp = MAGMA_QUERY_VENDOR_PARAM_0 + 13,
+  // Returns a buffer result.
+  kMsdArmVendorQueryDeviceProperties = MAGMA_QUERY_VENDOR_PARAM_0 + 14,
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_INCLUDE_MAGMA_VENDOR_QUERIES_H_

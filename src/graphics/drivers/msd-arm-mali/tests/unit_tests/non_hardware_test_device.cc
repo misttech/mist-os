@@ -6,12 +6,14 @@
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <lib/fdio/directory.h>
 #include <lib/inspect/cpp/reader.h>
+#include <lib/zx/vmar.h>
 
 #include <condition_variable>
 #include <mutex>
 
 #include <gtest/gtest.h>
 
+#include "magma_vendor_queries.h"
 #include "mock/mock_bus_mapper.h"
 #include "mock/mock_mmio.h"
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
@@ -465,6 +467,35 @@ class TestNonHardwareMsdArmDevice {
     EXPECT_EQ(0u, device->register_io_->Read32(registers::GpuCommand::kOffset));
   }
 
+  void DevicePropertiesQuery() {
+    auto device = MakeTestDevice();
+    uint32_t handle;
+    auto result = device->QueryReturnsBuffer(kMsdArmVendorQueryDeviceProperties, &handle);
+    EXPECT_EQ(MAGMA_STATUS_OK, result);
+
+    zx::vmo vmo(handle);
+    size_t size;
+    EXPECT_EQ(ZX_OK, vmo.get_size(&size));
+    zx_vaddr_t vaddr;
+    // Check that mapping for write doesn't work.
+    EXPECT_NE(ZX_OK, zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size,
+                                                &vaddr));
+
+    // magma::PlatformBuffer::MapCpu always maps R+W, so we need to use raw zx primitives instead.
+    EXPECT_EQ(ZX_OK, zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, vmo, 0, size, &vaddr));
+    auto header = reinterpret_cast<magma_arm_mali_device_properties_return_header*>(vaddr);
+    EXPECT_EQ(header->header_size, sizeof(*header));
+    EXPECT_LT(0u, header->entry_count);
+    auto entries = reinterpret_cast<magma_arm_mali_device_properties_return_entry*>(header + 1);
+
+    // Check that entries are sorted.
+    for (size_t i = 1; i < header->entry_count; i++) {
+      EXPECT_LT(entries[i - 1].id, entries[i].id);
+    }
+
+    EXPECT_EQ(ZX_OK, zx::vmar::root_self()->unmap(vaddr, size));
+  }
+
  private:
   bool got_start_exit_protected_ = false;
   bool got_finish_exit_protected_ = false;
@@ -513,4 +544,9 @@ TEST(NonHardwareMsdArmDevice, ResetOnStart) {
 TEST(NonHardwareMsdArmDevice, ProtectedCallbacks) {
   TestNonHardwareMsdArmDevice test;
   test.ProtectedCallbacks();
+}
+
+TEST(NonHardwareMsdArmDevice, DevicePropertiesQuery) {
+  TestNonHardwareMsdArmDevice test;
+  test.DevicePropertiesQuery();
 }

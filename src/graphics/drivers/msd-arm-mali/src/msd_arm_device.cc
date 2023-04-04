@@ -253,6 +253,10 @@ bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
   scheduler_ = std::make_unique<JobScheduler>(this, 3);
   address_manager_ = std::make_unique<AddressManager>(this, gpu_features_.address_space_count);
 
+  if (!InitializeDevicePropertiesBuffer()) {
+    return false;
+  }
+
   if (!InitializeInterrupts())
     return false;
 
@@ -288,6 +292,49 @@ bool MsdArmDevice::InitializeHardware() {
   EnableInterrupts();
   InitializeHardwareQuirks(&gpu_features_, register_io_.get());
   EnableAllCores();
+  return true;
+}
+
+bool MsdArmDevice::InitializeDevicePropertiesBuffer() {
+  std::vector<uint64_t> properties = {MAGMA_QUERY_DEVICE_ID,
+                                      kMsdArmVendorQueryL2Present,
+                                      kMsdArmVendorQueryMaxThreads,
+                                      kMsdArmVendorQueryThreadMaxBarrierSize,
+                                      kMsdArmVendorQueryThreadMaxWorkgroupSize,
+                                      kMsdArmVendorQueryShaderPresent,
+                                      kMsdArmVendorQueryTilerFeatures,
+                                      kMsdArmVendorQueryThreadFeatures,
+                                      kMsdArmVendorQueryL2Features,
+                                      kMsdArmVendorQueryMemoryFeatures,
+                                      kMsdArmVendorQueryMmuFeatures,
+                                      kMsdArmVendorQueryCoherencyEnabled,
+                                      kMsdArmVendorQueryThreadTlsAlloc,
+                                      kMsdArmVendorQuerySupportsProtectedMode};
+
+  std::sort(properties.begin(), properties.end());
+  auto buffer = magma::PlatformBuffer::Create(
+      sizeof(magma_arm_mali_device_properties_return_header) +
+          sizeof(magma_arm_mali_device_properties_return_entry) * std::size(properties),
+      "MaliDeviceProperties");
+  if (!buffer) {
+    return DRETF(false, "Failed to allocate device properties buffer");
+  }
+  void* buffer_data;
+  if (!buffer->MapCpu(&buffer_data)) {
+    return DRETF(false, "Failed to map device properties buffer");
+  }
+  auto header = static_cast<magma_arm_mali_device_properties_return_header*>(buffer_data);
+  header->header_size = sizeof(*header);
+  header->entry_count = std::size(properties);
+  auto entries = reinterpret_cast<magma_arm_mali_device_properties_return_entry*>(header + 1);
+  for (size_t i = 0; i < std::size(properties); i++) {
+    entries[i].id = properties[i];
+    if (QueryInfo(entries[i].id, &entries[i].value) != MAGMA_STATUS_OK) {
+      return DRETF(false, "Failed to query property %lu", entries[i].id);
+    }
+  }
+  buffer->UnmapCpu();
+  device_properties_buffer_ = std::move(buffer);
   return true;
 }
 
@@ -1392,6 +1439,22 @@ magma_status_t MsdArmDevice::QueryReturnsBuffer(uint64_t id, uint32_t* buffer_ou
         return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to dupe timestamp buffer");
 
       return QueryTimestamp(std::move(buffer)).get();
+    }
+    case kMsdArmVendorQueryDeviceProperties: {
+      DASSERT(device_properties_buffer_);
+      zx::handle handle;
+      if (!device_properties_buffer_->duplicate_handle(&handle)) {
+        return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to dupe properties buffer");
+      }
+      zx::handle read_only_handle;
+      zx_status_t status =
+          handle.replace(ZX_DEFAULT_VMO_RIGHTS & ~ZX_RIGHT_WRITE, &read_only_handle);
+      if (status != ZX_OK) {
+        return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Error duplicating handle: %s",
+                        zx_status_get_string(status));
+      }
+      *buffer_out = read_only_handle.release();
+      return MAGMA_STATUS_OK;
     }
     default:
       return MAGMA_STATUS_INVALID_ARGS;
