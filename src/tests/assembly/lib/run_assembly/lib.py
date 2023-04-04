@@ -37,7 +37,7 @@ def run_product_assembly(
         "assembly_enabled=true",
         "sdk.root=" + root_build_dir,
         "sdk.type=in-tree",
-        "sdk.module=host_tools.modular",
+        "sdk.module=host_tools.internal",
     ]
 
     args = [ffx_bin]

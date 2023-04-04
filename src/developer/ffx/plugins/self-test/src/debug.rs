@@ -22,7 +22,7 @@ pub mod include_target {
     pub(crate) async fn test_debug_run_crasher() -> Result<()> {
         // If the test is running on CI/CQ bots, it's isolated with only files listed as test_data
         // available. We have added zxdb and zxdb-meta.json in ffx-e2e-test-data but we have to
-        // also provide an index file at host_x64/sdk/manifest/host_tools.modular.
+        // also provide an index file at host_x64/sdk/manifest/host_tools.internal.
         // Only when invoked from ffx-e2e-with-target.sh we could get sdk.root=.
         if ffx_config::get::<String, _>("sdk.root").await.unwrap_or_default() == "." {
             ensure!(cfg!(target_arch = "x86_64"), "The test only supports x86_64 for now.");

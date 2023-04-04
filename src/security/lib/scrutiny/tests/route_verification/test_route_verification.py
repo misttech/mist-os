@@ -55,7 +55,7 @@ def main():
         "analytics.disabled=true",
         "sdk.root=" + root_build_dir,
         "sdk.type=in-tree",
-        "sdk.module=host_tools.modular",
+        "sdk.module=host_tools.internal",
     ]
 
     ffx_args = [args.ffx_bin]
