@@ -70,6 +70,8 @@ RemoteForward 8443 [{{.DeviceIP}}]:8443
 RemoteForward 9080 [{{.DeviceIP}}]:80
 # UMA log requests to port 8888 on the remote are forwarded to target port 8888.
 RemoteForward 8888 [{{.DeviceIP}}]:8888
+# Fastboot over TCP
+RemoteForward 5554 [{{.DeviceIP}}]:5554
 {{range .TunnelPorts}}
 RemoteForward {{.}} [{{$.DeviceIP}}]:{{.}}
 {{end}}
@@ -87,6 +89,7 @@ var (
 	// UsedPorts is a set of port numbers which are used by the default SSH configuration.
 	UsedPorts = map[int]struct{}{
 		2345: {},
+		5554: {},
 		8007: {},
 		8008: {},
 		8022: {},
