@@ -496,7 +496,7 @@ impl FileOps for LimitsFile {
                 }
             };
             sink.write(
-                format!("{:<25}{:<20}{:<20}Units\n", "Limit", "Soft Limit", "Hard Limit")
+                format!("{:<25}{:<20}{:<20}{:<10}\n", "Limit", "Soft Limit", "Hard Limit", "Units")
                     .as_bytes(),
             );
             for resource in Resource::ALL {
