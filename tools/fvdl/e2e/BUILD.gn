@@ -66,7 +66,7 @@ if (is_linux) {
 
   host_test_data("copy_images") {
     sources = [ files.zbi ]
-    if (!bootfs_only) {
+    if (!bootfs_only && !fxfs_blob) {
       sources += [ files.fvm ]
     }
 
