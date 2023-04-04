@@ -465,7 +465,7 @@ fn spawn_with_actions(
         u32,                                  // flags
         *const *const raw::c_char,            // argv
         *const *const raw::c_char,            // environ
-        u64,                                  // action_count
+        usize,                                // action_count
         *const fdio_sys::fdio_spawn_action_t, // actions
         *mut zx::sys::zx_handle_t,            // process_out,
         *mut raw::c_char,                     // err_msg_out
@@ -486,19 +486,16 @@ fn spawn_with_actions(
 
     let status = {
         let environ = environ.as_ref().map_or_else(std::ptr::null, Vec::as_ptr);
-        match actions.len().try_into() {
-            Ok(action_count) => spawn_fn(
-                job,
-                flags,
-                argv.as_ptr(),
-                environ,
-                action_count,
-                actions.as_ptr() as _,
-                process.as_mut_ptr(),
-                err_msg.as_mut_ptr() as _,
-            ),
-            Err(std::num::TryFromIntError { .. }) => zx::Status::INVALID_ARGS.into_raw(),
-        }
+        spawn_fn(
+            job,
+            flags,
+            argv.as_ptr(),
+            environ,
+            actions.len(),
+            actions.as_ptr() as _,
+            process.as_mut_ptr(),
+            err_msg.as_mut_ptr() as _,
+        )
     };
 
     // Statically verify this hasn't been moved out of during the call above;
@@ -707,11 +704,8 @@ impl Namespace {
         flat: *mut fdio_sys::fdio_flat_namespace_t,
     ) -> Result<Vec<NamespaceEntry>, zx::Status> {
         let fdio_sys::fdio_flat_namespace_t { count, handle, type_, path } = *flat;
-        let capacity: usize =
-            count.try_into().map_err(|_: TryFromIntError| zx::Status::INVALID_ARGS)?;
-        let len: isize =
-            capacity.try_into().map_err(|_: TryFromIntError| zx::Status::INVALID_ARGS)?;
-        let mut entries = Vec::with_capacity(capacity);
+        let len: isize = count.try_into().map_err(|_: TryFromIntError| zx::Status::INVALID_ARGS)?;
+        let mut entries = Vec::with_capacity(count);
         for i in 0..len {
             // Explicitly take ownership of the handle, and invalidate the source.
             let handle = zx::Handle::from_raw(mem::replace(
