@@ -15,46 +15,8 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"go.fuchsia.dev/fuchsia/tools/bundle_fetcher/bundler"
 )
-
-// A simple in-memory implementation of dataSink.
-type memSink struct {
-	contents map[string][]byte
-	err      error
-	dir      string
-}
-
-func newMemSink(contents map[string][]byte, err error, dir string) *memSink {
-	return &memSink{
-		contents: contents,
-		err:      err,
-		dir:      dir,
-	}
-}
-
-func (s *memSink) readFromGCS(ctx context.Context, object string) ([]byte, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	if _, ok := s.contents[object]; !ok {
-		return nil, fmt.Errorf("file not found")
-	}
-	return s.contents[object], nil
-}
-
-func (s *memSink) getBucketName() string {
-	return s.dir
-}
-
-func (s *memSink) doesPathExist(ctx context.Context, prefix string) (bool, error) {
-	if s.err != nil {
-		return false, s.err
-	}
-	if _, ok := s.contents[prefix]; !ok {
-		return false, nil
-	}
-	return true, nil
-}
 
 func TestParseFlags(t *testing.T) {
 	dir, err := os.MkdirTemp("", "bundle_fetcher_dir")
@@ -248,7 +210,7 @@ func TestGetProductBundleContainerArtifactsFromImagesJSON(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sink := newMemSink(contents, test.dataSinkErr, "")
+			sink := bundler.NewMemSink(contents, test.dataSinkErr, "")
 			output, err := getProductBundleContainerArtifactsFromImagesJSON(ctx, sink, test.imageJSONPath)
 			if !reflect.DeepEqual(output, test.expectedOutput) {
 				t.Errorf("Got output: %v, want: %v", output, test.expectedOutput)
@@ -501,7 +463,7 @@ func TestReadDeviceMetadata(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sink := newMemSink(contentsDeviceMetadata, nil, test.dir)
+			sink := bundler.NewMemSink(contentsDeviceMetadata, nil, test.dir)
 			output, isNew, err := readDeviceMetadata(ctx, sink, test.deviceMetadataPath, test.knownDeviceMetadata)
 			if err != nil {
 				t.Errorf("Got error: %s, expected no error", err)
@@ -553,7 +515,7 @@ func TestReadDeviceMetadataInvalid(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sink := newMemSink(contentsDeviceMetadata, test.dataSinkErr, test.dir)
+			sink := bundler.NewMemSink(contentsDeviceMetadata, test.dataSinkErr, test.dir)
 			_, _, err := readDeviceMetadata(ctx, sink, test.deviceMetadataPath, test.knownDeviceMetadata)
 			if err != nil && err.Error() != test.expectedErrMessage {
 				t.Errorf("Got error: %s, want: %s", err.Error(), test.expectedErrMessage)
@@ -817,7 +779,7 @@ func TestGetProductBundleData(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sink := newMemSink(contentsProductBundle, nil, test.dir)
+			sink := bundler.NewMemSink(contentsProductBundle, nil, test.dir)
 			output, err := readAndUpdateProductBundleData(ctx, sink, test.productBundlePath)
 			if err != nil {
 				t.Errorf("Got error: %s, expected no error", err)
@@ -861,7 +823,7 @@ func TestGetProductBundleDataInvalid(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			sink := newMemSink(contentsProductBundle, test.dataSinkErr, test.dir)
+			sink := bundler.NewMemSink(contentsProductBundle, test.dataSinkErr, test.dir)
 			_, err := readAndUpdateProductBundleData(ctx, sink, test.productBundlePath)
 			if err != nil && err.Error() != test.expectedErrMessage {
 				t.Errorf("Got error: %s, want: %s", err.Error(), test.expectedErrMessage)

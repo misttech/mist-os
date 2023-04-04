@@ -32,6 +32,7 @@ func main() {
 	subcommands.Register(subcommands.HelpCommand(), "")
 	subcommands.Register(subcommands.FlagsCommand(), "")
 	subcommands.Register(&downloadCmd{}, "")
+	subcommands.Register(&productListCmd{}, "")
 
 	flag.Parse()
 	log := logger.NewLogger(level, color.NewColor(colors), os.Stdout, os.Stderr, "bundles ")

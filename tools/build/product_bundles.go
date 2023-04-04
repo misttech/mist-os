@@ -25,3 +25,7 @@ type ProductBundle struct {
 	// have a "file://" prefix if the file is local.
 	TransferManifestUrl string `json:"transfer_manifest_url"`
 }
+
+// ProductBundlesManifest is a JSON list of product bundles produced by the
+// Fuchsia build.
+type ProductBundlesManifest = []ProductBundle

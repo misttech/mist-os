@@ -10,22 +10,19 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"io"
 	"net/url"
 	"os"
 	"path/filepath"
 	"reflect"
 	"strings"
-	"time"
 
 	"go.fuchsia.dev/fuchsia/build/sdk/meta"
 	"go.fuchsia.dev/fuchsia/tools/artifactory"
 	"go.fuchsia.dev/fuchsia/tools/build"
+	"go.fuchsia.dev/fuchsia/tools/bundle_fetcher/bundler"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
-	"cloud.google.com/go/storage"
 	"github.com/google/subcommands"
-	"google.golang.org/api/iterator"
 )
 
 type downloadCmd struct {
@@ -108,11 +105,11 @@ func (cmd *downloadCmd) execute(ctx context.Context) error {
 		return err
 	}
 
-	sink, err := newCloudSink(ctx, cmd.gcsBucket)
+	sink, err := bundler.NewCloudSink(ctx, cmd.gcsBucket)
 	if err != nil {
 		return err
 	}
-	defer sink.close()
+	defer sink.Close()
 
 	productBundleContainer := meta.ProductBundleContainer{
 		SchemaID: meta.PBMContainerSchemaID,
@@ -191,9 +188,9 @@ func (cmd *downloadCmd) execute(ctx context.Context) error {
 
 // readDeviceMetadata reads the device metadata from GCS and checks that
 // the metadata hasn't been seen already.
-func readDeviceMetadata(ctx context.Context, sink dataSink, deviceMetadataPath string, knownDeviceMetadata *map[string][]byte) (*meta.DeviceMetadataData, bool, error) {
+func readDeviceMetadata(ctx context.Context, sink bundler.DataSink, deviceMetadataPath string, knownDeviceMetadata *map[string][]byte) (*meta.DeviceMetadataData, bool, error) {
 	var device meta.DeviceMetadata
-	data, err := sink.readFromGCS(ctx, deviceMetadataPath)
+	data, err := sink.ReadFromGCS(ctx, deviceMetadataPath)
 
 	if err != nil {
 		return nil, false, err
@@ -230,14 +227,14 @@ func convertMetadataToRawMessage(metadata interface{}) (json.RawMessage, error) 
 }
 
 // getGCSURIBasedOnFileURI gets the gcs_uri based on the product_bundle path.
-func getGCSURIBasedOnFileURI(ctx context.Context, sink dataSink, fileURI, productBundleJSONPath, bucket string) (string, error) {
+func getGCSURIBasedOnFileURI(ctx context.Context, sink bundler.DataSink, fileURI, productBundleJSONPath, bucket string) (string, error) {
 	u, err := url.ParseRequestURI(fileURI)
 	if err != nil {
 		return "", err
 	}
 	baseURI := filepath.Join(filepath.Dir(productBundleJSONPath), u.Path)
 	// Check that the path actually exists in GCS.
-	validPath, err := sink.doesPathExist(ctx, baseURI)
+	validPath, err := sink.DoesPathExist(ctx, baseURI)
 	if err != nil {
 		return "", err
 	}
@@ -247,9 +244,10 @@ func getGCSURIBasedOnFileURI(ctx context.Context, sink dataSink, fileURI, produc
 	return gcsBaseURI + filepath.Join(bucket, baseURI), nil
 }
 
-// readAndUpdateProductBundleData reads the product bundle from GCS and returns the ProductBundle Data
-// with updated images/packages paths that point to a GCS URI.
-func readAndUpdateProductBundleData(ctx context.Context, sink dataSink, productBundleJSONPath string) (*artifactory.Data, error) {
+// readAndUpdateProductBundleData reads the product bundle from GCS and returns
+// the ProductBundle Data with updated images/packages paths that point to a GCS
+// URI.
+func readAndUpdateProductBundleData(ctx context.Context, sink bundler.DataSink, productBundleJSONPath string) (*artifactory.Data, error) {
 	productBundleData, err := getProductBundleData(ctx, sink, productBundleJSONPath)
 	if err != nil {
 		return nil, err
@@ -263,7 +261,7 @@ func readAndUpdateProductBundleData(ctx context.Context, sink dataSink, productB
 	logger.Debugf(ctx, "updating images for product bundle %s", productBundleJSONPath)
 	for _, image := range data.Images {
 		if image.Format == fileFormatName {
-			gcsURI, err := getGCSURIBasedOnFileURI(ctx, sink, image.BaseURI, productBundleJSONPath, sink.getBucketName())
+			gcsURI, err := getGCSURIBasedOnFileURI(ctx, sink, image.BaseURI, productBundleJSONPath, sink.GetBucketName())
 			if err != nil {
 				return nil, err
 			}
@@ -278,13 +276,13 @@ func readAndUpdateProductBundleData(ctx context.Context, sink dataSink, productB
 	logger.Debugf(ctx, "updating packages for product bundle %s", productBundleJSONPath)
 	for _, pkg := range data.Packages {
 		if pkg.Format == fileFormatName {
-			repoURI, err := getGCSURIBasedOnFileURI(ctx, sink, pkg.RepoURI, productBundleJSONPath, sink.getBucketName())
+			repoURI, err := getGCSURIBasedOnFileURI(ctx, sink, pkg.RepoURI, productBundleJSONPath, sink.GetBucketName())
 			if err != nil {
 				return nil, err
 			}
 			logger.Debugf(ctx, "gcs_uri is %s for package repo_uri %s", repoURI, pkg.RepoURI)
 
-			blobURI, err := getGCSURIBasedOnFileURI(ctx, sink, pkg.BlobURI, productBundleJSONPath, sink.getBucketName())
+			blobURI, err := getGCSURIBasedOnFileURI(ctx, sink, pkg.BlobURI, productBundleJSONPath, sink.GetBucketName())
 			if err != nil {
 				return nil, err
 			}
@@ -304,9 +302,9 @@ func readAndUpdateProductBundleData(ctx context.Context, sink dataSink, productB
 	return &productBundleData.Data, nil
 }
 
-func getProductBundleData(ctx context.Context, sink dataSink, productBundleJSONPath string) (*artifactory.ProductBundle, error) {
+func getProductBundleData(ctx context.Context, sink bundler.DataSink, productBundleJSONPath string) (*artifactory.ProductBundle, error) {
 	productBundle := &artifactory.ProductBundle{}
-	data, err := sink.readFromGCS(ctx, productBundleJSONPath)
+	data, err := sink.ReadFromGCS(ctx, productBundleJSONPath)
 	if err != nil {
 		return nil, err
 	}
@@ -316,9 +314,9 @@ func getProductBundleData(ctx context.Context, sink dataSink, productBundleJSONP
 
 // getProductBundleContainerArtifactsFromImagesJSON reads the images.json file in GCS and determines
 // the paths for product_bundle and physical/virtual device metadata.
-func getProductBundleContainerArtifactsFromImagesJSON(ctx context.Context, sink dataSink, imagesJSONPath string) (*productBundleContainerArtifacts, error) {
+func getProductBundleContainerArtifactsFromImagesJSON(ctx context.Context, sink bundler.DataSink, imagesJSONPath string) (*productBundleContainerArtifacts, error) {
 	artifact := &productBundleContainerArtifacts{}
-	data, err := sink.readFromGCS(ctx, imagesJSONPath)
+	data, err := sink.ReadFromGCS(ctx, imagesJSONPath)
 	if err != nil {
 		return nil, err
 	}
@@ -343,76 +341,4 @@ func getProductBundleContainerArtifactsFromImagesJSON(ctx context.Context, sink 
 		return nil, fmt.Errorf("unable to find a physical or virtual device metadata in image manifest: %s", imagesJSONPath)
 	}
 	return artifact, nil
-}
-
-// DataSink is an abstract data sink, providing a mockable interface to
-// cloudSink, the GCS-backed implementation below.
-type dataSink interface {
-	readFromGCS(ctx context.Context, object string) ([]byte, error)
-	getBucketName() string
-	doesPathExist(ctx context.Context, prefix string) (bool, error)
-}
-
-// CloudSink is a GCS-backed data sink.
-type cloudSink struct {
-	client     *storage.Client
-	bucket     *storage.BucketHandle
-	bucketName string
-}
-
-func newCloudSink(ctx context.Context, bucket string) (*cloudSink, error) {
-	client, err := storage.NewClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &cloudSink{
-		client:     client,
-		bucket:     client.Bucket(bucket),
-		bucketName: bucket,
-	}, nil
-}
-
-func (s *cloudSink) close() {
-	s.client.Close()
-}
-
-// readFromGCS reads an object from GCS.
-func (s *cloudSink) readFromGCS(ctx context.Context, object string) ([]byte, error) {
-	logger.Debugf(ctx, "reading %s from GCS", object)
-	ctx, cancel := context.WithTimeout(ctx, time.Second*50)
-	defer cancel()
-	rc, err := s.bucket.Object(object).NewReader(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer rc.Close()
-
-	data, err := io.ReadAll(rc)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-func (s *cloudSink) getBucketName() string {
-	return s.bucketName
-}
-
-// doesPathExist checks if a path exists in GCS.
-func (s *cloudSink) doesPathExist(ctx context.Context, prefix string) (bool, error) {
-	logger.Debugf(ctx, "checking if %s is a valid path in GCS", prefix)
-	it := s.bucket.Objects(ctx, &storage.Query{
-		Prefix:    prefix,
-		Delimiter: "/",
-	})
-	_, err := it.Next()
-	// If the first object in the iterator is the end of the iterator, the path
-	// is invalid and doesn't exist in GCS.
-	if err == iterator.Done {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
 }
