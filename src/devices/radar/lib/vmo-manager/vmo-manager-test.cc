@@ -170,6 +170,16 @@ TEST(VmoManagerTest, GetUnlockedVmo) {
   fit::result vmo_id = manager.WriteUnlockedVmoAndGetId({kTestBurstData, sizeof(kTestBurstData)});
   ASSERT_TRUE(vmo_id.is_ok());
   EXPECT_EQ(*vmo_id, 5);
+
+  manager.UnlockVmo(1);
+  vmo_id = manager.WriteUnlockedVmoAndGetId({kTestBurstData, sizeof(kTestBurstData)});
+  ASSERT_TRUE(vmo_id.is_ok());
+  EXPECT_EQ(*vmo_id, 1);
+
+  manager.UnlockVmo(10);
+  vmo_id = manager.WriteUnlockedVmoAndGetId({kTestBurstData, sizeof(kTestBurstData)});
+  ASSERT_TRUE(vmo_id.is_ok());
+  EXPECT_EQ(*vmo_id, 10);
 }
 
 TEST(VmoManagerTest, WriteTooMuchDataToVmo) {

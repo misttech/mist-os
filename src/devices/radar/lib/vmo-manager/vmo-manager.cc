@@ -10,51 +10,45 @@ namespace radar {
 
 using StatusCode = fuchsia_hardware_radar::StatusCode;
 
-VmoManager::VmoManager(const size_t minimum_vmo_size)
-    : minimum_vmo_size_(minimum_vmo_size),
-      registered_vmos_(vmo_store::Options{
-          .map = {{
-              .vm_option = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
-              .vmar = nullptr,
-          }},
-          .pin = {},
-      }) {}
+fit::function<bool(const VmoManager::VmoMeta&)> VmoManager::VmoIdMatches(const uint32_t vmo_id) {
+  return [vmo_id](const VmoMeta& vmo) { return vmo.vmo_id == vmo_id; };
+}
 
-VmoManager::~VmoManager() {
-  // These must be manually cleared before destruction to avoid triggering an assert.
-  locked_vmos_.clear();
-  unlocked_vmos_.clear();
+void VmoManager::RemoveVmoId(const uint32_t vmo_id, std::vector<VmoMeta>* const list) {
+  const auto it = std::remove_if(list->begin(), list->end(), VmoIdMatches(vmo_id));
+  list->erase(it, list->end());
 }
 
 fit::result<StatusCode, uint32_t> VmoManager::WriteUnlockedVmoAndGetId(
     const cpp20::span<const uint8_t> data) {
-  fbl::AutoLock lock(&lock_);
-
-  // Take a VMO from the front of the unlocked list and move it to the back of the locked list.
-  VmoMeta* vmo = unlocked_vmos_.pop_front();
-  if (vmo == nullptr) {
-    return fit::error(StatusCode::kOutOfVmos);
-  }
-
-  if (data.size_bytes() > vmo->vmo_data.size_bytes()) {
+  if (data.size_bytes() > burst_size_) {
     return fit::error(StatusCode::kVmoTooSmall);
   }
 
-  locked_vmos_.push_back(vmo);
-  memcpy(vmo->vmo_data.data(), data.data(), data.size_bytes());
-  return fit::success(vmo->vmo_id);
+  fbl::AutoLock lock(&lock_);
+
+  if (unlocked_vmos_.empty()) {
+    return fit::error(StatusCode::kOutOfVmos);
+  }
+
+  // Take a VMO from the back of the unlocked list and move it to the back of the locked list.
+  locked_vmos_.push_back(unlocked_vmos_.back());
+  unlocked_vmos_.pop_back();
+
+  memcpy(locked_vmos_.back().vmo_data, data.data(), data.size_bytes());
+  return fit::success(locked_vmos_.back().vmo_id);
 }
 
-void VmoManager::UnlockVmo(uint32_t vmo_id) {
+void VmoManager::UnlockVmo(const uint32_t vmo_id) {
   fbl::AutoLock lock(&lock_);
 
   // Find the VMO and move it to the back of the unlocked list. If the client is unlocking VMOs in
-  // the order that they were received then this VMO should be the first in the locked list.
-  const auto it =
-      locked_vmos_.find_if([vmo_id](const VmoMeta& vmo) { return vmo.vmo_id == vmo_id; });
-  if (it.IsValid()) {
-    VmoMeta* vmo = locked_vmos_.erase(it);
-    unlocked_vmos_.push_back(vmo);
+  // the order that they were received then this VMO should be the last in the locked list.
+  const auto it = std::find_if(locked_vmos_.crbegin(), locked_vmos_.crend(), VmoIdMatches(vmo_id));
+  if (it != locked_vmos_.crend()) {
+    unlocked_vmos_.push_back(*it);
+    // Convert the reverse iterator to a forward iterator to erase.
+    locked_vmos_.erase((it + 1).base());
   }
 }
 
@@ -73,21 +67,19 @@ StatusCode VmoManager::RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
     const uint32_t vmo_id = vmo_ids[last_vmo_index];
 
     status = registered_vmos_.RegisterWithKey(
-        vmo_id, vmo_store::StoredVmo<VmoMeta>(std::move(vmos[last_vmo_index]), {}));
+        vmo_id, vmo_store::StoredVmo<void>(std::move(vmos[last_vmo_index])));
     if (status != ZX_OK) {
       break;
     }
 
-    vmo_store::StoredVmo<VmoMeta>* vmo = registered_vmos_.GetVmo(vmo_id);
+    vmo_store::StoredVmo<void>* vmo = registered_vmos_.GetVmo(vmo_id);
     ZX_ASSERT(vmo != nullptr);
-    if (vmo->data().size_bytes() < minimum_vmo_size_) {
+    if (vmo->data().size_bytes() < burst_size_) {
       status = ZX_ERR_BUFFER_TOO_SMALL;
       break;
     }
 
-    vmo->meta().vmo_id = vmo_id;
-    vmo->meta().vmo_data = vmo->data().subspan(0, minimum_vmo_size_);
-    unlocked_vmos_.push_back(&vmo->meta());
+    unlocked_vmos_.push_back({.vmo_id = vmo_id, .vmo_data = vmo->data().data()});
   }
 
   // Registration for one of the VMOs failed, so undo any previous registrations that may have
@@ -98,7 +90,7 @@ StatusCode VmoManager::RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
       // Only unregister the final VMO if the status code isn't ZX_ERR_ALREADY_EXISTS. Otherwise
       // this would unregister a VMO that had been registered in a previous call call.
       if (i != last_vmo_index || status != ZX_ERR_ALREADY_EXISTS) {
-        unlocked_vmos_.erase_if([vmo_id](const VmoMeta& vmo) { return vmo.vmo_id == vmo_id; });
+        RemoveVmoId(vmo_id, &unlocked_vmos_);
 
         // We can't return handles to the caller, so just close them.
         zx::result<zx::vmo> vmo = registered_vmos_.Unregister(vmo_id);
@@ -108,6 +100,10 @@ StatusCode VmoManager::RegisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
 
   switch (status) {
     case ZX_OK:
+      // Reserve space for VMOs up front. Existing VMOs may be on the locked list, so the total
+      // number of VMOs is the sum of the sizes of the two lists.
+      locked_vmos_.reserve(locked_vmos_.size() + unlocked_vmos_.size());
+      unlocked_vmos_.reserve(locked_vmos_.size() + unlocked_vmos_.size());
       return StatusCode::kSuccess;
     case ZX_ERR_BAD_HANDLE:
     case ZX_ERR_WRONG_TYPE:
@@ -152,8 +148,7 @@ StatusCode VmoManager::UnregisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
   fbl::AutoLock lock(&lock_);
 
   for (const uint32_t vmo_id : vmo_ids) {
-    vmo_store::StoredVmo<VmoMeta>* vmo = registered_vmos_.GetVmo(vmo_id);
-    if (vmo == nullptr) {
+    if (registered_vmos_.GetVmo(vmo_id) == nullptr) {
       return StatusCode::kVmoNotFound;
     }
   }
@@ -161,8 +156,8 @@ StatusCode VmoManager::UnregisterVmos(fidl::VectorView<const uint32_t> vmo_ids,
   for (size_t i = 0; i < vmo_ids.count(); i++) {
     const uint32_t vmo_id = vmo_ids[i];
 
-    unlocked_vmos_.erase_if([vmo_id](const VmoMeta& vmo) { return vmo.vmo_id == vmo_id; });
-    locked_vmos_.erase_if([vmo_id](const VmoMeta& vmo) { return vmo.vmo_id == vmo_id; });
+    RemoveVmoId(vmo_id, &unlocked_vmos_);
+    RemoveVmoId(vmo_id, &locked_vmos_);
 
     auto status = registered_vmos_.Unregister(vmo_id);
     ZX_ASSERT(status.is_ok());

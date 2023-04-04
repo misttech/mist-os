@@ -4,12 +4,14 @@
 
 #include <fidl/fuchsia.hardware.radar/cpp/wire.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
+#include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <stdint.h>
 
-#include <fbl/intrusive_double_list.h>
+#include <vector>
+
 #include <fbl/mutex.h>
 
 #include "src/lib/vmo_store/vmo_store.h"
@@ -19,9 +21,15 @@ namespace radar {
 // Thread-safe utility class for keeping track of registered VMOs, their VMARs, and lock states.
 class VmoManager {
  public:
-  explicit VmoManager(size_t minimum_vmo_size);
-
-  ~VmoManager();
+  explicit VmoManager(size_t radar_burst_size)
+      : burst_size_(radar_burst_size),
+        registered_vmos_(vmo_store::Options{
+            .map = {{
+                .vm_option = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE,
+                .vmar = nullptr,
+            }},
+            .pin = {},
+        }) {}
 
   // Gets the next unlocked VMO, locks it, writes the provided data to it, and returns the VMO ID.
   // Returns an error if no VMOs are unlocked or if `data` is too large.
@@ -50,21 +58,21 @@ class VmoManager {
       const std::vector<uint32_t>& vmo_ids);
 
  private:
-  struct VmoMeta : public fbl::DoublyLinkedListable<VmoMeta*, fbl::NodeOptions::AllowMove> {
-    VmoMeta() : fbl::DoublyLinkedListable<VmoMeta*, kNodeOptions>() {}
+  struct VmoMeta {
     uint32_t vmo_id;
-    cpp20::span<uint8_t> vmo_data;
+    uint8_t* vmo_data;  // Guaranteed to be at least burst_size_ bytes.
   };
 
-  using VmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t, VmoMeta>>;
+  using VmoStore = vmo_store::VmoStore<vmo_store::HashTableStorage<uint32_t>>;
 
-  const size_t minimum_vmo_size_;
+  static fit::function<bool(const VmoMeta&)> VmoIdMatches(uint32_t vmo_id);
+  static void RemoveVmoId(uint32_t vmo_id, std::vector<VmoMeta>* list);
+
+  const size_t burst_size_;
 
   fbl::Mutex lock_;
-  // Doubly linked lists to keep track of which VMOs are locked and which are unlocked. Entries
-  // (VmoMeta*) are owned by registered_vmos_.
-  fbl::DoublyLinkedList<VmoMeta*> locked_vmos_ TA_GUARDED(lock_);
-  fbl::DoublyLinkedList<VmoMeta*> unlocked_vmos_ TA_GUARDED(lock_);
+  std::vector<VmoMeta> locked_vmos_ TA_GUARDED(lock_);
+  std::vector<VmoMeta> unlocked_vmos_ TA_GUARDED(lock_);
   VmoStore registered_vmos_ TA_GUARDED(lock_);
 };
 
