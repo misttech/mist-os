@@ -13,7 +13,7 @@ driver_bind_rules("usb_xhci_bind") {
   bind_output = "xhci.bindbc"
   tests = "tests.json"
   deps = [
-    "//src/devices/bind/fuchsia.driver.framework",
+    "//src/devices/bind/fuchsia.hardware.platform.device",
     "//src/devices/bind/fuchsia.pci",
     "//src/devices/bind/fuchsia.pci:serial",
     "//src/devices/bind/fuchsia.pci:serial.usb",
