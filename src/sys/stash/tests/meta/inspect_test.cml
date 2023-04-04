@@ -3,10 +3,12 @@
 // found in the LICENSE file.
 {
     include: [
-        // FIXME(fxbug.dev/60072): build complains that I need to include this shard, but not
-        // sure why since this component doesn't have a program.
+        "//src/sys/test_runners/rust/default.shard.cml",
         "syslog/client.shard.cml",
     ],
+    program: {
+        binary: "bin/inspect_test",
+    },
     children: [
         {
             name: "stash",
@@ -18,10 +20,9 @@
             url: "fuchsia-pkg://fuchsia.com/stash-integration-tests#meta/stash_secure.cm",
             startup: "eager",
         },
-        {
-            name: "test",
-            url: "fuchsia-pkg://fuchsia.com/stash-integration-tests#meta/inspect_test_exec.cm",
-        },
+    ],
+    use: [
+        { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
     ],
     offer: [
         {
@@ -30,7 +31,6 @@
             to: [
                 "#stash",
                 "#stash_secure",
-                "#test",
             ],
         },
 
@@ -42,19 +42,6 @@
                 "#stash",
                 "#stash_secure",
             ],
-        },
-
-        // to #test
-        {
-            protocol: "fuchsia.diagnostics.ArchiveAccessor",
-            from: "parent",
-            to: "#test",
-        },
-    ],
-    expose: [
-        {
-            protocol: "fuchsia.test.Suite",
-            from: "#test",
         },
     ],
 }

@@ -5,11 +5,9 @@
 use {
     anyhow::Error,
     diagnostics_reader::{assert_data_tree, ArchiveReader, Inspect},
-    fuchsia_async::{self as fasync},
 };
 
-#[ignore]
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn stash_inspect() -> Result<(), Error> {
     // stash is started as an eager child of the test's top-level component.
     let data = ArchiveReader::new().add_selector("stash:root").snapshot::<Inspect>().await?;
@@ -26,8 +24,7 @@ async fn stash_inspect() -> Result<(), Error> {
     Ok(())
 }
 
-#[ignore]
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn stash_secure_inspect() -> Result<(), Error> {
     // stash_secure is started as an eager child of the test's top-level component.
     let data = ArchiveReader::new().add_selector("stash_secure:root").snapshot::<Inspect>().await?;
