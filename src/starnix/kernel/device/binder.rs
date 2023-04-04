@@ -367,19 +367,18 @@ struct TransactionState {
 
 impl Drop for TransactionState {
     fn drop(&mut self) {
-        if let Some(proc) = self.proc.upgrade() {
-            let mut proc = proc.lock();
-            for handle in &self.handles {
-                // Ignore the error because there is little we can do about it.
-                // Panicking would be wrong, in case the client issued an extra strong decrement.
-                let result = proc.handles.dec_strong(handle.object_index());
-                if let Err(error) = result {
-                    log_warn!(
-                        "Error when dropping transaction state for process {}: {:?}",
-                        proc.base.pid,
-                        error
-                    );
-                }
+        let Some(proc) = self.proc.upgrade() else { return; };
+        let mut proc = proc.lock();
+        for handle in &self.handles {
+            // Ignore the error because there is little we can do about it.
+            // Panicking would be wrong, in case the client issued an extra strong decrement.
+            let result = proc.handles.dec_strong(handle.object_index());
+            if let Err(error) = result {
+                log_warn!(
+                    "Error when dropping transaction state for process {}: {:?}",
+                    proc.base.pid,
+                    error
+                );
             }
         }
     }
