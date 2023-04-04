@@ -713,6 +713,46 @@ impl<'a> BinderProcessGuard<'a> {
         self.thread_pool.0.remove(&tid);
     }
 
+    /// Inserts a reference to a binder object, returning a handle that represents it.
+    /// The handle may be an existing handle if the object was already present in the table.
+    /// A new handle will have a single strong reference, an existing handle will have its strong
+    /// reference count incremented by one.
+    /// Returns the handle representing the object.
+    pub fn insert_for_transaction(
+        self,
+        target_process: &Arc<BinderProcess>,
+        object: Arc<BinderObject>,
+    ) -> Result<Handle, Errno> {
+        // Increment the strong reference count of this object, while keeping the lock on the
+        // source process. This ensures the object cannot be release before being installed into
+        // the handle table to the target process. Moreover, this doesn't creates any new refcount
+        // operation, as `HandleTable::insert_for_transaction` also increase the strong reference
+        // count of the object.
+        let actions = object.inc_strong()?;
+
+        // Now that the object has at least one strong reference, release the lock on the source
+        // process so that actions can be executed.
+        std::mem::drop(self);
+        for action in actions {
+            action.execute();
+        }
+
+        // Create a handle in the receiving process that references the binder object
+        // in the sender's process. A new strong reference will be taken on `object`.
+        let (actions, handle) =
+            target_process.lock().handles.insert_for_transaction(object.clone());
+        for action in actions {
+            action.execute();
+        }
+
+        // Now that the object is kept by the target process handle table, the initial strong
+        // increment can be released.
+        for action in object.dec_strong()? {
+            action.execute();
+        }
+        Ok(handle)
+    }
+
     /// Handle a binder thread's request to increment/decrement a strong/weak reference to a remote
     /// binder object.
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
@@ -1286,10 +1326,10 @@ impl RefCountAction {
 }
 
 impl HandleTable {
-    /// Inserts a reference to a binder object, returning a handle that represents it. The handle
-    /// may be an existing handle if the object was already present in the table. If the client does
-    /// not acquire a strong reference to this handle before the transaction that inserted it is
-    /// complete, the handle will be dropped.
+    /// Inserts a reference to a binder object, returning a handle that represents it.
+    /// The handle may be an existing handle if the object was already present in the table.
+    /// A new handle will have a single strong reference, an existing handle will have its strong
+    /// reference count incremented by one.
     /// Returns a vector of `RefCountAction`s that must be `execute`d without holding a lock on
     /// `BinderProcess` and the handle representing the object.
     fn insert_for_transaction(
@@ -3184,11 +3224,9 @@ impl BinderDriver {
                             serialized_object
                         }
                         Handle::Object { index } => {
-                            let proxy = source_proc
-                                .lock()
-                                .handles
-                                .get(index)
-                                .ok_or(TransactionError::Failure)?;
+                            let source_proc = source_proc.lock();
+                            let proxy =
+                                source_proc.handles.get(index).ok_or(TransactionError::Failure)?;
                             if std::ptr::eq(Arc::as_ptr(target_proc), proxy.owner.as_ptr()) {
                                 // The binder object belongs to the receiving process, so convert it
                                 // from a handle to a local object.
@@ -3196,12 +3234,8 @@ impl BinderDriver {
                             } else {
                                 // The binder object does not belong to the receiving process, so
                                 // dup the handle in the receiving process' handle table.
-                                let (actions, new_handle) =
-                                    target_proc.lock().handles.insert_for_transaction(proxy);
-                                for action in actions {
-                                    action.execute();
-                                }
-
+                                let new_handle =
+                                    source_proc.insert_for_transaction(target_proc, proxy)?;
                                 // Tie this handle's strong reference to be held as long as this
                                 // buffer.
                                 transaction_state.push_handle(new_handle);
@@ -3216,17 +3250,11 @@ impl BinderDriver {
                     // to translate this address to some handle.
 
                     // Register this binder object if it hasn't already been registered.
-                    let object =
-                        source_proc.lock().find_or_register_object(source_thread, local, flags);
-
+                    let mut source_proc = source_proc.lock();
+                    let object = source_proc.find_or_register_object(source_thread, local, flags);
                     // Create a handle in the receiving process that references the binder object
                     // in the sender's process.
-                    let (actions, handle) =
-                        target_proc.lock().handles.insert_for_transaction(object);
-                    for action in actions {
-                        action.execute();
-                    }
-
+                    let handle = source_proc.insert_for_transaction(target_proc, object)?;
                     // Tie this handle's strong reference to be held as long as this buffer.
                     transaction_state.push_handle(handle);
 
