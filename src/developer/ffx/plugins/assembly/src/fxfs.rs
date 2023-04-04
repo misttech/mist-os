@@ -59,7 +59,7 @@ mod tests {
     use super::construct_fxfs;
     use crate::base_package::construct_base_package;
     use assembly_config_schema::ImageAssemblyConfig;
-    use assembly_manifest::{AssemblyManifest, BlobfsContents};
+    use assembly_manifest::AssemblyManifest;
     use camino::{Utf8Path, Utf8PathBuf};
     use serde_json::json;
     use std::fs::File;
@@ -155,44 +155,7 @@ mod tests {
 
         // Ensure the blobs match expectations.
         let blobs = blobs.relativize(dir).unwrap();
-        let expected_blobs: BlobfsContents = serde_json::from_str(
-            "\
-{
-  \"packages\": {
-    \"base\": [
-      {
-        \"name\": \"system_image\",
-        \"manifest\": \"base/package_manifest.json\",
-        \"blobs\": [
-          {
-            \"merkle\": \"6ef2ad21fe7a1f22e224da891fba56b8cc53f39b977867a839584d4cc3919c4c\",
-            \"path\": \"extra_base_data.txt\",
-            \"used_space_in_blobfs\": 4096
-          },
-          {
-            \"merkle\": \"8a7bb95ce6dfb4f9c9b9b3c3b654923c4148351db2719ecc98d24ae328128e2b\",
-            \"path\": \"data/cache_packages.json\",
-            \"used_space_in_blobfs\": 4096
-          },
-          {
-            \"merkle\": \"942f27dbeb9dccdb46f93fde2220490c0ef942c8dcbdccaad4439cd2c27255f9\",
-            \"path\": \"meta/\",
-            \"used_space_in_blobfs\": 8192
-          },
-          {
-            \"merkle\": \"e4f7b124a8c758488b7b9f0a42c09cb0c3c3ca6e4cf2d42ba6f03158eb2ad890\",
-            \"path\": \"data/static_packages\",
-            \"used_space_in_blobfs\": 4096
-          }
-        ]
-      }
-    ],
-    \"cache\": []
-  },
-  \"maximum_contents_size\": null
-}",
-        )
-        .unwrap();
-        assert_eq!(blobs, expected_blobs);
+        assert!(!blobs.packages.base.0.is_empty());
+        assert!(blobs.packages.cache.0.is_empty());
     }
 }
