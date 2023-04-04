@@ -12,7 +12,7 @@ use {
         Axis, ConsumerControlButton, ConsumerControlDescriptor, ConsumerControlInputDescriptor,
         ContactInputDescriptor, DeviceDescriptor, InputDeviceMarker, KeyboardDescriptor,
         KeyboardInputDescriptor, MouseDescriptor, MouseInputDescriptor, Range, TouchDescriptor,
-        TouchInputDescriptor, TouchType, Unit, UnitType,
+        TouchInputDescriptor, TouchType, Unit, UnitType, TOUCH_MAX_CONTACTS,
     },
     fidl_fuchsia_ui_test_input::MouseButton,
     std::convert::TryFrom,
@@ -41,7 +41,6 @@ impl InputDeviceRegistry {
         min_y: i64,
         max_y: i64,
     ) -> Result<InputDevice, Error> {
-        const MAX_CONTACTS: u32 = 255;
         self.add_device(DeviceDescriptor {
             touch: Some(TouchDescriptor {
                 input: Some(TouchInputDescriptor {
@@ -65,10 +64,13 @@ impl InputDeviceRegistry {
                             }),
                             ..ContactInputDescriptor::EMPTY
                         })
-                        .take(usize::try_from(MAX_CONTACTS).context("usize is impossibly small")?)
+                        .take(
+                            usize::try_from(TOUCH_MAX_CONTACTS)
+                                .context("usize is impossibly small")?,
+                        )
                         .collect(),
                     ),
-                    max_contacts: Some(MAX_CONTACTS),
+                    max_contacts: Some(TOUCH_MAX_CONTACTS),
                     touch_type: Some(TouchType::Touchscreen),
                     buttons: Some(vec![]),
                     ..TouchInputDescriptor::EMPTY
