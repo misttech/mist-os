@@ -84,14 +84,7 @@ static inline affine::Ratio riscv_generic_timer_compute_conversion_factors(uint3
   return cntpct_to_nsec;
 }
 
-// TODO-rvbringup: wire this up to the new mechanism
-#if 0
-static void riscv_generic_timer_pdev_init(const void* driver_data, uint32_t length) {
-  ASSERT(length >= sizeof(zbi_dcfg_riscv_generic_timer_driver_t));
-  auto driver = static_cast<const zbi_dcfg_riscv_generic_timer_driver_t*>(driver_data);
-  platform_set_ticks_to_time_ratio(riscv_generic_timer_compute_conversion_factors<true>(driver->freq_hz));
+void riscv_generic_timer_init_early(const zbi_dcfg_riscv_generic_timer_driver_t& config) {
+  platform_set_ticks_to_time_ratio(
+      riscv_generic_timer_compute_conversion_factors<true>(config.freq_hz));
 }
-
-LK_PDEV_INIT(riscv_generic_timer_pdev_init, KDRV_RISCV_GENERIC_TIMER, riscv_generic_timer_pdev_init,
-             LK_INIT_LEVEL_PLATFORM_EARLY)
-#endif
