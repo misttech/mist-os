@@ -13,6 +13,7 @@ import (
 
 	resultpb "go.chromium.org/luci/resultdb/proto/v1"
 
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -38,6 +39,14 @@ func TestParseSummary(t *testing.T) {
 	}
 	if requests[0].TestResults[0].TestId != "test_0" {
 		t.Errorf("Incorrect TestId parsed for first suite. got %s, want test_0", requests[0].TestResults[0].TestId)
+	}
+}
+
+func checkTagValue(t *testing.T, tags map[string]string, key, want string) {
+	if got, ok := tags[key]; !ok {
+		t.Errorf("Did not find %q in tags", key)
+	} else if got != want {
+		t.Errorf("Wrong value for tag %q: got %q, wanted %q", key, got, want)
 	}
 }
 
@@ -69,18 +78,10 @@ func TestSetTestDetailsToResultSink(t *testing.T) {
 		t.Errorf("tags(%v) contains unexpected values.", tags)
 	}
 
-	checkTagValue := func(key, want string) {
-		if got, ok := tags[key]; !ok {
-			t.Errorf("Did not find %q in tags", key)
-		} else if got != want {
-			t.Errorf("Wrong value for tag %q: got %q, wanted %q", key, got, want)
-		}
-	}
-
-	checkTagValue("key1", "value1")
-	checkTagValue("gn_label", detail.GNLabel)
-	checkTagValue("test_case_count", "5")
-	checkTagValue("affected", "false")
+	checkTagValue(t, tags, "key1", "value1")
+	checkTagValue(t, tags, "gn_label", detail.GNLabel)
+	checkTagValue(t, tags, "test_case_count", "5")
+	checkTagValue(t, tags, "affected", "false")
 
 	if len(result.Artifacts) != 2 {
 		t.Errorf("Got %d artifacts, want 2", len(result.Artifacts))
@@ -94,7 +95,20 @@ func TestSetTestCaseToResultSink(t *testing.T) {
 	if len(results) != 5 {
 		t.Errorf("Got %d test case results, want 5", len(results))
 	}
+
 	for i, result := range results {
+		tags := make(map[string]string)
+		for _, tag := range result.Tags {
+			tags[tag.Key] = tag.Value
+		}
+		// We only expect 2 tags
+		// 1. format:value
+		// 2. key1:value1
+		if len(tags) != 2 {
+			t.Errorf("tags(%v) contains unexpected values.", tags)
+		}
+		checkTagValue(t, tags, "format", detail.Cases[i].Format)
+		checkTagValue(t, tags, "key1", "value1")
 		if len(result.Artifacts) != 2 {
 			t.Errorf("Got %d artifacts for test case %d, want 2", len(result.Artifacts), i+1)
 		}
@@ -134,6 +148,7 @@ func createTestDetailWithTestCase(testCase int, outputRoot string) *runtests.Tes
 			Status:      runtests.TestSuccess,
 			Format:      "Rust",
 			OutputFiles: []string{"case/outputfile1", "case/outputfile2"},
+			Tags:        []build.TestTag{{"key1", "value1"}},
 		})
 	}
 	return &runtests.TestDetails{

@@ -110,9 +110,15 @@ func testCaseToResultSink(testCases []runtests.TestCaseResult, tags []*resultpb.
 			testsSkipped = append(testsSkipped, testID)
 			continue
 		}
+		testCaseTags := append([]*resultpb.StringPair{{Key: "format", Value: testCase.Format}}, tags...)
+		for _, tag := range testCase.Tags {
+			testCaseTags = append(testCaseTags, &resultpb.StringPair{
+				Key: tag.Key, Value: tag.Value,
+			})
+		}
 		r := sinkpb.TestResult{
 			TestId: testID,
-			Tags:   append([]*resultpb.StringPair{{Key: "format", Value: testCase.Format}}, tags...),
+			Tags:   testCaseTags,
 		}
 		testCaseStatus, err := resultDBStatus(testCase.Status)
 		if err != nil {

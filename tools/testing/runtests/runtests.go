@@ -130,4 +130,6 @@ type TestCaseResult struct {
 	OutputFiles []string `json:"output_files,omitempty"`
 	// The directory where the OutputFiles live if given as relative paths.
 	OutputDir string `json:"output_dir,omitempty"`
+	// Tags contain test case metadata.
+	Tags []build.TestTag `json:"tags"`
 }
