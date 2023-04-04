@@ -26,6 +26,9 @@ def print_fences():
     print(
         "ninja complains about a cyclic dependency in //src/virtualization/bin/vmm/device/virtio_net/virtio_net (http://fxbug.dev/114895)"
     )
+    print(
+        "After fxr/829176, assembly complains that host_tools.modular manifest cannot be found (http://fxbug.dev/124905)."
+    )
     pass
 
 
