@@ -33,8 +33,8 @@ use futures::{
     Future, FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _,
 };
 use net_declare::{
-    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_subnet, net_subnet_v4, net_subnet_v6, std_ip_v4,
-    std_socket_addr,
+    fidl_ip_v4, fidl_ip_v6, fidl_mac, fidl_socket_addr, fidl_subnet, net_subnet_v4, net_subnet_v6,
+    std_ip_v4, std_socket_addr,
 };
 use net_types::{
     ip::{Ip, IpAddress as _, IpInvariant, Ipv4, Ipv6},
@@ -557,14 +557,14 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
 }
 
 enum UdpCacheInvalidationReasonNdp {
-    RouterDiscovered,
-    PrefixDiscovered,
+    RouterAdvertisement,
+    RouterAdvertisementWithPrefix,
 }
 
 #[netstack_test]
-#[test_case("router_discovered", UdpCacheInvalidationReasonNdp::RouterDiscovered)]
-#[test_case("prefix_discovered", UdpCacheInvalidationReasonNdp::PrefixDiscovered)]
-async fn udp_send_msg_preflight_ndp(
+#[test_case("ra", UdpCacheInvalidationReasonNdp::RouterAdvertisement)]
+#[test_case("ra_with_prefix", UdpCacheInvalidationReasonNdp::RouterAdvertisementWithPrefix)]
+async fn udp_send_msg_preflight_fidl_ndp(
     root_name: &str,
     test_name: &str,
     invalidation_reason: UdpCacheInvalidationReasonNdp,
@@ -577,21 +577,81 @@ async fn udp_send_msg_preflight_ndp(
 
     let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv6>(&iface, &socket).await;
 
+    // Note that the following prefix must not overlap with
+    // `<Ipv6 as UdpSendMsgPreflightTestIpExt>::INSTALLED_ADDR`, as there is already a subnet
+    // route for the installed addr and so discovering the same prefix will not cause a route
+    // to be added and induce cache invalidation.
+    const PREFIX: net_types::ip::Subnet<net_types::ip::Ipv6Addr> =
+        net_subnet_v6!("2001:db8:ffff:ffff::/64");
+    const SOCKADDR_IN_PREFIX: fnet::SocketAddress =
+        fidl_socket_addr!("[2001:db8:ffff:ffff::1]:9999");
+
+    // These are arbitrary large lifetime values so that the information
+    // contained within the RA are not deprecated/invalidated over the course
+    // of the test.
+    const LARGE_ROUTER_LIFETIME: u16 = 9000;
+    const LARGE_PREFIX_LIFETIME: u32 = 99999;
+    async fn send_ra(
+        fake_ep: &netemul::TestFakeEndpoint<'_>,
+        router_lifetime: u16,
+        prefix_lifetime: Option<u32>,
+    ) {
+        let options = prefix_lifetime
+            .into_iter()
+            .map(|lifetime| {
+                NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
+                    PREFIX.prefix(),  /* prefix_length */
+                    true,             /* on_link_flag */
+                    true,             /* autonomous_address_configuration_flag */
+                    lifetime,         /* valid_lifetime */
+                    lifetime,         /* preferred_lifetime */
+                    PREFIX.network(), /* prefix */
+                ))
+            })
+            .collect::<Vec<_>>();
+        ndp::send_ra_with_router_lifetime(
+            &fake_ep,
+            router_lifetime,
+            &options,
+            ipv6_consts::LINK_LOCAL_ADDR,
+        )
+        .await
+        .expect("failed to fake RA message");
+    }
+    fn route_found(
+        fnet_routes_ext::InstalledRoute {
+            route: fnet_routes_ext::Route { destination, action, properties: _ },
+            effective_properties: _,
+        }: fnet_routes_ext::InstalledRoute<Ipv6>,
+        want: net_types::ip::Subnet<net_types::ip::Ipv6Addr>,
+        interface_id: u64,
+    ) -> bool {
+        let route_found = destination == want;
+        if route_found {
+            assert_eq!(
+                action,
+                fnet_routes_ext::RouteAction::Forward(fnet_routes_ext::RouteTarget {
+                    outbound_interface: interface_id,
+                    next_hop: None,
+                }),
+            );
+        }
+        route_found
+    }
+    let routes_state = realm
+        .connect_to_protocol::<fnet_routes::StateV6Marker>()
+        .expect("connect to route state FIDL");
+    let event_stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&routes_state)
+        .expect("routes event stream from state");
+    futures::pin_mut!(event_stream);
+    let mut routes = std::collections::HashSet::new();
+
     match invalidation_reason {
-        UdpCacheInvalidationReasonNdp::RouterDiscovered => {
-            // Use the maximum permissible value according to [RFC 4861 section 4.2] so
-            // that the route does not get invalidated during the test.
-            //
-            // [RFC 4861 section 4.2]: https://www.rfc-editor.org/rfc/rfc4861#section-4.2.
-            const MAX_ROUTER_LIFETIME: u16 = 9000;
-            ndp::send_ra_with_router_lifetime(
-                &fake_ep,
-                MAX_ROUTER_LIFETIME,
-                &[],
-                ipv6_consts::LINK_LOCAL_ADDR,
-            )
-            .await
-            .expect("failed to fake RA message");
+        // Send a RA message with an arbitrarily chosen but large router lifetime value to
+        // indicate to Netstack that a router is present. Netstack will add a default route,
+        // and invalidate the cache.
+        UdpCacheInvalidationReasonNdp::RouterAdvertisement => {
+            send_ra(&fake_ep, LARGE_ROUTER_LIFETIME, None /* prefix_lifetime */).await;
 
             // Wait until a default IPv6 route is added in response to the RA.
             let mut interface_state = fnet_interfaces_ext::InterfaceState::Unknown(iface.id());
@@ -605,68 +665,88 @@ async fn udp_send_msg_preflight_ndp(
             .await
             .expect("failed to wait for default IPv6 route");
         }
-        UdpCacheInvalidationReasonNdp::PrefixDiscovered => {
+        // Send a RA message with router lifetime of 0 (otherwise the router information
+        // also induces a default route and this test case tests a strict superset of the
+        // `RouterAdvertisement` test case), but containing a prefix information option. Since
+        // the prefix is on-link, Netstack will add a subnet route, and invalidate the cache.
+        UdpCacheInvalidationReasonNdp::RouterAdvertisementWithPrefix => {
+            send_ra(
+                &fake_ep,
+                0,                           /* router_lifetime */
+                Some(LARGE_PREFIX_LIFETIME), /* prefix_lifetime */
+            )
+            .await;
+
+            fnet_routes_ext::wait_for_routes(event_stream.by_ref(), &mut routes, |routes| {
+                routes
+                    .iter()
+                    .any(|installed_route| route_found(*installed_route, PREFIX, iface.id()))
+            })
+            .await
+            .expect("failed to wait for subnet route to appear");
+        }
+    }
+
+    assert_preflights_invalidated(successful_preflights);
+
+    // Note that `SOCKADDR_IN_PREFIX` is reachable in both cases because there
+    // is either a route to the prefix or a default route.
+    let successful_preflights = execute_and_validate_preflights(
+        [SOCKADDR_IN_PREFIX, Ipv6::REACHABLE_ADDR1].into_iter().map(|socket_address| {
+            UdpSendMsgPreflight {
+                to_addr: Some(socket_address),
+                expected_result: UdpSendMsgPreflightExpectation::Success(
+                    UdpSendMsgPreflightSuccessExpectation {
+                        expected_to_addr: ToAddrExpectation::Specified(None),
+                        expect_all_eventpairs_valid: true,
+                    },
+                ),
+            }
+        }),
+        &socket,
+    )
+    .await;
+
+    match invalidation_reason {
+        // Send an RA message invalidating the existence of the router, causing
+        // the default route to be removed, and the cache to be invalidated.
+        UdpCacheInvalidationReasonNdp::RouterAdvertisement => {
+            send_ra(&fake_ep, 0 /* router_lifetime */, None /* prefix_lifetime */).await;
+
+            // Wait until the default IPv6 route is removed.
+            let mut interface_state = fnet_interfaces_ext::InterfaceState::Unknown(iface.id());
+            fnet_interfaces_ext::wait_interface_with_id(
+                iface.get_interface_event_stream().expect("get interface event stream"),
+                &mut interface_state,
+                |fnet_interfaces_ext::Properties { has_default_ipv6_route, .. }| {
+                    (!has_default_ipv6_route).then_some(())
+                },
+            )
+            .await
+            .expect("failed to wait for default IPv6 route");
+        }
+        // Send an RA message invalidating the prefix, causing the subnet
+        // route to be removed, and the cache to be invalidated.
+        UdpCacheInvalidationReasonNdp::RouterAdvertisementWithPrefix => {
             let routes_state = realm
                 .connect_to_protocol::<fnet_routes::StateV6Marker>()
                 .expect("connect to route state FIDL");
             let event_stream = fnet_routes_ext::event_stream_from_state::<Ipv6>(&routes_state)
                 .expect("routes event stream from state");
             futures::pin_mut!(event_stream);
+            let _: Vec<_> = fnet_routes_ext::collect_routes_until_idle(event_stream.by_ref())
+                .await
+                .expect("collect routes until idle");
 
-            // Note that the following prefix must not overlap with `<Ipv6 as
-            // UdpSendMsgPreflightTestIpExt>::INSTALLED_ADDR`, as there is already a subnet
-            // route for the installed addr and so discovering the same prefix will not cause
-            // a route to be added and induce cache invalidation.
-            //
-            // The valid and preferred lifetimes are arbitrary, and just need to be large
-            // so that the prefix is never deprecated/invalidated over the duration of this
-            // test.
-            let prefix_discovered = net_subnet_v6!("2001:db8:ffff:ffff::/64");
-            let options = [NdpOptionBuilder::PrefixInformation(PrefixInformation::new(
-                prefix_discovered.prefix(),  /* prefix_length */
-                true,                        /* on_link_flag */
-                true,                        /* autonomous_address_configuration_flag */
-                99999,                       /* valid_lifetime */
-                99999,                       /* preferred_lifetime */
-                prefix_discovered.network(), /* prefix */
-            ))];
-            // The router lifetime is set to 0 to avoid conveying router information
-            // to Netstack, as doing so induces a default route and causes this test
-            // case to be a strict superset of the router-discovered test case.
-            ndp::send_ra_with_router_lifetime(
-                &fake_ep,
-                0, /* lifetime */
-                &options,
-                ipv6_consts::LINK_LOCAL_ADDR,
-            )
-            .await
-            .expect("failed to fake RA message");
+            send_ra(&fake_ep, 0 /* router_lifetime */, Some(0) /* prefix_lifetime */).await;
 
-            let mut routes = std::collections::HashSet::new();
             fnet_routes_ext::wait_for_routes(event_stream, &mut routes, |routes| {
-                routes.iter().any(
-                    |fnet_routes_ext::InstalledRoute {
-                         route: fnet_routes_ext::Route { destination, action, properties: _ },
-                         effective_properties: _,
-                     }| {
-                        let route_found = *destination == prefix_discovered;
-                        if route_found {
-                            assert_eq!(
-                                *action,
-                                fnet_routes_ext::RouteAction::Forward(
-                                    fnet_routes_ext::RouteTarget {
-                                        outbound_interface: iface.id(),
-                                        next_hop: None,
-                                    }
-                                ),
-                            );
-                        }
-                        route_found
-                    },
-                )
+                routes
+                    .iter()
+                    .all(|installed_route| !route_found(*installed_route, PREFIX, iface.id()))
             })
             .await
-            .expect("failed to wait for subnet route to appear");
+            .expect("failed to wait for subnet route to disappear");
         }
     }
 
