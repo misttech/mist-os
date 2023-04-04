@@ -748,7 +748,7 @@ type Payloader interface {
 func compile(r fidlgen.Root) *Root {
 	root := Root{
 		Experiments: r.Experiments,
-		Library: r.Name.Parse(),
+		Library:     r.Name.Parse(),
 	}
 
 	c := compiler{

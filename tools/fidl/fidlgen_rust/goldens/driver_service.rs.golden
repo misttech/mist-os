@@ -28,5 +28,3 @@ use {
     fuchsia_zircon_status as zx_status,
     futures::future::{self, MaybeDone, TryFutureExt},
 };
-
-const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;

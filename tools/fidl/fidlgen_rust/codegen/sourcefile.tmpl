@@ -76,9 +76,7 @@ const _FIDL_TRACE_BINDINGS_RUST: u32 = 6;
 {{ template "TableDeclaration" $table }}
 {{ end -}}
 {{ range $protocol := .Protocols -}}
-{{ range $transport, $_ := .Transports -}}
-{{ if eq $transport "Channel" -}}{{ template "ProtocolDeclaration" $protocol }}{{- end }}
-{{ end -}}
+{{ template "ProtocolDeclaration" $protocol }}
 {{ end -}}
 {{range (call .ServicesForTransport "Channel") -}}
 {{ template "ServiceDeclaration" . }}

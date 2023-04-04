@@ -1873,6 +1873,7 @@ func (dc *derivesCompiler) derivesForType(t Type) derives {
 
 func Compile(r fidlgen.Root) Root {
 	r = r.ForBindings("rust")
+	r = r.ForTransport("Channel")
 	root := Root{
 		Experiments: r.Experiments,
 	}
