@@ -30,22 +30,25 @@
 #define RISCV64_CSR_STVAL (0x043 | RISCV64_CSR_SMODE_BITS)
 #define RISCV64_CSR_SIP (0x044 | RISCV64_CSR_SMODE_BITS)
 
-#define RISCV64_CSR_SSTATUS_IE (1u << 1)
-#define RISCV64_CSR_SSTATUS_PIE (1u << 5)
-#define RISCV64_CSR_SSTATUS_PP (1u << 8)
-#define RISCV64_CSR_SSTATUS_FS (3u << 13)
-#define RISCV64_CSR_SSTATUS_FS_OFF (0u)
-#define RISCV64_CSR_SSTATUS_FS_INITIAL (1u << 13)
-#define RISCV64_CSR_SSTATUS_FS_CLEAN (2u << 13)
-#define RISCV64_CSR_SSTATUS_FS_DIRTY (3u << 13)
+#define RISCV64_CSR_SSTATUS_IE (1ul << 1)
+#define RISCV64_CSR_SSTATUS_PIE (1ul << 5)
+#define RISCV64_CSR_SSTATUS_PP (1ul << 8)
+#define RISCV64_CSR_SSTATUS_FS (3ul << 13)
+#define RISCV64_CSR_SSTATUS_FS_OFF (0ul)
+#define RISCV64_CSR_SSTATUS_FS_INITIAL (1ul << 13)
+#define RISCV64_CSR_SSTATUS_FS_CLEAN (2ul << 13)
+#define RISCV64_CSR_SSTATUS_FS_DIRTY (3ul << 13)
+#define RISCV64_CSR_SSTATUS_SUM (1ul << 18)
+#define RISCV64_CSR_SSTATUS_MXR (1ul << 19)
+#define RISCV64_CSR_SSTATUS_SD (1ul << 63)
 
-#define RISCV64_CSR_SIE_SIE (1u << 1)
-#define RISCV64_CSR_SIE_TIE (1u << 5)
-#define RISCV64_CSR_SIE_EIE (1u << 9)
+#define RISCV64_CSR_SIE_SIE (1ul << 1)
+#define RISCV64_CSR_SIE_TIE (1ul << 5)
+#define RISCV64_CSR_SIE_EIE (1ul << 9)
 
-#define RISCV64_CSR_SIP_SIP (1u << 1)
-#define RISCV64_CSR_SIP_TIP (1u << 5)
-#define RISCV64_CSR_SIP_EIP (1u << 9)
+#define RISCV64_CSR_SIP_SIP (1ul << 1)
+#define RISCV64_CSR_SIP_TIP (1ul << 5)
+#define RISCV64_CSR_SIP_EIP (1ul << 9)
 
 // Interrupts, top bit set in cause register
 #define RISCV64_INTERRUPT_SSWI 1  // software interrupt
@@ -126,29 +129,30 @@
   })
 
 // Register state layout used by riscv64_context_switch().
-struct riscv64_context_switch_frame {
-  unsigned long ra;  // return address (x1)
+struct alignas(16) riscv64_context_switch_frame {
+  uint64_t ra;  // return address (x1)
 
-  unsigned long s0;  // x8-x9
-  unsigned long s1;
+  uint64_t s0;  // x8-x9
+  uint64_t s1;
 
-  unsigned long s2;  // x18-x27
-  unsigned long s3;
-  unsigned long s4;
-  unsigned long s5;
-  unsigned long s6;
-  unsigned long s7;
-  unsigned long s8;
-  unsigned long s9;
-  unsigned long s10;
-  unsigned long s11;
+  uint64_t s2;  // x18-x27
+  uint64_t s3;
+  uint64_t s4;
+  uint64_t s5;
+  uint64_t s6;
+  uint64_t s7;
+  uint64_t s8;
+  uint64_t s9;
+  uint64_t s10;
+  uint64_t s11;
 
-  unsigned long reserved;  // stack alignment
+  uint64_t reserved;  // stack alignment
 };
 
-static_assert(__offsetof(riscv64_context_switch_frame, ra) == CONTEXT_SWITCH_FRAME_OFFSET_RA, "");
-static_assert(__offsetof(riscv64_context_switch_frame, s0) == CONTEXT_SWITCH_FRAME_OFFSET_S(0), "");
-static_assert(sizeof(riscv64_context_switch_frame) == SIZEOF_CONTEXT_SWITCH_FRAME, "");
+static_assert(__offsetof(riscv64_context_switch_frame, ra) == CONTEXT_SWITCH_FRAME_OFFSET_RA);
+static_assert(__offsetof(riscv64_context_switch_frame, s0) == CONTEXT_SWITCH_FRAME_OFFSET_S(0));
+static_assert(sizeof(riscv64_context_switch_frame) == SIZEOF_CONTEXT_SWITCH_FRAME);
+static_assert(sizeof(riscv64_context_switch_frame) % 16u == 0u);
 
 extern "C" void riscv64_exception_entry();
 extern "C" void riscv64_context_switch(vaddr_t* old_sp, vaddr_t new_sp);

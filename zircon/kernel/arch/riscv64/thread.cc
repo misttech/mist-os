@@ -28,7 +28,7 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
   // create a default stack frame on the stack
   vaddr_t stack_top = t->stack().top();
 
-  // make sure the top of the stack is 16 byte aligned for EABI compliance
+  // make sure the top of the stack is 16 byte aligned for ABI compliance
   DEBUG_ASSERT(IS_ALIGNED(stack_top, 16));
 
   struct riscv64_context_switch_frame* frame = (struct riscv64_context_switch_frame*)(stack_top);
@@ -39,11 +39,15 @@ void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
 
   // set the stack pointer
   t->arch().sp = (vaddr_t)frame;
+#if __has_feature(shadow_call_stack)
+  // the shadow call stack grows up
+  frame->s2 = t->stack().shadow_call_base();
+#endif
 }
 
-__NO_SAFESTACK void arch_thread_construct_first(Thread* t) { arch_set_current_thread(t); }
+void arch_thread_construct_first(Thread* t) { arch_set_current_thread(t); }
 
-__NO_SAFESTACK void arch_context_switch(Thread* oldthread, Thread* newthread) {
+void arch_context_switch(Thread* oldthread, Thread* newthread) {
   DEBUG_ASSERT(arch_ints_disabled());
 
   LTRACEF("old %p (%s), new %p (%s)\n", oldthread, oldthread->name(), newthread, newthread->name());
@@ -59,6 +63,18 @@ void arch_dump_thread(Thread* t) {
   }
 }
 
+vaddr_t arch_thread_get_blocked_fp(Thread* t) {
+  if (!WITH_FRAME_POINTERS) {
+    return 0;
+  }
+
+  const struct riscv64_context_switch_frame* frame;
+  frame = reinterpret_cast<const riscv64_context_switch_frame*>(t->arch().sp);
+  DEBUG_ASSERT(frame);
+
+  return frame->s0;
+}
+
 __NO_SAFESTACK void arch_save_user_state(Thread* thread) {}
 
 __NO_SAFESTACK void arch_restore_user_state(Thread* thread) {}
@@ -67,5 +83,3 @@ void arch_set_suspended_general_regs(struct Thread* thread, GeneralRegsSource so
                                      void* iframe) {}
 
 void arch_reset_suspended_general_regs(struct Thread* thread) {}
-
-vaddr_t arch_thread_get_blocked_fp(Thread* t) { return 0; }

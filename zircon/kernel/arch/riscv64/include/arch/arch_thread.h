@@ -27,7 +27,7 @@ struct arch_thread {
   // If non-NULL, address to return to on data fault.
   uint64_t data_fault_resume;
 
-  // TODO: fpu/vector state goes here
+  // TODO-rvbringup: fpu/vector state goes here
 };
 
 #define thread_pointer_offsetof(field)        \

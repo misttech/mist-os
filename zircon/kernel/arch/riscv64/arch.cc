@@ -125,12 +125,15 @@ void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uint
                               uintptr_t arg2) {
   iframe->regs.pc = pc;
   iframe->regs.sp = sp;
-  iframe->sstatus = RISCV64_CSR_SSTATUS_PIE;
+  iframe->status = RISCV64_CSR_SSTATUS_PIE;
   iframe->regs.a0 = arg1;
   iframe->regs.a1 = arg2;
 }
 
-extern "C" void riscv64_uspace_entry(iframe_t* iframe, vaddr_t tp);
+extern "C" void riscv64_uspace_entry(iframe_t* iframe, vaddr_t tp) {
+  // TODO-rvbringup: implement in asm
+  PANIC_UNIMPLEMENTED;
+}
 
 // Switch to user mode, set the user stack pointer to user_stack_top, save the
 // top of the kernel stack pointer.
