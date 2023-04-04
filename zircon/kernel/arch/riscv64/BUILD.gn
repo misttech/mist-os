@@ -76,6 +76,7 @@ if (toolchain_base_environment == "kernel") {
       "cache.cc",
       "crashlog.cc",
       "debugger.cc",
+      "exceptions.S",
       "exceptions_c.cc",
       "mmu.cc",
       "mp.cc",
