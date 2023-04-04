@@ -59,7 +59,7 @@ use crate::{
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
-        forwarding::{Destination, ForwardingTable},
+        forwarding::{Destination, ForwardingTable, NextHop},
         gmp::igmp::IgmpPacketHandler,
         icmp::{
             BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpSockets,
@@ -747,10 +747,13 @@ impl<
                 };
                 Ok(IpSockRoute {
                     local_ip,
-                    destination: Destination { device: loopback, next_hop: addr },
+                    destination: Destination {
+                        device: loopback,
+                        next_hop: NextHop::RemoteAsNeighbor,
+                    },
                 })
             }
-            None => lookup_route_table(self, ctx, device, addr)
+            None => lookup_route_table(self, ctx, device, *addr)
                 .map(|destination| {
                     let Destination { device, next_hop: _ } = &destination;
                     Ok(IpSockRoute { local_ip: get_local_addr(self, device)?, destination })
@@ -1721,7 +1724,7 @@ pub(crate) fn receive_ipv4_packet<
                 Ipv4
             );
         }
-        ReceivePacketAction::Forward { dst } => {
+        ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
             let ttl = packet.ttl();
             if ttl > 1 {
                 trace!("receive_ipv4_packet: forwarding");
@@ -1732,8 +1735,8 @@ pub(crate) fn receive_ipv4_packet<
                 match BufferIpDeviceContext::<Ipv4, _, _>::send_ip_frame(
                     sync_ctx,
                     ctx,
-                    &dst.device,
-                    dst.next_hop,
+                    &dst_device,
+                    next_hop.as_gateway().unwrap_or(dst_ip),
                     buffer,
                 ) {
                     Ok(()) => (),
@@ -1988,7 +1991,7 @@ pub(crate) fn receive_ipv6_packet<
                 }
             }
         }
-        ReceivePacketAction::Forward { dst } => {
+        ReceivePacketAction::Forward { dst: Destination { device: dst_device, next_hop } } => {
             ctx.increment_debug_counter("receive_ipv6_packet::forward");
             let ttl = packet.ttl();
             if ttl > 1 {
@@ -2012,8 +2015,8 @@ pub(crate) fn receive_ipv6_packet<
                 if let Err(buffer) = BufferIpDeviceContext::<Ipv6, _, _>::send_ip_frame(
                     sync_ctx,
                     ctx,
-                    &dst.device,
-                    dst.next_hop,
+                    &dst_device,
+                    next_hop.as_gateway().unwrap_or(dst_ip),
                     buffer,
                 ) {
                     // TODO(https://fxbug.dev/86247): Encode the MTU error more
@@ -2317,7 +2320,7 @@ fn receive_ip_packet_action_common<
         ctx.increment_debug_counter("receive_ip_packet_action_common::routing_disabled_per_device");
         ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
     } else {
-        match lookup_route_table(sync_ctx, ctx, None, dst_ip) {
+        match lookup_route_table(sync_ctx, ctx, None, *dst_ip) {
             Some(dst) => {
                 ctx.increment_debug_counter("receive_ip_packet_action_common::forward");
                 ReceivePacketAction::Forward { dst }
@@ -2339,7 +2342,7 @@ fn lookup_route_table<
     sync_ctx: &mut SC,
     _ctx: &mut C,
     device: Option<&SC::DeviceId>,
-    dst_ip: SpecifiedAddr<I::Addr>,
+    dst_ip: I::Addr,
 ) -> Option<Destination<I::Addr, SC::DeviceId>> {
     sync_ctx.with_ip_routing_table(|sync_ctx, table| table.lookup(sync_ctx, device, dst_ip))
 }
@@ -4616,7 +4619,7 @@ mod tests {
                 v4_config.remote_ip
             ),
             ReceivePacketAction::Forward {
-                dst: Destination { next_hop: v4_config.remote_ip, device: v4_dev.clone() }
+                dst: Destination { next_hop: NextHop::RemoteAsNeighbor, device: v4_dev.clone() }
             }
         );
         assert_eq!(
@@ -4627,7 +4630,7 @@ mod tests {
                 v6_config.remote_ip
             ),
             ReceivePacketAction::Forward {
-                dst: Destination { next_hop: v6_config.remote_ip, device: v6_dev.clone() }
+                dst: Destination { next_hop: NextHop::RemoteAsNeighbor, device: v6_dev.clone() }
             }
         );
 
@@ -4706,19 +4709,19 @@ mod tests {
                 None,
                 Device::First.ip_address(),
                 Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: Device::First.ip_address(), device: Device::Loopback,
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback,
                 }}); "local delivery")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 Device::First.ip_address(),
                 Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: Device::First.ip_address(), device: Device::Loopback
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
                 }}); "local delivery specified local addr")]
     #[test_case(Some(Device::First.ip_address()),
                 Some(Device::First),
                 Device::First.ip_address(),
                 Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: Device::First.ip_address(), device: Device::Loopback
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
                 }}); "local delivery specified device and addr")]
     #[test_case(None,
                 Some(Device::Loopback),
@@ -4729,7 +4732,7 @@ mod tests {
                 Some(Device::Loopback),
                 Device::Loopback.ip_address(),
                 Ok(IpSockRoute { local_ip: Device::Loopback.ip_address(), destination: Destination {
-                    next_hop: Device::Loopback.ip_address(), device: Device::Loopback
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
                 }}); "local delivery to loopback addr via specified loopback device no addr")]
     #[test_case(None,
                 Some(Device::Second),
@@ -4750,13 +4753,13 @@ mod tests {
                 None,
                 remote_ip::<I>(),
                 Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: remote_ip::<I>(), device: Device::First
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
                 }}); "remote delivery")]
     #[test_case(Some(Device::First.ip_address()),
                 None,
                 remote_ip::<I>(),
                 Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: remote_ip::<I>(), device: Device::First
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
                 }}); "remote delivery specified addr")]
     #[test_case(Some(Device::Second.ip_address()), None, remote_ip::<I>(),
                 Err(IpSockRouteError::Unroutable(IpSockUnroutableError::LocalAddrNotAssigned));
@@ -4765,7 +4768,7 @@ mod tests {
                 Some(Device::First),
                 remote_ip::<I>(),
                 Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
-                    next_hop: remote_ip::<I>(), device: Device::First
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
                 }}); "remote delivery specified device")]
     #[test_case(None, Some(Device::Second), remote_ip::<I>(),
                 Err(IpSockRouteError::Unroutable(IpSockUnroutableError::NoRouteToRemoteAddr));
@@ -4774,7 +4777,7 @@ mod tests {
                 None,
                 Device::First.ip_address(),
                 Ok(IpSockRoute {local_ip: Device::Second.ip_address(), destination: Destination {
-                    next_hop: Device::First.ip_address(), device: Device::Loopback
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Loopback
                 }});
                 "local delivery cross device")]
     fn lookup_route<I: Ip + TestIpExt + IpDeviceIpExt + IpLayerIpExt>(

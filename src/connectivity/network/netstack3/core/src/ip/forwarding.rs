@@ -9,7 +9,7 @@ use core::{fmt::Debug, slice::Iter};
 
 use log::debug;
 use net_types::{
-    ip::{Ip, IpAddress, Subnet},
+    ip::{Ip, Subnet},
     SpecifiedAddr,
 };
 use thiserror::Error;
@@ -35,16 +35,11 @@ pub(crate) fn add_gateway_route<
     metric: AddableMetric,
 ) -> Result<(), AddRouteError> {
     sync_ctx.with_ip_routing_table_mut(|sync_ctx, table| {
-        let device = table.lookup(sync_ctx, None, next_hop).map_or(
+        let device = table.lookup(sync_ctx, None, *next_hop).map_or(
             Err(AddRouteError::GatewayNotNeighbor),
-            |Destination { next_hop: found_next_hop, device }| {
-                // If the found route to the `next_hop` has it's own unique
-                // next hop, then the given `next_hop` is not a neighbor.
-                if next_hop != found_next_hop {
-                    Err(AddRouteError::GatewayNotNeighbor)
-                } else {
-                    Ok(device)
-                }
+            |Destination { next_hop: found_next_hop, device }| match found_next_hop {
+                NextHop::RemoteAsNeighbor => Ok(device),
+                NextHop::Gateway(_intermediary_gateway) => Err(AddRouteError::GatewayNotNeighbor),
             },
         )?;
         let metric = observe_metric(sync_ctx, &device, metric);
@@ -91,21 +86,35 @@ fn observe_metric<I: IpLayerIpExt, C, SC: IpDeviceContext<I, C>>(
     }
 }
 
-// TODO(joshlf):
-// - How do we detect circular routes? Do we attempt to detect at rule
-//   installation time? At runtime? Using what algorithm?
+/// The next hop for a [`Destination`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub(crate) enum NextHop<A> {
+    /// Indicates that the next-hop for a the packet is the remote since it is a
+    /// neighboring node (on-link).
+    RemoteAsNeighbor,
+    /// Indicates that the next-hop is a gateway/router since the remote is not
+    /// a neighboring node (off-link).
+    Gateway(SpecifiedAddr<A>),
+}
+
+impl<A> NextHop<A> {
+    pub(crate) fn as_gateway(self) -> Option<SpecifiedAddr<A>> {
+        match self {
+            NextHop::RemoteAsNeighbor => None,
+            NextHop::Gateway(gateway) => Some(gateway),
+        }
+    }
+}
 
 /// The destination of an outbound IP packet.
 ///
 /// Outbound IP packets are sent to a particular device (specified by the
-/// `device` field). They are sent to a particular IP host on the local network
-/// attached to that device, identified by `next_hop`. Note that `next_hop` is
-/// not necessarily the destination IP address of the IP packet. In particular,
-/// if the destination is not on the local network, the `next_hop` will be the
-/// IP address of the next IP router on the way to the destination.
+/// `device` field).
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub(crate) struct Destination<A: IpAddress, D> {
-    pub(crate) next_hop: SpecifiedAddr<A>,
+pub(crate) struct Destination<A, D> {
+    /// Indicates the next hop via which this destination can be reached.
+    pub(crate) next_hop: NextHop<A>,
+    /// Indicates the device over which this destination can be reached.
     pub(crate) device: D,
 }
 
@@ -268,30 +277,21 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         self.table.iter()
     }
 
-    /// Look up an address in the table.
+    /// Look up the forwarding entry for an address in the table.
     ///
-    /// Look up an IP address in the table, returning a next hop IP address and
-    /// a device to send over. If `address` is link-local, then the returned
-    /// next hop will be `address`. Otherwise, it will be the link-local address
-    /// of an IP router capable of delivering packets to `address`.
+    /// Look up the forwarding entry for an address in the table, returning the
+    /// next hop and device over which the address is reachable.
     ///
     /// If `device` is specified, the available routes are limited to those that
     /// egress over the device.
     ///
-    /// If `address` matches an entry which maps to an IP address, `lookup` will
-    /// look that address up in the table as well, continuing until a link-local
-    /// address and device are found.
-    ///
-    /// If multiple entries match `address` or any intermediate IP address, the
-    /// entry with the longest prefix will be chosen.
-    ///
-    /// The unspecified address (0.0.0.0 in IPv4 and :: in IPv6) are not
-    /// routable and will return None even if they have been added to the table.
+    /// If multiple entries match `address` or the first entry will be selected.
+    /// See [`ForwardingTable`] for more details of how entries are sorted.
     pub(crate) fn lookup<SC: DeviceIdContext<AnyDevice, DeviceId = D>>(
         &self,
         sync_ctx: &mut SC,
         local_device: Option<&D>,
-        address: SpecifiedAddr<I::Addr>,
+        address: I::Addr,
     ) -> Option<Destination<I::Addr, D>> {
         let Self { table } = self;
 
@@ -301,9 +301,7 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
                 && local_device.map_or(true, |d| d == device)
                 && sync_ctx.is_device_installed(device))
             .then(|| {
-                let next_hop =
-                    if let Some(next_hop) = gateway { next_hop.clone() } else { address };
-
+                let next_hop = gateway.map_or(NextHop::RemoteAsNeighbor, NextHop::Gateway);
                 Destination { next_hop, device: device.clone() }
             })
         })
@@ -546,18 +544,18 @@ mod tests {
 
         // Do lookup for our next hop (should be the device).
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, next_hop),
-            Some(Destination { next_hop, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *next_hop),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
         );
 
         // Do lookup for some address within `subnet`.
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, config.local_ip),
-            Some(Destination { next_hop: config.local_ip, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *config.local_ip),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, config.remote_ip),
-            Some(Destination { next_hop: config.remote_ip, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *config.remote_ip),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
         );
 
         // Delete routes to the subnet and make sure that we can no longer route
@@ -580,11 +578,11 @@ mod tests {
             ])
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, next_hop),
-            Some(Destination { next_hop, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *next_hop),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
         );
-        assert_eq!(table.lookup(&mut sync_ctx, None, config.local_ip), None);
-        assert_eq!(table.lookup(&mut sync_ctx, None, config.remote_ip), None);
+        assert_eq!(table.lookup(&mut sync_ctx, None, *config.local_ip), None);
+        assert_eq!(table.lookup(&mut sync_ctx, None, *config.remote_ip), None);
 
         // Make the subnet routable again but through a gateway.
         let gateway_entry = ip::types::Entry {
@@ -595,16 +593,16 @@ mod tests {
         };
         assert_eq!(table.add_entry(gateway_entry.clone()), Ok(&gateway_entry));
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, next_hop),
-            Some(Destination { next_hop, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *next_hop),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: device.clone() })
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, config.local_ip),
-            Some(Destination { next_hop, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *config.local_ip),
+            Some(Destination { next_hop: NextHop::Gateway(next_hop), device: device.clone() })
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, config.remote_ip),
-            Some(Destination { next_hop, device: device.clone() })
+            table.lookup(&mut sync_ctx, None, *config.remote_ip),
+            Some(Destination { next_hop: NextHop::Gateway(next_hop), device: device.clone() })
         );
     }
 
@@ -629,10 +627,10 @@ mod tests {
         assert_eq!(table.add_entry(entry.clone()), Ok(&entry));
         table.print_table();
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, addr1).unwrap(),
-            Destination { next_hop: addr1, device: device0.clone() }
+            table.lookup(&mut sync_ctx, None, *addr1).unwrap(),
+            Destination { next_hop: NextHop::RemoteAsNeighbor, device: device0.clone() }
         );
-        assert_eq!(table.lookup(&mut sync_ctx, None, addr2), None);
+        assert_eq!(table.lookup(&mut sync_ctx, None, *addr2), None);
 
         // Add a default route.
         //
@@ -650,16 +648,20 @@ mod tests {
 
         assert_eq!(table.add_entry(default_entry.clone()), Ok(&default_entry));
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, addr1).unwrap(),
-            Destination { next_hop: addr1, device: device0.clone() }
+            table.lookup(&mut sync_ctx, None, *addr1).unwrap(),
+            Destination { next_hop: NextHop::RemoteAsNeighbor, device: device0.clone() }
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, addr2).unwrap(),
-            Destination { next_hop: addr1, device: device0.clone() }
+            table.lookup(&mut sync_ctx, None, *addr2).unwrap(),
+            Destination { next_hop: NextHop::Gateway(addr1), device: device0.clone() }
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, addr3).unwrap(),
-            Destination { next_hop: addr1, device: device0.clone() }
+            table.lookup(&mut sync_ctx, None, *addr3).unwrap(),
+            Destination { next_hop: NextHop::Gateway(addr1), device: device0.clone() }
+        );
+        assert_eq!(
+            table.lookup(&mut sync_ctx, None, I::UNSPECIFIED_ADDRESS).unwrap(),
+            Destination { next_hop: NextHop::Gateway(addr1), device: device0.clone() }
         );
     }
 
@@ -670,10 +672,10 @@ mod tests {
 
         let mut sync_ctx = FakeCtx::<I>::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-        let (next_hop, more_specific_sub) = I::next_hop_addr_sub(1, 1);
+        let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 1);
         let less_specific_sub = {
             let (addr, sub) = I::next_hop_addr_sub(1, 2);
-            assert_eq!(next_hop, addr);
+            assert_eq!(remote, addr);
             sub
         };
         let metric = Metric::ExplicitMetric(RawMetric(0));
@@ -685,17 +687,23 @@ mod tests {
         };
         assert_eq!(table.add_entry(less_specific_entry.clone()), Ok(&less_specific_entry));
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, next_hop),
-            Some(Destination { next_hop, device: LESS_SPECIFIC_SUB_DEVICE.clone() }),
+            table.lookup(&mut sync_ctx, None, *remote),
+            Some(Destination {
+                next_hop: NextHop::RemoteAsNeighbor,
+                device: LESS_SPECIFIC_SUB_DEVICE.clone()
+            }),
             "matches route"
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, Some(&LESS_SPECIFIC_SUB_DEVICE), next_hop),
-            Some(Destination { next_hop, device: LESS_SPECIFIC_SUB_DEVICE.clone() }),
+            table.lookup(&mut sync_ctx, Some(&LESS_SPECIFIC_SUB_DEVICE), *remote),
+            Some(Destination {
+                next_hop: NextHop::RemoteAsNeighbor,
+                device: LESS_SPECIFIC_SUB_DEVICE.clone()
+            }),
             "route matches specified device"
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, Some(&MORE_SPECIFIC_SUB_DEVICE), next_hop),
+            table.lookup(&mut sync_ctx, Some(&MORE_SPECIFIC_SUB_DEVICE), *remote),
             None,
             "no route with the specified device"
         );
@@ -708,18 +716,27 @@ mod tests {
         };
         assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
         assert_eq!(
-            table.lookup(&mut sync_ctx, None, next_hop).unwrap(),
-            Destination { next_hop, device: MORE_SPECIFIC_SUB_DEVICE.clone() },
+            table.lookup(&mut sync_ctx, None, *remote).unwrap(),
+            Destination {
+                next_hop: NextHop::RemoteAsNeighbor,
+                device: MORE_SPECIFIC_SUB_DEVICE.clone()
+            },
             "matches most specific route"
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, Some(&LESS_SPECIFIC_SUB_DEVICE), next_hop),
-            Some(Destination { next_hop, device: LESS_SPECIFIC_SUB_DEVICE.clone() }),
+            table.lookup(&mut sync_ctx, Some(&LESS_SPECIFIC_SUB_DEVICE), *remote),
+            Some(Destination {
+                next_hop: NextHop::RemoteAsNeighbor,
+                device: LESS_SPECIFIC_SUB_DEVICE.clone()
+            }),
             "matches less specific route with the specified device"
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, Some(&MORE_SPECIFIC_SUB_DEVICE), next_hop).unwrap(),
-            Destination { next_hop, device: MORE_SPECIFIC_SUB_DEVICE.clone() },
+            table.lookup(&mut sync_ctx, Some(&MORE_SPECIFIC_SUB_DEVICE), *remote).unwrap(),
+            Destination {
+                next_hop: NextHop::RemoteAsNeighbor,
+                device: MORE_SPECIFIC_SUB_DEVICE.clone()
+            },
             "matches the most specific route with the specified device"
         );
     }
@@ -731,7 +748,7 @@ mod tests {
 
         let mut sync_ctx = FakeCtx::<I>::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-        let (next_hop, sub) = I::next_hop_addr_sub(1, 1);
+        let (remote, sub) = I::next_hop_addr_sub(1, 1);
         let metric = Metric::ExplicitMetric(RawMetric(0));
 
         let entry1 =
@@ -740,23 +757,23 @@ mod tests {
         let entry2 =
             ip::types::Entry { subnet: sub, device: DEVICE2.clone(), gateway: None, metric };
         assert_eq!(table.add_entry(entry2.clone()), Ok(&entry2));
-        let lookup = table.lookup(&mut sync_ctx, None, next_hop);
+        let lookup = table.lookup(&mut sync_ctx, None, *remote);
         assert!(
             [
-                Some(Destination { next_hop, device: DEVICE1.clone() }),
-                Some(Destination { next_hop, device: DEVICE2.clone() })
+                Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: DEVICE1.clone() }),
+                Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: DEVICE2.clone() })
             ]
             .contains(&lookup),
             "lookup = {:?}",
             lookup
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, Some(&DEVICE1), next_hop),
-            Some(Destination { next_hop, device: DEVICE1.clone() }),
+            table.lookup(&mut sync_ctx, Some(&DEVICE1), *remote),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: DEVICE1.clone() }),
         );
         assert_eq!(
-            table.lookup(&mut sync_ctx, Some(&DEVICE2), next_hop),
-            Some(Destination { next_hop, device: DEVICE2.clone() }),
+            table.lookup(&mut sync_ctx, Some(&DEVICE2), *remote),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: DEVICE2.clone() }),
         );
     }
 
@@ -767,10 +784,10 @@ mod tests {
 
         let mut sync_ctx = FakeCtx::<I>::default();
         let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
-        let (next_hop, more_specific_sub) = I::next_hop_addr_sub(1, 1);
+        let (remote, more_specific_sub) = I::next_hop_addr_sub(1, 1);
         let less_specific_sub = {
             let (addr, sub) = I::next_hop_addr_sub(1, 2);
-            assert_eq!(next_hop, addr);
+            assert_eq!(remote, addr);
             sub
         };
         let metric = Metric::ExplicitMetric(RawMetric(0));
@@ -785,14 +802,20 @@ mod tests {
         for (device_removed, expected) in [
             // If the device is removed, then we cannot use routes through it.
             (true, None),
-            (false, Some(Destination { next_hop, device: LESS_SPECIFIC_SUB_DEVICE.clone() })),
+            (
+                false,
+                Some(Destination {
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    device: LESS_SPECIFIC_SUB_DEVICE.clone(),
+                }),
+            ),
         ] {
             sync_ctx
                 .get_mut()
                 .ip_device_id_ctx
                 .set_device_removed(LESS_SPECIFIC_SUB_DEVICE, device_removed);
             assert_eq!(
-                table.lookup(&mut sync_ctx, None, next_hop),
+                table.lookup(&mut sync_ctx, None, *remote),
                 expected,
                 "device_removed={}",
                 device_removed,
@@ -807,17 +830,29 @@ mod tests {
         };
         assert_eq!(table.add_entry(more_specific_entry.clone()), Ok(&more_specific_entry));
         for (device_removed, expected) in [
-            (false, Some(Destination { next_hop, device: MORE_SPECIFIC_SUB_DEVICE.clone() })),
+            (
+                false,
+                Some(Destination {
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    device: MORE_SPECIFIC_SUB_DEVICE.clone(),
+                }),
+            ),
             // If the device is removed, then we cannot use routes through it,
             // but can use routes through other (active) devices.
-            (true, Some(Destination { next_hop, device: LESS_SPECIFIC_SUB_DEVICE.clone() })),
+            (
+                true,
+                Some(Destination {
+                    next_hop: NextHop::RemoteAsNeighbor,
+                    device: LESS_SPECIFIC_SUB_DEVICE.clone(),
+                }),
+            ),
         ] {
             sync_ctx
                 .get_mut()
                 .ip_device_id_ctx
                 .set_device_removed(MORE_SPECIFIC_SUB_DEVICE, device_removed);
             assert_eq!(
-                table.lookup(&mut sync_ctx, None, next_hop),
+                table.lookup(&mut sync_ctx, None, *remote),
                 expected,
                 "device_removed={}",
                 device_removed,
@@ -826,7 +861,7 @@ mod tests {
 
         // If no devices exist, then we can't get a route.
         sync_ctx.get_mut().ip_device_id_ctx.set_device_removed(LESS_SPECIFIC_SUB_DEVICE, true);
-        assert_eq!(table.lookup(&mut sync_ctx, None, next_hop), None,);
+        assert_eq!(table.lookup(&mut sync_ctx, None, *remote), None,);
     }
 
     #[ip_test]

@@ -531,7 +531,7 @@ fn send_ip_packet<
             device: &device,
             src_ip: *local_ip,
             dst_ip: *remote_ip,
-            next_hop,
+            next_hop: next_hop.as_gateway().unwrap_or(*remote_ip),
             ttl: options.hop_limit(remote_ip),
             proto: *proto,
             mtu,
@@ -995,7 +995,7 @@ pub(crate) mod testutil {
         ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError> {
             let FakeIpSocketCtx { device_state, table, ip_device_id_ctx } = self;
             let destination = table
-                .lookup(ip_device_id_ctx, device, addr)
+                .lookup(ip_device_id_ctx, device, *addr)
                 .ok_or(IpSockUnroutableError::NoRouteToRemoteAddr)?;
 
             let Destination { device, next_hop: _ } = &destination;
