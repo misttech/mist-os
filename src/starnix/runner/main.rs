@@ -25,7 +25,7 @@ use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
 /// The name of the collection that the starnix_kernel is run in.
 const KERNEL_COLLECTION: &str = "kernels";
 
-#[fuchsia::main(logging_tags = ["starnix_manager"])]
+#[fuchsia::main(logging_tags = ["starnix_runner"])]
 async fn main() -> Result<(), Error> {
     const KERNELS_DIRECTORY: &str = "kernels";
     const SVC_DIRECTORY: &str = "svc";
@@ -218,7 +218,7 @@ async fn create_new_kernel(
 ) -> Result<(), Error> {
     // The name of the directory capability that is being offered to the starnix_kernel.
     const KERNEL_DIRECTORY: &str = "kernels";
-    // The url of the starnix_kernel component, which is packaged with the starnix_manager.
+    // The url of the starnix_kernel component, which is packaged with the starnix_runner.
     const KERNEL_URL: &str = "fuchsia-pkg://fuchsia.com/starnix_kernel#meta/starnix_kernel.cm";
 
     let kernel_start_info =

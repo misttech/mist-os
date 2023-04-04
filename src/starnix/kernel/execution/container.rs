@@ -39,7 +39,7 @@ use fidl::HandleBased;
 /// handles for the container's component controller and `/pkg` directory.
 ///
 /// When using structured_config, the `component_controller` handle will not be set. When all
-/// containers are run as components, by starnix_manager, the `component_controller` will always
+/// containers are run as components, by starnix_runner, the `component_controller` will always
 /// exist.
 struct ConfigWrapper {
     config: Config,

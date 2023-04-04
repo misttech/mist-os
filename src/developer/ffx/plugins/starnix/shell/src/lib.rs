@@ -18,7 +18,7 @@ use {
 
 #[ffx_plugin(
     "starnix_enabled",
-    ManagerProxy = "core/starnix_manager:expose:fuchsia.starnix.developer.Manager"
+    ManagerProxy = "core/starnix_runner:expose:fuchsia.starnix.developer.Manager"
 )]
 pub async fn shell_starnix(
     manager_proxy: ManagerProxy,

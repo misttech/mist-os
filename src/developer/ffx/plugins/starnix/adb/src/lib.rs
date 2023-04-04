@@ -33,7 +33,7 @@ async fn serve_adb_connection(mut stream: TcpStream, bridge_socket: fidl::Socket
 
 #[ffx_plugin(
     "starnix_enabled",
-    ManagerProxy = "core/starnix_manager:expose:fuchsia.starnix.developer.Manager"
+    ManagerProxy = "core/starnix_runner:expose:fuchsia.starnix.developer.Manager"
 )]
 pub async fn adb_starnix(manager_proxy: ManagerProxy, command: AdbStarnixCommand) -> Result<()> {
     println!("adb_starnix - listening");

@@ -115,7 +115,7 @@
         },
         {
             protocol: "fuchsia.starnix.developer.Manager",
-            from: "#starnix_manager",
+            from: "#starnix_runner",
         },
         {
             protocol: "fuchsia.hardware.serial.DeviceProxy",

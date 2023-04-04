@@ -14,8 +14,8 @@ group("runner") {
   }
 }
 
-rustc_binary("starnix_manager_bin") {
-  name = "starnix_manager"
+rustc_binary("starnix_runner_bin") {
+  name = "starnix_runner"
   edition = "2021"
   with_unit_tests = true
 
@@ -45,14 +45,14 @@ rustc_binary("starnix_manager_bin") {
   sources = [ "main.rs" ]
 }
 
-core_shard("starnix_manager_core_shard") {
-  shard_file = "meta/starnix_manager.core_shard.cml"
+core_shard("starnix_runner_core_shard") {
+  shard_file = "meta/starnix_runner.core_shard.cml"
 }
 
 fuchsia_package_with_single_component("starnix_package") {
-  manifest = "meta/starnix_manager.cml"
+  manifest = "meta/starnix_runner.cml"
   package_name = "starnix"
-  component_name = "starnix_manager"
+  component_name = "starnix_runner"
 
-  deps = [ ":starnix_manager_bin" ]
+  deps = [ ":starnix_runner_bin" ]
 }

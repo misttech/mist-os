@@ -87,8 +87,8 @@
             url: "fuchsia-pkg://fuchsia.com/cobalt#meta/cobalt.cm",
         },
         {
-            name: "starnix_manager",
-            url: "fuchsia-pkg://fuchsia.com/starnix#meta/starnix_manager.cm",
+            name: "starnix_runner",
+            url: "fuchsia-pkg://fuchsia.com/starnix#meta/starnix_runner.cm",
             environment: "#core-env",
         },
         {
@@ -245,7 +245,7 @@
         {
             protocol: [ "fuchsia.posix.socket.Provider" ],
             from: "#network",
-            to: [ "#starnix_manager" ],
+            to: [ "#starnix_runner" ],
         },
         {
             protocol: "fuchsia.stash.SecureStore",
@@ -335,14 +335,14 @@
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],
             from: "parent",
-            to: "#starnix_manager",
+            to: "#starnix_runner",
         },
         {
             protocol: [ "fuchsia.sysmem.Allocator" ],
             from: "#sysmem_connector",
             to: [
                 "#agis",
-                "#starnix_manager",
+                "#starnix_runner",
             ],
         },
         {
@@ -540,7 +540,7 @@
             from: "#vulkan_loader",
             to: [
                 "#agis",
-                "#starnix_manager",
+                "#starnix_runner",
             ],
         },
         {
@@ -561,7 +561,7 @@
             from: "parent",
             as: "dev-gpu",
             to: [
-                "#starnix_manager",
+                "#starnix_runner",
                 "#vulkan_loader",
             ],
             subdir: "gpu",

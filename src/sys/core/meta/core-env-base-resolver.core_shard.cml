@@ -16,11 +16,11 @@
             runners: [
                 {
                     runner: "stardroid",
-                    from: "#starnix_manager",
+                    from: "#starnix_runner",
                 },
                 {
                     runner: "starnix_chromiumos",
-                    from: "#starnix_manager",
+                    from: "#starnix_runner",
                 },
             ],
         },
