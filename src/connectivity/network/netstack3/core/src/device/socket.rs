@@ -53,10 +53,7 @@ pub trait NonSyncContext {}
 impl<C> NonSyncContext for C {}
 
 /// Identifier for a socket.
-///
-/// This is intentionally not cloneable since each socket ID is a reference to
-/// unique state held elsewhere.
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Clone, Debug, Hash, Eq, PartialEq)]
 pub struct SocketId(usize);
 
 /// Holds sockets that are not bound to a particular device.
