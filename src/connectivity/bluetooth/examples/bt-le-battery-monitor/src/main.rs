@@ -9,10 +9,11 @@ use fidl_fuchsia_bluetooth_le::{
     CentralMarker, CentralProxy, ConnectionMarker, ConnectionOptions, ConnectionProxy, Filter,
     Peer, ScanOptions, ScanResultWatcherMarker, ScanResultWatcherProxy,
 };
+use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::le::Peer as btPeer;
 use fuchsia_bluetooth::types::{PeerId, Uuid};
 use fuchsia_component::client::connect_to_protocol;
-use futures::stream::TryStreamExt;
+use futures::stream::{StreamExt, TryStreamExt};
 use std::collections::HashMap;
 use tracing::{info, warn};
 
@@ -31,6 +32,9 @@ struct BatteryClient {
     _gatt: gatt::ClientProxy,
     /// Connection to the peer's GATT Battery service.
     _gatt_service_connection: gatt::RemoteServiceProxy,
+    /// A task that monitors the current battery level of the peer. None if notifications aren't
+    /// supported.
+    _monitor_task: Option<fasync::Task<()>>,
 }
 
 fn is_battery_service(info: &gatt::ServiceInfo) -> bool {
@@ -45,6 +49,10 @@ fn is_readable(char: &gatt::Characteristic) -> bool {
     char.properties.map_or(false, |p| p.contains(gatt::CharacteristicPropertyBits::READ))
 }
 
+fn is_notifiable(char: &gatt::Characteristic) -> bool {
+    char.properties.map_or(false, |p| p.contains(gatt::CharacteristicPropertyBits::NOTIFY))
+}
+
 /// Attempts to parse the GATT Read `result` and return a battery value in the range [0, 100].
 /// Returns Error if the GATT Read Result is invalidly formatted.
 fn read_battery_level(result: gatt::ReadValue) -> Result<u8, Error> {
@@ -56,13 +64,18 @@ fn read_battery_level(result: gatt::ReadValue) -> Result<u8, Error> {
     Ok(battery_percent)
 }
 
-fn read_characteristics(characteristics: Vec<gatt::Characteristic>) -> Result<gatt::Handle, Error> {
-    // TODO(fxbug.dev/123852): Also check NOTIFY to start monitor changes in battery level.
+/// Returns the handle associated with the battery level characteristic and a flag if notifications
+/// are supported.
+/// Returns Error if no compatible characteristic could be found.
+fn read_characteristics(
+    characteristics: Vec<gatt::Characteristic>,
+) -> Result<(gatt::Handle, bool), Error> {
     let Some(chrc) = characteristics.iter().find(|c| is_battery_level(c) && is_readable(c)) else {
         return Err(format_err!("No battery level characteristic"));
     };
     // TODO(fxbug.dev/123852): `handle` check can be removed when converted to a local type.
-    chrc.handle.ok_or(format_err!("characteristic missing handle"))
+    let handle = chrc.handle.ok_or(format_err!("characteristic missing handle"))?;
+    Ok((handle, is_notifiable(chrc)))
 }
 
 /// Parses the set of `services` and returns the Handle of the first valid Battery Service.
@@ -72,6 +85,22 @@ fn read_services(services: Vec<gatt::ServiceInfo>) -> Result<gatt::ServiceHandle
     };
     // TODO(fxbug.dev/123852): `handle` check can be removed when converted to a local type.
     service.handle.ok_or(format_err!("service missing handle"))
+}
+
+/// Monitors GATT notifications received in the `stream` and logs changes in battery level.
+async fn watch_battery_level(id: PeerId, mut stream: gatt::CharacteristicNotifierRequestStream) {
+    while let Some(notification) = stream.next().await {
+        // `OnNotification` is the only request type in this protocol.
+        let Ok((notif, responder)) = notification.map(|n| n.into_on_notification().expect("only request")) else { continue };
+        let _ = responder.send();
+        match read_battery_level(notif) {
+            Ok(battery_percent) => info!(%id, "Battery level: {battery_percent}"),
+            Err(e) => warn!(%id, "Couldn't read battery level: {e:?}"),
+        }
+        // TODO(fxbug.dev/123880): Integrate this with the Fuchsia power reporting services using
+        // the `fuchsia.bluetooth.power.Reporter` API.
+    }
+    info!(%id, "Battery notifications terminated");
 }
 
 /// Attempts to connect to the peer and read the battery level.
@@ -94,8 +123,9 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
 
     // Discover the characteristics provided by the service.
     let characteristics = remote_client.discover_characteristics().await?;
-    let mut battery_level_handle = read_characteristics(characteristics)?;
+    let (mut battery_level_handle, notifications) = read_characteristics(characteristics)?;
 
+    // Read the current battery level and listen for updates if notifications are supported.
     let read_response = remote_client
         .read_characteristic(
             &mut battery_level_handle,
@@ -107,12 +137,25 @@ async fn try_connect(id: PeerId, central: &CentralProxy) -> Result<BatteryClient
         Ok(level) => info!(%id, "Battery level: {level}"),
         Err(e) => info!(%id, "Failed to read battery level: {e:?}"),
     };
-    // TODO(fxbug.dev/123852): If Notifications are supported, start a battery watching task.
+
+    let _monitor_task = if notifications {
+        let (notification_client, notification_server) =
+            fidl::endpoints::create_request_stream::<gatt::CharacteristicNotifierMarker>()?;
+        remote_client
+            .register_characteristic_notifier(&mut battery_level_handle, notification_client)
+            .await?
+            .map_err(|e| format_err! {"{e:?}"})?;
+        Some(fasync::Task::local(watch_battery_level(id, notification_server)))
+    } else {
+        None
+    };
+
     Ok(BatteryClient {
         id,
         _connection: le_client,
         _gatt: gatt_client,
         _gatt_service_connection: remote_client,
+        _monitor_task,
     })
 }
 
@@ -357,9 +400,18 @@ mod tests {
 
         // Expect a request to read the battery level - send back an example battery level.
         let read_fut = remote_service_server.select_next_some();
-        let (read_result, mut connect_fut) = run_while(&mut exec, connect_fut, read_fut);
+        let (read_result, connect_fut) = run_while(&mut exec, connect_fut, read_fut);
         let (_, _, responder) = read_result.unwrap().into_read_characteristic().unwrap();
         let _ = responder.send(&mut Ok(example_battery_level()));
+
+        // Because notifications are supported on the example characteristic, we expect a request
+        // to subscribe to notifications.
+        let notification_fut = remote_service_server.select_next_some();
+        let (notification_result, mut connect_fut) =
+            run_while(&mut exec, connect_fut, notification_fut);
+        let (_, _notifier, responder) =
+            notification_result.unwrap().into_register_characteristic_notifier().unwrap();
+        let _ = responder.send(&mut Ok(()));
 
         let result = exec.run_until_stalled(&mut connect_fut).expect("connect success");
         assert_matches!(result, Ok(_));
