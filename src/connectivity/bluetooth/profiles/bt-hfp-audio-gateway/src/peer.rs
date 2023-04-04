@@ -109,6 +109,8 @@ pub struct PeerImpl {
     hfp_sender: mpsc::Sender<hfp::Event>,
     /// TODO(fxbug.dev/122263): consider configuring in-band SCO per codec type.
     in_band_sco: bool,
+    /// The last call manager connected.  Used on re-connect to a peer
+    last_call_manager: Option<hfp::ManagerConnectionId>,
     inspect_node: inspect::Node,
 }
 
@@ -143,6 +145,7 @@ impl PeerImpl {
             connection_behavior,
             hfp_sender,
             in_band_sco,
+            last_call_manager: None,
             inspect_node,
         })
     }
@@ -192,6 +195,10 @@ impl Peer for PeerImpl {
         if let Err(request) = self.queue.try_send_fut(PeerRequest::Profile(event)).await {
             // Task ended, so let's spin it back up since somebody wants it.
             self.spawn_task()?;
+            // If a call manager is set and we respawned, send the connect message
+            if let Some(id) = self.last_call_manager {
+                self.call_manager_connected(id).await?;
+            }
             self.expect_send_request(request).await;
         }
         Ok(())
@@ -201,6 +208,7 @@ impl Peer for PeerImpl {
     /// not expected to happen under normal operation and likely indicates a bug or unrecoverable
     /// failure condition in the system.
     async fn call_manager_connected(&mut self, id: hfp::ManagerConnectionId) -> Result<(), Error> {
+        self.last_call_manager = Some(id);
         if let Err(request) = self.queue.try_send_fut(PeerRequest::ManagerConnected { id }).await {
             // Task ended, so let's spin it back up since somebody wants it.
             self.spawn_task()?;
@@ -319,6 +327,7 @@ mod tests {
     use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
     use fuchsia_async as fasync;
     use futures::pin_mut;
+    use futures::StreamExt;
 
     use crate::{audio::TestAudioControl, AudioGatewayFeatureSupport};
 
@@ -326,19 +335,21 @@ mod tests {
         Arc::new(Mutex::new(Box::new(TestAudioControl::default())))
     }
 
-    fn make_peer(id: PeerId) -> PeerImpl {
-        let proxy = fidl::endpoints::create_proxy::<ProfileMarker>().unwrap().0;
-        PeerImpl::new(
+    fn make_peer(id: PeerId) -> (PeerImpl, mpsc::Receiver<hfp::Event>) {
+        let proxy = fidl::endpoints::create_proxy_and_stream::<ProfileMarker>().unwrap().0;
+        let (send, recv) = mpsc::channel(1);
+        let peer = PeerImpl::new(
             id,
             proxy,
             new_audio_control(),
             AudioGatewayFeatureSupport::default(),
             ConnectionBehavior::default(),
-            mpsc::channel(1).0,
+            send,
             false,
             Default::default(),
         )
-        .expect("valid peer")
+        .expect("valid peer");
+        (peer, recv)
     }
 
     #[fuchsia::test]
@@ -347,7 +358,7 @@ mod tests {
         let _exec = fasync::TestExecutor::new();
 
         let id = PeerId(1);
-        let peer = make_peer(id);
+        let peer = make_peer(id).0;
         assert_eq!(peer.id(), id);
     }
 
@@ -356,7 +367,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(1);
-        let mut peer = make_peer(id);
+        let mut peer = make_peer(id).0;
 
         // Stop the inner task and wait until it has fully stopped
         // The inner task is replaced by a no-op task so that it can be consumed and canceled.
@@ -383,11 +394,64 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn profile_event_request_resets_call_manager_when_respawning_task() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let id = PeerId(1);
+        let (mut peer, mut receiver) = make_peer(id);
+
+        // Set up the call manager
+        let sent_manager_id = 1.into();
+        exec.run_singlethreaded(&mut peer.call_manager_connected(sent_manager_id))
+            .expect("success");
+
+        let (local, remote) = fuchsia_bluetooth::types::Channel::create();
+        let event =
+            ProfileEvent::PeerConnected { id: PeerId(1), protocol: vec![], channel: local.into() };
+        exec.run_singlethreaded(peer.profile_event(event)).expect("success");
+
+        // Should get PeerConnected with the right handler id.
+        let message = exec.run_singlethreaded(&mut receiver.next());
+        let Some(hfp::Event::PeerConnected { manager_id, handle, ..}) = message else {
+            panic!("Expected PeerConnected after restarting task, got {message:?}");
+        };
+        assert_eq!(sent_manager_id, manager_id);
+        drop(handle);
+
+        // Close the remote connection, which should cause the peer task to stop.
+        drop(remote);
+
+        // Wait until it has fully stopped
+        // The inner task is replaced by a no-op task so that it can be waited on.
+        let mut task = std::mem::replace(&mut peer.task, fasync::Task::local(async move {}));
+        exec.run_singlethreaded(&mut task);
+
+        let (local, _remote) = fuchsia_bluetooth::types::Channel::create();
+        let event =
+            ProfileEvent::PeerConnected { id: PeerId(1), protocol: vec![], channel: local.into() };
+        exec.run_singlethreaded(peer.profile_event(event)).expect("success");
+
+        // The new task should notify the previously-connected CallManager of its
+        // existence with a new peer when connected.
+        let message = exec.run_singlethreaded(&mut receiver.next());
+        let Some(hfp::Event::PeerConnected { manager_id, handle, ..}) = message else {
+            panic!("Expected PeerConnected after restarting task, got {message:?}");
+        };
+        assert_eq!(sent_manager_id, manager_id);
+        drop(handle);
+
+        // A new task has been spun up and is actively running (the remote hasn't been dropped)
+        let task = std::mem::replace(&mut peer.task, fasync::Task::local(async move {}));
+        pin_mut!(task);
+        assert!(exec.run_until_stalled(&mut task).is_pending());
+    }
+
+    #[fuchsia::test]
     fn manager_request_returns_error_when_task_is_stopped() {
         let mut exec = fasync::TestExecutor::new();
 
         let id = PeerId(1);
-        let mut peer = make_peer(id);
+        let mut peer = make_peer(id).0;
 
         // Stop the inner task and wait until it has fully stopped
         // The inner task is replaced by a no-op task so that it can be consumed and canceled.

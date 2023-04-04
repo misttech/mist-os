@@ -159,6 +159,7 @@ impl PeerTask {
     }
 
     fn set_handler(&mut self, handler: Option<PeerHandlerProxy>) {
+        info!(id = %self.id, "Replacing {:?} with new handler", self.handler);
         self.handler = handler;
         self.inspect.connected_peer_handler.set(self.handler.is_some());
     }
@@ -248,41 +249,40 @@ impl PeerTask {
 
     async fn setup_handler(&mut self) -> Result<(), Error> {
         info!("Got request to handle peer {} headset using handler", self.id);
-        if let Some(handler) = self.handler.clone() {
-            // Getting the network information the first time should always return a complete table.
-            // If the call returns an error, do not set up the handler.
-            let info = match handler.watch_network_information().await {
-                Ok(info) => info,
-                Err(fidl::Error::ClientChannelClosed {
-                    status: zx::Status::PEER_CLOSED, ..
-                }) => {
-                    return Ok(());
-                }
-                Err(e) => {
-                    warn!("Error handling peer request: {}", e);
-                    return Ok(());
-                }
-            };
-
-            self.handle_network_update(info).await;
-
-            let client_end = self.gain_control.get_client_end()?;
-            if let Err(e) = handler.gain_control(client_end) {
-                warn!("Error setting gain control for peer {}: {}", self.id, e);
+        let Some(handler) = self.handler.clone() else {
+            return Ok(());
+        };
+        // Getting the network information the first time should always return a complete table.
+        // If the call returns an error, do not set up the handler.
+        let info = match handler.watch_network_information().await {
+            Ok(info) => info,
+            Err(fidl::Error::ClientChannelClosed { status: zx::Status::PEER_CLOSED, .. }) => {
                 return Ok(());
             }
-
-            self.calls = Calls::new(Some(handler.clone()));
-            if let Err(e) = self.calls.iattach(self.inspect.node(), "calls") {
-                warn!("Failed to attach Calls to PeerTaskInspect: {}", e)
+            Err(e) => {
+                warn!("Error handling peer request: {}", e);
+                return Ok(());
             }
+        };
 
-            self.create_network_updates_stream(handler);
+        self.handle_network_update(info).await;
+
+        let client_end = self.gain_control.get_client_end()?;
+        if let Err(e) = handler.gain_control(client_end) {
+            warn!("Error setting gain control for peer {}: {}", self.id, e);
+            return Ok(());
         }
+
+        self.calls = Calls::new(Some(handler.clone()));
+        if let Err(e) = self.calls.iattach(self.inspect.node(), "calls") {
+            warn!("Failed to attach Calls to PeerTaskInspect: {}", e)
+        }
+
+        self.create_network_updates_stream(handler);
         Ok(())
     }
 
-    /// A new call manager is connected. The PeerTask should
+    /// A new call manager is connected.
     async fn on_manager_connected(&mut self, id: hfp::ManagerConnectionId) -> Result<(), Error> {
         self.manager_id = Some(id);
         if !self.connection.connected() {
@@ -453,22 +453,19 @@ impl PeerTask {
             }
             SlcRequest::Answer { response } => {
                 let result = self.calls.answer().map_err(|e| {
-                    warn!("Unexpected Answer from Hands Free for peer {}: {}", self.id, e);
+                    warn!(peer = %self.id, %e, "Unexpected Answer from Hands Free");
                 });
                 self.connection.receive_ag_request(marker, response(result)).await;
             }
             SlcRequest::HangUp { response } => {
                 let result = self.calls.hang_up().map_err(|e| {
-                    warn!("Unexpected Hang Up from Hands Free for peer {}: {}", self.id, e);
+                    warn!(peer = %self.id, %e, "Unexpected Hang Up from Hands Free");
                 });
                 self.connection.receive_ag_request(marker, response(result)).await;
             }
             SlcRequest::Hold { command, response } => {
                 let result = self.calls.hold(command).map_err(|e| {
-                    warn!(
-                        "Unexpected Action {:?} from Hands Free for peer {}: {}",
-                        command, self.id, e
-                    );
+                    warn!(peer = %self.id, %e, ?command, "Unexpected Action from Hands Free");
                 });
                 self.connection.receive_ag_request(marker, response(result)).await;
             }
@@ -478,7 +475,7 @@ impl PeerTask {
             }
             SlcRequest::SynchronousConnectionSetup { response } => {
                 if self.sco_state.is_active() {
-                    info!("Got SCO setup request when SCO state was active");
+                    warn!(peer = %self.id, "SCO setup request when SCO state was active");
                     // Drop existing SCO connection.
                     self.sco_state.iset(ScoState::SettingUp);
                 }
@@ -494,7 +491,7 @@ impl PeerTask {
                     Err(err) => Err(err.into()),
                 };
                 let result =
-                    finish_result.map_err(|e| warn!("Error setting up audio connection: {:?}", e));
+                    finish_result.map_err(|e| warn!(?e, "Error setting up audio connection"));
                 self.connection.receive_ag_request(marker, response(result)).await;
             }
             SlcRequest::RestartCodecConnectionSetup { response } => {
@@ -518,17 +515,14 @@ impl PeerTask {
         if call_active && three_way_calling {
             // Hold calls, and return Err(_) if it fails.
             self.calls.hold_active().map_err(|e| {
-                warn!(
-                    "Failed to hold active call when making outgoing call for peer {}: {}",
-                    self.id, e
-                )
+                warn!(peer = %self.id, %e, "Failed to hold active call when making outgoing call");
             })?;
         }
 
         match handler.request_outgoing_call(&mut call_action.into()).await {
             Ok(Ok(())) => Ok(()),
             err => {
-                warn!("Error initiating outgoing call for peer {}: {:?}", self.id, err);
+                warn!(peer = %self.id, ?err, "Error initiating outgoing call");
                 Err(())
             }
         }
@@ -537,28 +531,28 @@ impl PeerTask {
     pub async fn run(mut self, mut task_channel: mpsc::Receiver<PeerRequest>) -> Self {
         loop {
             let mut active_sco_closed_fut = self.on_active_sco_closed().fuse();
-            info!("Beginning select for peer {:?}, SCO state is {:?}", self.id, self.sco_state);
+            info!(peer = %self.id, sco_state = ?self.sco_state, "Beginning select");
             let mut sco_state = self.sco_state.as_mut();
             select! {
                 // Wait until the HF sets up a SCO connection.
                 conn_res = sco_state.on_connected() => {
                     drop(sco_state);
-                    info!("Handling SCO Connection accepted for peer {}.", self.id);
+                    info!(peer = %self.id, "Handling SCO Connection accepted");
                     match conn_res {
                         Ok(sco) if !sco.is_closed() => {
                             let finish_sco_res = self.finish_sco_connection(sco).await;
                             if let Err(err) = finish_sco_res {
-                                warn!("Failed to finish SCO connection with {:} for peer {}", err, self.id)
+                                warn!(peer = %self.id, ?err, "Failed to finish SCO connection");
                             }
                             let call_transfer_res = self.calls.transfer_to_hf();
                             if let Err(err) = call_transfer_res {
-                                warn!("Transfer to HF failed with {:} for peer {}", err, self.id)
+                                warn!(peer = %self.id, ?err, "Transfer to HF failed");
                             }
                         },
                         // This can occur if the HF opens and closes a SCO connection immediately.
-                        Ok(_) => warn!("Got already closed SCO connection for peer {}.", self.id),
+                        Ok(_) => warn!(peer = %self.id, "Got already closed SCO connection"),
                         Err(err) => {
-                            warn!("Got error waiting for SCO connection {:} for peer {}", err, self.id);
+                            warn!(peer = %self.id, %err, "Got error waiting for SCO connection");
                             break;
                         }
                     }
@@ -566,26 +560,26 @@ impl PeerTask {
                 // New request coming from elsewhere in the component
                 request = task_channel.next() => {
                     drop(sco_state);
-                    info!("Handling peer request {:?} for peer {}", request, self.id);
+                    info!(peer = %self.id, ?request, "Handling peer request");
                     if let Some(request) = request {
                         if let Err(e) = self.peer_request(request).await {
-                            warn!("Error handling peer request {} for peer {}", e, self.id);
+                            warn!(peer = %self.id, %e, "Error handling peer request");
                             break;
                         }
                     } else {
-                        info!("Peer task channel closed for peer {}", self.id);
+                        info!(peer = %self.id, "Peer task channel closed");
                         break;
                     }
                 }
                 // New request on the gain control protocol
                 request = self.gain_control.select_next_some() => {
-                    info!("Handling gain control {:?} for peer {}", request, self.id);
+                    info!(peer = %self.id, ?request, "Handling gain control");
                     self.connection.receive_ag_request(ProcedureMarker::VolumeControl, request.into()).await;
                 },
                 // A new call state has been received from the call service
                 update = self.calls.select_next_some() => {
                     drop(sco_state);
-                    info!("Handling call {:?} for peer {}", update, self.id);
+                    info!(peer = %self.id, ?update, "Handling call");
                     // TODO(fxbug.dev/75538): for in-band ring  setup audio if should_ring is true
                     self.ringer.ring(self.calls.should_ring());
                     if update.callwaiting {
@@ -603,7 +597,7 @@ impl PeerTask {
                 // SCO connection has closed.
                 _ = active_sco_closed_fut => {
                     drop(sco_state);
-                    info!("Handling SCO Connection closed for peer {}, transferring call to AG.", self.id);
+                    info!(peer = %self.id, "Handling SCO Connection closed, transferring call to AG");
                     self.sco_state.iset(ScoState::TearingDown);
                     let call_transfer_res = self.calls.transfer_to_ag();
                     if let Err(err) = call_transfer_res {

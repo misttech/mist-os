@@ -33,6 +33,7 @@ use crate::{
     peer::{indicators::battery_level_to_battchg_value, ConnectionBehavior, Peer, PeerImpl},
 };
 
+#[derive(Debug)]
 pub enum Event {
     PeerConnected {
         peer_id: PeerId,
@@ -267,6 +268,13 @@ pub struct CallManager {
     proxy: Option<CallManagerProxy>,
     #[inspect(forward)]
     inspect: CallManagerInspect,
+}
+
+#[cfg(test)]
+impl From<usize> for ManagerConnectionId {
+    fn from(value: usize) -> Self {
+        Self(value)
+    }
 }
 
 impl CallManager {
