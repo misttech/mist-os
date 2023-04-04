@@ -94,6 +94,7 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   dprintf(INFO, "RISCV: SBI extension HSM %ld\n", sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_HSM).value);
 
   // TODO-rvbringup: this should move to platform
+#if 0
   uint32_t max_cpus = arch_max_num_cpus();
   int secondaries_to_init = max_cpus;
 
@@ -101,6 +102,7 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
 
   LTRACEF("releasing %d secondary cpus\n", secondaries_to_init);
   secondaries_released.store(true);
+#endif
 }
 
 void arch_late_init_percpu(void) {
