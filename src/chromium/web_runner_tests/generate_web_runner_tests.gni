@@ -12,7 +12,11 @@ template("generate_web_runner_tests") {
     testonly = true
 
     deps = [
-      "${invoker.chromium_dir}:web_engine",
+      # TODO(fxbug.dev/119212): This should be provided by the Product
+      # configurations on which these tests run rather than as deps.
+      "${invoker.chromium_dir}:uses_web_engine",
+
+      # The tests themselves.
       "//src/chromium/web_runner_tests",
 
       # The deps below are necessary on minimal product configs.
