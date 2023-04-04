@@ -16,7 +16,10 @@ import("//src/media/lib/ffmpeg/build/profiles.gni")
 # the updated targets.
 #
 ffmpeg_profile_set("profiles") {
-  deps = [ ":default" ]
+  deps = [
+    ":default",
+    ":smart_display",
+  ]
 }
 
 #
@@ -72,4 +75,12 @@ ffmpeg_profile("default") {
     "//src/media/lib/ffmpeg/features:enable_parser_vp3",
     "//src/media/lib/ffmpeg/features:enable_parser_vp8",
   ]
+}
+
+#
+# "smart_display" ffmpeg profile. This profile includes only the h264
+# decoder and is intended for smart displays.
+#
+ffmpeg_profile("smart_display") {
+  deps = [ "//src/media/lib/ffmpeg/features:enable_decoder_h264" ]
 }
