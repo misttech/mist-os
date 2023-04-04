@@ -13,6 +13,12 @@ pub struct Null {}
 
 impl Capability for Null {}
 
+impl Null {
+    pub fn new() -> Self {
+        Null {}
+    }
+}
+
 impl Into<zx::Handle> for Null {
     fn into(self) -> zx::Handle {
         zx::Handle::invalid()
