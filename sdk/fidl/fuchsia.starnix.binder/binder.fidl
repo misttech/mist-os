@@ -109,6 +109,17 @@ protocol DevBinder {
     });
 };
 
+/// Protocol that allows Starnix to control binder servers and clients in other
+/// Fuchsia components.
+@discoverable
+protocol RemoteController {
+    /// Called by the Starnix kernel when it requires the remote Fuchsia
+    /// component to start servicing the binder protocol.
+    Start(resource table {
+        1: dev_binder client_end:DevBinder;
+    });
+};
+
 /// An opened connection to a binder driver.
 protocol Binder {
     /// Set the VMO to used as a share resource between the driver and the

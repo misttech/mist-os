@@ -3744,7 +3744,7 @@ pub fn create_binders(current_task: &CurrentTask) -> Result<(), Errno> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
     use crate::fs::{DirEntry, FdFlags};
     use crate::mm::MemoryAccessor;
@@ -6434,7 +6434,70 @@ mod tests {
             .expect("binder dev open failed");
     }
 
-    type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;
+    pub type TestFdTable = BTreeMap<i32, fbinder::FileHandle>;
+    /// Run a test implementation of the ProcessAccessor protocol.
+    /// The test implementation starts with an empty fd table, and updates it depending on the
+    /// client calls. The future will resolve when the client is disconnected and return the
+    /// current fd table at that point.
+    pub async fn run_process_accessor(
+        server_end: ServerEnd<fbinder::ProcessAccessorMarker>,
+    ) -> Result<TestFdTable, anyhow::Error> {
+        let mut stream = fbinder::ProcessAccessorRequestStream::from_channel(
+            fasync::Channel::from_channel(server_end.into_channel())?,
+        );
+        // The fd table is per connection.
+        let mut next_fd = 0;
+        let mut fds: TestFdTable = Default::default();
+        'event_loop: while let Some(event) = stream.try_next().await? {
+            match event {
+                fbinder::ProcessAccessorRequest::WriteMemory { address, content, responder } => {
+                    let size = content.get_content_size()?;
+                    // SAFETY: This is not safe and rely on the client being correct.
+                    let buffer = unsafe {
+                        std::slice::from_raw_parts_mut(address as *mut u8, size as usize)
+                    };
+                    content.read(buffer, 0)?;
+                    responder.send(&mut Ok(()))?;
+                }
+                fbinder::ProcessAccessorRequest::ReadMemory { address, length, responder } => {
+                    let vmo = zx::Vmo::create(length)?;
+                    // SAFETY: This is not safe and rely on the client being correct.
+                    let buffer = unsafe {
+                        std::slice::from_raw_parts(address as *const u8, length as usize)
+                    };
+                    vmo.write(buffer, 0)?;
+                    vmo.set_content_size(&length)?;
+                    responder.send(&mut Ok(vmo))?;
+                }
+                fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
+                    let mut response = fbinder::FileResponse::EMPTY;
+                    for fd in payload.close_requests.unwrap_or(vec![]) {
+                        if fds.remove(&fd).is_none() {
+                            responder.send(&mut Err(fposix::Errno::Ebadf))?;
+                            continue 'event_loop;
+                        }
+                    }
+                    for fd in payload.get_requests.unwrap_or(vec![]) {
+                        if let Some(file) = fds.remove(&fd) {
+                            response.get_responses.get_or_insert_with(Vec::new).push(file);
+                        } else {
+                            responder.send(&mut Err(fposix::Errno::Ebadf))?;
+                            continue 'event_loop;
+                        }
+                    }
+                    for file in payload.add_requests.unwrap_or(vec![]) {
+                        let fd = next_fd;
+                        next_fd += 1;
+                        fds.insert(fd, file);
+                        response.add_responses.get_or_insert_with(Vec::new).push(fd);
+                    }
+                    responder.send(&mut Ok(response))?;
+                }
+            }
+        }
+        Ok(fds)
+    }
+
     /// Spawn a new thread that will run a test implementation of the ProcessAccessor
     /// protocol.
     /// The test implementation starts with an empty fd table, and updates it depending
@@ -6445,70 +6508,7 @@ mod tests {
     ) -> std::thread::JoinHandle<Result<TestFdTable, anyhow::Error>> {
         std::thread::spawn(move || {
             let mut executor = LocalExecutor::new();
-            executor.run_singlethreaded(async move {
-                let mut stream = fbinder::ProcessAccessorRequestStream::from_channel(
-                    fasync::Channel::from_channel(server_end.into_channel())?,
-                );
-                // The fd table is per connection.
-                let mut next_fd = 0;
-                let mut fds: TestFdTable = Default::default();
-                'event_loop: while let Some(event) = stream.try_next().await? {
-                    match event {
-                        fbinder::ProcessAccessorRequest::WriteMemory {
-                            address,
-                            content,
-                            responder,
-                        } => {
-                            let size = content.get_content_size()?;
-                            // SAFETY: This is not safe and rely on the client being correct.
-                            let buffer = unsafe {
-                                std::slice::from_raw_parts_mut(address as *mut u8, size as usize)
-                            };
-                            content.read(buffer, 0)?;
-                            responder.send(&mut Ok(()))?;
-                        }
-                        fbinder::ProcessAccessorRequest::ReadMemory {
-                            address,
-                            length,
-                            responder,
-                        } => {
-                            let vmo = zx::Vmo::create(length)?;
-                            // SAFETY: This is not safe and rely on the client being correct.
-                            let buffer = unsafe {
-                                std::slice::from_raw_parts(address as *const u8, length as usize)
-                            };
-                            vmo.write(buffer, 0)?;
-                            vmo.set_content_size(&length)?;
-                            responder.send(&mut Ok(vmo))?;
-                        }
-                        fbinder::ProcessAccessorRequest::FileRequest { payload, responder } => {
-                            let mut response = fbinder::FileResponse::EMPTY;
-                            for fd in payload.close_requests.unwrap_or(vec![]) {
-                                if fds.remove(&fd).is_none() {
-                                    responder.send(&mut Err(fposix::Errno::Ebadf))?;
-                                    continue 'event_loop;
-                                }
-                            }
-                            for fd in payload.get_requests.unwrap_or(vec![]) {
-                                if let Some(file) = fds.remove(&fd) {
-                                    response.get_responses.get_or_insert_with(Vec::new).push(file);
-                                } else {
-                                    responder.send(&mut Err(fposix::Errno::Ebadf))?;
-                                    continue 'event_loop;
-                                }
-                            }
-                            for file in payload.add_requests.unwrap_or(vec![]) {
-                                let fd = next_fd;
-                                next_fd += 1;
-                                fds.insert(fd, file);
-                                response.add_responses.get_or_insert_with(Vec::new).push(fd);
-                            }
-                            responder.send(&mut Ok(response))?;
-                        }
-                    }
-                }
-                Ok(fds)
-            })
+            executor.run_singlethreaded(run_process_accessor(server_end))
         })
     }
 
