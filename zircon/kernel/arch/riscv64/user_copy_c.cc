@@ -5,14 +5,14 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/user_copy/internal.h>
+#include <trace.h>
 
 #include <arch/riscv64/user_copy.h>
 #include <arch/user_copy.h>
 #include <kernel/thread.h>
 #include <vm/vm.h>
 
-extern "C" Riscv64UserCopyRet _riscv64_user_copy(void* dst, const void* src, size_t len,
-                                                 uint64_t* fault_return);
+#define LOCAL_TRACE 0
 
 zx_status_t arch_copy_from_user(void* dst, const void* src, size_t len) {
   // The assembly code just does memcpy with fault handling.  This is
@@ -22,7 +22,7 @@ zx_status_t arch_copy_from_user(void* dst, const void* src, size_t len) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume)
+  return _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume, 0)
       .status;
 }
 
@@ -31,7 +31,7 @@ zx_status_t arch_copy_to_user(void* dst, const void* src, size_t len) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  return _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume)
+  return _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume, 0)
       .status;
 }
 
@@ -44,8 +44,13 @@ UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const 
     return UserCopyCaptureFaultsResult{ZX_ERR_INVALID_ARGS};
   }
 
+  LTRACEF("dst %p src %p len %zu\n", dst, src, len);
+
   Riscv64UserCopyRet ret =
-      _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume);
+      _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume,
+                         RISCV_CAPTURE_USER_COPY_FAULTS_BIT);
+
+  LTRACEF("ret status %d, pf_va %#lx pf_flags %#x\n", ret.status, ret.pf_va, ret.pf_flags);
 
   // If a fault didn't occur, and ret.status == ZX_OK, this will copy garbage data. It is the
   // responsibility of the caller to check the status and ignore.
@@ -54,7 +59,6 @@ UserCopyCaptureFaultsResult arch_copy_from_user_capture_faults(void* dst, const 
   } else {
     return {ret.status, {ret.pf_va, ret.pf_flags}};
   }
-  return UserCopyCaptureFaultsResult{ZX_OK};
 }
 
 UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const void* src,
@@ -63,8 +67,13 @@ UserCopyCaptureFaultsResult arch_copy_to_user_capture_faults(void* dst, const vo
     return UserCopyCaptureFaultsResult{ZX_ERR_INVALID_ARGS};
   }
 
+  LTRACEF("dst %p src %p len %zu\n", dst, src, len);
+
   Riscv64UserCopyRet ret =
-      _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume);
+      _riscv64_user_copy(dst, src, len, &Thread::Current::Get()->arch().data_fault_resume,
+                         RISCV_CAPTURE_USER_COPY_FAULTS_BIT);
+
+  LTRACEF("ret status %d, pf_va %#lx pf_flags %#x\n", ret.status, ret.pf_va, ret.pf_flags);
 
   // If a fault didn't occur, and ret.status == ZX_OK, this will copy garbage data. It is the
   // responsibility of the caller to check the status and ignore.

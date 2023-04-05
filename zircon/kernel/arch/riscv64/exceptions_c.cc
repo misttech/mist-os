@@ -17,6 +17,7 @@
 #include <arch/arch_ops.h>
 #include <arch/exception.h>
 #include <arch/regs.h>
+#include <arch/riscv64/user_copy.h>
 #include <arch/thread.h>
 #include <arch/user_copy.h>
 #include <kernel/interrupt.h>
@@ -172,28 +173,52 @@ static void riscv64_page_fault_handler(long cause, struct iframe_t* frame, bool 
   pf_flags |= (cause == RISCV64_EXCEPTION_INS_PAGE_FAULT) ? VMM_PF_FLAG_INSTRUCTION : 0;
   pf_flags |= user ? VMM_PF_FLAG_USER : 0;
 
-  zx_status_t pf_status = vmm_page_fault_handler(tval, pf_flags);
+  LTRACEF("Page fault: %s, %s, address %#lx\n",
+          (pf_flags & VMM_PF_FLAG_INSTRUCTION) ? "instruction" : "data",
+          (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
 
-  if (pf_status != ZX_OK) {
-    uint64_t dfr = Thread::Current::Get()->arch().data_fault_resume;
-    if (unlikely(dfr)) {
-      frame->regs.pc = dfr;
-      frame->regs.a1 = tval;
-      frame->regs.a2 = pf_flags;
+  uint64_t dfr = Thread::Current::Get()->arch().data_fault_resume;
+  if (unlikely(!user) && unlikely(!dfr)) {
+    // Any page fault in kernel mode that's not during user-copy is a bug.
+    exception_die(frame, "Page fault in kernel: %s, %s, address %#lx\n",
+                  (pf_flags & VMM_PF_FLAG_INSTRUCTION) ? "instruction" : "data",
+                  (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
+  }
+
+  // Check if the current thread was expecting a data fault and we should return to its handler.
+  // If the capture bit was set we should run the dfr routine first before calling the page fault
+  // handler along with captured data about the exception.
+  if (unlikely(dfr & RISCV_CAPTURE_USER_COPY_FAULTS_BIT)) {
+    LTRACEF("DFR is set with capture: pc %#lx tval %#lx flags %#x\n", dfr, tval, pf_flags);
+    frame->regs.pc = dfr & ~RISCV_CAPTURE_USER_COPY_FAULTS_BIT;
+    frame->regs.a1 = tval;
+    frame->regs.a2 = pf_flags;
+    return;
+  }
+
+  zx_status_t pf_status = vmm_page_fault_handler(tval, pf_flags);
+  if (pf_status == ZX_OK) {
+    return;
+  }
+
+  // Check again that the data fault handler should be run, this time without the captured data.
+  if (unlikely(dfr)) {
+    LTRACEF("DFR is set without capture: pc %#lx tval %#lx flags %#x\n", dfr, tval, pf_flags);
+    DEBUG_ASSERT((dfr & RISCV_CAPTURE_USER_COPY_FAULTS_BIT) == 0);
+    frame->regs.pc = dfr;
+    return;
+  }
+
+  // If this is from user space, let the user exception handler get a shot at it.
+  if (user) {
+    if (try_dispatch_user_data_fault_exception(ZX_EXCP_FATAL_PAGE_FAULT, frame) == ZX_OK) {
       return;
     }
-
-    // If this is from user space, let the user exception handler get a shot at it.
-    if (pf_flags & VMM_PF_FLAG_USER) {
-      if (try_dispatch_user_data_fault_exception(ZX_EXCP_FATAL_PAGE_FAULT, frame) == ZX_OK) {
-        return;
-      }
-    } else {
-      exception_die(frame, "Page fault in kernel: %s, %s, address %#lx\n",
-                    (pf_flags & VMM_PF_FLAG_INSTRUCTION) ? "instruction" : "data",
-                    (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
-    }
   }
+
+  exception_die(frame, "Page fault in kernel: %s, %s, address %#lx\n",
+                (pf_flags & VMM_PF_FLAG_INSTRUCTION) ? "instruction" : "data",
+                (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
 }
 
 static void riscv64_illegal_instruction_handler(long cause, struct iframe_t* frame, bool user) {
@@ -235,6 +260,13 @@ extern "C" void riscv64_exception_handler(long cause, struct iframe_t* frame) {
 
   LTRACEF("hart %u cause %s epc %#lx status %#lx user %u\n", arch_curr_cpu_num(),
           cause_to_string(cause), frame->regs.pc, frame->status, user);
+
+  // Some basic state checks of the current status register
+  uint64_t status = riscv64_csr_read(sstatus);
+  DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_IE) == 0);
+  DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_UBE) == 0);
+  DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_SUM) == 0);
+  DEBUG_ASSERT((status & RISCV64_CSR_SSTATUS_MXR) == 0);
 
   // TODO-rvbringup: add some kcounters
 

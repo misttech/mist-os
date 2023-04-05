@@ -161,6 +161,11 @@ LOCAL_FUNCTION(kernel_exception_entry)
     // we came from kernel space so tp and gp are okay
     save_regs 0
 
+    // Clear the SUM bit in case we interrupted a section of the kernel with it cleared.
+    // TODO-rvbringup: see if this can be moved prior to pushing state on the kernel stack
+    li      t0, RISCV64_CSR_SSTATUS_SUM
+    csrc    sstatus, t0
+
     call    riscv64_exception_handler
     restore_regs 0
 
