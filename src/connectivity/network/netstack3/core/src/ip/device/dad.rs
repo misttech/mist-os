@@ -11,7 +11,7 @@ use net_types::{ip::Ipv6Addr, MulticastAddr, UnicastAddr, Witness as _};
 use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
 
 use crate::{
-    context::{EventContext, TimerContext},
+    context::{EventContext, TimerContext, TimerHandler},
     device::AnyDevice,
     ip::{device::state::AddressState, DeviceIdContext},
 };
@@ -117,10 +117,6 @@ pub(crate) trait DadHandler<C>: DeviceIdContext<AnyDevice> {
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
     );
-
-    /// Handles a timer.
-    // TODO(https://fxbug.dev/101399): Replace this with a `TimerHandler` bound.
-    fn handle_timer(&mut self, ctx: &mut C, id: DadTimerId<Self::DeviceId>);
 }
 
 enum DoDadVariation {
@@ -245,11 +241,15 @@ impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>> DadHandler<C> for SC
         let _: Option<C::Instant> =
             ctx.cancel_timer(DadTimerId { device_id: device_id.clone(), addr });
     }
+}
 
+impl<C: DadNonSyncContext<SC::DeviceId>, SC: DadContext<C>>
+    TimerHandler<C, DadTimerId<SC::DeviceId>> for SC
+{
     fn handle_timer(
         &mut self,
         ctx: &mut C,
-        DadTimerId { device_id, addr }: DadTimerId<Self::DeviceId>,
+        DadTimerId { device_id, addr }: DadTimerId<SC::DeviceId>,
     ) {
         do_duplicate_address_detection(self, ctx, &device_id, addr, DoDadVariation::Continue)
     }
@@ -368,7 +368,7 @@ mod tests {
                 max_dad_transmits: None,
                 ip_device_id_ctx: Default::default(),
             }));
-        DadHandler::handle_timer(
+        TimerHandler::handle_timer(
             &mut sync_ctx,
             &mut non_sync_ctx,
             DadTimerId { device_id: FakeDeviceId, addr: OTHER_ADDRESS },
@@ -386,7 +386,7 @@ mod tests {
                 max_dad_transmits: None,
                 ip_device_id_ctx: Default::default(),
             }));
-        DadHandler::handle_timer(
+        TimerHandler::handle_timer(
             &mut sync_ctx,
             &mut non_sync_ctx,
             DadTimerId { device_id: FakeDeviceId, addr: DAD_ADDRESS },
@@ -488,7 +488,7 @@ mod tests {
                 RETRANS_TIMER,
             );
             assert_eq!(
-                non_sync_ctx.trigger_next_timer(&mut sync_ctx, DadHandler::handle_timer),
+                non_sync_ctx.trigger_next_timer(&mut sync_ctx, TimerHandler::handle_timer),
                 Some(DAD_TIMER_ID)
             );
         }

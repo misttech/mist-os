@@ -169,7 +169,8 @@ pub(crate) fn handle_ipv6_timer<
         + TimerHandler<C, RsTimerId<SC::DeviceId>>
         + TimerHandler<C, Ipv6DiscoveredRouteTimerId<SC::DeviceId>>
         + TimerHandler<C, MldDelayedReportTimerId<SC::DeviceId>>
-        + TimerHandler<C, SlaacTimerId<SC::DeviceId>>,
+        + TimerHandler<C, SlaacTimerId<SC::DeviceId>>
+        + TimerHandler<C, DadTimerId<SC::DeviceId>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -177,7 +178,7 @@ pub(crate) fn handle_ipv6_timer<
 ) {
     match id {
         Ipv6DeviceTimerId::Mld(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
-        Ipv6DeviceTimerId::Dad(id) => DadHandler::handle_timer(sync_ctx, ctx, id),
+        Ipv6DeviceTimerId::Dad(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
         Ipv6DeviceTimerId::Rs(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
         Ipv6DeviceTimerId::RouteDiscovery(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
         Ipv6DeviceTimerId::Slaac(id) => TimerHandler::handle_timer(sync_ctx, ctx, id),
