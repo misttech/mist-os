@@ -6,13 +6,14 @@
 
 import subprocess
 import unittest
+from typing import Any, Dict, List
 from unittest import mock
 
 from honeydew import errors
 from honeydew.utils import ffx_cli
 from parameterized import parameterized
 
-_FFX_TARGET_SHOW_OUTPUT = \
+_FFX_TARGET_SHOW_OUTPUT: bytes = \
     '[{"title":"Target","label":"target","description":"",' \
     '"child":[{"title":"Name","label":"name","description":"Target name.",' \
     '"value":"fuchsia-emulator"},{"title":"SSH Address",' \
@@ -27,7 +28,7 @@ _FFX_TARGET_SHOW_OUTPUT = \
     '"label":"commit","description":"Integration Commit Date",' \
     '"value":"2023-02-01T17:26:40+00:00"}]}]'.encode()
 
-_FFX_TARGET_SHOW_JSON = [
+_FFX_TARGET_SHOW_JSON: List[Dict[str, Any]] = [
     {
         "title":
             "Target",
@@ -84,12 +85,12 @@ _FFX_TARGET_SHOW_JSON = [
 ]
 
 
-def _custom_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
-    test_func_name = testcase_func.__name__
+    test_func_name: str = testcase_func.__name__
 
-    params_dict = param.args[0]
-    test_label = parameterized.to_safe_name(params_dict["label"])
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
 
@@ -109,7 +110,7 @@ class FfxCliTests(unittest.TestCase):
         # Make sure all mock patches are stopped when the test is completed.
         self.addCleanup(mock.patch.stopall)
 
-    def test_check_ffx_connection_success(self):
+    def test_check_ffx_connection_success(self) -> None:
         """Test case for ffx_cli.check_ffx_connection() success case."""
         self.assertTrue(ffx_cli.check_ffx_connection(target="fuchsia-emulator"))
 
@@ -119,7 +120,8 @@ class FfxCliTests(unittest.TestCase):
             stderr=subprocess.STDOUT,
             timeout=10)
 
-    def test_check_ffx_connection_failure_because_of_target_not_present(self):
+    def test_check_ffx_connection_failure_because_of_target_not_present(
+            self) -> None:
         """Test case for ffx_cli.check_ffx_connection() failure case where
         target name passed is not same as output returned by
         ffx_cli.ffx_target_show()."""
@@ -131,7 +133,7 @@ class FfxCliTests(unittest.TestCase):
             stderr=subprocess.STDOUT,
             timeout=10)
 
-    def test_check_ffx_connection_failure_because_of_timeout(self):
+    def test_check_ffx_connection_failure_because_of_timeout(self) -> None:
         """Test case for ffx_cli.check_ffx_connection() failure case where
         ffx_cli.ffx_target_show() returns subprocess.TimeoutExpired."""
         self.mock_check_output.side_effect = subprocess.TimeoutExpired(
@@ -163,7 +165,8 @@ class FfxCliTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_check_ffx_connection_raises_exception(self, parameterized_dict):
+    def test_check_ffx_connection_raises_exception(
+            self, parameterized_dict) -> None:
         """Test case for ffx_cli.check_ffx_connection() case where it raises as
         exception."""
         self.mock_check_output.side_effect = parameterized_dict["side_effect"]
@@ -177,9 +180,10 @@ class FfxCliTests(unittest.TestCase):
             stderr=subprocess.STDOUT,
             timeout=10)
 
-    def test_ffx_target_show_when_connected(self):
+    def test_ffx_target_show_when_connected(self) -> None:
         """Verify ffx_target_show succeeds when target is connected to host."""
-        result = ffx_cli.ffx_target_show(target="fuchsia-emulator")
+        result: List[Dict[str, Any]] = ffx_cli.ffx_target_show(
+            target="fuchsia-emulator")
         self.assertEqual(result, _FFX_TARGET_SHOW_JSON)
 
         self.mock_check_output.assert_called_once_with(
@@ -188,7 +192,7 @@ class FfxCliTests(unittest.TestCase):
             stderr=subprocess.STDOUT,
             timeout=10)
 
-    def test_ffx_target_show_when_not_connected(self):
+    def test_ffx_target_show_when_not_connected(self) -> None:
         """Verify ffx_target_show raises an exception when target is not
         connected to host."""
         self.mock_check_output.side_effect = subprocess.CalledProcessError(
@@ -203,10 +207,10 @@ class FfxCliTests(unittest.TestCase):
             stderr=subprocess.STDOUT,
             timeout=10)
 
-    def test_get_target_address(self):
+    def test_get_target_address(self) -> None:
         """Verify get_target_address returns ip address of fuchsia device."""
-        result = ffx_cli.get_target_address(target="fuchsia-emulator")
-        expected = _FFX_TARGET_SHOW_JSON[0]["child"][1]["value"][:-3]
+        result: str = ffx_cli.get_target_address(target="fuchsia-emulator")
+        expected: str = _FFX_TARGET_SHOW_JSON[0]["child"][1]["value"][:-3]
 
         self.assertEqual(result, expected)
 
@@ -233,7 +237,7 @@ class FfxCliTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_get_target_address_exception(self, parameterized_dict):
+    def test_get_target_address_exception(self, parameterized_dict) -> None:
         """Verify get_target_address raise exception in failure cases."""
         self.mock_check_output.side_effect = parameterized_dict["side_effect"]
 
@@ -246,10 +250,10 @@ class FfxCliTests(unittest.TestCase):
             stderr=subprocess.STDOUT,
             timeout=10)
 
-    def test_get_target_type(self):
+    def test_get_target_type(self) -> None:
         """Verify get_target_type returns target type of fuchsia device."""
-        result = ffx_cli.get_target_type(target="fuchsia-emulator")
-        expected = _FFX_TARGET_SHOW_JSON[1]["child"][2]["value"]
+        result: str = ffx_cli.get_target_type(target="fuchsia-emulator")
+        expected: str = _FFX_TARGET_SHOW_JSON[1]["child"][2]["value"]
 
         self.assertEqual(result, expected)
 
@@ -276,7 +280,7 @@ class FfxCliTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_get_target_type_exception(self, parameterized_dict):
+    def test_get_target_type_exception(self, parameterized_dict) -> None:
         """Verify get_target_type raise exception in failure cases."""
         self.mock_check_output.side_effect = parameterized_dict["side_effect"]
 

@@ -4,12 +4,12 @@
 # found in the LICENSE file.
 """Component capability default implementation."""
 
-from typing import List
+from typing import Any, Dict, List
 
 from honeydew.interfaces.affordances import component
 from honeydew.interfaces.transports import sl4f as sl4f_transport
 
-_SL4F_METHODS = {
+_SL4F_METHODS: Dict[str, str] = {
     "Launch": "component_facade.Launch",
     "List": "component_facade.List",
     "Search": "component_facade.Search",
@@ -25,8 +25,8 @@ class ComponentDefault(component.Component):
     """
 
     def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
-        self._name = device_name
-        self._sl4f = sl4f
+        self._name: str = device_name
+        self._sl4f: sl4f_transport.SL4F = sl4f
 
     # List all the public methods in alphabetical order
     def launch(self, url: str) -> None:
@@ -50,7 +50,7 @@ class ComponentDefault(component.Component):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        list_components_resp = self._sl4f.send_sl4f_command(
+        list_components_resp: Dict[str, Any] = self._sl4f.send_sl4f_command(
             method=_SL4F_METHODS["List"])
         return list_components_resp.get("result", [])
 
@@ -66,7 +66,7 @@ class ComponentDefault(component.Component):
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        search_component_resp = self._sl4f.send_sl4f_command(
+        search_component_resp: Dict[str, Any] = self._sl4f.send_sl4f_command(
             method=_SL4F_METHODS["Search"], params={"name": name})
 
         return search_component_resp.get("result", "") == "Success"

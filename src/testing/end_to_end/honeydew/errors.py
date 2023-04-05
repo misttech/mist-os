@@ -5,26 +5,22 @@
 """Contains errors raised by HoneyDew."""
 
 import logging
+from typing import Union
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class HoneyDewError(Exception):
     """Base exception for honeydew module.
 
     More specific exceptions will be created by inheriting from this exception.
-
-    Attributes:
-        err_code (int): numeric code of the error.
     """
-    err_code = 1
 
-    def __init__(self, msg):
+    def __init__(self, msg: Union[str, Exception]) -> None:
         """Inits HoneyDewError with 'msg' (an error message string).
 
         Args:
-            msg (str or Exception): an error message string or an Exception
-            instance.
+            msg: an error message string or an Exception instance.
 
         Note: Additionally, logs 'msg' to debug log level file.
         """
@@ -33,36 +29,16 @@ class HoneyDewError(Exception):
 
 
 class FfxCommandError(HoneyDewError):
-    """Exception for errors raised by ffx commands running on host machine.
-
-    Attributes:
-        err_code (int): numeric code of the error.
-    """
-    err_code = 10
+    """Exception for errors raised by ffx commands running on host machine."""
 
 
 class HttpRequestError(HoneyDewError):
-    """Exception for errors raised by HTTP requests running on host machine.
-
-    Attributes:
-        err_code (int): numeric code of the error.
-    """
-    err_code = 11
+    """Exception for errors raised by HTTP requests running on host machine."""
 
 
 class SSHCommandError(HoneyDewError):
-    """Exception for errors raised by SSH commands running on host machine.
-
-    Attributes:
-        err_code (int): numeric code of the error.
-    """
-    err_code = 12
+    """Exception for errors raised by SSH commands running on host machine."""
 
 
 class FuchsiaDeviceError(HoneyDewError):
-    """Base exception for errors raised by fuchsia device.
-
-    Attributes:
-        err_code (int): numeric code of the error.
-    """
-    err_code = 20
+    """Base exception for errors raised by fuchsia device."""

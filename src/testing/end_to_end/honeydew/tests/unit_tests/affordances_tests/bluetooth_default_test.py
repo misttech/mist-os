@@ -5,6 +5,7 @@
 """Unit tests for honeydew.affordances.bluetooth_default.py."""
 
 import unittest
+from typing import Any, Dict
 from unittest import mock
 
 from honeydew.affordances import bluetooth_default
@@ -12,12 +13,12 @@ from honeydew.interfaces.transports import sl4f
 from parameterized import parameterized
 
 
-def _custom_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
-    test_func_name = testcase_func.__name__
+    test_func_name: str = testcase_func.__name__
 
-    params_dict = param.args[0]
-    test_label = parameterized.to_safe_name(params_dict["label"])
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
 
@@ -53,7 +54,7 @@ class BluetoothDefaultTests(unittest.TestCase):
             },),
         ],
         name_func=_custom_test_name_func)
-    def test_request_discovery(self, parameterized_dict):
+    def test_request_discovery(self, parameterized_dict) -> None:
         """Test for BluetoothDefault.request_discovery() method."""
         self.bluetooth_obj.request_discovery(
             discovery=parameterized_dict["discovery"])

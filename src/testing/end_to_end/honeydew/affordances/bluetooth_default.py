@@ -4,10 +4,12 @@
 # found in the LICENSE file.
 """Bluetooth capability default implementation."""
 
+from typing import Dict
+
 from honeydew.interfaces.affordances import bluetooth
 from honeydew.interfaces.transports import sl4f as sl4f_transport
 
-_SL4F_METHODS = {
+_SL4F_METHODS: Dict[str, str] = {
     "BluetoothInitSys": "bt_sys_facade.BluetoothInitSys",
     "BluetoothRequestDiscovery": "bt_sys_facade.BluetoothRequestDiscovery",
 }
@@ -22,8 +24,8 @@ class BluetoothDefault(bluetooth.Bluetooth):
     """
 
     def __init__(self, device_name: str, sl4f: sl4f_transport.SL4F) -> None:
-        self._name = device_name
-        self._sl4f = sl4f
+        self._name: str = device_name
+        self._sl4f: sl4f_transport.SL4F = sl4f
 
         # Initialize the bluetooth stack
         self.sys_init()

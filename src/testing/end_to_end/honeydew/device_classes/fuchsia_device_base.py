@@ -13,7 +13,7 @@ import sys
 import time
 from datetime import datetime
 from http.client import RemoteDisconnected
-from typing import Any, Dict, Iterable, Optional, Type
+from typing import Any, Dict, Iterable, List, Optional, Type
 
 from honeydew import custom_types, errors
 from honeydew.affordances import bluetooth_default, component_default
@@ -26,15 +26,13 @@ from honeydew.interfaces.device_classes import (
 from honeydew.interfaces.transports import sl4f
 from honeydew.utils import ffx_cli, http_utils, properties
 
-_LOGGER = logging.getLogger(__name__)
-
-_CMDS = {
+_CMDS: Dict[str, str] = {
     "ECHO": "echo",
     "START_SL4F": "start_sl4f",
 }
 
 _SL4F_PORT = 80
-_SL4F_METHODS = {
+_SL4F_METHODS: Dict[str, str] = {
     "GetDeviceName": "device_facade.GetDeviceName",
     "GetDeviceInfo": "hwinfo_facade.HwinfoGetDeviceInfo",
     "GetProductInfo": "hwinfo_facade.HwinfoGetProductInfo",
@@ -46,7 +44,7 @@ _SL4F_METHODS = {
     "Snapshot": "feedback_data_provider_facade.GetSnapshot",
 }
 
-_TIMEOUTS = {
+_TIMEOUTS: Dict[str, int] = {
     "BOOT_UP_COMPLETE": 60,
     "OFFLINE": 60,
     "ONLINE": 60,
@@ -55,12 +53,16 @@ _TIMEOUTS = {
     "SSH_COMMAND_RESPONSE": 60,
 }
 
-_SSH_OPTIONS_TUPLE = (
-    "-oPasswordAuthentication=no", "-oStrictHostKeyChecking=no",
-    f"-oConnectTimeout={_TIMEOUTS['SSH_COMMAND_ARG']}")
-_SSH_OPTIONS = " ".join(_SSH_OPTIONS_TUPLE)
+_SSH_OPTIONS_LIST: List[str] = [
+    "-oPasswordAuthentication=no",
+    "-oStrictHostKeyChecking=no",
+    f"-oConnectTimeout={_TIMEOUTS['SSH_COMMAND_ARG']}",
+]
+_SSH_OPTIONS: str = " ".join(_SSH_OPTIONS_LIST)
 _SSH_COMMAND = \
     "ssh {ssh_options} -i {ssh_private_key} {ssh_user}@{ip_address} {command}"
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
@@ -156,7 +158,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        get_device_info_resp = self.send_sl4f_command(
+        get_device_info_resp: Dict[str, Any] = self.send_sl4f_command(
             method=_SL4F_METHODS["GetDeviceInfo"])
         return get_device_info_resp["result"]["serial_number"]
 
@@ -171,7 +173,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        get_version_resp = self.send_sl4f_command(
+        get_version_resp: Dict[str, Any] = self.send_sl4f_command(
             method=_SL4F_METHODS["GetVersion"])
         return get_version_resp["result"]
 
@@ -216,7 +218,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         """Clean up method."""
         return
 
-    def log_message_to_device(self, message: str, level: custom_types.LEVEL):
+    def log_message_to_device(
+            self, message: str, level: custom_types.LEVEL) -> None:
         """Log message to fuchsia device at specified level.
 
         Args:
@@ -300,28 +303,33 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         # pylint: disable=protected-access
         if ipaddress.ip_address(self._normalize_ip_addr(
                 self._ip_address)).version == 6:
-            url = f"http://[{self._ip_address}]:{_SL4F_PORT}"
+            url: str = f"http://[{self._ip_address}]:{_SL4F_PORT}"
         else:
             url = f"http://{self._ip_address}:{_SL4F_PORT}"
 
         # id is required by the SL4F server to parse test_data but is not
         # currently used.
-        data = {"jsonrpc": "2.0", "id": "", "method": method, "params": params}
+        data: Dict[str, Any] = {
+            "jsonrpc": "2.0",
+            "id": "",
+            "method": method,
+            "params": params
+        }
 
-        exception_msg = f"SL4F method '{method}' failed on '{self.name}'."
+        exception_msg: str = f"SL4F method '{method}' failed on '{self.name}'."
         for attempt in range(1, attempts + 1):
             # if this is not first attempt wait for sometime before next retry.
             if attempt > 1:
                 time.sleep(interval)
             try:
-                http_response = http_utils.send_http_request(
+                http_response: Dict[str, Any] = http_utils.send_http_request(
                     url,
                     data,
                     attempts=attempts,
                     interval=interval,
                     exceptions_to_skip=exceptions_to_skip)
 
-                error = http_response.get("error")
+                error: str | None = http_response.get("error")
                 if not error:
                     return http_response
 
@@ -364,13 +372,14 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             pass
 
         if not snapshot_file:
-            timestamp = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
+            timestamp: str = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
             snapshot_file = f"Snapshot_{self.name}_{timestamp}.zip"
-        snapshot_file_path = os.path.join(directory, snapshot_file)
+        snapshot_file_path: str = os.path.join(directory, snapshot_file)
 
-        snapshot_resp = self.send_sl4f_command(method=_SL4F_METHODS["Snapshot"])
-        snapshot_base64_encoded_str = snapshot_resp["result"]["zip"]
-        snapshot_base64_decoded_bytes = base64.b64decode(
+        snapshot_resp: Dict[str, Any] = self.send_sl4f_command(
+            method=_SL4F_METHODS["Snapshot"])
+        snapshot_base64_encoded_str: str = snapshot_resp["result"]["zip"]
+        snapshot_base64_decoded_bytes: bytes = base64.b64decode(
             snapshot_base64_encoded_str)
 
         with open(snapshot_file_path, "wb") as snapshot_binary_zip:
@@ -392,7 +401,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         self.check_sl4f_connection()
 
     # List all private methods in alphabetical order
-    def _check_ssh_connection_to_device(self, timeout: float):
+    def _check_ssh_connection_to_device(self, timeout: float) -> None:
         """Checks the SSH connection from host to Fuchsia device.
 
         Args:
@@ -401,8 +410,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: If fails to establish SSH connection.
         """
-        start_time = time.time()
-        end_time = start_time + timeout
+        start_time: float = time.time()
+        end_time: float = start_time + timeout
 
         _LOGGER.info("Waiting for %s to allow ssh connection...", self.name)
         while time.time() < end_time:
@@ -416,7 +425,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                 f"Failed to connect to '{self.name}' via SSH.")
         _LOGGER.info("%s is available via ssh.", self.name)
 
-    def _get_device_ip_address(self, timeout: float):
+    def _get_device_ip_address(self, timeout: float) -> str:
         """Returns the device IP(V4|V6) address used for SSHing from host.
 
         Args:
@@ -425,8 +434,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: If fails to gets the ip address.
         """
-        start_time = time.time()
-        end_time = start_time + timeout
+        start_time: float = time.time()
+        end_time: float = start_time + timeout
 
         while time.time() < end_time:
             try:
@@ -466,7 +475,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
-        get_product_info_resp = self.send_sl4f_command(
+        get_product_info_resp: Dict[str, Any] = self.send_sl4f_command(
             method=_SL4F_METHODS["GetProductInfo"])
         return get_product_info_resp["result"]
 
@@ -486,7 +495,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.SSHCommandError: On failure.
         """
-        ssh_command = _SSH_COMMAND.format(
+        ssh_command: str = _SSH_COMMAND.format(
             ssh_options=_SSH_OPTIONS,
             ssh_private_key=self._ssh_private_key,
             ssh_user=self._ssh_user,
@@ -494,7 +503,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             command=command)
         try:
             _LOGGER.debug("Running the SSH command: '%s'...", ssh_command)
-            output = subprocess.check_output(
+            output: str = subprocess.check_output(
                 ssh_command.split(), timeout=timeout).decode()
             _LOGGER.debug(
                 "Output returned by SSH command '%s' is: '%s'", ssh_command,
@@ -513,14 +522,14 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: If bootup operation(s) fail.
         """
-        end_time = time.time() + timeout
+        end_time: float = time.time() + timeout
 
         # wait until device is responsive to FFX
         self._wait_for_online(timeout)
 
         # IP address may change on reboot. So get the ip address once again
-        remaining_timeout = max(0, end_time - time.time())
-        self._ip_address = self._get_device_ip_address(remaining_timeout)
+        remaining_timeout: float = max(0, end_time - time.time())
+        self._ip_address: str = self._get_device_ip_address(remaining_timeout)
 
         # wait until device to allow ssh connection
         remaining_timeout = max(0, end_time - time.time())
@@ -543,8 +552,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             errors.FuchsiaDeviceError: If device is not offline.
         """
         _LOGGER.info("Waiting for %s to go offline...", self.name)
-        start_time = time.time()
-        end_time = start_time + timeout
+        start_time: float = time.time()
+        end_time: float = start_time + timeout
         while time.time() < end_time:
             if not ffx_cli.check_ffx_connection(self.name):
                 _LOGGER.info("%s is offline.", self.name)
@@ -564,8 +573,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             errors.FuchsiaDeviceError: If device is not online.
         """
         _LOGGER.info("Waiting for %s to go online...", self.name)
-        start_time = time.time()
-        end_time = start_time + timeout
+        start_time: float = time.time()
+        end_time: float = start_time + timeout
         while time.time() < end_time:
             if ffx_cli.check_ffx_connection(self.name):
                 _LOGGER.info("%s is online.", self.name)

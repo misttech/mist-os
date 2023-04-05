@@ -14,7 +14,7 @@ from honeydew.utils import properties
 
 MOBLY_CONTROLLER_CONFIG_NAME = "FuchsiaDevice"
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 def create(
@@ -42,9 +42,9 @@ def create(
         "FuchsiaDevice controller configs received in testbed yml file is '%s'",
         configs)
 
-    fuchsia_devices = []
+    fuchsia_devices: List[fuchsia_device_interface.FuchsiaDevice] = []
     for config in configs:
-        device_config = _get_device_config(config)
+        device_config: Dict[str, str] = _get_device_config(config)
         fuchsia_devices.append(
             honeydew.create_device(
                 device_name=device_config["name"],
@@ -107,7 +107,7 @@ def _get_fuchsia_device_info(
         if attr.startswith("_"):
             continue
 
-        attr_type = getattr(type(fuchsia_device), attr, None)
+        attr_type: Any | None = getattr(type(fuchsia_device), attr, None)
         if isinstance(attr_type, properties.DynamicProperty):
             device_info["dynamic"][attr] = getattr(fuchsia_device, attr)
         elif isinstance(attr_type, properties.PersistentProperty):
@@ -134,7 +134,7 @@ def _get_device_config(config: Dict[str, str]) -> Dict[str, str]:
         "FuchsiaDevice controller config received in testbed yml file is '%s'",
         config)
 
-    device_config = {
+    device_config: Dict[str, str] = {
         "name":
             "",
         "ssh_private_key":

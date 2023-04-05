@@ -7,6 +7,7 @@
 import json
 import unittest
 from http.client import RemoteDisconnected
+from typing import Any, Dict
 from unittest import mock
 
 from honeydew import errors
@@ -14,7 +15,7 @@ from honeydew.utils import http_utils
 from parameterized import parameterized
 
 # pylint: disable=protected-access
-_PARAMS = {
+_PARAMS: Dict[str, Any] = {
     "url": "http://12.34.56.78",
     "data": {
         "key1": "value1",
@@ -34,17 +35,17 @@ _PARAMS = {
     "exceptions_to_skip": []
 }
 
-_MOCK_ARGS = {
+_MOCK_ARGS: Dict[str, Any] = {
     "urlopen_resp": b'{"id": "", "result": "fuchsia-emulator", "error": null}'
 }
 
 
-def _custom_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
-    test_func_name = testcase_func.__name__
+    test_func_name: str = testcase_func.__name__
 
-    params_dict = param.args[0]
-    test_label = parameterized.to_safe_name(params_dict["label"])
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
 
@@ -99,7 +100,8 @@ class HttpUtilsTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func)
     @mock.patch.object(http_utils.urllib.request, "urlopen", autospec=True)
-    def test_send_http_request_success(self, parameterized_dict, mock_urlopen):
+    def test_send_http_request_success(
+            self, parameterized_dict, mock_urlopen) -> None:
         """Test case for http_utils.send_http_request() success case."""
 
         urlopen_return_value = mock.MagicMock()
@@ -108,11 +110,11 @@ class HttpUtilsTests(unittest.TestCase):
         urlopen_return_value.__enter__.return_value = urlopen_return_value
         mock_urlopen.return_value = urlopen_return_value
 
-        result = http_utils.send_http_request(
+        result: Dict[str, Any] = http_utils.send_http_request(
             url=parameterized_dict["url"],
             **parameterized_dict["optional_params"])
 
-        expected_output = json.loads(
+        expected_output: Dict[str, Any] = json.loads(
             parameterized_dict["urlopen_resp"].decode("utf-8"))
 
         self.assertEqual(result, expected_output)
@@ -124,11 +126,12 @@ class HttpUtilsTests(unittest.TestCase):
         "urlopen",
         side_effect=RemoteDisconnected,
         autospec=True)
-    def test_send_http_request_with_exceptions_to_skip(self, mock_urlopen):
+    def test_send_http_request_with_exceptions_to_skip(
+            self, mock_urlopen) -> None:
         """Testcase to make sure http_utils.send_http_request() do not
         fail when it receives an exception that is part of exceptions_to_skip
         input arg"""
-        response = http_utils.send_http_request(
+        response: Dict[str, Any] = http_utils.send_http_request(
             url=_PARAMS["url"], exceptions_to_skip=[RemoteDisconnected])
         self.assertEqual(response, {})
         mock_urlopen.assert_called_once()
@@ -140,7 +143,7 @@ class HttpUtilsTests(unittest.TestCase):
         side_effect=RuntimeError("some run time error"),
         autospec=True)
     def test_send_http_request_fail_because_of_exception(
-            self, mock_urlopen, mock_sleep):
+            self, mock_urlopen, mock_sleep) -> None:
         """Testcase for http_utils.send_http_request() failure case because of
         an exception."""
         with self.assertRaisesRegex(errors.HttpRequestError,

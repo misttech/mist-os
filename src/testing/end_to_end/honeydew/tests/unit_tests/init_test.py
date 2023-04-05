@@ -6,19 +6,21 @@
 
 import os
 import unittest
+from typing import Any, Dict, Set, Type
 from unittest import mock
 
 import honeydew
 from honeydew.device_classes import generic_fuchsia_device, x64
+from honeydew.interfaces.device_classes import fuchsia_device
 from parameterized import parameterized
 
 
-def _custom_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
-    test_func_name = testcase_func.__name__
+    test_func_name: str = testcase_func.__name__
 
-    params_dict = param.args[0]
-    test_label = parameterized.to_safe_name(params_dict["label"])
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
 
@@ -43,7 +45,7 @@ class InitTests(unittest.TestCase):
         autospec=True)
     def test_create_device_return_default_device(
             self, mock_get_device_class, mock_get_target_address,
-            mock_start_sl4f_server):
+            mock_start_sl4f_server) -> None:
         """Test case for honeydew.create_device() where it returns default
         fuchsia device object."""
         device_name = "fuchsia-emulator"
@@ -70,7 +72,7 @@ class InitTests(unittest.TestCase):
         "honeydew._get_device_class", return_value=x64.X64, autospec=True)
     def test_create_device_return_specific_device(
             self, mock_get_device_class, mock_get_target_address,
-            mock_start_sl4f_server):
+            mock_start_sl4f_server) -> None:
         """Test case for honeydew.create_device() where it returns a specific
         fuchsia device object."""
         device_name = "fuchsia-1234"
@@ -86,23 +88,24 @@ class InitTests(unittest.TestCase):
         "honeydew._get_device_class",
         return_value=generic_fuchsia_device.GenericFuchsiaDevice,
         autospec=True)
-    def test_get_all_affordances(self, mock_get_device_class):
+    def test_get_all_affordances(self, mock_get_device_class) -> None:
         """Test case for honeydew.get_all_affordances()."""
         device_name = "fuchsia-emulator"
-        expected_affordances = ["bluetooth", "component"]
+        expected_affordances: list[str] = ["bluetooth", "component"]
 
         self.assertEqual(
             honeydew.get_all_affordances(device_name), expected_affordances)
         mock_get_device_class.assert_called_once()
 
-    def test_get_device_classes(self):
+    def test_get_device_classes(self) -> None:
         """Test case for honeydew.get_device_classes()."""
-        device_classes_path = os.path.dirname(honeydew.device_classes.__file__)
+        device_classes_path: str = os.path.dirname(
+            honeydew.device_classes.__file__)
         device_classes_module = honeydew._DEVICE_CLASSES_MODULE
-        expected_device_classes = {
+        expected_device_classes: Set[Type[fuchsia_device.FuchsiaDevice]] = {
             honeydew.device_classes.fuchsia_device_base.FuchsiaDeviceBase,
             honeydew.device_classes.generic_fuchsia_device.GenericFuchsiaDevice,
-            honeydew.device_classes.x64.X64
+            honeydew.device_classes.x64.X64,
         }
         self.assertEqual(
             honeydew.get_device_classes(
@@ -125,9 +128,10 @@ class InitTests(unittest.TestCase):
             },),
         ],
         name_func=_custom_test_name_func)
-    def test_register_device_classes(self, parameterized_dict):
+    def test_register_device_classes(self, parameterized_dict) -> None:
         """Test case for honeydew.register_device_classes()."""
-        fuchsia_device_classes = parameterized_dict["fuchsia_device_classes"]
+        fuchsia_device_classes: Any = parameterized_dict[
+            "fuchsia_device_classes"]
         honeydew.register_device_classes(
             fuchsia_device_classes=fuchsia_device_classes)
         self.assertTrue(
@@ -140,7 +144,8 @@ class InitTests(unittest.TestCase):
         "get_target_type",
         return_value="qemu-x64",
         autospec=True)
-    def test_get_device_class_return_default_device(self, mock_get_target_type):
+    def test_get_device_class_return_default_device(
+            self, mock_get_target_type) -> None:
         """Test case for honeydew.create_device() where it returns generic
         fuchsia device class implementation."""
         device_name = "fuchsia-emulator"
@@ -154,7 +159,8 @@ class InitTests(unittest.TestCase):
 
     @mock.patch(
         "honeydew.get_device_classes", return_value={x64.X64}, autospec=True)
-    def test_get_all_register_device_classes(self, mock_get_device_classes):
+    def test_get_all_register_device_classes(
+            self, mock_get_device_classes) -> None:
         """Test case for honeydew._get_all_register_device_classes()."""
         self.assertEqual(honeydew._get_all_register_device_classes(), {x64.X64})
         mock_get_device_classes.assert_called_once()
@@ -166,7 +172,8 @@ class InitTests(unittest.TestCase):
     @mock.patch.object(
         honeydew.ffx_cli, "get_target_type", return_value="x64", autospec=True)
     def test_get_device_class_return_specific_device(
-            self, mock_get_target_type, mock_get_all_register_device_classes):
+            self, mock_get_target_type,
+            mock_get_all_register_device_classes) -> None:
         """Test case for honeydew._get_device_class() where it returns a
         specific fuchsia device class implementation."""
         device_name = "fuchsia-emulator"

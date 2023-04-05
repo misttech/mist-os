@@ -16,11 +16,11 @@ class DynamicProperty(property):
             fget: Callable[[Any], Any],
             fset: Optional[Callable[[Any, Any], None]] = None,
             fdel: Optional[Callable[[Any], None]] = None,
-            doc: Optional[str] = None):
+            doc: Optional[str] = None) -> None:
         if not doc:
             doc = fget.__doc__
         super().__init__(fget, fset=fset, fdel=fdel, doc=doc)
-        self.name = fget.__name__
+        self.name: str = fget.__name__
 
 
 class PersistentProperty(property):
@@ -29,14 +29,14 @@ class PersistentProperty(property):
     Value is queried only once and cached.
     """
 
-    def __init__(self, fget: Callable[[Any], Any]):
+    def __init__(self, fget: Callable[[Any], Any]) -> None:
         super().__init__(functools.lru_cache()(fget), doc=fget.__doc__)
-        self.name = fget.__name__
+        self.name: str = fget.__name__
 
 
 class Affordance(property):
     """A property that represents an affordance."""
 
-    def __init__(self, fget: Callable[[Any], Any]):
+    def __init__(self, fget: Callable[[Any], Any]) -> None:
         super().__init__(functools.lru_cache()(fget), doc=fget.__doc__)
-        self.name = fget.__name__
+        self.name: str = fget.__name__

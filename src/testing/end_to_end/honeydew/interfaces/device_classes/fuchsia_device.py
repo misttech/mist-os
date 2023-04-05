@@ -44,10 +44,10 @@ class FuchsiaDevice(abc.ABC):
             ssh_private_key: str,
             ssh_user: str = DEFAULT_SSH_USER,
             device_ip_address: Optional[str] = None) -> None:
-        self.name = device_name
-        self._ssh_private_key = ssh_private_key
-        self._ssh_user = ssh_user
-        self._ip_address = device_ip_address or ffx_cli.get_target_address(
+        self.name: str = device_name
+        self._ssh_private_key: str = ssh_private_key
+        self._ssh_user: str = ssh_user
+        self._ip_address: str = device_ip_address or ffx_cli.get_target_address(
             self.name)
 
     # List all the persistent properties in alphabetical order
@@ -131,7 +131,8 @@ class FuchsiaDevice(abc.ABC):
         """Clean up method."""
 
     @abc.abstractmethod
-    def log_message_to_device(self, message: str, level: custom_types.LEVEL):
+    def log_message_to_device(
+            self, message: str, level: custom_types.LEVEL) -> None:
         """Log message to fuchsia device at specified level.
 
         Args:

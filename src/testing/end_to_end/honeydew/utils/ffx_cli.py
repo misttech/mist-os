@@ -11,15 +11,15 @@ from typing import Any, Dict, List
 
 from honeydew import errors
 
-_CMDS = {
+_CMDS: Dict[str, str] = {
     "FUCHSIA_TARGETS_SHOW": "ffx -t {target} target show --json",
 }
 
-_TIMEOUTS = {
+_TIMEOUTS: Dict[str, int] = {
     "FFX_CLI": 10,
 }
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
 # List all the public methods in alphabetical order
@@ -60,12 +60,14 @@ def check_ffx_connection(
     #     },
     # ]
     try:
-        ffx_target_show_info = ffx_target_show(target, timeout)
+        ffx_target_show_info: List[Dict[str, Any]] = ffx_target_show(
+            target, timeout)
     except subprocess.TimeoutExpired:
         # which means fuchsia device is not currently connected to host
         return False
-    target_entry = _get_label_entry(ffx_target_show_info, label_value="target")
-    target_title_entry = _get_label_entry(
+    target_entry: Dict[str, Any] = _get_label_entry(
+        ffx_target_show_info, label_value="target")
+    target_title_entry: Dict[str, Any] = _get_label_entry(
         target_entry["child"], label_value="name")
     return target_title_entry["value"] == target
 
@@ -86,10 +88,10 @@ def ffx_target_show(
         subprocess.TimeoutExpired: In case of timeout
         errors.FfxCommandError: In case of failure.
     """
-    cmd = _CMDS["FUCHSIA_TARGETS_SHOW"].format(target=target)
+    cmd: str = _CMDS["FUCHSIA_TARGETS_SHOW"].format(target=target)
     try:
         _LOGGER.debug("Executing command `%s`", cmd)
-        output = subprocess.check_output(
+        output: str = subprocess.check_output(
             cmd, shell=True, stderr=subprocess.STDOUT,
             timeout=timeout).decode()
         ffx_target_show_info: List[Dict[str, Any]] = json.loads(output)
@@ -139,10 +141,11 @@ def get_target_address(
     #     },
     # ]
     try:
-        ffx_target_show_info = ffx_target_show(target, timeout)
-        target_entry = _get_label_entry(
+        ffx_target_show_info: List[Dict[str, Any]] = ffx_target_show(
+            target, timeout)
+        target_entry: Dict[str, Any] = _get_label_entry(
             ffx_target_show_info, label_value="target")
-        ssh_address_entry = _get_label_entry(
+        ssh_address_entry: Dict[str, Any] = _get_label_entry(
             target_entry["child"], label_value="ssh_address")
         # in 'fe80::92bf:167b:19c3:58f0%qemu:22', ":22" is SSH port.
         return ssh_address_entry["value"][:-3]
@@ -199,10 +202,11 @@ def get_target_type(target: str, timeout: float = _TIMEOUTS["FFX_CLI"]) -> str:
     #     },
     # ]
     try:
-        ffx_target_show_info = ffx_target_show(target, timeout)
-        build_entry = _get_label_entry(
+        ffx_target_show_info: List[Dict[str, Any]] = ffx_target_show(
+            target, timeout)
+        build_entry: Dict[str, Any] = _get_label_entry(
             ffx_target_show_info, label_value="build")
-        board_entry = _get_label_entry(
+        board_entry: Dict[str, Any] = _get_label_entry(
             build_entry["child"], label_value="board")
         return board_entry["value"]
     except Exception as err:  # pylint: disable=broad-except

@@ -8,6 +8,7 @@ import base64
 import subprocess
 import unittest
 from http.client import RemoteDisconnected
+from typing import Any, Dict
 from unittest import mock
 
 from honeydew import errors
@@ -15,14 +16,14 @@ from honeydew.device_classes import fuchsia_device_base
 from parameterized import parameterized
 
 # pylint: disable=protected-access
-_INPUT_ARGS = {
+_INPUT_ARGS: Dict[str, str] = {
     "device_name": "fuchsia-emulator",
     "ssh_private_key": "/tmp/.ssh/pkey",
     "ssh_user": "root",
     "device_ip_address": "11.22.33.44"
 }
 
-_MOCK_ARGS = {
+_MOCK_ARGS: Dict[str, Any] = {
     "device_name": "fuchsia-emulator",
     "device_ip_address": "12.34.56.78",
     "device_type": "qemu-x64",
@@ -41,12 +42,12 @@ _MOCK_ARGS = {
 _BASE64_ENCODED_STR = "some base64 encoded string=="
 
 
-def _custom_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom test name function method."""
-    test_func_name = testcase_func.__name__
+    test_func_name: str = testcase_func.__name__
 
-    params_dict = param.args[0]
-    test_label = parameterized.to_safe_name(params_dict["label"])
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_with_{test_label}"
 
@@ -148,12 +149,12 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_fuchsia_device_base_init(
             self, parameterized_dict, mock_check_output,
-            mock_get_target_address, mock_send_sl4f_command):
+            mock_get_target_address, mock_send_sl4f_command) -> None:
         """Verify FuchsiaDeviceBase class instantiation."""
-        optional_params = parameterized_dict["optional_params"]
+        optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
-        device_name = parameterized_dict["mandatory_params"]["device_name"]
-        ssh_private_key = parameterized_dict["mandatory_params"][
+        device_name: str = parameterized_dict["mandatory_params"]["device_name"]
+        ssh_private_key: str = parameterized_dict["mandatory_params"][
             "ssh_private_key"]
 
         mock_send_sl4f_command.return_value = {"result": device_name}
@@ -181,7 +182,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "get_target_type",
         return_value=_MOCK_ARGS["device_type"],
         autospec=True)
-    def test_device_type(self, mock_ffx_cli_get_target_type):
+    def test_device_type(self, mock_ffx_cli_get_target_type) -> None:
         """Testcase for FuchsiaDeviceBase.device_type property"""
         self.assertEqual(self.fd_obj.device_type, _MOCK_ARGS["device_type"])
         mock_ffx_cli_get_target_type.assert_called_once_with(self.fd_obj.name)
@@ -198,7 +199,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                 }
         },
         autospec=True)
-    def test_manufacturer(self, mock_send_sl4f_command):
+    def test_manufacturer(self, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.manufacturer property"""
         self.assertEqual(self.fd_obj.manufacturer, "default-manufacturer")
 
@@ -218,7 +219,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                 }
         },
         autospec=True)
-    def test_model(self, mock_send_sl4f_command):
+    def test_model(self, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.model property"""
         self.assertEqual(self.fd_obj.model, "default-model")
 
@@ -238,7 +239,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                 }
         },
         autospec=True)
-    def test_product_name(self, mock_send_sl4f_command):
+    def test_product_name(self, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.product_name property"""
         self.assertEqual(self.fd_obj.product_name, "default-product-name")
 
@@ -253,7 +254,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             "serial_number": "default-serial-number",
         }},
         autospec=True)
-    def test_serial_number(self, mock_send_sl4f_command):
+    def test_serial_number(self, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.serial_number property"""
         self.assertEqual(self.fd_obj.serial_number, "default-serial-number")
 
@@ -267,7 +268,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "send_sl4f_command",
         return_value={"result": "1.2.3"},
         autospec=True)
-    def test_firmware_version(self, mock_send_sl4f_command):
+    def test_firmware_version(self, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.firmware_version property"""
         self.assertEqual(self.fd_obj.firmware_version, "1.2.3")
 
@@ -283,7 +284,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "send_sl4f_command",
         return_value={"result": _MOCK_ARGS["device_name"]},
         autospec=True)
-    def test_check_sl4f_connection(self, mock_send_sl4f_command):
+    def test_check_sl4f_connection(self, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.check_sl4f_connection()"""
         self.fd_obj.check_sl4f_connection()
 
@@ -291,9 +292,12 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             self.fd_obj,
             method=fuchsia_device_base._SL4F_METHODS["GetDeviceName"])
 
-    def test_close(self):
+    # pytype: disable=attribute-error
+    def test_close(self) -> None:
         """Testcase for FuchsiaDeviceBase.close()"""
         self.fd_obj.close()
+
+    # pytype: enable=attribute-error
 
     @parameterized.expand(
         [
@@ -325,7 +329,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "send_sl4f_command",
         autospec=True)
     def test_log_message_to_device(
-            self, parameterized_dict, mock_send_sl4f_command):
+            self, parameterized_dict, mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.log_message_to_device()"""
         self.fd_obj.log_message_to_device(
             level=parameterized_dict["log_level"],
@@ -346,7 +350,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "_wait_for_offline",
         autospec=True)
     def test_power_cycle(
-            self, mock_wait_for_offline, mock_wait_for_bootup_complete):
+            self, mock_wait_for_offline, mock_wait_for_bootup_complete) -> None:
         """Testcase for FuchsiaDeviceBase.power_cycle()"""
         power_switch = mock.MagicMock(
             spec=fuchsia_device_base.power_switch_interface.PowerSwitch)
@@ -372,7 +376,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     def test_reboot(
             self, mock_send_sl4f_command, mock_wait_for_offline,
-            mock_wait_for_bootup_complete):
+            mock_wait_for_bootup_complete) -> None:
         """Testcase for FuchsiaDeviceBase.reboot()"""
         self.fd_obj.reboot()
 
@@ -412,13 +416,14 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         autospec=True)
     @mock.patch.object(fuchsia_device_base.os, "makedirs", autospec=True)
     def test_snapshot(
-            self, parameterized_dict, mock_makedirs, mock_send_sl4f_command):
+            self, parameterized_dict, mock_makedirs,
+            mock_send_sl4f_command) -> None:
         """Testcase for FuchsiaDeviceBase.snapshot()"""
-        directory = parameterized_dict["directory"]
-        optional_params = parameterized_dict["optional_params"]
+        directory: str = parameterized_dict["directory"]
+        optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
         with mock.patch("builtins.open", mock.mock_open()) as mocked_file:
-            snapshot_file_path = self.fd_obj.snapshot(
+            snapshot_file_path: str = self.fd_obj.snapshot(
                 directory=directory, **optional_params)
 
         if "snapshot_file" in optional_params:
@@ -448,7 +453,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         side_effect=[subprocess.CalledProcessError, b"some output"],
         autospec=True)
     def test_check_ssh_connection_to_device_success(
-            self, mock_run_ssh_command_on_host, mock_sleep):
+            self, mock_run_ssh_command_on_host, mock_sleep) -> None:
         """Testcase for FuchsiaDeviceBase._check_ssh_connection_to_device()
         success case"""
         self.fd_obj._check_ssh_connection_to_device(timeout=5)
@@ -463,7 +468,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         side_effect=subprocess.CalledProcessError,
         autospec=True)
     def test_check_ssh_connection_to_device_fail(
-            self, mock_run_ssh_command_on_host):
+            self, mock_run_ssh_command_on_host) -> None:
         """Testcase for FuchsiaDeviceBase._check_ssh_connection_to_device()
         failure case"""
         with self.assertRaisesRegex(
@@ -483,7 +488,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         ],
         autospec=True)
     def test_get_device_ip_address_success(
-            self, mock_get_target_address, mock_sleep):
+            self, mock_get_target_address, mock_sleep) -> None:
         """Testcase for FuchsiaDeviceBase._get_device_ip_address() success
         case"""
         self.fd_obj._get_device_ip_address(timeout=5)
@@ -496,7 +501,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "get_target_address",
         side_effect=errors.FuchsiaDeviceError,
         autospec=True)
-    def test_get_device_ip_address_fail(self, mock_get_target_address):
+    def test_get_device_ip_address_fail(self, mock_get_target_address) -> None:
         """Testcase for FuchsiaDeviceBase._get_device_ip_address() failure
         case"""
 
@@ -539,7 +544,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_normalize_ip_addr(self, parameterized_dict):
+    def test_normalize_ip_addr(self, parameterized_dict) -> None:
         """Test case for FuchsiaDeviceBase._normalize_ip_addr()"""
         with mock.patch.object(fuchsia_device_base.sys, "version_info",
                                parameterized_dict["py_ver"]):
@@ -552,7 +557,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "check_output",
         return_value=b"some output",
         autospec=True)
-    def test_run_ssh_command_on_host(self, mock_check_output):
+    def test_run_ssh_command_on_host(self, mock_check_output) -> None:
         """Testcase for FuchsiaDeviceBase._run_ssh_command_on_host()"""
         command = "some_command"
 
@@ -568,7 +573,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         side_effect=subprocess.CalledProcessError(
             returncode=1, cmd="ssh fuchsia@12.34.56.78:ls"),
         autospec=True)
-    def test_run_ssh_command_on_host_exception(self, mock_check_output):
+    def test_run_ssh_command_on_host_exception(self, mock_check_output) -> None:
         """Testcase for FuchsiaDeviceBase._run_ssh_command_on_host() raising
         errors.SSHCommandError exception"""
         command = "some_command"
@@ -606,7 +611,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         return_value=_MOCK_ARGS["sl4f_response"],
         autospec=True)
     def test_send_sl4f_command_success(
-            self, parameterized_dict, mock_send_http_request):
+            self, parameterized_dict, mock_send_http_request) -> None:
         """Testcase for FuchsiaDeviceBase.send_sl4f_command() success case"""
         method = parameterized_dict["method"]
 
@@ -622,11 +627,11 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         return_value=_MOCK_ARGS["sl4f_error_response"],
         autospec=True)
     def test_send_sl4f_command_fail_because_of_error_in_resp(
-            self, mock_send_http_request):
+            self, mock_send_http_request) -> None:
         """Testcase for FuchsiaDeviceBase.send_sl4f_command() failure case when
         there is 'error' in SL4F response received."""
-        method = _MOCK_ARGS["sl4f_request"]
-        expected_error = _MOCK_ARGS["sl4f_error_response"]["error"]
+        method: str = _MOCK_ARGS["sl4f_request"]
+        expected_error: str | None = _MOCK_ARGS["sl4f_error_response"]["error"]
         with self.assertRaisesRegex(errors.FuchsiaDeviceError,
                                     f"Error: '{expected_error}'"):
             self.fd_obj.send_sl4f_command(method=method, attempts=5, interval=0)
@@ -639,10 +644,10 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         side_effect=RuntimeError("some run time error"),
         autospec=True)
     def test_send_sl4f_command_fail_because_of_exception(
-            self, mock_send_http_request):
+            self, mock_send_http_request) -> None:
         """Testcase for FuchsiaDeviceBase.send_sl4f_command() failure case when
         there is an exception thrown while sending HTTP request."""
-        method = _MOCK_ARGS["sl4f_request"]
+        method: str = _MOCK_ARGS["sl4f_request"]
         with self.assertRaisesRegex(
                 errors.FuchsiaDeviceError,
                 f"SL4F method '{method}' failed on '{self.fd_obj.name}'."):
@@ -678,7 +683,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     def test_wait_for_bootup_complete(
             self, mock_get_device_ip_address, mock_wait_for_online,
             mock_check_ssh_connection_to_device, mock_start_sl4f_server,
-            mock_device_type, mock_bluetooth_sys_init):
+            mock_device_type, mock_bluetooth_sys_init) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_bootup_complete()"""
         self.fd_obj._wait_for_bootup_complete(timeout=10)
 
@@ -696,7 +701,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         side_effect=[True, False],
         autospec=True)
     def test_wait_for_offline_success(
-            self, mock_check_ffx_connection, mock_sleep):
+            self, mock_check_ffx_connection, mock_sleep) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_offline() success case"""
         self.fd_obj._wait_for_offline()
 
@@ -708,7 +713,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "check_ffx_connection",
         return_value=True,
         autospec=True)
-    def test_wait_for_offline_fail(self, mock_check_ffx_connection):
+    def test_wait_for_offline_fail(self, mock_check_ffx_connection) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_offline() failure case"""
         with self.assertRaisesRegex(
                 fuchsia_device_base.errors.FuchsiaDeviceError,
@@ -724,7 +729,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         side_effect=[False, True],
         autospec=True)
     def test_wait_for_online_success(
-            self, mock_check_ffx_connection, mock_sleep):
+            self, mock_check_ffx_connection, mock_sleep) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_online() success case"""
         self.fd_obj._wait_for_online()
 
@@ -736,7 +741,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         "check_ffx_connection",
         return_value=False,
         autospec=True)
-    def test_wait_for_online_fail(self, mock_check_ffx_connection):
+    def test_wait_for_online_fail(self, mock_check_ffx_connection) -> None:
         """Testcase for FuchsiaDeviceBase._wait_for_online() failure case"""
         with self.assertRaisesRegex(
                 fuchsia_device_base.errors.FuchsiaDeviceError,

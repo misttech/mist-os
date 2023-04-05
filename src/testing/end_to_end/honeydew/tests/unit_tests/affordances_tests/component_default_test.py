@@ -5,6 +5,7 @@
 """Unit tests for honeydew.affordances.component_default.py."""
 
 import unittest
+from typing import Any, Dict
 from unittest import mock
 
 from honeydew.affordances import component_default
@@ -12,12 +13,12 @@ from honeydew.interfaces.transports import sl4f
 from parameterized import parameterized
 
 
-def _custom_test_name_func(testcase_func, _, param):
+def _custom_test_name_func(testcase_func, _, param) -> str:
     """Custom name function method."""
-    test_func_name = testcase_func.__name__
+    test_func_name: str = testcase_func.__name__
 
-    params_dict = param.args[0]
-    test_label = parameterized.to_safe_name(params_dict["label"])
+    params_dict: Dict[str, Any] = param.args[0]
+    test_label: str = parameterized.to_safe_name(params_dict["label"])
 
     return f"{test_func_name}_{test_label}"
 
@@ -33,7 +34,7 @@ class ComponentDefaultTests(unittest.TestCase):
         self.component_obj = component_default.ComponentDefault(
             device_name="fuchsia-emulator", sl4f=self.sl4f_obj)
 
-    def test_launch(self):
+    def test_launch(self) -> None:
         """Testcase for ComponentDefault.launch()"""
         url = "fuchsia-pkg://fuchsia.com/sl4f#meta/sl4f.cmx"
         self.component_obj.launch(url=url)
@@ -68,9 +69,9 @@ class ComponentDefaultTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_list(self, parameterized_dict):
+    def test_list(self, parameterized_dict) -> None:
         """Testcase for ComponentDefault.list()"""
-        return_value = parameterized_dict["return_value"]
+        return_value: Dict[str, Any] = parameterized_dict["return_value"]
         self.sl4f_obj.send_sl4f_command.return_value = return_value
 
         self.assertEqual(self.component_obj.list(), return_value["result"])
@@ -103,7 +104,7 @@ class ComponentDefaultTests(unittest.TestCase):
                 },),
         ],
         name_func=_custom_test_name_func)
-    def test_search(self, parameterized_dict):
+    def test_search(self, parameterized_dict) -> None:
         """Testcase for ComponentDefault.search()"""
         self.sl4f_obj.send_sl4f_command.return_value = parameterized_dict[
             "return_value"]

@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 import abc
-from typing import Optional, Union
+from typing import Dict, Optional, Union
 
 
 class PowerSwitch(abc.ABC):
@@ -16,7 +16,7 @@ class PowerSwitch(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def from_station_config(
-            cls, config: dict[str, Union[str, float, int]]) -> PowerSwitch:
+            cls, config: Dict[str, Union[str, float, int]]) -> PowerSwitch:
         """Class method to instantiate the power switch class.
 
         Args:
@@ -28,7 +28,7 @@ class PowerSwitch(abc.ABC):
 
     # List all the public methods in alphabetical order
     @abc.abstractmethod
-    def power_off(self, outlet: Optional[int] = None):
+    def power_off(self, outlet: Optional[int] = None) -> None:
         """Turns off the power at the specified outlet on the power switch.
 
         Args:
@@ -36,7 +36,7 @@ class PowerSwitch(abc.ABC):
         """
 
     @abc.abstractmethod
-    def power_on(self, outlet: Optional[int] = None):
+    def power_on(self, outlet: Optional[int] = None) -> None:
         """Turns on the power at the specified outlet on the power switch.
 
         Args:

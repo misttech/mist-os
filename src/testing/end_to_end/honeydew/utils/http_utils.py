@@ -12,13 +12,13 @@ from typing import Any, Dict, Iterable, Optional, Type
 
 from honeydew import errors
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_TIMEOUTS = {
+_TIMEOUTS: Dict[str, int] = {
     "HTTP_RESPONSE": 30,
 }
 
-_DEFAULTS = {
+_DEFAULTS: Dict[str, int] = {
     "ATTEMPTS": 3,
     "INTERVAL": 1,
 }
@@ -58,14 +58,14 @@ def send_http_request(
 
     if data is None:
         data = {}
-    data_bytes = json.dumps(data).encode("utf-8")
+    data_bytes: bytes = json.dumps(data).encode("utf-8")
 
     if headers is None:
         headers = {}
     headers["Content-Type"] = "application/json; charset=utf-8"
     headers["Content-Length"] = len(data_bytes)
 
-    err_msg = f"Failed to send the HTTP request to url={url} with " \
+    err_msg: str = f"Failed to send the HTTP request to url={url} with " \
               f"data={data} and headers={headers}"
     for attempt in range(1, attempts + 1):
         # if this is not first attempt wait for sometime before next retry.
@@ -78,7 +78,7 @@ def send_http_request(
                 url, data, headers)
             req = urllib.request.Request(url, data=data_bytes, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as response:
-                response_body = response.read().decode("utf-8")
+                response_body: str = response.read().decode("utf-8")
             _LOGGER.debug(
                 "HTTP response received from url=%s is '%s'", url,
                 response_body)
