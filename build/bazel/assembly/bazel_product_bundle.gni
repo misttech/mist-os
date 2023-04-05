@@ -169,18 +169,16 @@ template("bazel_product_bundle") {
     }
   }
 
-  _manifest_dir = "${target_out_dir}/manifests"
-  _package_manifest_list_target = "${target_name}_pakage_manifest_list"
-  _pb_dir = target_gen_dir + "/product_bundle"
+  _package_manifests_list_target = "${target_name}_package_manifests_list"
 
-  package_tool_package_manifest_list_create(_package_manifest_list_target) {
+  package_tool_package_manifest_list_create(_package_manifests_list_target) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
-    product_bundle = _pb_dir
-    manifests_dir = _manifest_dir
+    product_bundle = target_gen_dir + "/product_bundle"
+    manifests_dir = "${target_out_dir}/manifests"
 
     deps = [ ":${_bazel_action_target}" ]
   }
@@ -194,7 +192,7 @@ template("bazel_product_bundle") {
                            ])
     deps = [
       ":${_bazel_action_target}",
-      ":${_package_manifest_list_target}",
+      ":${_package_manifests_list_target}",
     ]
   }
 }

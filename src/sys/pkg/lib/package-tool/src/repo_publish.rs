@@ -96,7 +96,7 @@ pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()
 
     let package_manifest_list_path = match cmd.package_manifest_list_path {
         Some(path) => path,
-        None => cmd.manifest_dir.clone().join("package_manifest.list"),
+        None => cmd.manifest_dir.clone().join("package_manifests.list"),
     };
 
     repo_package_manifest_list(
@@ -1103,7 +1103,7 @@ mod tests {
         };
 
         assert_matches!(cmd_repo_package_manifest_list(merge_cmd).await, Ok(()));
-        let package_manifest_list = dir.join("manifests").join("package_manifest.list");
+        let package_manifest_list = dir.join("manifests").join("package_manifests.list");
         let list_string = read_to_string(package_manifest_list).unwrap();
         assert!(list_string.contains("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9_package_manifest.json"));
         assert!(list_string.contains("cd726370b3dd4656f4408f7fa4e2818f3f086da710f6580d4213e3e01d3e7faa_package_manifest.json"));

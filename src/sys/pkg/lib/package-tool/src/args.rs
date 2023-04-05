@@ -216,7 +216,7 @@ pub struct RepoPMListCommand {
     #[argh(option)]
     pub src_trusted_root_path: Option<Utf8PathBuf>,
 
-    /// path to the package manifest list (Default is to use <manifest_dir>/package_manifest.list)
+    /// path to the package manifest list (Default is to use <manifest_dir>/package_manifests.list)
     #[argh(option)]
     pub package_manifest_list_path: Option<Utf8PathBuf>,
 }
