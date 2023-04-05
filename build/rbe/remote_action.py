@@ -41,6 +41,16 @@ _REMOTE_LOG_SCRIPT = os.path.join('build', 'rbe', 'log-it.sh')
 
 _DETAIL_DIFF_SCRIPT = os.path.join('build', 'rbe', 'detail-diff.sh')
 
+_RECLIENT_ERROR_STATUS = 35
+_RBE_SERVER_ERROR_STATUS = 45
+_RBE_KILLED_STATUS = 137
+
+_RETRIABLE_REWRAPPER_STATUSES = {
+    _RECLIENT_ERROR_STATUS,
+    _RBE_SERVER_ERROR_STATUS,
+    _RBE_KILLED_STATUS,
+}
+
 
 def msg(text: str):
     print(f'[{_SCRIPT_BASENAME}] {text}')
@@ -233,6 +243,32 @@ def remove_working_dir_abspaths_from_depfile_in_place(
         depfile,
         lambda line: remove_working_dir_abspaths(line, build_subdir),
     )
+
+
+def _matches_file_not_found(line: str) -> bool:
+    return "fatal error:" in line and "file not found" in line
+
+
+def _should_retry_remote_action(status: cl_utils.SubprocessResult) -> bool:
+    """Heuristic for deciding when it is worth retrying rewrapper.
+
+    Retry once under these conditions:
+      35: reclient error (includes infrastructural issues or local errors)
+      45: remote execution (server) error, e.g. remote blob download failure
+      137: SIGKILL'd (signal 9) by OS.
+        Reasons may include segmentation fault, or out of memory.
+
+    Args:
+      status: exit code, stdout, stderr of a completed subprocess.
+    """
+    if status.returncode == 0:  # success, no need to retry
+        return False
+
+    # Do not retry missing file errors, the user should address those.
+    if any(_matches_file_not_found(line) for line in status.stderr):
+        return False
+
+    return status.returncode in _RETRIABLE_REWRAPPER_STATUSES
 
 
 class RemoteAction(object):
@@ -545,9 +581,14 @@ class RemoteAction(object):
         """
         try:
             result = self._run_maybe_remotely()
-            # TODO(http://fxbug.dev/96250): handle some re-client error cases
-            #   and in some cases, retry once
+
+            # Under certain error conditions, do a one-time retry
+            # for flake/fault-tolerance.
+            if _should_retry_remote_action(result):
+                return self._run_maybe_remotely().returncode
+
             return result.returncode
+
         finally:
             if not self._save_temps:
                 self._cleanup()

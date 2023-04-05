@@ -896,6 +896,108 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.local_command, ['cat', '../src/cow/moo.txt'])
         self.assertEqual(action.options, ['--exec_strategy=racing'])
 
+    def test_fail_no_retry(self):
+        command = ['echo', 'hello']
+        action = remote_action.RemoteAction(
+            rewrapper='/path/to/rewrapper',
+            command=command,
+            exec_root=self._PROJECT_ROOT,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        for exit_code in (1, 2):
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_run_maybe_remotely',
+                                   return_value=_fake_subprocess_result(
+                                       exit_code)) as mock_call:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_cleanup') as mock_cleanup:
+                    self.assertEqual(action.run(), exit_code)
+
+            mock_cleanup.assert_called_once()
+            mock_call.assert_called_once()  # no retry
+
+    def test_file_not_found_no_retry(self):
+        command = ['echo', 'hello']
+        action = remote_action.RemoteAction(
+            rewrapper='/path/to/rewrapper',
+            command=command,
+            exec_root=self._PROJECT_ROOT,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        with mock.patch.object(
+                remote_action.RemoteAction,
+                '_run_maybe_remotely',
+                return_value=_fake_subprocess_result(
+                    returncode=2, stderr=['ERROR: file not found: /bin/smash',
+                                          'going home now']),
+        ) as mock_call:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                self.assertEqual(action.run(), 2)
+
+        mock_cleanup.assert_called_once()
+        mock_call.assert_called_once()  # no retry
+
+    def test_retry_once_successful(self):
+        command = ['echo', 'hello']
+        action = remote_action.RemoteAction(
+            rewrapper='/path/to/rewrapper',
+            command=command,
+            exec_root=self._PROJECT_ROOT,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        for exit_code in remote_action._RETRIABLE_REWRAPPER_STATUSES:
+            with mock.patch.object(
+                    remote_action.RemoteAction,
+                    '_run_maybe_remotely',
+                    side_effect=[
+                        # If at first you don't succeed,
+                        _fake_subprocess_result(exit_code),
+                        # try, try again (and succeed).
+                        _fake_subprocess_result(0),
+                    ]) as mock_call:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_cleanup') as mock_cleanup:
+                    self.assertEqual(action.run(), 0)
+
+            mock_cleanup.assert_called_once()
+            # expect called twice, second time is the retry
+            self.assertEqual(len(mock_call.call_args_list), 2)
+
+    def test_retry_once_fails_again(self):
+        command = ['echo', 'hello']
+        action = remote_action.RemoteAction(
+            rewrapper='/path/to/rewrapper',
+            command=command,
+            exec_root=self._PROJECT_ROOT,
+        )
+        self.assertEqual(action.local_command, command)
+        self.assertEqual(action.exec_root, self._PROJECT_ROOT)
+
+        for exit_code in remote_action._RETRIABLE_REWRAPPER_STATUSES:
+            with mock.patch.object(
+                    remote_action.RemoteAction,
+                    '_run_maybe_remotely',
+                    side_effect=[
+                        # If at first you don't succeed,
+                        _fake_subprocess_result(exit_code),
+                        # try, try again (and fail again).
+                        _fake_subprocess_result(exit_code),
+                    ]) as mock_call:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_cleanup') as mock_cleanup:
+                    self.assertEqual(action.run(), exit_code)  # fail
+
+            mock_cleanup.assert_called_once()
+            # expect called twice, second time is the retry
+            self.assertEqual(len(mock_call.call_args_list), 2)
+
 
 class MainTests(unittest.TestCase):
 
