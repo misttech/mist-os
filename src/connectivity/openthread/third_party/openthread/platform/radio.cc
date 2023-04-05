@@ -351,11 +351,25 @@ extern "C" otRadioState otPlatRadioGetState(otInstance *a_instance) {
   return sRadioSpinel.GetState();
 }
 
+#ifdef OPENTHREAD_USE_OLD_SETTING_API
 extern "C" void otPlatRadioSetMacFrameCounter(otInstance *a_instance,
                                               uint32_t a_mac_frame_counter) {
   SuccessOrDie(sRadioSpinel.SetMacFrameCounter(a_mac_frame_counter));
   OT_UNUSED_VARIABLE(a_instance);
 }
+#else
+extern "C" void otPlatRadioSetMacFrameCounter(otInstance *a_instance,
+                                              uint32_t a_mac_frame_counter) {
+  SuccessOrDie(sRadioSpinel.SetMacFrameCounter(a_mac_frame_counter, /* aSetIfLarger */ false));
+  OT_UNUSED_VARIABLE(a_instance);
+}
+
+extern "C" void otPlatRadioSetMacFrameCounterIfLarger(otInstance *aInstance,
+                                                      uint32_t aMacFrameCounter) {
+  SuccessOrDie(sRadioSpinel.SetMacFrameCounter(aMacFrameCounter, /* aSetIfLarger */ true));
+  OT_UNUSED_VARIABLE(aInstance);
+}
+#endif
 
 extern "C" uint64_t otPlatRadioGetNow(otInstance *a_instance) {
   OT_UNUSED_VARIABLE(a_instance);

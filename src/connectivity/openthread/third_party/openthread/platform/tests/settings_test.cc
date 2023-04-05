@@ -22,11 +22,7 @@ class SettingsTest : public ::gtest::TestLoopFixture {
  public:
   void SetUp() override {
     TestLoopFixture::SetUp();
-#if OPENTHREAD_USE_OLD_SETTING_API
-    otPlatSettingsInit(instance);
-#else
     otPlatSettingsInit(instance, NULL, 0);
-#endif
     otPlatSettingsWipe(instance);
 
     // Initialize data with some non-zero value

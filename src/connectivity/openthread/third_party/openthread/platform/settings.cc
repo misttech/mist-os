@@ -41,13 +41,8 @@ static otError platformSettingsDelete(otInstance *instance, uint16_t key, int in
 
 std::unique_ptr<ThreadConfigManager> config_manager;
 
-#if OPENTHREAD_USE_OLD_SETTING_API
-void otPlatSettingsInit(otInstance *instance)
-#else
 void otPlatSettingsInit(otInstance *instance, const uint16_t *aSensitiveKeys,
-                        uint16_t aSensitiveKeysLength)
-#endif
-{
+                        uint16_t aSensitiveKeysLength) {
   otPlatLog(OT_LOG_LEVEL_DEBG, OT_LOG_REGION_PLATFORM, "Inside otPlatSettingsInit");
   if (config_manager == nullptr) {
     config_manager = std::make_unique<ThreadConfigManager>(kThreadSettingsPath);

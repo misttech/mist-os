@@ -31,7 +31,7 @@ source_set("platform") {
   # This allows for compilation work both before and after update
   # of third_party/openthread
   if (openthread_upstream_version ==
-      "74f5ab5c9f434c4ffe44c580be40b7ff14e7f0e9") {
+      "645fbcd400d2e6c2de641bccb0335e3eaaed1f36") {
     defines = [ "OPENTHREAD_USE_OLD_SETTING_API=1" ]
   }
 
