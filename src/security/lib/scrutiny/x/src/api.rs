@@ -240,27 +240,27 @@ pub trait DataSource: Debug {
 
 impl<SourcePath: AsRef<Path>> PartialEq for dyn DataSource<SourcePath = SourcePath> {
     fn eq(&self, other: &dyn DataSource<SourcePath = SourcePath>) -> bool {
-        // Cope with boxed type returned by `data_source.parent()` using anscestor variables.
-        let mut a_anscestor: Option<Box<dyn DataSource<SourcePath = SourcePath>>> = None;
-        let mut b_anscestor: Option<Box<dyn DataSource<SourcePath = SourcePath>>> = None;
+        // Cope with boxed type returned by `data_source.parent()` using ancestor variables.
+        let mut a_ancestor: Option<Box<dyn DataSource<SourcePath = SourcePath>>> = None;
+        let mut b_ancestor: Option<Box<dyn DataSource<SourcePath = SourcePath>>> = None;
 
         // Move `a` and `b` up to the root of the data source tree.
         loop {
-            // Inspect either latest anscestor or initial values.
-            let a: &dyn DataSource<SourcePath = SourcePath> = match a_anscestor.as_ref() {
+            // Inspect either latest ancestor or initial values.
+            let a: &dyn DataSource<SourcePath = SourcePath> = match a_ancestor.as_ref() {
                 Some(a) => a.as_ref(),
                 None => self,
             };
-            let b: &dyn DataSource<SourcePath = SourcePath> = match b_anscestor.as_ref() {
+            let b: &dyn DataSource<SourcePath = SourcePath> = match b_ancestor.as_ref() {
                 Some(b) => b.as_ref(),
                 None => other,
             };
 
-            // Move up anscestor tree, return early, or break at root of tree.
+            // Move up ancestor tree, return early, or break at root of tree.
             match (a.parent(), b.parent()) {
                 (Some(a_parent), Some(b_parent)) => {
-                    a_anscestor = Some(a_parent);
-                    b_anscestor = Some(b_parent);
+                    a_ancestor = Some(a_parent);
+                    b_ancestor = Some(b_parent);
                 }
                 (None, Some(_)) | (Some(_), None) => {
                     return false;
@@ -272,11 +272,11 @@ impl<SourcePath: AsRef<Path>> PartialEq for dyn DataSource<SourcePath = SourcePa
         }
 
         // Directly (shallow) compare root before working entirely in terms of boxed descendants.
-        let a = match a_anscestor.as_ref() {
+        let a = match a_ancestor.as_ref() {
             Some(a) => a.as_ref(),
             None => self,
         };
-        let b = match b_anscestor.as_ref() {
+        let b = match b_ancestor.as_ref() {
             Some(b) => b.as_ref(),
             None => other,
         };
