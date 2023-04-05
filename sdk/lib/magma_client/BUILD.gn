@@ -5,10 +5,7 @@
 import("//build/cpp/sdk_static_library.gni")
 
 config("magma_include") {
-  include_dirs = [
-    "include/lib",
-    "include",
-  ]
+  include_dirs = [ "include" ]
 }
 
 source_set("magma_common") {
