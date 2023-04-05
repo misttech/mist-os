@@ -1,5 +1,7 @@
-#include <poll.h>
-#include <signal.h>
-#include <stddef.h>
+#include <unistd.h>
+#include <zircon/syscalls.h>
 
-int pause(void) { return poll(NULL, 0, 0); }
+int pause(void) {
+  _zx_nanosleep(ZX_TIME_INFINITE);
+  __builtin_trap();  // unreachable
+}
