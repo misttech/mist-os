@@ -172,6 +172,9 @@ def _build_fuchsia_package_impl(ctx):
     # where we will collect all of the temporary files
     pkg_dir = ctx.label.name + "_pkg/"
 
+    # An environment variable that creates an isolated FFX instance.
+    ffx_isolate_dir = ctx.actions.declare_directory(pkg_dir + "_package.ffx")
+
     # Declare all of the output files
     manifest = ctx.actions.declare_file(pkg_dir + "manifest")
     meta_package = ctx.actions.declare_file(pkg_dir + "meta/package")
@@ -294,27 +297,27 @@ def _build_fuchsia_package_impl(ctx):
         progress_message = "Building package for %s" % ctx.label,
     )
 
+    artifact_inputs = [r.src for r in package_resources] + [
+        output_package_manifest,
+        meta_far,
+    ]
+
     # Create the far file.
     ctx.actions.run(
-        executable = sdk.pm,
+        executable = sdk.ffx,
         arguments = [
-            "-o",
-            output_dir,
-            "-m",
-            manifest.path,
-            "-n",
-            ctx.attr.package_name,
+            "--isolate-dir",
+            ffx_isolate_dir.path,
+            "package",
             "archive",
-            "-output",
-            # pm automatically adds .far so we have to remove it here to make
-            # bazel happy since we need to declare the output with the extension
-            far_file.path[:-4],
+            "create",
+            output_package_manifest.path,
+            "-o",
+            far_file.path,
         ],
-        inputs = [meta_far, output_package_manifest] + build_inputs,
-        outputs = [
-            far_file,
-        ],
-        mnemonic = "FuchsiaPmArchive",
+        inputs = artifact_inputs,
+        outputs = [far_file, ffx_isolate_dir],
+        mnemonic = "FuchsiaFfxPackageArchiveCreate",
         progress_message = "Archiving package for %{label}",
     )
 
