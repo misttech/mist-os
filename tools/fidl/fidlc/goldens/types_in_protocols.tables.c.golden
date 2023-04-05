@@ -3,12 +3,19 @@
 #include <lib/fidl/internal.h>
 
 
+__LOCAL extern const struct FidlCodedBits zx_rightsTable;
+__LOCAL extern const struct FidlCodedEnum zx_obj_typeTable;
 __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_VectorOptionalTable;
 __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_VectorBasicTable;
 __LOCAL extern const struct FidlCodedUnion test_typesinprotocols_UnionTable;
 __LOCAL extern const struct FidlCodedUnion test_typesinprotocols_UnionNullableRefTable;
 __LOCAL extern const struct FidlCodedTable test_typesinprotocols_TableTable;
 __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_StructTable;
+__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ResourceUnionTable;
+__LOCAL extern const struct FidlCodedUnion test_typesinprotocols_ResourceUnionNullableRefTable;
+__LOCAL extern const struct FidlCodedTable test_typesinprotocols_ResourceTableTable;
+__LOCAL extern const struct FidlCodedStruct test_typesinprotocols_ResourceStructTable;
+__LOCAL extern const struct FidlCodedStruct test_typesinprotocols_ResourceTable;
 __LOCAL extern const struct FidlCodedEnum test_typesinprotocols_EnumTable;
 __LOCAL extern const struct FidlCodedBits test_typesinprotocols_BitsTable;
 __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_VectorCompoundTable;
@@ -19,6 +26,7 @@ __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_ArrayVectorNes
 __LOCAL extern const struct FidlCodedStruct test_typesinprotocols_ArrayBasicTable;
 
 static const struct FidlCodedStructPointer Pointer28test_typesinprotocols_StructTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_typesinprotocols_StructTable};
+static const struct FidlCodedStructPointer Pointer36test_typesinprotocols_ResourceStructTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_typesinprotocols_ResourceStructTable};
 
 static const struct FidlCodedVector Vector4294967295nullable5uint8Table = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&fidl_internal_kUint8Table), .max_count=4294967295u, .element_size_v2=1u, .nullable=kFidlNullability_Nullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CanMemcpy};
 
@@ -55,6 +63,50 @@ static const struct FidlCodedVector Vector4294967295nonnullable27String429496729
 static const struct FidlCodedString String4294967295nullableTable = {.tag=kFidlTypeString, .max_size=4294967295u, .nullable=kFidlNullability_Nullable};
 
 static const struct FidlCodedVector Vector4294967295nonnullable24String4294967295nullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&String4294967295nullableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+
+static const struct FidlCodedHandle Handlehandle2147483648nonnullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_NONE, .handle_rights=2147483648u, .nullable=kFidlNullability_Nonnullable};
+
+static const struct FidlCodedHandle Handlevmo2147483648nonnullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_VMO, .handle_rights=2147483648u, .nullable=kFidlNullability_Nonnullable};
+
+static const struct FidlCodedHandle Protocol30test_typesinprotocols_ProtocolnonnullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_CHANNEL, .handle_rights=ZX_DEFAULT_CHANNEL_RIGHTS, .nullable=kFidlNullability_Nonnullable};
+
+static const struct FidlCodedHandle Request30test_typesinprotocols_ProtocolnonnullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_CHANNEL, .handle_rights=ZX_DEFAULT_CHANNEL_RIGHTS, .nullable=kFidlNullability_Nonnullable};
+
+static const struct FidlCodedHandle Handlehandle2147483648nullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_NONE, .handle_rights=2147483648u, .nullable=kFidlNullability_Nullable};
+
+static const struct FidlCodedHandle Handlevmo2147483648nullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_VMO, .handle_rights=2147483648u, .nullable=kFidlNullability_Nullable};
+
+static const struct FidlCodedHandle Protocol30test_typesinprotocols_ProtocolnullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_CHANNEL, .handle_rights=ZX_DEFAULT_CHANNEL_RIGHTS, .nullable=kFidlNullability_Nullable};
+
+static const struct FidlCodedHandle Request30test_typesinprotocols_ProtocolnullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_CHANNEL, .handle_rights=ZX_DEFAULT_CHANNEL_RIGHTS, .nullable=kFidlNullability_Nullable};
+
+static const struct FidlCodedArray Array20_33Handlehandle2147483648nonnullableTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&Handlehandle2147483648nonnullableTable), .array_size_v2=20u, .element_size_v2=4u};
+
+static const struct FidlCodedArray Array20_30Handlevmo2147483648nonnullableTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable), .array_size_v2=20u, .element_size_v2=4u};
+
+static const struct FidlCodedArray Array20_51Protocol30test_typesinprotocols_ProtocolnonnullableTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&Protocol30test_typesinprotocols_ProtocolnonnullableTable), .array_size_v2=20u, .element_size_v2=4u};
+
+static const struct FidlCodedArray Array20_50Request30test_typesinprotocols_ProtocolnonnullableTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&Request30test_typesinprotocols_ProtocolnonnullableTable), .array_size_v2=20u, .element_size_v2=4u};
+
+static const struct FidlCodedArray Array5_36test_typesinprotocols_ResourceStructTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&test_typesinprotocols_ResourceStructTable), .array_size_v2=5u, .element_size_v2=1u};
+
+static const struct FidlCodedArray Array80_35test_typesinprotocols_ResourceTableTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&test_typesinprotocols_ResourceTableTable), .array_size_v2=80u, .element_size_v2=16u};
+
+static const struct FidlCodedArray Array80_35test_typesinprotocols_ResourceUnionTable __attribute__((unused)) = {.tag=kFidlTypeArray, .element=(fidl_type_t*)(&test_typesinprotocols_ResourceUnionTable), .array_size_v2=80u, .element_size_v2=16u};
+
+static const struct FidlCodedVector Vector4294967295nonnullable33Handlehandle2147483648nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&Handlehandle2147483648nonnullableTable), .max_count=4294967295u, .element_size_v2=4u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+
+static const struct FidlCodedVector Vector4294967295nonnullable30Handlevmo2147483648nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable), .max_count=4294967295u, .element_size_v2=4u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+
+static const struct FidlCodedVector Vector4294967295nonnullable51Protocol30test_typesinprotocols_ProtocolnonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&Protocol30test_typesinprotocols_ProtocolnonnullableTable), .max_count=4294967295u, .element_size_v2=4u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+
+static const struct FidlCodedVector Vector4294967295nonnullable50Request30test_typesinprotocols_ProtocolnonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&Request30test_typesinprotocols_ProtocolnonnullableTable), .max_count=4294967295u, .element_size_v2=4u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+
+static const struct FidlCodedVector Vector4294967295nonnullable36test_typesinprotocols_ResourceStructTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_typesinprotocols_ResourceStructTable), .max_count=4294967295u, .element_size_v2=1u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CanMemcpy};
+
+static const struct FidlCodedVector Vector4294967295nonnullable35test_typesinprotocols_ResourceTableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_typesinprotocols_ResourceTableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+
+static const struct FidlCodedVector Vector4294967295nonnullable35test_typesinprotocols_ResourceUnionTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_typesinprotocols_ResourceUnionTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
 
 static const struct FidlCodedVector Vector4294967295nonnullable26test_typesinprotocols_BitsTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_typesinprotocols_BitsTable), .max_count=4294967295u, .element_size_v2=4u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CanMemcpy};
 
@@ -152,6 +204,49 @@ const struct FidlCodedUnion test_typesinprotocols_UnionNullableRefTable = {.tag=
 const struct FidlCodedTable test_typesinprotocols_TableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_NotResource, .name="test.typesinprotocols/Table"};
 
 const struct FidlCodedStruct test_typesinprotocols_StructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.typesinprotocols/Struct"};
+
+static const struct FidlUnionField Fields35test_typesinprotocols_ResourceUnion[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
+};
+const struct FidlCodedUnion test_typesinprotocols_ResourceUnionTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields35test_typesinprotocols_ResourceUnion, .nullable=kFidlNullability_Nonnullable, .name="test.typesinprotocols/ResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
+static const struct FidlUnionField Fields46test_typesinprotocols_ResourceUnionNullableRef[] = {
+    /*FidlUnionField*/{.type=(fidl_type_t*)(&fidl_internal_kBoolTable)}
+};
+const struct FidlCodedUnion test_typesinprotocols_ResourceUnionNullableRefTable = {.tag=kFidlTypeUnion, .field_count=1u, .fields=Fields46test_typesinprotocols_ResourceUnionNullableRef, .nullable=kFidlNullability_Nullable, .name="test.typesinprotocols/ResourceUnion", .strictness=kFidlStrictness_Flexible, .is_resource=kFidlIsResource_Resource};
+const struct FidlCodedTable test_typesinprotocols_ResourceTableTable = {.tag=kFidlTypeTable, .fields=NULL, .field_count=0u, .is_resource=kFidlIsResource_Resource, .name="test.typesinprotocols/ResourceTable"};
+
+const struct FidlCodedStruct test_typesinprotocols_ResourceStructTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_DoesNotContainEnvelope, .is_empty=kFidlEmpty_IsEmpty, .elements=NULL, .element_count=0u, .size_v2=1u, .name="test.typesinprotocols/ResourceStruct"};
+
+static const struct FidlStructElement Fields30test_typesinprotocols_Resource[] = {
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=0u, .field_type=(fidl_type_t*)(&Handlehandle2147483648nonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=4u, .field_type=(fidl_type_t*)(&Handlevmo2147483648nonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=8u, .field_type=(fidl_type_t*)(&Protocol30test_typesinprotocols_ProtocolnonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=12u, .field_type=(fidl_type_t*)(&Request30test_typesinprotocols_ProtocolnonnullableTable)}},
+    /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=16u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding64,.is_resource=kFidlIsResource_NotResource},.mask_64=18446744073709551360ul}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=24u, .field_type=(fidl_type_t*)(&test_typesinprotocols_ResourceTableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=40u, .field_type=(fidl_type_t*)(&test_typesinprotocols_ResourceUnionTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=56u, .field_type=(fidl_type_t*)(&Handlehandle2147483648nullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=60u, .field_type=(fidl_type_t*)(&Handlevmo2147483648nullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=64u, .field_type=(fidl_type_t*)(&Protocol30test_typesinprotocols_ProtocolnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=68u, .field_type=(fidl_type_t*)(&Request30test_typesinprotocols_ProtocolnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=72u, .field_type=(fidl_type_t*)(&Pointer36test_typesinprotocols_ResourceStructTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=80u, .field_type=(fidl_type_t*)(&test_typesinprotocols_ResourceUnionNullableRefTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=96u, .field_type=(fidl_type_t*)(&Array20_33Handlehandle2147483648nonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=116u, .field_type=(fidl_type_t*)(&Array20_30Handlevmo2147483648nonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=136u, .field_type=(fidl_type_t*)(&Array20_51Protocol30test_typesinprotocols_ProtocolnonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=156u, .field_type=(fidl_type_t*)(&Array20_50Request30test_typesinprotocols_ProtocolnonnullableTable)}},
+    /*FidlStructPadding*/{.padding=/*FidlStructPadding*/{.offset_v2=180u, .header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Padding32,.is_resource=kFidlIsResource_NotResource},.mask_32=4294967040u}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=184u, .field_type=(fidl_type_t*)(&Array80_35test_typesinprotocols_ResourceTableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=264u, .field_type=(fidl_type_t*)(&Array80_35test_typesinprotocols_ResourceUnionTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=344u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable33Handlehandle2147483648nonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=360u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable30Handlevmo2147483648nonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=376u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable51Protocol30test_typesinprotocols_ProtocolnonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=392u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable50Request30test_typesinprotocols_ProtocolnonnullableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=408u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable36test_typesinprotocols_ResourceStructTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=424u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable35test_typesinprotocols_ResourceTableTable)}},
+    /*FidlStructPadding*/{.field=/*FidlStructField*/{.header=/*FidlStructElementHeader*/{.element_type=kFidlStructElementType_Field, .is_resource=kFidlIsResource_Resource},.offset_v2=440u, .field_type=(fidl_type_t*)(&Vector4294967295nonnullable35test_typesinprotocols_ResourceUnionTable)}}
+};
+const struct FidlCodedStruct test_typesinprotocols_ResourceTable = {.tag=kFidlTypeStruct, .contains_envelope=kFidlContainsEnvelope_ContainsEnvelope, .is_empty=kFidlEmpty_IsNotEmpty, .elements=Fields30test_typesinprotocols_Resource, .element_count=27u, .size_v2=456u, .name="test.typesinprotocols/Resource"};
 
 const struct FidlCodedEnum test_typesinprotocols_EnumTable = {.tag=kFidlTypeEnum, .underlying_type=kFidlCodedPrimitiveSubtype_Uint32, .strictness=kFidlStrictness_Flexible, .validate=NULL, .name="test.typesinprotocols/Enum"};
 

@@ -36,6 +36,18 @@ struct fidl::ostream::Formatter<::test_typesinprotocols::Union> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Union& value);
 };
 template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value);
+};
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value);
+};
+template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::Basic> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Basic& value);
 };
@@ -67,6 +79,10 @@ template <>
 struct fidl::ostream::Formatter<::test_typesinprotocols::ArrayVectorNested> {
   static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::ArrayVectorNested& value);
 };
+template <>
+struct fidl::ostream::Formatter<::test_typesinprotocols::Resource> {
+  static std::ostream& Format(std::ostream& os, const ::test_typesinprotocols::Resource& value);
+};
 
 namespace test_typesinprotocols {
 
@@ -79,6 +95,12 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Struct
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Table& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Union& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Basic& value);
 
@@ -95,6 +117,8 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Vector
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::VectorOptional& value);
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ArrayVectorNested& value);
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resource& value);
 
 }  // namespace test_typesinprotocols
 

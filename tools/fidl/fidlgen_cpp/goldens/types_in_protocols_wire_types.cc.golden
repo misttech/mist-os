@@ -10,6 +10,77 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
+#ifdef __Fuchsia__
+void ::test_typesinprotocols::wire::ResourceStruct::_CloseHandles() {
+}
+
+#endif  // __Fuchsia__
+
+#ifdef __Fuchsia__
+void ::test_typesinprotocols::wire::Resource::_CloseHandles() {
+  handle.reset();
+  vmo.reset();
+  client_end.reset();
+  server_end.reset();
+  struct_._CloseHandles();
+  table._CloseHandles();
+  union_._CloseHandles();
+  opt_handle.reset();
+  opt_vmo.reset();
+  opt_client_end.reset();
+  opt_server_end.reset();
+  if (opt_struct != nullptr) {
+    opt_struct->_CloseHandles();
+  }
+  if (opt_union.has_value()) {
+    opt_union->_CloseHandles();
+  }
+  for (auto& e_1 : array_handle) {
+    e_1.reset();
+  }
+  for (auto& e_1 : array_vmo) {
+    e_1.reset();
+  }
+  for (auto& e_1 : array_client_end) {
+    e_1.reset();
+  }
+  for (auto& e_1 : array_server_end) {
+    e_1.reset();
+  }
+  for (auto& e_1 : array_struct) {
+    e_1._CloseHandles();
+  }
+  for (auto& e_1 : array_table) {
+    e_1._CloseHandles();
+  }
+  for (auto& e_1 : array_union) {
+    e_1._CloseHandles();
+  }
+  for (auto& e_1 : vector_handle) {
+    e_1.reset();
+  }
+  for (auto& e_1 : vector_vmo) {
+    e_1.reset();
+  }
+  for (auto& e_1 : vector_client_end) {
+    e_1.reset();
+  }
+  for (auto& e_1 : vector_server_end) {
+    e_1.reset();
+  }
+  for (auto& e_1 : vector_struct) {
+    e_1._CloseHandles();
+  }
+  for (auto& e_1 : vector_table) {
+    e_1._CloseHandles();
+  }
+  for (auto& e_1 : vector_union) {
+    e_1._CloseHandles();
+  }
+}
+
+#endif  // __Fuchsia__
+
 auto ::test_typesinprotocols::wire::Union::Which() const -> ::test_typesinprotocols::wire::Union::Tag {
   ZX_ASSERT(!has_invalid_tag());
   switch (ordinal_) {
@@ -25,6 +96,53 @@ void ::test_typesinprotocols::wire::Union::SizeAndOffsetAssertionHelper() {
   static_assert(offsetof(Union, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
   static_assert(offsetof(Union, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
 }
+
+#ifdef __Fuchsia__
+
+auto ::test_typesinprotocols::wire::ResourceUnion::Which() const -> ::test_typesinprotocols::wire::ResourceUnion::Tag {
+  ZX_ASSERT(!has_invalid_tag());
+  switch (ordinal_) {
+    case ::test_typesinprotocols::wire::ResourceUnion::Ordinal::kB:
+      return static_cast<::test_typesinprotocols::wire::ResourceUnion::Tag>(ordinal_);
+    default:
+      return ::test_typesinprotocols::wire::ResourceUnion::Tag::_do_not_handle_this__write_a_default_case_instead;
+  }
+}
+
+void ::test_typesinprotocols::wire::ResourceUnion::SizeAndOffsetAssertionHelper() {
+  static_assert(sizeof(ResourceUnion) == sizeof(fidl_xunion_v2_t));
+  static_assert(offsetof(ResourceUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
+  static_assert(offsetof(ResourceUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+}
+::test_typesinprotocols::wire::ResourceUnion::~ResourceUnion() {
+  switch (ordinal_) {
+    case ::test_typesinprotocols::wire::ResourceUnion::Ordinal::kB:
+      envelope_.As<bool>().clear_data();
+      break;
+    default:
+      break;
+  }
+}
+
+void ::test_typesinprotocols::wire::ResourceUnion::_Move(ResourceUnion&& other) {
+  ordinal_ = other.ordinal_;
+  switch (ordinal_) {
+    case ::test_typesinprotocols::wire::ResourceUnion::Ordinal::kB:
+      envelope_.As<bool>() = std::move(other.envelope_.As<bool>());
+      break;
+    default:
+      break;
+  }
+}
+
+void ::test_typesinprotocols::wire::ResourceUnion::_CloseHandles() {
+  switch (ordinal_) {
+    default:
+      break;
+  }
+}
+
+#endif  // __Fuchsia__
 
 bool ::fidl::WireTableFrame<::test_typesinprotocols::wire::Table>::HasUnknownData() const {
   return false;
@@ -44,5 +162,31 @@ bool ::test_typesinprotocols::wire::Table::HasUnknownData() const {
   }
   return frame_ptr_->HasUnknownData();
 }
+
+#ifdef __Fuchsia__
+
+bool ::fidl::WireTableFrame<::test_typesinprotocols::wire::ResourceTable>::HasUnknownData() const {
+  return false;
+}
+
+uint64_t fidl::WireTableFrame<::test_typesinprotocols::wire::ResourceTable>::ComputeMaxOrdinal() const {
+  uint64_t max_ordinal = 0;
+  return max_ordinal;
+}
+
+bool ::test_typesinprotocols::wire::ResourceTable::HasUnknownData() const {
+  if (max_ordinal_ > 0) {
+    return true;
+  }
+  if (frame_ptr_ == nullptr) {
+    return false;
+  }
+  return frame_ptr_->HasUnknownData();
+}
+
+void ::test_typesinprotocols::wire::ResourceTable::_CloseHandles() {
+}
+
+#endif  // __Fuchsia__
 
 #pragma clang diagnostic pop

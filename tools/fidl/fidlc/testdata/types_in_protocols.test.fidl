@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 library test.typesinprotocols;
 
+using zx;
+
 type Bits = bits {
     VAL = 1;
 };
@@ -12,6 +14,11 @@ type Enum = enum {
 type Struct = struct {};
 type Table = table {};
 type Union = union {
+    1: b bool;
+};
+type ResourceStruct = resource struct {};
+type ResourceTable = resource table {};
+type ResourceUnion = resource union {
     1: b bool;
 };
 
@@ -118,6 +125,39 @@ type ArrayVectorNested = struct {
     vector_vector_uint8 vector<vector<uint8>>;
 };
 
+type Resource = resource struct {
+    handle zx.handle;
+    vmo zx.handle:VMO;
+    client_end client_end:Protocol;
+    server_end server_end:Protocol;
+    struct ResourceStruct;
+    table ResourceTable;
+    union ResourceUnion;
+
+    opt_handle zx.handle:optional;
+    opt_vmo zx.handle:<VMO, optional>;
+    opt_client_end client_end:<Protocol, optional>;
+    opt_server_end server_end:<Protocol, optional>;
+    opt_struct box<ResourceStruct>;
+    opt_union ResourceUnion:optional;
+
+    array_handle array<zx.handle, 5>;
+    array_vmo array<zx.handle:VMO, 5>;
+    array_client_end array<client_end:Protocol, 5>;
+    array_server_end array<server_end:Protocol, 5>;
+    array_struct array<ResourceStruct, 5>;
+    array_table array<ResourceTable, 5>;
+    array_union array<ResourceUnion, 5>;
+
+    vector_handle vector<zx.handle>;
+    vector_vmo vector<zx.handle:VMO>;
+    vector_client_end vector<client_end:Protocol>;
+    vector_server_end vector<server_end:Protocol>;
+    vector_struct vector<ResourceStruct>;
+    vector_table vector<ResourceTable>;
+    vector_union vector<ResourceUnion>;
+};
+
 protocol Protocol {
     OneWayBasic(Basic);
     TwoWayBasic(Basic) -> (Basic);
@@ -150,4 +190,8 @@ protocol Protocol {
     OneWayArrayVectorNested(ArrayVectorNested);
     TwoWayArrayVectorNested(ArrayVectorNested) -> (ArrayVectorNested);
     -> EventArrayVectorNested(ArrayVectorNested);
+
+    OneWayResource(Resource);
+    TwoWayResource(Resource) -> (Resource);
+    -> EventResource(Resource);
 };

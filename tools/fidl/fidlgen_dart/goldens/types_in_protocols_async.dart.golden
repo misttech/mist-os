@@ -17,6 +17,7 @@ import 'package:fidl/fidl.dart' as $fidl;
 import 'package:meta/meta.dart';
 import 'package:zircon/zircon.dart' as $zircon;
 
+import 'package:fidl_zx/fidl_async.dart' as lib$zx;
 // ignore_for_file: always_specify_types
 // ignore_for_file: avoid_positional_boolean_parameters
 // ignore_for_file: avoid_returning_null
@@ -128,6 +129,82 @@ class Bits extends $fidl.Bits {
 
 const $fidl.BitsType<Bits> kBits_Type =
     $fidl.BitsType<Bits>(type: $fidl.Uint32Type(), ctor: Bits._ctor);
+
+enum ResourceUnionTag {
+  $unknown,
+  b, // 0x1
+}
+
+const Map<int, ResourceUnionTag> _ResourceUnionTag_map = {
+  1: ResourceUnionTag.b,
+};
+
+class ResourceUnion extends $fidl.Union {
+  const ResourceUnion.withB(bool value)
+      : _ordinal = 1,
+        _data = value;
+  const ResourceUnion.with$UnknownData(this._ordinal, $fidl.UnknownRawData data)
+      : _data = data;
+
+  ResourceUnion._(int ordinal, Object data)
+      : _ordinal = ordinal,
+        _data = data;
+
+  final int _ordinal;
+  final _data;
+
+  ResourceUnionTag get $tag =>
+      _ResourceUnionTag_map[_ordinal] ?? ResourceUnionTag.$unknown;
+
+  bool? get b {
+    if (_ordinal != 1) {
+      return null;
+    }
+    return _data;
+  }
+
+  $fidl.UnknownRawData? get $unknownData {
+    switch (_ordinal) {
+      case 1:
+        return null;
+      default:
+        return _data;
+    }
+  }
+
+  @override
+  int get $ordinal => _ordinal;
+
+  @override
+  Object get $data => _data;
+
+  static ResourceUnion _ctor(int ordinal, Object data) {
+    return ResourceUnion._(ordinal, data);
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.UnionType<ResourceUnion> kResourceUnion_Type =
+    $fidl.UnionType<ResourceUnion>(
+  members: <int, $fidl.FidlType>{
+    1: $fidl.BoolType(),
+  },
+  ctor: ResourceUnion._ctor,
+  flexible: true,
+  resource: true,
+);
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.NullableUnionType<ResourceUnion> kResourceUnion_OptType =
+    $fidl.NullableUnionType<ResourceUnion>(
+  members: <int, $fidl.FidlType>{
+    1: $fidl.BoolType(),
+  },
+  ctor: ResourceUnion._ctor,
+  flexible: true,
+  resource: true,
+);
 
 enum UnionTag {
   $unknown,
@@ -914,6 +991,453 @@ class Compound extends $fidl.Struct {
 const $fidl.StructType<Compound> kCompound_Type = $fidl.StructType<Compound>(
     inlineSize: 72, structDecode: Compound._structDecode);
 
+class Resource extends $fidl.Struct {
+  const Resource({
+    required this.handle,
+    required this.vmo,
+    required this.clientEnd,
+    required this.serverEnd,
+    required this.struct,
+    required this.table,
+    required this.union,
+    this.optHandle,
+    this.optVmo,
+    this.optClientEnd,
+    this.optServerEnd,
+    this.optStruct,
+    this.optUnion,
+    required this.arrayHandle,
+    required this.arrayVmo,
+    required this.arrayClientEnd,
+    required this.arrayServerEnd,
+    required this.arrayStruct,
+    required this.arrayTable,
+    required this.arrayUnion,
+    required this.vectorHandle,
+    required this.vectorVmo,
+    required this.vectorClientEnd,
+    required this.vectorServerEnd,
+    required this.vectorStruct,
+    required this.vectorTable,
+    required this.vectorUnion,
+  });
+  Resource.clone(
+    Resource $orig, {
+    $zircon.Handle? handle,
+    $zircon.Vmo? vmo,
+    $fidl.InterfaceHandle<Protocol>? clientEnd,
+    $fidl.InterfaceRequest<Protocol>? serverEnd,
+    ResourceStruct? struct,
+    ResourceTable? table,
+    ResourceUnion? union,
+    $zircon.Handle? optHandle,
+    $zircon.Vmo? optVmo,
+    $fidl.InterfaceHandle<Protocol>? optClientEnd,
+    $fidl.InterfaceRequest<Protocol>? optServerEnd,
+    ResourceStruct? optStruct,
+    ResourceUnion? optUnion,
+    List<$zircon.Handle>? arrayHandle,
+    List<$zircon.Vmo>? arrayVmo,
+    List<$fidl.InterfaceHandle<Protocol>>? arrayClientEnd,
+    List<$fidl.InterfaceRequest<Protocol>>? arrayServerEnd,
+    List<ResourceStruct>? arrayStruct,
+    List<ResourceTable>? arrayTable,
+    List<ResourceUnion>? arrayUnion,
+    List<$zircon.Handle>? vectorHandle,
+    List<$zircon.Vmo>? vectorVmo,
+    List<$fidl.InterfaceHandle<Protocol>>? vectorClientEnd,
+    List<$fidl.InterfaceRequest<Protocol>>? vectorServerEnd,
+    List<ResourceStruct>? vectorStruct,
+    List<ResourceTable>? vectorTable,
+    List<ResourceUnion>? vectorUnion,
+  }) : this(
+          handle: handle ?? $orig.handle,
+          vmo: vmo ?? $orig.vmo,
+          clientEnd: clientEnd ?? $orig.clientEnd,
+          serverEnd: serverEnd ?? $orig.serverEnd,
+          struct: struct ?? $orig.struct,
+          table: table ?? $orig.table,
+          union: union ?? $orig.union,
+          optHandle: optHandle ?? $orig.optHandle,
+          optVmo: optVmo ?? $orig.optVmo,
+          optClientEnd: optClientEnd ?? $orig.optClientEnd,
+          optServerEnd: optServerEnd ?? $orig.optServerEnd,
+          optStruct: optStruct ?? $orig.optStruct,
+          optUnion: optUnion ?? $orig.optUnion,
+          arrayHandle: arrayHandle ?? $orig.arrayHandle,
+          arrayVmo: arrayVmo ?? $orig.arrayVmo,
+          arrayClientEnd: arrayClientEnd ?? $orig.arrayClientEnd,
+          arrayServerEnd: arrayServerEnd ?? $orig.arrayServerEnd,
+          arrayStruct: arrayStruct ?? $orig.arrayStruct,
+          arrayTable: arrayTable ?? $orig.arrayTable,
+          arrayUnion: arrayUnion ?? $orig.arrayUnion,
+          vectorHandle: vectorHandle ?? $orig.vectorHandle,
+          vectorVmo: vectorVmo ?? $orig.vectorVmo,
+          vectorClientEnd: vectorClientEnd ?? $orig.vectorClientEnd,
+          vectorServerEnd: vectorServerEnd ?? $orig.vectorServerEnd,
+          vectorStruct: vectorStruct ?? $orig.vectorStruct,
+          vectorTable: vectorTable ?? $orig.vectorTable,
+          vectorUnion: vectorUnion ?? $orig.vectorUnion,
+        );
+
+  Resource.cloneWithout(
+    Resource $orig, {
+    bool optHandle = false,
+    bool optVmo = false,
+    bool optClientEnd = false,
+    bool optServerEnd = false,
+    bool optStruct = false,
+    bool optUnion = false,
+  }) : this(
+          handle: $orig.handle,
+          vmo: $orig.vmo,
+          clientEnd: $orig.clientEnd,
+          serverEnd: $orig.serverEnd,
+          struct: $orig.struct,
+          table: $orig.table,
+          union: $orig.union,
+          optHandle: optHandle ? null : $orig.optHandle,
+          optVmo: optVmo ? null : $orig.optVmo,
+          optClientEnd: optClientEnd ? null : $orig.optClientEnd,
+          optServerEnd: optServerEnd ? null : $orig.optServerEnd,
+          optStruct: optStruct ? null : $orig.optStruct,
+          optUnion: optUnion ? null : $orig.optUnion,
+          arrayHandle: $orig.arrayHandle,
+          arrayVmo: $orig.arrayVmo,
+          arrayClientEnd: $orig.arrayClientEnd,
+          arrayServerEnd: $orig.arrayServerEnd,
+          arrayStruct: $orig.arrayStruct,
+          arrayTable: $orig.arrayTable,
+          arrayUnion: $orig.arrayUnion,
+          vectorHandle: $orig.vectorHandle,
+          vectorVmo: $orig.vectorVmo,
+          vectorClientEnd: $orig.vectorClientEnd,
+          vectorServerEnd: $orig.vectorServerEnd,
+          vectorStruct: $orig.vectorStruct,
+          vectorTable: $orig.vectorTable,
+          vectorUnion: $orig.vectorUnion,
+        );
+
+  Resource $cloneWith({
+    $zircon.Handle? handle,
+    $zircon.Vmo? vmo,
+    $fidl.InterfaceHandle<Protocol>? clientEnd,
+    $fidl.InterfaceRequest<Protocol>? serverEnd,
+    ResourceStruct? struct,
+    ResourceTable? table,
+    ResourceUnion? union,
+    $fidl.OptionalNullable<$zircon.Handle?> optHandle =
+        const $fidl.OptionalNullable.undefined(),
+    $fidl.OptionalNullable<$zircon.Vmo?> optVmo =
+        const $fidl.OptionalNullable.undefined(),
+    $fidl.OptionalNullable<$fidl.InterfaceHandle<Protocol>?> optClientEnd =
+        const $fidl.OptionalNullable.undefined(),
+    $fidl.OptionalNullable<$fidl.InterfaceRequest<Protocol>?> optServerEnd =
+        const $fidl.OptionalNullable.undefined(),
+    $fidl.OptionalNullable<ResourceStruct?> optStruct =
+        const $fidl.OptionalNullable.undefined(),
+    $fidl.OptionalNullable<ResourceUnion?> optUnion =
+        const $fidl.OptionalNullable.undefined(),
+    List<$zircon.Handle>? arrayHandle,
+    List<$zircon.Vmo>? arrayVmo,
+    List<$fidl.InterfaceHandle<Protocol>>? arrayClientEnd,
+    List<$fidl.InterfaceRequest<Protocol>>? arrayServerEnd,
+    List<ResourceStruct>? arrayStruct,
+    List<ResourceTable>? arrayTable,
+    List<ResourceUnion>? arrayUnion,
+    List<$zircon.Handle>? vectorHandle,
+    List<$zircon.Vmo>? vectorVmo,
+    List<$fidl.InterfaceHandle<Protocol>>? vectorClientEnd,
+    List<$fidl.InterfaceRequest<Protocol>>? vectorServerEnd,
+    List<ResourceStruct>? vectorStruct,
+    List<ResourceTable>? vectorTable,
+    List<ResourceUnion>? vectorUnion,
+  }) {
+    return Resource(
+      handle: handle ?? this.handle,
+      vmo: vmo ?? this.vmo,
+      clientEnd: clientEnd ?? this.clientEnd,
+      serverEnd: serverEnd ?? this.serverEnd,
+      struct: struct ?? this.struct,
+      table: table ?? this.table,
+      union: union ?? this.union,
+      optHandle: optHandle.or(this.optHandle),
+      optVmo: optVmo.or(this.optVmo),
+      optClientEnd: optClientEnd.or(this.optClientEnd),
+      optServerEnd: optServerEnd.or(this.optServerEnd),
+      optStruct: optStruct.or(this.optStruct),
+      optUnion: optUnion.or(this.optUnion),
+      arrayHandle: arrayHandle ?? this.arrayHandle,
+      arrayVmo: arrayVmo ?? this.arrayVmo,
+      arrayClientEnd: arrayClientEnd ?? this.arrayClientEnd,
+      arrayServerEnd: arrayServerEnd ?? this.arrayServerEnd,
+      arrayStruct: arrayStruct ?? this.arrayStruct,
+      arrayTable: arrayTable ?? this.arrayTable,
+      arrayUnion: arrayUnion ?? this.arrayUnion,
+      vectorHandle: vectorHandle ?? this.vectorHandle,
+      vectorVmo: vectorVmo ?? this.vectorVmo,
+      vectorClientEnd: vectorClientEnd ?? this.vectorClientEnd,
+      vectorServerEnd: vectorServerEnd ?? this.vectorServerEnd,
+      vectorStruct: vectorStruct ?? this.vectorStruct,
+      vectorTable: vectorTable ?? this.vectorTable,
+      vectorUnion: vectorUnion ?? this.vectorUnion,
+    );
+  }
+
+  final $zircon.Handle handle;
+  final $zircon.Vmo vmo;
+  final $fidl.InterfaceHandle<Protocol> clientEnd;
+  final $fidl.InterfaceRequest<Protocol> serverEnd;
+  final ResourceStruct struct;
+  final ResourceTable table;
+  final ResourceUnion union;
+  final $zircon.Handle? optHandle;
+  final $zircon.Vmo? optVmo;
+  final $fidl.InterfaceHandle<Protocol>? optClientEnd;
+  final $fidl.InterfaceRequest<Protocol>? optServerEnd;
+  final ResourceStruct? optStruct;
+  final ResourceUnion? optUnion;
+  final List<$zircon.Handle> arrayHandle;
+  final List<$zircon.Vmo> arrayVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd;
+  final List<ResourceStruct> arrayStruct;
+  final List<ResourceTable> arrayTable;
+  final List<ResourceUnion> arrayUnion;
+  final List<$zircon.Handle> vectorHandle;
+  final List<$zircon.Vmo> vectorVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd;
+  final List<ResourceStruct> vectorStruct;
+  final List<ResourceTable> vectorTable;
+  final List<ResourceUnion> vectorUnion;
+
+  @override
+  List<Object?> get $fields {
+    return <Object?>[
+      handle,
+      vmo,
+      clientEnd,
+      serverEnd,
+      struct,
+      table,
+      union,
+      optHandle,
+      optVmo,
+      optClientEnd,
+      optServerEnd,
+      optStruct,
+      optUnion,
+      arrayHandle,
+      arrayVmo,
+      arrayClientEnd,
+      arrayServerEnd,
+      arrayStruct,
+      arrayTable,
+      arrayUnion,
+      vectorHandle,
+      vectorVmo,
+      vectorClientEnd,
+      vectorServerEnd,
+      vectorStruct,
+      vectorTable,
+      vectorUnion,
+    ];
+  }
+
+  static const $fieldType0 =
+      $fidl.HandleType(objectType: 0, rights: 2147483648);
+  static const $fieldType1 = $fidl.VmoType(objectType: 3, rights: 2147483648);
+  static const $fieldType2 = $fidl.InterfaceHandleType<Protocol>();
+  static const $fieldType3 = $fidl.InterfaceRequestType<Protocol>();
+  static const $fieldType4 = kResourceStruct_Type;
+  static const $fieldType5 = kResourceTable_Type;
+  static const $fieldType6 = kResourceUnion_Type;
+  static const $fieldType7 = $fidl.NullableHandleType(
+      $fidl.HandleType(objectType: 0, rights: 2147483648));
+  static const $fieldType8 = $fidl.NullableHandleType(
+      $fidl.VmoType(objectType: 3, rights: 2147483648));
+  static const $fieldType9 = $fidl.NullableInterfaceHandleType<Protocol>();
+  static const $fieldType10 = $fidl.NullableInterfaceRequestType<Protocol>();
+  static const $fieldType11 =
+      $fidl.PointerType<ResourceStruct>(element: kResourceStruct_Type);
+  static const $fieldType12 = kResourceUnion_OptType;
+  static const $fieldType13 =
+      $fidl.ArrayType<$zircon.Handle, List<$zircon.Handle>>(
+          element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+          elementCount: 5);
+  static const $fieldType14 = $fidl.ArrayType<$zircon.Vmo, List<$zircon.Vmo>>(
+      element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+      elementCount: 5);
+  static const $fieldType15 = $fidl.ArrayType<$fidl.InterfaceHandle<Protocol>,
+          List<$fidl.InterfaceHandle<Protocol>>>(
+      element: $fidl.InterfaceHandleType<Protocol>(), elementCount: 5);
+  static const $fieldType16 = $fidl.ArrayType<$fidl.InterfaceRequest<Protocol>,
+          List<$fidl.InterfaceRequest<Protocol>>>(
+      element: $fidl.InterfaceRequestType<Protocol>(), elementCount: 5);
+  static const $fieldType17 =
+      $fidl.ArrayType<ResourceStruct, List<ResourceStruct>>(
+          element: kResourceStruct_Type, elementCount: 5);
+  static const $fieldType18 =
+      $fidl.ArrayType<ResourceTable, List<ResourceTable>>(
+          element: kResourceTable_Type, elementCount: 5);
+  static const $fieldType19 =
+      $fidl.ArrayType<ResourceUnion, List<ResourceUnion>>(
+          element: kResourceUnion_Type, elementCount: 5);
+  static const $fieldType20 =
+      $fidl.VectorType<$zircon.Handle, List<$zircon.Handle>>(
+          element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+          maybeElementCount: null);
+  static const $fieldType21 = $fidl.VectorType<$zircon.Vmo, List<$zircon.Vmo>>(
+      element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+      maybeElementCount: null);
+  static const $fieldType22 = $fidl.VectorType<$fidl.InterfaceHandle<Protocol>,
+          List<$fidl.InterfaceHandle<Protocol>>>(
+      element: $fidl.InterfaceHandleType<Protocol>(), maybeElementCount: null);
+  static const $fieldType23 = $fidl.VectorType<$fidl.InterfaceRequest<Protocol>,
+          List<$fidl.InterfaceRequest<Protocol>>>(
+      element: $fidl.InterfaceRequestType<Protocol>(), maybeElementCount: null);
+  static const $fieldType24 =
+      $fidl.VectorType<ResourceStruct, List<ResourceStruct>>(
+          element: kResourceStruct_Type, maybeElementCount: null);
+  static const $fieldType25 =
+      $fidl.VectorType<ResourceTable, List<ResourceTable>>(
+          element: kResourceTable_Type, maybeElementCount: null);
+  static const $fieldType26 =
+      $fidl.VectorType<ResourceUnion, List<ResourceUnion>>(
+          element: kResourceUnion_Type, maybeElementCount: null);
+
+  @override
+  void $encode($fidl.Encoder $encoder, int $offset, int $depth) {
+    $fieldType0.encode($encoder, handle, $offset + 0, $depth);
+    $fieldType1.encode($encoder, vmo, $offset + 4, $depth);
+    $fieldType2.encode($encoder, clientEnd, $offset + 8, $depth);
+    $fieldType3.encode($encoder, serverEnd, $offset + 12, $depth);
+    $fieldType4.encode($encoder, struct, $offset + 16, $depth);
+    $fieldType5.encode($encoder, table, $offset + 24, $depth);
+    $fieldType6.encode($encoder, union, $offset + 40, $depth);
+    $fieldType7.encode($encoder, optHandle, $offset + 56, $depth);
+    $fieldType8.encode($encoder, optVmo, $offset + 60, $depth);
+    $fieldType9.encode($encoder, optClientEnd, $offset + 64, $depth);
+    $fieldType10.encode($encoder, optServerEnd, $offset + 68, $depth);
+    $fieldType11.encode($encoder, optStruct, $offset + 72, $depth);
+    $fieldType12.encode($encoder, optUnion, $offset + 80, $depth);
+    $fieldType13.encode($encoder, arrayHandle, $offset + 96, $depth);
+    $fieldType14.encode($encoder, arrayVmo, $offset + 116, $depth);
+    $fieldType15.encode($encoder, arrayClientEnd, $offset + 136, $depth);
+    $fieldType16.encode($encoder, arrayServerEnd, $offset + 156, $depth);
+    $fieldType17.encode($encoder, arrayStruct, $offset + 176, $depth);
+    $fieldType18.encode($encoder, arrayTable, $offset + 184, $depth);
+    $fieldType19.encode($encoder, arrayUnion, $offset + 264, $depth);
+    $fieldType20.encode($encoder, vectorHandle, $offset + 344, $depth);
+    $fieldType21.encode($encoder, vectorVmo, $offset + 360, $depth);
+    $fieldType22.encode($encoder, vectorClientEnd, $offset + 376, $depth);
+    $fieldType23.encode($encoder, vectorServerEnd, $offset + 392, $depth);
+    $fieldType24.encode($encoder, vectorStruct, $offset + 408, $depth);
+    $fieldType25.encode($encoder, vectorTable, $offset + 424, $depth);
+    $fieldType26.encode($encoder, vectorUnion, $offset + 440, $depth);
+  }
+
+  static Resource _structDecode(
+      $fidl.Decoder $decoder, int $offset, int $depth) {
+    switch ($decoder.wireFormat) {
+      case $fidl.WireFormat.v2:
+        $decoder.checkPadding($offset + 17, 7);
+
+        $decoder.checkPadding($offset + 181, 3);
+        return Resource(
+            handle: $fieldType0.decode($decoder, $offset + 0, $depth),
+            vmo: $fieldType1.decode($decoder, $offset + 4, $depth),
+            clientEnd: $fieldType2.decode($decoder, $offset + 8, $depth),
+            serverEnd: $fieldType3.decode($decoder, $offset + 12, $depth),
+            struct: $fieldType4.decode($decoder, $offset + 16, $depth),
+            table: $fieldType5.decode($decoder, $offset + 24, $depth),
+            union: $fieldType6.decode($decoder, $offset + 40, $depth),
+            optHandle: $fieldType7.decode($decoder, $offset + 56, $depth),
+            optVmo: $fieldType8.decode($decoder, $offset + 60, $depth),
+            optClientEnd: $fieldType9.decode($decoder, $offset + 64, $depth),
+            optServerEnd: $fieldType10.decode($decoder, $offset + 68, $depth),
+            optStruct: $fieldType11.decode($decoder, $offset + 72, $depth),
+            optUnion: $fieldType12.decode($decoder, $offset + 80, $depth),
+            arrayHandle: $fieldType13.decode($decoder, $offset + 96, $depth),
+            arrayVmo: $fieldType14.decode($decoder, $offset + 116, $depth),
+            arrayClientEnd:
+                $fieldType15.decode($decoder, $offset + 136, $depth),
+            arrayServerEnd:
+                $fieldType16.decode($decoder, $offset + 156, $depth),
+            arrayStruct: $fieldType17.decode($decoder, $offset + 176, $depth),
+            arrayTable: $fieldType18.decode($decoder, $offset + 184, $depth),
+            arrayUnion: $fieldType19.decode($decoder, $offset + 264, $depth),
+            vectorHandle: $fieldType20.decode($decoder, $offset + 344, $depth),
+            vectorVmo: $fieldType21.decode($decoder, $offset + 360, $depth),
+            vectorClientEnd:
+                $fieldType22.decode($decoder, $offset + 376, $depth),
+            vectorServerEnd:
+                $fieldType23.decode($decoder, $offset + 392, $depth),
+            vectorStruct: $fieldType24.decode($decoder, $offset + 408, $depth),
+            vectorTable: $fieldType25.decode($decoder, $offset + 424, $depth),
+            vectorUnion: $fieldType26.decode($decoder, $offset + 440, $depth));
+    }
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.StructType<Resource> kResource_Type = $fidl.StructType<Resource>(
+    inlineSize: 456, structDecode: Resource._structDecode);
+
+class ResourceStruct extends $fidl.Struct {
+  const ResourceStruct({
+    this.reserved = 0x0,
+  });
+  ResourceStruct.clone(
+    ResourceStruct $orig, {
+    int? reserved,
+  }) : this(
+          reserved: reserved ?? $orig.reserved,
+        );
+
+  ResourceStruct $cloneWith({
+    int? reserved,
+  }) {
+    return ResourceStruct(
+      reserved: reserved ?? this.reserved,
+    );
+  }
+
+  final int reserved;
+
+  @override
+  List<Object?> get $fields {
+    return <Object?>[
+      reserved,
+    ];
+  }
+
+  static const $fieldType0 = $fidl.Uint8Type();
+
+  @override
+  void $encode($fidl.Encoder $encoder, int $offset, int $depth) {
+    $fieldType0.encode($encoder, reserved, $offset + 0, $depth);
+  }
+
+  static ResourceStruct _structDecode(
+      $fidl.Decoder $decoder, int $offset, int $depth) {
+    switch ($decoder.wireFormat) {
+      case $fidl.WireFormat.v2:
+        $decoder.checkPadding($offset + 0, 1);
+        return ResourceStruct(
+            reserved: $fieldType0.decode($decoder, $offset + 0, $depth));
+    }
+  }
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.StructType<ResourceStruct> kResourceStruct_Type =
+    $fidl.StructType<ResourceStruct>(
+        inlineSize: 1, structDecode: ResourceStruct._structDecode);
+
 class Struct extends $fidl.Struct {
   const Struct({
     this.reserved = 0x0,
@@ -1364,6 +1888,51 @@ class VectorOptional extends $fidl.Struct {
 const $fidl.StructType<VectorOptional> kVectorOptional_Type =
     $fidl.StructType<VectorOptional>(
         inlineSize: 64, structDecode: VectorOptional._structDecode);
+
+class ResourceTable extends $fidl.Table {
+  const ResourceTable({
+    this.$unknownData,
+  });
+
+  ResourceTable._(Map<int, dynamic> argv, this.$unknownData);
+
+  ResourceTable $cloneWith({
+    $fidl.OptionalNullable<Map<int, $fidl.UnknownRawData>> $unknownData =
+        const $fidl.OptionalNullable.undefined(),
+  }) {
+    return ResourceTable();
+  }
+
+  @override
+  final Map<int, $fidl.UnknownRawData>? $unknownData;
+
+  @override
+  dynamic $field(int index) {
+    switch (index) {
+      
+    }
+    return null;
+  }
+
+  @override
+  Map<int, dynamic> get $fields {
+    return {};
+  }
+
+  static ResourceTable _ctor(Map<int, dynamic> argv,
+          [Map<int, $fidl.UnknownRawData>? unknownData]) =>
+      ResourceTable._(argv, unknownData);
+}
+
+// See fxbug.dev/7644:
+// ignore: recursive_compile_time_constant
+const $fidl.TableType<ResourceTable> kResourceTable_Type =
+    $fidl.TableType<ResourceTable>(
+  inlineSize: 16,
+  members: [],
+  ctor: ResourceTable._ctor,
+  resource: true,
+);
 
 class Table extends $fidl.Table {
   const Table({
@@ -2548,6 +3117,409 @@ const $fidl.MethodType _kProtocol_EventArrayVectorNested_Type =
   requestInlineSizeV2: 0,
   responseInlineSizeV2: 144,
 );
+// oneWayResource: ($zircon.Handle handle, $zircon.Vmo vmo, $fidl.InterfaceHandle<Protocol> clientEnd, $fidl.InterfaceRequest<Protocol> serverEnd, ResourceStruct struct, ResourceTable table, ResourceUnion union, $zircon.Handle? optHandle, $zircon.Vmo? optVmo, $fidl.InterfaceHandle<Protocol>? optClientEnd, $fidl.InterfaceRequest<Protocol>? optServerEnd, ResourceStruct? optStruct, ResourceUnion? optUnion, List<$zircon.Handle> arrayHandle, List<$zircon.Vmo> arrayVmo, List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd, List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd, List<ResourceStruct> arrayStruct, List<ResourceTable> arrayTable, List<ResourceUnion> arrayUnion, List<$zircon.Handle> vectorHandle, List<$zircon.Vmo> vectorVmo, List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd, List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd, List<ResourceStruct> vectorStruct, List<ResourceTable> vectorTable, List<ResourceUnion> vectorUnion)
+const int _kProtocol_OneWayResource_Ordinal = 0x5af4795a9ed3a022;
+const $fidl.MethodType _kProtocol_OneWayResource_Type = $fidl.MethodType(
+  request: <$fidl.MemberType>[
+    $fidl.MemberType<$zircon.Handle>(
+        type: $fidl.HandleType(objectType: 0, rights: 2147483648), offset: 0),
+    $fidl.MemberType<$zircon.Vmo>(
+        type: $fidl.VmoType(objectType: 3, rights: 2147483648), offset: 4),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>>(
+        type: $fidl.InterfaceHandleType<Protocol>(), offset: 8),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>>(
+        type: $fidl.InterfaceRequestType<Protocol>(), offset: 12),
+    $fidl.MemberType<ResourceStruct>(type: kResourceStruct_Type, offset: 16),
+    $fidl.MemberType<ResourceTable>(type: kResourceTable_Type, offset: 24),
+    $fidl.MemberType<ResourceUnion>(type: kResourceUnion_Type, offset: 40),
+    $fidl.MemberType<$zircon.Handle?>(
+        type: $fidl.NullableHandleType(
+            $fidl.HandleType(objectType: 0, rights: 2147483648)),
+        offset: 56),
+    $fidl.MemberType<$zircon.Vmo?>(
+        type: $fidl.NullableHandleType(
+            $fidl.VmoType(objectType: 3, rights: 2147483648)),
+        offset: 60),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>?>(
+        type: $fidl.NullableInterfaceHandleType<Protocol>(), offset: 64),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>?>(
+        type: $fidl.NullableInterfaceRequestType<Protocol>(), offset: 68),
+    $fidl.MemberType<ResourceStruct?>(
+        type: $fidl.PointerType<ResourceStruct>(element: kResourceStruct_Type),
+        offset: 72),
+    $fidl.MemberType<ResourceUnion?>(type: kResourceUnion_OptType, offset: 80),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.ArrayType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            elementCount: 5),
+        offset: 96),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.ArrayType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            elementCount: 5),
+        offset: 116),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(), elementCount: 5),
+        offset: 136),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(), elementCount: 5),
+        offset: 156),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.ArrayType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, elementCount: 5),
+        offset: 176),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.ArrayType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, elementCount: 5),
+        offset: 184),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.ArrayType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, elementCount: 5),
+        offset: 264),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.VectorType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 344),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.VectorType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 360),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(),
+            maybeElementCount: null),
+        offset: 376),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(),
+            maybeElementCount: null),
+        offset: 392),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.VectorType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, maybeElementCount: null),
+        offset: 408),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.VectorType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, maybeElementCount: null),
+        offset: 424),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.VectorType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, maybeElementCount: null),
+        offset: 440),
+  ],
+  response: [],
+  name: r"Protocol.OneWayResource",
+  requestInlineSizeV2: 456,
+  responseInlineSizeV2: 0,
+);
+// twoWayResource: ($zircon.Handle handle, $zircon.Vmo vmo, $fidl.InterfaceHandle<Protocol> clientEnd, $fidl.InterfaceRequest<Protocol> serverEnd, ResourceStruct struct, ResourceTable table, ResourceUnion union, $zircon.Handle? optHandle, $zircon.Vmo? optVmo, $fidl.InterfaceHandle<Protocol>? optClientEnd, $fidl.InterfaceRequest<Protocol>? optServerEnd, ResourceStruct? optStruct, ResourceUnion? optUnion, List<$zircon.Handle> arrayHandle, List<$zircon.Vmo> arrayVmo, List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd, List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd, List<ResourceStruct> arrayStruct, List<ResourceTable> arrayTable, List<ResourceUnion> arrayUnion, List<$zircon.Handle> vectorHandle, List<$zircon.Vmo> vectorVmo, List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd, List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd, List<ResourceStruct> vectorStruct, List<ResourceTable> vectorTable, List<ResourceUnion> vectorUnion) -> ($zircon.Handle handle, $zircon.Vmo vmo, $fidl.InterfaceHandle<Protocol> clientEnd, $fidl.InterfaceRequest<Protocol> serverEnd, ResourceStruct struct, ResourceTable table, ResourceUnion union, $zircon.Handle? optHandle, $zircon.Vmo? optVmo, $fidl.InterfaceHandle<Protocol>? optClientEnd, $fidl.InterfaceRequest<Protocol>? optServerEnd, ResourceStruct? optStruct, ResourceUnion? optUnion, List<$zircon.Handle> arrayHandle, List<$zircon.Vmo> arrayVmo, List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd, List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd, List<ResourceStruct> arrayStruct, List<ResourceTable> arrayTable, List<ResourceUnion> arrayUnion, List<$zircon.Handle> vectorHandle, List<$zircon.Vmo> vectorVmo, List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd, List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd, List<ResourceStruct> vectorStruct, List<ResourceTable> vectorTable, List<ResourceUnion> vectorUnion)
+const int _kProtocol_TwoWayResource_Ordinal = 0x1904824a11c6ad5b;
+const $fidl.MethodType _kProtocol_TwoWayResource_Type = $fidl.MethodType(
+  request: <$fidl.MemberType>[
+    $fidl.MemberType<$zircon.Handle>(
+        type: $fidl.HandleType(objectType: 0, rights: 2147483648), offset: 0),
+    $fidl.MemberType<$zircon.Vmo>(
+        type: $fidl.VmoType(objectType: 3, rights: 2147483648), offset: 4),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>>(
+        type: $fidl.InterfaceHandleType<Protocol>(), offset: 8),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>>(
+        type: $fidl.InterfaceRequestType<Protocol>(), offset: 12),
+    $fidl.MemberType<ResourceStruct>(type: kResourceStruct_Type, offset: 16),
+    $fidl.MemberType<ResourceTable>(type: kResourceTable_Type, offset: 24),
+    $fidl.MemberType<ResourceUnion>(type: kResourceUnion_Type, offset: 40),
+    $fidl.MemberType<$zircon.Handle?>(
+        type: $fidl.NullableHandleType(
+            $fidl.HandleType(objectType: 0, rights: 2147483648)),
+        offset: 56),
+    $fidl.MemberType<$zircon.Vmo?>(
+        type: $fidl.NullableHandleType(
+            $fidl.VmoType(objectType: 3, rights: 2147483648)),
+        offset: 60),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>?>(
+        type: $fidl.NullableInterfaceHandleType<Protocol>(), offset: 64),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>?>(
+        type: $fidl.NullableInterfaceRequestType<Protocol>(), offset: 68),
+    $fidl.MemberType<ResourceStruct?>(
+        type: $fidl.PointerType<ResourceStruct>(element: kResourceStruct_Type),
+        offset: 72),
+    $fidl.MemberType<ResourceUnion?>(type: kResourceUnion_OptType, offset: 80),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.ArrayType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            elementCount: 5),
+        offset: 96),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.ArrayType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            elementCount: 5),
+        offset: 116),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(), elementCount: 5),
+        offset: 136),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(), elementCount: 5),
+        offset: 156),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.ArrayType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, elementCount: 5),
+        offset: 176),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.ArrayType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, elementCount: 5),
+        offset: 184),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.ArrayType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, elementCount: 5),
+        offset: 264),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.VectorType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 344),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.VectorType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 360),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(),
+            maybeElementCount: null),
+        offset: 376),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(),
+            maybeElementCount: null),
+        offset: 392),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.VectorType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, maybeElementCount: null),
+        offset: 408),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.VectorType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, maybeElementCount: null),
+        offset: 424),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.VectorType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, maybeElementCount: null),
+        offset: 440),
+  ],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<$zircon.Handle>(
+        type: $fidl.HandleType(objectType: 0, rights: 2147483648), offset: 0),
+    $fidl.MemberType<$zircon.Vmo>(
+        type: $fidl.VmoType(objectType: 3, rights: 2147483648), offset: 4),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>>(
+        type: $fidl.InterfaceHandleType<Protocol>(), offset: 8),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>>(
+        type: $fidl.InterfaceRequestType<Protocol>(), offset: 12),
+    $fidl.MemberType<ResourceStruct>(type: kResourceStruct_Type, offset: 16),
+    $fidl.MemberType<ResourceTable>(type: kResourceTable_Type, offset: 24),
+    $fidl.MemberType<ResourceUnion>(type: kResourceUnion_Type, offset: 40),
+    $fidl.MemberType<$zircon.Handle?>(
+        type: $fidl.NullableHandleType(
+            $fidl.HandleType(objectType: 0, rights: 2147483648)),
+        offset: 56),
+    $fidl.MemberType<$zircon.Vmo?>(
+        type: $fidl.NullableHandleType(
+            $fidl.VmoType(objectType: 3, rights: 2147483648)),
+        offset: 60),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>?>(
+        type: $fidl.NullableInterfaceHandleType<Protocol>(), offset: 64),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>?>(
+        type: $fidl.NullableInterfaceRequestType<Protocol>(), offset: 68),
+    $fidl.MemberType<ResourceStruct?>(
+        type: $fidl.PointerType<ResourceStruct>(element: kResourceStruct_Type),
+        offset: 72),
+    $fidl.MemberType<ResourceUnion?>(type: kResourceUnion_OptType, offset: 80),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.ArrayType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            elementCount: 5),
+        offset: 96),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.ArrayType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            elementCount: 5),
+        offset: 116),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(), elementCount: 5),
+        offset: 136),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(), elementCount: 5),
+        offset: 156),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.ArrayType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, elementCount: 5),
+        offset: 176),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.ArrayType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, elementCount: 5),
+        offset: 184),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.ArrayType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, elementCount: 5),
+        offset: 264),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.VectorType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 344),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.VectorType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 360),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(),
+            maybeElementCount: null),
+        offset: 376),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(),
+            maybeElementCount: null),
+        offset: 392),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.VectorType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, maybeElementCount: null),
+        offset: 408),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.VectorType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, maybeElementCount: null),
+        offset: 424),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.VectorType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, maybeElementCount: null),
+        offset: 440),
+  ],
+  name: r"Protocol.TwoWayResource",
+  requestInlineSizeV2: 456,
+  responseInlineSizeV2: 456,
+);
+// eventResource:  -> ($zircon.Handle handle, $zircon.Vmo vmo, $fidl.InterfaceHandle<Protocol> clientEnd, $fidl.InterfaceRequest<Protocol> serverEnd, ResourceStruct struct, ResourceTable table, ResourceUnion union, $zircon.Handle? optHandle, $zircon.Vmo? optVmo, $fidl.InterfaceHandle<Protocol>? optClientEnd, $fidl.InterfaceRequest<Protocol>? optServerEnd, ResourceStruct? optStruct, ResourceUnion? optUnion, List<$zircon.Handle> arrayHandle, List<$zircon.Vmo> arrayVmo, List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd, List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd, List<ResourceStruct> arrayStruct, List<ResourceTable> arrayTable, List<ResourceUnion> arrayUnion, List<$zircon.Handle> vectorHandle, List<$zircon.Vmo> vectorVmo, List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd, List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd, List<ResourceStruct> vectorStruct, List<ResourceTable> vectorTable, List<ResourceUnion> vectorUnion)
+const int _kProtocol_EventResource_Ordinal = 0x4fbde2864601698b;
+const $fidl.MethodType _kProtocol_EventResource_Type = $fidl.MethodType(
+  request: [],
+  response: <$fidl.MemberType>[
+    $fidl.MemberType<$zircon.Handle>(
+        type: $fidl.HandleType(objectType: 0, rights: 2147483648), offset: 0),
+    $fidl.MemberType<$zircon.Vmo>(
+        type: $fidl.VmoType(objectType: 3, rights: 2147483648), offset: 4),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>>(
+        type: $fidl.InterfaceHandleType<Protocol>(), offset: 8),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>>(
+        type: $fidl.InterfaceRequestType<Protocol>(), offset: 12),
+    $fidl.MemberType<ResourceStruct>(type: kResourceStruct_Type, offset: 16),
+    $fidl.MemberType<ResourceTable>(type: kResourceTable_Type, offset: 24),
+    $fidl.MemberType<ResourceUnion>(type: kResourceUnion_Type, offset: 40),
+    $fidl.MemberType<$zircon.Handle?>(
+        type: $fidl.NullableHandleType(
+            $fidl.HandleType(objectType: 0, rights: 2147483648)),
+        offset: 56),
+    $fidl.MemberType<$zircon.Vmo?>(
+        type: $fidl.NullableHandleType(
+            $fidl.VmoType(objectType: 3, rights: 2147483648)),
+        offset: 60),
+    $fidl.MemberType<$fidl.InterfaceHandle<Protocol>?>(
+        type: $fidl.NullableInterfaceHandleType<Protocol>(), offset: 64),
+    $fidl.MemberType<$fidl.InterfaceRequest<Protocol>?>(
+        type: $fidl.NullableInterfaceRequestType<Protocol>(), offset: 68),
+    $fidl.MemberType<ResourceStruct?>(
+        type: $fidl.PointerType<ResourceStruct>(element: kResourceStruct_Type),
+        offset: 72),
+    $fidl.MemberType<ResourceUnion?>(type: kResourceUnion_OptType, offset: 80),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.ArrayType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            elementCount: 5),
+        offset: 96),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.ArrayType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            elementCount: 5),
+        offset: 116),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(), elementCount: 5),
+        offset: 136),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.ArrayType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(), elementCount: 5),
+        offset: 156),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.ArrayType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, elementCount: 5),
+        offset: 176),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.ArrayType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, elementCount: 5),
+        offset: 184),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.ArrayType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, elementCount: 5),
+        offset: 264),
+    $fidl.MemberType<List<$zircon.Handle>>(
+        type: $fidl.VectorType<$zircon.Handle, List<$zircon.Handle>>(
+            element: $fidl.HandleType(objectType: 0, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 344),
+    $fidl.MemberType<List<$zircon.Vmo>>(
+        type: $fidl.VectorType<$zircon.Vmo, List<$zircon.Vmo>>(
+            element: $fidl.VmoType(objectType: 3, rights: 2147483648),
+            maybeElementCount: null),
+        offset: 360),
+    $fidl.MemberType<List<$fidl.InterfaceHandle<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceHandle<Protocol>,
+                List<$fidl.InterfaceHandle<Protocol>>>(
+            element: $fidl.InterfaceHandleType<Protocol>(),
+            maybeElementCount: null),
+        offset: 376),
+    $fidl.MemberType<List<$fidl.InterfaceRequest<Protocol>>>(
+        type: $fidl.VectorType<$fidl.InterfaceRequest<Protocol>,
+                List<$fidl.InterfaceRequest<Protocol>>>(
+            element: $fidl.InterfaceRequestType<Protocol>(),
+            maybeElementCount: null),
+        offset: 392),
+    $fidl.MemberType<List<ResourceStruct>>(
+        type: $fidl.VectorType<ResourceStruct, List<ResourceStruct>>(
+            element: kResourceStruct_Type, maybeElementCount: null),
+        offset: 408),
+    $fidl.MemberType<List<ResourceTable>>(
+        type: $fidl.VectorType<ResourceTable, List<ResourceTable>>(
+            element: kResourceTable_Type, maybeElementCount: null),
+        offset: 424),
+    $fidl.MemberType<List<ResourceUnion>>(
+        type: $fidl.VectorType<ResourceUnion, List<ResourceUnion>>(
+            element: kResourceUnion_Type, maybeElementCount: null),
+        offset: 440),
+  ],
+  name: r"Protocol.EventResource",
+  requestInlineSizeV2: 0,
+  responseInlineSizeV2: 456,
+);
 
 class Protocol$TwoWayBasic$Response {
   final int uint8;
@@ -2889,6 +3861,124 @@ class Protocol$EventArrayVectorNested$Response {
   );
 }
 
+class Protocol$TwoWayResource$Response {
+  final $zircon.Handle handle;
+  final $zircon.Vmo vmo;
+  final $fidl.InterfaceHandle<Protocol> clientEnd;
+  final $fidl.InterfaceRequest<Protocol> serverEnd;
+  final ResourceStruct struct;
+  final ResourceTable table;
+  final ResourceUnion union;
+  final $zircon.Handle? optHandle;
+  final $zircon.Vmo? optVmo;
+  final $fidl.InterfaceHandle<Protocol>? optClientEnd;
+  final $fidl.InterfaceRequest<Protocol>? optServerEnd;
+  final ResourceStruct? optStruct;
+  final ResourceUnion? optUnion;
+  final List<$zircon.Handle> arrayHandle;
+  final List<$zircon.Vmo> arrayVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd;
+  final List<ResourceStruct> arrayStruct;
+  final List<ResourceTable> arrayTable;
+  final List<ResourceUnion> arrayUnion;
+  final List<$zircon.Handle> vectorHandle;
+  final List<$zircon.Vmo> vectorVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd;
+  final List<ResourceStruct> vectorStruct;
+  final List<ResourceTable> vectorTable;
+  final List<ResourceUnion> vectorUnion;
+  Protocol$TwoWayResource$Response(
+    this.handle,
+    this.vmo,
+    this.clientEnd,
+    this.serverEnd,
+    this.struct,
+    this.table,
+    this.union,
+    this.optHandle,
+    this.optVmo,
+    this.optClientEnd,
+    this.optServerEnd,
+    this.optStruct,
+    this.optUnion,
+    this.arrayHandle,
+    this.arrayVmo,
+    this.arrayClientEnd,
+    this.arrayServerEnd,
+    this.arrayStruct,
+    this.arrayTable,
+    this.arrayUnion,
+    this.vectorHandle,
+    this.vectorVmo,
+    this.vectorClientEnd,
+    this.vectorServerEnd,
+    this.vectorStruct,
+    this.vectorTable,
+    this.vectorUnion,
+  );
+}
+
+class Protocol$EventResource$Response {
+  final $zircon.Handle handle;
+  final $zircon.Vmo vmo;
+  final $fidl.InterfaceHandle<Protocol> clientEnd;
+  final $fidl.InterfaceRequest<Protocol> serverEnd;
+  final ResourceStruct struct;
+  final ResourceTable table;
+  final ResourceUnion union;
+  final $zircon.Handle? optHandle;
+  final $zircon.Vmo? optVmo;
+  final $fidl.InterfaceHandle<Protocol>? optClientEnd;
+  final $fidl.InterfaceRequest<Protocol>? optServerEnd;
+  final ResourceStruct? optStruct;
+  final ResourceUnion? optUnion;
+  final List<$zircon.Handle> arrayHandle;
+  final List<$zircon.Vmo> arrayVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd;
+  final List<ResourceStruct> arrayStruct;
+  final List<ResourceTable> arrayTable;
+  final List<ResourceUnion> arrayUnion;
+  final List<$zircon.Handle> vectorHandle;
+  final List<$zircon.Vmo> vectorVmo;
+  final List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd;
+  final List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd;
+  final List<ResourceStruct> vectorStruct;
+  final List<ResourceTable> vectorTable;
+  final List<ResourceUnion> vectorUnion;
+  Protocol$EventResource$Response(
+    this.handle,
+    this.vmo,
+    this.clientEnd,
+    this.serverEnd,
+    this.struct,
+    this.table,
+    this.union,
+    this.optHandle,
+    this.optVmo,
+    this.optClientEnd,
+    this.optServerEnd,
+    this.optStruct,
+    this.optUnion,
+    this.arrayHandle,
+    this.arrayVmo,
+    this.arrayClientEnd,
+    this.arrayServerEnd,
+    this.arrayStruct,
+    this.arrayTable,
+    this.arrayUnion,
+    this.vectorHandle,
+    this.vectorVmo,
+    this.vectorClientEnd,
+    this.vectorServerEnd,
+    this.vectorStruct,
+    this.vectorTable,
+    this.vectorUnion,
+  );
+}
+
 abstract class Protocol {
   $fidl.ServiceData? get $serviceData => ProtocolData();
   $async.Future<void> oneWayBasic(
@@ -3041,6 +4131,63 @@ abstract class Protocol {
           List<Uint8List> vectorVectorUint8);
   $async.Stream<Protocol$EventArrayVectorNested$Response>?
       get eventArrayVectorNested;
+  $async.Future<void> oneWayResource(
+      $zircon.Handle handle,
+      $zircon.Vmo vmo,
+      $fidl.InterfaceHandle<Protocol> clientEnd,
+      $fidl.InterfaceRequest<Protocol> serverEnd,
+      ResourceStruct struct,
+      ResourceTable table,
+      ResourceUnion union,
+      $zircon.Handle? optHandle,
+      $zircon.Vmo? optVmo,
+      $fidl.InterfaceHandle<Protocol>? optClientEnd,
+      $fidl.InterfaceRequest<Protocol>? optServerEnd,
+      ResourceStruct? optStruct,
+      ResourceUnion? optUnion,
+      List<$zircon.Handle> arrayHandle,
+      List<$zircon.Vmo> arrayVmo,
+      List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd,
+      List<ResourceStruct> arrayStruct,
+      List<ResourceTable> arrayTable,
+      List<ResourceUnion> arrayUnion,
+      List<$zircon.Handle> vectorHandle,
+      List<$zircon.Vmo> vectorVmo,
+      List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd,
+      List<ResourceStruct> vectorStruct,
+      List<ResourceTable> vectorTable,
+      List<ResourceUnion> vectorUnion);
+  $async.Future<Protocol$TwoWayResource$Response> twoWayResource(
+      $zircon.Handle handle,
+      $zircon.Vmo vmo,
+      $fidl.InterfaceHandle<Protocol> clientEnd,
+      $fidl.InterfaceRequest<Protocol> serverEnd,
+      ResourceStruct struct,
+      ResourceTable table,
+      ResourceUnion union,
+      $zircon.Handle? optHandle,
+      $zircon.Vmo? optVmo,
+      $fidl.InterfaceHandle<Protocol>? optClientEnd,
+      $fidl.InterfaceRequest<Protocol>? optServerEnd,
+      ResourceStruct? optStruct,
+      ResourceUnion? optUnion,
+      List<$zircon.Handle> arrayHandle,
+      List<$zircon.Vmo> arrayVmo,
+      List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd,
+      List<ResourceStruct> arrayStruct,
+      List<ResourceTable> arrayTable,
+      List<ResourceUnion> arrayUnion,
+      List<$zircon.Handle> vectorHandle,
+      List<$zircon.Vmo> vectorVmo,
+      List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd,
+      List<ResourceStruct> vectorStruct,
+      List<ResourceTable> vectorTable,
+      List<ResourceUnion> vectorUnion);
+  $async.Stream<Protocol$EventResource$Response>? get eventResource;
 } // TODO: Remove ServiceData for non-service
 
 class ProtocolData implements $fidl.ServiceData<Protocol> {
@@ -3071,6 +4218,7 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
       _eventVectorCompoundEventStreamController.close();
       _eventVectorOptionalEventStreamController.close();
       _eventArrayVectorNestedEventStreamController.close();
+      _eventResourceEventStreamController.close();
     }, onError: (_) {});
   }
   @override
@@ -3345,6 +4493,59 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
           _eventArrayVectorNestedEventStreamController.add($response);
         });
         break;
+      case _kProtocol_EventResource_Ordinal:
+        final String _name = _kProtocol_EventResource_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'event', _eventResourceEventStreamController.addError,
+            () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_EventResource_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          if ($message.overflowing == $fidl.CallOverflowing.large) {
+            throw $fidl.FidlError(
+                r'Unexpected byte overflow for _kProtocol_EventResource_Ordinal',
+                $fidl.FidlErrorCode.fidlLargeMessageImpossible);
+          }
+          final Protocol$EventResource$Response $response = $fidl
+              .decodeMessageWithCallback<Protocol$EventResource$Response>(
+                  $message,
+                  _kProtocol_EventResource_Type.responseInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
+            return Protocol$EventResource$Response(
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
+              $types[2].decode($decoder, $offset, 1),
+              $types[3].decode($decoder, $offset, 1),
+              $types[4].decode($decoder, $offset, 1),
+              $types[5].decode($decoder, $offset, 1),
+              $types[6].decode($decoder, $offset, 1),
+              $types[7].decode($decoder, $offset, 1),
+              $types[8].decode($decoder, $offset, 1),
+              $types[9].decode($decoder, $offset, 1),
+              $types[10].decode($decoder, $offset, 1),
+              $types[11].decode($decoder, $offset, 1),
+              $types[12].decode($decoder, $offset, 1),
+              $types[13].decode($decoder, $offset, 1),
+              $types[14].decode($decoder, $offset, 1),
+              $types[15].decode($decoder, $offset, 1),
+              $types[16].decode($decoder, $offset, 1),
+              $types[17].decode($decoder, $offset, 1),
+              $types[18].decode($decoder, $offset, 1),
+              $types[19].decode($decoder, $offset, 1),
+              $types[20].decode($decoder, $offset, 1),
+              $types[21].decode($decoder, $offset, 1),
+              $types[22].decode($decoder, $offset, 1),
+              $types[23].decode($decoder, $offset, 1),
+              $types[24].decode($decoder, $offset, 1),
+              $types[25].decode($decoder, $offset, 1),
+              $types[26].decode($decoder, $offset, 1),
+            );
+          });
+          _eventResourceEventStreamController.add($response);
+        });
+        break;
       default:
         $message.closeHandles();
         ctrl.proxyError(
@@ -3592,6 +4793,54 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
               $types[1].decode($decoder, $offset, 1),
               $types[2].decode($decoder, $offset, 1),
               $types[3].decode($decoder, $offset, 1),
+            );
+          });
+          $completer.complete($response);
+        });
+        break;
+      case _kProtocol_TwoWayResource_Ordinal:
+        final String _name = _kProtocol_TwoWayResource_Type.name;
+        $fidl.performCtrlWithExceptionHandling(
+            _name, ctrl, 'method response', $completer.completeError, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_TwoWayResource_Type.response!;
+          final $wireFormat = $message.parseWireFormat();
+          // ignore: prefer_const_declarations
+
+          final Protocol$TwoWayResource$Response $response = $fidl
+              .decodeMaybeLargeMessageWithCallback<
+                      Protocol$TwoWayResource$Response>(
+                  $message,
+                  _kProtocol_TwoWayResource_Type.responseInlineSize(
+                      $wireFormat), ($fidl.Decoder $decoder, int $offset) {
+            return Protocol$TwoWayResource$Response(
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
+              $types[2].decode($decoder, $offset, 1),
+              $types[3].decode($decoder, $offset, 1),
+              $types[4].decode($decoder, $offset, 1),
+              $types[5].decode($decoder, $offset, 1),
+              $types[6].decode($decoder, $offset, 1),
+              $types[7].decode($decoder, $offset, 1),
+              $types[8].decode($decoder, $offset, 1),
+              $types[9].decode($decoder, $offset, 1),
+              $types[10].decode($decoder, $offset, 1),
+              $types[11].decode($decoder, $offset, 1),
+              $types[12].decode($decoder, $offset, 1),
+              $types[13].decode($decoder, $offset, 1),
+              $types[14].decode($decoder, $offset, 1),
+              $types[15].decode($decoder, $offset, 1),
+              $types[16].decode($decoder, $offset, 1),
+              $types[17].decode($decoder, $offset, 1),
+              $types[18].decode($decoder, $offset, 1),
+              $types[19].decode($decoder, $offset, 1),
+              $types[20].decode($decoder, $offset, 1),
+              $types[21].decode($decoder, $offset, 1),
+              $types[22].decode($decoder, $offset, 1),
+              $types[23].decode($decoder, $offset, 1),
+              $types[24].decode($decoder, $offset, 1),
+              $types[25].decode($decoder, $offset, 1),
+              $types[26].decode($decoder, $offset, 1),
             );
           });
           $completer.complete($response);
@@ -4275,6 +5524,164 @@ class ProtocolProxy extends $fidl.AsyncProxy<Protocol> implements Protocol {
   $async.Stream<Protocol$EventArrayVectorNested$Response>
       get eventArrayVectorNested =>
           _eventArrayVectorNestedEventStreamController.stream;
+
+  @override
+  $async.Future<void> oneWayResource(
+      $zircon.Handle handle,
+      $zircon.Vmo vmo,
+      $fidl.InterfaceHandle<Protocol> clientEnd,
+      $fidl.InterfaceRequest<Protocol> serverEnd,
+      ResourceStruct struct,
+      ResourceTable table,
+      ResourceUnion union,
+      $zircon.Handle? optHandle,
+      $zircon.Vmo? optVmo,
+      $fidl.InterfaceHandle<Protocol>? optClientEnd,
+      $fidl.InterfaceRequest<Protocol>? optServerEnd,
+      ResourceStruct? optStruct,
+      ResourceUnion? optUnion,
+      List<$zircon.Handle> arrayHandle,
+      List<$zircon.Vmo> arrayVmo,
+      List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd,
+      List<ResourceStruct> arrayStruct,
+      List<ResourceTable> arrayTable,
+      List<ResourceUnion> arrayUnion,
+      List<$zircon.Handle> vectorHandle,
+      List<$zircon.Vmo> vectorVmo,
+      List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd,
+      List<ResourceStruct> vectorStruct,
+      List<ResourceTable> vectorTable,
+      List<ResourceUnion> vectorUnion) {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_OneWayResource_Ordinal, 0, $fidl.CallStrictness.strict);
+    final List<$fidl.MemberType> $types =
+        _kProtocol_OneWayResource_Type.request!;
+    $fidl.encodeMessageWithCallback($encoder,
+        _kProtocol_OneWayResource_Type.requestInlineSize($encoder.wireFormat),
+        () {
+      $types[0].encode($encoder, handle, $fidl.kMessageHeaderSize, 1);
+      $types[1].encode($encoder, vmo, $fidl.kMessageHeaderSize, 1);
+      $types[2].encode($encoder, clientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[3].encode($encoder, serverEnd, $fidl.kMessageHeaderSize, 1);
+      $types[4].encode($encoder, struct, $fidl.kMessageHeaderSize, 1);
+      $types[5].encode($encoder, table, $fidl.kMessageHeaderSize, 1);
+      $types[6].encode($encoder, union, $fidl.kMessageHeaderSize, 1);
+      $types[7].encode($encoder, optHandle, $fidl.kMessageHeaderSize, 1);
+      $types[8].encode($encoder, optVmo, $fidl.kMessageHeaderSize, 1);
+      $types[9].encode($encoder, optClientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[10].encode($encoder, optServerEnd, $fidl.kMessageHeaderSize, 1);
+      $types[11].encode($encoder, optStruct, $fidl.kMessageHeaderSize, 1);
+      $types[12].encode($encoder, optUnion, $fidl.kMessageHeaderSize, 1);
+      $types[13].encode($encoder, arrayHandle, $fidl.kMessageHeaderSize, 1);
+      $types[14].encode($encoder, arrayVmo, $fidl.kMessageHeaderSize, 1);
+      $types[15].encode($encoder, arrayClientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[16].encode($encoder, arrayServerEnd, $fidl.kMessageHeaderSize, 1);
+      $types[17].encode($encoder, arrayStruct, $fidl.kMessageHeaderSize, 1);
+      $types[18].encode($encoder, arrayTable, $fidl.kMessageHeaderSize, 1);
+      $types[19].encode($encoder, arrayUnion, $fidl.kMessageHeaderSize, 1);
+      $types[20].encode($encoder, vectorHandle, $fidl.kMessageHeaderSize, 1);
+      $types[21].encode($encoder, vectorVmo, $fidl.kMessageHeaderSize, 1);
+      $types[22].encode($encoder, vectorClientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[23].encode($encoder, vectorServerEnd, $fidl.kMessageHeaderSize, 1);
+      $types[24].encode($encoder, vectorStruct, $fidl.kMessageHeaderSize, 1);
+      $types[25].encode($encoder, vectorTable, $fidl.kMessageHeaderSize, 1);
+      $types[26].encode($encoder, vectorUnion, $fidl.kMessageHeaderSize, 1);
+    });
+    return $async.Future.sync(() {
+      ctrl.sendMessage($encoder.message);
+    });
+  }
+
+  @override
+  $async.Future<Protocol$TwoWayResource$Response> twoWayResource(
+      $zircon.Handle handle,
+      $zircon.Vmo vmo,
+      $fidl.InterfaceHandle<Protocol> clientEnd,
+      $fidl.InterfaceRequest<Protocol> serverEnd,
+      ResourceStruct struct,
+      ResourceTable table,
+      ResourceUnion union,
+      $zircon.Handle? optHandle,
+      $zircon.Vmo? optVmo,
+      $fidl.InterfaceHandle<Protocol>? optClientEnd,
+      $fidl.InterfaceRequest<Protocol>? optServerEnd,
+      ResourceStruct? optStruct,
+      ResourceUnion? optUnion,
+      List<$zircon.Handle> arrayHandle,
+      List<$zircon.Vmo> arrayVmo,
+      List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd,
+      List<ResourceStruct> arrayStruct,
+      List<ResourceTable> arrayTable,
+      List<ResourceUnion> arrayUnion,
+      List<$zircon.Handle> vectorHandle,
+      List<$zircon.Vmo> vectorVmo,
+      List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd,
+      List<ResourceStruct> vectorStruct,
+      List<ResourceTable> vectorTable,
+      List<ResourceUnion> vectorUnion) {
+    if (!ctrl.isBound) {
+      return $async.Future.error(
+          $fidl.FidlStateException('Proxy<${ctrl.$interfaceName}> is closed.'),
+          StackTrace.current);
+    }
+
+    final $fidl.Encoder $encoder = $fidl.Encoder($fidl.kWireFormatDefault);
+    $encoder.encodeMessageHeader(
+        _kProtocol_TwoWayResource_Ordinal, 0, $fidl.CallStrictness.strict);
+    final List<$fidl.MemberType> $types =
+        _kProtocol_TwoWayResource_Type.request!;
+    $fidl.encodeMessageWithCallback($encoder,
+        _kProtocol_TwoWayResource_Type.requestInlineSize($encoder.wireFormat),
+        () {
+      $types[0].encode($encoder, handle, $fidl.kMessageHeaderSize, 1);
+      $types[1].encode($encoder, vmo, $fidl.kMessageHeaderSize, 1);
+      $types[2].encode($encoder, clientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[3].encode($encoder, serverEnd, $fidl.kMessageHeaderSize, 1);
+      $types[4].encode($encoder, struct, $fidl.kMessageHeaderSize, 1);
+      $types[5].encode($encoder, table, $fidl.kMessageHeaderSize, 1);
+      $types[6].encode($encoder, union, $fidl.kMessageHeaderSize, 1);
+      $types[7].encode($encoder, optHandle, $fidl.kMessageHeaderSize, 1);
+      $types[8].encode($encoder, optVmo, $fidl.kMessageHeaderSize, 1);
+      $types[9].encode($encoder, optClientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[10].encode($encoder, optServerEnd, $fidl.kMessageHeaderSize, 1);
+      $types[11].encode($encoder, optStruct, $fidl.kMessageHeaderSize, 1);
+      $types[12].encode($encoder, optUnion, $fidl.kMessageHeaderSize, 1);
+      $types[13].encode($encoder, arrayHandle, $fidl.kMessageHeaderSize, 1);
+      $types[14].encode($encoder, arrayVmo, $fidl.kMessageHeaderSize, 1);
+      $types[15].encode($encoder, arrayClientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[16].encode($encoder, arrayServerEnd, $fidl.kMessageHeaderSize, 1);
+      $types[17].encode($encoder, arrayStruct, $fidl.kMessageHeaderSize, 1);
+      $types[18].encode($encoder, arrayTable, $fidl.kMessageHeaderSize, 1);
+      $types[19].encode($encoder, arrayUnion, $fidl.kMessageHeaderSize, 1);
+      $types[20].encode($encoder, vectorHandle, $fidl.kMessageHeaderSize, 1);
+      $types[21].encode($encoder, vectorVmo, $fidl.kMessageHeaderSize, 1);
+      $types[22].encode($encoder, vectorClientEnd, $fidl.kMessageHeaderSize, 1);
+      $types[23].encode($encoder, vectorServerEnd, $fidl.kMessageHeaderSize, 1);
+      $types[24].encode($encoder, vectorStruct, $fidl.kMessageHeaderSize, 1);
+      $types[25].encode($encoder, vectorTable, $fidl.kMessageHeaderSize, 1);
+      $types[26].encode($encoder, vectorUnion, $fidl.kMessageHeaderSize, 1);
+    });
+    final $completer = $async.Completer<Protocol$TwoWayResource$Response>();
+    ctrl.sendMessageWithResponse($encoder.message, $completer);
+    return $completer.future;
+  }
+
+  final _eventResourceEventStreamController =
+      $async.StreamController<Protocol$EventResource$Response>.broadcast();
+  @override
+  $async.Stream<Protocol$EventResource$Response> get eventResource =>
+      _eventResourceEventStreamController.stream;
 }
 
 class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
@@ -4603,6 +6010,83 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
               onError: (_e) {
             $fidl.handleException(
                 _kProtocol_EventArrayVectorNested_Type.name, _e, close);
+          }));
+        }
+        final _eventResource_stream = impl.eventResource;
+        if (_eventResource_stream != null) {
+          $subscriptions.add(_eventResource_stream.listen(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_EventResource_Ordinal, 0,
+                $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_EventResource_Type.response!;
+            $fidl.encodeMessageWithCallback(
+                $encoder,
+                _kProtocol_EventResource_Type
+                    .responseInlineSize($encoder.wireFormat), () {
+              $types[0].encode(
+                  $encoder, $response.handle, $fidl.kMessageHeaderSize, 1);
+              $types[1]
+                  .encode($encoder, $response.vmo, $fidl.kMessageHeaderSize, 1);
+              $types[2].encode(
+                  $encoder, $response.clientEnd, $fidl.kMessageHeaderSize, 1);
+              $types[3].encode(
+                  $encoder, $response.serverEnd, $fidl.kMessageHeaderSize, 1);
+              $types[4].encode(
+                  $encoder, $response.struct, $fidl.kMessageHeaderSize, 1);
+              $types[5].encode(
+                  $encoder, $response.table, $fidl.kMessageHeaderSize, 1);
+              $types[6].encode(
+                  $encoder, $response.union, $fidl.kMessageHeaderSize, 1);
+              $types[7].encode(
+                  $encoder, $response.optHandle, $fidl.kMessageHeaderSize, 1);
+              $types[8].encode(
+                  $encoder, $response.optVmo, $fidl.kMessageHeaderSize, 1);
+              $types[9].encode($encoder, $response.optClientEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[10].encode($encoder, $response.optServerEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[11].encode(
+                  $encoder, $response.optStruct, $fidl.kMessageHeaderSize, 1);
+              $types[12].encode(
+                  $encoder, $response.optUnion, $fidl.kMessageHeaderSize, 1);
+              $types[13].encode(
+                  $encoder, $response.arrayHandle, $fidl.kMessageHeaderSize, 1);
+              $types[14].encode(
+                  $encoder, $response.arrayVmo, $fidl.kMessageHeaderSize, 1);
+              $types[15].encode($encoder, $response.arrayClientEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[16].encode($encoder, $response.arrayServerEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[17].encode(
+                  $encoder, $response.arrayStruct, $fidl.kMessageHeaderSize, 1);
+              $types[18].encode(
+                  $encoder, $response.arrayTable, $fidl.kMessageHeaderSize, 1);
+              $types[19].encode(
+                  $encoder, $response.arrayUnion, $fidl.kMessageHeaderSize, 1);
+              $types[20].encode($encoder, $response.vectorHandle,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[21].encode(
+                  $encoder, $response.vectorVmo, $fidl.kMessageHeaderSize, 1);
+              $types[22].encode($encoder, $response.vectorClientEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[23].encode($encoder, $response.vectorServerEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[24].encode($encoder, $response.vectorStruct,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[25].encode(
+                  $encoder, $response.vectorTable, $fidl.kMessageHeaderSize, 1);
+              $types[26].encode(
+                  $encoder, $response.vectorUnion, $fidl.kMessageHeaderSize, 1);
+            });
+            sendMessage($encoder.message);
+          },
+              // TODO: was ignoring errors intentional here? For methods, the
+              // channel gets closed on error.
+              onError: (_e) {
+            $fidl.handleException(
+                _kProtocol_EventResource_Type.name, _e, close);
           }));
         }
       }
@@ -5280,6 +6764,164 @@ class ProtocolBinding extends $fidl.AsyncBinding<Protocol> {
                   $fidl.kMessageHeaderSize, 1);
               $types[3].encode($encoder, $response.vectorVectorUint8,
                   $fidl.kMessageHeaderSize, 1);
+            });
+            $respond($encoder.message);
+          }, onError: (_e) {
+            $fidl.handleException(_name, _e, close);
+          });
+        }, close);
+        break;
+      case _kProtocol_OneWayResource_Ordinal:
+        final String _name = _kProtocol_OneWayResource_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_OneWayResource_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          final $async.Future<void> $future = $fidl
+              .decodeMaybeLargeMessageWithCallback<$async.Future<void>>(
+                  $message,
+                  _kProtocol_OneWayResource_Type.requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
+            return _impl.oneWayResource(
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
+              $types[2].decode($decoder, $offset, 1),
+              $types[3].decode($decoder, $offset, 1),
+              $types[4].decode($decoder, $offset, 1),
+              $types[5].decode($decoder, $offset, 1),
+              $types[6].decode($decoder, $offset, 1),
+              $types[7].decode($decoder, $offset, 1),
+              $types[8].decode($decoder, $offset, 1),
+              $types[9].decode($decoder, $offset, 1),
+              $types[10].decode($decoder, $offset, 1),
+              $types[11].decode($decoder, $offset, 1),
+              $types[12].decode($decoder, $offset, 1),
+              $types[13].decode($decoder, $offset, 1),
+              $types[14].decode($decoder, $offset, 1),
+              $types[15].decode($decoder, $offset, 1),
+              $types[16].decode($decoder, $offset, 1),
+              $types[17].decode($decoder, $offset, 1),
+              $types[18].decode($decoder, $offset, 1),
+              $types[19].decode($decoder, $offset, 1),
+              $types[20].decode($decoder, $offset, 1),
+              $types[21].decode($decoder, $offset, 1),
+              $types[22].decode($decoder, $offset, 1),
+              $types[23].decode($decoder, $offset, 1),
+              $types[24].decode($decoder, $offset, 1),
+              $types[25].decode($decoder, $offset, 1),
+              $types[26].decode($decoder, $offset, 1),
+            );
+          });
+        }, close);
+        break;
+      case _kProtocol_TwoWayResource_Ordinal:
+        final String _name = _kProtocol_TwoWayResource_Type.name;
+        $fidl.performWithExceptionHandling(_name, () {
+          final List<$fidl.MemberType> $types =
+              _kProtocol_TwoWayResource_Type.request!;
+          // ignore: prefer_const_declarations
+          final _impl = impl!;
+          final $async.Future<Protocol$TwoWayResource$Response> $future = $fidl
+              .decodeMaybeLargeMessageWithCallback<
+                      $async.Future<Protocol$TwoWayResource$Response>>($message,
+                  _kProtocol_TwoWayResource_Type.requestInlineSize($wireFormat),
+                  ($fidl.Decoder $decoder, int $offset) {
+            return _impl.twoWayResource(
+              $types[0].decode($decoder, $offset, 1),
+              $types[1].decode($decoder, $offset, 1),
+              $types[2].decode($decoder, $offset, 1),
+              $types[3].decode($decoder, $offset, 1),
+              $types[4].decode($decoder, $offset, 1),
+              $types[5].decode($decoder, $offset, 1),
+              $types[6].decode($decoder, $offset, 1),
+              $types[7].decode($decoder, $offset, 1),
+              $types[8].decode($decoder, $offset, 1),
+              $types[9].decode($decoder, $offset, 1),
+              $types[10].decode($decoder, $offset, 1),
+              $types[11].decode($decoder, $offset, 1),
+              $types[12].decode($decoder, $offset, 1),
+              $types[13].decode($decoder, $offset, 1),
+              $types[14].decode($decoder, $offset, 1),
+              $types[15].decode($decoder, $offset, 1),
+              $types[16].decode($decoder, $offset, 1),
+              $types[17].decode($decoder, $offset, 1),
+              $types[18].decode($decoder, $offset, 1),
+              $types[19].decode($decoder, $offset, 1),
+              $types[20].decode($decoder, $offset, 1),
+              $types[21].decode($decoder, $offset, 1),
+              $types[22].decode($decoder, $offset, 1),
+              $types[23].decode($decoder, $offset, 1),
+              $types[24].decode($decoder, $offset, 1),
+              $types[25].decode($decoder, $offset, 1),
+              $types[26].decode($decoder, $offset, 1),
+            );
+          });
+          $future.then(($response) {
+            final $fidl.Encoder $encoder =
+                $fidl.Encoder($fidl.kWireFormatDefault);
+            $encoder.encodeMessageHeader(_kProtocol_TwoWayResource_Ordinal,
+                $message.txid, $fidl.CallStrictness.strict);
+            final List<$fidl.MemberType> $types =
+                _kProtocol_TwoWayResource_Type.response!;
+            $fidl.encodeMessageWithCallback(
+                $encoder,
+                _kProtocol_TwoWayResource_Type
+                    .responseInlineSize($encoder.wireFormat), () {
+              $types[0].encode(
+                  $encoder, $response.handle, $fidl.kMessageHeaderSize, 1);
+              $types[1]
+                  .encode($encoder, $response.vmo, $fidl.kMessageHeaderSize, 1);
+              $types[2].encode(
+                  $encoder, $response.clientEnd, $fidl.kMessageHeaderSize, 1);
+              $types[3].encode(
+                  $encoder, $response.serverEnd, $fidl.kMessageHeaderSize, 1);
+              $types[4].encode(
+                  $encoder, $response.struct, $fidl.kMessageHeaderSize, 1);
+              $types[5].encode(
+                  $encoder, $response.table, $fidl.kMessageHeaderSize, 1);
+              $types[6].encode(
+                  $encoder, $response.union, $fidl.kMessageHeaderSize, 1);
+              $types[7].encode(
+                  $encoder, $response.optHandle, $fidl.kMessageHeaderSize, 1);
+              $types[8].encode(
+                  $encoder, $response.optVmo, $fidl.kMessageHeaderSize, 1);
+              $types[9].encode($encoder, $response.optClientEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[10].encode($encoder, $response.optServerEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[11].encode(
+                  $encoder, $response.optStruct, $fidl.kMessageHeaderSize, 1);
+              $types[12].encode(
+                  $encoder, $response.optUnion, $fidl.kMessageHeaderSize, 1);
+              $types[13].encode(
+                  $encoder, $response.arrayHandle, $fidl.kMessageHeaderSize, 1);
+              $types[14].encode(
+                  $encoder, $response.arrayVmo, $fidl.kMessageHeaderSize, 1);
+              $types[15].encode($encoder, $response.arrayClientEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[16].encode($encoder, $response.arrayServerEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[17].encode(
+                  $encoder, $response.arrayStruct, $fidl.kMessageHeaderSize, 1);
+              $types[18].encode(
+                  $encoder, $response.arrayTable, $fidl.kMessageHeaderSize, 1);
+              $types[19].encode(
+                  $encoder, $response.arrayUnion, $fidl.kMessageHeaderSize, 1);
+              $types[20].encode($encoder, $response.vectorHandle,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[21].encode(
+                  $encoder, $response.vectorVmo, $fidl.kMessageHeaderSize, 1);
+              $types[22].encode($encoder, $response.vectorClientEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[23].encode($encoder, $response.vectorServerEnd,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[24].encode($encoder, $response.vectorStruct,
+                  $fidl.kMessageHeaderSize, 1);
+              $types[25].encode(
+                  $encoder, $response.vectorTable, $fidl.kMessageHeaderSize, 1);
+              $types[26].encode(
+                  $encoder, $response.vectorUnion, $fidl.kMessageHeaderSize, 1);
             });
             $respond($encoder.message);
           }, onError: (_e) {

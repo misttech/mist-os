@@ -16,6 +16,7 @@ import 'package:fidl/fidl.dart' as $fidl;
 import 'package:meta/meta.dart';
 import 'package:zircon/zircon.dart' as $zircon;
 
+import 'package:fidl_zx/fidl_async.dart' as lib$zx;
 import './fidl_async.dart';
 
 // ignore_for_file: always_specify_types
@@ -344,6 +345,84 @@ class Protocol$TestBase extends Protocol {
     return $async.Stream.fromFuture($async.Future.error(
         UnimplementedError(
             r'eventArrayVectorNested not implemented on Protocol test base. Please implement.'),
+        StackTrace.current));
+  }
+
+  @override
+  $async.Future<void> oneWayResource(
+      $zircon.Handle handle,
+      $zircon.Vmo vmo,
+      $fidl.InterfaceHandle<Protocol> clientEnd,
+      $fidl.InterfaceRequest<Protocol> serverEnd,
+      ResourceStruct struct,
+      ResourceTable table,
+      ResourceUnion union,
+      $zircon.Handle? optHandle,
+      $zircon.Vmo? optVmo,
+      $fidl.InterfaceHandle<Protocol>? optClientEnd,
+      $fidl.InterfaceRequest<Protocol>? optServerEnd,
+      ResourceStruct? optStruct,
+      ResourceUnion? optUnion,
+      List<$zircon.Handle> arrayHandle,
+      List<$zircon.Vmo> arrayVmo,
+      List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd,
+      List<ResourceStruct> arrayStruct,
+      List<ResourceTable> arrayTable,
+      List<ResourceUnion> arrayUnion,
+      List<$zircon.Handle> vectorHandle,
+      List<$zircon.Vmo> vectorVmo,
+      List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd,
+      List<ResourceStruct> vectorStruct,
+      List<ResourceTable> vectorTable,
+      List<ResourceUnion> vectorUnion) {
+    return $async.Future.error(
+        UnimplementedError(
+            r'oneWayResource not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Future<Protocol$TwoWayResource$Response> twoWayResource(
+      $zircon.Handle handle,
+      $zircon.Vmo vmo,
+      $fidl.InterfaceHandle<Protocol> clientEnd,
+      $fidl.InterfaceRequest<Protocol> serverEnd,
+      ResourceStruct struct,
+      ResourceTable table,
+      ResourceUnion union,
+      $zircon.Handle? optHandle,
+      $zircon.Vmo? optVmo,
+      $fidl.InterfaceHandle<Protocol>? optClientEnd,
+      $fidl.InterfaceRequest<Protocol>? optServerEnd,
+      ResourceStruct? optStruct,
+      ResourceUnion? optUnion,
+      List<$zircon.Handle> arrayHandle,
+      List<$zircon.Vmo> arrayVmo,
+      List<$fidl.InterfaceHandle<Protocol>> arrayClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> arrayServerEnd,
+      List<ResourceStruct> arrayStruct,
+      List<ResourceTable> arrayTable,
+      List<ResourceUnion> arrayUnion,
+      List<$zircon.Handle> vectorHandle,
+      List<$zircon.Vmo> vectorVmo,
+      List<$fidl.InterfaceHandle<Protocol>> vectorClientEnd,
+      List<$fidl.InterfaceRequest<Protocol>> vectorServerEnd,
+      List<ResourceStruct> vectorStruct,
+      List<ResourceTable> vectorTable,
+      List<ResourceUnion> vectorUnion) {
+    return $async.Future.error(
+        UnimplementedError(
+            r'twoWayResource not implemented on Protocol test base. Please implement.'),
+        StackTrace.current);
+  }
+
+  @override
+  $async.Stream<Protocol$EventResource$Response> get eventResource {
+    return $async.Stream.fromFuture($async.Future.error(
+        UnimplementedError(
+            r'eventResource not implemented on Protocol test base. Please implement.'),
         StackTrace.current));
   }
 }

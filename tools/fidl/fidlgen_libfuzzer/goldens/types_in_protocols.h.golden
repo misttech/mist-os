@@ -23,6 +23,9 @@ using Enum = ::test::typesinprotocols::Enum;
 using Struct = ::test::typesinprotocols::Struct;
 using Table = ::test::typesinprotocols::Table;
 using Union = ::test::typesinprotocols::Union;
+using ResourceStruct = ::test::typesinprotocols::ResourceStruct;
+using ResourceTable = ::test::typesinprotocols::ResourceTable;
+using ResourceUnion = ::test::typesinprotocols::ResourceUnion;
 using Basic = ::test::typesinprotocols::Basic;
 using Compound = ::test::typesinprotocols::Compound;
 using ArrayBasic = ::test::typesinprotocols::ArrayBasic;
@@ -31,6 +34,7 @@ using VectorBasic = ::test::typesinprotocols::VectorBasic;
 using VectorCompound = ::test::typesinprotocols::VectorCompound;
 using VectorOptional = ::test::typesinprotocols::VectorOptional;
 using ArrayVectorNested = ::test::typesinprotocols::ArrayVectorNested;
+using Resource = ::test::typesinprotocols::Resource;
 
 template <>
 struct MinSize<Bits> {
@@ -116,6 +120,67 @@ struct Allocate<Union> {
     (*size)++;
 
     Union out;
+    switch (selector % 1) {
+      case 0: {
+        out.set_b(Allocate<bool>{}(src, size));
+        break;
+      }
+    }
+
+    return out;
+  }
+};
+template <>
+struct MinSize<ResourceStruct> {
+  operator size_t() {
+    return MinSize<uint8_t>();
+  }
+};
+template <>
+struct Allocate<ResourceStruct> {
+  ResourceStruct operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ResourceStruct>());
+    ResourceStruct out;
+    const size_t slack_per_member = (*size - MinSize<ResourceStruct>()) / 1;
+    size_t out_size;
+    out_size = MinSize<uint8_t>() + slack_per_member;
+    out.__reserved = Allocate<uint8_t>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<ResourceTable> {
+  operator size_t() {
+    return 0;
+  }
+};
+template <>
+struct Allocate<ResourceTable> {
+  ResourceTable operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ResourceTable>());
+    ResourceTable out;
+    return out;
+  }
+};
+template <>
+struct MinSize<ResourceUnion> {
+  operator size_t() {
+    size_t sizes[] = {0, MinSize<bool>()};
+    return 1 + *std::max_element(sizes, sizes + 1 + 1);
+  }
+};
+template <>
+struct Allocate<ResourceUnion> {
+  static_assert(1 > 0, "xunion must have at least one member");
+
+  ResourceUnion operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<ResourceUnion>());
+
+    uint8_t selector;
+    ZX_ASSERT(src->CopyBytes(&selector, 1));
+    (*size)++;
+
+    ResourceUnion out;
     switch (selector % 1) {
       case 0: {
         out.set_b(Allocate<bool>{}(src, size));
@@ -379,6 +444,76 @@ struct Allocate<ArrayVectorNested> {
     out.vector_array_uint8 = Allocate<::std::vector<::std::array<uint8_t, 5>>>{}(src, &out_size);
     out_size = MinSize<::std::vector<::std::vector<uint8_t>>>() + slack_per_member;
     out.vector_vector_uint8 = Allocate<::std::vector<::std::vector<uint8_t>>>{}(src, &out_size);
+    return out;
+  }
+};
+template <>
+struct MinSize<Resource> {
+  operator size_t() {
+    return MinSize<::zx::handle>() + MinSize<::zx::vmo>() + MinSize<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>() + MinSize<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>() + MinSize<::test::typesinprotocols::ResourceStruct>() + MinSize<::test::typesinprotocols::ResourceTable>() + MinSize<::test::typesinprotocols::ResourceUnion>() + MinSize<::zx::handle>() + MinSize<::zx::vmo>() + MinSize<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>() + MinSize<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>() + MinSize<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>() + MinSize<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>() + MinSize<::std::array<::zx::handle, 5>>() + MinSize<::std::array<::zx::vmo, 5>>() + MinSize<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>() + MinSize<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>() + MinSize<::std::array<::test::typesinprotocols::ResourceStruct, 5>>() + MinSize<::std::array<::test::typesinprotocols::ResourceTable, 5>>() + MinSize<::std::array<::test::typesinprotocols::ResourceUnion, 5>>() + MinSize<::std::vector<::zx::handle>>() + MinSize<::std::vector<::zx::vmo>>() + MinSize<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>() + MinSize<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>() + MinSize<::std::vector<::test::typesinprotocols::ResourceStruct>>() + MinSize<::std::vector<::test::typesinprotocols::ResourceTable>>() + MinSize<::std::vector<::test::typesinprotocols::ResourceUnion>>();
+  }
+};
+template <>
+struct Allocate<Resource> {
+  Resource operator()(FuzzInput* src, size_t* size) {
+    ZX_ASSERT(*size >= MinSize<Resource>());
+    Resource out;
+    const size_t slack_per_member = (*size - MinSize<Resource>()) / 27;
+    size_t out_size;
+    out_size = MinSize<::zx::handle>() + slack_per_member;
+    out.handle = Allocate<::zx::handle>{}(src, &out_size);
+    out_size = MinSize<::zx::vmo>() + slack_per_member;
+    out.vmo = Allocate<::zx::vmo>{}(src, &out_size);
+    out_size = MinSize<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>() + slack_per_member;
+    out.client_end = Allocate<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>{}(src, &out_size);
+    out_size = MinSize<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>() + slack_per_member;
+    out.server_end = Allocate<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>{}(src, &out_size);
+    out_size = MinSize<::test::typesinprotocols::ResourceStruct>() + slack_per_member;
+    out.struct_ = Allocate<::test::typesinprotocols::ResourceStruct>{}(src, &out_size);
+    out_size = MinSize<::test::typesinprotocols::ResourceTable>() + slack_per_member;
+    out.table = Allocate<::test::typesinprotocols::ResourceTable>{}(src, &out_size);
+    out_size = MinSize<::test::typesinprotocols::ResourceUnion>() + slack_per_member;
+    out.union_ = Allocate<::test::typesinprotocols::ResourceUnion>{}(src, &out_size);
+    out_size = MinSize<::zx::handle>() + slack_per_member;
+    out.opt_handle = Allocate<::zx::handle>{}(src, &out_size);
+    out_size = MinSize<::zx::vmo>() + slack_per_member;
+    out.opt_vmo = Allocate<::zx::vmo>{}(src, &out_size);
+    out_size = MinSize<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>() + slack_per_member;
+    out.opt_client_end = Allocate<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>{}(src, &out_size);
+    out_size = MinSize<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>() + slack_per_member;
+    out.opt_server_end = Allocate<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>{}(src, &out_size);
+    out_size = MinSize<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>() + slack_per_member;
+    out.opt_struct = Allocate<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>{}(src, &out_size);
+    out_size = MinSize<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>() + slack_per_member;
+    out.opt_union = Allocate<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::zx::handle, 5>>() + slack_per_member;
+    out.array_handle = Allocate<::std::array<::zx::handle, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::zx::vmo, 5>>() + slack_per_member;
+    out.array_vmo = Allocate<::std::array<::zx::vmo, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>() + slack_per_member;
+    out.array_client_end = Allocate<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>() + slack_per_member;
+    out.array_server_end = Allocate<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::test::typesinprotocols::ResourceStruct, 5>>() + slack_per_member;
+    out.array_struct = Allocate<::std::array<::test::typesinprotocols::ResourceStruct, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::test::typesinprotocols::ResourceTable, 5>>() + slack_per_member;
+    out.array_table = Allocate<::std::array<::test::typesinprotocols::ResourceTable, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::array<::test::typesinprotocols::ResourceUnion, 5>>() + slack_per_member;
+    out.array_union = Allocate<::std::array<::test::typesinprotocols::ResourceUnion, 5>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::zx::handle>>() + slack_per_member;
+    out.vector_handle = Allocate<::std::vector<::zx::handle>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::zx::vmo>>() + slack_per_member;
+    out.vector_vmo = Allocate<::std::vector<::zx::vmo>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>() + slack_per_member;
+    out.vector_client_end = Allocate<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>() + slack_per_member;
+    out.vector_server_end = Allocate<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::test::typesinprotocols::ResourceStruct>>() + slack_per_member;
+    out.vector_struct = Allocate<::std::vector<::test::typesinprotocols::ResourceStruct>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::test::typesinprotocols::ResourceTable>>() + slack_per_member;
+    out.vector_table = Allocate<::std::vector<::test::typesinprotocols::ResourceTable>>{}(src, &out_size);
+    out_size = MinSize<::std::vector<::test::typesinprotocols::ResourceUnion>>() + slack_per_member;
+    out.vector_union = Allocate<::std::vector<::test::typesinprotocols::ResourceUnion>>{}(src, &out_size);
     return out;
   }
 };

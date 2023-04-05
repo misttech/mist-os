@@ -90,6 +90,16 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Struct> {
   static inline ::test_typesinprotocols::Struct Convert(::test::typesinprotocols::Struct&&);
 };
 template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ResourceStruct> {
+  using HLCPPType = ::test::typesinprotocols::ResourceStruct;
+  static inline ::test::typesinprotocols::ResourceStruct Convert(::test_typesinprotocols::ResourceStruct&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceStruct> {
+  using NaturalType = ::test_typesinprotocols::ResourceStruct;
+  static inline ::test_typesinprotocols::ResourceStruct Convert(::test::typesinprotocols::ResourceStruct&&);
+};
+template <>
 struct NaturalToHLCPPTraits<::test_typesinprotocols::Basic> {
   using HLCPPType = ::test::typesinprotocols::Basic;
   static inline ::test::typesinprotocols::Basic Convert(::test_typesinprotocols::Basic&&);
@@ -170,6 +180,16 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::ArrayVectorNested> {
   static inline ::test_typesinprotocols::ArrayVectorNested Convert(::test::typesinprotocols::ArrayVectorNested&&);
 };
 template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::Resource> {
+  using HLCPPType = ::test::typesinprotocols::Resource;
+  static inline ::test::typesinprotocols::Resource Convert(::test_typesinprotocols::Resource&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::Resource> {
+  using NaturalType = ::test_typesinprotocols::Resource;
+  static inline ::test_typesinprotocols::Resource Convert(::test::typesinprotocols::Resource&&);
+};
+template <>
 struct NaturalToHLCPPTraits<::test_typesinprotocols::Table> {
   using HLCPPType = ::test::typesinprotocols::Table;
   static inline ::test::typesinprotocols::Table Convert(::test_typesinprotocols::Table&&);
@@ -178,6 +198,16 @@ template <>
 struct HLCPPToNaturalTraits<::test::typesinprotocols::Table> {
   using NaturalType = ::test_typesinprotocols::Table;
   static inline ::test_typesinprotocols::Table Convert(::test::typesinprotocols::Table&&);
+};
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ResourceTable> {
+  using HLCPPType = ::test::typesinprotocols::ResourceTable;
+  static inline ::test::typesinprotocols::ResourceTable Convert(::test_typesinprotocols::ResourceTable&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceTable> {
+  using NaturalType = ::test_typesinprotocols::ResourceTable;
+  static inline ::test_typesinprotocols::ResourceTable Convert(::test::typesinprotocols::ResourceTable&&);
 };
 template <>
 struct NaturalToHLCPPTraits<::test_typesinprotocols::Union> {
@@ -189,6 +219,16 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Union> {
   using NaturalType = ::test_typesinprotocols::Union;
   static inline ::test_typesinprotocols::Union Convert(::test::typesinprotocols::Union&&);
 };
+template <>
+struct NaturalToHLCPPTraits<::test_typesinprotocols::ResourceUnion> {
+  using HLCPPType = ::test::typesinprotocols::ResourceUnion;
+  static inline ::test::typesinprotocols::ResourceUnion Convert(::test_typesinprotocols::ResourceUnion&&);
+};
+template <>
+struct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceUnion> {
+  using NaturalType = ::test_typesinprotocols::ResourceUnion;
+  static inline ::test_typesinprotocols::ResourceUnion Convert(::test::typesinprotocols::ResourceUnion&&);
+};
 
 ::test::typesinprotocols::Struct NaturalToHLCPPTraits<::test_typesinprotocols::Struct>::Convert(::test_typesinprotocols::Struct&& value) {
   ::test::typesinprotocols::Struct hlcpp;
@@ -198,6 +238,17 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Union> {
 
 ::test_typesinprotocols::Struct HLCPPToNaturalTraits<::test::typesinprotocols::Struct>::Convert(::test::typesinprotocols::Struct&& value) {
   return ::test_typesinprotocols::Struct{{
+      .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
+  }};
+}
+::test::typesinprotocols::ResourceStruct NaturalToHLCPPTraits<::test_typesinprotocols::ResourceStruct>::Convert(::test_typesinprotocols::ResourceStruct&& value) {
+  ::test::typesinprotocols::ResourceStruct hlcpp;
+  hlcpp.__reserved = ::fidl::NaturalToHLCPP(std::move(value.__reserved()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::ResourceStruct HLCPPToNaturalTraits<::test::typesinprotocols::ResourceStruct>::Convert(::test::typesinprotocols::ResourceStruct&& value) {
+  return ::test_typesinprotocols::ResourceStruct{{
       .__reserved = ::fidl::HLCPPToNatural(std::move(value.__reserved)),
   }};
 }
@@ -403,6 +454,69 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Union> {
       .vector_vector_uint8 = ::fidl::HLCPPToNatural(std::move(value.vector_vector_uint8)),
   }};
 }
+::test::typesinprotocols::Resource NaturalToHLCPPTraits<::test_typesinprotocols::Resource>::Convert(::test_typesinprotocols::Resource&& value) {
+  ::test::typesinprotocols::Resource hlcpp;
+  hlcpp.handle = ::fidl::NaturalToHLCPP(std::move(value.handle()));
+  hlcpp.vmo = ::fidl::NaturalToHLCPP(std::move(value.vmo()));
+  hlcpp.client_end = ::fidl::NaturalToHLCPP(std::move(value.client_end()));
+  hlcpp.server_end = ::fidl::NaturalToHLCPP(std::move(value.server_end()));
+  hlcpp.struct_ = ::fidl::NaturalToHLCPP(std::move(value.struct_()));
+  hlcpp.table = ::fidl::NaturalToHLCPP(std::move(value.table()));
+  hlcpp.union_ = ::fidl::NaturalToHLCPP(std::move(value.union_()));
+  hlcpp.opt_handle = ::fidl::NaturalToHLCPP(std::move(value.opt_handle()));
+  hlcpp.opt_vmo = ::fidl::NaturalToHLCPP(std::move(value.opt_vmo()));
+  hlcpp.opt_client_end = ::fidl::NaturalToHLCPP(std::move(value.opt_client_end()));
+  hlcpp.opt_server_end = ::fidl::NaturalToHLCPP(std::move(value.opt_server_end()));
+  hlcpp.opt_struct = ::fidl::NaturalToHLCPP(std::move(value.opt_struct()));
+  hlcpp.opt_union = ::fidl::NaturalToHLCPP(std::move(value.opt_union()));
+  hlcpp.array_handle = ::fidl::NaturalToHLCPP(std::move(value.array_handle()));
+  hlcpp.array_vmo = ::fidl::NaturalToHLCPP(std::move(value.array_vmo()));
+  hlcpp.array_client_end = ::fidl::NaturalToHLCPP(std::move(value.array_client_end()));
+  hlcpp.array_server_end = ::fidl::NaturalToHLCPP(std::move(value.array_server_end()));
+  hlcpp.array_struct = ::fidl::NaturalToHLCPP(std::move(value.array_struct()));
+  hlcpp.array_table = ::fidl::NaturalToHLCPP(std::move(value.array_table()));
+  hlcpp.array_union = ::fidl::NaturalToHLCPP(std::move(value.array_union()));
+  hlcpp.vector_handle = ::fidl::NaturalToHLCPP(std::move(value.vector_handle()));
+  hlcpp.vector_vmo = ::fidl::NaturalToHLCPP(std::move(value.vector_vmo()));
+  hlcpp.vector_client_end = ::fidl::NaturalToHLCPP(std::move(value.vector_client_end()));
+  hlcpp.vector_server_end = ::fidl::NaturalToHLCPP(std::move(value.vector_server_end()));
+  hlcpp.vector_struct = ::fidl::NaturalToHLCPP(std::move(value.vector_struct()));
+  hlcpp.vector_table = ::fidl::NaturalToHLCPP(std::move(value.vector_table()));
+  hlcpp.vector_union = ::fidl::NaturalToHLCPP(std::move(value.vector_union()));
+  return hlcpp;
+}
+
+::test_typesinprotocols::Resource HLCPPToNaturalTraits<::test::typesinprotocols::Resource>::Convert(::test::typesinprotocols::Resource&& value) {
+  return ::test_typesinprotocols::Resource{{
+      .handle = ::fidl::HLCPPToNatural(std::move(value.handle)),
+      .vmo = ::fidl::HLCPPToNatural(std::move(value.vmo)),
+      .client_end = ::fidl::HLCPPToNatural(std::move(value.client_end)),
+      .server_end = ::fidl::HLCPPToNatural(std::move(value.server_end)),
+      .struct_ = ::fidl::HLCPPToNatural(std::move(value.struct_)),
+      .table = ::fidl::HLCPPToNatural(std::move(value.table)),
+      .union_ = ::fidl::HLCPPToNatural(std::move(value.union_)),
+      .opt_handle = ::fidl::HLCPPToNatural(std::move(value.opt_handle)),
+      .opt_vmo = ::fidl::HLCPPToNatural(std::move(value.opt_vmo)),
+      .opt_client_end = ::fidl::HLCPPToNatural(std::move(value.opt_client_end)),
+      .opt_server_end = ::fidl::HLCPPToNatural(std::move(value.opt_server_end)),
+      .opt_struct = ::fidl::HLCPPToNatural(std::move(value.opt_struct)),
+      .opt_union = ::fidl::HLCPPToNatural(std::move(value.opt_union)),
+      .array_handle = ::fidl::HLCPPToNatural(std::move(value.array_handle)),
+      .array_vmo = ::fidl::HLCPPToNatural(std::move(value.array_vmo)),
+      .array_client_end = ::fidl::HLCPPToNatural(std::move(value.array_client_end)),
+      .array_server_end = ::fidl::HLCPPToNatural(std::move(value.array_server_end)),
+      .array_struct = ::fidl::HLCPPToNatural(std::move(value.array_struct)),
+      .array_table = ::fidl::HLCPPToNatural(std::move(value.array_table)),
+      .array_union = ::fidl::HLCPPToNatural(std::move(value.array_union)),
+      .vector_handle = ::fidl::HLCPPToNatural(std::move(value.vector_handle)),
+      .vector_vmo = ::fidl::HLCPPToNatural(std::move(value.vector_vmo)),
+      .vector_client_end = ::fidl::HLCPPToNatural(std::move(value.vector_client_end)),
+      .vector_server_end = ::fidl::HLCPPToNatural(std::move(value.vector_server_end)),
+      .vector_struct = ::fidl::HLCPPToNatural(std::move(value.vector_struct)),
+      .vector_table = ::fidl::HLCPPToNatural(std::move(value.vector_table)),
+      .vector_union = ::fidl::HLCPPToNatural(std::move(value.vector_union)),
+  }};
+}
 ::test::typesinprotocols::Table NaturalToHLCPPTraits<::test_typesinprotocols::Table>::Convert(::test_typesinprotocols::Table&& value) {
   ::test::typesinprotocols::Table hlcpp;
   return hlcpp;
@@ -410,6 +524,15 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Union> {
 
 ::test_typesinprotocols::Table HLCPPToNaturalTraits<::test::typesinprotocols::Table>::Convert(::test::typesinprotocols::Table&& value) {
   ::test_typesinprotocols::Table natural;
+  return natural;
+}
+::test::typesinprotocols::ResourceTable NaturalToHLCPPTraits<::test_typesinprotocols::ResourceTable>::Convert(::test_typesinprotocols::ResourceTable&& value) {
+  ::test::typesinprotocols::ResourceTable hlcpp;
+  return hlcpp;
+}
+
+::test_typesinprotocols::ResourceTable HLCPPToNaturalTraits<::test::typesinprotocols::ResourceTable>::Convert(::test::typesinprotocols::ResourceTable&& value) {
+  ::test_typesinprotocols::ResourceTable natural;
   return natural;
 }
 
@@ -429,6 +552,28 @@ struct HLCPPToNaturalTraits<::test::typesinprotocols::Union> {
   using _NaturalUnion = ::test_typesinprotocols::Union;
   switch (value.Which()) {
     case ::test::typesinprotocols::Union::Tag::kB:
+      return _NaturalUnion::WithB(
+          ::fidl::HLCPPToNatural(std::move(value.b())));
+    default:
+      return _NaturalUnion(::fidl::internal::DefaultConstructPossiblyInvalidObjectTag{});
+  }
+}
+::test::typesinprotocols::ResourceUnion NaturalToHLCPPTraits<::test_typesinprotocols::ResourceUnion>::Convert(::test_typesinprotocols::ResourceUnion&& value) {
+  ::test::typesinprotocols::ResourceUnion hlcpp;
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ResourceUnion::Tag::kB:
+      hlcpp.set_b(::fidl::NaturalToHLCPP(std::move(value.b().value())));
+      break;
+    default:
+      break;
+  }
+  return hlcpp;
+}
+
+::test_typesinprotocols::ResourceUnion HLCPPToNaturalTraits<::test::typesinprotocols::ResourceUnion>::Convert(::test::typesinprotocols::ResourceUnion&& value) {
+  using _NaturalUnion = ::test_typesinprotocols::ResourceUnion;
+  switch (value.Which()) {
+    case ::test::typesinprotocols::ResourceUnion::Tag::kB:
       return _NaturalUnion::WithB(
           ::fidl::HLCPPToNatural(std::move(value.b())));
     default:

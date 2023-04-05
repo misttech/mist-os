@@ -356,6 +356,48 @@ class Protocol final {
     static constexpr bool kHasDomainError = false;
     static constexpr bool kHasFrameworkError = false;
   };
+  class OneWayResource final {
+    OneWayResource() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = true;
+    static constexpr bool kHasServerToClient = false;
+    static constexpr bool kHasServerToClientBody = false;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = false;
+    static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
+  class TwoWayResource final {
+    TwoWayResource() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = true;
+    static constexpr bool kHasClientToServerBody = true;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
+  class EventResource final {
+    EventResource() = delete;
+
+   public:
+    using Protocol = ::test_typesinprotocols::Protocol;
+    static constexpr bool kHasClientToServer = false;
+    static constexpr bool kHasClientToServerBody = false;
+    static constexpr bool kHasServerToClient = true;
+    static constexpr bool kHasServerToClientBody = true;
+
+    static constexpr bool kHasNonEmptyUserFacingResponse = true;
+    static constexpr bool kHasDomainError = false;
+    static constexpr bool kHasFrameworkError = false;
+  };
 };
 
 }  // namespace test_typesinprotocols

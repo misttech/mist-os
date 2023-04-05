@@ -286,6 +286,292 @@ void Union::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 }
 
 
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ResourceStructTable;
+const fidl_type_t* ResourceStruct::FidlType = &test_typesinprotocols_ResourceStructTable;
+
+void ResourceStruct::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<ResourceStruct>::value) {
+    memcpy(_encoder->template GetPtr<ResourceStruct>(_offset), this, sizeof(ResourceStruct));
+  } else {::fidl::Encode(_encoder, &__reserved, _offset + 0);
+    
+  }
+}
+
+void ResourceStruct::Decode(::fidl::Decoder* _decoder, ResourceStruct* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<ResourceStruct>::value) {
+    memcpy(_value, _decoder->template GetPtr<ResourceStruct>(_offset), sizeof(ResourceStruct));
+  } else {
+    ::fidl::Decode(_decoder, &_value->__reserved, _offset + 0);
+  }
+}
+
+zx_status_t ResourceStruct::Clone(ResourceStruct* _result) const {
+  zx_status_t _status = ::fidl::Clone(__reserved, &_result->__reserved);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+#endif  // __Fuchsia__
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ResourceTableTable;
+const fidl_type_t* ResourceTable::FidlType = &test_typesinprotocols_ResourceTableTable;
+
+ResourceTable::ResourceTable() {}
+
+ResourceTable::ResourceTable(ResourceTable&& other) {
+  field_presence_ = other.field_presence_;
+}
+
+ResourceTable::~ResourceTable() {
+}
+
+ResourceTable& ResourceTable::operator=(ResourceTable&& other) {
+  return *this;
+}
+
+bool ResourceTable::IsEmpty() const {
+  return field_presence_.IsEmpty();
+}
+
+void ResourceTable::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  size_t max_ordinal = MaxOrdinal();
+  ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
+  if (max_ordinal == 0) return;
+  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_v2_t));
+}
+
+void ResourceTable::Decode(::fidl::Decoder* _decoder, ResourceTable* _value, size_t _offset) {
+  fidl_vector_t* encoded = _decoder->GetPtr<fidl_vector_t>(_offset);
+  [[maybe_unused]] size_t base;
+  [[maybe_unused]] size_t count;
+  if (!encoded->data) {
+    goto clear_all;
+  }
+
+  base = _decoder->GetOffset(encoded->data);
+  count = encoded->count;
+
+  
+  if (count > 0) {
+    for (uint64_t ordinal = 1; ordinal <= count; ordinal++) {
+      if (IsOrdinalKnown(ordinal)) {
+        continue;
+      }
+
+      size_t envelope_base = base + (ordinal - 1) * sizeof(fidl_envelope_v2_t);
+      fidl_envelope_v2_t* envelope = _decoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      _decoder->CloseUnknownHandlesInEnvelope(envelope);
+    }
+  }
+
+  return;
+
+  // Clear unset values.
+clear_all:
+  return;
+}
+
+zx_status_t ResourceTable::Clone(ResourceTable* result) const {
+  return ZX_OK;
+}
+
+#endif  // __Fuchsia__
+
+
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ResourceUnionTable;
+const fidl_type_t* ResourceUnion::FidlType = &test_typesinprotocols_ResourceUnionTable;
+
+ResourceUnion::ResourceUnion() {}
+
+ResourceUnion::~ResourceUnion() {
+  Destroy();
+}
+
+ResourceUnion::ResourceUnion(ResourceUnion&& other) : tag_(other.tag_) {
+  switch (tag_) {
+    case ::test::typesinprotocols::ResourceUnion::Tag::kB:
+      b_ = std::move(other.b_);
+      break;
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid):
+      break;
+    default:
+      new (&unknown_data_) decltype(unknown_data_);
+      unknown_data_ = std::move(other.unknown_data_);
+      break;
+  }
+}
+
+ResourceUnion& ResourceUnion::operator=(ResourceUnion&& other) {
+  if (this != &other) {
+    Destroy();
+    tag_ = other.tag_;
+    switch (tag_) {
+      case ::test::typesinprotocols::ResourceUnion::Tag::kB:
+        b_ = std::move(other.b_);
+        break;
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid):
+        break;
+      default:
+        new (&unknown_data_) decltype(unknown_data_);
+        unknown_data_= std::move(other.unknown_data_);
+        break;
+    }
+  }
+  return *this;
+}
+
+ResourceUnion ResourceUnion::WithB(bool&& val) {
+  ResourceUnion result;
+  result.set_b(std::move(val));
+  return result;
+}
+
+
+void ResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  const size_t length_before = encoder->CurrentLength();
+  const size_t handles_before = encoder->CurrentHandleCount();
+
+  switch (Which()) {
+    case ::test::typesinprotocols::ResourceUnion::Tag::kB: {
+      if (::fidl::EncodingInlineSize<bool>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
+        ::fidl::Encode(encoder, &b_, offset + offsetof(fidl_xunion_v2_t, envelope));
+
+        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        xunion->tag = tag_;
+        xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+        xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
+        break;
+      }
+
+      ::fidl::Encode(
+        encoder,
+        &b_,
+        encoder->Alloc(::fidl::EncodingInlineSize<bool, ::fidl::Encoder>(encoder)));
+
+      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      xunion->tag = tag_;
+      xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
+      xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
+      xunion->envelope.flags = 0;
+      break;
+    }
+    case ::test::typesinprotocols::ResourceUnion::Tag::kUnknown: {
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      *encoder->GetPtr<uint64_t>(offset) = tag_;
+      break;
+    }
+    default:
+      break;
+  }
+}
+
+void ResourceUnion::Decode(::fidl::Decoder* _decoder, ResourceUnion* value, size_t offset) {
+  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+
+  if (xunion->envelope.num_bytes == 0 &&
+      xunion->envelope.num_handles == 0 &&
+      xunion->envelope.flags == 0) {
+    value->EnsureStorageInitialized(static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid));
+    return;
+  }
+
+  value->EnsureStorageInitialized(xunion->tag);
+
+
+  size_t value_offset = _decoder->EnvelopeValueOffset(&xunion->envelope);
+
+  switch (value->tag_) {
+    case ::test::typesinprotocols::ResourceUnion::Tag::kB: {
+      ::fidl::Decode(_decoder, &value->b_, value_offset);
+      break;
+    }
+    default: {
+  auto unknown_info = _decoder->EnvelopeUnknownDataInfo(&xunion->envelope);
+      value->unknown_data_.bytes.resize(unknown_info.num_bytes);
+      value->unknown_data_.handles.resize(unknown_info.num_handles);
+      ::fidl::DecodeUnknownDataContents(_decoder, &value->unknown_data_, unknown_info.value_offset);
+  break;
+    }
+  }
+
+}
+
+zx_status_t ResourceUnion::Clone(ResourceUnion* result) const {
+  result->Destroy();
+  result->tag_ = tag_;
+  switch (tag_) {
+    case ::test::typesinprotocols::ResourceUnion::Tag::Invalid:
+      return ZX_OK;
+    case ::test::typesinprotocols::ResourceUnion::Tag::kB:
+      return ::fidl::Clone(b_, &result->b_);
+    default:
+      new (&result->unknown_data_) decltype(unknown_data_);
+      return ::fidl::Clone(unknown_data_, &result->unknown_data_);
+    return ZX_OK;
+  }
+}
+
+ResourceUnion& ResourceUnion::set_b(bool value) {
+  EnsureStorageInitialized(::test::typesinprotocols::ResourceUnion::Tag::kB);
+  b_ = std::move(value);
+  return *this;
+}
+ResourceUnion& ResourceUnion::SetUnknownData(fidl_xunion_tag_t ordinal, std::vector<uint8_t> bytes, std::vector<zx::handle> handles) {
+  EnsureStorageInitialized(ordinal);
+  unknown_data_.bytes = std::move(bytes);
+  unknown_data_.handles = std::move(handles);
+  return *this;
+}
+
+void ResourceUnion::Destroy() {
+  switch (tag_) {
+    case ::test::typesinprotocols::ResourceUnion::Tag::kB:
+      break;
+  
+    case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid):
+      break;
+    default:
+      unknown_data_.~decltype(unknown_data_)();
+      break;
+  
+  }
+  tag_ = static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid);
+}
+
+void ResourceUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
+  if (tag_ != tag) {
+    Destroy();
+    tag_ = tag;
+    switch (tag_) {
+      case static_cast<fidl_xunion_tag_t>(::test::typesinprotocols::ResourceUnion::Tag::Invalid):
+        break;
+      case ::test::typesinprotocols::ResourceUnion::Tag::kB:
+        new (&b_) bool();
+        break;
+      default:
+        new (&unknown_data_) decltype(unknown_data_);
+        break;
+    }
+  }
+}
+
+#endif  // __Fuchsia__
+
+
+
 extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 const fidl_type_t* Basic::FidlType = &test_typesinprotocols_BasicTable;
 
@@ -789,6 +1075,233 @@ zx_status_t ArrayVectorNested::Clone(ArrayVectorNested* _result) const {
   return ZX_OK;
 }
 
+
+#ifdef __Fuchsia__
+
+extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
+const fidl_type_t* Resource::FidlType = &test_typesinprotocols_ResourceTable;
+
+void Resource::Encode(::fidl::Encoder* _encoder, size_t _offset,
+                         cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
+  if (::fidl::IsMemcpyCompatible<Resource>::value) {
+    memcpy(_encoder->template GetPtr<Resource>(_offset), this, sizeof(Resource));
+  } else {
+    ::fidl::Encode(_encoder, &handle, _offset + 0, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_NONE,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &vmo, _offset + 4, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_VMO,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &client_end, _offset + 8, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    
+    ::fidl::Encode(_encoder, &server_end, _offset + 12, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    ::fidl::Encode(_encoder, &struct_, _offset + 16);
+    ::fidl::Encode(_encoder, &table, _offset + 24);
+    ::fidl::Encode(_encoder, &union_, _offset + 40);
+    
+    ::fidl::Encode(_encoder, &opt_handle, _offset + 56, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_NONE,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &opt_vmo, _offset + 60, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_VMO,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &opt_client_end, _offset + 64, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    
+    ::fidl::Encode(_encoder, &opt_server_end, _offset + 68, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    ::fidl::Encode(_encoder, &opt_struct, _offset + 72);
+    ::fidl::Encode(_encoder, &opt_union, _offset + 80);
+    
+    ::fidl::Encode(_encoder, &array_handle, _offset + 96, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_NONE,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &array_vmo, _offset + 116, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_VMO,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &array_client_end, _offset + 136, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    
+    ::fidl::Encode(_encoder, &array_server_end, _offset + 156, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    ::fidl::Encode(_encoder, &array_struct, _offset + 176);
+    ::fidl::Encode(_encoder, &array_table, _offset + 184);
+    ::fidl::Encode(_encoder, &array_union, _offset + 264);
+    
+    ::fidl::Encode(_encoder, &vector_handle, _offset + 344, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_NONE,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &vector_vmo, _offset + 360, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_VMO,
+      .rights = 0x80000000,
+    });
+    
+    ::fidl::Encode(_encoder, &vector_client_end, _offset + 376, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    
+    ::fidl::Encode(_encoder, &vector_server_end, _offset + 392, ::fidl::HandleInformation {
+      .object_type = ZX_OBJ_TYPE_CHANNEL,
+      .rights = ZX_DEFAULT_CHANNEL_RIGHTS,
+    });
+    ::fidl::Encode(_encoder, &vector_struct, _offset + 408);
+    ::fidl::Encode(_encoder, &vector_table, _offset + 424);
+    ::fidl::Encode(_encoder, &vector_union, _offset + 440);
+    
+  }
+}
+
+void Resource::Decode(::fidl::Decoder* _decoder, Resource* _value, size_t _offset) {
+  if (::fidl::IsMemcpyCompatible<Resource>::value) {
+    memcpy(_value, _decoder->template GetPtr<Resource>(_offset), sizeof(Resource));
+  } else {
+    ::fidl::Decode(_decoder, &_value->handle, _offset + 0);
+    ::fidl::Decode(_decoder, &_value->vmo, _offset + 4);
+    ::fidl::Decode(_decoder, &_value->client_end, _offset + 8);
+    ::fidl::Decode(_decoder, &_value->server_end, _offset + 12);
+    ::fidl::Decode(_decoder, &_value->struct_, _offset + 16);
+    ::fidl::Decode(_decoder, &_value->table, _offset + 24);
+    ::fidl::Decode(_decoder, &_value->union_, _offset + 40);
+    ::fidl::Decode(_decoder, &_value->opt_handle, _offset + 56);
+    ::fidl::Decode(_decoder, &_value->opt_vmo, _offset + 60);
+    ::fidl::Decode(_decoder, &_value->opt_client_end, _offset + 64);
+    ::fidl::Decode(_decoder, &_value->opt_server_end, _offset + 68);
+    ::fidl::Decode(_decoder, &_value->opt_struct, _offset + 72);
+    ::fidl::Decode(_decoder, &_value->opt_union, _offset + 80);
+    ::fidl::Decode(_decoder, &_value->array_handle, _offset + 96);
+    ::fidl::Decode(_decoder, &_value->array_vmo, _offset + 116);
+    ::fidl::Decode(_decoder, &_value->array_client_end, _offset + 136);
+    ::fidl::Decode(_decoder, &_value->array_server_end, _offset + 156);
+    ::fidl::Decode(_decoder, &_value->array_struct, _offset + 176);
+    ::fidl::Decode(_decoder, &_value->array_table, _offset + 184);
+    ::fidl::Decode(_decoder, &_value->array_union, _offset + 264);
+    ::fidl::Decode(_decoder, &_value->vector_handle, _offset + 344);
+    ::fidl::Decode(_decoder, &_value->vector_vmo, _offset + 360);
+    ::fidl::Decode(_decoder, &_value->vector_client_end, _offset + 376);
+    ::fidl::Decode(_decoder, &_value->vector_server_end, _offset + 392);
+    ::fidl::Decode(_decoder, &_value->vector_struct, _offset + 408);
+    ::fidl::Decode(_decoder, &_value->vector_table, _offset + 424);
+    ::fidl::Decode(_decoder, &_value->vector_union, _offset + 440);
+  }
+}
+
+zx_status_t Resource::Clone(Resource* _result) const {
+  zx_status_t _status = ::fidl::Clone(handle, &_result->handle);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vmo, &_result->vmo);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(client_end, &_result->client_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(server_end, &_result->server_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(struct_, &_result->struct_);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(table, &_result->table);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(union_, &_result->union_);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_handle, &_result->opt_handle);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_vmo, &_result->opt_vmo);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_client_end, &_result->opt_client_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_server_end, &_result->opt_server_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_struct, &_result->opt_struct);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(opt_union, &_result->opt_union);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_handle, &_result->array_handle);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_vmo, &_result->array_vmo);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_client_end, &_result->array_client_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_server_end, &_result->array_server_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_struct, &_result->array_struct);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_table, &_result->array_table);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(array_union, &_result->array_union);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_handle, &_result->vector_handle);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_vmo, &_result->vector_vmo);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_client_end, &_result->vector_client_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_server_end, &_result->vector_server_end);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_struct, &_result->vector_struct);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_table, &_result->vector_table);
+  if (_status != ZX_OK)
+    return _status;
+  _status = ::fidl::Clone(vector_union, &_result->vector_union);
+  if (_status != ZX_OK)
+    return _status;
+  return ZX_OK;
+}
+
+#endif  // __Fuchsia__
+
+
 //
 // Proxies and stubs definitions
 //
@@ -845,6 +1358,13 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
   
   
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
+  
+  
+  
+  
+  
+  
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
   
   
   
@@ -931,6 +1451,15 @@ const fidl_type_t* ::test::typesinprotocols::Protocol_RequestDecoder::GetType(ui
       *out_needs_response = true;
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
         ;
+    case ::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal:
+      *out_is_known = true;
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal:
+      *out_is_known = true;
+      *out_needs_response = true;
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+        ;
     default:
       return nullptr;
   }
@@ -985,6 +1514,12 @@ const fidl_type_t* Protocol_ResponseDecoder::GetType(uint64_t ordinal) {
         ;
     case ::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_Ordinal:
       return &::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+        ;
+    case ::test::typesinprotocols::internal::kProtocol_EventResource_Ordinal:
+      return &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
         ;
     default:
       return nullptr;
@@ -1123,6 +1658,21 @@ zx_status_t Protocol_Proxy::Dispatch_(::fidl::HLCPPIncomingMessage message) {
       }
       ::fidl::Decoder decoder(std::move(message));
       EventArrayVectorNested(::fidl::DecodeAs<::std::array<::std::array<uint8_t, 5>, 5>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::std::vector<uint8_t>, 5>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::array<uint8_t, 5>>>(&decoder, 112 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::vector<uint8_t>>>(&decoder, 128 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    case ::test::typesinprotocols::internal::kProtocol_EventResource_Ordinal: {
+      if (!EventResource) {
+        status = ZX_OK;
+        break;
+      }
+      const char* error_msg = nullptr;
+      status = message.Decode(&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable, &error_msg);
+      if (status != ZX_OK) {
+        FIDL_REPORT_DECODING_ERROR(message, &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable, error_msg);
+        break;
+      }
+      ::fidl::Decoder decoder(std::move(message));
+      EventResource(::fidl::DecodeAs<::zx::handle>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 12 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceStruct>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceTable>(&decoder, 24 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceUnion>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::handle>(&decoder, 56 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 60 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 68 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>(&decoder, 72 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::handle, 5>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::vmo, 5>>(&decoder, 116 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>(&decoder, 136 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>(&decoder, 156 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceStruct, 5>>(&decoder, 176 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceTable, 5>>(&decoder, 184 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceUnion, 5>>(&decoder, 264 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::handle>>(&decoder, 344 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::vmo>>(&decoder, 360 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>(&decoder, 376 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>(&decoder, 392 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder, 408 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder, 424 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder, 440 + sizeof(fidl_message_header_t)));
       break;
     }
     default: {
@@ -1334,6 +1884,31 @@ void Protocol_Proxy::TwoWayArrayVectorNested(::std::array<::std::array<uint8_t, 
   const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
   controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayArrayVectorNested(&_encoder, &array_array_uint8, &array_vector_uint8, &vector_array_uint8, &vector_vector_uint8), Protocol_TwoWayArrayVectorNested_ResponseHandler(std::move(callback)));
 }
+void Protocol_Proxy::OneWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayResource_DynamicFlags);
+  const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::OneWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union), nullptr);
+}
+namespace {
+
+::std::unique_ptr<::fidl::internal::SingleUseMessageHandler>
+Protocol_TwoWayResource_ResponseHandler(Protocol::TwoWayResourceCallback&& callback) {
+  ZX_DEBUG_ASSERT_MSG(callback,
+                      "Callback must not be empty for Protocol::TwoWayResource\n");
+  return ::std::make_unique<::fidl::internal::SingleUseMessageHandler>(
+      [callback_ = std::move(callback)](::fidl::HLCPPIncomingMessage&& message) {
+        ::fidl::Decoder decoder(std::move(message));
+        callback_(::fidl::DecodeAs<::zx::handle>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 12 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceStruct>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceTable>(&decoder, 24 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceUnion>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::handle>(&decoder, 56 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 60 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 68 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>(&decoder, 72 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::handle, 5>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::vmo, 5>>(&decoder, 116 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>(&decoder, 136 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>(&decoder, 156 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceStruct, 5>>(&decoder, 176 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceTable, 5>>(&decoder, 184 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceUnion, 5>>(&decoder, 264 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::handle>>(&decoder, 344 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::vmo>>(&decoder, 360 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>(&decoder, 376 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>(&decoder, 392 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder, 408 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder, 424 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder, 440 + sizeof(fidl_message_header_t)));
+        return ZX_OK;
+      }, &::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable);
+}
+
+}  // namespace
+void Protocol_Proxy::TwoWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union, TwoWayResourceCallback callback) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayResource_DynamicFlags);
+  const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+  controller_->Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union), Protocol_TwoWayResource_ResponseHandler(std::move(callback)));
+}
 
 Protocol_Stub::Protocol_Stub(::test::typesinprotocols::Protocol_Stub::Protocol_clazz* impl) : impl_(impl) {
   (void)impl_;
@@ -1457,6 +2032,21 @@ class Protocol_TwoWayArrayVectorNested_Responder final {
     ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayArrayVectorNested_DynamicFlags);
     const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;
     response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayArrayVectorNested(&_encoder, &array_array_uint8, &array_vector_uint8, &vector_array_uint8, &vector_vector_uint8));
+  }
+
+ private:
+  ::fidl::internal::PendingResponse response_;
+};
+
+class Protocol_TwoWayResource_Responder final {
+ public:
+  Protocol_TwoWayResource_Responder(::fidl::internal::PendingResponse response)
+      : response_(std::move(response)) {}
+
+  void operator()(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) {
+    ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayResource_DynamicFlags);
+    const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+    response_.Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::TwoWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union));
   }
 
  private:
@@ -1595,6 +2185,18 @@ zx_status_t Protocol_Stub::Dispatch_(
       impl_->TwoWayArrayVectorNested(::fidl::DecodeAs<::std::array<::std::array<uint8_t, 5>, 5>>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::std::vector<uint8_t>, 5>>(&decoder, 32 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::array<uint8_t, 5>>>(&decoder, 112 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::std::vector<uint8_t>>>(&decoder, 128 + sizeof(fidl_message_header_t)), Protocol_TwoWayArrayVectorNested_Responder(std::move(response)));
       break;
     }
+    case ::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->OneWayResource(::fidl::DecodeAs<::zx::handle>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 12 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceStruct>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceTable>(&decoder, 24 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceUnion>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::handle>(&decoder, 56 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 60 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 68 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>(&decoder, 72 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::handle, 5>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::vmo, 5>>(&decoder, 116 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>(&decoder, 136 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>(&decoder, 156 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceStruct, 5>>(&decoder, 176 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceTable, 5>>(&decoder, 184 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceUnion, 5>>(&decoder, 264 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::handle>>(&decoder, 344 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::vmo>>(&decoder, 360 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>(&decoder, 376 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>(&decoder, 392 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder, 408 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder, 424 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder, 440 + sizeof(fidl_message_header_t)));
+      break;
+    }
+    case ::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal:
+    {
+      ::fidl::Decoder decoder(std::move(message));
+      impl_->TwoWayResource(::fidl::DecodeAs<::zx::handle>(&decoder, 0 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 4 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 8 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 12 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceStruct>(&decoder, 16 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceTable>(&decoder, 24 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::test::typesinprotocols::ResourceUnion>(&decoder, 40 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::handle>(&decoder, 56 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::zx::vmo>(&decoder, 60 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder, 64 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder, 68 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>(&decoder, 72 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>(&decoder, 80 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::handle, 5>>(&decoder, 96 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::zx::vmo, 5>>(&decoder, 116 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>(&decoder, 136 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>(&decoder, 156 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceStruct, 5>>(&decoder, 176 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceTable, 5>>(&decoder, 184 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceUnion, 5>>(&decoder, 264 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::handle>>(&decoder, 344 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::zx::vmo>>(&decoder, 360 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>(&decoder, 376 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>(&decoder, 392 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder, 408 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder, 424 + sizeof(fidl_message_header_t)), ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder, 440 + sizeof(fidl_message_header_t)), Protocol_TwoWayResource_Responder(std::move(response)));
+      break;
+    }
     default: {
       // Unknown ordinals are handled at the beginning of dispatching, so this
       // should be unreachable.
@@ -1634,6 +2236,10 @@ void Protocol_Stub::EventVectorOptional(::fidl::VectorPtr<uint8_t> opt_vector_ui
 void Protocol_Stub::EventArrayVectorNested(::std::array<::std::array<uint8_t, 5>, 5> array_array_uint8, ::std::array<::std::vector<uint8_t>, 5> array_vector_uint8, ::std::vector<::std::array<uint8_t, 5>> vector_array_uint8, ::std::vector<::std::vector<uint8_t>> vector_vector_uint8) {
   ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_Ordinal, ::test::typesinprotocols::internal::kProtocol_EventArrayVectorNested_DynamicFlags);
   const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ArrayVectorNestedTable;sender_()->Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::EventArrayVectorNested(&_encoder, &array_array_uint8, &array_vector_uint8, &vector_array_uint8, &vector_vector_uint8));
+}
+void Protocol_Stub::EventResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_EventResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_EventResource_DynamicFlags);
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;sender_()->Send(resp_type, ::test::typesinprotocols::Protocol_ResponseEncoder::EventResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union));
 }
 
 Protocol_SyncProxy::Protocol_SyncProxy(::zx::channel channel)
@@ -1854,6 +2460,52 @@ zx_status_t Protocol_SyncProxy::TwoWayArrayVectorNested(::std::array<::std::arra
   *out_array_vector_uint8 = ::fidl::DecodeAs<::std::array<::std::vector<uint8_t>, 5>>(&decoder_, 32 + sizeof(fidl_message_header_t));
   *out_vector_array_uint8 = ::fidl::DecodeAs<::std::vector<::std::array<uint8_t, 5>>>(&decoder_, 112 + sizeof(fidl_message_header_t));
   *out_vector_vector_uint8 = ::fidl::DecodeAs<::std::vector<::std::vector<uint8_t>>>(&decoder_, 128 + sizeof(fidl_message_header_t));
+  return ZX_OK;
+}
+
+zx_status_t Protocol_SyncProxy::OneWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_OneWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_OneWayResource_DynamicFlags);
+    const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+  return proxy_.Send(req_type, ::test::typesinprotocols::Protocol_RequestEncoder::OneWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union));
+}
+
+zx_status_t Protocol_SyncProxy::TwoWayResource(::zx::handle handle, ::zx::vmo vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> server_end, ::test::typesinprotocols::ResourceStruct struct_, ::test::typesinprotocols::ResourceTable table, ::test::typesinprotocols::ResourceUnion union_, ::zx::handle opt_handle, ::zx::vmo opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol> opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol> opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct> opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion> opt_union, ::std::array<::zx::handle, 5> array_handle, ::std::array<::zx::vmo, 5> array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5> array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5> array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5> array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5> array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5> array_union, ::std::vector<::zx::handle> vector_handle, ::std::vector<::zx::vmo> vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>> vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>> vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct> vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable> vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion> vector_union, ::zx::handle* out_handle, ::zx::vmo* out_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* out_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* out_server_end, ::test::typesinprotocols::ResourceStruct* out_struct_, ::test::typesinprotocols::ResourceTable* out_table, ::test::typesinprotocols::ResourceUnion* out_union_, ::zx::handle* out_opt_handle, ::zx::vmo* out_opt_vmo, ::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>* out_opt_client_end, ::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>* out_opt_server_end, ::std::unique_ptr<::test::typesinprotocols::ResourceStruct>* out_opt_struct, ::std::unique_ptr<::test::typesinprotocols::ResourceUnion>* out_opt_union, ::std::array<::zx::handle, 5>* out_array_handle, ::std::array<::zx::vmo, 5>* out_array_vmo, ::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>* out_array_client_end, ::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>* out_array_server_end, ::std::array<::test::typesinprotocols::ResourceStruct, 5>* out_array_struct, ::std::array<::test::typesinprotocols::ResourceTable, 5>* out_array_table, ::std::array<::test::typesinprotocols::ResourceUnion, 5>* out_array_union, ::std::vector<::zx::handle>* out_vector_handle, ::std::vector<::zx::vmo>* out_vector_vmo, ::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>* out_vector_client_end, ::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>* out_vector_server_end, ::std::vector<::test::typesinprotocols::ResourceStruct>* out_vector_struct, ::std::vector<::test::typesinprotocols::ResourceTable>* out_vector_table, ::std::vector<::test::typesinprotocols::ResourceUnion>* out_vector_union) {
+  ::fidl::MessageEncoder _encoder(::test::typesinprotocols::internal::kProtocol_TwoWayResource_Ordinal, ::test::typesinprotocols::internal::kProtocol_TwoWayResource_DynamicFlags);
+  ::fidl::IncomingMessageBuffer buffer_;
+  ::fidl::HLCPPIncomingMessage response_ = buffer_.CreateEmptyIncomingMessage();
+  const fidl_type_t* req_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+  const fidl_type_t* resp_type =&::test::typesinprotocols::_internal::test_typesinprotocols_ResourceTable;
+  zx_status_t status_ = proxy_.Call(req_type, resp_type, ::test::typesinprotocols::Protocol_RequestEncoder::TwoWayResource(&_encoder, &handle, &vmo, &client_end, &server_end, &struct_, &table, &union_, &opt_handle, &opt_vmo, &opt_client_end, &opt_server_end, &opt_struct, &opt_union, &array_handle, &array_vmo, &array_client_end, &array_server_end, &array_struct, &array_table, &array_union, &vector_handle, &vector_vmo, &vector_client_end, &vector_server_end, &vector_struct, &vector_table, &vector_union), &response_);
+  if (status_ != ZX_OK)
+    return status_;
+  ::fidl::Decoder decoder_(std::move(response_));
+  *out_handle = ::fidl::DecodeAs<::zx::handle>(&decoder_, 0 + sizeof(fidl_message_header_t));
+  *out_vmo = ::fidl::DecodeAs<::zx::vmo>(&decoder_, 4 + sizeof(fidl_message_header_t));
+  *out_client_end = ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder_, 8 + sizeof(fidl_message_header_t));
+  *out_server_end = ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder_, 12 + sizeof(fidl_message_header_t));
+  *out_struct_ = ::fidl::DecodeAs<::test::typesinprotocols::ResourceStruct>(&decoder_, 16 + sizeof(fidl_message_header_t));
+  *out_table = ::fidl::DecodeAs<::test::typesinprotocols::ResourceTable>(&decoder_, 24 + sizeof(fidl_message_header_t));
+  *out_union_ = ::fidl::DecodeAs<::test::typesinprotocols::ResourceUnion>(&decoder_, 40 + sizeof(fidl_message_header_t));
+  *out_opt_handle = ::fidl::DecodeAs<::zx::handle>(&decoder_, 56 + sizeof(fidl_message_header_t));
+  *out_opt_vmo = ::fidl::DecodeAs<::zx::vmo>(&decoder_, 60 + sizeof(fidl_message_header_t));
+  *out_opt_client_end = ::fidl::DecodeAs<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>(&decoder_, 64 + sizeof(fidl_message_header_t));
+  *out_opt_server_end = ::fidl::DecodeAs<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>(&decoder_, 68 + sizeof(fidl_message_header_t));
+  *out_opt_struct = ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceStruct>>(&decoder_, 72 + sizeof(fidl_message_header_t));
+  *out_opt_union = ::fidl::DecodeAs<::std::unique_ptr<::test::typesinprotocols::ResourceUnion>>(&decoder_, 80 + sizeof(fidl_message_header_t));
+  *out_array_handle = ::fidl::DecodeAs<::std::array<::zx::handle, 5>>(&decoder_, 96 + sizeof(fidl_message_header_t));
+  *out_array_vmo = ::fidl::DecodeAs<::std::array<::zx::vmo, 5>>(&decoder_, 116 + sizeof(fidl_message_header_t));
+  *out_array_client_end = ::fidl::DecodeAs<::std::array<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>, 5>>(&decoder_, 136 + sizeof(fidl_message_header_t));
+  *out_array_server_end = ::fidl::DecodeAs<::std::array<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>, 5>>(&decoder_, 156 + sizeof(fidl_message_header_t));
+  *out_array_struct = ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceStruct, 5>>(&decoder_, 176 + sizeof(fidl_message_header_t));
+  *out_array_table = ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceTable, 5>>(&decoder_, 184 + sizeof(fidl_message_header_t));
+  *out_array_union = ::fidl::DecodeAs<::std::array<::test::typesinprotocols::ResourceUnion, 5>>(&decoder_, 264 + sizeof(fidl_message_header_t));
+  *out_vector_handle = ::fidl::DecodeAs<::std::vector<::zx::handle>>(&decoder_, 344 + sizeof(fidl_message_header_t));
+  *out_vector_vmo = ::fidl::DecodeAs<::std::vector<::zx::vmo>>(&decoder_, 360 + sizeof(fidl_message_header_t));
+  *out_vector_client_end = ::fidl::DecodeAs<::std::vector<::fidl::InterfaceHandle<::test::typesinprotocols::Protocol>>>(&decoder_, 376 + sizeof(fidl_message_header_t));
+  *out_vector_server_end = ::fidl::DecodeAs<::std::vector<::fidl::InterfaceRequest<::test::typesinprotocols::Protocol>>>(&decoder_, 392 + sizeof(fidl_message_header_t));
+  *out_vector_struct = ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceStruct>>(&decoder_, 408 + sizeof(fidl_message_header_t));
+  *out_vector_table = ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceTable>>(&decoder_, 424 + sizeof(fidl_message_header_t));
+  *out_vector_union = ::fidl::DecodeAs<::std::vector<::test::typesinprotocols::ResourceUnion>>(&decoder_, 440 + sizeof(fidl_message_header_t));
   return ZX_OK;
 }
 

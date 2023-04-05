@@ -101,6 +101,78 @@ test_typesinprotocols_CompoundHandles {
     struct test_typesinprotocols_StructHandles
     opt_struct test_typesinprotocols_StructHandles
 } [packed]
+test_typesinprotocols_ResourceInLine {
+    handle flags[fidl_handle_presence, int32]
+    vmo flags[fidl_handle_presence, int32]
+    client_end flags[fidl_handle_presence, int32]
+    server_end flags[fidl_handle_presence, int32]
+    structInLine test_typesinprotocols_ResourceStructInLine
+     
+    unionInLine test_typesinprotocols_ResourceUnionInLine
+    opt_handle flags[fidl_handle_presence, int32]
+    opt_vmo flags[fidl_handle_presence, int32]
+    opt_client_end flags[fidl_handle_presence, int32]
+    opt_server_end flags[fidl_handle_presence, int32]
+    opt_structInLine test_typesinprotocols_ResourceStructInLine
+    opt_unionInLine test_typesinprotocols_ResourceUnionInLine
+    array_handleInLine array[flags[fidl_handle_presence, int32], 5]
+    array_vmoInLine array[flags[fidl_handle_presence, int32], 5]
+    array_client_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_server_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_structInLine array[test_typesinprotocols_ResourceStructInLine, 5]
+    array_tableInLine array[, 5]
+    array_unionInLine array[test_typesinprotocols_ResourceUnionInLine, 5]
+    vector_handleInLine fidl_vector
+    vector_vmoInLine fidl_vector
+    vector_client_endInLine fidl_vector
+    vector_server_endInLine fidl_vector
+    vector_structInLine fidl_vector
+    vector_tableInLine fidl_vector
+    vector_unionInLine fidl_vector
+} [packed]
+test_typesinprotocols_ResourceOutOfLine {
+    structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    opt_structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    array_structOutOfLine array[test_typesinprotocols_ResourceStructOutOfLine, 5]
+    vector_handleOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_vmoOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_client_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_server_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_structOutOfLine parallel_array[test_typesinprotocols_ResourceStructInLine, test_typesinprotocols_ResourceStructOutOfLine]
+    vector_tableOutOfLine array[]
+    vector_unionOutOfLine array[test_typesinprotocols_ResourceUnionInLine]
+} [packed]
+test_typesinprotocols_ResourceHandles {
+    handle zx_handle
+    vmo zx_vmo
+    client_end zx_chan_test_typesinprotocols_Protocol_client
+    server_end zx_chan_test_typesinprotocols_Protocol_server
+    struct test_typesinprotocols_ResourceStructHandles
+    opt_handle zx_handle
+    opt_vmo zx_vmo
+    opt_client_end zx_chan_test_typesinprotocols_Protocol_client
+    opt_server_end zx_chan_test_typesinprotocols_Protocol_server
+    opt_struct test_typesinprotocols_ResourceStructHandles
+    array_handleHandles array[zx_handle, 5]
+    array_vmoHandles array[zx_vmo, 5]
+    array_client_endHandles array[zx_chan_test_typesinprotocols_Protocol_client, 5]
+    array_server_endHandles array[zx_chan_test_typesinprotocols_Protocol_server, 5]
+    array_structHandles array[test_typesinprotocols_ResourceStructHandles, 5]
+    vector_handle array[zx_handle]
+    vector_vmo array[zx_vmo]
+    vector_client_end array[zx_chan_test_typesinprotocols_Protocol_client]
+    vector_server_end array[zx_chan_test_typesinprotocols_Protocol_server]
+    vector_struct array[test_typesinprotocols_ResourceStructHandles]
+} [packed]
+test_typesinprotocols_ResourceStructInLine {
+    padding int8
+} [packed]
+test_typesinprotocols_ResourceStructOutOfLine {
+    void void
+} [packed]
+test_typesinprotocols_ResourceStructHandles {
+    void void
+} [packed]
 test_typesinprotocols_StructInLine {
     padding int8
 } [packed]
@@ -179,6 +251,15 @@ test_typesinprotocols_VectorOptionalHandles {
     opt_vector_struct array[test_typesinprotocols_StructHandles]
     opt_vector_opt_struct array[test_typesinprotocols_StructHandles]
 } [packed]
+test_typesinprotocols_ResourceUnionInLine [
+    b fidl_union_member[1, int8]
+]
+test_typesinprotocols_ResourceUnionOutOfLine [
+    void void
+][varlen]
+test_typesinprotocols_ResourceUnionHandles [
+    void void
+][varlen]
 test_typesinprotocols_UnionInLine [
     b fidl_union_member[1, int8]
 ]
@@ -794,6 +875,254 @@ test_typesinprotocols_ProtocolEventArrayVectorNestedEvent {
 test_typesinprotocols_ProtocolEventArrayVectorNestedEventHandles {
     void void
 } [packed]
+test_typesinprotocols_ProtocolOneWayResourceRequest {
+    hdr fidl_message_header[6553996787849601058]
+    handle flags[fidl_handle_presence, int32]
+    vmo flags[fidl_handle_presence, int32]
+    client_end flags[fidl_handle_presence, int32]
+    server_end flags[fidl_handle_presence, int32]
+    structInLine test_typesinprotocols_ResourceStructInLine
+     
+    unionInLine test_typesinprotocols_ResourceUnionInLine
+    opt_handle flags[fidl_handle_presence, int32]
+    opt_vmo flags[fidl_handle_presence, int32]
+    opt_client_end flags[fidl_handle_presence, int32]
+    opt_server_end flags[fidl_handle_presence, int32]
+    opt_structInLine test_typesinprotocols_ResourceStructInLine
+    opt_unionInLine test_typesinprotocols_ResourceUnionInLine
+    array_handleInLine array[flags[fidl_handle_presence, int32], 5]
+    array_vmoInLine array[flags[fidl_handle_presence, int32], 5]
+    array_client_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_server_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_structInLine array[test_typesinprotocols_ResourceStructInLine, 5]
+    array_tableInLine array[, 5]
+    array_unionInLine array[test_typesinprotocols_ResourceUnionInLine, 5]
+    vector_handleInLine fidl_vector
+    vector_vmoInLine fidl_vector
+    vector_client_endInLine fidl_vector
+    vector_server_endInLine fidl_vector
+    vector_structInLine fidl_vector
+    vector_tableInLine fidl_vector
+    vector_unionInLine fidl_vector
+    structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    opt_structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    array_structOutOfLine array[test_typesinprotocols_ResourceStructOutOfLine, 5]
+    vector_handleOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_vmoOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_client_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_server_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_structOutOfLine parallel_array[test_typesinprotocols_ResourceStructInLine, test_typesinprotocols_ResourceStructOutOfLine]
+    vector_tableOutOfLine array[]
+    vector_unionOutOfLine array[test_typesinprotocols_ResourceUnionInLine]
+} [packed]
+test_typesinprotocols_ProtocolOneWayResourceRequestHandles {
+    handle zx_handle
+    vmo zx_vmo
+    client_end zx_chan_test_typesinprotocols_Protocol_client
+    server_end zx_chan_test_typesinprotocols_Protocol_server
+    struct test_typesinprotocols_ResourceStructHandles
+    opt_handle zx_handle
+    opt_vmo zx_vmo
+    opt_client_end zx_chan_test_typesinprotocols_Protocol_client
+    opt_server_end zx_chan_test_typesinprotocols_Protocol_server
+    opt_struct test_typesinprotocols_ResourceStructHandles
+    array_handleHandles array[zx_handle, 5]
+    array_vmoHandles array[zx_vmo, 5]
+    array_client_endHandles array[zx_chan_test_typesinprotocols_Protocol_client, 5]
+    array_server_endHandles array[zx_chan_test_typesinprotocols_Protocol_server, 5]
+    array_structHandles array[test_typesinprotocols_ResourceStructHandles, 5]
+    vector_handle array[zx_handle]
+    vector_vmo array[zx_vmo]
+    vector_client_end array[zx_chan_test_typesinprotocols_Protocol_client]
+    vector_server_end array[zx_chan_test_typesinprotocols_Protocol_server]
+    vector_struct array[test_typesinprotocols_ResourceStructHandles]
+} [packed]
+test_typesinprotocols_ProtocolTwoWayResourceRequest {
+    hdr fidl_message_header[1802709005492464987]
+    handle flags[fidl_handle_presence, int32]
+    vmo flags[fidl_handle_presence, int32]
+    client_end flags[fidl_handle_presence, int32]
+    server_end flags[fidl_handle_presence, int32]
+    structInLine test_typesinprotocols_ResourceStructInLine
+     
+    unionInLine test_typesinprotocols_ResourceUnionInLine
+    opt_handle flags[fidl_handle_presence, int32]
+    opt_vmo flags[fidl_handle_presence, int32]
+    opt_client_end flags[fidl_handle_presence, int32]
+    opt_server_end flags[fidl_handle_presence, int32]
+    opt_structInLine test_typesinprotocols_ResourceStructInLine
+    opt_unionInLine test_typesinprotocols_ResourceUnionInLine
+    array_handleInLine array[flags[fidl_handle_presence, int32], 5]
+    array_vmoInLine array[flags[fidl_handle_presence, int32], 5]
+    array_client_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_server_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_structInLine array[test_typesinprotocols_ResourceStructInLine, 5]
+    array_tableInLine array[, 5]
+    array_unionInLine array[test_typesinprotocols_ResourceUnionInLine, 5]
+    vector_handleInLine fidl_vector
+    vector_vmoInLine fidl_vector
+    vector_client_endInLine fidl_vector
+    vector_server_endInLine fidl_vector
+    vector_structInLine fidl_vector
+    vector_tableInLine fidl_vector
+    vector_unionInLine fidl_vector
+    structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    opt_structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    array_structOutOfLine array[test_typesinprotocols_ResourceStructOutOfLine, 5]
+    vector_handleOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_vmoOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_client_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_server_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_structOutOfLine parallel_array[test_typesinprotocols_ResourceStructInLine, test_typesinprotocols_ResourceStructOutOfLine]
+    vector_tableOutOfLine array[]
+    vector_unionOutOfLine array[test_typesinprotocols_ResourceUnionInLine]
+} [packed]
+test_typesinprotocols_ProtocolTwoWayResourceRequestHandles {
+    handle zx_handle
+    vmo zx_vmo
+    client_end zx_chan_test_typesinprotocols_Protocol_client
+    server_end zx_chan_test_typesinprotocols_Protocol_server
+    struct test_typesinprotocols_ResourceStructHandles
+    opt_handle zx_handle
+    opt_vmo zx_vmo
+    opt_client_end zx_chan_test_typesinprotocols_Protocol_client
+    opt_server_end zx_chan_test_typesinprotocols_Protocol_server
+    opt_struct test_typesinprotocols_ResourceStructHandles
+    array_handleHandles array[zx_handle, 5]
+    array_vmoHandles array[zx_vmo, 5]
+    array_client_endHandles array[zx_chan_test_typesinprotocols_Protocol_client, 5]
+    array_server_endHandles array[zx_chan_test_typesinprotocols_Protocol_server, 5]
+    array_structHandles array[test_typesinprotocols_ResourceStructHandles, 5]
+    vector_handle array[zx_handle]
+    vector_vmo array[zx_vmo]
+    vector_client_end array[zx_chan_test_typesinprotocols_Protocol_client]
+    vector_server_end array[zx_chan_test_typesinprotocols_Protocol_server]
+    vector_struct array[test_typesinprotocols_ResourceStructHandles]
+} [packed]
+test_typesinprotocols_ProtocolTwoWayResourceResponse {
+    hdr fidl_message_header[1802709005492464987]
+    handle flags[fidl_handle_presence, int32]
+    vmo flags[fidl_handle_presence, int32]
+    client_end flags[fidl_handle_presence, int32]
+    server_end flags[fidl_handle_presence, int32]
+    structInLine test_typesinprotocols_ResourceStructInLine
+     
+    unionInLine test_typesinprotocols_ResourceUnionInLine
+    opt_handle flags[fidl_handle_presence, int32]
+    opt_vmo flags[fidl_handle_presence, int32]
+    opt_client_end flags[fidl_handle_presence, int32]
+    opt_server_end flags[fidl_handle_presence, int32]
+    opt_structInLine test_typesinprotocols_ResourceStructInLine
+    opt_unionInLine test_typesinprotocols_ResourceUnionInLine
+    array_handleInLine array[flags[fidl_handle_presence, int32], 5]
+    array_vmoInLine array[flags[fidl_handle_presence, int32], 5]
+    array_client_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_server_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_structInLine array[test_typesinprotocols_ResourceStructInLine, 5]
+    array_tableInLine array[, 5]
+    array_unionInLine array[test_typesinprotocols_ResourceUnionInLine, 5]
+    vector_handleInLine fidl_vector
+    vector_vmoInLine fidl_vector
+    vector_client_endInLine fidl_vector
+    vector_server_endInLine fidl_vector
+    vector_structInLine fidl_vector
+    vector_tableInLine fidl_vector
+    vector_unionInLine fidl_vector
+    structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    opt_structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    array_structOutOfLine array[test_typesinprotocols_ResourceStructOutOfLine, 5]
+    vector_handleOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_vmoOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_client_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_server_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_structOutOfLine parallel_array[test_typesinprotocols_ResourceStructInLine, test_typesinprotocols_ResourceStructOutOfLine]
+    vector_tableOutOfLine array[]
+    vector_unionOutOfLine array[test_typesinprotocols_ResourceUnionInLine]
+} [packed]
+test_typesinprotocols_ProtocolTwoWayResourceResponseHandles {
+    handle zx_handle
+    vmo zx_vmo
+    client_end zx_chan_test_typesinprotocols_Protocol_client
+    server_end zx_chan_test_typesinprotocols_Protocol_server
+    struct test_typesinprotocols_ResourceStructHandles
+    opt_handle zx_handle
+    opt_vmo zx_vmo
+    opt_client_end zx_chan_test_typesinprotocols_Protocol_client
+    opt_server_end zx_chan_test_typesinprotocols_Protocol_server
+    opt_struct test_typesinprotocols_ResourceStructHandles
+    array_handleHandles array[zx_handle, 5]
+    array_vmoHandles array[zx_vmo, 5]
+    array_client_endHandles array[zx_chan_test_typesinprotocols_Protocol_client, 5]
+    array_server_endHandles array[zx_chan_test_typesinprotocols_Protocol_server, 5]
+    array_structHandles array[test_typesinprotocols_ResourceStructHandles, 5]
+    vector_handle array[zx_handle]
+    vector_vmo array[zx_vmo]
+    vector_client_end array[zx_chan_test_typesinprotocols_Protocol_client]
+    vector_server_end array[zx_chan_test_typesinprotocols_Protocol_server]
+    vector_struct array[test_typesinprotocols_ResourceStructHandles]
+} [packed]
+test_typesinprotocols_ProtocolEventResourceEvent {
+    hdr fidl_message_header[5745997765922613643]
+    handle flags[fidl_handle_presence, int32]
+    vmo flags[fidl_handle_presence, int32]
+    client_end flags[fidl_handle_presence, int32]
+    server_end flags[fidl_handle_presence, int32]
+    structInLine test_typesinprotocols_ResourceStructInLine
+     
+    unionInLine test_typesinprotocols_ResourceUnionInLine
+    opt_handle flags[fidl_handle_presence, int32]
+    opt_vmo flags[fidl_handle_presence, int32]
+    opt_client_end flags[fidl_handle_presence, int32]
+    opt_server_end flags[fidl_handle_presence, int32]
+    opt_structInLine test_typesinprotocols_ResourceStructInLine
+    opt_unionInLine test_typesinprotocols_ResourceUnionInLine
+    array_handleInLine array[flags[fidl_handle_presence, int32], 5]
+    array_vmoInLine array[flags[fidl_handle_presence, int32], 5]
+    array_client_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_server_endInLine array[flags[fidl_handle_presence, int32], 5]
+    array_structInLine array[test_typesinprotocols_ResourceStructInLine, 5]
+    array_tableInLine array[, 5]
+    array_unionInLine array[test_typesinprotocols_ResourceUnionInLine, 5]
+    vector_handleInLine fidl_vector
+    vector_vmoInLine fidl_vector
+    vector_client_endInLine fidl_vector
+    vector_server_endInLine fidl_vector
+    vector_structInLine fidl_vector
+    vector_tableInLine fidl_vector
+    vector_unionInLine fidl_vector
+    structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    opt_structOutOfLine test_typesinprotocols_ResourceStructOutOfLine
+    array_structOutOfLine array[test_typesinprotocols_ResourceStructOutOfLine, 5]
+    vector_handleOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_vmoOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_client_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_server_endOutOfLine array[flags[fidl_handle_presence, int32]]
+    vector_structOutOfLine parallel_array[test_typesinprotocols_ResourceStructInLine, test_typesinprotocols_ResourceStructOutOfLine]
+    vector_tableOutOfLine array[]
+    vector_unionOutOfLine array[test_typesinprotocols_ResourceUnionInLine]
+} [packed]
+test_typesinprotocols_ProtocolEventResourceEventHandles {
+    handle zx_handle
+    vmo zx_vmo
+    client_end zx_chan_test_typesinprotocols_Protocol_client
+    server_end zx_chan_test_typesinprotocols_Protocol_server
+    struct test_typesinprotocols_ResourceStructHandles
+    opt_handle zx_handle
+    opt_vmo zx_vmo
+    opt_client_end zx_chan_test_typesinprotocols_Protocol_client
+    opt_server_end zx_chan_test_typesinprotocols_Protocol_server
+    opt_struct test_typesinprotocols_ResourceStructHandles
+    array_handleHandles array[zx_handle, 5]
+    array_vmoHandles array[zx_vmo, 5]
+    array_client_endHandles array[zx_chan_test_typesinprotocols_Protocol_client, 5]
+    array_server_endHandles array[zx_chan_test_typesinprotocols_Protocol_server, 5]
+    array_structHandles array[test_typesinprotocols_ResourceStructHandles, 5]
+    vector_handle array[zx_handle]
+    vector_vmo array[zx_vmo]
+    vector_client_end array[zx_chan_test_typesinprotocols_Protocol_client]
+    vector_server_end array[zx_chan_test_typesinprotocols_Protocol_server]
+    vector_struct array[test_typesinprotocols_ResourceStructHandles]
+} [packed]
 
 resource zx_chan_test_typesinprotocols_Protocol_client[zx_chan]
 resource zx_chan_test_typesinprotocols_Protocol_server[zx_chan]
@@ -824,4 +1153,7 @@ zx_channel_read$test_typesinprotocols_ProtocolEventVectorOptional(handle zx_chan
 zx_channel_write$test_typesinprotocols_ProtocolOneWayArrayVectorNested(handle zx_chan_test_typesinprotocols_Protocol_client, options const[0], bytes ptr[in, test_typesinprotocols_ProtocolOneWayArrayVectorNestedRequest], num_bytes bytesize[bytes], handles ptr[in, test_typesinprotocols_ProtocolOneWayArrayVectorNestedRequestHandles], num_handles bytesize[handles])
 zx_channel_call$test_typesinprotocols_ProtocolTwoWayArrayVectorNested(handle zx_chan_test_typesinprotocols_Protocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_typesinprotocols_ProtocolTwoWayArrayVectorNestedRequest, test_typesinprotocols_ProtocolTwoWayArrayVectorNestedRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_typesinprotocols_ProtocolTwoWayArrayVectorNestedResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 zx_channel_read$test_typesinprotocols_ProtocolEventArrayVectorNested(handle zx_chan_test_typesinprotocols_Protocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_typesinprotocols_ProtocolEventArrayVectorNestedEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
+zx_channel_write$test_typesinprotocols_ProtocolOneWayResource(handle zx_chan_test_typesinprotocols_Protocol_client, options const[0], bytes ptr[in, test_typesinprotocols_ProtocolOneWayResourceRequest], num_bytes bytesize[bytes], handles ptr[in, test_typesinprotocols_ProtocolOneWayResourceRequestHandles], num_handles bytesize[handles])
+zx_channel_call$test_typesinprotocols_ProtocolTwoWayResource(handle zx_chan_test_typesinprotocols_Protocol_client, options const[0], deadline zx_time, args ptr[in, fidl_call_args[test_typesinprotocols_ProtocolTwoWayResourceRequest, test_typesinprotocols_ProtocolTwoWayResourceRequestHandles, array[int8, ZX_CHANNEL_MAX_MSG_BYTES], test_typesinprotocols_ProtocolTwoWayResourceResponseHandles]], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
+zx_channel_read$test_typesinprotocols_ProtocolEventResource(handle zx_chan_test_typesinprotocols_Protocol_client, options const[0], bytes ptr[out, array[int8, ZX_CHANNEL_MAX_MSG_BYTES]], num_bytes bytesize[bytes], handles ptr[out, test_typesinprotocols_ProtocolEventResourceEventHandles], num_handles bytesize[handles], actual_bytes ptr[out, int32], actual_handles ptr[out, int32])
 

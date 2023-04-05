@@ -46,6 +46,14 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Struct>::Format(
   os << "}";
   return os;
 }
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct>::Format(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value) {
+  os << "test_typesinprotocols::ResourceStruct";
+  os << "{ ";
+  os << "__reserved";
+  os << " = " << fidl::ostream::Formatted<uint8_t>(value.__reserved()) << ", ";
+  os << "}";
+  return os;
+}
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Basic>::Format(std::ostream& os, const ::test_typesinprotocols::Basic& value) {
   os << "test_typesinprotocols::Basic";
   os << "{ ";
@@ -224,8 +232,74 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ArrayVectorNeste
   os << "}";
   return os;
 }
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Format(std::ostream& os, const ::test_typesinprotocols::Resource& value) {
+  os << "test_typesinprotocols::Resource";
+  os << "{ ";
+  os << "handle";
+  os << " = " << fidl::ostream::Formatted<::zx::handle>(value.handle()) << ", ";
+  os << "vmo";
+  os << " = " << fidl::ostream::Formatted<::zx::vmo>(value.vmo()) << ", ";
+  os << "client_end";
+  os << " = " << fidl::ostream::Formatted<::fidl::ClientEnd<::test_typesinprotocols::Protocol>>(value.client_end()) << ", ";
+  os << "server_end";
+  os << " = " << fidl::ostream::Formatted<::fidl::ServerEnd<::test_typesinprotocols::Protocol>>(value.server_end()) << ", ";
+  os << "struct_";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ResourceStruct>(value.struct_()) << ", ";
+  os << "table";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ResourceTable>(value.table()) << ", ";
+  os << "union_";
+  os << " = " << fidl::ostream::Formatted<::test_typesinprotocols::ResourceUnion>(value.union_()) << ", ";
+  os << "opt_handle";
+  os << " = " << fidl::ostream::Formatted<::zx::handle>(value.opt_handle()) << ", ";
+  os << "opt_vmo";
+  os << " = " << fidl::ostream::Formatted<::zx::vmo>(value.opt_vmo()) << ", ";
+  os << "opt_client_end";
+  os << " = " << fidl::ostream::Formatted<::fidl::ClientEnd<::test_typesinprotocols::Protocol>>(value.opt_client_end()) << ", ";
+  os << "opt_server_end";
+  os << " = " << fidl::ostream::Formatted<::fidl::ServerEnd<::test_typesinprotocols::Protocol>>(value.opt_server_end()) << ", ";
+  os << "opt_struct";
+  os << " = " << fidl::ostream::Formatted<::fidl::Box<::test_typesinprotocols::ResourceStruct>>(value.opt_struct()) << ", ";
+  os << "opt_union";
+  os << " = " << fidl::ostream::Formatted<::fidl::Box<::test_typesinprotocols::ResourceUnion>>(value.opt_union()) << ", ";
+  os << "array_handle";
+  os << " = " << fidl::ostream::Formatted<::std::array<::zx::handle, 5>>(value.array_handle()) << ", ";
+  os << "array_vmo";
+  os << " = " << fidl::ostream::Formatted<::std::array<::zx::vmo, 5>>(value.array_vmo()) << ", ";
+  os << "array_client_end";
+  os << " = " << fidl::ostream::Formatted<::std::array<::fidl::ClientEnd<::test_typesinprotocols::Protocol>, 5>>(value.array_client_end()) << ", ";
+  os << "array_server_end";
+  os << " = " << fidl::ostream::Formatted<::std::array<::fidl::ServerEnd<::test_typesinprotocols::Protocol>, 5>>(value.array_server_end()) << ", ";
+  os << "array_struct";
+  os << " = " << fidl::ostream::Formatted<::std::array<::test_typesinprotocols::ResourceStruct, 5>>(value.array_struct()) << ", ";
+  os << "array_table";
+  os << " = " << fidl::ostream::Formatted<::std::array<::test_typesinprotocols::ResourceTable, 5>>(value.array_table()) << ", ";
+  os << "array_union";
+  os << " = " << fidl::ostream::Formatted<::std::array<::test_typesinprotocols::ResourceUnion, 5>>(value.array_union()) << ", ";
+  os << "vector_handle";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::zx::handle>>(value.vector_handle()) << ", ";
+  os << "vector_vmo";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::zx::vmo>>(value.vector_vmo()) << ", ";
+  os << "vector_client_end";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::fidl::ClientEnd<::test_typesinprotocols::Protocol>>>(value.vector_client_end()) << ", ";
+  os << "vector_server_end";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::fidl::ServerEnd<::test_typesinprotocols::Protocol>>>(value.vector_server_end()) << ", ";
+  os << "vector_struct";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::test_typesinprotocols::ResourceStruct>>(value.vector_struct()) << ", ";
+  os << "vector_table";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::test_typesinprotocols::ResourceTable>>(value.vector_table()) << ", ";
+  os << "vector_union";
+  os << " = " << fidl::ostream::Formatted<::std::vector<::test_typesinprotocols::ResourceUnion>>(value.vector_union()) << ", ";
+  os << "}";
+  return os;
+}
 std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Table>::Format(std::ostream& os, const ::test_typesinprotocols::Table& value) {
   os << "test_typesinprotocols::Table";
+  os << "{ ";
+  os << "}";
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable>::Format(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value) {
+  os << "test_typesinprotocols::ResourceTable";
   os << "{ ";
   os << "}";
   return os;
@@ -234,6 +308,17 @@ std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::Union>::Format(s
   os << "test_typesinprotocols::Union::";
   switch (value.Which()) {
     case ::test_typesinprotocols::Union::Tag::kB:
+      os << "b(" << fidl::ostream::Formatted<bool>(value.b().value()) << ")";
+      break;
+    default:
+      os << "Unknown";
+  }
+  return os;
+}
+std::ostream& fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::Format(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value) {
+  os << "test_typesinprotocols::ResourceUnion::";
+  switch (value.Which()) {
+    case ::test_typesinprotocols::ResourceUnion::Tag::kB:
       os << "b(" << fidl::ostream::Formatted<bool>(value.b().value()) << ")";
       break;
     default:
@@ -262,6 +347,18 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Table&
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Union& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::Union>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceStruct& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ResourceStruct>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceTable& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ResourceTable>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ResourceUnion& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::ResourceUnion>::Format(os, value);
 }
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Basic& value) {
@@ -294,6 +391,10 @@ std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Vector
 
 std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::ArrayVectorNested& value) {
   return fidl::ostream::Formatter<::test_typesinprotocols::ArrayVectorNested>::Format(os, value);
+}
+
+std::ostream& operator<<(std::ostream& os, const ::test_typesinprotocols::Resource& value) {
+  return fidl::ostream::Formatter<::test_typesinprotocols::Resource>::Format(os, value);
 }
 
 #pragma clang diagnostic pop

@@ -9,6 +9,7 @@ package typesinprotocols
 
 import (
 	_strings "strings"
+	_zx "syscall/zx"
 	_bindings "syscall/zx/fidl"
 )
 
@@ -194,6 +195,53 @@ func (msg *Compound) Marshaler() _bindings.Marshaler {
 	return _mCompound
 }
 
+type Resource struct {
+	_               struct{}                           `fidl:"s" fidl_size_v2:"456" fidl_alignment_v2:"8"`
+	Handle          _zx.Handle                         `fidl_offset_v2:"0" fidl_handle_subtype:"0" fidl_handle_rights:"2147483648" fidl_bounds:"0"`
+	Vmo             _zx.VMO                            `fidl_offset_v2:"4" fidl_handle_subtype:"3" fidl_handle_rights:"2147483648" fidl_bounds:"0"`
+	ClientEnd       ProtocolWithCtxInterface           `fidl_offset_v2:"8" fidl_handle_subtype:"4"`
+	ServerEnd       ProtocolWithCtxInterfaceRequest    `fidl_offset_v2:"12" fidl_handle_subtype:"4" fidl_bounds:"0"`
+	Struct          ResourceStruct                     `fidl_offset_v2:"16"`
+	Table           ResourceTable                      `fidl_offset_v2:"24"`
+	Union           ResourceUnion                      `fidl_offset_v2:"40"`
+	OptHandle       _zx.Handle                         `fidl_offset_v2:"56" fidl_handle_subtype:"0" fidl_handle_rights:"2147483648" fidl_bounds:"1"`
+	OptVmo          _zx.VMO                            `fidl_offset_v2:"60" fidl_handle_subtype:"3" fidl_handle_rights:"2147483648" fidl_bounds:"1"`
+	OptClientEnd    ProtocolWithCtxInterface           `fidl_offset_v2:"64" fidl_handle_subtype:"4"`
+	OptServerEnd    ProtocolWithCtxInterfaceRequest    `fidl_offset_v2:"68" fidl_handle_subtype:"4" fidl_bounds:"1"`
+	OptStruct       *ResourceStruct                    `fidl_offset_v2:"72"`
+	OptUnion        *ResourceUnion                     `fidl_offset_v2:"80"`
+	ArrayHandle     [5]_zx.Handle                      `fidl_offset_v2:"96" fidl_handle_subtype:"0" fidl_handle_rights:"2147483648" fidl_bounds:"0"`
+	ArrayVmo        [5]_zx.VMO                         `fidl_offset_v2:"116" fidl_handle_subtype:"3" fidl_handle_rights:"2147483648" fidl_bounds:"0"`
+	ArrayClientEnd  [5]ProtocolWithCtxInterface        `fidl_offset_v2:"136" fidl_handle_subtype:"4"`
+	ArrayServerEnd  [5]ProtocolWithCtxInterfaceRequest `fidl_offset_v2:"156" fidl_handle_subtype:"4" fidl_bounds:"0"`
+	ArrayStruct     [5]ResourceStruct                  `fidl_offset_v2:"176"`
+	ArrayTable      [5]ResourceTable                   `fidl_offset_v2:"184"`
+	ArrayUnion      [5]ResourceUnion                   `fidl_offset_v2:"264"`
+	VectorHandle    []_zx.Handle                       `fidl_offset_v2:"344" fidl_handle_subtype:"0" fidl_handle_rights:"2147483648" fidl_bounds:",0"`
+	VectorVmo       []_zx.VMO                          `fidl_offset_v2:"360" fidl_handle_subtype:"3" fidl_handle_rights:"2147483648" fidl_bounds:",0"`
+	VectorClientEnd []ProtocolWithCtxInterface         `fidl_offset_v2:"376" fidl_handle_subtype:"4" fidl_bounds:""`
+	VectorServerEnd []ProtocolWithCtxInterfaceRequest  `fidl_offset_v2:"392" fidl_handle_subtype:"4" fidl_bounds:",0"`
+	VectorStruct    []ResourceStruct                   `fidl_offset_v2:"408" fidl_bounds:""`
+	VectorTable     []ResourceTable                    `fidl_offset_v2:"424" fidl_bounds:""`
+	VectorUnion     []ResourceUnion                    `fidl_offset_v2:"440" fidl_bounds:""`
+}
+
+var _mResource = _bindings.CreateLazyMarshaler(Resource{})
+
+func (msg *Resource) Marshaler() _bindings.Marshaler {
+	return _mResource
+}
+
+type ResourceStruct struct {
+	_ struct{} `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
+}
+
+var _mResourceStruct = _bindings.CreateLazyMarshaler(ResourceStruct{})
+
+func (msg *ResourceStruct) Marshaler() _bindings.Marshaler {
+	return _mResourceStruct
+}
+
 type Struct struct {
 	_ struct{} `fidl:"s" fidl_size_v2:"1" fidl_alignment_v2:"1"`
 }
@@ -257,6 +305,64 @@ func (msg *VectorOptional) Marshaler() _bindings.Marshaler {
 	return _mVectorOptional
 }
 
+type I_resourceUnionTag uint64
+
+const (
+	ResourceUnion_unknownData = 0 // 0x00000000
+	ResourceUnionB            = 1 // 0x00000001
+)
+
+type ResourceUnion struct {
+	I_resourceUnionTag `fidl:"x" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
+	I_unknownData      interface{}
+	B                  bool `fidl_ordinal:"1"`
+}
+
+var _mResourceUnion = _bindings.CreateLazyMarshaler(ResourceUnion{})
+
+func (msg *ResourceUnion) Marshaler() _bindings.Marshaler {
+	return _mResourceUnion
+}
+
+func (_m *ResourceUnion) reset() {
+	switch _m.I_resourceUnionTag {
+	case 1:
+		var _zeroed bool
+		_m.B = _zeroed
+	default:
+		var _zeroed interface{}
+		_m.I_unknownData = _zeroed
+	}
+}
+
+func (_m *ResourceUnion) Which() I_resourceUnionTag {
+	switch _m.I_resourceUnionTag {
+	case 1:
+		return ResourceUnionB
+	default:
+		return ResourceUnion_unknownData
+	}
+}
+
+func (_m *ResourceUnion) Ordinal() uint64 {
+	return uint64(_m.I_resourceUnionTag)
+}
+
+func (_m *ResourceUnion) SetB(b bool) {
+	_m.reset()
+	_m.I_resourceUnionTag = ResourceUnionB
+	_m.B = b
+}
+
+func ResourceUnionWithB(b bool) ResourceUnion {
+	var _u ResourceUnion
+	_u.SetB(b)
+	return _u
+}
+func (_m *ResourceUnion) GetUnknownData() _bindings.UnknownData {
+	return _m.I_unknownData.(_bindings.UnknownData)
+}
+
 type I_unionTag uint64
 
 const (
@@ -315,6 +421,25 @@ func (_m *Union) GetUnknownData() _bindings.UnknownData {
 	return _m.I_unknownData.(_bindings.UnknownData)
 }
 
+type ResourceTable struct {
+	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"true"`
+	I_unknownData interface{}
+}
+
+var _mResourceTable = _bindings.CreateLazyMarshaler(ResourceTable{})
+
+func (msg *ResourceTable) Marshaler() _bindings.Marshaler {
+	return _mResourceTable
+}
+
+func (u *ResourceTable) HasUnknownData() bool {
+	return u.I_unknownData != nil
+}
+
+func (u *ResourceTable) GetUnknownData() map[uint64]_bindings.UnknownData {
+	return u.I_unknownData.(map[uint64]_bindings.UnknownData)
+}
+
 type Table struct {
 	_             struct{} `fidl:"t" fidl_size_v2:"16" fidl_alignment_v2:"8" fidl_resource:"false"`
 	I_unknownData interface{}
@@ -359,6 +484,9 @@ const (
 	ProtocolOneWayArrayVectorNestedOrdinal uint64 = 0x520dc9cb9b9b5ed7
 	ProtocolTwoWayArrayVectorNestedOrdinal uint64 = 0x4a438ce0948817dc
 	ProtocolEventArrayVectorNestedOrdinal  uint64 = 0x110b72cfebc4037e
+	ProtocolOneWayResourceOrdinal          uint64 = 0x5af4795a9ed3a022
+	ProtocolTwoWayResourceOrdinal          uint64 = 0x1904824a11c6ad5b
+	ProtocolEventResourceOrdinal           uint64 = 0x4fbde2864601698b
 )
 
 type ProtocolWithCtxInterface _bindings.ChannelProxy
@@ -515,6 +643,25 @@ func (p *ProtocolWithCtxInterface) ExpectEventArrayVectorNested(ctx_ _bindings.C
 	return (*resp_).ArrayArrayUint8, (*resp_).ArrayVectorUint8, (*resp_).VectorArrayUint8, (*resp_).VectorVectorUint8, err_
 }
 
+func (p *ProtocolWithCtxInterface) OneWayResource(ctx_ _bindings.Context, handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) error {
+	req_ := &Resource{Handle: handle, Vmo: vmo, ClientEnd: clientEnd, ServerEnd: serverEnd, Struct: struct_, Table: table, Union: union, OptHandle: optHandle, OptVmo: optVmo, OptClientEnd: optClientEnd, OptServerEnd: optServerEnd, OptStruct: optStruct, OptUnion: optUnion, ArrayHandle: arrayHandle, ArrayVmo: arrayVmo, ArrayClientEnd: arrayClientEnd, ArrayServerEnd: arrayServerEnd, ArrayStruct: arrayStruct, ArrayTable: arrayTable, ArrayUnion: arrayUnion, VectorHandle: vectorHandle, VectorVmo: vectorVmo, VectorClientEnd: vectorClientEnd, VectorServerEnd: vectorServerEnd, VectorStruct: vectorStruct, VectorTable: vectorTable, VectorUnion: vectorUnion}
+	err_ := ((*_bindings.ChannelProxy)(p)).Send(ProtocolOneWayResourceOrdinal, req_)
+	return err_
+}
+
+func (p *ProtocolWithCtxInterface) TwoWayResource(ctx_ _bindings.Context, handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) (_zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, ResourceStruct, ResourceTable, ResourceUnion, _zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, *ResourceStruct, *ResourceUnion, [5]_zx.Handle, [5]_zx.VMO, [5]ProtocolWithCtxInterface, [5]ProtocolWithCtxInterfaceRequest, [5]ResourceStruct, [5]ResourceTable, [5]ResourceUnion, []_zx.Handle, []_zx.VMO, []ProtocolWithCtxInterface, []ProtocolWithCtxInterfaceRequest, []ResourceStruct, []ResourceTable, []ResourceUnion, error) {
+	req_ := &Resource{Handle: handle, Vmo: vmo, ClientEnd: clientEnd, ServerEnd: serverEnd, Struct: struct_, Table: table, Union: union, OptHandle: optHandle, OptVmo: optVmo, OptClientEnd: optClientEnd, OptServerEnd: optServerEnd, OptStruct: optStruct, OptUnion: optUnion, ArrayHandle: arrayHandle, ArrayVmo: arrayVmo, ArrayClientEnd: arrayClientEnd, ArrayServerEnd: arrayServerEnd, ArrayStruct: arrayStruct, ArrayTable: arrayTable, ArrayUnion: arrayUnion, VectorHandle: vectorHandle, VectorVmo: vectorVmo, VectorClientEnd: vectorClientEnd, VectorServerEnd: vectorServerEnd, VectorStruct: vectorStruct, VectorTable: vectorTable, VectorUnion: vectorUnion}
+	resp_ := &Resource{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Call(ProtocolTwoWayResourceOrdinal, req_, resp_)
+	return (*resp_).Handle, (*resp_).Vmo, (*resp_).ClientEnd, (*resp_).ServerEnd, (*resp_).Struct, (*resp_).Table, (*resp_).Union, (*resp_).OptHandle, (*resp_).OptVmo, (*resp_).OptClientEnd, (*resp_).OptServerEnd, (*resp_).OptStruct, (*resp_).OptUnion, (*resp_).ArrayHandle, (*resp_).ArrayVmo, (*resp_).ArrayClientEnd, (*resp_).ArrayServerEnd, (*resp_).ArrayStruct, (*resp_).ArrayTable, (*resp_).ArrayUnion, (*resp_).VectorHandle, (*resp_).VectorVmo, (*resp_).VectorClientEnd, (*resp_).VectorServerEnd, (*resp_).VectorStruct, (*resp_).VectorTable, (*resp_).VectorUnion, err_
+}
+
+func (p *ProtocolWithCtxInterface) ExpectEventResource(ctx_ _bindings.Context) (_zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, ResourceStruct, ResourceTable, ResourceUnion, _zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, *ResourceStruct, *ResourceUnion, [5]_zx.Handle, [5]_zx.VMO, [5]ProtocolWithCtxInterface, [5]ProtocolWithCtxInterfaceRequest, [5]ResourceStruct, [5]ResourceTable, [5]ResourceUnion, []_zx.Handle, []_zx.VMO, []ProtocolWithCtxInterface, []ProtocolWithCtxInterfaceRequest, []ResourceStruct, []ResourceTable, []ResourceUnion, error) {
+	resp_ := &Resource{}
+	err_ := ((*_bindings.ChannelProxy)(p)).Recv(ProtocolEventResourceOrdinal, resp_)
+	return (*resp_).Handle, (*resp_).Vmo, (*resp_).ClientEnd, (*resp_).ServerEnd, (*resp_).Struct, (*resp_).Table, (*resp_).Union, (*resp_).OptHandle, (*resp_).OptVmo, (*resp_).OptClientEnd, (*resp_).OptServerEnd, (*resp_).OptStruct, (*resp_).OptUnion, (*resp_).ArrayHandle, (*resp_).ArrayVmo, (*resp_).ArrayClientEnd, (*resp_).ArrayServerEnd, (*resp_).ArrayStruct, (*resp_).ArrayTable, (*resp_).ArrayUnion, (*resp_).VectorHandle, (*resp_).VectorVmo, (*resp_).VectorClientEnd, (*resp_).VectorServerEnd, (*resp_).VectorStruct, (*resp_).VectorTable, (*resp_).VectorUnion, err_
+}
+
 type ProtocolWithCtx interface {
 	OneWayBasic(ctx_ _bindings.Context, uint8_ uint8, uint16_ uint16, uint32_ uint32, uint64_ uint64, int8_ int8, int16_ int16, int32_ int32, int64_ int64, float32 float32, float64 float64, string_ string, optString *string) error
 	TwoWayBasic(ctx_ _bindings.Context, uint8_ uint8, uint16_ uint16, uint32_ uint32, uint64_ uint64, int8_ int8, int16_ int16, int32_ int32, int64_ int64, float32 float32, float64 float64, string_ string, optString *string) (uint8, uint16, uint32, uint64, int8, int16, int32, int64, float32, float64, string, *string, error)
@@ -532,6 +679,8 @@ type ProtocolWithCtx interface {
 	TwoWayVectorOptional(ctx_ _bindings.Context, optVectorUint8 *[]uint8, optVectorString *[]string, optVectorStruct *[]Struct, optVectorOptStruct *[]*Struct) (*[]uint8, *[]string, *[]Struct, *[]*Struct, error)
 	OneWayArrayVectorNested(ctx_ _bindings.Context, arrayArrayUint8 [5][5]uint8, arrayVectorUint8 [5][]uint8, vectorArrayUint8 [][5]uint8, vectorVectorUint8 [][]uint8) error
 	TwoWayArrayVectorNested(ctx_ _bindings.Context, arrayArrayUint8 [5][5]uint8, arrayVectorUint8 [5][]uint8, vectorArrayUint8 [][5]uint8, vectorVectorUint8 [][]uint8) ([5][5]uint8, [5][]uint8, [][5]uint8, [][]uint8, error)
+	OneWayResource(ctx_ _bindings.Context, handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) error
+	TwoWayResource(ctx_ _bindings.Context, handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) (_zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, ResourceStruct, ResourceTable, ResourceUnion, _zx.Handle, _zx.VMO, ProtocolWithCtxInterface, ProtocolWithCtxInterfaceRequest, *ResourceStruct, *ResourceUnion, [5]_zx.Handle, [5]_zx.VMO, [5]ProtocolWithCtxInterface, [5]ProtocolWithCtxInterfaceRequest, [5]ResourceStruct, [5]ResourceTable, [5]ResourceUnion, []_zx.Handle, []_zx.VMO, []ProtocolWithCtxInterface, []ProtocolWithCtxInterfaceRequest, []ResourceStruct, []ResourceTable, []ResourceUnion, error)
 }
 
 type ProtocolWithCtxTransitionalBase struct{}
@@ -733,6 +882,29 @@ func (s_ *ProtocolWithCtxStub) Dispatch(args_ _bindings.DispatchArgs) (_bindings
 		arrayArrayUint8, arrayVectorUint8, vectorArrayUint8, vectorVectorUint8, err_ := s_.Impl.TwoWayArrayVectorNested(args_.Ctx, (*in_).ArrayArrayUint8, (*in_).ArrayVectorUint8, (*in_).VectorArrayUint8, (*in_).VectorVectorUint8)
 		out_ := &ArrayVectorNested{ArrayArrayUint8: arrayArrayUint8, ArrayVectorUint8: arrayVectorUint8, VectorArrayUint8: vectorArrayUint8, VectorVectorUint8: vectorVectorUint8}
 		return out_, true, err_
+	case ProtocolOneWayResourceOrdinal:
+		in_ := &Resource{}
+		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
+		if !ok {
+			return nil, false, _bindings.ErrMissingMarshalerContext
+		}
+		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
+			return nil, false, err_
+		}
+		err_ := s_.Impl.OneWayResource(args_.Ctx, (*in_).Handle, (*in_).Vmo, (*in_).ClientEnd, (*in_).ServerEnd, (*in_).Struct, (*in_).Table, (*in_).Union, (*in_).OptHandle, (*in_).OptVmo, (*in_).OptClientEnd, (*in_).OptServerEnd, (*in_).OptStruct, (*in_).OptUnion, (*in_).ArrayHandle, (*in_).ArrayVmo, (*in_).ArrayClientEnd, (*in_).ArrayServerEnd, (*in_).ArrayStruct, (*in_).ArrayTable, (*in_).ArrayUnion, (*in_).VectorHandle, (*in_).VectorVmo, (*in_).VectorClientEnd, (*in_).VectorServerEnd, (*in_).VectorStruct, (*in_).VectorTable, (*in_).VectorUnion)
+		return nil, false, err_
+	case ProtocolTwoWayResourceOrdinal:
+		in_ := &Resource{}
+		marshalerCtx, ok := _bindings.GetMarshalerContext(args_.Ctx)
+		if !ok {
+			return nil, false, _bindings.ErrMissingMarshalerContext
+		}
+		if err_ := _bindings.Unmarshal(marshalerCtx, args_.Bytes, args_.HandleInfos, in_); err_ != nil {
+			return nil, false, err_
+		}
+		handle, vmo, clientEnd, serverEnd, struct_, table, union, optHandle, optVmo, optClientEnd, optServerEnd, optStruct, optUnion, arrayHandle, arrayVmo, arrayClientEnd, arrayServerEnd, arrayStruct, arrayTable, arrayUnion, vectorHandle, vectorVmo, vectorClientEnd, vectorServerEnd, vectorStruct, vectorTable, vectorUnion, err_ := s_.Impl.TwoWayResource(args_.Ctx, (*in_).Handle, (*in_).Vmo, (*in_).ClientEnd, (*in_).ServerEnd, (*in_).Struct, (*in_).Table, (*in_).Union, (*in_).OptHandle, (*in_).OptVmo, (*in_).OptClientEnd, (*in_).OptServerEnd, (*in_).OptStruct, (*in_).OptUnion, (*in_).ArrayHandle, (*in_).ArrayVmo, (*in_).ArrayClientEnd, (*in_).ArrayServerEnd, (*in_).ArrayStruct, (*in_).ArrayTable, (*in_).ArrayUnion, (*in_).VectorHandle, (*in_).VectorVmo, (*in_).VectorClientEnd, (*in_).VectorServerEnd, (*in_).VectorStruct, (*in_).VectorTable, (*in_).VectorUnion)
+		out_ := &Resource{Handle: handle, Vmo: vmo, ClientEnd: clientEnd, ServerEnd: serverEnd, Struct: struct_, Table: table, Union: union, OptHandle: optHandle, OptVmo: optVmo, OptClientEnd: optClientEnd, OptServerEnd: optServerEnd, OptStruct: optStruct, OptUnion: optUnion, ArrayHandle: arrayHandle, ArrayVmo: arrayVmo, ArrayClientEnd: arrayClientEnd, ArrayServerEnd: arrayServerEnd, ArrayStruct: arrayStruct, ArrayTable: arrayTable, ArrayUnion: arrayUnion, VectorHandle: vectorHandle, VectorVmo: vectorVmo, VectorClientEnd: vectorClientEnd, VectorServerEnd: vectorServerEnd, VectorStruct: vectorStruct, VectorTable: vectorTable, VectorUnion: vectorUnion}
+		return out_, true, err_
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal
 }
@@ -770,4 +942,8 @@ func (p *ProtocolEventProxy) EventVectorOptional(optVectorUint8 *[]uint8, optVec
 func (p *ProtocolEventProxy) EventArrayVectorNested(arrayArrayUint8 [5][5]uint8, arrayVectorUint8 [5][]uint8, vectorArrayUint8 [][5]uint8, vectorVectorUint8 [][]uint8) error {
 	event_ := &ArrayVectorNested{ArrayArrayUint8: arrayArrayUint8, ArrayVectorUint8: arrayVectorUint8, VectorArrayUint8: vectorArrayUint8, VectorVectorUint8: vectorVectorUint8}
 	return ((*_bindings.ChannelProxy)(p)).Send(ProtocolEventArrayVectorNestedOrdinal, event_)
+}
+func (p *ProtocolEventProxy) EventResource(handle _zx.Handle, vmo _zx.VMO, clientEnd ProtocolWithCtxInterface, serverEnd ProtocolWithCtxInterfaceRequest, struct_ ResourceStruct, table ResourceTable, union ResourceUnion, optHandle _zx.Handle, optVmo _zx.VMO, optClientEnd ProtocolWithCtxInterface, optServerEnd ProtocolWithCtxInterfaceRequest, optStruct *ResourceStruct, optUnion *ResourceUnion, arrayHandle [5]_zx.Handle, arrayVmo [5]_zx.VMO, arrayClientEnd [5]ProtocolWithCtxInterface, arrayServerEnd [5]ProtocolWithCtxInterfaceRequest, arrayStruct [5]ResourceStruct, arrayTable [5]ResourceTable, arrayUnion [5]ResourceUnion, vectorHandle []_zx.Handle, vectorVmo []_zx.VMO, vectorClientEnd []ProtocolWithCtxInterface, vectorServerEnd []ProtocolWithCtxInterfaceRequest, vectorStruct []ResourceStruct, vectorTable []ResourceTable, vectorUnion []ResourceUnion) error {
+	event_ := &Resource{Handle: handle, Vmo: vmo, ClientEnd: clientEnd, ServerEnd: serverEnd, Struct: struct_, Table: table, Union: union, OptHandle: optHandle, OptVmo: optVmo, OptClientEnd: optClientEnd, OptServerEnd: optServerEnd, OptStruct: optStruct, OptUnion: optUnion, ArrayHandle: arrayHandle, ArrayVmo: arrayVmo, ArrayClientEnd: arrayClientEnd, ArrayServerEnd: arrayServerEnd, ArrayStruct: arrayStruct, ArrayTable: arrayTable, ArrayUnion: arrayUnion, VectorHandle: vectorHandle, VectorVmo: vectorVmo, VectorClientEnd: vectorClientEnd, VectorServerEnd: vectorServerEnd, VectorStruct: vectorStruct, VectorTable: vectorTable, VectorUnion: vectorUnion}
+	return ((*_bindings.ChannelProxy)(p)).Send(ProtocolEventResourceOrdinal, event_)
 }

@@ -8,7 +8,7 @@
 ## **PROTOCOLS**
 
 ## Protocol {#Protocol}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=121)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=161)*
 
 
 ### EventArrayBasic {#Protocol.EventArrayBasic}
@@ -319,6 +319,180 @@
             <td><code>opt_union</code></td>
             <td>
                 <code><a class='link' href='#Union'>Union</a>?</code>
+            </td>
+        </tr>
+</table>
+
+### EventResource {#Protocol.EventResource}
+
+
+
+
+
+#### Response {#Protocol.EventResource_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>table</code></td>
+            <td>
+                <code><a class='link' href='#ResourceTable'>ResourceTable</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_handle</code></td>
+            <td>
+                <code>handle[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_vmo</code></td>
+            <td>
+                <code>vmo[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_client_end</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_server_end</code></td>
+            <td>
+                <code>test.typesinprotocols/Protocol[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_struct</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_table</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_union</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_handle</code></td>
+            <td>
+                <code>vector&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_vmo</code></td>
+            <td>
+                <code>vector&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_client_end</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_server_end</code></td>
+            <td>
+                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_struct</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_table</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_union</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>&gt;</code>
             </td>
         </tr>
 </table>
@@ -804,6 +978,180 @@
             <td><code>opt_union</code></td>
             <td>
                 <code><a class='link' href='#Union'>Union</a>?</code>
+            </td>
+        </tr>
+</table>
+
+
+### OneWayResource {#Protocol.OneWayResource}
+
+
+
+
+#### Request {#Protocol.OneWayResource_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>table</code></td>
+            <td>
+                <code><a class='link' href='#ResourceTable'>ResourceTable</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_handle</code></td>
+            <td>
+                <code>handle[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_vmo</code></td>
+            <td>
+                <code>vmo[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_client_end</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_server_end</code></td>
+            <td>
+                <code>test.typesinprotocols/Protocol[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_struct</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_table</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_union</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_handle</code></td>
+            <td>
+                <code>vector&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_vmo</code></td>
+            <td>
+                <code>vector&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_client_end</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_server_end</code></td>
+            <td>
+                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_struct</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_table</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_union</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>&gt;</code>
             </td>
         </tr>
 </table>
@@ -1577,6 +1925,348 @@
         </tr>
 </table>
 
+### TwoWayResource {#Protocol.TwoWayResource}
+
+
+
+
+#### Request {#Protocol.TwoWayResource_Request}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>table</code></td>
+            <td>
+                <code><a class='link' href='#ResourceTable'>ResourceTable</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_handle</code></td>
+            <td>
+                <code>handle[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_vmo</code></td>
+            <td>
+                <code>vmo[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_client_end</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_server_end</code></td>
+            <td>
+                <code>test.typesinprotocols/Protocol[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_struct</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_table</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_union</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_handle</code></td>
+            <td>
+                <code>vector&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_vmo</code></td>
+            <td>
+                <code>vector&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_client_end</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_server_end</code></td>
+            <td>
+                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_struct</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_table</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_union</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>&gt;</code>
+            </td>
+        </tr>
+</table>
+
+
+#### Response {#Protocol.TwoWayResource_Response}
+
+<table>
+    <tr><th>Name</th><th>Type</th></tr>
+        <tr>
+            <td><code>handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>table</code></td>
+            <td>
+                <code><a class='link' href='#ResourceTable'>ResourceTable</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a></code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>opt_union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a>?</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_handle</code></td>
+            <td>
+                <code>handle[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_vmo</code></td>
+            <td>
+                <code>vmo[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_client_end</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_server_end</code></td>
+            <td>
+                <code>test.typesinprotocols/Protocol[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_struct</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_table</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>array_union</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_handle</code></td>
+            <td>
+                <code>vector&lt;handle&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_vmo</code></td>
+            <td>
+                <code>vector&lt;vmo&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_client_end</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_server_end</code></td>
+            <td>
+                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_struct</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_table</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>&gt;</code>
+            </td>
+        </tr>
+        <tr>
+            <td><code>vector_union</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>&gt;</code>
+            </td>
+        </tr>
+</table>
+
 ### TwoWayVectorBasic {#Protocol.TwoWayVectorBasic}
 
 
@@ -1911,7 +2601,7 @@
 ## **STRUCTS**
 
 ### ArrayBasic  {#ArrayBasic data-text="ArrayBasic"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=43)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=50)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2014,7 +2704,7 @@
 </table>
 
 ### ArrayCompound  {#ArrayCompound data-text="ArrayCompound"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=58)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=65)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2077,7 +2767,7 @@
 </table>
 
 ### ArrayVectorNested  {#ArrayVectorNested data-text="ArrayVectorNested"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=109)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=116)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2116,7 +2806,7 @@
 </table>
 
 ### Basic  {#Basic data-text="Basic"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=18)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=25)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2219,7 +2909,7 @@
 </table>
 
 ### Compound  {#Compound data-text="Compound"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=33)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=40)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2281,13 +2971,241 @@
         </tr>
 </table>
 
+### Resource [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#Resource data-text="Resource"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=128)*
+
+<table>
+    <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
+        <tr id="Resource.handle">
+            <td><code>handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vmo">
+            <td><code>vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.client_end">
+            <td><code>client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a></code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.server_end">
+            <td><code>server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.struct">
+            <td><code>struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a></code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.table">
+            <td><code>table</code></td>
+            <td>
+                <code><a class='link' href='#ResourceTable'>ResourceTable</a></code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.union">
+            <td><code>union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a></code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.opt_handle">
+            <td><code>opt_handle</code></td>
+            <td>
+                <code>handle&lt;handle&gt;?</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.opt_vmo">
+            <td><code>opt_vmo</code></td>
+            <td>
+                <code>handle&lt;vmo&gt;?</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.opt_client_end">
+            <td><code>opt_client_end</code></td>
+            <td>
+                <code><a class='link' href='#Protocol'>Protocol</a>?</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.opt_server_end">
+            <td><code>opt_server_end</code></td>
+            <td>
+                <code>server_end&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;?</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.opt_struct">
+            <td><code>opt_struct</code></td>
+            <td>
+                <code><a class='link' href='#ResourceStruct'>ResourceStruct</a>?</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.opt_union">
+            <td><code>opt_union</code></td>
+            <td>
+                <code><a class='link' href='#ResourceUnion'>ResourceUnion</a>?</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_handle">
+            <td><code>array_handle</code></td>
+            <td>
+                <code>handle[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_vmo">
+            <td><code>array_vmo</code></td>
+            <td>
+                <code>vmo[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_client_end">
+            <td><code>array_client_end</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_server_end">
+            <td><code>array_server_end</code></td>
+            <td>
+                <code>test.typesinprotocols/Protocol[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_struct">
+            <td><code>array_struct</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_table">
+            <td><code>array_table</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.array_union">
+            <td><code>array_union</code></td>
+            <td>
+                <code>[5]</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_handle">
+            <td><code>vector_handle</code></td>
+            <td>
+                <code>vector&lt;handle&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_vmo">
+            <td><code>vector_vmo</code></td>
+            <td>
+                <code>vector&lt;vmo&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_client_end">
+            <td><code>vector_client_end</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#Protocol'>Protocol</a>&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_server_end">
+            <td><code>vector_server_end</code></td>
+            <td>
+                <code>vector&lt;test.typesinprotocols/Protocol&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_struct">
+            <td><code>vector_struct</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceStruct'>ResourceStruct</a>&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_table">
+            <td><code>vector_table</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceTable'>ResourceTable</a>&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+        <tr id="Resource.vector_union">
+            <td><code>vector_union</code></td>
+            <td>
+                <code>vector&lt;<a class='link' href='#ResourceUnion'>ResourceUnion</a>&gt;</code>
+            </td>
+            <td></td>
+            <td>No default</td>
+        </tr>
+</table>
+
+### ResourceStruct [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#ResourceStruct data-text="ResourceStruct"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=19)*
+
+&lt;EMPTY&gt;
+
 ### Struct  {#Struct data-text="Struct"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=12)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=14)*
 
 &lt;EMPTY&gt;
 
 ### VectorBasic  {#VectorBasic data-text="VectorBasic"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=73)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=80)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2390,7 +3308,7 @@
 </table>
 
 ### VectorCompound  {#VectorCompound data-text="VectorCompound"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=88)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=95)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2453,7 +3371,7 @@
 </table>
 
 ### VectorOptional  {#VectorOptional data-text="VectorOptional"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=98)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=105)*
 
 <table>
     <tr><th>Field</th><th>Type</th><th>Description</th><th>Default</th></tr>
@@ -2497,7 +3415,7 @@
 ### Enum [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Enum data-text="Enum"}
 Type: <code>uint32</code>
 
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=9)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=11)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>
@@ -2511,10 +3429,19 @@ Type: <code>uint32</code>
 
 ## **TABLES**
 
+### ResourceTable [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#ResourceTable data-text="ResourceTable"}
+
+
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=20)*
+
+<table>
+    <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
+</table>
+
 ### Table  {#Table data-text="Table"}
 
 
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=13)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=15)*
 
 <table>
     <tr><th>Ordinal</th><th>Field</th><th>Type</th><th>Description</th></tr>
@@ -2523,8 +3450,22 @@ Type: <code>uint32</code>
 
 ## **UNIONS**
 
+### ResourceUnion [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} [resource](/fuchsia-src/reference/fidl/language/language.md#value-vs-resource){:.fidl-attribute} {#ResourceUnion data-text="ResourceUnion"}
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=21)*
+<table>
+    <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
+        <tr id="ResourceUnion.b">
+<td><h3 id="ResourceUnion.b" class="add-link hide-from-toc">1</h3></td>
+            <td><code>b</code></td>
+            <td>
+                <code>bool</code>
+            </td>
+            <td></td>
+        </tr>
+</table>
+
 ### Union [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute}  {#Union data-text="Union"}
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=14)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=16)*
 <table>
     <tr><th>Ordinal</th><th>Variant</th><th>Type</th><th>Description</th></tr>
         <tr id="Union.b">
@@ -2543,7 +3484,7 @@ Type: <code>uint32</code>
 ### Bits [flexible](/fuchsia-src/reference/fidl/language/language.md#strict-vs-flexible){:.fidl-attribute} {#Bits}
 Type: <code>uint32</code>
 
-*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=6)*
+*Defined in [test.typesinprotocols/types_in_protocols.test.fidl](https://cs.opensource.google/fuchsia/fuchsia/+/main:tools/fidl/fidlc/testdata/types_in_protocols.test.fidl;l=8)*
 
 <table>
     <tr><th>Name</th><th>Value</th><th>Description</th></tr>

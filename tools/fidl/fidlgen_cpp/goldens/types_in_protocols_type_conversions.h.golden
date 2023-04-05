@@ -56,6 +56,25 @@ struct WireTypeForNaturalType<::test_typesinprotocols::Struct> {
   using type = ::test_typesinprotocols::wire::Struct;
 };
 
+#ifdef __Fuchsia__
+
+template <>
+struct WireNaturalConversionTraits<::test_typesinprotocols::wire::ResourceStruct, ::test_typesinprotocols::ResourceStruct> {
+  static ::test_typesinprotocols::ResourceStruct ToNatural(::test_typesinprotocols::wire::ResourceStruct src);
+  static ::test_typesinprotocols::wire::ResourceStruct ToWire(fidl::AnyArena& arena, ::test_typesinprotocols::ResourceStruct src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_typesinprotocols::wire::ResourceStruct> {
+  using type = ::test_typesinprotocols::ResourceStruct;
+};
+template <>
+struct WireTypeForNaturalType<::test_typesinprotocols::ResourceStruct> {
+  using type = ::test_typesinprotocols::wire::ResourceStruct;
+};
+
+#endif  // __Fuchsia__
+
 template <>
 struct WireNaturalConversionTraits<::test_typesinprotocols::wire::Basic, ::test_typesinprotocols::Basic> {
   static ::test_typesinprotocols::Basic ToNatural(::test_typesinprotocols::wire::Basic src);
@@ -176,6 +195,25 @@ struct WireTypeForNaturalType<::test_typesinprotocols::ArrayVectorNested> {
   using type = ::test_typesinprotocols::wire::ArrayVectorNested;
 };
 
+#ifdef __Fuchsia__
+
+template <>
+struct WireNaturalConversionTraits<::test_typesinprotocols::wire::Resource, ::test_typesinprotocols::Resource> {
+  static ::test_typesinprotocols::Resource ToNatural(::test_typesinprotocols::wire::Resource src);
+  static ::test_typesinprotocols::wire::Resource ToWire(fidl::AnyArena& arena, ::test_typesinprotocols::Resource src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_typesinprotocols::wire::Resource> {
+  using type = ::test_typesinprotocols::Resource;
+};
+template <>
+struct WireTypeForNaturalType<::test_typesinprotocols::Resource> {
+  using type = ::test_typesinprotocols::wire::Resource;
+};
+
+#endif  // __Fuchsia__
+
 template <>
 struct WireNaturalConversionTraits<::test_typesinprotocols::wire::Table, ::test_typesinprotocols::Table> {
   static ::test_typesinprotocols::Table ToNatural(::test_typesinprotocols::wire::Table src);
@@ -190,6 +228,25 @@ template <>
 struct WireTypeForNaturalType<::test_typesinprotocols::Table> {
   using type = ::test_typesinprotocols::wire::Table;
 };
+
+#ifdef __Fuchsia__
+
+template <>
+struct WireNaturalConversionTraits<::test_typesinprotocols::wire::ResourceTable, ::test_typesinprotocols::ResourceTable> {
+  static ::test_typesinprotocols::ResourceTable ToNatural(::test_typesinprotocols::wire::ResourceTable src);
+  static ::test_typesinprotocols::wire::ResourceTable ToWire(fidl::AnyArena& arena, ::test_typesinprotocols::ResourceTable src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_typesinprotocols::wire::ResourceTable> {
+  using type = ::test_typesinprotocols::ResourceTable;
+};
+template <>
+struct WireTypeForNaturalType<::test_typesinprotocols::ResourceTable> {
+  using type = ::test_typesinprotocols::wire::ResourceTable;
+};
+
+#endif  // __Fuchsia__
 
 template <>
 struct WireNaturalConversionTraits<::test_typesinprotocols::wire::Union, ::test_typesinprotocols::Union> {
@@ -211,6 +268,31 @@ template <>
 struct WireTypeForNaturalType<::test_typesinprotocols::Union> {
   using type = ::test_typesinprotocols::wire::Union;
 };
+
+#ifdef __Fuchsia__
+
+template <>
+struct WireNaturalConversionTraits<::test_typesinprotocols::wire::ResourceUnion, ::test_typesinprotocols::ResourceUnion> {
+  static ::test_typesinprotocols::ResourceUnion ToNatural(::test_typesinprotocols::wire::ResourceUnion src);
+  static ::test_typesinprotocols::wire::ResourceUnion ToWire(fidl::AnyArena& arena, ::test_typesinprotocols::ResourceUnion src);
+};
+
+template <>
+struct WireNaturalConversionTraits<::fidl::WireOptional<::test_typesinprotocols::wire::ResourceUnion>, std::unique_ptr<::test_typesinprotocols::ResourceUnion>> {
+  static std::unique_ptr<::test_typesinprotocols::ResourceUnion> ToNatural(::fidl::WireOptional<::test_typesinprotocols::wire::ResourceUnion> src);
+  static ::fidl::WireOptional<::test_typesinprotocols::wire::ResourceUnion> ToWire(fidl::AnyArena& arena, std::unique_ptr<::test_typesinprotocols::ResourceUnion> src);
+};
+
+template <>
+struct NaturalTypeForWireType<::test_typesinprotocols::wire::ResourceUnion> {
+  using type = ::test_typesinprotocols::ResourceUnion;
+};
+template <>
+struct WireTypeForNaturalType<::test_typesinprotocols::ResourceUnion> {
+  using type = ::test_typesinprotocols::wire::ResourceUnion;
+};
+
+#endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
 
@@ -332,6 +414,21 @@ struct NaturalTypeForWireType<::fidl::WireResponse<::test_typesinprotocols::Prot
 template <>
 struct WireTypeForNaturalType<::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>> {
   using type = ::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>;
+};
+
+template <>
+struct WireNaturalConversionTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayResource>, ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource>> {
+  static ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> ToNatural(::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayResource> src);
+  static ::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayResource> ToWire(fidl::AnyArena& arena, ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> src);
+};
+
+template <>
+struct NaturalTypeForWireType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayResource>> {
+  using type = ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource>;
+};
+template <>
+struct WireTypeForNaturalType<::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource>> {
+  using type = ::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayResource>;
 };
 
 #endif  // __Fuchsia__

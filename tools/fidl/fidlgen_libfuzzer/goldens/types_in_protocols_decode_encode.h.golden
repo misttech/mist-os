@@ -14,7 +14,7 @@
 
 namespace fuzzing {
 
-inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 20>
+inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 26>
     test_typesinprotocols_decoder_encoders = {
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_typesinprotocols::wire::Struct",
@@ -39,6 +39,30 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 20>
             .has_flexible_envelope = true,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::Table, true>,
+        },
+        ::fidl::fuzzing::DecoderEncoderForType{
+            .fidl_type_name = "::test_typesinprotocols::wire::ResourceStruct",
+            .has_flexible_envelope = false,
+            .treat_bytes_as_transactional_message = false,
+            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::ResourceStruct, false>,
+        },
+        ::fidl::fuzzing::DecoderEncoderForType{
+            .fidl_type_name = "A transactional message using ::test_typesinprotocols::wire::ResourceStruct as the body",
+            .has_flexible_envelope = false,
+            .treat_bytes_as_transactional_message = true,
+            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::ResourceStruct, true>,
+        },
+        ::fidl::fuzzing::DecoderEncoderForType{
+            .fidl_type_name = "::test_typesinprotocols::wire::ResourceTable",
+            .has_flexible_envelope = true,
+            .treat_bytes_as_transactional_message = false,
+            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::ResourceTable, false>,
+        },
+        ::fidl::fuzzing::DecoderEncoderForType{
+            .fidl_type_name = "A transactional message using ::test_typesinprotocols::wire::ResourceTable as the body",
+            .has_flexible_envelope = true,
+            .treat_bytes_as_transactional_message = true,
+            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::ResourceTable, true>,
         },
         ::fidl::fuzzing::DecoderEncoderForType{
             .fidl_type_name = "::test_typesinprotocols::wire::Basic",
@@ -135,6 +159,18 @@ inline constexpr ::std::array<::fidl::fuzzing::DecoderEncoderForType, 20>
             .has_flexible_envelope = false,
             .treat_bytes_as_transactional_message = true,
             .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::ArrayVectorNested, true>,
+        },
+        ::fidl::fuzzing::DecoderEncoderForType{
+            .fidl_type_name = "::test_typesinprotocols::wire::Resource",
+            .has_flexible_envelope = true,
+            .treat_bytes_as_transactional_message = false,
+            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::Resource, false>,
+        },
+        ::fidl::fuzzing::DecoderEncoderForType{
+            .fidl_type_name = "A transactional message using ::test_typesinprotocols::wire::Resource as the body",
+            .has_flexible_envelope = true,
+            .treat_bytes_as_transactional_message = true,
+            .decoder_encoder = ::fidl::fuzzing::DecoderEncoderImpl<::test_typesinprotocols::wire::Resource, true>,
         },
 };
 

@@ -207,6 +207,29 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::EventArrayVectorNested> {
   using Request = ::test_typesinprotocols::ArrayVectorNested;
 };
+
+template <>
+struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::OneWayResource> {
+  using Request = ::test_typesinprotocols::Resource;
+
+  using Completer = fidl::Completer<>;
+};
+
+template <>
+struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::TwoWayResource> {
+  using Request = ::test_typesinprotocols::Resource;
+
+  using Response = ::test_typesinprotocols::Resource;
+
+  using Completer = fidl::Completer<::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayResource>>;
+  using ResultCallback =
+      ::fit::callback<void(::fidl::Result<::test_typesinprotocols::Protocol::TwoWayResource>&)>;
+};
+
+template <>
+struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::EventResource> {
+  using Request = ::test_typesinprotocols::Resource;
+};
 namespace test_typesinprotocols {
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 
@@ -223,6 +246,8 @@ __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 
 __LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
+
+__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_typesinprotocols
@@ -358,6 +383,22 @@ class ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>
 };
 
 template <>
+class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> final : public ::test_typesinprotocols::Resource {
+ public:
+  using ::test_typesinprotocols::Resource::Resource;
+  Response(::test_typesinprotocols::Resource v) : Resource(std::move(v)) {}
+};
+
+template <>
+class ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayResource> final : public ::fit::result<::fidl::Error, ::test_typesinprotocols::Resource> {
+ public:
+  using ::fit::result<::fidl::Error, ::test_typesinprotocols::Resource>::result;
+
+ protected:
+  Result() = default;
+};
+
+template <>
 class ::fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol> final : public ::fidl::internal::NaturalClientBase {
  public:
   using NaturalClientBase::NaturalClientBase;
@@ -377,6 +418,8 @@ class ::fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol> fin
 
   ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested> TwoWayArrayVectorNested(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>& request) const;
 
+  ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayResource> TwoWayResource(::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource> request) const;
+
   ::fit::result<::fidl::OneWayError> OneWayBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayBasic>& request) const;
 
   ::fit::result<::fidl::OneWayError> OneWayCompound(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayCompound>& request) const;
@@ -392,6 +435,8 @@ class ::fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol> fin
   ::fit::result<::fidl::OneWayError> OneWayVectorOptional(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayVectorOptional>& request) const;
 
   ::fit::result<::fidl::OneWayError> OneWayArrayVectorNested(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayArrayVectorNested>& request) const;
+
+  ::fit::result<::fidl::OneWayError> OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request) const;
 };
 namespace test_typesinprotocols {
 
@@ -421,6 +466,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>
 
   ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested> TwoWayArrayVectorNested(const ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>& request);
 
+  ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayResource> TwoWayResource(::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource> request);
+
   ::fit::result<::fidl::OneWayError> OneWayBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayBasic>& request);
 
   ::fit::result<::fidl::OneWayError> OneWayCompound(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayCompound>& request);
@@ -436,6 +483,8 @@ class ::fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>
   ::fit::result<::fidl::OneWayError> OneWayVectorOptional(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayVectorOptional>& request);
 
   ::fit::result<::fidl::OneWayError> OneWayArrayVectorNested(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayArrayVectorNested>& request);
+
+  ::fit::result<::fidl::OneWayError> OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request);
 
  private:
   ::fidl::UnownedClientEnd<::test_typesinprotocols::Protocol> _client_end() const {
@@ -461,6 +510,7 @@ class ::fidl::internal::NaturalEventHandlerInterface<::test_typesinprotocols::Pr
   virtual void EventVectorCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorCompound>&) = 0;
   virtual void EventVectorOptional(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorOptional>&) = 0;
   virtual void EventArrayVectorNested(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayVectorNested>&) = 0;
+  virtual void EventResource(::fidl::Event<::test_typesinprotocols::Protocol::EventResource>&) = 0;
 };
 
 template <>
@@ -476,6 +526,7 @@ class ::fidl::AsyncEventHandler<::test_typesinprotocols::Protocol>
   void EventVectorCompound(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorCompound>&) override {}
   void EventVectorOptional(::fidl::Event<::test_typesinprotocols::Protocol::EventVectorOptional>&) override {}
   void EventArrayVectorNested(::fidl::Event<::test_typesinprotocols::Protocol::EventArrayVectorNested>&) override {}
+  void EventResource(::fidl::Event<::test_typesinprotocols::Protocol::EventResource>&) override {}
 };
 
 template <>
@@ -524,6 +575,8 @@ class ::fidl::internal::NaturalWeakEventSender<::test_typesinprotocols::Protocol
   ::fit::result<::fidl::OneWayError> EventVectorOptional(const ::test_typesinprotocols::VectorOptional& payload);
 
   ::fit::result<::fidl::OneWayError> EventArrayVectorNested(const ::test_typesinprotocols::ArrayVectorNested& payload);
+
+  ::fit::result<::fidl::OneWayError> EventResource(::test_typesinprotocols::Resource payload);
 };
 
 template <>
@@ -547,6 +600,8 @@ class ::fidl::internal::NaturalEventSender<::test_typesinprotocols::Protocol>
   ::fit::result<::fidl::OneWayError> EventVectorOptional(const ::test_typesinprotocols::VectorOptional& payload);
 
   ::fit::result<::fidl::OneWayError> EventArrayVectorNested(const ::test_typesinprotocols::ArrayVectorNested& payload);
+
+  ::fit::result<::fidl::OneWayError> EventResource(::test_typesinprotocols::Resource payload);
 };
 
 #endif  // __Fuchsia__
@@ -618,6 +673,15 @@ template <>
 class ::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested> : public ::fidl::CompleterBase {
  public:
   void Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>& response);
+
+ protected:
+  using ::fidl::CompleterBase::CompleterBase;
+};
+
+template <>
+class ::fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayResource> : public ::fidl::CompleterBase {
+ public:
+  void Reply(::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> response);
 
  protected:
   using ::fidl::CompleterBase::CompleterBase;
@@ -729,6 +793,18 @@ class ::fidl::Server<::test_typesinprotocols::Protocol> : public ::fidl::interna
 
   virtual void TwoWayArrayVectorNested(TwoWayArrayVectorNestedRequest& request,
                                        TwoWayArrayVectorNestedCompleter::Sync& completer) = 0;
+
+  using OneWayResourceRequest = ::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource>;
+  using OneWayResourceCompleter = ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::OneWayResource>;
+
+  virtual void OneWayResource(OneWayResourceRequest& request,
+                              OneWayResourceCompleter::Sync& completer) = 0;
+
+  using TwoWayResourceRequest = ::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource>;
+  using TwoWayResourceCompleter = ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::TwoWayResource>;
+
+  virtual void TwoWayResource(TwoWayResourceRequest& request,
+                              TwoWayResourceCompleter::Sync& completer) = 0;
 
   // |bind_handler| returns a handler that binds incoming connections to this
   // server implementation.

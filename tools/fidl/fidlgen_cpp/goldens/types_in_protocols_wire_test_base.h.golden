@@ -100,6 +100,16 @@ class WireTestBase<::test_typesinprotocols::Protocol> : public ::fidl::WireServe
       TwoWayArrayVectorNestedCompleter::Sync& completer) override {
     NotImplemented_("TwoWayArrayVectorNested", completer);
   }
+  virtual void OneWayResource(
+      ::test_typesinprotocols::wire::Resource* request,
+      OneWayResourceCompleter::Sync& completer) override {
+    NotImplemented_("OneWayResource", completer);
+  }
+  virtual void TwoWayResource(
+      ::test_typesinprotocols::wire::Resource* request,
+      TwoWayResourceCompleter::Sync& completer) override {
+    NotImplemented_("TwoWayResource", completer);
+  }
 };
 
 template <>
@@ -130,6 +140,9 @@ class ::fidl::testing::WireSyncEventHandlerTestBase<::test_typesinprotocols::Pro
   }
   void EventArrayVectorNested(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventArrayVectorNested>* event) override {
     NotImplemented_("EventArrayVectorNested");
+  }
+  void EventResource(::fidl::WireEvent<::test_typesinprotocols::Protocol::EventResource>* event) override {
+    NotImplemented_("EventResource");
   }
 };
 #pragma clang diagnostic pop

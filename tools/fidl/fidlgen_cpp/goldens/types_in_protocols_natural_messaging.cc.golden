@@ -109,6 +109,18 @@ namespace test_typesinprotocols {
 
 [[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
+[[maybe_unused]] constexpr inline uint64_t kProtocol_OneWayResource_Ordinal = 6553996787849601058lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_OneWayResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kProtocol_TwoWayResource_Ordinal = 1802709005492464987lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_TwoWayResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
+[[maybe_unused]] constexpr inline uint64_t kProtocol_EventResource_Ordinal = 5745997765922613643lu;
+
+[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_EventResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+
 #ifdef __Fuchsia__
 }  // namespace test_typesinprotocols
 
@@ -248,6 +260,23 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayArra
       });
 }
 
+::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayResource>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::TwoWayResource(::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource> request) const {
+  return ::fidl::internal::NaturalThenable<::test_typesinprotocols::Protocol::TwoWayResource>(
+      &client_base(), {}, &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayResource_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayResource_DynamicFlags,
+      [request = std::move(request)](NaturalMessageEncoder& encoder) mutable {
+        encoder.EncodeBody(std::move(request));
+        return ZX_OK;
+      },
+      [](
+          ::fidl::internal::ThenableBase* base,
+          ::fidl::internal::NaturalMessageEncoder& encoder,
+          ::fidl::internal::ResponseContext* response_context) {
+        ::fidl::OutgoingMessage msg = encoder.GetMessage();
+        return base->SendTwoWay(msg, response_context);
+      });
+}
+
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::OneWayBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayBasic>& request) const {
   ::fidl::internal::NaturalMessageEncoder _encoder{
@@ -330,6 +359,17 @@ fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::OneWayArra
   ::fidl::internal::NaturalMessageEncoder _encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_OneWayArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_OneWayArrayVectorNested_DynamicFlags};
   _encoder.EncodeBody(request);
+
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
+  return ::fidl::internal::ToFitxResult(status);
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol>::OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request) const {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_OneWayResource_Ordinal, ::test_typesinprotocols::kProtocol_OneWayResource_DynamicFlags};
+  _encoder.EncodeBody(std::move(request));
 
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   ::fidl::OneWayStatus status = client_base().SendOneWay(_encoded_message);
@@ -431,6 +471,17 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWay
       msg.Call(_client_end().handle(), response_storage.view()), nullptr);
 }
 
+::fidl::Result<::test_typesinprotocols::Protocol::TwoWayResource>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::TwoWayResource(::fidl::Request<::test_typesinprotocols::Protocol::TwoWayResource> request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayResource_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayResource_DynamicFlags};
+  encoder.EncodeBody(std::move(request));
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  ::fidl::internal::IncomingMessageStorage<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayResource>> response_storage;
+  return ::fidl::internal::DecodeResponseAndFoldError<::test_typesinprotocols::Protocol::TwoWayResource>(
+      msg.Call(_client_end().handle(), response_storage.view()), nullptr);
+}
+
 ::fit::result<::fidl::OneWayError>
 fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::OneWayBasic(const ::fidl::Request<::test_typesinprotocols::Protocol::OneWayBasic>& request) {
   ::fidl::internal::NaturalMessageEncoder encoder{
@@ -506,6 +557,16 @@ fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::OneWay
   ::fidl::internal::NaturalMessageEncoder encoder{
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_OneWayArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_OneWayArrayVectorNested_DynamicFlags};
   encoder.EncodeBody(request);
+  ::fidl::OutgoingMessage msg = encoder.GetMessage();
+  msg.Write(_client_end().handle());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
+}
+
+::fit::result<::fidl::OneWayError>
+fidl::internal::NaturalSyncClientImpl<::test_typesinprotocols::Protocol>::OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request) {
+  ::fidl::internal::NaturalMessageEncoder encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_OneWayResource_Ordinal, ::test_typesinprotocols::kProtocol_OneWayResource_DynamicFlags};
+  encoder.EncodeBody(std::move(request));
   ::fidl::OutgoingMessage msg = encoder.GetMessage();
   msg.Write(_client_end().handle());
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{msg});
@@ -611,6 +672,17 @@ fidl::internal::NaturalEventDispatcher<::test_typesinprotocols::Protocol>::Dispa
       if (event_handler()) {
         ::fidl::Event<::test_typesinprotocols::Protocol::EventArrayVectorNested> event = std::move(decoded.value());
         event_handler()->EventArrayVectorNested(event);
+      }
+      return ::fidl::Status::Ok();
+    }
+    case ::test_typesinprotocols::kProtocol_EventResource_Ordinal: {
+      ::fit::result decoded = ::fidl::internal::DecodeTransactionalMessage<::test_typesinprotocols::Resource>(std::move(msg));
+      if (decoded.is_error()) {
+        return decoded.error_value();
+      }
+      if (event_handler()) {
+        ::fidl::Event<::test_typesinprotocols::Protocol::EventResource> event = std::move(decoded.value());
+        event_handler()->EventResource(event);
       }
       return ::fidl::Status::Ok();
     }
@@ -760,6 +832,23 @@ fidl::internal::NaturalEventDispatcher<::test_typesinprotocols::Protocol>::Dispa
   return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
 }
 
+::fit::result<::fidl::OneWayError> fidl::internal::NaturalWeakEventSender<::test_typesinprotocols::Protocol>::EventResource(::test_typesinprotocols::Resource payload) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_EventResource_Ordinal, ::test_typesinprotocols::kProtocol_EventResource_DynamicFlags};
+  _encoder.EncodeBody(std::move(payload));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  return ::fidl::internal::ToFitxResult(_inner().SendEvent(_encoded_message));
+}
+
+::fit::result<::fidl::OneWayError> fidl::internal::NaturalEventSender<::test_typesinprotocols::Protocol>::EventResource(::test_typesinprotocols::Resource payload) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_EventResource_Ordinal, ::test_typesinprotocols::kProtocol_EventResource_DynamicFlags};
+  _encoder.EncodeBody(std::move(payload));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  _encoded_message.Write(_transport());
+  return ::fidl::internal::ToFitxResult(::fidl::OneWayStatus{::fidl::Status{_encoded_message}});
+}
+
 #endif  // __Fuchsia__
 
 void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayBasic>::Reply(const ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic>& response) {
@@ -830,6 +919,15 @@ void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::Two
       &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayArrayVectorNested_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayArrayVectorNested_DynamicFlags};
   _encoder.EncodeBody(
       ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>::IntoDomainObject(response));
+  ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
+  SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
+}
+
+void fidl::internal::NaturalCompleterBase<::test_typesinprotocols::Protocol::TwoWayResource>::Reply(::fidl::Response<::test_typesinprotocols::Protocol::TwoWayResource> response) {
+  ::fidl::internal::NaturalMessageEncoder _encoder{
+      &::fidl::internal::ChannelTransport::VTable, ::test_typesinprotocols::kProtocol_TwoWayResource_Ordinal, ::test_typesinprotocols::kProtocol_TwoWayResource_DynamicFlags};
+  _encoder.EncodeBody(
+      ::fidl::internal::ResponseMessageConverter<::test_typesinprotocols::Protocol::TwoWayResource>::IntoDomainObject(std::move(response)));
   ::fidl::OutgoingMessage _encoded_message = _encoder.GetMessage();
   SendReply(&_encoded_message, ::fidl::internal::OutgoingTransportContext{});
 }
@@ -1093,10 +1191,42 @@ constexpr ::fidl::internal::MethodEntry fidl::internal::NaturalServerDispatcher<
           return ::fidl::Status::Ok();
         },
     },
+    {
+        ::test_typesinprotocols::kProtocol_OneWayResource_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_typesinprotocols::Resource>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::OneWayResource>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->OneWayResource(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
+    {
+        ::test_typesinprotocols::kProtocol_TwoWayResource_Ordinal,
+        [](void* interface, ::fidl::EncodedMessage& msg, ::fidl::WireFormatMetadata metadata,
+           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
+          ::fit::result decoded = ::fidl::StandaloneDecode<::test_typesinprotocols::Resource>(
+              std::move(msg), metadata);
+          if (decoded.is_error()) {
+            return decoded.error_value();
+          }
+          ::fidl::internal::NaturalCompleter<::test_typesinprotocols::Protocol::TwoWayResource>::Sync completer(txn);
+          static_cast<::fidl::Server<::test_typesinprotocols::Protocol>*>(interface)->TwoWayResource(
+              decoded.value(),
+              completer);
+          return ::fidl::Status::Ok();
+        },
+    },
 };
 
 const ::fidl::internal::MethodEntry* fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol>::entries_end_ =
-    &entries_[16];
+    &entries_[18];
 
 void fidl::internal::NaturalServerDispatcher<::test_typesinprotocols::Protocol>::Dispatch(::fidl::Server<::test_typesinprotocols::Protocol>* impl, ::fidl::IncomingHeaderAndMessage&& msg,
                                                                                           internal::MessageStorageViewBase* storage_view, ::fidl::Transaction* txn) {
