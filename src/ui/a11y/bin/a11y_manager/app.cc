@@ -142,9 +142,6 @@ void App::FinishSetUp() {
   FX_DCHECK(initialization_state_.IsInitialized());
   FX_DCHECK(i18n_profile_) << "App is being initialized without i18n profile from user.";
 
-  // Start watching setui for current settings
-  WatchSetui();
-
   // Configures a View Coordinate Converter. Done at this point because the a11y view is guaranteed
   // to be initialized.
   auto a11y_view = view_manager_->a11y_view();
@@ -155,6 +152,18 @@ void App::FinishSetUp() {
   auto view_coordinate_converter = std::make_unique<a11y::ViewCoordinateConverter>(
       context_->svc()->Connect<fuchsia::ui::observation::scope::Registry>(), view_ref_koid);
   view_manager_->SetViewCoordinateConverter(std::move(view_coordinate_converter));
+
+  // Note that initializing the gesture manager here is important:
+  // 1. It is done when the a11y view is initialized for sure;
+  // 2. It obtains the touch source, and starts watching for pointer events, even when a11y features
+  // are not on. This is **critical**: a11y may block touch input if it does not start participating
+  // right away in gesture disambiguation.
+  gesture_manager_ = std::make_unique<a11y::GestureManagerV2>(a11y_view->TakeTouchSource());
+
+  // Start watching setui for current settings. Must be the last step in the initialization because
+  // this may turn on / off a11y features, and these features depend on the things initialized
+  // above.
+  WatchSetui();
 }
 
 void App::SetState(A11yManagerState state) {
@@ -207,39 +216,22 @@ void App::UpdateGestureManagerState() {
 
   gesture_state_ = new_state;
 
-  // For now the easiest way to properly set up all gestures with the right priorities is to rebuild
+  // For now the easiest way to properly set up all gestures with the right priorities is to clear
   // the gesture manager when the gestures change.
+  gesture_manager_->Clear();
 
   if (!gesture_state_.has_any()) {
-    // Shut down and clean up if no users
-    gesture_manager_.reset();
-  } else {
-    // Register with the pointer event registry on first use, rather than in the
-    // constructor. The service is usually not ready when the constructor is
-    // called, so we should wait until we need the service to register.
-    if (!pointer_event_registry_) {
-      pointer_event_registry_ =
-          context_->svc()->Connect<fuchsia::ui::input::accessibility::PointerEventRegistry>();
-      pointer_event_registry_.set_error_handler([](zx_status_t status) {
-        FX_LOGS(ERROR) << "Error from fuchsia::ui::input::accessibility::PointerEventRegistry: "
-                       << zx_status_get_string(status);
-      });
-    }
+    return;
+  }
 
-    gesture_manager_ = std::make_unique<a11y::GestureManager>();
-    pointer_event_registry_->Register(gesture_manager_->binding().NewBinding(), [](bool status) {
-      FX_LOGS(INFO) << "Registration completed for pointer event registry with status: " << status;
-    });
+  // The ordering of these recognizers is significant, as it signifies priority.
+  if (gesture_state_.magnifier_gestures) {
+    magnifier_->BindGestures(gesture_manager_->gesture_handler());
+  }
 
-    // The ordering of these recognizers is significant, as it signifies priority.
-    if (gesture_state_.magnifier_gestures) {
-      magnifier_->BindGestures(gesture_manager_->gesture_handler());
-    }
-
-    if (gesture_state_.screen_reader_gestures) {
-      screen_reader_->BindGestures(gesture_manager_->gesture_handler());
-      gesture_manager_->gesture_handler()->ConsumeAll();
-    }
+  if (gesture_state_.screen_reader_gestures) {
+    screen_reader_->BindGestures(gesture_manager_->gesture_handler());
+    gesture_manager_->gesture_handler()->ConsumeAll();
   }
 }
 

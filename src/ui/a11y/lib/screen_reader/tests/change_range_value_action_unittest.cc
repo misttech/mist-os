@@ -83,7 +83,7 @@ TEST_F(ChangeRangeValueActionTest, NoTreeInFocus) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kIncrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Update A11y Focus Manager to return invalid a11y focus.
@@ -105,7 +105,7 @@ TEST_F(ChangeRangeValueActionTest, FocusedNodeNotFound) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kIncrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Update focused node to an invalid node_id.
@@ -129,7 +129,7 @@ TEST_F(ChangeRangeValueActionTest, OnAccessibilityActionRequestedFailed) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kIncrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Update semantics source so that a call to PerformAccessibilityAction() results in failure.
@@ -153,7 +153,7 @@ TEST_F(ChangeRangeValueActionTest, RangeControlIncremented) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kIncrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   mock_semantics_source()->set_custom_action_callback(
@@ -185,7 +185,7 @@ TEST_F(ChangeRangeValueActionTest, RangeControlDecremented) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kDecrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   mock_semantics_source()->set_custom_action_callback(
@@ -217,7 +217,7 @@ TEST_F(ChangeRangeValueActionTest, RangeControlIncrementedUseValue) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kIncrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Increment the slider value, but store the new value in the range field
@@ -255,7 +255,7 @@ TEST_F(ChangeRangeValueActionTest, FocusChangesBeforeActionCompletes) {
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::ChangeRangeValueAction range_value_action(action_context(), context,
                                                   ChangeRangeValueActionType::kIncrementAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Increment the slider value, but store the new value in the range field

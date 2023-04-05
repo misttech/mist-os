@@ -22,7 +22,7 @@ class DefaultAction : public ScreenReaderAction {
 
   // This method implements the actual sequence of events that should
   // happen when an associated gesture is performed on an element.
-  void Run(GestureContext gesture_context) override;
+  void Run(a11y::gesture_util_v2::GestureContext gesture_context) override;
 };
 
 }  // namespace a11y

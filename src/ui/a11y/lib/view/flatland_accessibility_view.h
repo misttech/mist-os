@@ -79,10 +79,6 @@ class FlatlandAccessibilityView : public AccessibilityViewInterface,
   // Helper method to handle layout changes.
   void ResizeLayout(fuchsia::math::SizeU logical_size);
 
-  // Watches and responds no to pointer events.
-  // TODO(fxbug.com/100030): Delete once a11y is using the new gd protocol.
-  void WatchForTouchEvents(std::vector<fuchsia::ui::pointer::TouchResponse> old_responses);
-
   // Manages a11y view's flatland connection.
   FlatlandConnection flatland_a11y_;
 

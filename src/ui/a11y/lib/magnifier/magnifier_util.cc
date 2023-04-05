@@ -20,7 +20,8 @@ bool Delta::operator==(const Delta& other) const {
 
 glm::vec2 ToVec2(::fuchsia::math::PointF point) { return glm::vec2(point.x, point.y); }
 
-Delta GetDelta(const GestureContext& current, const GestureContext& previous) {
+Delta GetDelta(const a11y::gesture_util_v2::GestureContext& current,
+               const a11y::gesture_util_v2::GestureContext& previous) {
   Delta delta;
 
   // We only ever compute deltas after a gesture has been recognized and before

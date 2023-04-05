@@ -30,7 +30,7 @@ bool RecoverA11YFocusAction::FocusIsValid() {
   return focused_node != nullptr;
 }
 
-void RecoverA11YFocusAction::Run(GestureContext gesture_context) {
+void RecoverA11YFocusAction::Run(a11y::gesture_util_v2::GestureContext gesture_context) {
   auto a11y_focus_manager = screen_reader_context_->GetA11yFocusManager();
   FX_DCHECK(a11y_focus_manager);
 

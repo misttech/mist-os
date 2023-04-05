@@ -42,7 +42,7 @@ namespace accessibility_test {
 namespace {
 
 using AccessibilityPointerEvent = fuchsia::ui::input::accessibility::PointerEvent;
-using GestureType = a11y::GestureHandler::GestureType;
+using GestureType = a11y::GestureHandlerV2::GestureType;
 using PointerEventPhase = fuchsia::ui::input::PointerEventPhase;
 using fuchsia::accessibility::gesture::Type;
 using fuchsia::accessibility::semantics::Node;
@@ -68,7 +68,7 @@ class MockScreenReaderActionRegistryImpl : public a11y::ScreenReaderActionRegist
     return this;
   }
 
-  void Run(a11y::GestureContext gesture_context) override {}
+  void Run(a11y::gesture_util_v2::GestureContext gesture_context) override {}
 
   std::vector<std::string>& invoked_actions() { return invoked_actions_; }
 
@@ -95,7 +95,7 @@ class ScreenReaderTest : public gtest::TestLoopFixture {
     gtest::TestLoopFixture::SetUp();
 
     context_provider_ = std::make_unique<sys::testing::ComponentContextProvider>();
-    mock_gesture_handler_ = std::make_unique<MockGestureHandler>();
+    mock_gesture_handler_ = std::make_unique<MockGestureHandlerV2>();
     view_manager_ = std::make_unique<a11y::ViewManager>(
         std::make_unique<MockSemanticTreeServiceFactory>(),
         std::make_unique<MockViewSemanticsFactory>(), std::make_unique<MockAnnotationViewFactory>(),
@@ -111,7 +111,7 @@ class ScreenReaderTest : public gtest::TestLoopFixture {
     semantic_provider_ = std::make_unique<MockSemanticProvider>(view_manager_.get());
     gesture_manager_ = std::make_unique<a11y::GestureManager>();
     gesture_listener_registry_ = std::make_unique<a11y::GestureListenerRegistry>();
-    mock_gesture_handler_ = std::make_unique<MockGestureHandler>();
+    mock_gesture_handler_ = std::make_unique<MockGestureHandlerV2>();
     mock_gesture_listener_ = std::make_unique<MockGestureListener>();
   }
 
@@ -138,7 +138,7 @@ class ScreenReaderTest : public gtest::TestLoopFixture {
   std::unique_ptr<a11y::GestureManager> gesture_manager_;
   std::unique_ptr<a11y::GestureListenerRegistry> gesture_listener_registry_;
   std::unique_ptr<MockGestureListener> mock_gesture_listener_;
-  std::unique_ptr<MockGestureHandler> mock_gesture_handler_;
+  std::unique_ptr<MockGestureHandlerV2> mock_gesture_handler_;
 
   std::unique_ptr<MockScreenReaderContext> context_;
   MockScreenReaderContext* context_ptr_;

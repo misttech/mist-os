@@ -10,7 +10,7 @@
 #include <unordered_map>
 
 #include "src/lib/fxl/memory/weak_ptr.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_handler.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_handler_v2.h"
 #include "src/ui/a11y/lib/gesture_manager/gesture_listener_registry.h"
 #include "src/ui/a11y/lib/screen_reader/i18n/messages.h"
 #include "src/ui/a11y/lib/screen_reader/screen_reader_action.h"
@@ -49,7 +49,7 @@ class ScreenReader : public SemanticsEventListener {
 
   ~ScreenReader();
 
-  void BindGestures(a11y::GestureHandler* gesture_handler);
+  void BindGestures(a11y::GestureHandlerV2* gesture_handler);
 
   ScreenReaderContext* context() { return context_.get(); }
 
@@ -68,7 +68,8 @@ class ScreenReader : public SemanticsEventListener {
   // for the matched Action.
   // Functions returns false, if no action matches the provided "action_name",
   // returns true if Run() is called.
-  bool ExecuteAction(const std::string& action_name, GestureContext gesture_context);
+  bool ExecuteAction(const std::string& action_name,
+                     a11y::gesture_util_v2::GestureContext gesture_context);
 
   // Speaks the message represented by |message_id|.
   void SpeakMessage(fuchsia::intl::l10n::MessageIds message_id);
@@ -76,8 +77,8 @@ class ScreenReader : public SemanticsEventListener {
 
   // The Screen Reader can simulate a touch screen tap down, an optional sequence of injected moves,
   // followed by a tap up event to directly interact with runtimes.
-  void SimulateTapDown(GestureContext context);
-  void SimulateTapUp(GestureContext context);
+  void SimulateTapDown(a11y::gesture_util_v2::GestureContext context);
+  void SimulateTapUp(a11y::gesture_util_v2::GestureContext context);
 
   // Stores information about the Screen Reader state.
   std::unique_ptr<ScreenReaderContext> context_;

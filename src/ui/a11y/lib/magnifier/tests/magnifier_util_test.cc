@@ -9,6 +9,8 @@
 namespace accessibility_test {
 namespace {
 
+using a11y::GetDelta;
+
 TEST(MagnifierUtilTest, DeltaSum) {
   a11y::Delta delta_1;
   delta_1.translation = glm::vec2(1, 2);
@@ -35,13 +37,13 @@ TEST(MagnifierUnitTest, GetDeltaFromGestureContexts) {
   //   Centroid: (3, 5)
   // NOTE: NDC coordinates will be between -1 and 1, but we use integers here to
   // avoid flakiness from float rounding.
-  a11y::GestureContext current;
+  a11y::gesture_util_v2::GestureContext current;
   current.current_pointer_locations[0].ndc_point.x = 6;
   current.current_pointer_locations[0].ndc_point.y = 8;
   current.current_pointer_locations[1].ndc_point.x = 0;
   current.current_pointer_locations[1].ndc_point.y = 0;
 
-  a11y::GestureContext previous;
+  a11y::gesture_util_v2::GestureContext previous;
   previous.current_pointer_locations[0].ndc_point.x = 9;
   previous.current_pointer_locations[0].ndc_point.y = 13;
   previous.current_pointer_locations[1].ndc_point.x = -3;
@@ -55,11 +57,11 @@ TEST(MagnifierUnitTest, GetDeltaFromGestureContexts) {
 }
 
 TEST(MagnifierUnitTest, GetDeltaFromGestureContextsDifferentNumPointers) {
-  a11y::GestureContext current;
+  a11y::gesture_util_v2::GestureContext current;
   current.current_pointer_locations[0].ndc_point.x = 6;
   current.current_pointer_locations[0].ndc_point.y = 8;
 
-  a11y::GestureContext previous;
+  a11y::gesture_util_v2::GestureContext previous;
 
   auto delta = GetDelta(current, previous);
 
@@ -69,11 +71,11 @@ TEST(MagnifierUnitTest, GetDeltaFromGestureContextsDifferentNumPointers) {
 }
 
 TEST(MagnifierUnitTest, GetDeltaFromGestureContextsDifferentPointerIds) {
-  a11y::GestureContext current;
+  a11y::gesture_util_v2::GestureContext current;
   current.current_pointer_locations[0].ndc_point.x = 6;
   current.current_pointer_locations[0].ndc_point.y = 8;
 
-  a11y::GestureContext previous;
+  a11y::gesture_util_v2::GestureContext previous;
   previous.current_pointer_locations[1].ndc_point.x = -3;
   previous.current_pointer_locations[1].ndc_point.y = -3;
 

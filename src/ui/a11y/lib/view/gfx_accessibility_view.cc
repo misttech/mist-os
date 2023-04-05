@@ -182,7 +182,6 @@ void GfxAccessibilityView::Initialize() {
                                    error) {
                           FX_DCHECK(error == nullptr);
                           touch_source_ = augmented.Bind();
-                          WatchForTouchEvents({});
                         });
 
                     if (is_initialized() && !old) {
@@ -307,27 +306,6 @@ fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr GfxAccessibilityView::
 void GfxAccessibilityView::SetTouchSource(
     fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) {
   touch_source_ = std::move(touch_source);
-}
-
-void GfxAccessibilityView::WatchForTouchEvents(
-    std::vector<fuchsia::ui::pointer::TouchResponse> old_responses) {
-  auto callback =
-      [this](std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> events) {
-        std::vector<fuchsia::ui::pointer::TouchResponse> responses;
-        for (uint32_t i = 0; i < events.size(); ++i) {
-          auto& event = events[i];
-          fuchsia::ui::pointer::TouchResponse response;
-          if (event.touch_event.has_pointer_sample()) {
-            FX_DCHECK(event.touch_event.has_trace_flow_id());
-            response.set_trace_flow_id(event.touch_event.trace_flow_id());
-            response.set_response_type(fuchsia::ui::pointer::TouchResponseType::NO);
-          }
-          responses.push_back(std::move(response));
-        }
-        WatchForTouchEvents(std::move(responses));
-      };
-  FX_DCHECK(touch_source_);
-  (*touch_source_)->Watch(std::move(old_responses), callback);
 }
 
 }  // namespace a11y

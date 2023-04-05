@@ -7,7 +7,7 @@
 
 #include <map>
 
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
 
 #include <glm/glm.hpp>
 
@@ -33,7 +33,8 @@ glm::vec2 ToVec2(::fuchsia::math::PointF point);
 // This method expects that |current| and |previous| have the same set of
 // pointers. If not, it will return the "NOOP" Delta with a translation of (0,
 // 0) and a scale of 1.
-Delta GetDelta(const GestureContext& current, const GestureContext& previous);
+Delta GetDelta(const a11y::gesture_util_v2::GestureContext& current,
+               const a11y::gesture_util_v2::GestureContext& previous);
 
 }  // namespace a11y
 

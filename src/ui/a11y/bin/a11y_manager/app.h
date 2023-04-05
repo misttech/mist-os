@@ -25,7 +25,7 @@
 #include "src/ui/a11y/lib/configuration/color_transform_manager.h"
 #include "src/ui/a11y/lib/focus_chain/focus_chain_manager.h"
 #include "src/ui/a11y/lib/gesture_manager/gesture_listener_registry.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_manager.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_manager_v2.h"
 #include "src/ui/a11y/lib/magnifier/magnifier_2.h"
 #include "src/ui/a11y/lib/screen_reader/screen_reader.h"
 #include "src/ui/a11y/lib/tts/tts_manager.h"
@@ -195,7 +195,7 @@ class App {
   std::unique_ptr<a11y::FocusChainManager> focus_chain_manager_;
   // The gesture manager is instantiated whenever a11y manager starts listening
   // for pointer events, and destroyed when the listener disconnects.
-  std::unique_ptr<a11y::GestureManager> gesture_manager_;
+  std::unique_ptr<a11y::GestureManagerV2> gesture_manager_;
   GestureState gesture_state_;
   std::unique_ptr<a11y::Magnifier2> magnifier_;
 
@@ -203,17 +203,12 @@ class App {
   fidl::BindingSet<fuchsia::accessibility::virtualkeyboard::Registry>
       virtualkeyboard_registry_bindings_;
 
-  fidl::BindingSet<fuchsia::ui::input::accessibility::PointerEventListener> listener_bindings_;
   fidl::BindingSet<fuchsia::ui::focus::FocusChainListener> focus_chain_listener_bindings_;
 
   fidl::BindingSet<fuchsia::accessibility::Magnifier> magnifier_bindings_;
 
   fidl::BindingSet<fuchsia::accessibility::gesture::ListenerRegistry>
       gesture_listener_registry_bindings_;
-
-  // Interface between a11y manager and Scenic to register a
-  // accessibility pointer event listener.
-  fuchsia::ui::input::accessibility::PointerEventRegistryPtr pointer_event_registry_;
 
   // Interface between Setui and a11y manager to get updates when user settings change.
   fuchsia::settings::AccessibilityPtr setui_settings_;

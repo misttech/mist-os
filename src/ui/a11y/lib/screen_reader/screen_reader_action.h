@@ -9,7 +9,7 @@
 #include <fuchsia/ui/input/accessibility/cpp/fidl.h>
 #include <lib/fpromise/promise.h>
 
-#include "src/ui/a11y/lib/gesture_manager/gesture_util/util.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_util_v2/util.h"
 #include "src/ui/a11y/lib/input_injection/injector_manager.h"
 #include "src/ui/a11y/lib/screen_reader/screen_reader_context.h"
 #include "src/ui/a11y/lib/screen_reader/speaker.h"
@@ -40,7 +40,7 @@ class ScreenReaderAction {
 
   // Action implementations override this method with the necessary method parameters to perform
   // that action.
-  virtual void Run(GestureContext gesture_context) = 0;
+  virtual void Run(a11y::gesture_util_v2::GestureContext gesture_context) = 0;
 
  protected:
   // Constructor for mocks.
@@ -49,7 +49,7 @@ class ScreenReaderAction {
   // Helper function to call hit testing based on ActionContext and
   // GestureContext.
   void ExecuteHitTesting(
-      ActionContext* context, GestureContext gesture_context,
+      ActionContext* context, a11y::gesture_util_v2::GestureContext gesture_context,
       fuchsia::accessibility::semantics::SemanticListener::HitTestCallback callback);
 
   // Returns a promise that executes an accessibility action targeting the semantic tree

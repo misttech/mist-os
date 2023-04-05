@@ -13,7 +13,7 @@ DefaultAction::DefaultAction(ActionContext* action_context,
     : ScreenReaderAction(action_context, screen_reader_context) {}
 DefaultAction::~DefaultAction() = default;
 
-void DefaultAction::Run(GestureContext gesture_context) {
+void DefaultAction::Run(a11y::gesture_util_v2::GestureContext gesture_context) {
   auto a11y_focus = screen_reader_context_->GetA11yFocusManager()->GetA11yFocus();
   if (!a11y_focus) {
     FX_LOGS(INFO) << "No view is in focus.";

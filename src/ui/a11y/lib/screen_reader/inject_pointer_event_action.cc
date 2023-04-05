@@ -12,6 +12,22 @@
 #include "src/ui/a11y/lib/screen_reader/util/util.h"
 
 namespace a11y {
+namespace {
+
+fuchsia::ui::input::PointerEventPhase ConvertPhase(fuchsia::ui::pointer::EventPhase phase) {
+  switch (phase) {
+    case fuchsia::ui::pointer::EventPhase::ADD:
+      return fuchsia::ui::input::PointerEventPhase ::ADD;
+    case fuchsia::ui::pointer::EventPhase::CHANGE:
+      return fuchsia::ui::input::PointerEventPhase ::MOVE;
+    case fuchsia::ui::pointer::EventPhase::REMOVE:
+      return fuchsia::ui::input::PointerEventPhase ::REMOVE;
+    case fuchsia::ui::pointer::EventPhase::CANCEL:
+      return fuchsia::ui::input::PointerEventPhase ::CANCEL;
+  }
+}
+
+}  // namespace
 
 InjectPointerEventAction::InjectPointerEventAction(ActionContext* action_context,
                                                    ScreenReaderContext* screen_reader_context)
@@ -19,7 +35,7 @@ InjectPointerEventAction::InjectPointerEventAction(ActionContext* action_context
 
 InjectPointerEventAction::~InjectPointerEventAction() = default;
 
-void InjectPointerEventAction::Run(GestureContext gesture_context) {
+void InjectPointerEventAction::Run(a11y::gesture_util_v2::GestureContext gesture_context) {
   auto a11y_focus = screen_reader_context_->GetA11yFocusManager()->GetA11yFocus();
   if (!a11y_focus || a11y_focus->view_ref_koid == ZX_KOID_INVALID) {
     return;
@@ -74,7 +90,7 @@ void InjectPointerEventAction::Run(GestureContext gesture_context) {
   pointer_event.device_id = 1u;
   pointer_event.pointer_id = gesture_context.last_event_pointer_id;
   pointer_event.type = fuchsia::ui::input::PointerEventType::TOUCH;
-  pointer_event.phase = gesture_context.last_event_phase;
+  pointer_event.phase = ConvertPhase(gesture_context.last_event_phase);
   pointer_event.x = action_target_root.x;
   pointer_event.y = action_target_root.y;
   fuchsia::ui::input::InputEvent input_event;

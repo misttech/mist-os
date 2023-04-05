@@ -128,80 +128,80 @@ ScreenReader::ScreenReader(std::unique_ptr<ScreenReaderContext> context,
 
 ScreenReader::~ScreenReader() { tts_manager_->UnregisterTTSEngineReadyCallback(); }
 
-void ScreenReader::BindGestures(a11y::GestureHandler* gesture_handler) {
+void ScreenReader::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
   // Add gestures with higher priority earlier than gestures with lower priority.
   // Add a three finger Up swipe recognizer. This corresponds to a physical three finger Right
   // swipe.
   bool gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kThreeFingerRightSwipeActionLabel, std::move(context));
       },
-      GestureHandler::kThreeFingerUpSwipe);
+      GestureHandlerV2::kThreeFingerUpSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add a three finger Down swipe recognizer. This corresponds to a physical three finger Left
   // swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kThreeFingerLeftSwipeActionLabel, std::move(context));
       },
-      GestureHandler::kThreeFingerDownSwipe);
+      GestureHandlerV2::kThreeFingerDownSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add a three finger Left swipe recognizer. This corresponds to a physical three finger Up swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kThreeFingerUpSwipeActionLabel, std::move(context));
       },
-      GestureHandler::kThreeFingerLeftSwipe);
+      GestureHandlerV2::kThreeFingerLeftSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add a three finger Right swipe recognizer. This corresponds to a physical three finger Down
   // swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kThreeFingerDownSwipeActionLabel, std::move(context));
       },
-      GestureHandler::kThreeFingerRightSwipe);
+      GestureHandlerV2::kThreeFingerRightSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add one finger Down swipe recognizer. This corresponds to a physical one finger Left swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         auto action_name = PreviousActionFromSemanticLevel(context_->semantic_level());
         ExecuteAction(action_name, std::move(context));
       },
-      GestureHandler::kOneFingerDownSwipe);
+      GestureHandlerV2::kOneFingerDownSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add one finger Up swipe recognizer. This corresponds to a physical one finger Right swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         auto action_name = NextActionFromSemanticLevel(context_->semantic_level());
         ExecuteAction(action_name, std::move(context));
       },
-      GestureHandler::kOneFingerUpSwipe);
+      GestureHandlerV2::kOneFingerUpSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add one finger Left swipe recognizer. This corresponds to a physical one finger Up swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kPreviousSemanticLevelActionLabel, std::move(context));
       },
-      GestureHandler::kOneFingerLeftSwipe);
+      GestureHandlerV2::kOneFingerLeftSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add one finger Right swipe recognizer. This corresponds to a physical one finger Down swipe.
   gesture_bind_status = gesture_handler->BindSwipeAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kNextSemanticLevelActionLabel, std::move(context));
       },
-      GestureHandler::kOneFingerRightSwipe);
+      GestureHandlerV2::kOneFingerRightSwipe);
   FX_DCHECK(gesture_bind_status);
 
   // Add OneFingerDoubleTap recognizer.
-  gesture_bind_status =
-      gesture_handler->BindOneFingerDoubleTapAction([this](GestureContext context) {
+  gesture_bind_status = gesture_handler->BindOneFingerDoubleTapAction(
+      [this](a11y::gesture_util_v2::GestureContext context) {
         // This simulated tap down / up event is necessary because some of the supported runtimes at
         // the moment do not have an accessibility action to bring up a keyboard when interacting
         // with a text field.
@@ -217,17 +217,21 @@ void ScreenReader::BindGestures(a11y::GestureHandler* gesture_handler) {
 
   // Add MFingerNTapDragRecognizer (1 finger, 2 taps), recognizer.
   gesture_bind_status = gesture_handler->BindMFingerNTapDragAction(
-      [this](GestureContext context) { SimulateTapDown(std::move(context)); }, /*on_start*/
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
+        SimulateTapDown(std::move(context));
+      }, /*on_start*/
+      [this](a11y::gesture_util_v2::GestureContext context) {
         ExecuteAction(kInjectPointerEventActionLabel, std::move(context));
       }, /*on_update*/
-      [this](GestureContext context) { SimulateTapUp(std::move(context)); } /*on_complete*/,
+      [this](a11y::gesture_util_v2::GestureContext context) {
+        SimulateTapUp(std::move(context));
+      } /*on_complete*/,
       1u /*num_fingers*/, 2u /*num_taps*/);
   FX_DCHECK(gesture_bind_status);
 
   // Add OneFingerSingleTap recognizer.
-  gesture_bind_status =
-      gesture_handler->BindOneFingerSingleTapAction([this](GestureContext context) {
+  gesture_bind_status = gesture_handler->BindOneFingerSingleTapAction(
+      [this](a11y::gesture_util_v2::GestureContext context) {
         context_->set_semantic_level(ScreenReaderContext::SemanticLevel::kDefault);
         ExecuteAction(kExploreActionLabel, std::move(context));
       });
@@ -235,16 +239,16 @@ void ScreenReader::BindGestures(a11y::GestureHandler* gesture_handler) {
 
   // Add OneFingerDrag recognizer.
   gesture_bind_status = gesture_handler->BindOneFingerDragAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         context_->set_semantic_level(ScreenReaderContext::SemanticLevel::kDefault);
         context_->set_mode(ScreenReaderContext::ScreenReaderMode::kContinuousExploration);
       }, /*on_start*/
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         FX_DCHECK(context_->mode() ==
                   ScreenReaderContext::ScreenReaderMode::kContinuousExploration);
         ExecuteAction(kExploreActionLabel, std::move(context));
       }, /*on_update*/
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         FX_DCHECK(context_->mode() ==
                   ScreenReaderContext::ScreenReaderMode::kContinuousExploration);
         context_->set_mode(ScreenReaderContext::ScreenReaderMode::kNormal);
@@ -257,8 +261,8 @@ void ScreenReader::BindGestures(a11y::GestureHandler* gesture_handler) {
   FX_DCHECK(gesture_bind_status);
 
   // Add TwoFingerSingleTap recognizer.
-  gesture_bind_status =
-      gesture_handler->BindTwoFingerSingleTapAction([this](GestureContext /* unused */) {
+  gesture_bind_status = gesture_handler->BindTwoFingerSingleTapAction(
+      [this](a11y::gesture_util_v2::GestureContext /* unused */) {
         // Cancel any outstanding speech.
         auto promise = context_->speaker()->CancelTts();
         auto* executor = context_->executor();
@@ -331,7 +335,8 @@ void ScreenReader::InitializeActions() {
       std::make_unique<ProcessUpdateAction>(action_context_.get(), context_.get()));
 }
 
-bool ScreenReader::ExecuteAction(const std::string& action_name, GestureContext gesture_context) {
+bool ScreenReader::ExecuteAction(const std::string& action_name,
+                                 a11y::gesture_util_v2::GestureContext gesture_context) {
   auto* action = action_registry_->GetActionByName(action_name);
   if (!action) {
     return false;
@@ -364,7 +369,7 @@ void ScreenReader::OnEvent(SemanticsEventInfo event_info) {
   // Process internal semantic events.
   switch (event_info.event_type) {
     case SemanticsEventType::kSemanticTreeUpdated: {
-      GestureContext gesture_context;
+      a11y::gesture_util_v2::GestureContext gesture_context;
       if (event_info.view_ref_koid) {
         gesture_context.view_ref_koid = *event_info.view_ref_koid;
       }
@@ -391,19 +396,20 @@ void ScreenReader::OnEvent(SemanticsEventInfo event_info) {
   }
 }
 
-void ScreenReader::SimulateTapDown(GestureContext context) {
+void ScreenReader::SimulateTapDown(a11y::gesture_util_v2::GestureContext context) {
   // Enable injector for the view that is receiving pointer events.
   action_context_->injector_manager->MarkViewReadyForInjection(context.view_ref_koid, true);
   // When the gesture detects, events are already under way. We need to inject an (ADD) event here
   // to simulate the beginning of the stream that will be injected after this tap down.
-  context.last_event_phase = fuchsia::ui::input::PointerEventPhase::ADD;
+  context.last_event_phase = fuchsia::ui::pointer::EventPhase::ADD;
   ExecuteAction(kInjectPointerEventActionLabel, context);
-  context.last_event_phase = fuchsia::ui::input::PointerEventPhase::MOVE;
+  context.last_event_phase =
+      fuchsia::ui::pointer::EventPhase::CHANGE;  //  fuchsia::ui::input::PointerEventPhase::MOVE;
   ExecuteAction(kInjectPointerEventActionLabel, context);
 }
 
-void ScreenReader::SimulateTapUp(GestureContext context) {
-  context.last_event_phase = fuchsia::ui::input::PointerEventPhase::REMOVE;
+void ScreenReader::SimulateTapUp(a11y::gesture_util_v2::GestureContext context) {
+  context.last_event_phase = fuchsia::ui::pointer::EventPhase::REMOVE;
   ExecuteAction(kInjectPointerEventActionLabel, context);
 
   // End injection for the view.

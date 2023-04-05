@@ -43,6 +43,9 @@ class GestureManagerV2 {
 
   void AddRecognizer(GestureRecognizerV2* recognizer);
 
+  // clears all recognizers, removing them from the arena.
+  void Clear();
+
  private:
   // Call `TouchSourceWithLocalHit.Watch` repeatedly, responding to touch events.
   void WatchForTouchEvents(std::vector<fuchsia::ui::pointer::TouchResponse> responses);

@@ -229,4 +229,10 @@ void GestureManagerV2::ConvertToNdc(fuchsia::ui::pointer::augment::TouchEventWit
 
 void GestureManagerV2::AddRecognizer(GestureRecognizerV2* recognizer) { arena_->Add(recognizer); }
 
+void GestureManagerV2::Clear() {
+  arena_->ClearRecognizers();
+  gesture_handler_.Clear();
+  held_interactions_.clear();
+}
+
 }  // namespace a11y

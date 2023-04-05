@@ -17,7 +17,6 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/mocks/mock_color_transform_handler.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/mocks/mock_focus_chain.h"
-#include "src/ui/a11y/bin/a11y_manager/tests/mocks/mock_pointer_event_registry.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/mocks/mock_property_provider.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/mocks/mock_setui_accessibility.h"
 #include "src/ui/a11y/bin/a11y_manager/tests/util/util.h"
@@ -35,6 +34,7 @@
 #include "src/ui/a11y/lib/view/a11y_view_semantics.h"
 #include "src/ui/a11y/lib/view/tests/mocks/mock_accessibility_view.h"
 #include "src/ui/a11y/lib/view/tests/mocks/mock_view_injector_factory.h"
+#include "src/ui/a11y/lib/view/tests/mocks/scenic_mocks.h"
 
 namespace accessibility_test {
 namespace {
@@ -50,7 +50,6 @@ class AppUnitTest : public gtest::TestLoopFixture {
   AppUnitTest()
       : context_provider_(),
         context_(context_provider_.context()),
-        mock_pointer_event_registry_(&context_provider_),
         mock_color_transform_handler_(&context_provider_),
         mock_setui_(&context_provider_),
         mock_focus_chain_(&context_provider_),
@@ -61,6 +60,7 @@ class AppUnitTest : public gtest::TestLoopFixture {
         color_transform_manager_(context_),
         screen_reader_context_factory_() {
     auto mock_a11y_view = std::make_unique<MockAccessibilityView>();
+    mock_a11y_view->SetTouchSource(mock_local_hit_.NewTouchSource());
     mock_a11y_view_ptr_ = mock_a11y_view.get();
     view_manager_ = std::make_unique<a11y::ViewManager>(
         std::make_unique<a11y::SemanticTreeServiceFactory>(),
@@ -69,6 +69,7 @@ class AppUnitTest : public gtest::TestLoopFixture {
         std::make_unique<MockViewInjectorFactory>(), std::make_unique<MockSemanticsEventManager>(),
         std::move(mock_a11y_view), context_provider_.context());
     mock_semantic_provider_ = std::make_unique<MockSemanticProvider>(view_manager_.get());
+    mock_local_hit_.SetViewRefKoidForTouchEvents(mock_semantic_provider_->koid());
   }
 
   void AddNodeToTree(uint32_t node_id, std::string label,
@@ -78,43 +79,6 @@ class AppUnitTest : public gtest::TestLoopFixture {
     mock_semantic_provider_->UpdateSemanticNodes(std::move(updates));
     mock_semantic_provider_->CommitUpdates();
     RunLoopUntilIdle();
-  }
-
-  // Sends pointer events and returns the |handled| argument of the (last) resulting
-  // |OnStreamHandled| invocation.
-  //
-  // Yo dawg, I heard you like pointer event listener pointers, so I took a pointer to your pointer
-  // event listener pointer so you can receive events while you receive events (while honoring the
-  // C++ style guide).
-  std::optional<EventHandling> SendPointerEvents(PointerEventListenerPtr* listener,
-                                                 const std::vector<PointerParams>& events) {
-    std::optional<EventHandling> event_handling;
-    listener->events().OnStreamHandled = [&event_handling](uint32_t /*unused*/, uint32_t /*unused*/,
-                                                           EventHandling handled) {
-      event_handling = handled;
-    };
-
-    for (const auto& params : events) {
-      SendPointerEvent(listener->get(), params);
-      if (event_handling == fuchsia::ui::input::accessibility::EventHandling::REJECTED) {
-        break;
-      }
-    }
-
-    return event_handling;
-  }
-
-  void SendPointerEvent(PointerEventListener* listener, const PointerParams& params) {
-    listener->OnEvent(ToPointerEvent(params, input_event_time_++, mock_semantic_provider_->koid()));
-
-    // Simulate trivial passage of time (can expose edge cases with posted async tasks).
-    RunLoopUntilIdle();
-  }
-
-  // Sends a gesture that wouldn't be recognized by any accessibility feature, for testing arena
-  // configuration.
-  std::optional<EventHandling> SendUnrecognizedGesture(PointerEventListenerPtr* listener) {
-    return SendPointerEvents(listener, Zip({TapEvents(1, {}), TapEvents(2, {})}));
   }
 
   void ConnectSpeakerAndEngineToTtsManager() {
@@ -166,7 +130,7 @@ class AppUnitTest : public gtest::TestLoopFixture {
   sys::testing::ComponentContextProvider context_provider_;
   sys::ComponentContext* context_;
 
-  MockPointerEventRegistry mock_pointer_event_registry_;
+  MockLocalHit mock_local_hit_;
   MockColorTransformHandler mock_color_transform_handler_;
   MockSetUIAccessibility mock_setui_;
   MockFocusChain mock_focus_chain_;
@@ -184,7 +148,7 @@ class AppUnitTest : public gtest::TestLoopFixture {
  private:
   // We don't actually use these times. If we did, we'd want to more closely correlate them with
   // fake time.
-  uint64_t input_event_time_ = 0;
+  // uint64_t input_event_time_ = 0;
   fuchsia::ui::views::ViewRefControl a11y_control_ref_;
 };
 
@@ -227,108 +191,6 @@ TEST_F(AppUnitTest, NoListenerInitially) {
   mock_setui_.Set({}, [](auto) {});
 
   RunLoopUntilIdle();
-  EXPECT_FALSE(mock_pointer_event_registry_.listener())
-      << "No listener should be registered in the beginning, as there is no accessibility service "
-         "enabled.";
-}
-
-TEST_F(AppUnitTest, ListenerForScreenReader) {
-  auto app = GetApp();
-  EXPECT_FALSE(app->state().screen_reader_enabled());
-
-  fuchsia::settings::AccessibilitySettings settings;
-  settings.set_screen_reader(true);
-  mock_setui_.Set(std::move(settings), [](auto) {});
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(app->state().screen_reader_enabled());
-
-  ASSERT_TRUE(mock_pointer_event_registry_.listener());
-  EXPECT_EQ(SendUnrecognizedGesture(&mock_pointer_event_registry_.listener()),
-            EventHandling::CONSUMED);
-}
-
-TEST_F(AppUnitTest, ListenerForMagnifier) {
-  auto app = GetApp();
-  fuchsia::settings::AccessibilitySettings settings;
-  settings.set_enable_magnification(true);
-  mock_setui_.Set(std::move(settings), [](auto) {});
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(app->state().magnifier_enabled());
-
-  ASSERT_TRUE(mock_pointer_event_registry_.listener());
-  EXPECT_EQ(SendUnrecognizedGesture(&mock_pointer_event_registry_.listener()),
-            EventHandling::REJECTED);
-}
-
-TEST_F(AppUnitTest, ListenerForAll) {
-  auto app = GetApp();
-  fuchsia::settings::AccessibilitySettings settings;
-  settings.set_screen_reader(true);
-  settings.set_enable_magnification(true);
-  mock_setui_.Set(std::move(settings), [](auto) {});
-
-  RunLoopUntilIdle();
-  ASSERT_TRUE(mock_pointer_event_registry_.listener());
-  EXPECT_EQ(SendUnrecognizedGesture(&mock_pointer_event_registry_.listener()),
-            EventHandling::CONSUMED);
-}
-
-TEST_F(AppUnitTest, NoListenerAfterAllRemoved) {
-  auto app = GetApp();
-  {
-    fuchsia::settings::AccessibilitySettings settings;
-    settings.set_screen_reader(true);
-    settings.set_enable_magnification(true);
-    mock_setui_.Set(std::move(settings), [](auto) {});
-  }
-  RunLoopUntilIdle();
-  {
-    fuchsia::settings::AccessibilitySettings settings;
-    settings.set_screen_reader(false);
-    settings.set_enable_magnification(false);
-    mock_setui_.Set(std::move(settings), [](auto) {});
-  }
-
-  RunLoopUntilIdle();
-  EXPECT_FALSE(mock_pointer_event_registry_.listener());
-}
-
-// Covers a couple additional edge cases around removing listeners.
-TEST_F(AppUnitTest, ListenerRemoveOneByOne) {
-  auto app = GetApp();
-  {
-    fuchsia::settings::AccessibilitySettings settings;
-    settings.set_screen_reader(true);
-    settings.set_enable_magnification(true);
-    mock_setui_.Set(std::move(settings), [](auto) {});
-  }
-  RunLoopUntilIdle();
-  {
-    fuchsia::settings::AccessibilitySettings settings;
-    settings.set_screen_reader(false);
-    settings.set_enable_magnification(true);
-    mock_setui_.Set(std::move(settings), [](auto) {});
-  }
-  RunLoopUntilIdle();
-
-  EXPECT_EQ(app->state().screen_reader_enabled(), false);
-  EXPECT_EQ(app->state().magnifier_enabled(), true);
-
-  ASSERT_TRUE(mock_pointer_event_registry_.listener());
-  EXPECT_EQ(SendUnrecognizedGesture(&mock_pointer_event_registry_.listener()),
-            EventHandling::REJECTED);
-  {
-    fuchsia::settings::AccessibilitySettings settings;
-    settings.set_screen_reader(false);
-    settings.set_enable_magnification(false);
-    mock_setui_.Set(std::move(settings), [](auto) {});
-  }
-  RunLoopUntilIdle();
-
-  EXPECT_EQ(app->state().magnifier_enabled(), false);
-  EXPECT_FALSE(mock_pointer_event_registry_.listener());
 }
 
 // Makes sure gesture priorities are right. If they're not, screen reader would intercept this
@@ -349,7 +211,11 @@ TEST_F(AppUnitTest, MagnifierGestureWithScreenReader) {
   mock_setui_.Set(std::move(settings), [](auto) {});
   RunLoopUntilIdle();
 
-  SendPointerEvents(&mock_pointer_event_registry_.listener(), 3 * TapEvents(1, {}));
+  mock_local_hit_.EnqueueTapToEvents();
+  mock_local_hit_.EnqueueTapToEvents();
+  mock_local_hit_.EnqueueTapToEvents();
+  mock_local_hit_.SimulateEnqueuedEvents();
+
   RunLoopFor(a11y::Magnifier2::kTransitionPeriod);
 
   EXPECT_GT(mag_handler.transform().scale, 1);
@@ -415,11 +281,8 @@ TEST_F(AppUnitTest, ScreenReaderOnAtUserInitiatedReboot) {
 
   auto app = GetApp();
 
-  // Verify that screen reader is on and the pointer event registry is wired up.
+  // Verify that screen reader is on.
   EXPECT_TRUE(app->state().screen_reader_enabled());
-  ASSERT_TRUE(mock_pointer_event_registry_.listener());
-  EXPECT_EQ(SendUnrecognizedGesture(&mock_pointer_event_registry_.listener()),
-            EventHandling::CONSUMED);
 
   // Both a speaker and an engine need to be connected to the TTS manager in
   // order for the screen reader to announce that it's on.
@@ -537,7 +400,9 @@ TEST_F(AppUnitTest, FocusChainIsWiredToScreenReader) {
 
   // Send Tap event for view_ref_. This should trigger explore action, which should then call
   // FocusChain to set focus to the tapped view.
-  SendPointerEvents(&mock_pointer_event_registry_.listener(), TapEvents(1, {}));
+  mock_local_hit_.EnqueueTapToEvents();
+  mock_local_hit_.SimulateEnqueuedEvents();
+
   RunLoopFor(a11y::kMaxTapDuration);
 
   auto mock_screen_reader_context = screen_reader_context_factory_.mock_screen_reader_context();

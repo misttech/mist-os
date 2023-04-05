@@ -50,7 +50,7 @@ TEST_F(DefaultActionTest, OnAccessibilitActionRequestedCalled) {
 
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::DefaultAction default_action(action_context(), context);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Update focused node.
@@ -79,7 +79,7 @@ TEST_F(DefaultActionTest, OnAccessibilitActionRequestedNotCalled) {
 
   a11y::ScreenReaderContext* context = mock_screen_reader_context();
   a11y::DefaultAction default_action(action_context(), context);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
 
   // Update focused node.
   mock_a11y_focus_manager()->SetA11yFocus(ZX_KOID_INVALID, node_id, [](bool result) {});

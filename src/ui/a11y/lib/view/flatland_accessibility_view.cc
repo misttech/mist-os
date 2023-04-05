@@ -317,7 +317,6 @@ void FlatlandAccessibilityView::CreateView(
                        std::unique_ptr<fuchsia::ui::pointer::augment::ErrorForLocalHit> error) {
                   FX_DCHECK(error == nullptr);
                   touch_source_ = augmented.Bind();
-                  WatchForTouchEvents({});
 
                   // The a11y view can be considered initialized from now on, because it has the
                   // Touch Source it needs.
@@ -573,27 +572,6 @@ FlatlandAccessibilityView::TakeTouchSource() {
 void FlatlandAccessibilityView::SetTouchSource(
     fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source) {
   touch_source_ = std::move(touch_source);
-}
-
-void FlatlandAccessibilityView::WatchForTouchEvents(
-    std::vector<fuchsia::ui::pointer::TouchResponse> old_responses) {
-  auto callback =
-      [this](std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> events) {
-        std::vector<fuchsia::ui::pointer::TouchResponse> responses;
-        for (uint32_t i = 0; i < events.size(); ++i) {
-          auto& event = events[i];
-          fuchsia::ui::pointer::TouchResponse response;
-          if (event.touch_event.has_pointer_sample()) {
-            FX_DCHECK(event.touch_event.has_trace_flow_id());
-            response.set_trace_flow_id(event.touch_event.trace_flow_id());
-            response.set_response_type(fuchsia::ui::pointer::TouchResponseType::NO);
-          }
-          responses.push_back(std::move(response));
-        }
-        WatchForTouchEvents(std::move(responses));
-      };
-  FX_DCHECK(touch_source_);
-  (*touch_source_)->Watch(std::move(old_responses), callback);
 }
 
 }  // namespace a11y

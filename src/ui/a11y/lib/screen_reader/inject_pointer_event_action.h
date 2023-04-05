@@ -21,7 +21,7 @@ class InjectPointerEventAction : public ScreenReaderAction {
 
   // Invokes the inject pointer event action, injecting a pointer event into the
   // currently focused view.
-  void Run(GestureContext gesture_context) override;
+  void Run(a11y::gesture_util_v2::GestureContext gesture_context) override;
 };
 }  // namespace a11y
 

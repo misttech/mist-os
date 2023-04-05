@@ -26,7 +26,7 @@ ExploreAction::ExploreAction(ActionContext* context, ScreenReaderContext* screen
 ExploreAction::~ExploreAction() = default;
 
 fpromise::promise<Hit> ExploreAction::ExecuteHitTestingPromise(
-    const GestureContext& gesture_context) {
+    const a11y::gesture_util_v2::GestureContext& gesture_context) {
   fpromise::bridge<Hit> bridge;
   ExecuteHitTesting(action_context_, gesture_context,
                     [completer = std::move(bridge.completer)](Hit hit) mutable {
@@ -90,7 +90,7 @@ fpromise::promise<> ExploreAction::SetA11yFocusOrStopPromise(
   });
 }
 
-void ExploreAction::Run(GestureContext gesture_context) {
+void ExploreAction::Run(a11y::gesture_util_v2::GestureContext gesture_context) {
   // TODO(fxbug.dev/95647): Use activity service to detect when user is using a fuchsia device.
   screen_reader_context_->set_last_interaction(async::Now(async_get_default_dispatcher()));
 

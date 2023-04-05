@@ -46,7 +46,7 @@ TEST_F(ChangeSemanticLevelAction, NoChangeForNonSliderNode) {
   mock_a11y_focus_manager()->set_should_get_a11y_focus_fail(true);
   a11y::ChangeSemanticLevelAction action(a11y::ChangeSemanticLevelAction::Direction::kForward,
                                          action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   action.Run(gesture_context);
   RunLoopUntilIdle();
@@ -67,7 +67,7 @@ TEST_F(ChangeSemanticLevelAction, DISABLED_CyclesForwardThroughLevelsForNonSlide
   mock_a11y_focus_manager()->set_should_get_a11y_focus_fail(true);
   a11y::ChangeSemanticLevelAction action(a11y::ChangeSemanticLevelAction::Direction::kForward,
                                          action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   action.Run(gesture_context);
   RunLoopUntilIdle();
@@ -92,7 +92,7 @@ TEST_F(ChangeSemanticLevelAction, DISABLED_CyclesBackwardThroughLevelsForNonSlid
   mock_a11y_focus_manager()->set_should_get_a11y_focus_fail(true);
   a11y::ChangeSemanticLevelAction action(a11y::ChangeSemanticLevelAction::Direction::kBackward,
                                          action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   action.Run(gesture_context);
   RunLoopUntilIdle();
@@ -114,7 +114,7 @@ TEST_F(ChangeSemanticLevelAction, DISABLED_CyclesBackwardThroughLevelsForNonSlid
 TEST_F(ChangeSemanticLevelAction, CyclesForwardThroughLevelsForSliderNode) {
   a11y::ChangeSemanticLevelAction action(a11y::ChangeSemanticLevelAction::Direction::kForward,
                                          action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   action.Run(gesture_context);
   RunLoopUntilIdle();
@@ -142,7 +142,7 @@ TEST_F(ChangeSemanticLevelAction, CyclesForwardThroughLevelsForSliderNode) {
 TEST_F(ChangeSemanticLevelAction, CyclesBackwardThroughLevelsForSliderNode) {
   a11y::ChangeSemanticLevelAction action(a11y::ChangeSemanticLevelAction::Direction::kBackward,
                                          action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   /* TODO(fxb/63293): Uncomment when word and character navigation exist.
   action.Run(action_data);
@@ -173,7 +173,7 @@ TEST_F(ChangeSemanticLevelAction, CyclesForwardThroughLevelsForSliderNodeNoRange
   mock_semantics_source()->CreateSemanticNode(mock_semantic_provider()->koid(), std::move(node));
   a11y::ChangeSemanticLevelAction action(a11y::ChangeSemanticLevelAction::Direction::kForward,
                                          action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   action.Run(gesture_context);
   RunLoopUntilIdle();

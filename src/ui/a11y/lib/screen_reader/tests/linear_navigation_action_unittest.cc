@@ -75,7 +75,7 @@ TEST_F(LinearNavigationActionTest, NextNodeNotFound) {
 
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call NextAction Run().
@@ -98,7 +98,7 @@ TEST_F(LinearNavigationActionTest, PreviousNodeNotFound) {
 
   a11y::LinearNavigationAction previous_action(action_context(), mock_screen_reader_context(),
                                                kPreviousAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call PreviousAction Run().
@@ -123,7 +123,7 @@ TEST_F(LinearNavigationActionTest, SetA11yFocusFailed) {
 
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call NextAction Run().
@@ -148,7 +148,7 @@ TEST_F(LinearNavigationActionTest, NextActionPerformed) {
 
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call NextAction Run().
@@ -180,7 +180,7 @@ TEST_F(LinearNavigationActionTest, PreviousActionPerformed) {
 
   a11y::LinearNavigationAction previous_action(action_context(), mock_screen_reader_context(),
                                                kPreviousAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call PreviousAction Run().
@@ -229,7 +229,7 @@ TEST_F(LinearNavigationActionTest, LinearNavigationSkipsRedundantNodes) {
   {
     a11y::LinearNavigationAction action(action_context(), mock_screen_reader_context(),
                                         kNextAction);
-    a11y::GestureContext gesture_context;
+    a11y::gesture_util_v2::GestureContext gesture_context;
     gesture_context.view_ref_koid = mock_semantic_provider()->koid();
     action.Run(gesture_context);
     RunLoopUntilIdle();
@@ -244,7 +244,7 @@ TEST_F(LinearNavigationActionTest, LinearNavigationSkipsRedundantNodes) {
   {
     a11y::LinearNavigationAction action(action_context(), mock_screen_reader_context(),
                                         kNextAction);
-    a11y::GestureContext gesture_context;
+    a11y::gesture_util_v2::GestureContext gesture_context;
     gesture_context.view_ref_koid = mock_semantic_provider()->koid();
     action.Run(gesture_context);
     RunLoopUntilIdle();
@@ -259,7 +259,7 @@ TEST_F(LinearNavigationActionTest, LinearNavigationSkipsRedundantNodes) {
   {
     a11y::LinearNavigationAction action(action_context(), mock_screen_reader_context(),
                                         kPreviousAction);
-    a11y::GestureContext gesture_context;
+    a11y::gesture_util_v2::GestureContext gesture_context;
     gesture_context.view_ref_koid = mock_semantic_provider()->koid();
     action.Run(gesture_context);
     RunLoopUntilIdle();
@@ -336,7 +336,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersTable) {
   // Navigate from node 1 -> node 3, entering the table (node 2).
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call NextAction Run().
@@ -363,7 +363,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersTable) {
   // Navigate to the next table cell.
   a11y::LinearNavigationAction next_action_2(action_context(), mock_screen_reader_context(),
                                              kNextAction);
-  a11y::GestureContext gesture_context_2;
+  a11y::gesture_util_v2::GestureContext gesture_context_2;
   gesture_context_2.view_ref_koid = mock_semantic_provider()->koid();
   next_action_2.Run(gesture_context);
   RunLoopUntilIdle();
@@ -422,7 +422,7 @@ TEST_F(LinearNavigationActionTest, PreviousActionExitsTable) {
 
   a11y::LinearNavigationAction previous_action(action_context(), mock_screen_reader_context(),
                                                kPreviousAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   // Call NextAction Run().
@@ -494,7 +494,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersNestedTable) {
 
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   next_action.Run(gesture_context);
@@ -565,7 +565,7 @@ TEST_F(LinearNavigationActionTest, PreviousActionExitsNestedTable) {
 
   a11y::LinearNavigationAction previous_action(action_context(), mock_screen_reader_context(),
                                                kPreviousAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   previous_action.Run(gesture_context);
@@ -625,7 +625,7 @@ TEST_F(LinearNavigationActionTest, NextActionEntersList) {
   // Navigate from node 1 -> node 4, entering the list.
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   next_action.Run(gesture_context);
@@ -689,7 +689,7 @@ TEST_F(LinearNavigationActionTest, NextActionExitsList) {
   // Navigate from node 4 -> node 5, entering the list.
   a11y::LinearNavigationAction next_action(action_context(), mock_screen_reader_context(),
                                            kNextAction);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   next_action.Run(gesture_context);

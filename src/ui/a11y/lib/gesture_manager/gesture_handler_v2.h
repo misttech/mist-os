@@ -93,6 +93,9 @@ class GestureHandlerV2 {
   // Binds a recognizer that consumes everything.
   void ConsumeAll();
 
+  // Clears all recognizers.
+  void Clear();
+
  protected:
   // Constructor for mocks.
   GestureHandlerV2() = default;

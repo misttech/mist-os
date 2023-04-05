@@ -72,10 +72,10 @@ TEST_F(InjectPointerEventActionTest, InjectPointerEventAction) {
   // Populate the gesture context.
   a11y::ScreenReaderContext* context = screen_reader_context_.get();
   a11y::InjectPointerEventAction inject_pointer_event_action(&action_context_, context);
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider_->koid();
   gesture_context.last_event_time = 10;
-  gesture_context.last_event_phase = fuchsia::ui::input::PointerEventPhase::MOVE;
+  gesture_context.last_event_phase = fuchsia::ui::pointer::EventPhase::CHANGE;
   gesture_context.last_event_pointer_id = 1;
   gesture_context.starting_pointer_locations[1].local_point.x = 0.f;
   gesture_context.starting_pointer_locations[1].local_point.y = 0.f;

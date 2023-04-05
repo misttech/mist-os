@@ -26,7 +26,7 @@ class ChangeRangeValueAction : public ScreenReaderAction {
 
   // This method implements the sequence of events that should happen when range control is
   // incremented or decremented.
-  void Run(GestureContext gesture_context) override;
+  void Run(a11y::gesture_util_v2::GestureContext gesture_context) override;
 
  private:
   // Stores if the range value will be incremented or decremented.

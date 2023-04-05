@@ -63,10 +63,6 @@ class GfxAccessibilityView : public AccessibilityViewInterface {
  private:
   void OnScenicEvent(std::vector<fuchsia::ui::scenic::Event> events);
 
-  // Watches and responds no to pointer events.
-  // TODO(fxbug.com/100030): Delete once a11y is using the new gd protocol.
-  void WatchForTouchEvents(std::vector<fuchsia::ui::pointer::TouchResponse> old_responses);
-
   // Component context, used to connect to scenic services.
   sys::ComponentContext* context_;
 

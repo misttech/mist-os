@@ -30,7 +30,7 @@ ScreenReaderAction::ScreenReaderAction(ActionContext* context,
 ScreenReaderAction::~ScreenReaderAction() = default;
 
 void ScreenReaderAction::ExecuteHitTesting(
-    ActionContext* context, GestureContext gesture_context,
+    ActionContext* context, a11y::gesture_util_v2::GestureContext gesture_context,
     fuchsia::accessibility::semantics::SemanticListener::HitTestCallback callback) {
   FX_DCHECK(context);
   FX_DCHECK(context->semantics_source);

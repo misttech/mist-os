@@ -51,6 +51,12 @@ int run_a11y_manager(int argc, const char** argv) {
   scenic->UsesFlatland([&](bool flatland_enabled) {
     std::shared_ptr<a11y::AccessibilityViewInterface> a11y_view;
 
+    auto local_hit = context->svc()->Connect<fuchsia::ui::pointer::augment::LocalHit>();
+    local_hit.set_error_handler([&loop](zx_status_t status) {
+      FX_PLOGS(ERROR, status) << "LocalHit connection closed; exiting";
+      loop.Quit();
+    });
+
     if (flatland_enabled) {
       auto make_flatland = [&]() {
         fidl::InterfacePtr flatland = context->svc()->Connect<fuchsia::ui::composition::Flatland>();

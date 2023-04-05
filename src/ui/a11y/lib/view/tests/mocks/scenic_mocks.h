@@ -207,6 +207,25 @@ class MockLocalHit : public fuchsia::ui::pointer::augment::LocalHit,
   MockLocalHit();
   ~MockLocalHit() = default;
 
+  // |fuchsia::ui::pointer::augment::TouchSourceWithLocalHit|
+  void Watch(std::vector<fuchsia::ui::pointer::TouchResponse> responses,
+             WatchCallback callback) override;
+
+  // |fuchsia::ui::pointer::augment::TouchSourceWithLocalHit|
+  void UpdateResponse(fuchsia::ui::pointer::TouchInteractionId interaction,
+                      fuchsia::ui::pointer::TouchResponse response,
+                      UpdateResponseCallback callback) override;
+
+  uint32_t NumWatchCalls() const;
+
+  void SimulateEvents(std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> events);
+
+  std::vector<fuchsia::ui::pointer::TouchResponse> TakeResponses();
+
+  std::vector<
+      std::pair<fuchsia::ui::pointer::TouchInteractionId, fuchsia::ui::pointer::TouchResponse>>
+  TakeUpdatedResponses();
+
   fidl::InterfaceRequestHandler<fuchsia::ui::pointer::augment::LocalHit> GetHandler(
       async_dispatcher_t* dispatcher = nullptr) {
     return [this,
@@ -215,26 +234,39 @@ class MockLocalHit : public fuchsia::ui::pointer::augment::LocalHit,
     };
   }
 
-  // |fuchsia::ui::pointer::augment::TouchSourceWithLocalHit|
-  void Watch(std::vector<fuchsia::ui::pointer::TouchResponse> responses,
-             WatchCallback callback) override {}
-
-  // |fuchsia::ui::pointer::augment::TouchSourceWithLocalHit|
-  void UpdateResponse(fuchsia::ui::pointer::TouchInteractionId stream,
-                      fuchsia::ui::pointer::TouchResponse response,
-                      UpdateResponseCallback callback) override {}
-
   // |fuchsia::ui::pointer::augment::LocalHit|
   void Upgrade(fidl::InterfaceHandle<fuchsia::ui::pointer::TouchSource> original,
                fuchsia::ui::pointer::augment::LocalHit::UpgradeCallback callback) override {
-    // fidl::InterfaceHandle<fuchsia::ui::pointer::augment::TouchSourceWithLocalHit> handle;
-    // touch_source_binding_.Bind(handle.NewRequest());
     callback(touch_source_binding_.NewBinding(), nullptr);
   }
+
+  // Returns a bound touch source to this object.
+  fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr NewTouchSource() {
+    fuchsia::ui::pointer::augment::TouchSourceWithLocalHitPtr touch_source;
+    touch_source.Bind(touch_source_binding_.NewBinding());
+    return touch_source;
+  }
+
+  void EnqueueTapToEvents();
+
+  void SimulateEnqueuedEvents();
+
+  // Configures the view ref koid that will be used to create fake touch events. This corresponds to
+  // the view that would be hit by that event.
+  void SetViewRefKoidForTouchEvents(uint64_t view_ref_koid);
 
  private:
   fidl::BindingSet<fuchsia::ui::pointer::augment::LocalHit> bindings_;
   fidl::Binding<fuchsia::ui::pointer::augment::TouchSourceWithLocalHit> touch_source_binding_;
+  uint32_t num_watch_calls_ = 0;
+  std::vector<fuchsia::ui::pointer::TouchResponse> responses_;
+  std::vector<
+      std::pair<fuchsia::ui::pointer::TouchInteractionId, fuchsia::ui::pointer::TouchResponse>>
+      updated_responses_;
+  WatchCallback callback_;
+  std::vector<fuchsia::ui::pointer::augment::TouchEventWithLocalHit> enqueued_events_;
+  bool view_parameters_sent_ = false;
+  uint64_t view_ref_koid_for_hit_ = 0;
 };
 
 }  // namespace accessibility_test

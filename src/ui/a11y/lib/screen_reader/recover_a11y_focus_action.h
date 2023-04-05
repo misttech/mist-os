@@ -21,7 +21,7 @@ class RecoverA11YFocusAction : public ScreenReaderAction {
                                   ScreenReaderContext* screen_reader_context);
   ~RecoverA11YFocusAction() override;
 
-  void Run(GestureContext gesture_context) override;
+  void Run(a11y::gesture_util_v2::GestureContext gesture_context) override;
 
  private:
   // Check whether the focus is valid (i.e., the a11y focus exists and the

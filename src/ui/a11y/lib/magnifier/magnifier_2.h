@@ -13,7 +13,7 @@
 
 #include "src/lib/callback/scoped_task_runner.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
-#include "src/ui/a11y/lib/gesture_manager/gesture_handler.h"
+#include "src/ui/a11y/lib/gesture_manager/gesture_handler_v2.h"
 #include "src/ui/a11y/lib/magnifier/magnifier_util.h"
 
 #include <glm/glm.hpp>
@@ -54,7 +54,7 @@ class Magnifier2 {
   ~Magnifier2() = default;
 
   // Method to register recognizers in a gesture recognition arena.
-  void BindGestures(a11y::GestureHandler* gesture_handler);
+  void BindGestures(a11y::GestureHandlerV2* gesture_handler);
 
   // Returns the screen to "normal" zoom (scale = 1) if it's currently magnified.
   void ZoomOutIfMagnified();
@@ -91,7 +91,7 @@ class Magnifier2 {
     // is still in progress).
     // This state is necessary to enable us to compute changes in magnification
     // scale/translation.
-    GestureContext gesture_context;
+    a11y::gesture_util_v2::GestureContext gesture_context;
 
     float transition_rate = 0;
     float scale = kDefaultScale;

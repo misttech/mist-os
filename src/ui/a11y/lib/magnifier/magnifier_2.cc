@@ -169,36 +169,38 @@ void Magnifier2::TogglePersistentMagnification() {
   }
 }
 
-void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
+void Magnifier2::BindGestures(a11y::GestureHandlerV2* gesture_handler) {
   FX_DCHECK(gesture_handler);
 
   // Add gestures with higher priority earlier than gestures with lower priority.
-  bool gesture_bind_status = gesture_handler->BindMFingerNTapAction(
-      1 /* number of fingers */, 3 /* number of taps */, [this](GestureContext context) {
-        state_.gesture_context = context;
-        // One-finger-triple-tap should be a NOOP in temporary magnification
-        // mode.
-        if (state_.mode == Mode::TEMPORARY) {
-          return;
-        }
-        TogglePersistentMagnification();
-      });
+  bool gesture_bind_status =
+      gesture_handler->BindMFingerNTapAction(1 /* number of fingers */, 3 /* number of taps */,
+                                             [this](a11y::gesture_util_v2::GestureContext context) {
+                                               state_.gesture_context = context;
+                                               // One-finger-triple-tap should be a NOOP in
+                                               // temporary magnification mode.
+                                               if (state_.mode == Mode::TEMPORARY) {
+                                                 return;
+                                               }
+                                               TogglePersistentMagnification();
+                                             });
   FX_DCHECK(gesture_bind_status);
 
-  gesture_bind_status = gesture_handler->BindMFingerNTapAction(
-      3 /* number of fingers */, 2 /* number of taps */, [this](GestureContext context) {
-        state_.gesture_context = context;
-        // Three-finger-double-tap should be a NOOP in temporary magnification
-        // mode.
-        if (state_.mode == Mode::TEMPORARY) {
-          return;
-        }
-        TogglePersistentMagnification();
-      });
+  gesture_bind_status =
+      gesture_handler->BindMFingerNTapAction(3 /* number of fingers */, 2 /* number of taps */,
+                                             [this](a11y::gesture_util_v2::GestureContext context) {
+                                               state_.gesture_context = context;
+                                               // Three-finger-double-tap should be a NOOP in
+                                               // temporary magnification mode.
+                                               if (state_.mode == Mode::TEMPORARY) {
+                                                 return;
+                                               }
+                                               TogglePersistentMagnification();
+                                             });
   FX_DCHECK(gesture_bind_status);
 
   gesture_bind_status = gesture_handler->BindMFingerNTapDragAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         state_.gesture_context = context;
         // Tap-drag gestures should only work to enable temporary magnification
         // from an unmagnified state.
@@ -208,7 +210,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         state_.mode = Mode::TEMPORARY;
         TransitionIntoZoom();
       }, /* on recognize */
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         // We should be in TEMPORARY magnification mode if we hit this callback.
         if (state_.mode != Mode::TEMPORARY) {
           return;
@@ -217,7 +219,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         state_.gesture_context = context;
         HandleTemporaryDrag(delta);
       }, /* on update */
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         state_.mode = Mode::UNMAGNIFIED;
         TransitionOutOfZoom();
       }, /* on complete */
@@ -225,7 +227,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
   FX_DCHECK(gesture_bind_status);
 
   gesture_bind_status = gesture_handler->BindMFingerNTapDragAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         state_.gesture_context = context;
         // Tap-drag gestures should only work to enable temporary magnification
         // from an unmagnified state.
@@ -235,7 +237,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         state_.mode = Mode::TEMPORARY;
         TransitionIntoZoom();
       }, /* on recognize */
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         // We should be in TEMPORARY magnification mode if we hit this callback.
         if (state_.mode != Mode::TEMPORARY) {
           return;
@@ -244,7 +246,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         state_.gesture_context = context;
         HandleTemporaryDrag(delta);
       }, /* on update */
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         state_.mode = Mode::UNMAGNIFIED;
         TransitionOutOfZoom();
       }, /* on complete */
@@ -252,7 +254,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
   FX_DCHECK(gesture_bind_status);
 
   gesture_bind_status = gesture_handler->BindTwoFingerDragAction(
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         // The magnifier should only respond to two-finger drags when in
         // PERSISTENT magnification mode.
         if (state_.mode != Mode::PERSISTENT) {
@@ -263,7 +265,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         // adjust the magnification transform meaningfully yet.
         state_.gesture_context = context;
       }, /* on recognize */
-      [this](GestureContext context) {
+      [this](a11y::gesture_util_v2::GestureContext context) {
         // The magnifier should only respond to two-finger drags when in
         // PERSISTENT magnification mode.
         if (state_.mode != Mode::PERSISTENT) {
@@ -278,7 +280,7 @@ void Magnifier2::BindGestures(a11y::GestureHandler* gesture_handler) {
         // to use the old gesture_context.
         state_.gesture_context = context;
       }, /* on update */
-      [](GestureContext context) { /* NOOP */ } /* on complete */);
+      [](a11y::gesture_util_v2::GestureContext context) { /* NOOP */ } /* on complete */);
   FX_DCHECK(gesture_bind_status);
 }
 

@@ -22,7 +22,7 @@ class ProcessUpdateAction : public ScreenReaderAction {
                                ScreenReaderContext* screen_reader_context);
   ~ProcessUpdateAction() override;
 
-  void Run(GestureContext gesture_context) override;
+  void Run(a11y::gesture_util_v2::GestureContext gesture_context) override;
 
  private:
   zx::time last_spoken_feedback_;

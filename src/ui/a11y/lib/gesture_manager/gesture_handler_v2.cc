@@ -421,4 +421,9 @@ bool GestureHandlerV2::BindMFingerNTapDragAction(OnGestureCallback on_recognize,
 
 void GestureHandlerV2::ConsumeAll() { add_recognizer_callback_(&consume_all); }
 
+void GestureHandlerV2::Clear() {
+  gesture_handlers_.clear();
+  gesture_recognizers_.clear();
+}
+
 }  // namespace a11y

@@ -44,7 +44,7 @@ class ExploreActionTest : public ScreenReaderActionTest {
 
 TEST_F(ExploreActionTest, SuccessfulExploreActionReadsNode) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -72,7 +72,7 @@ TEST_F(ExploreActionTest, SuccessfulExploreActionReadsNode) {
 
 TEST_F(ExploreActionTest, HitTestFails) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -92,7 +92,7 @@ TEST_F(ExploreActionTest, HitTestFails) {
 
 TEST_F(ExploreActionTest, SetA11yFocusFails) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -119,7 +119,7 @@ TEST_F(ExploreActionTest, SetA11yFocusFails) {
 
 TEST_F(ExploreActionTest, GettingA11yFocusFails) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -149,7 +149,7 @@ TEST_F(ExploreActionTest, GettingA11yFocusFails) {
 
 TEST_F(ExploreActionTest, HitTestNodeIDResultIsNotPresentInTheTree) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -169,7 +169,7 @@ TEST_F(ExploreActionTest, HitTestNodeIDResultIsNotPresentInTheTree) {
 
 TEST_F(ExploreActionTest, HitTestNodeNotDescribable) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -210,7 +210,7 @@ TEST_F(ExploreActionTest, IgnoresRedundantNodes) {
 
   // Hit node_3.
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -234,7 +234,7 @@ TEST_F(ExploreActionTest, IgnoresRedundantNodes) {
 
 TEST_F(ExploreActionTest, ContinuousExploreSpeaksNodeWhenA11yFocusIsDifferent) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -263,7 +263,7 @@ TEST_F(ExploreActionTest, ContinuousExploreSpeaksNodeWhenA11yFocusIsDifferent) {
 
 TEST_F(ExploreActionTest, ContinuousExploreDropsWhenA11yFocusIsTheSame) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
@@ -285,7 +285,7 @@ TEST_F(ExploreActionTest, ContinuousExploreDropsWhenA11yFocusIsTheSame) {
 
 TEST_F(ExploreActionTest, ReadsKeyboardKey) {
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   gesture_context.current_pointer_locations[0].local_point.x = kLocalCoordForTesting;
   gesture_context.current_pointer_locations[0].local_point.y = kLocalCoordForTesting;
@@ -336,7 +336,7 @@ TEST_F(ExploreActionTest, UpdatesNavigationContext) {
                                               std::move(cell_node));
 
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
 
   fuchsia::accessibility::semantics::Hit hit;
@@ -404,7 +404,7 @@ TEST_F(ExploreActionTest, UserExitsTableInSeparateView) {
 
   // Run the action using a gesture context in view 2.
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = semantic_provider_2.koid();
 
   explore_action.Run(gesture_context);
@@ -524,7 +524,7 @@ TEST_F(ExploreActionTest, NextActionEnteringAndExitingMultipleNestedContainers) 
   // and 1 table.
   a11y::ExploreAction explore_action(action_context(), mock_screen_reader_context());
 
-  a11y::GestureContext gesture_context;
+  a11y::gesture_util_v2::GestureContext gesture_context;
   gesture_context.view_ref_koid = mock_semantic_provider()->koid();
   // Note that x and y are set just for completeness of the data type. the semantic provider is
   // responsible for returning what was the hit based on these numbers.
