@@ -109,6 +109,10 @@ pub fn sys_clock_nanosleep(
     let request = current_task.mm.read_object(user_request)?;
     log_trace!(current_task, "clock_nanosleep({}, {}, {:?})", which_clock, flags, request);
 
+    if timespec_is_zero(request) {
+        return Ok(());
+    }
+
     if which_clock == CLOCK_REALTIME {
         return clock_nanosleep_relative_to_clock(
             current_task,
