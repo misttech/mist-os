@@ -16,7 +16,7 @@ use {
     },
     fidl_fuchsia_net_ext::SocketAddress,
     fidl_fuchsia_pkg::RepositoryManagerMarker,
-    fidl_fuchsia_pkg_rewrite::EngineMarker,
+    fidl_fuchsia_pkg_rewrite::EngineMarker as RewriteEngineMarker,
     fidl_fuchsia_pkg_rewrite_ext::{do_transaction, Rule},
     fuchsia_async as fasync,
     fuchsia_hyper::{new_https_client, HttpsClient},
@@ -481,7 +481,7 @@ async fn create_aliases(
     let alias_rules = aliases_to_rules(repo_name, &aliases)?;
 
     let rewrite_proxy = match cx
-        .open_target_proxy::<EngineMarker>(
+        .open_target_proxy::<RewriteEngineMarker>(
             Some(target_nodename.to_string()),
             REWRITE_PROTOCOL_SELECTOR,
         )
@@ -1335,7 +1335,8 @@ mod tests {
             MirrorConfig, RepositoryConfig, RepositoryKeyConfig, RepositoryManagerRequest,
         },
         fidl_fuchsia_pkg_rewrite::{
-            EditTransactionRequest, EngineMarker, EngineRequest, RuleIteratorRequest,
+            EditTransactionRequest, EngineMarker as RewriteEngineMarker,
+            EngineRequest as RewriteEngineRequest, RuleIteratorRequest,
         },
         futures::TryStreamExt,
         pretty_assertions::assert_eq,
@@ -1487,28 +1488,34 @@ mod tests {
         }
     }
 
-    struct FakeEngine {
-        events: Arc<Mutex<Vec<EngineEvent>>>,
+    struct FakeRewriteEngine {
+        events: Arc<Mutex<Vec<RewriteEngineEvent>>>,
     }
 
-    impl FakeEngine {
-        fn new(
-        ) -> (Self, impl Fn(&Context, Request<EngineMarker>) -> Result<(), anyhow::Error> + 'static)
-        {
+    impl FakeRewriteEngine {
+        fn new() -> (
+            Self,
+            impl Fn(&Context, Request<RewriteEngineMarker>) -> Result<(), anyhow::Error> + 'static,
+        ) {
             Self::with_rules(vec![])
         }
 
         fn with_rules(
             rules: Vec<Rule>,
-        ) -> (Self, impl Fn(&Context, Request<EngineMarker>) -> Result<(), anyhow::Error> + 'static)
-        {
+        ) -> (
+            Self,
+            impl Fn(&Context, Request<RewriteEngineMarker>) -> Result<(), anyhow::Error> + 'static,
+        ) {
             let rules = Arc::new(Mutex::new(rules));
             let events = Arc::new(Mutex::new(Vec::new()));
             let events_closure = Arc::clone(&events);
 
             let closure = move |_cx: &Context, req| {
                 match req {
-                    EngineRequest::StartEditTransaction { transaction, control_handle: _ } => {
+                    RewriteEngineRequest::StartEditTransaction {
+                        transaction,
+                        control_handle: _,
+                    } => {
                         let rules = Arc::clone(&rules);
                         let events_closure = Arc::clone(&events_closure);
                         fasync::Task::local(async move {
@@ -1517,7 +1524,10 @@ mod tests {
                                 let request = request.unwrap();
                                 match request {
                                     EditTransactionRequest::ResetAll { control_handle: _ } => {
-                                        events_closure.lock().unwrap().push(EngineEvent::ResetAll);
+                                        events_closure
+                                            .lock()
+                                            .unwrap()
+                                            .push(RewriteEngineEvent::ResetAll);
                                     }
                                     EditTransactionRequest::ListDynamic {
                                         iterator,
@@ -1526,7 +1536,7 @@ mod tests {
                                         events_closure
                                             .lock()
                                             .unwrap()
-                                            .push(EngineEvent::ListDynamic);
+                                            .push(RewriteEngineEvent::ListDynamic);
                                         let mut stream = iterator.into_stream().unwrap();
 
                                         let mut rules = rules.lock().unwrap().clone().into_iter();
@@ -1536,7 +1546,7 @@ mod tests {
                                             events_closure
                                                 .lock()
                                                 .unwrap()
-                                                .push(EngineEvent::IteratorNext);
+                                                .push(RewriteEngineEvent::IteratorNext);
 
                                             if let Some(rule) = rules.next() {
                                                 let rule = rule.into();
@@ -1548,7 +1558,7 @@ mod tests {
                                     }
                                     EditTransactionRequest::Add { rule, responder } => {
                                         events_closure.lock().unwrap().push(
-                                            EngineEvent::EditTransactionAdd {
+                                            RewriteEngineEvent::EditTransactionAdd {
                                                 rule: rule.try_into().unwrap(),
                                             },
                                         );
@@ -1558,7 +1568,7 @@ mod tests {
                                         events_closure
                                             .lock()
                                             .unwrap()
-                                            .push(EngineEvent::EditTransactionCommit);
+                                            .push(RewriteEngineEvent::EditTransactionCommit);
                                         responder.send(&mut Ok(())).unwrap()
                                     }
                                 }
@@ -1575,13 +1585,13 @@ mod tests {
             (Self { events }, closure)
         }
 
-        fn take_events(&self) -> Vec<EngineEvent> {
+        fn take_events(&self) -> Vec<RewriteEngineEvent> {
             self.events.lock().unwrap().drain(..).collect::<Vec<_>>()
         }
     }
 
     #[derive(Debug, PartialEq)]
-    enum EngineEvent {
+    enum RewriteEngineEvent {
         ResetAll,
         ListDynamic,
         IteratorNext,
@@ -1851,14 +1861,14 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .rcs_handler(fake_rcs_closure)
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -1894,30 +1904,30 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("example.com" => "repo1", "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => "repo1", "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("corp2.com" => "repo2", "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("anothercorp3.com" => "repo3", "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
 
@@ -2020,14 +2030,14 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .rcs_handler(fake_rcs_closure)
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2085,16 +2095,16 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
         });
@@ -2252,7 +2262,7 @@ mod tests {
         run_test(async {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
 
             let daemon = FakeDaemonBuilder::new()
@@ -2260,7 +2270,7 @@ mod tests {
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2305,16 +2315,16 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
 
@@ -2361,7 +2371,7 @@ mod tests {
         run_test(async {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
             let (fake_rcs, fake_rcs_closure) = FakeRcs::new();
 
             let daemon = FakeDaemonBuilder::new()
@@ -2369,7 +2379,7 @@ mod tests {
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2414,16 +2424,16 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
 
@@ -2477,7 +2487,7 @@ mod tests {
         run_test(async {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
             let (fake_rcs, fake_rcs_closure) = FakeRcs::new();
 
             let daemon = FakeDaemonBuilder::new()
@@ -2485,7 +2495,7 @@ mod tests {
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2530,16 +2540,16 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
 
@@ -2601,7 +2611,7 @@ mod tests {
 
         let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
         let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-        let (fake_engine, fake_engine_closure) = FakeEngine::new();
+        let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
         let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
 
         let daemon = FakeDaemonBuilder::new()
@@ -2609,7 +2619,7 @@ mod tests {
             .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                 fake_repo_manager_closure,
             )
-            .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+            .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
             .inject_fidl_protocol(Rc::clone(&repo))
             .target(ffx::TargetInfo {
                 nodename: Some(TARGET_NODENAME.to_string()),
@@ -2718,7 +2728,7 @@ mod tests {
         run_test(async {
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
             let (_fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::with_rules(vec![
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::with_rules(vec![
                 rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                 rule!("fuchsia.com" => "example.com", "/" => "/"),
                 rule!("fuchsia.com" => "example.com", "/" => "/"),
@@ -2732,7 +2742,7 @@ mod tests {
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .register_fidl_protocol::<Repo<TestEventHandlerProvider>>()
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2760,28 +2770,28 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => "mycorp.com", "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => "example.com", "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("example.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("fuchsia.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
         })
@@ -2831,14 +2841,14 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .rcs_handler(fake_rcs_closure)
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2869,16 +2879,16 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
         });
@@ -2890,14 +2900,14 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .rcs_handler(fake_rcs_closure)
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2954,7 +2964,7 @@ mod tests {
         run_test(async {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (fake_repo_manager, fake_repo_manager_closure) = FakeRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
             let (_fake_rcs, fake_rcs_closure) = FakeRcs::new();
 
             let daemon = FakeDaemonBuilder::new()
@@ -2962,7 +2972,7 @@ mod tests {
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     fake_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -2996,16 +3006,16 @@ mod tests {
             assert_eq!(
                 fake_engine.take_events(),
                 vec![
-                    EngineEvent::ListDynamic,
-                    EngineEvent::IteratorNext,
-                    EngineEvent::ResetAll,
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::ListDynamic,
+                    RewriteEngineEvent::IteratorNext,
+                    RewriteEngineEvent::ResetAll,
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("anothercorp.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionAdd {
+                    RewriteEngineEvent::EditTransactionAdd {
                         rule: rule!("mycorp.com" => REPO_NAME, "/" => "/"),
                     },
-                    EngineEvent::EditTransactionCommit,
+                    RewriteEngineEvent::EditTransactionCommit,
                 ],
             );
 
@@ -3028,13 +3038,13 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (erroring_repo_manager, erroring_repo_manager_closure) =
                 ErroringRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     erroring_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -3096,13 +3106,13 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (erroring_repo_manager, erroring_repo_manager_closure) =
                 ErroringRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     erroring_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
@@ -3139,13 +3149,13 @@ mod tests {
             let repo = Rc::new(RefCell::new(Repo::<TestEventHandlerProvider>::default()));
             let (erroring_repo_manager, erroring_repo_manager_closure) =
                 ErroringRepositoryManager::new();
-            let (fake_engine, fake_engine_closure) = FakeEngine::new();
+            let (fake_engine, fake_engine_closure) = FakeRewriteEngine::new();
 
             let daemon = FakeDaemonBuilder::new()
                 .register_instanced_protocol_closure::<RepositoryManagerMarker, _>(
                     erroring_repo_manager_closure,
                 )
-                .register_instanced_protocol_closure::<EngineMarker, _>(fake_engine_closure)
+                .register_instanced_protocol_closure::<RewriteEngineMarker, _>(fake_engine_closure)
                 .inject_fidl_protocol(Rc::clone(&repo))
                 .target(ffx::TargetInfo {
                     nodename: Some(TARGET_NODENAME.to_string()),
