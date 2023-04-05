@@ -236,6 +236,7 @@ class FuchsiaTestCommand {
             "--trusted-root",
             amberFilesDir + "/repository/root.json",
             "--ignore-missing-packages",
+            "--time-versioning",
           ];
 
           int? delivery_blob_type = await readDeliveryBlobType(

@@ -296,7 +296,12 @@ else
 
   if is_feature_enabled "incremental" || is_feature_enabled "incremental_new"; then
     fx-info "Incremental package auto-publishing is enabled for ffx."
-    package_tool_flags=( --watch --package-list "all_package_manifests.list" --trusted-root "${repo_dir}/repository/9.root.json" )
+    package_tool_flags=(
+      --watch
+      --package-list "all_package_manifests.list"
+      --trusted-root "${repo_dir}/repository/9.root.json"
+      --time-versioning
+    )
     package_tool_args=( repository publish "${repo_dir}" "${package_tool_flags[@]}" )
 
     # the manifest list file has relative paths and package manifest watcher looks for them

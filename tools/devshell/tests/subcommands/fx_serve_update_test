@@ -436,7 +436,13 @@ EOF
   BT_ASSERT_FILE_EXISTS "${started_server}"
   BT_ASSERT_FILE_EXISTS "${stopped_server}"
 
-  btf::expect-mock-args "${package_tool}" "package-tool" "repository" "publish" "${REPODIR}" "--watch" "--package-list" "all_package_manifests.list" "--trusted-root" "${REPODIR}/repository/9.root.json"
+  btf::expect-mock-args \
+    "${package_tool}" "package-tool" "repository" \
+    "publish" "${REPODIR}" \
+    "--watch" \
+    "--package-list" "all_package_manifests.list" \
+    "--trusted-root" "${REPODIR}/repository/9.root.json" \
+    "--time-versioning"
 
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stdout "Ready to push packages!"
   BT_EXPECT_FILE_CONTAINS_SUBSTRING stderr "Incremental package auto-publishing is enabled for ffx."
