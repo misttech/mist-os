@@ -311,7 +311,7 @@ rustc_binary("starnix_kernel_bin") {
       "arch/x64/registers.rs",
       "arch/x64/signal_handling.rs",
       "arch/x64/syscalls.rs",
-      "task/task_x64.rs",
+      "arch/x64/task.rs",
     ]
   } else if (current_cpu == "arm64") {
     sources += [
@@ -320,7 +320,7 @@ rustc_binary("starnix_kernel_bin") {
       "arch/aarch64/registers.rs",
       "arch/aarch64/signal_handling.rs",
       "arch/aarch64/syscalls.rs",
-      "task/task_arm64.rs",
+      "arch/aarch64/task.rs",
     ]
   }
 

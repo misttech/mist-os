@@ -10,7 +10,7 @@ use std::ffi::CString;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::arch::registers::RegisterState;
+use crate::arch::{registers::RegisterState, task::decode_page_fault_exception_report};
 use crate::auth::*;
 use crate::execution::*;
 use crate::fs::*;
