@@ -2382,32 +2382,22 @@ pub(crate) fn del_device_routes<
     })
 }
 
-/// Calls the function with an immutable reference to the IPv4 & IPv6 routing
-/// table.
-///
-/// Helper function to enforce lock ordering in a single place.
-fn with_ipv4_and_ipv6_routing_tables<
-    C: NonSyncContext,
-    O,
-    F: FnOnce(&ForwardingTable<Ipv4, DeviceId<C>>, &ForwardingTable<Ipv6, DeviceId<C>>) -> O,
->(
-    sync_ctx: &SyncCtx<C>,
-    cb: F,
-) -> O {
-    cb(&sync_ctx.state.ipv4.inner.table.read(), &sync_ctx.state.ipv6.inner.table.read())
-}
-
 /// Get all the routes.
 pub fn get_all_routes<NonSyncCtx: NonSyncContext>(
-    mut sync_ctx: &SyncCtx<NonSyncCtx>,
+    sync_ctx: &SyncCtx<NonSyncCtx>,
 ) -> Vec<types::EntryEither<DeviceId<NonSyncCtx>>> {
-    with_ipv4_and_ipv6_routing_tables(&mut sync_ctx, |ipv4, ipv6| {
-        ipv4.iter_table()
-            .cloned()
-            .map(From::from)
-            .chain(ipv6.iter_table().cloned().map(From::from))
-            .collect()
-    })
+    {
+        let mut sync_ctx = Locked::new(sync_ctx);
+        IpStateContext::<Ipv4, _>::with_ip_routing_table(&mut sync_ctx, |sync_ctx, ipv4| {
+            IpStateContext::<Ipv6, _>::with_ip_routing_table(sync_ctx, |_, ipv6| {
+                ipv4.iter_table()
+                    .cloned()
+                    .map(From::from)
+                    .chain(ipv6.iter_table().cloned().map(From::from))
+                    .collect()
+            })
+        })
+    }
 }
 
 /// The metadata associated with an outgoing IP packet.
