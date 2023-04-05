@@ -173,8 +173,6 @@ async fn test_udp_socket(name: &str, protocol: UdpProtocol) {
 enum UdpCacheInvalidationReason {
     ConnectCalled,
     InterfaceDisabled,
-    IPv6OnlyCalled,
-    BroadcastCalled,
     AddressRemoved,
     SetConfigurationCalled,
     SetInterfaceIpForwardingDeprecatedCalled,
@@ -325,6 +323,8 @@ trait UdpSendMsgPreflightTestIpExt {
     const REACHABLE_ADDR2: fnet::SocketAddress;
     const UNREACHABLE_ADDR: fnet::SocketAddress;
     const OTHER_SUBNET: fnet::Subnet;
+    const FORWARDING_CONFIG: fnet_interfaces_admin::Configuration;
+    const FIDL_IP_VERSION: fnet::IpVersion;
 }
 
 impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
@@ -347,6 +347,15 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv4 {
             port: Self::PORT,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("203.0.113.0/24");
+    const FORWARDING_CONFIG: fnet_interfaces_admin::Configuration =
+        fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                forwarding: Some(true),
+                ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
+            }),
+            ..fnet_interfaces_admin::Configuration::EMPTY
+        };
+    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V4;
 }
 
 impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
@@ -372,6 +381,15 @@ impl UdpSendMsgPreflightTestIpExt for net_types::ip::Ipv6 {
             zone_index: 0,
         });
     const OTHER_SUBNET: fnet::Subnet = fidl_subnet!("2001:db8:eeee:eeee::/64");
+    const FORWARDING_CONFIG: fnet_interfaces_admin::Configuration =
+        fnet_interfaces_admin::Configuration {
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                forwarding: Some(true),
+                ..fnet_interfaces_admin::Ipv6Configuration::EMPTY
+            }),
+            ..fnet_interfaces_admin::Configuration::EMPTY
+        };
+    const FIDL_IP_VERSION: fnet::IpVersion = fnet::IpVersion::V6;
 }
 
 async fn udp_send_msg_preflight_fidl_setup<I: net_types::ip::Ip + UdpSendMsgPreflightTestIpExt>(
@@ -453,8 +471,6 @@ fn assert_preflights_invalidated(
 
 #[netstack_test]
 #[test_case("connect_called", UdpCacheInvalidationReason::ConnectCalled)]
-#[test_case("ipv6_only_called", UdpCacheInvalidationReason::IPv6OnlyCalled)]
-#[test_case("broadcast_called", UdpCacheInvalidationReason::BroadcastCalled)]
 #[test_case("Control.Disable", UdpCacheInvalidationReason::InterfaceDisabled)]
 #[test_case("Control.RemoveAddress", UdpCacheInvalidationReason::AddressRemoved)]
 #[test_case("Control.SetConfiguration", UdpCacheInvalidationReason::SetConfigurationCalled)]
@@ -494,20 +510,6 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
                 .expect("failed to disable interface");
             assert_eq!(disabled, true);
         }
-        UdpCacheInvalidationReason::IPv6OnlyCalled => {
-            let () = socket
-                .set_ipv6_only(true)
-                .await
-                .expect("set_ipv6_only fidl error")
-                .expect("failed to set ipv6 only");
-        }
-        UdpCacheInvalidationReason::BroadcastCalled => {
-            let () = socket
-                .set_broadcast(true)
-                .await
-                .expect("set_so_broadcast fidl error")
-                .expect("failed to set so_broadcast");
-        }
         UdpCacheInvalidationReason::AddressRemoved => {
             let mut installed_subnet = I::INSTALLED_ADDR;
             let removed = iface
@@ -531,13 +533,7 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
         UdpCacheInvalidationReason::SetConfigurationCalled => {
             let _prev_config = iface
                 .control()
-                .set_configuration(fnet_interfaces_admin::Configuration {
-                    ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                        forwarding: Some(true),
-                        ..fnet_interfaces_admin::Ipv4Configuration::EMPTY
-                    }),
-                    ..fnet_interfaces_admin::Configuration::EMPTY
-                })
+                .set_configuration(I::FORWARDING_CONFIG)
                 .await
                 .expect("set_configuration fidl error")
                 .expect("failed to set interface configuration");
@@ -546,10 +542,72 @@ async fn udp_send_msg_preflight_fidl<I: net_types::ip::Ip + UdpSendMsgPreflightT
             let () = iface
                 .connect_stack()
                 .expect("connect stack")
-                .set_interface_ip_forwarding_deprecated(iface.id(), fnet::IpVersion::V4, true)
+                .set_interface_ip_forwarding_deprecated(iface.id(), I::FIDL_IP_VERSION, true)
                 .await
                 .expect("set_interface_ip_forwarding_deprecated fidl error")
-                .expect("failed to set IPv4 forwarding on interface");
+                .expect("failed to set IP forwarding on interface");
+        }
+    }
+
+    assert_preflights_invalidated(successful_preflights);
+}
+
+enum UdpCacheInvalidationReasonV4 {
+    BroadcastCalled,
+}
+
+#[netstack_test]
+#[test_case("broadcast_called", UdpCacheInvalidationReasonV4::BroadcastCalled)]
+async fn udp_send_msg_preflight_fidl_v4only(
+    root_name: &str,
+    test_name: &str,
+    invalidation_reason: UdpCacheInvalidationReasonV4,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm_name = format!("{}_{}", root_name, test_name);
+    let (_net, _netstack, iface, socket) =
+        setup_fastudp_network(&realm_name, &sandbox, Ipv4::SOCKET_DOMAIN).await;
+
+    let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv4>(&iface, &socket).await;
+
+    match invalidation_reason {
+        UdpCacheInvalidationReasonV4::BroadcastCalled => {
+            let () = socket
+                .set_broadcast(true)
+                .await
+                .expect("set_so_broadcast fidl error")
+                .expect("failed to set so_broadcast");
+        }
+    }
+
+    assert_preflights_invalidated(successful_preflights);
+}
+
+enum UdpCacheInvalidationReasonV6 {
+    Ipv6OnlyCalled,
+}
+
+#[netstack_test]
+#[test_case("ipv6_only_called", UdpCacheInvalidationReasonV6::Ipv6OnlyCalled)]
+async fn udp_send_msg_preflight_fidl_v6only(
+    root_name: &str,
+    test_name: &str,
+    invalidation_reason: UdpCacheInvalidationReasonV6,
+) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm_name = format!("{}_{}", root_name, test_name);
+    let (_net, _netstack, iface, socket) =
+        setup_fastudp_network(&realm_name, &sandbox, Ipv6::SOCKET_DOMAIN).await;
+
+    let successful_preflights = udp_send_msg_preflight_fidl_setup::<Ipv6>(&iface, &socket).await;
+
+    match invalidation_reason {
+        UdpCacheInvalidationReasonV6::Ipv6OnlyCalled => {
+            let () = socket
+                .set_ipv6_only(true)
+                .await
+                .expect("set_ipv6_only fidl error")
+                .expect("failed to set ipv6 only");
         }
     }
 
