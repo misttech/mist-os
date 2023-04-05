@@ -32,10 +32,19 @@ static constexpr uint64_t hid_report_trace_id(uint32_t instance_id, uint64_t rep
   return (report_id << 32) | instance_id;
 }
 
-HidInstance::HidInstance(HidDevice* base, zx::event fifo_event)
+HidInstance::HidInstance(HidDevice* base, zx::event fifo_event, async_dispatcher_t* dispatcher,
+                         fidl::ServerEnd<fuchsia_hardware_input::Device> session)
     : base_(base),
       fifo_event_(std::move(fifo_event)),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+      loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      binding_(dispatcher, std::move(session), this,
+               [](HidInstance* instance, fidl::UnbindInfo info) {
+                 if (!instance) {
+                   return;
+                 }
+                 instance->CloseInstance();
+                 instance->base_->RemoveInstance(*instance);
+               }) {
   zx_hid_fifo_init(&fifo_);
 }
 

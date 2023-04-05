@@ -34,11 +34,11 @@ namespace hid_driver {
 class HidDevice;
 
 class HidInstance : public fidl::WireServer<fuchsia_hardware_input::Device>,
-                    public fbl::DoublyLinkedListable<fbl::RefPtr<HidInstance>,
-                                                     fbl::NodeOptions::AllowRemoveFromContainer>,
+                    public fbl::DoublyLinkedListable<fbl::RefPtr<HidInstance>>,
                     public fbl::RefCounted<HidInstance> {
  public:
-  HidInstance(HidDevice* base, zx::event fifo_event);
+  HidInstance(HidDevice* base, zx::event fifo_event, async_dispatcher_t* dispatcher,
+              fidl::ServerEnd<fuchsia_hardware_input::Device> session);
   ~HidInstance() override = default;
 
   void GetBootProtocol(GetBootProtocolCompleter::Sync& _completer) override;
@@ -81,6 +81,8 @@ class HidInstance : public fidl::WireServer<fuchsia_hardware_input::Device>,
   bool loop_started_ __TA_GUARDED(readers_lock_) = false;
   async::Loop loop_ __TA_GUARDED(readers_lock_);
   std::list<std::unique_ptr<DeviceReportsReader>> readers_ __TA_GUARDED(readers_lock_);
+
+  fidl::ServerBinding<fuchsia_hardware_input::Device> binding_;
 };
 
 }  // namespace hid_driver

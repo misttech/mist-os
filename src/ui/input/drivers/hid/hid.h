@@ -86,12 +86,15 @@ class HidDevice : public HidDeviceType,
 
   ddk::HidbusProtocolClient* GetHidbusProtocol() { return &hidbus_; }
 
-  zx::result<fbl::RefPtr<HidInstance>> CreateInstance();
+  zx::result<fbl::RefPtr<HidInstance>> CreateInstance(
+      async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_hardware_input::Device> session);
 
   size_t GetReportDescLen() { return hid_report_desc_.size(); }
   const uint8_t* GetReportDesc() { return hid_report_desc_.data(); }
 
   const char* GetName();
+
+  void RemoveInstance(HidInstance& instance);
 
  private:
   zx_status_t ProcessReportDescriptor();
@@ -118,10 +121,7 @@ class HidDevice : public HidDeviceType,
   size_t num_reports_ = 0;
 
   fbl::Mutex instance_lock_;
-  // Unmanaged linked-list because the HidInstances free themselves through DdkRelease.
   fbl::DoublyLinkedList<fbl::RefPtr<HidInstance>> instance_list_ __TA_GUARDED(instance_lock_);
-  fidl::ServerBindingGroup<fuchsia_hardware_input::Device> bindings_;
-  std::optional<ddk::UnbindTxn> unbind_txn_;
 
   std::array<char, ZX_DEVICE_NAME_MAX + 1> name_;
 

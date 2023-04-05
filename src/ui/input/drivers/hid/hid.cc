@@ -110,14 +110,16 @@ fuchsia_hardware_input::BootProtocol HidDevice::GetBootProtocol() {
   return fuchsia_hardware_input::BootProtocol::kNone;
 }
 
-zx::result<fbl::RefPtr<HidInstance>> HidDevice::CreateInstance() {
+zx::result<fbl::RefPtr<HidInstance>> HidDevice::CreateInstance(
+    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_hardware_input::Device> session) {
   zx::event fifo_event;
   if (zx_status_t status = zx::event::create(0, &fifo_event); status != ZX_OK) {
     return zx::error(status);
   }
 
   fbl::AllocChecker ac;
-  fbl::RefPtr instance = fbl::MakeRefCountedChecked<HidInstance>(&ac, this, std::move(fifo_event));
+  fbl::RefPtr instance = fbl::MakeRefCountedChecked<HidInstance>(&ac, this, std::move(fifo_event),
+                                                                 dispatcher, std::move(session));
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -202,29 +204,20 @@ void HidDevice::DdkRelease() {
 }
 
 void HidDevice::OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) {
-  zx::result instance = CreateInstance();
+  zx::result instance = CreateInstance(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                       std::move(request->session));
   if (instance.is_error()) {
     request->session.Close(instance.error_value());
     return;
   }
-
-  // TODO(dgilhooley): refcount the base device and call stop if no instances are open
-  bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                       std::move(request->session), instance.value().get(),
-                       [](HidInstance* instance, fidl::UnbindInfo) {
-                         instance->RemoveFromContainer()->CloseInstance();
-                       });
 }
 
 void HidDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  ZX_ASSERT(!unbind_txn_.has_value());
-  ddk::UnbindTxn& unbind_txn = unbind_txn_.emplace(std::move(txn));
-  auto cleanup = fit::bind_member(&unbind_txn, &ddk::UnbindTxn::Reply);
-  bindings_.set_empty_set_handler(cleanup);
-  if (!bindings_.CloseAll(ZX_OK)) {
-    // Binding set was already empty.
-    cleanup();
+  {
+    fbl::AutoLock lock(&instance_lock_);
+    instance_list_.clear();
   }
+  txn.Reply();
 }
 
 void HidDevice::IoQueue(void* cookie, const uint8_t* buf, size_t len, zx_time_t time) {
@@ -442,6 +435,11 @@ zx_status_t HidDevice::SetReportDescriptor() {
 }
 
 const char* HidDevice::GetName() { return name_.data(); }
+
+void HidDevice::RemoveInstance(HidInstance& instance) {
+  fbl::AutoLock _(&instance_lock_);
+  instance_list_.erase(instance);
+}
 
 zx_status_t HidDevice::Bind(ddk::HidbusProtocolClient hidbus_proto) {
   hidbus_ = hidbus_proto;

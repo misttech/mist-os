@@ -5,6 +5,8 @@
 #include "hid.h"
 
 #include <fuchsia/hardware/hidbus/cpp/banjo.h>
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/driver/testing/cpp/driver_runtime_env.h>
 #include <unistd.h>
 
 #include <thread>
@@ -127,17 +129,23 @@ class FakeHidbus : public ddk::HidbusProtocol<FakeHidbus> {
 
 class HidDeviceTest : public zxtest::Test {
  public:
-  HidDeviceTest() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+  HidDeviceTest() = default;
   void SetUp() override {
+    ASSERT_EQ(ZX_OK, dispatcher_.StartAsDefault({}, "hid-test-dispatcher").status_value());
+
     fake_root_ = MockDevice::FakeRootParent();
     client_ = ddk::HidbusProtocolClient(fake_hidbus_.GetProto());
     device_ = new HidDevice(fake_root_.get());
 
-    ASSERT_OK(loop_.StartThread("fidl-thread"));
     // Each test is responsible for calling Bind().
   }
 
-  void TearDown() override { TeardownInstanceDriver(); }
+  void TearDown() override {
+    auto child = fake_root_->GetLatestChild();
+    child->UnbindOp();
+    EXPECT_EQ(ZX_OK, child->WaitUntilUnbindReplyCalled());
+    EXPECT_TRUE(child->UnbindReplyCalled());
+  }
 
   void SetupBootMouseDevice() {
     size_t desc_size;
@@ -154,27 +162,16 @@ class HidDeviceTest : public zxtest::Test {
   }
 
   void SetupInstanceDriver() {
-    zx::result instance = device_->CreateInstance();
-    ASSERT_OK(instance);
-    instance_driver_ = std::move(instance.value());
-
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
     ASSERT_OK(endpoints.status_value());
+
+    ASSERT_OK(device_->CreateInstance(dispatcher_.dispatcher(), std::move(endpoints->server)));
     sync_client_ = fidl::WireSyncClient(std::move(endpoints->client));
-    fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), instance_driver_.get());
 
     auto result = sync_client_->GetReportsEvent();
     ASSERT_OK(result.status());
     ASSERT_OK(result.value().status);
     report_event_ = std::move(result.value().event);
-  }
-
-  void TeardownInstanceDriver() {
-    if (instance_driver_ == nullptr) {
-      return;
-    }
-    instance_driver_->CloseInstance();
-    instance_driver_ = nullptr;
   }
 
   zx_status_t ReadOneReport(uint8_t* report_data, size_t report_size, size_t* returned_size) {
@@ -204,12 +201,13 @@ class HidDeviceTest : public zxtest::Test {
   }
 
  protected:
-  fbl::RefPtr<HidInstance> instance_driver_;
+  fdf_testing::DriverRuntimeEnv managed_runtime_env_;
+  fdf::TestSynchronizedDispatcher dispatcher_;
+
   fidl::WireSyncClient<fuchsia_hardware_input::Device> sync_client_;
   zx::event report_event_;
 
   HidDevice* device_;
-  async::Loop loop_;
 
   std::shared_ptr<MockDevice> fake_root_;
   FakeHidbus fake_hidbus_;
@@ -238,23 +236,15 @@ TEST_F(HidDeviceTest, TestQuery) {
 
   ASSERT_OK(device_->Bind(client_));
 
-  zx::result instance = device_->CreateInstance();
-  ASSERT_OK(instance);
-  auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_input::Device>();
-  ASSERT_OK(endpoints.status_value());
-  auto sync_client =
-      fidl::WireSyncClient<fuchsia_hardware_input::Device>(std::move(endpoints->client));
-  fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), instance.value().get());
+  SetupInstanceDriver();
 
-  auto result = sync_client->GetDeviceIds();
+  auto result = sync_client_->GetDeviceIds();
   ASSERT_OK(result.status());
   fuchsia_hardware_input::wire::DeviceIds ids = result.value().ids;
 
   ASSERT_EQ(kVendorId, ids.vendor_id);
   ASSERT_EQ(kProductId, ids.product_id);
   ASSERT_EQ(kVersion, ids.version);
-
-  instance.value()->CloseInstance();
 }
 
 TEST_F(HidDeviceTest, BootMouseSendReport) {
