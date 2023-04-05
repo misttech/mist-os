@@ -304,27 +304,22 @@ rustc_binary("starnix_kernel_bin") {
     "vmex_resource.rs",
   ]
 
+  arch_dir = ""
   if (current_cpu == "x64") {
-    sources += [
-      "arch/x64/loader.rs",
-      "arch/x64/mod.rs",
-      "arch/x64/registers.rs",
-      "arch/x64/signal_handling.rs",
-      "arch/x64/syscalls.rs",
-      "arch/x64/task.rs",
-      "arch/x64/vdso.rs",
-    ]
+    arch_dir = "arch/x64"
   } else if (current_cpu == "arm64") {
-    sources += [
-      "arch/aarch64/loader.rs",
-      "arch/aarch64/mod.rs",
-      "arch/aarch64/registers.rs",
-      "arch/aarch64/signal_handling.rs",
-      "arch/aarch64/syscalls.rs",
-      "arch/aarch64/task.rs",
-      "arch/aarch64/vdso.rs",
-    ]
+    arch_dir = "arch/aarch64"
   }
+  sources += [
+    "${arch_dir}/execution.rs",
+    "${arch_dir}/loader.rs",
+    "${arch_dir}/mod.rs",
+    "${arch_dir}/registers.rs",
+    "${arch_dir}/signal_handling.rs",
+    "${arch_dir}/syscalls.rs",
+    "${arch_dir}/task.rs",
+    "${arch_dir}/vdso.rs",
+  ]
 
   features = []
   if (starnix_restricted_mode) {

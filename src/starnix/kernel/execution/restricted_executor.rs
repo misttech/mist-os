@@ -8,13 +8,15 @@
 use anyhow::{format_err, Error};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Task as zxTask};
-use std::arch::asm;
 use std::sync::Arc;
 
 use super::shared::{
     as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync, TaskInfo,
 };
-use crate::arch::registers::RegisterState;
+use crate::arch::{
+    execution::{generate_cfi_directives, restore_cfi_directives},
+    registers::RegisterState,
+};
 use crate::logging::{log_error, log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
@@ -160,56 +162,16 @@ fn run_task(current_task: &mut CurrentTask) -> Result<ExitStatus, Error> {
         current_task.registers = zx::sys::zx_thread_state_general_regs_t::from(&state).into();
         syscall_decl = SyscallDecl::from_number(state.rax);
 
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            // Generate CFI directives so the unwinder will be redirected to unwind the restricted
-            // stack.
-            //
-            // The base address that the unwinder will use is stored in r15. Then it will look for
-            // each register value at an offset specified below. These offsets match the offsets of
-            // the register values in the `zx_thread_state_general_regs_t` struct.
-            let state_addr = std::ptr::addr_of!(state);
-            asm!(
-                ".cfi_remember_state",
-                ".cfi_def_cfa r15, 0",
-                ".cfi_offset rdi, 0",
-                ".cfi_offset rsi, 0x08",
-                ".cfi_offset rbp, 0x10",
-                ".cfi_offset rbx, 0x18",
-                ".cfi_offset rdx, 0x20",
-                ".cfi_offset rcx, 0x28",
-                ".cfi_offset rax, 0x30",
-                ".cfi_offset rsp, 0x38",
-                ".cfi_offset r8, 0x40",
-                ".cfi_offset r9, 0x48",
-                ".cfi_offset r10, 0x50",
-                ".cfi_offset r11, 0x58",
-                ".cfi_offset r12, 0x60",
-                ".cfi_offset r13, 0x68",
-                ".cfi_offset r14, 0x70",
-                ".cfi_offset r15, 0x78",
-                ".cfi_offset rip, 0x80",
-                // zxdb doesn't support unwinding these registers yet.
-                // ".cfi_offset rflags, 0x88",
-                // ".cfi_offset fs.base, 0x90",
-                // ".cfi_offset gs.base, 0x98",
-
-                // r15 could technically get clobbered between here and `execute_syscall`. We should
-                // use a method for computing `.cfi_def_cfa` that can't fail (e.g., rsp offset).
-                in("r15") state_addr,
-                options(nomem, preserves_flags, nostack),
-            );
-        }
+        // Generate CFI directives so the unwinder will be redirected to unwind the restricted
+        // stack.
+        generate_cfi_directives!(state);
 
         if let Some(new_error_context) = execute_syscall(current_task, syscall_decl) {
             error_context = Some(new_error_context);
         }
 
-        #[cfg(target_arch = "x86_64")]
-        unsafe {
-            // Restore the CFI state before continuing.
-            asm!(".cfi_restore_state");
-        }
+        // Restore the CFI directives before continuing.
+        restore_cfi_directives!();
 
         if let Some(exit_status) = process_completed_syscall(current_task, &error_context)? {
             trace_duration_end!(
