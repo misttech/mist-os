@@ -280,6 +280,15 @@ impl<'a> TestRealm<'a> {
         self.realm.get_moniker().await.context("failed to call get moniker")
     }
 
+    /// Starts the specified child component of the managed realm.
+    pub async fn start_child_component(&self, child_name: &str) -> Result {
+        self.realm
+            .start_child_component(child_name)
+            .await?
+            .map_err(zx::Status::from_raw)
+            .with_context(|| format!("failed to start child component '{}'", child_name))
+    }
+
     /// Stops the specified child component of the managed realm.
     pub async fn stop_child_component(&self, child_name: &str) -> Result {
         self.realm

@@ -229,6 +229,18 @@ closed protocol ManagedRealm {
     strict GetDevfs(resource struct {
         devfs server_end:fuchsia.io.Directory;
     });
+    /// Starts the specified child component in this realm. Starting an already
+    /// running child component is a no-op and returns success.
+    ///
+    /// + request `child_name` the name of the child component to be started.
+    /// * error `ZX_ERR_NOT_FOUND` if `child_name` is not a child component in
+    ///     this realm.
+    /// * error `ZX_ERR_INVALID_ARGS` if `child_name` cannot be composed into a
+    ///     well-formed moniker.
+    /// * error `ZX_ERR_INTERNAL` if the call to the service dependency fails.
+    strict StartChildComponent(struct {
+        child_name fuchsia.component.name;
+    }) -> () error zx.status;
     /// Stops the specified child component in this realm. Stopping an already
     /// stopped child component is a no-op and returns success.
     ///
