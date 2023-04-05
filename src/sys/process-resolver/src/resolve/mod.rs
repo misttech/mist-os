@@ -8,23 +8,8 @@ use fuchsia_zircon as zx;
 use std::sync::Arc;
 use tracing::warn;
 
-// When this feature is enabled, process-resolver will use fuchsia.pkg.PackageResolver
-// to resolve packages from the universe set.
-#[cfg(feature = "auto_update_packages")]
-mod auto_update;
-#[cfg(feature = "auto_update_packages")]
-pub use auto_update::serve;
-#[cfg(feature = "auto_update_packages")]
-pub const AUTO_UPDATE_ENABLED: bool = true;
-
-// When this feature is disabled, process-resolver will use the /pkgfs/packages directory
-// to resolve packages from the base set only.
-#[cfg(not(feature = "auto_update_packages"))]
-mod base_set_only;
-#[cfg(not(feature = "auto_update_packages"))]
-pub use base_set_only::serve;
-#[cfg(not(feature = "auto_update_packages"))]
-pub const AUTO_UPDATE_ENABLED: bool = false;
+mod serve;
+pub use serve::serve;
 
 pub async fn get_binary_and_loader_from_pkg_dir(
     pkg_dir: &fio::DirectoryProxy,

@@ -23,13 +23,13 @@
         {
             protocol: "fuchsia.pkg.PackageResolver",
             from: "#pkg-resolver",
+            as: "fuchsia.pkg.PackageResolver-full",
             to: "#process_resolver",
         },
         {
-            directory: "pkgfs",
+            protocol: "fuchsia.pkg.PackageResolver-base",
             from: "parent",
             to: "#process_resolver",
-            rights: [ "rx*" ],
         },
     ],
     expose: [

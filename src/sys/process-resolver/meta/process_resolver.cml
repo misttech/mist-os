@@ -11,11 +11,11 @@
         { protocol: "fuchsia.process.Resolver" },
     ],
     use: [
-        { protocol: "fuchsia.pkg.PackageResolver" },
         {
-            directory: "pkgfs",
-            rights: [ "rx*" ],
-            path: "/pkgfs",
+            protocol: [
+                "fuchsia.pkg.PackageResolver-base",
+                "fuchsia.pkg.PackageResolver-full",
+            ],
         },
     ],
     expose: [

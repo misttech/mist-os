@@ -1157,6 +1157,11 @@
             from: "#fshost",
         },
         {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "#base_resolver",
+            as: "fuchsia.pkg.PackageResolver-base",
+        },
+        {
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.fshost.BlockWatcher",
