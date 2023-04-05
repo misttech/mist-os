@@ -93,19 +93,42 @@ reproxy="$reclient_bindir"/reproxy
 # accumulated per build invocation.
 date="$(date +%Y%m%d-%H%M%S)"
 reproxy_logdir="$(mktemp -d -t reproxy."$date".XXXX)"
-# These environment variables take precedence over those found in --cfg.
-export RBE_log_dir="$reproxy_logdir"
-export RBE_proxy_log_dir="$reproxy_logdir"
-# rbe_metrics.{pb,txt} appears in -output_dir
-export RBE_output_dir="$reproxy_logdir"
-export RBE_server_address=unix://"$reproxy_logdir"/reproxy.sock
+server_address=unix://"$reproxy_logdir"/reproxy.sock
+
 # deps cache dir should be somewhere persistent between builds,
 # and thus, not random.  /var/cache can be root-owned and not always writeable.
 if test -n "$HOME"
-then export RBE_cache_dir="$HOME/.cache/reproxy/deps"
-else export RBE_cache_dir="/tmp/.cache/reproxy/deps"
+then _RBE_cache_dir="$HOME/.cache/reproxy/deps"
+else _RBE_cache_dir="/tmp/.cache/reproxy/deps"
 fi
-mkdir -p "$RBE_cache_dir"
+mkdir -p "$_RBE_cache_dir"
+
+# These environment variables take precedence over those found in --cfg.
+bootstrap_env=(
+  env
+  TMPDIR="$reproxy_tmpdir"
+  RBE_proxy_log_dir="$reproxy_logdir"
+  RBE_log_dir="$reproxy_logdir"
+  RBE_server_address="$server_address"
+  # rbe_metrics.{pb,txt} appears in -output_dir
+  RBE_output_dir="$reproxy_logdir"
+  RBE_cache_dir="$_RBE_cache_dir"
+)
+
+# These environment variables take precedence over those found in --cfg.
+rewrapper_log_dir="$reproxy_logdir/rewrapper-logs"
+mkdir -p "$rewrapper_log_dir"
+rewrapper_env=(
+  env
+  RBE_server_address="$server_address"
+  # rewrapper logs
+  RBE_log_dir="$rewrapper_log_dir"
+  # Technically, RBE_proxy_log_dir is not needed for rewrapper,
+  # however, the reproxy logs do contain information about individual
+  # rewrapper executions that could be discovered and used in diagnostics,
+  # so we include it.
+  RBE_proxy_log_dir="$reproxy_logdir"
+)
 
 # Check authentication.
 auth_option=()
@@ -186,7 +209,8 @@ function cleanup() {
 # Use the same config for bootstrap as for reproxy.
 # This also checks for authentication, and prompts the user to
 # re-authenticate if needed.
-TMPDIR="$reproxy_tmpdir" "$bootstrap" \
+"${bootstrap_env[@]}" \
+  "$bootstrap" \
   --re_proxy="$reproxy" \
   --cfg="$reproxy_cfg" \
   "${auth_option[@]}" \
@@ -202,7 +226,10 @@ test "$BUILD_METRICS_ENABLED" = 0 || {
 
 shutdown() {
   # b/188923283 -- added --cfg to shut down properly
-  "$bootstrap" --shutdown --cfg="$reproxy_cfg"
+  "${bootstrap_env[@]}" \
+    "$bootstrap" \
+    --shutdown \
+    --cfg="$reproxy_cfg"
 
   cleanup
 
@@ -228,4 +255,4 @@ trap shutdown EXIT
 
 # original command is in "$@"
 # Do not 'exec' this, so that trap takes effect.
-"$@"
+"${rewrapper_env[@]}" "$@"
