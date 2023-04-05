@@ -14,17 +14,25 @@
             matchers: [
                 // TODO(https://fxbug.dev/106735): Support packet sockets.
                 "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
+                "AllInetTests/CookedPacketTest.BindReceive/*",
+                "AllInetTests/CookedPacketTest.Receive/*",
+                "AllInetTests/CookedPacketTest.Send/*",
+                "AllInetTests/RawPacketTest.SetSocketRecvBuf*",
+                "AllInetTests/RawPacketTest.SetSocketSendBuf*",
+                "AllInetTests/RawPacketTest.GetSocketError*",
+                "AllInetTests/RawPacketTest.Receive/*",
+                "AllInetTests/RawPacketTest.Send/*",
+                "AllInetTests/RawPacketTest.SetSocketDetachFilterNoInstalledFilter/*",
+                "AllInetTests/RawPacketTest.SetAndGetSocketLinger/*",
+                "AllInetTests/RawPacketTest.GetSocketAcceptConn/*",
             ],
         },
         {
             type: "skip",
             matchers: [
                 // TODO(https://fxbug.dev/110824): Stop skipping these manually once NS3 is
-                // returning EPERM for raw and packet socket creation.
-                "AllInetTests/RawPacketTest.*",
-                "AllInetTests/CookedPacketTest.*",
+                // returning EPERM for raw socket creation.
                 "AllRawPacketMsgSizeTest/*",
-                "BasicCookedPacketTest.WrongType",
                 "RawHDRINCL.*",
                 "RawSocketICMPTest.*",
                 "RawSocketICMPv6Test.*",
