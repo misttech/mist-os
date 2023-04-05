@@ -18,10 +18,13 @@
 
 #include <fbl/ref_ptr.h>
 
-#include "src/storage/f2fs/f2fs.h"
-#include "src/storage/f2fs/test/compatibility/file_backed_block_device.h"
+// clang-format off: work-around a collision between a banjo macro and a FIDL constant. We can
+// work-around the issue by including the virtualization headers before the f2fs headers.
 #include "src/virtualization/tests/lib/enclosed_guest.h"
 #include "src/virtualization/tests/lib/guest_test.h"
+// clang-format on
+#include "src/storage/f2fs/f2fs.h"
+#include "src/storage/f2fs/test/compatibility/file_backed_block_device.h"
 
 namespace f2fs {
 
