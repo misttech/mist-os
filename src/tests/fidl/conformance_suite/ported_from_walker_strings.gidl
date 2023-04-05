@@ -166,8 +166,6 @@ success("AbsentNullableBoundedString") {
 }
 
 decode_failure("PresentNonnullableBoundedStringShortError") {
-    // TODO(fxbug.dev/37304): Check bounds in Rust.
-    bindings_denylist = [rust],
     type = MultipleShortNonnullableStrings,
     bytes = {
         v1, v2 = [
@@ -185,8 +183,6 @@ decode_failure("PresentNonnullableBoundedStringShortError") {
 }
 
 decode_failure("PresentNullableBoundedStringShortError") {
-    // TODO(fxbug.dev/37304): Check bounds in Rust.
-    bindings_denylist = [rust],
     type = MultipleShortNullableStrings,
     bytes = {
         v1, v2 = [

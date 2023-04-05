@@ -29,8 +29,6 @@ success("VectorWrapper_randomly_generated") {
 }
 
 encode_failure("VectorExceedsLimit") {
-    // TODO(fxbug.dev/37304) Enforce size bounds in rust
-    bindings_denylist = [rust],
     value = VectorWithLimit{
         v: [1, 2, 3], // exceeds the string length
     },

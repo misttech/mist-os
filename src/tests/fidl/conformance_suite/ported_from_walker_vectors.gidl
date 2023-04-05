@@ -489,8 +489,6 @@ success("MultipleBoundedNonnullableVectorsOfUint32s_randomly_generated") {
 }
 
 decode_failure("PresentNonnullableBoundedVectorOfUint32ShortError") {
-    // TODO(fxbug.dev/37304): Validate bounds in Rust.
-    bindings_denylist = [rust],
     type = MultipleBoundedNonnullableVectorsOfUint32s,
     bytes = {
         v1, v2 = [
@@ -514,8 +512,6 @@ decode_failure("PresentNonnullableBoundedVectorOfUint32ShortError") {
 }
 
 decode_failure("PresentNullableBoundedVectorOfUint32ShortError") {
-    // TODO(fxbug.dev/37304): Validate bounds in Rust.
-    bindings_denylist = [rust],
     type = MultipleBoundedNullableVectorsOfUint32s,
     bytes = {
         v1, v2 = [
