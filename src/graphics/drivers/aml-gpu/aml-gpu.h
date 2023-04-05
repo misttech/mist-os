@@ -5,13 +5,15 @@
 #define SRC_GRAPHICS_DRIVERS_AML_GPU_AML_GPU_H_
 
 #include <fidl/fuchsia.hardware.gpu.clock/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/gpu/mali/cpp/banjo.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/driver/outgoing/cpp/outgoing_directory.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <memory>
 #include <optional>
@@ -69,7 +71,7 @@ using DdkDeviceType =
                 ddk::GetProtocolable>;
 
 class AmlGpu final : public DdkDeviceType,
-                     public ddk::ArmMaliProtocol<AmlGpu>,
+                     public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali>,
                      public ddk::EmptyProtocol<ZX_PROTOCOL_GPU_THERMAL> {
  public:
   AmlGpu(zx_device_t* parent);
@@ -81,11 +83,12 @@ class AmlGpu final : public DdkDeviceType,
   void DdkRelease() { delete this; }
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
 
-  // ArmMaliProtocol implementation.
-  void ArmMaliGetProperties(mali_properties_t* out_properties);
-  zx_status_t ArmMaliEnterProtectedMode();
-  zx_status_t ArmMaliStartExitProtectedMode();
-  zx_status_t ArmMaliFinishExitProtectedMode();
+  void GetProperties(fdf::Arena& arena, GetPropertiesCompleter::Sync& completer) override;
+  void EnterProtectedMode(fdf::Arena& arena, EnterProtectedModeCompleter::Sync& completer) override;
+  void StartExitProtectedMode(fdf::Arena& arena,
+                              StartExitProtectedModeCompleter::Sync& completer) override;
+  void FinishExitProtectedMode(fdf::Arena& arena,
+                               FinishExitProtectedModeCompleter::Sync& completer) override;
 
   void SetFrequencySource(SetFrequencySourceRequestView request,
                           SetFrequencySourceCompleter::Sync& completer) override;
@@ -97,13 +100,16 @@ class AmlGpu final : public DdkDeviceType,
   void InitClock();
   void SetClkFreqSource(int32_t clk_source);
   void SetInitialClkFreqSource(int32_t clk_source);
-  zx_status_t ProcessMetadata(std::vector<uint8_t> metadata);
+  zx_status_t ProcessMetadata(
+      std::vector<uint8_t> metadata,
+      fidl::WireTableBuilder<fuchsia_hardware_gpu_mali::wire::MaliProperties>& builder);
   zx_status_t SetProtected(uint32_t protection_mode);
 
   void UpdateClockProperties();
 
   ddk::PDev pdev_;
-  mali_properties_t properties_{};
+  fidl::Arena<> arena_;
+  fuchsia_hardware_gpu_mali::wire::MaliProperties properties_;
 
   std::optional<fdf::MmioBuffer> hiu_buffer_;
   std::optional<fdf::MmioBuffer> gpu_buffer_;
@@ -120,6 +126,10 @@ class AmlGpu final : public DdkDeviceType,
   inspect::Inspector inspector_;
   // bootstrap/driver_manager:root/aml-gpu
   inspect::Node root_;
+  fdf::OutgoingDirectory outgoing_dir_;
+  // Signaled when the loop is shutdown.
+  libsync::Completion loop_shutdown_completion_;
+  fdf::UnsynchronizedDispatcher loop_dispatcher_;
 
   inspect::UintProperty current_clk_source_property_;
   inspect::UintProperty current_clk_mux_source_property_;

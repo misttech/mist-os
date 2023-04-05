@@ -71,6 +71,11 @@ std::unique_ptr<magma::PlatformInterrupt> ParentDevice::RegisterInterrupt(unsign
   return std::make_unique<magma::ZirconPlatformInterrupt>(zx::handle(interrupt.release()));
 }
 
+zx_status_t ParentDevice::ConnectRuntimeProtocol(const char* service_name, const char* name,
+                                                 fdf::Channel server_end) {
+  return device_connect_runtime_protocol(parent_, service_name, name, server_end.release());
+}
+
 // static
 std::unique_ptr<ParentDevice> ParentDevice::Create(msd::DeviceHandle* device_handle) {
   if (!device_handle)

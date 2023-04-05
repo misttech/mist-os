@@ -5,12 +5,14 @@
 #include "aml-gpu.h"
 
 #include <fidl/fuchsia.hardware.gpu.amlogic/cpp/wire.h>
+#include <fidl/fuchsia.hardware.gpu.mali/cpp/wire.h>
 #include <fuchsia/hardware/iommu/c/banjo.h>
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/trace/event.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -33,9 +35,18 @@
 #include "t931-gpu.h"
 
 namespace aml_gpu {
-AmlGpu::AmlGpu(zx_device_t* parent) : DdkDeviceType(parent) {}
+AmlGpu::AmlGpu(zx_device_t* parent)
+    : DdkDeviceType(parent),
+      outgoing_dir_(fdf::OutgoingDirectory::Create(fdf::Dispatcher::GetCurrent()->get())) {}
 
-AmlGpu::~AmlGpu() {}
+AmlGpu::~AmlGpu() {
+  if (loop_dispatcher_.get()) {
+    loop_dispatcher_.ShutdownAsync();
+    // At this point the Mali device has been released and won't call into this driver, so the loop
+    // should shutdown quickly.
+    loop_shutdown_completion_.Wait();
+  }
+}
 
 void AmlGpu::SetClkFreqSource(int32_t clk_source) {
   if (current_clk_source_ == clk_source) {
@@ -192,12 +203,7 @@ void AmlGpu::InitClock() {
 }
 
 zx_status_t AmlGpu::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
-  if (proto_id == ZX_PROTOCOL_ARM_MALI) {
-    auto proto = static_cast<arm_mali_protocol_t*>(out_proto);
-    proto->ctx = this;
-    proto->ops = &arm_mali_protocol_ops_;
-    return ZX_OK;
-  } else if (proto_id == bind_fuchsia_platform::BIND_PROTOCOL_DEVICE) {
+  if (proto_id == bind_fuchsia_platform::BIND_PROTOCOL_DEVICE) {
     pdev_protocol_t* gpu_proto = static_cast<pdev_protocol_t*>(out_proto);
     // Forward the underlying ops.
     pdev_.GetProto(gpu_proto);
@@ -208,8 +214,8 @@ zx_status_t AmlGpu::DdkGetProtocol(uint32_t proto_id, void* out_proto) {
   }
 }
 
-void AmlGpu::ArmMaliGetProperties(mali_properties_t* out_properties) {
-  *out_properties = properties_;
+void AmlGpu::GetProperties(fdf::Arena& arena, GetPropertiesCompleter::Sync& completer) {
+  completer.buffer(arena).Reply(properties_);
 }
 
 // Match the definitions in the Amlogic OPTEE implementation.
@@ -247,30 +253,50 @@ zx_status_t AmlGpu::SetProtected(uint32_t protection_mode) {
   return ZX_OK;
 }
 
-zx_status_t AmlGpu::ArmMaliEnterProtectedMode() {
+void AmlGpu::EnterProtectedMode(fdf::Arena& arena, EnterProtectedModeCompleter::Sync& completer) {
   if (!secure_monitor_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
   }
 
-  return SetProtected(DMC_DEV_TYPE_SECURE);
+  zx_status_t status = SetProtected(DMC_DEV_TYPE_SECURE);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
+  }
 }
 
-zx_status_t AmlGpu::ArmMaliStartExitProtectedMode() {
+void AmlGpu::StartExitProtectedMode(fdf::Arena& arena,
+                                    StartExitProtectedModeCompleter::Sync& completer) {
   if (!secure_monitor_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
   }
   // Switch device to inaccessible mode. This will prevent writes to all memory
   // and start resetting the GPU.
-  return SetProtected(DMC_DEV_TYPE_INACCESSIBLE);
+  zx_status_t status = SetProtected(DMC_DEV_TYPE_INACCESSIBLE);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
+  }
 }
 
-zx_status_t AmlGpu::ArmMaliFinishExitProtectedMode() {
+void AmlGpu::FinishExitProtectedMode(fdf::Arena& arena,
+                                     FinishExitProtectedModeCompleter::Sync& completer) {
   if (!secure_monitor_) {
-    return ZX_ERR_NOT_SUPPORTED;
+    completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+    return;
   }
   // Switch to non-secure mode. This will check that the device has been reset
   // and will re-enable access to non-protected memory.
-  return SetProtected(DMC_DEV_TYPE_NON_SECURE);
+  zx_status_t status = SetProtected(DMC_DEV_TYPE_NON_SECURE);
+  if (status == ZX_OK) {
+    completer.buffer(arena).ReplySuccess();
+  } else {
+    completer.buffer(arena).ReplyError(status);
+  }
 }
 
 void AmlGpu::SetFrequencySource(SetFrequencySourceRequestView request,
@@ -284,8 +310,9 @@ void AmlGpu::SetFrequencySource(SetFrequencySourceRequestView request,
   completer.Reply(ZX_OK);
 }
 
-zx_status_t AmlGpu::ProcessMetadata(std::vector<uint8_t> raw_metadata) {
-  properties_ = {};
+zx_status_t AmlGpu::ProcessMetadata(
+    std::vector<uint8_t> raw_metadata,
+    fidl::WireTableBuilder<fuchsia_hardware_gpu_mali::wire::MaliProperties>& builder) {
   fit::result decoded = fidl::InplaceUnpersist<fuchsia_hardware_gpu_amlogic::wire::Metadata>(
       cpp20::span(raw_metadata));
   if (!decoded.is_ok()) {
@@ -293,13 +320,22 @@ zx_status_t AmlGpu::ProcessMetadata(std::vector<uint8_t> raw_metadata) {
     return ZX_ERR_INTERNAL;
   }
   const auto& metadata = *decoded.value();
-  if (metadata.has_supports_protected_mode() && metadata.supports_protected_mode()) {
-    properties_.supports_protected_mode = true;
-  }
+  builder.supports_protected_mode(metadata.has_supports_protected_mode() &&
+                                  metadata.supports_protected_mode());
   return ZX_OK;
 }
 
 zx_status_t AmlGpu::Bind() {
+  auto loop_dispatcher = fdf::UnsynchronizedDispatcher::Create(
+      fdf::UnsynchronizedDispatcher::Options{}, "aml-gpu-thread",
+      [this](fdf_dispatcher_t* dispatcher) { loop_shutdown_completion_.Signal(); },
+      "fuchsia.graphics.drivers.aml-gpu");
+
+  if (!loop_dispatcher.is_ok()) {
+    zxlogf(ERROR, "Creating dispatcher failed, status=%s\n", loop_dispatcher.status_string());
+    return loop_dispatcher.status_value();
+  }
+  loop_dispatcher_ = *std::move(loop_dispatcher);
   root_ = inspector_.GetRoot().CreateChild("aml-gpu");
   current_clk_source_property_ = root_.CreateUint("current_clk_source", current_clk_source_);
   current_clk_mux_source_property_ = root_.CreateUint("current_clk_mux_source", 0);
@@ -308,6 +344,8 @@ zx_status_t AmlGpu::Bind() {
   current_protected_mode_property_ = root_.CreateInt("current_protected_mode", -1);
   size_t size;
   zx_status_t status = DdkGetMetadataSize(fuchsia_hardware_gpu_amlogic::wire::kMaliMetadata, &size);
+
+  auto builder = fuchsia_hardware_gpu_mali::wire::MaliProperties::Builder(arena_);
   if (status == ZX_OK) {
     std::vector<uint8_t> raw_metadata(size);
     size_t actual;
@@ -321,7 +359,7 @@ zx_status_t AmlGpu::Bind() {
       GPU_ERROR("Non-matching sizes %ld %ld", size, actual);
       return ZX_ERR_INTERNAL;
     }
-    status = ProcessMetadata(std::move(raw_metadata));
+    status = ProcessMetadata(std::move(raw_metadata), builder);
     if (status != ZX_OK) {
       GPU_ERROR("Error processing metadata %d", status);
       return status;
@@ -381,7 +419,7 @@ zx_status_t AmlGpu::Bind() {
 
   reset_register_ = fidl::WireSyncClient(std::move(reset_register_client.value()));
 
-  if (info.pid == PDEV_PID_AMLOGIC_S905D3 && properties_.supports_protected_mode) {
+  if (info.pid == PDEV_PID_AMLOGIC_S905D3 && builder.supports_protected_mode()) {
     // S905D3 needs to use an SMC into the TEE to do protected mode switching.
     static constexpr uint32_t kTrustedOsSmcIndex = 0;
     status = pdev_.GetSmc(kTrustedOsSmcIndex, &secure_monitor_);
@@ -389,8 +427,7 @@ zx_status_t AmlGpu::Bind() {
       GPU_ERROR("Unable to retrieve secure monitor SMC: %d", status);
       return status;
     }
-
-    properties_.use_protected_mode_callbacks = true;
+    builder.use_protected_mode_callbacks(true);
   }
 
   if (info.pid == PDEV_PID_AMLOGIC_S905D2 || info.pid == PDEV_PID_AMLOGIC_S905D3) {
@@ -401,7 +438,40 @@ zx_status_t AmlGpu::Bind() {
     }
   }
 
+  properties_ = builder.Build();
+
   InitClock();
+
+  auto outgoing_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+  if (outgoing_endpoints.is_error()) {
+    return outgoing_endpoints.status_value();
+  }
+
+  auto protocol = [this](fdf::ServerEnd<fuchsia_hardware_gpu_mali::ArmMali> server_end) mutable {
+    fdf::BindServer(loop_dispatcher_.get(), std::move(server_end), this);
+  };
+
+  fuchsia_hardware_gpu_mali::Service::InstanceHandler handler({.arm_mali = std::move(protocol)});
+  {
+    auto status = outgoing_dir_.AddService<fuchsia_hardware_gpu_mali::Service>(std::move(handler));
+    if (status.is_error()) {
+      zxlogf(ERROR, "%s(): Failed to add service to outgoing directory: %s\n", __func__,
+             status.status_string());
+      return status.error_value();
+    }
+  }
+  {
+    auto result = outgoing_dir_.Serve(std::move(outgoing_endpoints->server));
+    if (result.is_error()) {
+      zxlogf(ERROR, "%s(): Failed to serve outgoing directory: %s\n", __func__,
+             result.status_string());
+      return result.error_value();
+    }
+  }
+
+  std::array offers = {
+      fuchsia_hardware_gpu_mali::Service::Name,
+  };
 
   zx_device_prop_t props[] = {
       {BIND_PROTOCOL, 0, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE},
@@ -410,8 +480,11 @@ zx_status_t AmlGpu::Bind() {
       {BIND_PLATFORM_DEV_DID, 0, bind_fuchsia_arm_platform::BIND_PLATFORM_DEV_DID_MAGMA_MALI},
   };
 
-  status = DdkAdd(
-      ddk::DeviceAddArgs("aml-gpu").set_props(props).set_inspect_vmo(inspector_.DuplicateVmo()));
+  status = DdkAdd(ddk::DeviceAddArgs("aml-gpu")
+                      .set_props(props)
+                      .set_runtime_service_offers(offers)
+                      .set_outgoing_dir(outgoing_endpoints->client.TakeChannel())
+                      .set_inspect_vmo(inspector_.DuplicateVmo()));
 
   if (status != ZX_OK) {
     return status;

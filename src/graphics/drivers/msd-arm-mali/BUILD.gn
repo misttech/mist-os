@@ -68,6 +68,9 @@ driver_bind_rules("msd_arm_test_bind") {
 
 entry_deps = [
   "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp_wire",
+  "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_driver",
+  "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp_wire",
+  "//src/devices/bin/driver_runtime",
   "//src/devices/lib/driver",
   "//src/graphics/lib/magma/src/magma_util:macros",
   "//src/graphics/lib/magma/src/magma_util/platform:logger",

@@ -5,7 +5,7 @@
 #ifndef MSD_ARM_DEVICE_H
 #define MSD_ARM_DEVICE_H
 
-#include <fuchsia/hardware/gpu/mali/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fit/thread_safety.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -188,6 +188,11 @@ class MsdArmDevice : public msd::Device,
     inspect::Node node;
   };
 
+  struct MaliProperties {
+    bool supports_protected_mode = false;
+    bool use_protected_mode_callbacks = false;
+  };
+
   mali::RegisterIo* register_io() override {
     DASSERT(register_io_);
     return register_io_.get();
@@ -264,7 +269,7 @@ class MsdArmDevice : public msd::Device,
   std::mutex inspect_events_mutex_;
   FIT_GUARDED(inspect_events_mutex_) std::deque<InspectEvent> inspect_events_;
 
-  ddk::ArmMaliProtocolClient mali_protocol_client_;
+  fdf::WireSyncClient<fuchsia_hardware_gpu_mali::ArmMali> mali_protocol_client_;
   // Flag is set to true if reset completion should trigger FinishExitProtectedMode.
   std::atomic_bool exiting_protected_mode_flag_{false};
 
@@ -309,7 +314,7 @@ class MsdArmDevice : public msd::Device,
   std::unique_ptr<magma::PlatformInterrupt> job_interrupt_;
   std::unique_ptr<magma::PlatformInterrupt> mmu_interrupt_;
 
-  mali_properties_t mali_properties_{};
+  MaliProperties mali_properties_{};
   GpuFeatures gpu_features_;
   ArmMaliCacheCoherencyStatus cache_coherency_status_ = kArmMaliCacheCoherencyNone;
   std::unique_ptr<magma::PlatformBuffer> device_properties_buffer_;

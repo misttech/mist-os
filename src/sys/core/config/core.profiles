@@ -13,6 +13,7 @@
     "fuchsia.devices.wlan.drivers.brcmf.workqueue.runner": { "capacity": "400us", "deadline": "1ms", "period": "1ms" },
 
     // Msd Arm Mali / Vsi Vip profiles.
+    "fuchsia.graphics.drivers.aml-gpu": { "capacity": "2500us", "deadline": "16666us", "period": "16666us" },
     "fuchsia.graphics.drivers.msd-arm-mali.gpu-interrupt": { "capacity": "60us", "deadline": "125us", "period": "125us" },
     "fuchsia.graphics.drivers.msd-arm-mali.job-interrupt": { "capacity": "60us", "deadline": "125us", "period": "125us" },
     "fuchsia.graphics.drivers.msd-arm-mali.mmu-interrupt": { "capacity": "60us", "deadline": "125us", "period": "125us" },

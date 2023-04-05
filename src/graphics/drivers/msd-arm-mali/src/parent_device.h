@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/fdf/cpp/channel.h>
 
 #include <chrono>
 #include <memory>
@@ -44,6 +45,9 @@ class ParentDevice {
 
   // Register an interrupt listed at |index| in the platform device.
   virtual std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index);
+
+  virtual zx_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
+                                             fdf::Channel server_end);
 
   // Ownership of |device_handle| is *not* transferred to the ParentDevice.
   static std::unique_ptr<ParentDevice> Create(msd::DeviceHandle* device_handle);

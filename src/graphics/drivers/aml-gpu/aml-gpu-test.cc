@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.gpu.amlogic/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
 #include <lib/zx/vmo.h>
 
 #include <zxtest/zxtest.h>
@@ -88,15 +89,10 @@ class TestAmlGpu {
   static void TestMetadata() {
     using fuchsia_hardware_gpu_amlogic::wire::Metadata;
     aml_gpu::AmlGpu aml_gpu(nullptr);
-    arm_mali_protocol_t protocol;
-    EXPECT_OK(aml_gpu.DdkGetProtocol(ZX_PROTOCOL_ARM_MALI, &protocol));
-
-    mali_properties_t properties;
-    protocol.ops->get_properties(protocol.ctx, &properties);
-    EXPECT_FALSE(properties.supports_protected_mode);
 
     {
       fidl::Arena allocator;
+      auto properties = fuchsia_hardware_gpu_mali::wire::MaliProperties::Builder(allocator);
       auto metadata = Metadata::Builder(allocator);
       metadata.supports_protected_mode(false);
       {
@@ -104,28 +100,26 @@ class TestAmlGpu {
         fit::result encoded_metadata = fidl::Persist(built_metadata);
         ASSERT_TRUE(encoded_metadata.is_ok());
         std::vector<uint8_t>& message_bytes = encoded_metadata.value();
-        EXPECT_OK(aml_gpu.ProcessMetadata(std::vector<uint8_t>(
-            message_bytes.data(), message_bytes.data() + message_bytes.size())));
+        EXPECT_OK(aml_gpu.ProcessMetadata(
+            std::vector<uint8_t>(message_bytes.data(), message_bytes.data() + message_bytes.size()),
+            properties));
       }
+      EXPECT_FALSE(properties.Build().supports_protected_mode());
     }
-
-    protocol.ops->get_properties(protocol.ctx, &properties);
-    EXPECT_FALSE(properties.supports_protected_mode);
 
     {
       fidl::Arena allocator;
+      auto properties = fuchsia_hardware_gpu_mali::wire::MaliProperties::Builder(allocator);
       auto metadata = Metadata::Builder(allocator);
       metadata.supports_protected_mode(true);
       {
         auto built_metadata = metadata.Build();
         fit::result metadata_bytes = fidl::Persist(built_metadata);
         ASSERT_TRUE(metadata_bytes.is_ok());
-        EXPECT_OK(aml_gpu.ProcessMetadata(std::move(metadata_bytes.value())));
+        EXPECT_OK(aml_gpu.ProcessMetadata(std::move(metadata_bytes.value()), properties));
       }
+      EXPECT_TRUE(properties.Build().supports_protected_mode());
     }
-
-    protocol.ops->get_properties(protocol.ctx, &properties);
-    EXPECT_TRUE(properties.supports_protected_mode);
   }
 };
 }  // namespace aml_gpu

@@ -4,8 +4,10 @@
 
 #include "src/graphics/drivers/msd-arm-mali/src/msd_arm_device.h"
 
+#include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <lib/async/cpp/task.h>
 #include <lib/backtrace-request/backtrace-request.h>
+#include <lib/ddk/device.h>
 #include <lib/fit/defer.h>
 
 #include <bitset>
@@ -232,11 +234,33 @@ bool MsdArmDevice::Init(std::unique_ptr<ParentDevice> platform_device,
   }
 #endif
 
-  arm_mali_protocol mali_proto;
-  if (parent_device_->GetProtocol(ZX_PROTOCOL_ARM_MALI, &mali_proto)) {
-    mali_protocol_client_ = ddk::ArmMaliProtocolClient(&mali_proto);
-    DASSERT(mali_protocol_client_.is_valid());
-    mali_protocol_client_.GetProperties(&mali_properties_);
+  {
+    auto endpoints =
+        fdf::CreateEndpoints<fuchsia_hardware_gpu_mali::Service::ArmMali::ProtocolType>();
+
+    zx_status_t status = parent_device_->ConnectRuntimeProtocol(
+        fuchsia_hardware_gpu_mali::Service::ArmMali::ServiceName,
+        fuchsia_hardware_gpu_mali::Service::ArmMali::Name, endpoints->server.TakeChannel());
+    if (status != ZX_OK) {
+      // Not a fatal error, since very simple parent drivers may not need to support the arm mali
+      // service.
+      MAGMA_LOG(INFO, "DdkConnectRuntimeProtocol failed: %s", zx_status_get_string(status));
+    } else {
+      mali_protocol_client_ = fdf::WireSyncClient(std::move(endpoints->client));
+      fdf::Arena arena('MALI');
+      auto result = mali_protocol_client_.buffer(arena)->GetProperties();
+      if (!result.ok()) {
+        MAGMA_LOG(ERROR, "Error retrieving mali properties: %s", result.lossy_description());
+        return false;
+      } else {
+        auto& properties = result->properties;
+        mali_properties_.supports_protected_mode =
+            properties.has_supports_protected_mode() && properties.supports_protected_mode();
+        mali_properties_.use_protected_mode_callbacks =
+            properties.has_use_protected_mode_callbacks() &&
+            properties.use_protected_mode_callbacks();
+      }
+    }
   }
 
   UpdateProtectedModeSupported();
@@ -561,11 +585,14 @@ void MsdArmDevice::HandleResetInterrupt() {
   DLOG("Received GPU reset completed");
   if (exiting_protected_mode_flag_) {
     exiting_protected_mode_flag_ = false;
+    fdf::Arena arena('MALI');
     // Call Finish before clearing the irq register because the TEE requires the interrupt is
     // still set to prove that the reset happened.
-    zx_status_t status = mali_protocol_client_.FinishExitProtectedMode();
-    if (status != ZX_OK) {
-      MAGMA_LOG(ERROR, "error from FinishExitProtectedMode: %d", status);
+    auto status = mali_protocol_client_.buffer(arena)->FinishExitProtectedMode();
+    if (!status.ok()) {
+      MAGMA_LOG(ERROR, "error from FinishExitProtectedMode: %s", status.status_string());
+    } else if (!status->is_ok()) {
+      MAGMA_LOG(ERROR, "Remote error from FinishExitProtectedMode: %d", status->error_value());
     }
   }
   reset_semaphore_->Signal();
@@ -1523,10 +1550,14 @@ void MsdArmDevice::EnterProtectedMode() {
     // Keep trying to reset the device, or the job scheduler will hang forever.
   }
 
-  zx_status_t status = mali_protocol_client_.EnterProtectedMode();
-  if (status != ZX_OK) {
+  fdf::Arena arena('MALI');
+  auto status = mali_protocol_client_.buffer(arena)->EnterProtectedMode();
+  if (!status.ok()) {
     TRACE_ALERT("magma", "pmode-error");
-    MAGMA_LOG(ERROR, "Error from EnterProtectedMode: %d", status);
+    MAGMA_LOG(ERROR, "Error from EnterProtectedMode: %s", status.status_string());
+  } else if (!status->is_ok()) {
+    TRACE_ALERT("magma", "pmode-error");
+    MAGMA_LOG(ERROR, "Remote error from EnterProtectedMode: %d", status->error_value());
   }
 
   EnableAllCores();
@@ -1586,9 +1617,14 @@ bool MsdArmDevice::ResetDevice() {
     register_io_->Write32(registers::GpuCommand::kCmdSoftReset, registers::GpuCommand::kOffset);
   } else {
     exiting_protected_mode_flag_ = true;
-    zx_status_t status = mali_protocol_client_.StartExitProtectedMode();
-    if (status != ZX_OK) {
-      MAGMA_LOG(ERROR, "Error from StartExitProtectedMode: %d", status);
+    fdf::Arena arena('MALI');
+    auto status = mali_protocol_client_.buffer(arena)->StartExitProtectedMode();
+    if (!status.ok()) {
+      MAGMA_LOG(ERROR, "Error from StartExitProtectedMode: %s", status.status_string());
+      return false;
+    }
+    if (!status->is_ok()) {
+      MAGMA_LOG(ERROR, "Remote error from StartExitProtectedMode: %d", status->error_value());
       return false;
     }
   }

@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/hardware/gpu/mali/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
+#include <lib/driver/runtime/testing/runtime/dispatcher.h>
+#include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
 #include <lib/inspect/cpp/reader.h>
-#include <lib/zx/vmar.h>
 
 #include <condition_variable>
 #include <mutex>
@@ -88,21 +89,62 @@ class FakeParentDevice : public ParentDevice {
   std::unique_ptr<magma::PlatformInterrupt> RegisterInterrupt(unsigned int index) override {
     return std::make_unique<FakePlatformInterrupt>();
   }
+  magma_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
+                                        fdf::Channel server_end) override {
+    return MAGMA_STATUS_INTERNAL_ERROR;
+  }
 };
+
+class ArmMaliServer : public fdf::WireServer<fuchsia_hardware_gpu_mali::ArmMali> {
+ public:
+  void GetProperties(fdf::Arena& arena, GetPropertiesCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(fuchsia_hardware_gpu_mali::wire::MaliProperties::Builder(arena)
+                                      .supports_protected_mode(true)
+                                      .use_protected_mode_callbacks(use_protected_mode_callbacks_)
+                                      .Build());
+  }
+  void EnterProtectedMode(fdf::Arena& arena,
+                          EnterProtectedModeCompleter::Sync& completer) override {
+    got_enter_protected_mode_ = true;
+    completer.buffer(arena).ReplySuccess();
+  }
+  void StartExitProtectedMode(fdf::Arena& arena,
+                              StartExitProtectedModeCompleter::Sync& completer) override {
+    got_start_exit_protected_mode_ = true;
+    completer.buffer(arena).ReplySuccess();
+  }
+  void FinishExitProtectedMode(fdf::Arena& arena,
+                               FinishExitProtectedModeCompleter::Sync& completer) override {
+    got_finish_exit_protected_mode_ = true;
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  bool use_protected_mode_callbacks_ = false;
+
+  bool got_enter_protected_mode_ = false;
+  bool got_start_exit_protected_mode_ = false;
+  bool got_finish_exit_protected_mode_ = false;
+};
+
 class FakeParentDeviceWithProtocol : public FakeParentDevice {
  public:
-  FakeParentDeviceWithProtocol(uint32_t proto_id, std::vector<uint8_t> metadata)
-      : proto_id_(proto_id), metadata_(metadata) {}
-  bool GetProtocol(uint32_t proto_id, void* proto_out) override {
-    if (proto_id != proto_id_)
-      return DRETF(false, "Bad proto %d", proto_id);
-    memcpy(proto_out, metadata_.data(), metadata_.size());
-    return true;
+  explicit FakeParentDeviceWithProtocol(fdf_dispatcher_t* dispatcher, ArmMaliServer* server)
+      : dispatcher_(dispatcher), server_(server) {}
+
+  magma_status_t ConnectRuntimeProtocol(const char* service_name, const char* name,
+                                        fdf::Channel server_end) override {
+    EXPECT_EQ(std::string("fuchsia.hardware.gpu.mali.Service"), service_name);
+    EXPECT_EQ(std::string("arm_mali"), name);
+
+    fdf::BindServer(dispatcher_,
+                    fdf::ServerEnd<fuchsia_hardware_gpu_mali::ArmMali>(std::move(server_end)),
+                    server_);
+    return MAGMA_STATUS_OK;
   }
 
  private:
-  uint32_t proto_id_;
-  std::vector<uint8_t> metadata_;
+  fdf_dispatcher_t* dispatcher_{};
+  ArmMaliServer* server_;
 };
 
 }  // namespace
@@ -391,29 +433,33 @@ class TestNonHardwareMsdArmDevice {
     EXPECT_TRUE(found_child);
   }
 
-  static void mali_protocol_handler(void* ctx, mali_properties_t* properties) {
-    *properties = {};
-    properties->supports_protected_mode = true;
-  }
-
   void MaliProtocol() {
-    auto driver = MsdArmDriver::Create();
-    auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
-                                                 std::make_unique<MockBusMapper>());
-    ASSERT_TRUE(device);
-    EXPECT_FALSE(device->IsProtectedModeSupported());
-    arm_mali_protocol mali_proto{};
-    arm_mali_protocol_ops_t ops;
-    ops.get_properties = mali_protocol_handler;
-    mali_proto.ctx = this;
-    mali_proto.ops = &ops;
-    std::vector<uint8_t> proto_vec(sizeof(mali_proto));
-    memcpy(proto_vec.data(), &mali_proto, proto_vec.size());
+    fdf::TestSynchronizedDispatcher test_dispatcher;
+    ASSERT_EQ(ZX_OK,
+              test_dispatcher
+                  .Start(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop")
+                  .status_value());
+    ASSERT_EQ(ZX_OK,
+              fdf::RunOnDispatcherSync(test_dispatcher.dispatcher(), [&]() {
+                auto driver = MsdArmDriver::Create();
+                auto device = driver->CreateDeviceForTesting(std::make_unique<FakeParentDevice>(),
+                                                             std::make_unique<MockBusMapper>());
+                ASSERT_TRUE(device);
+                EXPECT_FALSE(device->IsProtectedModeSupported());
 
-    device = driver->CreateDeviceForTesting(
-        std::make_unique<FakeParentDeviceWithProtocol>(ZX_PROTOCOL_ARM_MALI, std::move(proto_vec)),
-        std::make_unique<MockBusMapper>());
-    EXPECT_TRUE(device->IsProtectedModeSupported());
+                ArmMaliServer server;
+                libsync::Completion server_completion;
+                auto dispatcher = fdf::SynchronizedDispatcher::Create(
+                    {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
+                ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
+
+                device = driver->CreateDeviceForTesting(
+                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server),
+                    std::make_unique<MockBusMapper>());
+                EXPECT_TRUE(device->IsProtectedModeSupported());
+                dispatcher->ShutdownAsync();
+                server_completion.Wait();
+              }).status_value());
   }
 
   void ResetOnStart() {
@@ -426,45 +472,37 @@ class TestNonHardwareMsdArmDevice {
               device->register_io_->Read32(registers::GpuCommand::kOffset));
   }
 
-  static void mali_get_properties_with_callbacks(void* ctx, mali_properties_t* properties) {
-    *properties = {};
-    properties->supports_protected_mode = true;
-    properties->use_protected_mode_callbacks = true;
-  }
-
-  static zx_status_t mali_start_exit_protected(void* ctx) {
-    static_cast<TestNonHardwareMsdArmDevice*>(ctx)->got_start_exit_protected_ = true;
-    return ZX_OK;
-  }
-  static zx_status_t mali_finish_exit_protected(void* ctx) {
-    static_cast<TestNonHardwareMsdArmDevice*>(ctx)->got_finish_exit_protected_ = true;
-    return ZX_OK;
-  }
-
   void ProtectedCallbacks() {
+    fdf::TestSynchronizedDispatcher test_dispatcher;
+    ASSERT_EQ(ZX_OK,
+              test_dispatcher
+                  .Start(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "driver-test-loop")
+                  .status_value());
     auto driver = MsdArmDriver::Create();
-    arm_mali_protocol mali_proto{};
-    arm_mali_protocol_ops_t ops;
-    ops.get_properties = mali_get_properties_with_callbacks;
-    ops.start_exit_protected_mode = mali_start_exit_protected;
-    ops.finish_exit_protected_mode = mali_finish_exit_protected;
-    mali_proto.ctx = this;
-    mali_proto.ops = &ops;
-    std::vector<uint8_t> proto_vec(sizeof(mali_proto));
-    memcpy(proto_vec.data(), &mali_proto, proto_vec.size());
+    ArmMaliServer server;
+    server.use_protected_mode_callbacks_ = true;
+    libsync::Completion server_completion;
+    ASSERT_EQ(ZX_OK,
+              fdf::RunOnDispatcherSync(test_dispatcher.dispatcher(), [&]() {
+                auto dispatcher = fdf::SynchronizedDispatcher::Create(
+                    {}, "mali_server_test", [&](fdf_dispatcher_t*) { server_completion.Signal(); });
+                ASSERT_FALSE(dispatcher.is_error()) << dispatcher.status_string();
 
-    auto device = driver->CreateDeviceForTesting(
-        std::make_unique<FakeParentDeviceWithProtocol>(ZX_PROTOCOL_ARM_MALI, std::move(proto_vec)),
-        std::make_unique<MockBusMapper>());
-    ASSERT_TRUE(device);
-    EXPECT_TRUE(device->IsProtectedModeSupported());
-    EXPECT_TRUE(got_start_exit_protected_);
-    EXPECT_TRUE(device->exiting_protected_mode_flag_);
-    device->HandleResetInterrupt();
-    EXPECT_FALSE(device->exiting_protected_mode_flag_);
-    EXPECT_TRUE(got_finish_exit_protected_);
-    // Callbacks should have been used instead of a soft stop command.
-    EXPECT_EQ(0u, device->register_io_->Read32(registers::GpuCommand::kOffset));
+                auto device = driver->CreateDeviceForTesting(
+                    std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server),
+                    std::make_unique<MockBusMapper>());
+                ASSERT_TRUE(device);
+                EXPECT_TRUE(device->IsProtectedModeSupported());
+                EXPECT_TRUE(server.got_start_exit_protected_mode_);
+                EXPECT_TRUE(device->exiting_protected_mode_flag_);
+                device->HandleResetInterrupt();
+                EXPECT_FALSE(device->exiting_protected_mode_flag_);
+                EXPECT_TRUE(server.got_finish_exit_protected_mode_);
+                // Callbacks should have been used instead of a soft stop command.
+                EXPECT_EQ(0u, device->register_io_->Read32(registers::GpuCommand::kOffset));
+                dispatcher->ShutdownAsync();
+                server_completion.Wait();
+              }).status_value());
   }
 
   void DevicePropertiesQuery() {
@@ -495,10 +533,6 @@ class TestNonHardwareMsdArmDevice {
 
     EXPECT_EQ(ZX_OK, zx::vmar::root_self()->unmap(vaddr, size));
   }
-
- private:
-  bool got_start_exit_protected_ = false;
-  bool got_finish_exit_protected_ = false;
 };
 
 TEST(NonHardwareMsdArmDevice, MockDump) {
