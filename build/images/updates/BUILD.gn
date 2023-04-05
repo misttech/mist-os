@@ -241,22 +241,31 @@ if (use_bringup_assembly) {
 
   action("all_package_manifests.list") {
     testonly = true
-    script = "//build/cat.sh"
+    script = "create-all-package-manifests-list.py"
     outputs = [ all_package_manifests_list ]
-    deps = [ ":universe_package_manifests.list" ]
+    deps = []
+    args = rebase_path(outputs, root_build_dir)
+    sources = []
+
+    _manifest_deps = [ ":universe_package_manifests.list" ]
 
     # TODO(https://fxbug.dev/123120): Figure out how to provide the following
     # information when only Bazel assembly is used.
-    if (!use_bazel_images_only) {
-      deps += [
+    if (use_bazel_images_only) {
+      deps += [ labels.bazel_package_manifests_list ]
+
+      args +=
+          [ rebase_path(files.bazel_package_manifests_list, root_build_dir) ]
+      sources += [ files.bazel_package_manifests_list ]
+    } else {
+      _manifest_deps += [
         ":base_package_manifests.list",
         ":cache_package_manifests.list",
       ]
     }
 
-    args = rebase_path(outputs, root_build_dir)
-    sources = []
-    foreach(_dep, deps) {
+    foreach(_dep, _manifest_deps) {
+      deps += [ _dep ]
       _dep_outputs = []  # tell gn its ok to rewrite each iteration
       _dep_outputs = get_target_outputs(_dep)
       args += [ rebase_path(_dep_outputs[0], root_build_dir) ]

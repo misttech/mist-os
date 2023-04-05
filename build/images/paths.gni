@@ -41,6 +41,10 @@ labels = {
     # images_prime target is used to provide extra metadata, for Bazel assembly
     # we consolidate metadata on the same product bundle GN wrapper.
     images_prime = bazel_assembly_targets[0]
+
+    # Path to the `package_tool_package_manifest_list_create` target defined in
+    # `bazel_product_bundle`.
+    bazel_package_manifests_list = images + "_package_manifests_list"
   } else if (use_bringup_assembly) {
     images = "//build/images/bringup(${default_toolchain})"
     assembly_name = "bringup"
@@ -67,6 +71,9 @@ files = {
     images_outdir =
         get_label_info(labels.images, "target_gen_dir") + "/product_bundle"
     assembly_outdir = images_outdir + "/system_a"
+    bazel_package_manifests_list =
+        get_label_info(labels.images, "target_out_dir") +
+        "/manifests/package_manifests.list"
   } else {
     images_outdir = get_label_info(labels.images, "target_out_dir")
     assembly_outdir = images_outdir + "/${labels.assembly_name}"
