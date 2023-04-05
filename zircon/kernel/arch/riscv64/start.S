@@ -14,9 +14,6 @@
 #include <lib/code-patching/asm.h>
 #include <lib/arch/asm.h>
 
-// TODO-rvbringup: set up the shadow call stack, configure TP
-// TODO-rvbringup: set kernel_virtial_entry_ticks
-
 // This code is purely position-independent and generates no relocations
 // that need boot-time fixup.
 .text

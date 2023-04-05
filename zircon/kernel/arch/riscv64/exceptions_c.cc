@@ -235,20 +235,16 @@ static void riscv64_illegal_instruction_handler(long cause, struct iframe_t* fra
 #endif
 }
 
-extern "C" syscall_result riscv64_syscall_dispatcher(struct iframe_t* frame) {
-  // TODO-rvbringup: implement in exceptions.S
-  PANIC_UNIMPLEMENTED;
-}
-
 static void riscv64_syscall_handler(struct iframe_t* frame, bool user) {
   if (unlikely(!user)) {
     exception_die(frame, "syscall from supervisor mode\n");
   }
 
-  // TODO-rvbringup: double check that need to do this skip
-  frame->regs.pc = frame->regs.pc + 0x4;  // Skip the ecall instruction
+  // Push the PC forward over the ECALL instruction. By definition the ECALL instruction
+  // is 32 bits wide, and cannot be implemented as a compressed 16 bit instruction.
+  frame->regs.pc += 0x4;
 
-  struct syscall_result ret = riscv64_syscall_dispatcher(frame);
+  syscall_result ret = riscv64_syscall_dispatcher(frame);
   frame->regs.a0 = ret.status;
   if (ret.is_signaled) {
     Thread::Current::ProcessPendingSignals(GeneralRegsSource::Iframe, frame);

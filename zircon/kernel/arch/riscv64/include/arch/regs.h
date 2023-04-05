@@ -7,39 +7,39 @@
 #ifndef ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_REGS_H_
 #define ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_REGS_H_
 
-#define RISCV64_IFRAME_OFFSET_PC (0 * 8)    // in the x0 slot
-#define RISCV64_IFRAME_OFFSET_RA (1 * 8)    // x1
-#define RISCV64_IFRAME_OFFSET_SP (2 * 8)    // x2
-#define RISCV64_IFRAME_OFFSET_GP (3 * 8)    // x3
-#define RISCV64_IFRAME_OFFSET_TP (4 * 8)    // x4
-#define RISCV64_IFRAME_OFFSET_T0 (5 * 8)    // x5
-#define RISCV64_IFRAME_OFFSET_T1 (6 * 8)    // x6
-#define RISCV64_IFRAME_OFFSET_T2 (7 * 8)    // x7
-#define RISCV64_IFRAME_OFFSET_S0 (8 * 8)    // x8
-#define RISCV64_IFRAME_OFFSET_S1 (9 * 8)    // x9
-#define RISCV64_IFRAME_OFFSET_A0 (10 * 8)   // x10
-#define RISCV64_IFRAME_OFFSET_A1 (11 * 8)   // x11
-#define RISCV64_IFRAME_OFFSET_A2 (12 * 8)   // x12
-#define RISCV64_IFRAME_OFFSET_A3 (13 * 8)   // x13
-#define RISCV64_IFRAME_OFFSET_A4 (14 * 8)   // x14
-#define RISCV64_IFRAME_OFFSET_A5 (15 * 8)   // x15
-#define RISCV64_IFRAME_OFFSET_A6 (16 * 8)   // x16
-#define RISCV64_IFRAME_OFFSET_A7 (17 * 8)   // x17
-#define RISCV64_IFRAME_OFFSET_S2 (18 * 8)   // x18
-#define RISCV64_IFRAME_OFFSET_S3 (19 * 8)   // x19
-#define RISCV64_IFRAME_OFFSET_S4 (20 * 8)   // x20
-#define RISCV64_IFRAME_OFFSET_S5 (21 * 8)   // x21
-#define RISCV64_IFRAME_OFFSET_S6 (22 * 8)   // x22
-#define RISCV64_IFRAME_OFFSET_S7 (23 * 8)   // x23
-#define RISCV64_IFRAME_OFFSET_S8 (24 * 8)   // x24
-#define RISCV64_IFRAME_OFFSET_S9 (25 * 8)   // x25
-#define RISCV64_IFRAME_OFFSET_S10 (26 * 8)  // x26
-#define RISCV64_IFRAME_OFFSET_S11 (27 * 8)  // x27
-#define RISCV64_IFRAME_OFFSET_T3 (28 * 8)   // x28
-#define RISCV64_IFRAME_OFFSET_T4 (29 * 8)   // x29
-#define RISCV64_IFRAME_OFFSET_T5 (30 * 8)   // x30
-#define RISCV64_IFRAME_OFFSET_T6 (31 * 8)   // x31
-#define RISCV64_IFRAME_OFFSET_STATUS (32 * 8)
+#define RISCV64_IFRAME_OFFSET_STATUS (0 * 8)
+#define RISCV64_IFRAME_OFFSET_PC (1 * 8)    // in the x0 slot
+#define RISCV64_IFRAME_OFFSET_RA (2 * 8)    // x1
+#define RISCV64_IFRAME_OFFSET_SP (3 * 8)    // x2
+#define RISCV64_IFRAME_OFFSET_GP (4 * 8)    // x3
+#define RISCV64_IFRAME_OFFSET_TP (5 * 8)    // x4
+#define RISCV64_IFRAME_OFFSET_T0 (6 * 8)    // x5
+#define RISCV64_IFRAME_OFFSET_T1 (7 * 8)    // x6
+#define RISCV64_IFRAME_OFFSET_T2 (8 * 8)    // x7
+#define RISCV64_IFRAME_OFFSET_S0 (9 * 8)    // x8
+#define RISCV64_IFRAME_OFFSET_S1 (10 * 8)   // x9
+#define RISCV64_IFRAME_OFFSET_A0 (11 * 8)   // x10
+#define RISCV64_IFRAME_OFFSET_A1 (12 * 8)   // x11
+#define RISCV64_IFRAME_OFFSET_A2 (13 * 8)   // x12
+#define RISCV64_IFRAME_OFFSET_A3 (14 * 8)   // x13
+#define RISCV64_IFRAME_OFFSET_A4 (15 * 8)   // x14
+#define RISCV64_IFRAME_OFFSET_A5 (16 * 8)   // x15
+#define RISCV64_IFRAME_OFFSET_A6 (17 * 8)   // x16
+#define RISCV64_IFRAME_OFFSET_A7 (18 * 8)   // x17
+#define RISCV64_IFRAME_OFFSET_S2 (19 * 8)   // x18
+#define RISCV64_IFRAME_OFFSET_S3 (20 * 8)   // x19
+#define RISCV64_IFRAME_OFFSET_S4 (21 * 8)   // x20
+#define RISCV64_IFRAME_OFFSET_S5 (22 * 8)   // x21
+#define RISCV64_IFRAME_OFFSET_S6 (23 * 8)   // x22
+#define RISCV64_IFRAME_OFFSET_S7 (24 * 8)   // x23
+#define RISCV64_IFRAME_OFFSET_S8 (25 * 8)   // x24
+#define RISCV64_IFRAME_OFFSET_S9 (26 * 8)   // x25
+#define RISCV64_IFRAME_OFFSET_S10 (27 * 8)  // x26
+#define RISCV64_IFRAME_OFFSET_S11 (28 * 8)  // x27
+#define RISCV64_IFRAME_OFFSET_T3 (29 * 8)   // x28
+#define RISCV64_IFRAME_OFFSET_T4 (30 * 8)   // x29
+#define RISCV64_IFRAME_OFFSET_T5 (31 * 8)   // x30
+#define RISCV64_IFRAME_OFFSET_T6 (32 * 8)   // x31
 #define RISCV64_IFRAME_SIZE ((32 + 2) * 8)
 
 #ifndef __ASSEMBLER__
@@ -50,9 +50,8 @@
 
 // Registers saved on entering the kernel via architectural exception.
 struct alignas(16) iframe_t {
-  zx_riscv64_thread_state_general_regs_t regs;
   uint64_t status;
-  uint64_t pad;
+  zx_riscv64_thread_state_general_regs_t regs;
 };
 
 struct arch_exception_context {

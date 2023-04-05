@@ -41,6 +41,10 @@
 #define RISCV64_CSR_SSTATUS_FS_DIRTY (3ul << 13)
 #define RISCV64_CSR_SSTATUS_SUM (1ul << 18)
 #define RISCV64_CSR_SSTATUS_MXR (1ul << 19)
+#define RISCV64_CSR_SSTATUS_UXL_MASK (3ul << 32)
+#define RISCV64_CSR_SSTATUS_UXL_32BIT (1ul << 32)
+#define RISCV64_CSR_SSTATUS_UXL_64BIT (2ul << 32)
+#define RISCV64_CSR_SSTATUS_UXL_128BIT (3ul << 32)
 #define RISCV64_CSR_SSTATUS_SD (1ul << 63)
 
 #define RISCV64_CSR_SIE_SIE (1ul << 1)
@@ -90,6 +94,7 @@
 
 #include <arch/defines.h>
 #include <kernel/cpu.h>
+#include <syscalls/syscalls.h>
 
 #define __ASM_STR(x) #x
 
@@ -158,6 +163,12 @@ static_assert(sizeof(riscv64_context_switch_frame) % 16u == 0u);
 
 extern "C" void riscv64_exception_entry();
 extern "C" void riscv64_context_switch(vaddr_t* old_sp, vaddr_t new_sp);
+#if __has_feature(shadow_call_stack)
+extern "C" void riscv64_uspace_entry(iframe_t* iframe, vaddr_t tp, vaddr_t shadow_call_base);
+#else
+extern "C" void riscv64_uspace_entry(iframe_t* iframe, vaddr_t tp);
+#endif
+extern "C" syscall_result riscv64_syscall_dispatcher(iframe_t* frame);
 
 extern void riscv64_timer_exception();
 extern void riscv64_software_exception();

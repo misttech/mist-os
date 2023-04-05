@@ -126,20 +126,20 @@ __NO_RETURN int arch_idle_thread_routine(void*) {
   }
 }
 
-// TODO-rvbringup: move to uspace.cc
-
 void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t pc, uintptr_t sp, uintptr_t arg1,
                               uintptr_t arg2) {
   iframe->regs.pc = pc;
   iframe->regs.sp = sp;
-  iframe->status = RISCV64_CSR_SSTATUS_PIE;
   iframe->regs.a0 = arg1;
   iframe->regs.a1 = arg2;
-}
 
-extern "C" void riscv64_uspace_entry(iframe_t* iframe, vaddr_t tp) {
-  // TODO-rvbringup: implement in asm
-  PANIC_UNIMPLEMENTED;
+  // Saved interrupt enable (so that interrupts are enabled when returning to user space).
+  // Current interrupt enable state is also disabled, which will matter when the
+  // arch_uspace_entry loads sstatus temporarily before switching to user space.
+  // Set user space bitness to 64bit.
+  // All other bits set to zero, default options.
+  // This also means floating point, vector, and extention state is implicitly off.
+  iframe->status = RISCV64_CSR_SSTATUS_PIE | RISCV64_CSR_SSTATUS_UXL_64BIT;
 }
 
 // Switch to user mode, set the user stack pointer to user_stack_top, save the
@@ -154,7 +154,14 @@ void arch_enter_uspace(iframe_t* iframe) {
 
   arch_disable_ints();
 
+  // TODO-rvbringup: load/initialize FPU state here or elsewhere.
+  // For now the FPU is implicitly disabled.
+
+#if __has_feature(shadow_call_stack)
+  riscv64_uspace_entry(iframe, ct->stack().top(), ct->stack().shadow_call_base());
+#else
   riscv64_uspace_entry(iframe, ct->stack().top());
+#endif
   __UNREACHABLE;
 }
 
