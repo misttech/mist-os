@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        args::{RepoMergeCommand, RepoPublishCommand},
+        args::{RepoPMListCommand, RepoPublishCommand},
         write_depfile,
     },
     anyhow::{format_err, Context, Result},
@@ -13,7 +13,7 @@ use {
     fuchsia_async as fasync,
     fuchsia_hash::Hash,
     fuchsia_lockfile::Lockfile,
-    fuchsia_pkg::PackageManifest,
+    fuchsia_pkg::{PackageManifest, PackageManifestError},
     fuchsia_repo::{
         package_manifest_watcher::PackageManifestWatcher,
         repo_builder::RepoBuilder,
@@ -23,9 +23,15 @@ use {
     },
     futures::StreamExt,
     sdk_metadata::get_repositories,
-    std::{collections::BTreeSet, fs::File, io::BufReader, str::FromStr},
+    std::{
+        collections::BTreeSet,
+        fs::{create_dir_all, File},
+        io::{BufReader, BufWriter, Write},
+        str::FromStr,
+    },
     tracing::{error, info, warn},
     tuf::{metadata::RawSignedMetadata, Error as TufError},
+    utf8_path::path_relative_from_file,
 };
 
 /// Time in seconds after which the attempt to get a lock file is considered failed.
@@ -83,21 +89,21 @@ async fn repo_incremental_publish(cmd: &mut RepoPublishCommand) -> Result<()> {
     Ok(())
 }
 
-pub async fn cmd_repo_merge(cmd: RepoMergeCommand) -> Result<()> {
+pub async fn cmd_repo_package_manifest_list(cmd: RepoPMListCommand) -> Result<()> {
     let src_trusted_root_path = cmd
         .src_trusted_root_path
         .unwrap_or(cmd.src_repo_path.join("repository").join("1.root.json"));
-    let dest_trusted_root_path = cmd
-        .dest_trusted_root_path
-        .unwrap_or(cmd.dest_repo_path.join("repository").join("1.root.json"));
-    let dest_trusted_keys = cmd.dest_trusted_keys.unwrap_or(cmd.dest_repo_path.join("keys"));
 
-    repo_merge(
+    let package_manifest_list_path = match cmd.package_manifest_list_path {
+        Some(path) => path,
+        None => cmd.manifest_dir.clone().join("package_manifest.list"),
+    };
+
+    repo_package_manifest_list(
         cmd.src_repo_path,
         src_trusted_root_path,
-        cmd.dest_repo_path,
-        dest_trusted_keys,
-        dest_trusted_root_path,
+        cmd.manifest_dir,
+        package_manifest_list_path,
     )
     .await
 }
@@ -139,18 +145,16 @@ async fn repo_publish(cmd: &RepoPublishCommand) -> Result<()> {
     publish_result
 }
 
-pub async fn repo_merge(
+pub async fn repo_package_manifest_list(
     src_repo_path: Utf8PathBuf,
     src_trusted_root_path: Utf8PathBuf,
-    dest_repo_path: Utf8PathBuf,
-    dest_trusted_keys: Utf8PathBuf,
-    dest_trusted_root_path: Utf8PathBuf,
+    manifests_dir: Utf8PathBuf,
+    package_manifest_list_path: Utf8PathBuf,
 ) -> Result<()> {
     // Create repository based on src repository path
     let blobs_dir = src_repo_path.join("blobs");
-    let manifests_dir = src_repo_path.join("manifests");
+    create_dir_all(&manifests_dir)?;
     let src_repos = get_repositories(src_repo_path)?;
-    let mut package_manifests = Vec::new();
     for src_repo in src_repos {
         let buf = async_fs::read(&src_trusted_root_path)
             .await
@@ -162,48 +166,32 @@ pub async fn repo_merge(
         client.update().await.context("updating the src repo metadata")?;
         let packages =
             client.list_packages(ListFields::empty()).await.context("listing packages")?;
+        let mut package_manfiest_list = Vec::new();
         for package in &packages {
-            package_manifests.push((
-                None,
-                PackageManifest::from_blobs_dir(
-                    blobs_dir.as_std_path(),
-                    Hash::from_str(
-                        &package.hash.clone().expect("package should have hash for meta.far"),
-                    )?,
-                    manifests_dir.as_std_path(),
-                )?,
-            ))
+            let hash = &package.hash.clone().expect("package should have hash for meta.far");
+            let source_pathbuf =
+                manifests_dir.clone().join(format!("{}_package_manifest.json", hash));
+            package_manfiest_list
+                .push(path_relative_from_file(&source_pathbuf, &package_manifest_list_path)?);
+
+            let package_manifest = PackageManifest::from_blobs_dir(
+                blobs_dir.as_std_path(),
+                Hash::from_str(hash)?,
+                manifests_dir.as_std_path(),
+            )?;
+
+            package_manifest
+                .write_with_relative_paths(source_pathbuf.as_path())
+                .map_err(PackageManifestError::RelativeWrite)?;
+        }
+
+        let file = File::create(&package_manifest_list_path)?;
+        let mut writer = BufWriter::new(file);
+        for package_manfiest in package_manfiest_list {
+            writeln!(writer, "{}", package_manfiest)?;
         }
     }
 
-    // Publish it to destination repository
-    let dir = dest_repo_path.join("repository");
-    if !dir.exists() {
-        error!("Destination repo dir does not exist: {}", &dir);
-    }
-    let lock_file = lock_repository(&dir).await?;
-
-    let dest_repo = PmRepository::builder(dest_repo_path.clone()).build();
-    let buf = async_fs::read(&dest_trusted_root_path)
-        .await
-        .with_context(|| format!("reading trusted root {dest_trusted_root_path}"))?;
-    let trusted_root = RawSignedMetadata::new(buf);
-    let dest_client = RepoClient::from_trusted_root(&trusted_root, &dest_repo).await?;
-
-    let mut deps = BTreeSet::new();
-    let repo_trusted_keys = read_repo_keys_if_exists(&mut deps, &dest_trusted_keys)?;
-
-    let repo_builder =
-        RepoBuilder::from_database(&dest_repo, &repo_trusted_keys, dest_client.database());
-
-    repo_builder
-        .refresh_metadata(true)
-        .add_package_manifests(package_manifests.into_iter())
-        .await?
-        .commit()
-        .await?;
-
-    lock_file.unlock()?;
     Ok(())
 }
 
@@ -376,8 +364,10 @@ mod tests {
         fuchsia_repo::{repository::CopyMode, test_utils},
         futures::FutureExt,
         sdk_metadata::{ProductBundle, ProductBundleV2, Repository},
-        serde_json::json,
-        std::{fs::create_dir_all, io::Write},
+        std::{
+            fs::{create_dir_all, read_to_string},
+            io::Write,
+        },
         tempfile::TempDir,
         tuf::metadata::Metadata as _,
     };
@@ -1029,9 +1019,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_merge_repo() {
-        // Prepare the package manifests. Initially, src repository contains
-        // package a' and package b, dest repository contains package a.
+    async fn test_create_package_manifest_list() {
         let tempdir = TempDir::new().unwrap();
         let dir = Utf8Path::from_path(tempdir.path()).unwrap();
 
@@ -1107,51 +1095,18 @@ mod tests {
         });
         pb.write(&src_repo_path).unwrap();
 
-        // Prepare the dest repo
-        let dest_repo_path = dir.join("dest");
-        create_dir_all(&dest_repo_path).unwrap();
-        test_utils::make_pm_repository(&dest_repo_path).await;
-        let dest_trusted_root = dest_repo_path.join("repository").join("1.root.json");
-        let repo_keys_path = dest_repo_path.join("keys");
-
-        let cmd = RepoPublishCommand {
-            package_manifests: vec![pkga_manifest_path],
-            trusted_root: Some(dest_trusted_root.clone()),
-            trusted_keys: Some(repo_keys_path.clone()),
-            repo_path: dest_repo_path.to_path_buf(),
-            ..default_command_for_test()
-        };
-        repo_publish(&cmd).await.unwrap();
-
-        let repo = PmRepository::new(dest_repo_path.to_path_buf());
-        let mut repo_client = RepoClient::from_trusted_remote(repo).await.unwrap();
-        repo_client.update().await.unwrap();
-
-        let trusted_targets = repo_client.database().trusted_targets().unwrap();
-        assert_eq!(
-            trusted_targets.targets().get("packagea/0").unwrap().custom().get("merkle").unwrap(),
-            &json!("26f71e3012253d673813af8f73d59937b746159a72f25fb92b54459623993235")
-        );
-        assert!(trusted_targets.targets().get("packageb/0").is_none());
-
-        let merge_cmd = RepoMergeCommand {
+        let merge_cmd = RepoPMListCommand {
             src_repo_path,
             src_trusted_root_path: None,
-            dest_repo_path,
-            dest_trusted_root_path: None,
-            dest_trusted_keys: None,
+            manifest_dir: dir.join("manifests"),
+            package_manifest_list_path: None,
         };
 
-        assert_matches!(cmd_repo_merge(merge_cmd).await, Ok(()));
-
-        // Validate merkle of package A is updated, and we can see package B.
-        repo_client.update().await.unwrap();
-        let trusted_targets = repo_client.database().trusted_targets().unwrap();
-        assert_eq!(
-            trusted_targets.targets().get("packagea/0").unwrap().custom().get("merkle").unwrap(),
-            &json!("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9")
-        );
-        assert!(trusted_targets.targets().get("packageb/0").is_some());
+        assert_matches!(cmd_repo_package_manifest_list(merge_cmd).await, Ok(()));
+        let package_manifest_list = dir.join("manifests").join("package_manifest.list");
+        let list_string = read_to_string(package_manifest_list).unwrap();
+        assert!(list_string.contains("e2333edbf2e36a0881384cce4b77debcb629aa4535f8b7b922bba4aba85e50d9_package_manifest.json"));
+        assert!(list_string.contains("cd726370b3dd4656f4408f7fa4e2818f3f086da710f6580d4213e3e01d3e7faa_package_manifest.json"));
     }
 
     #[fuchsia::test]

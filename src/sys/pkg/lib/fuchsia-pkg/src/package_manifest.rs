@@ -16,7 +16,7 @@ use {
     serde::{Deserialize, Serialize},
     std::{
         collections::{BTreeMap, HashMap, HashSet},
-        fs::{self, File},
+        fs::{self, create_dir_all, File},
         io,
         io::{BufReader, Read, Seek, SeekFrom, Write},
         path::Path,
@@ -556,6 +556,7 @@ impl PackageManifestV1 {
 
             let versioned_manifest = VersionedPackageManifest::Version1(manifest.clone());
 
+            create_dir_all(manifest_path.parent().unwrap())?;
             let file = File::create(manifest_path)?;
             serde_json::to_writer(file, &versioned_manifest)?;
 

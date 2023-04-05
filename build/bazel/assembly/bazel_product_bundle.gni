@@ -5,6 +5,7 @@
 import("//build/bazel/bazel_action.gni")
 import("//build/images/args.gni")
 import("//bundles/assembly/platform_aibs.gni")
+import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 
 # A GN wrapper for a Bazel product bundle target. From GN's perspective, the
 # output product bundle is opaque (only a manifest file containing paths to the
@@ -168,6 +169,22 @@ template("bazel_product_bundle") {
     }
   }
 
+  _manifest_dir = "${target_out_dir}/manifests"
+  _package_manifest_list_target = "${target_name}_pakage_manifest_list"
+  _pb_dir = target_gen_dir + "/product_bundle"
+
+  package_tool_package_manifest_list_create(_package_manifest_list_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    product_bundle = _pb_dir
+    manifests_dir = _manifest_dir
+
+    deps = [ ":${_bazel_action_target}" ]
+  }
+
   # A convenience group for easy `fx build` invocation.
   group(target_name) {
     forward_variables_from(invoker,
@@ -175,6 +192,9 @@ template("bazel_product_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    deps = [ ":${_bazel_action_target}" ]
+    deps = [
+      ":${_bazel_action_target}",
+      ":${_package_manifest_list_target}",
+    ]
   }
 }

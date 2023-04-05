@@ -23,6 +23,7 @@ if (is_host) {
       "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//src/lib/fuchsia-async",
       "//src/lib/fuchsia-lockfile:lib",
+      "//src/lib/utf8_path",
       "//src/lib/versioning/version-history/rust:version-history",
       "//src/sys/pkg/lib/fuchsia-hash",
       "//src/sys/pkg/lib/fuchsia-merkle",

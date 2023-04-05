@@ -372,3 +372,48 @@ template("package_tool_archive_create") {
     ]
   }
 }
+
+# Generate a package manifests list.
+#
+# Parameters
+#
+#   product_bundle (required)
+#     [path] A path to Product Bundle dir.
+#
+#   manifests_dir (required)
+#     [path] A directory where package manifest will be written to.
+#
+template("package_tool_package_manifest_list_create") {
+  assert(defined(invoker.product_bundle), "product_bundle is required")
+  assert(defined(invoker.manifests_dir), "manifests_dir is required")
+  _manifests_dir = invoker.manifests_dir
+
+  compiled_action(target_name) {
+    tool = "//src/sys/pkg/bin/package-tool"
+    tool_output_name = "package-tool"
+    forward_variables_from(invoker,
+                           [
+                             "metadata",
+                             "public_deps",
+                             "deps",
+                             "testonly",
+                             "visibility",
+                             "no_output_dir_leaks",
+                           ])
+
+    # The contents of these folders is dynamic, and managed entirely by this action.
+
+    hermetic_action_ignored_prefixes = [
+      _manifests_dir,
+      invoker.product_bundle,
+    ]
+    inputs = [ invoker.product_bundle ]
+    outputs = [ "${_manifests_dir}/package_manifest.list" ]
+    args = [
+      "repository",
+      "create-package-manifest-list",
+      rebase_path(invoker.product_bundle, root_build_dir),
+      rebase_path(_manifests_dir, root_build_dir),
+    ]
+  }
+}
