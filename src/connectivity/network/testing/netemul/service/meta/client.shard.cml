@@ -38,6 +38,7 @@
             storage: [
                 "cache",
                 "data",
+                "tmp",
             ],
             from: "parent",
             to: "#sandbox",

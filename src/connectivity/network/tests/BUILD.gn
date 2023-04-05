@@ -11,6 +11,7 @@ group("tests") {
     "fidl:tests",
     "getifaddrs:tests",
     "integration:tests",
+    "iperf:tests",
     "multi_nic:tests",
     "socket:tests",
     "//third_party/gvisor_syscall_tests:tests",

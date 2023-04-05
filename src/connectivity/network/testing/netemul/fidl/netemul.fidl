@@ -127,6 +127,8 @@ closed protocol Sandbox {
                                 DATA = 0;
                                 /// The `cache` storage capability variant.
                                 CACHE = 1;
+                                /// The `tmp` storage capability variant.
+                                TMP = 2;
                             };
 
                             /// The path at which the storage capability will be

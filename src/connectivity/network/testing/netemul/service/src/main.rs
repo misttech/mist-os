@@ -141,6 +141,7 @@ impl std::fmt::Display for StorageVariant {
         let v = match self {
             Self(fnetemul::StorageVariant::Data) => "data",
             Self(fnetemul::StorageVariant::Cache) => "cache",
+            Self(fnetemul::StorageVariant::Tmp) => "tmp",
         };
         write!(f, "{}", v)
     }
