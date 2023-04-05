@@ -26,7 +26,6 @@
             matchers: [
                 "SocketTest.CloseClonedSocketAfterTcpRst",
                 "SocketTest.PassFD",
-                "SocketTest.ZXSocketSignalNotPermitted",
             ]
         }
     ],

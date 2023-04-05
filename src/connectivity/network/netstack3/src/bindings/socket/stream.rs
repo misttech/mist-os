@@ -949,9 +949,7 @@ where
                     .try_into_fidl_with_ctx(&non_sync_ctx)
                     .unwrap_or_else(|DeviceNotFoundError| panic!("unknown device"));
                 let PeerZirconSocketAndWatcher { peer, watcher, socket } = peer;
-                let (client, request_stream) =
-                    fidl::endpoints::create_request_stream::<fposix_socket::StreamSocketMarker>()
-                        .expect("failed to create new fidl endpoints");
+                let (client, request_stream) = crate::bindings::socket::create_request_stream();
                 spawn_send_task::<I>(ctx.clone(), socket, watcher, accepted);
                 spawn_connected_socket_task(ctx.clone(), accepted, peer, request_stream);
                 Ok((want_addr.then(|| Box::new(addr.into_sock_addr())), client))
@@ -1168,7 +1166,11 @@ where
             }
             fposix_socket::StreamSocketRequest::Describe { responder } => {
                 let socket = peer
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .duplicate_handle(
+                        (zx::Rights::BASIC | zx::Rights::IO | zx::Rights::PROPERTY)
+                        // Don't allow the peer to duplicate the stream.
+                        & !zx::Rights::DUPLICATE,
+                    )
                     .expect("failed to duplicate the socket handle");
                 responder_send!(
                     responder,

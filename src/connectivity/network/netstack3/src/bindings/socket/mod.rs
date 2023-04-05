@@ -89,18 +89,13 @@ pub(crate) async fn serve(
                     responder_send!(responder, &mut Err(zx::Status::NOT_FOUND.into_raw()));
                 }
                 psocket::ProviderRequest::StreamSocket { domain, proto, responder } => {
-                    match fidl::endpoints::create_request_stream() {
-                        Ok((client, request_stream)) => {
-                            stream::spawn_worker(domain, proto, ctx.clone(), request_stream).await;
-                            responder_send!(responder, &mut Ok(client));
-                        }
-                        Err(_) => responder_send!(responder, &mut Err(Errno::Enobufs)),
-                    }
+                    let (client, request_stream) = create_request_stream();
+                    stream::spawn_worker(domain, proto, ctx.clone(), request_stream).await;
+                    responder_send!(responder, &mut Ok(client));
                 }
                 psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
                     let mut response = (|| {
-                        let (client, request_stream) = fidl::endpoints::create_request_stream()
-                            .map_err(|_: fidl::Error| Errno::Enobufs)?;
+                        let (client, request_stream) = create_request_stream();
                         let () = datagram::spawn_worker(
                             domain,
                             proto,
@@ -114,8 +109,7 @@ pub(crate) async fn serve(
                 }
                 psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
                     let mut response = (|| {
-                        let (client, request_stream) = fidl::endpoints::create_request_stream()
-                            .map_err(|_: fidl::Error| Errno::Enobufs)?;
+                        let (client, request_stream) = create_request_stream();
                         let () = datagram::spawn_worker(
                             domain,
                             proto,
@@ -138,6 +132,11 @@ pub(crate) async fn serve(
         })
         .map_ok(|_: crate::bindings::NetstackContext| ())
         .await
+}
+
+pub(crate) fn create_request_stream<T: fidl::endpoints::ProtocolMarker>(
+) -> (fidl::endpoints::ClientEnd<T>, T::RequestStream) {
+    fidl::endpoints::create_request_stream().expect("can't create stream")
 }
 
 /// A trait generalizing the data structures passed as arguments to POSIX socket

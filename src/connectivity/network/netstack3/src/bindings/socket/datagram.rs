@@ -1513,15 +1513,7 @@ where
     > {
         match request {
             fposix_socket::SynchronousDatagramSocketRequest::Describe { responder } => {
-                match self.describe() {
-                    Ok(response) => responder_send!(responder, response),
-                    Err(status) => {
-                        // If the call to duplicate_handle fails, we have no
-                        // choice but to drop the responder and close the
-                        // channel, since Describe must be infallible.
-                        let _: zx::Status = status;
-                    }
-                }
+                responder_send!(responder, self.describe())
             }
             fposix_socket::SynchronousDatagramSocketRequest::Connect { addr, responder } => {
                 responder_send!(responder, &mut self.connect(addr).await);
@@ -1922,16 +1914,20 @@ where
         ControlFlow::Continue(None)
     }
 
-    fn describe(
-        &self,
-    ) -> Result<fposix_socket::SynchronousDatagramSocketDescribeResponse, zx::Status> {
+    fn describe(&self) -> fposix_socket::SynchronousDatagramSocketDescribeResponse {
         let Self { ctx: _, data: BindingData { peer_event, info: _, messages: _ } } = self;
-        peer_event.duplicate_handle(zx::Rights::BASIC).map(|peer| {
-            fposix_socket::SynchronousDatagramSocketDescribeResponse {
-                event: Some(peer),
-                ..fposix_socket::SynchronousDatagramSocketDescribeResponse::EMPTY
-            }
-        })
+        let peer = peer_event
+            .duplicate_handle(
+                // The peer doesn't need to be able to signal, just receive signals,
+                // so attenuate that right when duplicating.
+                zx::Rights::BASIC,
+            )
+            .expect("failed to duplicate");
+
+        fposix_socket::SynchronousDatagramSocketDescribeResponse {
+            event: Some(peer),
+            ..fposix_socket::SynchronousDatagramSocketDescribeResponse::EMPTY
+        }
     }
 
     fn get_max_receive_buffer_size(&self) -> u64 {
@@ -2602,7 +2598,7 @@ mod tests {
     ) -> (fposix_socket::SynchronousDatagramSocketProxy, zx::EventPair) {
         let ctlr = get_socket::<A>(test_stack, proto).await;
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event, .. } =
-            ctlr.describe().await.expect("Socket describe succeeds");
+            ctlr.describe().await.expect("describe succeeds");
         (ctlr, event.expect("Socket describe contains event"))
     }
 
