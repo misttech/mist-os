@@ -229,6 +229,8 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         Raises:
             errors.FuchsiaDeviceError: On failure.
         """
+        timestamp: str = datetime.now().strftime("%Y-%m-%d-%I-%M-%S-%p")
+        message = f"[HoneyDew] - [Host Time: {timestamp}] - {message}"
         self.send_sl4f_command(
             method=_SL4F_METHODS[f"Log{level.name.capitalize()}"],
             params={"message": message})
@@ -245,6 +247,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                 power switch hardware where this fuchsia device is connected.
         """
         _LOGGER.info("Power cycling %s...", self.name)
+        self.log_message_to_device(
+            message=f"Powering cycling {self.name}...",
+            level=custom_types.LEVEL.INFO)
 
         _LOGGER.info("Powering off %s...", self.name)
         power_switch.power_off(outlet)
@@ -254,6 +259,10 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         power_switch.power_on(outlet)
         self._wait_for_bootup_complete()
 
+        self.log_message_to_device(
+            message=f"Successfully power cycled {self.name}...",
+            level=custom_types.LEVEL.INFO)
+
     def reboot(self) -> None:
         """Soft reboot the device.
 
@@ -261,11 +270,16 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             errors.FuchsiaDeviceError: On failure.
         """
         _LOGGER.info("Rebooting %s...", self.name)
+        self.log_message_to_device(
+            message=f"Rebooting {self.name}...", level=custom_types.LEVEL.INFO)
         self.send_sl4f_command(
             method=_SL4F_METHODS["Reboot"],
             exceptions_to_skip=[RemoteDisconnected])
         self._wait_for_offline()
         self._wait_for_bootup_complete()
+        self.log_message_to_device(
+            message=f"Successfully rebooted {self.name}...",
+            level=custom_types.LEVEL.INFO)
 
     def send_sl4f_command(
         self,

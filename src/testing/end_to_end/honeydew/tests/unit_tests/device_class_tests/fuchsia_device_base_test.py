@@ -335,11 +335,7 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
             level=parameterized_dict["log_level"],
             message=parameterized_dict["log_message"])
 
-        mock_send_sl4f_command.assert_called_once_with(
-            self.fd_obj,
-            method=fuchsia_device_base._SL4F_METHODS[
-                parameterized_dict["sl4f_method"]],
-            params={"message": parameterized_dict["log_message"]})
+        mock_send_sl4f_command.assert_called_once()
 
     @mock.patch.object(
         fuchsia_device_base.FuchsiaDeviceBase,
@@ -349,12 +345,19 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         fuchsia_device_base.FuchsiaDeviceBase,
         "_wait_for_offline",
         autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "log_message_to_device",
+        autospec=True)
     def test_power_cycle(
-            self, mock_wait_for_offline, mock_wait_for_bootup_complete) -> None:
+            self, mock_log_message_to_device, mock_wait_for_offline,
+            mock_wait_for_bootup_complete) -> None:
         """Testcase for FuchsiaDeviceBase.power_cycle()"""
         power_switch = mock.MagicMock(
             spec=fuchsia_device_base.power_switch_interface.PowerSwitch)
         self.fd_obj.power_cycle(power_switch=power_switch, outlet=5)
+
+        self.assertEqual(mock_log_message_to_device.call_count, 2)
 
         power_switch.power_off.assert_called_once()
         mock_wait_for_offline.assert_called_once()
@@ -374,11 +377,17 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         fuchsia_device_base.FuchsiaDeviceBase,
         "send_sl4f_command",
         autospec=True)
+    @mock.patch.object(
+        fuchsia_device_base.FuchsiaDeviceBase,
+        "log_message_to_device",
+        autospec=True)
     def test_reboot(
-            self, mock_send_sl4f_command, mock_wait_for_offline,
-            mock_wait_for_bootup_complete) -> None:
+            self, mock_log_message_to_device, mock_send_sl4f_command,
+            mock_wait_for_offline, mock_wait_for_bootup_complete) -> None:
         """Testcase for FuchsiaDeviceBase.reboot()"""
         self.fd_obj.reboot()
+
+        self.assertEqual(mock_log_message_to_device.call_count, 2)
 
         mock_send_sl4f_command.assert_called_once_with(
             self.fd_obj,
