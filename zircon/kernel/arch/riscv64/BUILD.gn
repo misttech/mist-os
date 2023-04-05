@@ -78,6 +78,7 @@ if (toolchain_base_environment == "kernel") {
       "debugger.cc",
       "exceptions.S",
       "exceptions_c.cc",
+      "fpu_asm.S",
       "mmu.cc",
       "mp.cc",
       "spinlock.cc",

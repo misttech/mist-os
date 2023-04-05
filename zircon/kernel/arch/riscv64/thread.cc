@@ -22,7 +22,7 @@
 static_assert(sizeof(riscv64_context_switch_frame) % 16 == 0);
 
 void arch_thread_initialize(Thread* t, vaddr_t entry_point) {
-  // zero out the entire arch state
+  // zero out the entire arch state, including fpu state, which defaults to all zero
   t->arch() = {};
 
   // create a default stack frame on the stack
@@ -56,6 +56,65 @@ void arch_context_switch(Thread* oldthread, Thread* newthread) {
 
   LTRACEF("old %p (%s), new %p (%s)\n", oldthread, oldthread->name(), newthread, newthread->name());
 
+  // FPU context switch
+  // Based on a combination of the current hardware state and whether or not the threads have
+  // a dirty flag set, conditionally save and/or restore hardware state.
+  uint64_t status = riscv64_csr_read(RISCV64_CSR_SSTATUS);
+  uint64_t fpu_status = status & RISCV64_CSR_SSTATUS_FS_MASK;
+  LTRACEF("fpu: sstatus.fp %#lx, sd %u, old.dirty %u, new.dirty %u\n",
+          fpu_status >> RISCV64_CSR_SSTATUS_FS_SHIFT, !!(status & RISCV64_CSR_SSTATUS_SD),
+          oldthread->arch().fpu_dirty, newthread->arch().fpu_dirty);
+
+  bool current_state_initial = false;
+  switch (fpu_status) {
+    case RISCV64_CSR_SSTATUS_FS_DIRTY:
+      // The hardware state is dirty, save the old state.
+      riscv64_fpu_save(&oldthread->arch().fpu_state);
+
+      // Record that this thread has modified the state and will need to restore it
+      // from now on out on every context switch.
+      oldthread->arch().fpu_dirty = true;
+      break;
+
+    // These three states means the thread didn't modify the state, so do not
+    // write anything back.
+    case RISCV64_CSR_SSTATUS_FS_INITIAL:
+      // The old thread has the initial zeroed state. Remember this for use below.
+      current_state_initial = true;
+      break;
+    case RISCV64_CSR_SSTATUS_FS_CLEAN:
+      // The old thread has some valid state loaded, but it didn't modify it.
+      break;
+    case RISCV64_CSR_SSTATUS_FS_OFF:
+      // We currently leave the fpu on all the time, so we should never get this state.
+      // If lazy FPU load is implemented, this will be a valid state if the thread has
+      // never trapped.
+      panic("riscv context switch: FPU was disabled during context switch: sstatus %#lx\n", status);
+  }
+
+  // Restore the state from the new thread
+  if (newthread->arch().fpu_dirty) {
+    riscv64_fpu_restore(&newthread->arch().fpu_state);
+
+    // Set the fpu hardware state to clean
+    riscv64_csr_clear(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_FS_MASK);
+    riscv64_csr_set(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_FS_CLEAN);
+  } else if (!current_state_initial) {
+    // Zero the state of the fpu unit if it currently is known to have something other
+    // than the initial state loaded.
+    riscv64_fpu_zero();
+
+    // Set the fpu hardware state to clean
+    riscv64_csr_clear(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_FS_MASK);
+    riscv64_csr_set(RISCV64_CSR_SSTATUS, RISCV64_CSR_SSTATUS_FS_INITIAL);
+  } else {
+    // The old fpu hardware should have the initial state here and we didn't reset it
+    // so we should still be in the initial state.
+    DEBUG_ASSERT((riscv64_csr_read(RISCV64_CSR_SSTATUS) & RISCV64_CSR_SSTATUS_FS_MASK) ==
+                 RISCV64_CSR_SSTATUS_FS_INITIAL);
+  }
+
+  // regular integer context switch
   riscv64_context_switch(&oldthread->arch().sp, newthread->arch().sp);
 }
 

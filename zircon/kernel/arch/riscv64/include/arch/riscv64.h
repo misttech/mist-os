@@ -34,7 +34,8 @@
 #define RISCV64_CSR_SSTATUS_PIE (1ul << 5)
 #define RISCV64_CSR_SSTATUS_UBE (1ul << 6)
 #define RISCV64_CSR_SSTATUS_PP (1ul << 8)
-#define RISCV64_CSR_SSTATUS_FS (3ul << 13)
+#define RISCV64_CSR_SSTATUS_FS_SHIFT (13)
+#define RISCV64_CSR_SSTATUS_FS_MASK (3ul << 13)
 #define RISCV64_CSR_SSTATUS_FS_OFF (0ul)
 #define RISCV64_CSR_SSTATUS_FS_INITIAL (1ul << 13)
 #define RISCV64_CSR_SSTATUS_FS_CLEAN (2ul << 13)
@@ -174,6 +175,16 @@ extern void riscv64_timer_exception();
 extern void riscv64_software_exception();
 
 void platform_irq(iframe_t* frame);
+
+// Double precision floating point state at context switch time.
+struct riscv64_fpu_state {
+  uint64_t f[32];
+  uint32_t fcsr;
+};
+
+extern "C" void riscv64_fpu_zero();
+extern "C" void riscv64_fpu_save(riscv64_fpu_state* state);
+extern "C" void riscv64_fpu_restore(const riscv64_fpu_state* state);
 
 /*
  * Creates a stack and sets the stack pointer for the specified secondary CPU.

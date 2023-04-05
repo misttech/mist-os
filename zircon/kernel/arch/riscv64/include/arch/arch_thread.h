@@ -13,6 +13,8 @@
 #include <sys/types.h>
 #include <zircon/tls.h>
 
+#include <arch/riscv64.h>
+
 struct arch_thread {
   // The compiler knows the position of these two fields relative to tp, which
   // is what __builtin_thread_pointer() returns.  i.e. to &abi[1].
@@ -27,7 +29,11 @@ struct arch_thread {
   // If non-NULL, address to return to on data fault.
   uint64_t data_fault_resume;
 
-  // TODO-rvbringup: fpu/vector state goes here
+  // Record whether or not the floating point state was ever modified on this thread.
+  bool fpu_dirty;
+
+  // Full snapshot of the double precision state at context switch time
+  riscv64_fpu_state fpu_state;
 };
 
 #define thread_pointer_offsetof(field)        \
