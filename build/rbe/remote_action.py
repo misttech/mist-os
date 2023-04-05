@@ -97,10 +97,6 @@ def _expand_common_files_between_dirs(
             yield os.path.join(left, f), os.path.join(right, f)
 
 
-def command_quoted_str(command: Iterable[str]) -> str:
-    return ' '.join(shlex.quote(t) for t in command)
-
-
 def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
     if not command:
         return []
@@ -536,6 +532,10 @@ class RemoteAction(object):
             if os.path.exists(f):
                 os.remove(f)
 
+    def _run_maybe_remotely(self) -> cl_utils.SubprocessResult:
+        return cl_utils.subprocess_call(
+            self.launch_command, cwd=self.working_dir)
+
     def run(self) -> int:
         """Remotely execute the command.
 
@@ -544,9 +544,10 @@ class RemoteAction(object):
             but sometimes an re-client internal error code like 35 or 45.
         """
         try:
+            result = self._run_maybe_remotely()
             # TODO(http://fxbug.dev/96250): handle some re-client error cases
             #   and in some cases, retry once
-            return subprocess.call(self.launch_command, cwd=self.working_dir)
+            return result.returncode
         finally:
             if not self._save_temps:
                 self._cleanup()
@@ -563,7 +564,7 @@ class RemoteAction(object):
         Returns:
           exit code
         """
-        command_str = command_quoted_str(self.launch_command)
+        command_str = cl_utils.command_quoted_str(self.launch_command)
         if main_args.verbose and not main_args.dry_run:
             msg(command_str)
         if main_args.dry_run:
@@ -621,6 +622,19 @@ class RemoteAction(object):
             self._fsatrace_local_log + '.norm',
             self._fsatrace_remote_log + '.norm')
 
+    def _run_locally(self) -> int:
+        # Run the job locally.
+        # Local command may include an fsatrace prefix.
+        local_command = list(self._generate_local_launch_command())
+        local_command_str = cl_utils.command_quoted_str(local_command)
+        exit_code = subprocess.call(local_command)
+        if exit_code != 0:
+            # Presumably, we want to only compare against local successes.
+            msg(
+                f"Local command failed for comparison (exit={exit_code}): {local_command_str}"
+            )
+        return exit_code
+
     def _compare_against_local(self) -> int:
         # Backup outputs from remote execution first to '.remote'.
 
@@ -646,16 +660,9 @@ class RemoteAction(object):
         for d, bkp in compare_output_dirs:
             os.rename(d, bkp)
 
-        # Run the job locally.
-        # Local command may include an fsatrace prefix.
-        local_command = list(self._generate_local_launch_command())
-        local_command_str = command_quoted_str(local_command)
-        local_exit_code = subprocess.call(local_command)
+        # Run the job locally, for comparison.
+        local_exit_code = self._run_locally()
         if local_exit_code != 0:
-            # Presumably, we want to only compare against local successes.
-            msg(
-                f"Local command failed for comparison (exit={local_exit_code}): {local_command_str}"
-            )
             return local_exit_code
 
         # Apply workarounds to make comparisons more meaningful.

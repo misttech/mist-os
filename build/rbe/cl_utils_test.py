@@ -9,7 +9,7 @@ from unittest import mock
 import cl_utils
 
 
-class FlattenCommaListTest(unittest.TestCase):
+class FlattenCommaListTests(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -42,7 +42,7 @@ class FlattenCommaListTest(unittest.TestCase):
         )
 
 
-class ExpandFusedFlagsTest(unittest.TestCase):
+class ExpandFusedFlagsTests(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -85,7 +85,7 @@ class ExpandFusedFlagsTest(unittest.TestCase):
         )
 
 
-class FuseExpandedFlagsTest(unittest.TestCase):
+class FuseExpandedFlagsTests(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -120,7 +120,7 @@ class FuseExpandedFlagsTest(unittest.TestCase):
         )
 
 
-class KeyedFlagsToValuesDict(unittest.TestCase):
+class KeyedFlagsToValuesDictTests(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(
@@ -165,7 +165,7 @@ class KeyedFlagsToValuesDict(unittest.TestCase):
         )
 
 
-class LastValueOrDefaultTest(unittest.TestCase):
+class LastValueOrDefaultTests(unittest.TestCase):
 
     def test_default(self):
         self.assertEqual(
@@ -180,7 +180,7 @@ class LastValueOrDefaultTest(unittest.TestCase):
         )
 
 
-class LastValueOfDictFlag(unittest.TestCase):
+class LastValueOfDictFlagTests(unittest.TestCase):
 
     def test_default_no_key(self):
         self.assertEqual(
@@ -212,6 +212,33 @@ class LastValueOfDictFlag(unittest.TestCase):
             'h',
         )
 
+class SubprocessCallTests(unittest.TestCase):
+
+    def test_success(self):
+        result = cl_utils.subprocess_call(['echo', 'hello'])
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, ['hello'])
+        self.assertEqual(result.stderr, [])
+
+    def test_success_quiet(self):
+        result = cl_utils.subprocess_call(['echo', 'hello'], quiet=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, ['hello'])  # still captured
+        self.assertEqual(result.stderr, [])
+
+    def test_failure(self):
+        result = cl_utils.subprocess_call(['false'])
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, [])
+        self.assertEqual(result.stderr, [])
+
+    def test_error(self):
+        result = cl_utils.subprocess_call(['ls', '/does/not/exist'])
+        # error code is 2 on linux, 1 on darwin
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, [])
+        self.assertIn('No such file or directory', result.stderr[0])
+        self.assertIn('/does/not/exist', result.stderr[0])
 
 if __name__ == '__main__':
     unittest.main()

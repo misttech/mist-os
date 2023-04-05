@@ -44,7 +44,9 @@ class CxxRemoteActionTests(unittest.TestCase):
         # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root, [])
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+        with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                               '_run_remote_action',
+                               return_value=0) as mock_call:
             exit_code = c.run()
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
@@ -58,7 +60,8 @@ class CxxRemoteActionTests(unittest.TestCase):
         self.assertTrue(c.local_only)
         with mock.patch.object(cxx_remote_wrapper,
                                'check_missing_remote_tools') as mock_check:
-            with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+            with mock.patch.object(subprocess, 'call',
+                                   return_value=0) as mock_call:
                 exit_code = c.run()
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_with(command)  # ran locally
@@ -156,7 +159,9 @@ class CxxRemoteActionTests(unittest.TestCase):
         # no additional inputs, hello.cc is already implicitly included
         self.assertEqual(
             c.remote_compile_action.inputs_relative_to_project_root, [])
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+        with mock.patch.object(cxx_remote_wrapper.CxxRemoteAction,
+                               '_run_remote_action',
+                               return_value=0) as mock_call:
             exit_code = c.run()
         self.assertEqual(exit_code, 0)
         mock_call.assert_called_once()
@@ -172,10 +177,8 @@ class CxxRemoteActionTests(unittest.TestCase):
             compiler_relpath, '--target=riscv64-apple-darwin21', '-c',
             'hello.cc', '-o', 'hello.o'
         ]
-        with mock.patch.object(cxx_remote_wrapper,
-                               'REMOTE_COMPILER_SWAPPER',
-                               os.path.join(fake_root,
-                                            'scripts/swapperoo.sh')):
+        with mock.patch.object(cxx_remote_wrapper, 'REMOTE_COMPILER_SWAPPER',
+                               os.path.join(fake_root, 'scripts/swapperoo.sh')):
             c = cxx_remote_wrapper.CxxRemoteAction(
                 [f'--exec_root={fake_root}', '--'] + command,
                 working_dir=fake_cwd,
@@ -194,8 +197,7 @@ class CxxRemoteActionTests(unittest.TestCase):
             ddash = remote_compile_command.index('--')
             rewrapper_prefix = remote_compile_command[:ddash]
             self.assertIn(
-                '--remote_wrapper=../scripts/swapperoo.sh',
-                    rewrapper_prefix)
+                '--remote_wrapper=../scripts/swapperoo.sh', rewrapper_prefix)
 
     def test_remote_cross_compile_gcc(self):
         fake_root = remote_action.PROJECT_ROOT
@@ -232,6 +234,7 @@ class CxxRemoteActionTests(unittest.TestCase):
                     '--remote_wrapper=../scripts/swapperoo.sh',
                     rewrapper_prefix)
 
+
 class MainTests(unittest.TestCase):
 
     def test_help_implicit(self):
@@ -259,6 +262,7 @@ class MainTests(unittest.TestCase):
                                        'run', return_value=0):
                     self.assertEqual(cxx_remote_wrapper.main(['--help']), 0)
             mock_exit.assert_called_with(0)
+
 
 if __name__ == '__main__':
     unittest.main()

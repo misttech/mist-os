@@ -288,6 +288,9 @@ class CxxRemoteAction(object):
             )
             return cpp_status
 
+    def _run_remote_action(self) -> int:
+        return self._remote_action.run_with_main_args(self._main_args)
+
     def run(self) -> int:
         if self.local_only:
             return self._run_locally()
@@ -298,7 +301,7 @@ class CxxRemoteAction(object):
 
         # Remote compile C++
         try:
-            return self._remote_action.run_with_main_args(self._main_args)
+            return self._run_remote_action()
         # TODO: normalize absolute paths in remotely generated depfile (gcc)
         finally:
             if not self._main_args.save_temps:

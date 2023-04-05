@@ -5,9 +5,21 @@
 """Generic utilities for working with command lines and argparse.
 """
 
+import asyncio
 import collections
+import dataclasses
 
-from typing import Dict, FrozenSet, Iterable, Sequence
+import io
+import os
+import shlex
+import sys
+import platform
+
+from typing import Callable, Dict, FrozenSet, Iterable, Sequence
+
+
+def command_quoted_str(command: Iterable[str]) -> str:
+    return ' '.join(shlex.quote(t) for t in command)
 
 
 def flatten_comma_list(items: Iterable[str]) -> Iterable[str]:
@@ -123,3 +135,106 @@ def last_value_of_dict_flag(
         d: Dict[str, Sequence[str]], key: str, default: str = '') -> str:
     """This selects the last value among repeated occurrences of a flag as a winner."""
     return last_value_or_default(d.get(key, []), default)
+
+
+# The following code implements subprocess 'tee' behavior based on:
+# https://stackoverflow.com/questions/2996887/how-to-replicate-tee-behavior-in-python-when-using-subprocess
+
+@dataclasses.dataclass
+class SubprocessResult(object):
+    returncode: int
+    stdout: Sequence[str]  # lines
+    stderr: Sequence[str]  # lines
+
+
+async def _read_stream(stream: io.TextIOBase, callback: Callable[[str], None]):
+    while True:
+        line = await stream.readline()
+        if line:
+            callback(line)
+        else:
+            break
+
+
+async def _stream_subprocess(
+    cmd: Sequence[str],
+    stdin: io.TextIOBase = None,
+    stdout: io.TextIOBase = None,
+    stderr: io.TextIOBase = None,
+    quiet: bool = False,
+    **kwargs,
+) -> SubprocessResult:
+    popen_kwargs = {}
+    if platform.system() == 'Windows':
+        platform_settings = {"env": os.environ}
+    else:
+        platform_settings = {}
+        # default interpreter is sufficient: {"executable": "/bin/sh"}
+
+    popen_kwargs.update(platform_settings)
+    popen_kwargs.update(kwargs)
+
+    cmd_str = command_quoted_str(cmd)
+    p = await asyncio.create_subprocess_shell(
+        cmd_str,
+        stdin=stdin,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        **popen_kwargs)
+
+    out_text = []
+    err_text = []
+
+    def tee(line: str, sink: Sequence[str], pipe: io.TextIOBase):
+        line = line.decode("utf-8").rstrip()
+        sink.append(line)
+        if not quiet:
+            print(line, file=pipe)
+
+    await asyncio.wait(
+        [   # Forward stdout, stderr while capturing them.
+            _read_stream(p.stdout, lambda l: tee(l, out_text, stdout or sys.stdout)),
+            _read_stream(p.stderr, lambda l: tee(l, err_text, stderr or sys.stderr)),
+        ])
+
+    return SubprocessResult(
+        returncode=await p.wait(),
+        stdout=out_text,
+        stderr=err_text,
+    )
+
+
+def subprocess_call(
+    cmd: Sequence[str],
+    stdin: io.TextIOBase = None,
+    stdout: io.TextIOBase = None,
+    stderr: io.TextIOBase = None,
+    quiet: bool = False,
+    **kwargs,
+) -> SubprocessResult:
+    """Similar to subprocess.call(), but records stdout/stderr.
+
+    Use this when interested in stdout/stderr.
+
+    Args:
+      cmd: command to execute
+      stdin: input stream
+      stdout: output stream
+      stderr: error stream
+      quiet: if True, suppress forwarding to sys.stdout/stderr.
+      **kwargs: forwarded subprocess.Popen arguments.
+
+    Returns:
+      returncode, stdout (text), stderr (text)
+    """
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(
+        _stream_subprocess(
+            cmd=cmd,
+            stdin=stdin,
+            stdout=stdout,
+            stderr=stderr,
+            quiet=quiet,
+            **kwargs,
+        ))
+    return result

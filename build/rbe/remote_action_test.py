@@ -23,6 +23,14 @@ def _write_file_contents(path: str, contents: str):
         f.write(contents)
 
 
+def _fake_subprocess_result(returncode: int, stdout=None, stderr=None):
+    return cl_utils.SubprocessResult(
+        returncode=returncode,
+        stdout=stdout or [],
+        stderr=stderr or [],
+    )
+
+
 class FileMatchTests(unittest.TestCase):
 
     def test_match(self):
@@ -531,23 +539,24 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 stack.enter_context(m)
 
             # both local and remote commands succeed
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_call:
-                with mock.patch.object(
-                        remote_action.RemoteAction,
-                        '_compare_fsatraces') as mock_compare_traces:
-                    with mock.patch.object(os, 'remove') as mock_cleanup:
-                        exit_code = action.run_with_main_args(main_args)
+            with mock.patch.object(remote_action.RemoteAction, '_run_locally',
+                                   return_value=0) as mock_local_launch:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_run_maybe_remotely',
+                                       return_value=_fake_subprocess_result(
+                                           0)) as mock_remote_launch:
+                    with mock.patch.object(
+                            remote_action.RemoteAction,
+                            '_compare_fsatraces') as mock_compare_traces:
+                        with mock.patch.object(os, 'remove') as mock_cleanup:
+                            exit_code = action.run_with_main_args(main_args)
 
+        remote_command = action.launch_command
         self.assertEqual(exit_code, 0)  # remote success and compare success
         mock_compare_traces.assert_not_called()
-        self.assertEqual(len(mock_call.call_args_list), 2)
-        remote_args, remote_kwargs = mock_call.call_args_list[0]
-        local_args, local_kwargs = mock_call.call_args_list[1]
-        remote_command = remote_args[0]  # subprocess.call
-        local_command = local_args[0]  # subprocess.call
+        mock_local_launch.assert_called_once()
+        mock_remote_launch.assert_called_once()
         self.assertEqual(remote_command[-2:], base_command)
-        self.assertEqual(local_command, base_command)
         mock_cleanup.assert_called_with(output + '.remote')
 
     def test_local_remote_compare_found_diffs_from_main_args(self):
@@ -581,22 +590,23 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 stack.enter_context(m)
 
             # both local and remote commands succeed
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_call:
-                with mock.patch.object(
-                        remote_action.RemoteAction,
-                        '_compare_fsatraces') as mock_compare_traces:
-                    exit_code = action.run_with_main_args(main_args)
+            with mock.patch.object(remote_action.RemoteAction, '_run_locally',
+                                   return_value=0) as mock_local_launch:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_run_maybe_remotely',
+                                       return_value=_fake_subprocess_result(
+                                           0)) as mock_remote_launch:
+                    with mock.patch.object(
+                            remote_action.RemoteAction,
+                            '_compare_fsatraces') as mock_compare_traces:
+                        exit_code = action.run_with_main_args(main_args)
 
+        remote_command = action.launch_command
         self.assertEqual(exit_code, 1)  # remote success, but compare failure
         mock_compare_traces.assert_not_called()
-        self.assertEqual(len(mock_call.call_args_list), 2)
-        remote_args, remote_kwargs = mock_call.call_args_list[0]
-        local_args, local_kwargs = mock_call.call_args_list[1]
-        remote_command = remote_args[0]  # subprocess.call
-        local_command = local_args[0]  # subprocess.call
+        mock_local_launch.assert_called_once()
+        mock_remote_launch.assert_called_once()
         self.assertEqual(remote_command[-2:], base_command)
-        self.assertEqual(local_command, base_command)
 
     def test_local_remote_compare_with_fsatrace_from_main_args(self):
         # Same as test_remote_fsatrace_from_main_args, but with --compare
@@ -638,18 +648,22 @@ class RemoteActionMainParserTests(unittest.TestCase):
                 stack.enter_context(m)
 
             # both local and remote commands succeed
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_call:
-                with mock.patch.object(remote_action, '_text_diff',
-                                       return_value=0) as mock_trace_diff:
-                    exit_code = action.run_with_main_args(main_args)
+            with mock.patch.object(remote_action.RemoteAction, '_run_locally',
+                                   return_value=0) as mock_local_launch:
+                with mock.patch.object(remote_action.RemoteAction,
+                                       '_run_maybe_remotely',
+                                       return_value=_fake_subprocess_result(
+                                           0)) as mock_remote_launch:
+                    with mock.patch.object(remote_action, '_text_diff',
+                                           return_value=0) as mock_trace_diff:
+                        exit_code = action.run_with_main_args(main_args)
 
+        remote_command = action.launch_command
+        # make sure local command is also traced
+        local_command = list(action._generate_local_launch_command())
         self.assertEqual(exit_code, 1)  # remote success, but compare failure
-        self.assertEqual(len(mock_call.call_args_list), 2)
-        remote_args, remote_kwargs = mock_call.call_args_list[0]
-        local_args, local_kwargs = mock_call.call_args_list[1]
-        remote_command = remote_args[0]  # subprocess.call
-        local_command = local_args[0]  # subprocess.call
+        mock_remote_launch.assert_called_once()
+        mock_local_launch.assert_called_once()
         self.assertIn(fake_fsatrace_rel, remote_command)
         self.assertIn(fake_fsatrace_rel, local_command)
         remote_trace = output + '.remote-fsatrace'
@@ -840,8 +854,9 @@ class RemoteActionConstructionTests(unittest.TestCase):
                     '../src/meow.txt',
                 ])
             mock_input_list_file.assert_called_once()
-            with mock.patch.object(subprocess, 'call',
-                                   return_value=0) as mock_call:
+            with mock.patch.object(
+                    remote_action.RemoteAction, '_run_maybe_remotely',
+                    return_value=_fake_subprocess_result(0)) as mock_call:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_cleanup') as mock_cleanup:
                     self.assertEqual(action.run(), 0)
@@ -859,7 +874,9 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertEqual(action.local_command, command)
         self.assertEqual(action.exec_root, self._PROJECT_ROOT)
         self.assertTrue(action.save_temps)
-        with mock.patch.object(subprocess, 'call', return_value=0) as mock_call:
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=_fake_subprocess_result(0)) as mock_call:
             with mock.patch.object(remote_action.RemoteAction,
                                    '_cleanup') as mock_cleanup:
                 self.assertEqual(action.run(), 0)
