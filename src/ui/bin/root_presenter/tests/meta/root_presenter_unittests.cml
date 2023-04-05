@@ -53,7 +53,6 @@
         {
             protocol: [
                 "fuchsia.ui.focus.FocusChainListenerRegistry",
-                "fuchsia.ui.input.InputDeviceRegistry",
                 "fuchsia.ui.keyboard.focus.Controller",
                 "fuchsia.ui.pointerinjector.Registry",
                 "fuchsia.ui.scenic.Scenic",

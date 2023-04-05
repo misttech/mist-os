@@ -27,10 +27,7 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.input.injection.InputDeviceRegistry",
-                "fuchsia.ui.input.InputDeviceRegistry",
-            ],
+            protocol: [ "fuchsia.input.injection.InputDeviceRegistry" ],
             from: "#scene_manager",
             to: [ "#input-synthesis" ],
         },

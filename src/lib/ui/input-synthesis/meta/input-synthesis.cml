@@ -20,7 +20,6 @@
             protocol: [
                 "fuchsia.input.injection.InputDeviceRegistry",
                 "fuchsia.logger.LogSink",
-                "fuchsia.ui.input.InputDeviceRegistry",
             ],
         },
     ],
