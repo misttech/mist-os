@@ -64,7 +64,6 @@ type ContextFeatureFlags = strict bits : uint64 {
     /// - [`fuchsia.net.interfaces/State`]
     /// - [`fuchsia.net.name/Lookup`]
     /// - [`fuchsia.posix.socket/Provider`]
-    /// And a `root-ssl-certificates` directory containing `cert.pem`.
     NETWORK = 0x1;
 
     /// Enables audio input and output. Requires the following services:
@@ -75,6 +74,8 @@ type ContextFeatureFlags = strict bits : uint64 {
 
     /// Enables GPU-accelerated rendering of the web content. Requires the following services:
     /// - [`fuchsia.vulkan.loader/Loader`]
+    /// The following service is required in order to collect Vulkan trace data.
+    /// - [`fuchsia.tracing.provider.Registry`]
     VULKAN = 0x4;
 
     /// Enables hardware video decoding.
@@ -124,17 +125,24 @@ type ContextFeatureFlags = strict bits : uint64 {
 
 /// Parameters specifying the configuration for a new [`Context`].
 type CreateContextParams = resource table {
-    /// Service directory to be used by the context. The following services must be present in the
-    /// directory:
+    /// Service directory to be used by the context.
+    ///
+    /// The following services must be present in the service directory:
+    ///
     /// - [`fuchsia.buildinfo/Provider`]
     /// - [`fuchsia.device/NameProvider`]
     /// - [`fuchsia.fonts/Provider`]
+    /// - [`fuchsia.hwinfo.Product`]
     /// - [`fuchsia.intl/PropertyProvider`]
     /// - [`fuchsia.kernel/VmexResource`] (unless [`ContextFeatureFlags.DISABLE_DYNAMIC_CODE_GENERATION`] is set)
     /// - [`fuchsia.logger/LogSink`]
     /// - [`fuchsia.memorypressure/Provider`]
     /// - [`fuchsia.process/Launcher`]
     /// - [`fuchsia.sysmem/Allocator`]
+    ///
+    /// The following services are recommended to be present in order to allow CPU scheduling
+    /// profiles to be applied to threads to tune their performance, especially for media rendering.
+    /// - [`fuchsia.media.ProfileProvider`]
     ///
     /// The following services must be present in order to render web content in a Scenic view
     /// using [`Frame.CreateView`], [`Frame.CreateViewWithViewRef`] or [`Frame.CreateView2`]]:
@@ -143,10 +151,10 @@ type CreateContextParams = resource table {
     /// - [`fuchsia.ui.composition/Flatland`]
     /// - [`fuchsia.ui.scenic/Scenic`]
     ///
-    /// The following services must be present in order to collect diagnostic tracing data.
-    /// - [`fuchsia.tracing.perfetto.ProducerConnector`]: for browser trace data.
-    /// - [`fuchsia.tracing.provider.Registry`]: for Vulkan trace data.
-    // TODO(fxbug.dev/64204): Remove gfx references after Flatland migration is completed.
+    /// The following service must be present in order to collect diagnostic tracing data.
+    /// - [`fuchsia.tracing.perfetto.ProducerConnector`]
+    // TODO(crbug.com/1427170): Remove `fuchsia.ui.scenic/Scenic` after Flatland migration completes.
+    // TODO(crbug.com/1224707): Migrate from `fuchsia.media.ProfileProvider`to `fuchsia.scheduler`.
     1: service_directory client_end:fuchsia.io.Directory;
 
     /// Handle to the directory that will contain the [`Context`]'s persistent data. If it is left

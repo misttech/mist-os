@@ -23,6 +23,8 @@
 
                 // More required protocols.
                 "fuchsia.logger.LogSink",
+
+                // TODO(crbug.com/1224707): Migrate to `fuchsia.scheduler`.
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.process.Launcher",
