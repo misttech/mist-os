@@ -909,9 +909,9 @@ mod tests {
                     },
                     ipv6_state: {
                         "@time": AnyProperty,
-                        "1m": vec![8f64],
-                        "15m": vec![8f64],
-                        "1h": vec![8f64],
+                        "1m": vec![25f64],
+                        "15m": vec![25f64],
+                        "1h": vec![25f64],
                     },
                 }
             }
@@ -932,9 +932,9 @@ mod tests {
                         "1h": vec![0f64],
                     },
                     ipv6_state: contains {
-                        "1m": vec![18f64 / 2f64],
-                        "15m": vec![18f64 / 2f64],
-                        "1h": vec![18f64 / 2f64],
+                        "1m": vec![55f64 / 2f64],
+                        "15m": vec![55f64 / 2f64],
+                        "1h": vec![55f64 / 2f64],
                     },
                 }
             }

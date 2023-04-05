@@ -63,36 +63,24 @@ pub enum State {
     /// State not yet determined.
     None = 1,
     /// Interface no longer present.
-    Removed = 2,
+    Removed = 5,
     /// Interface is down.
-    Down = 3,
+    Down = 10,
     /// Interface is up, no packets seen yet.
-    Up = 4,
-    /// Interface is up, packets seen.
-    LinkLayerUp = 5,
-    /// Interface is up, and configured as an L3 interface.
-    NetworkLayerUp = 6,
+    Up = 15,
     /// L3 Interface is up, local neighbors seen.
-    Local = 7,
+    Local = 20,
     /// L3 Interface is up, local gateway configured and reachable.
-    Gateway = 8,
-    /// Expected response not seen from reachability test URL.
-    WalledGarden = 9,
+    Gateway = 25,
     /// Expected response seen from reachability test URL.
-    Internet = 10,
+    Internet = 30,
 }
 
 impl State {
     fn has_interface_up(&self) -> bool {
         match self {
             State::None | State::Removed | State::Down => false,
-            State::Up
-            | State::LinkLayerUp
-            | State::NetworkLayerUp
-            | State::Local
-            | State::Gateway
-            | State::WalledGarden
-            | State::Internet => true,
+            State::Up | State::Local | State::Gateway | State::Internet => true,
         }
     }
 
@@ -131,11 +119,8 @@ impl std::str::FromStr for State {
             "Removed" => Ok(Self::Removed),
             "Down" => Ok(Self::Down),
             "Up" => Ok(Self::Up),
-            "LinkLayerUp" => Ok(Self::LinkLayerUp),
-            "NetworkLayerUp" => Ok(Self::NetworkLayerUp),
             "Local" => Ok(Self::Local),
             "Gateway" => Ok(Self::Gateway),
-            "WalledGarden" => Ok(Self::WalledGarden),
             "Internet" => Ok(Self::Internet),
             _ => Err(()),
         }
@@ -1148,15 +1133,12 @@ mod tests {
         assert_data_tree!(inspector, root: {
             state_vals: {
                 "1": "None",
-                "2": "Removed",
-                "3": "Down",
-                "4": "Up",
-                "5": "LinkLayerUp",
-                "6": "NetworkLayerUp",
-                "7": "Local",
-                "8": "Gateway",
-                "9": "WalledGarden",
-                "10": "Internet",
+                "5": "Removed",
+                "10": "Down",
+                "15": "Up",
+                "20": "Local",
+                "25": "Gateway",
+                "30": "Internet",
             }
         })
     }
