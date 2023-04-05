@@ -52,7 +52,7 @@ func (c *fakeSSHClient) Run(_ context.Context, command []string, _, _ io.Writer)
 
 func (c *fakeSSHClient) Close() {}
 
-func (c *fakeSSHClient) Reconnect(_ context.Context) error {
+func (c *fakeSSHClient) ReconnectWithBackoff(_ context.Context, _ retry.Backoff) error {
 	c.reconnectCalls++
 	if c.reconnectErrs == nil {
 		return nil

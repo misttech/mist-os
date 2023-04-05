@@ -104,7 +104,7 @@ var newTempDir = func(dir, pattern string) (string, error) {
 // For testability
 type sshClient interface {
 	Close()
-	Reconnect(ctx context.Context) error
+	ReconnectWithBackoff(ctx context.Context, backoff retry.Backoff) error
 	Run(ctx context.Context, command []string, stdout, stderr io.Writer) error
 }
 
@@ -944,7 +944,7 @@ func NewFuchsiaSSHTester(ctx context.Context, addr net.IPAddr, sshKeyFile, local
 }
 
 func (t *FuchsiaSSHTester) reconnect(ctx context.Context) error {
-	if err := t.client.Reconnect(ctx); err != nil {
+	if err := t.client.ReconnectWithBackoff(ctx, retry.WithMaxDuration(retry.NewConstantBackoff(time.Second), 10*time.Second)); err != nil {
 		return fmt.Errorf("failed to reestablish SSH connection: %w", err)
 	}
 	if err := t.copier.Reconnect(); err != nil {
