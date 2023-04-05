@@ -24,6 +24,11 @@ trap 'rm -f "${tmpfile}"' EXIT
 
 for file in "$@"
 do
+  if [ ! -e "$file" ]; then
+    echo "File does not exist: $file" 1>&2
+    exit 1
+  fi
+
   while read line
   do
     if [ -n "${line}" ]; then
