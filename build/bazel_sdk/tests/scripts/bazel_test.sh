@@ -14,7 +14,7 @@ main() {
   export LOCAL_FUCHSIA_PLATFORM_BUILD=${fuchsia_build_dir}
   (
     cd $(dirname "$0")/..
-    bazel test :tests
+    bazel test :tests "$@"
   )
 }
 
