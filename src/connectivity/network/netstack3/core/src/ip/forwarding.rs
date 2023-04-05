@@ -16,10 +16,16 @@ use thiserror::Error;
 
 use crate::ip::{
     self,
-    types::{AddableMetric, Metric},
-    AnyDevice, DeviceIdContext, ExistsError, IpDeviceContext, IpLayerContext, IpLayerEvent,
-    IpLayerIpExt, IpLayerNonSyncContext,
+    types::{AddableMetric, Metric, RawMetric},
+    AnyDevice, DeviceIdContext, ExistsError, IpLayerContext, IpLayerEvent, IpLayerIpExt,
+    IpLayerNonSyncContext,
 };
+
+/// Provides access to a device for the purposes of IP forwarding.
+pub(crate) trait IpForwardingDeviceContext: DeviceIdContext<AnyDevice> {
+    /// Returns the routing metric for the device.
+    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
+}
 
 /// Add a route with a gateway to the forwarding table, returning `Err` if the
 /// route is already in the table.
@@ -73,7 +79,7 @@ pub(crate) fn add_device_route<
 
 // Converts the given [`AddableMetric`] into the corresponding [`Metric`],
 // observing the device's metric, if applicable.
-fn observe_metric<I: IpLayerIpExt, C, SC: IpDeviceContext<I, C>>(
+fn observe_metric<SC: IpForwardingDeviceContext>(
     sync_ctx: &mut SC,
     device: &SC::DeviceId,
     metric: AddableMetric,

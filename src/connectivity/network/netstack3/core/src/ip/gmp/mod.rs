@@ -287,10 +287,20 @@ impl<A: IpAddress, T> MulticastGroupSet<A, T> {
     }
 }
 
+/// An implementation of query operations on a Group Management Protocol (GMP).
+pub(crate) trait GmpQueryHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
+    /// Returns true if the device is a member of the group.
+    fn gmp_is_in_group(
+        &mut self,
+        device: &Self::DeviceId,
+        group_addr: MulticastAddr<I::Addr>,
+    ) -> bool;
+}
+
 /// An implementation of a Group Management Protocol (GMP) such as the Internet
 /// Group Management Protocol, Version 2 (IGMPv2) for IPv4 or the Multicast
 /// Listener Discovery (MLD) protocol for IPv6.
-pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
+pub(crate) trait GmpHandler<I: Ip, C>: GmpQueryHandler<I, C> {
     /// Handles GMP potentially being enabled.
     ///
     /// Attempts to transition memberships in the non-member state to a member
@@ -320,6 +330,18 @@ pub(crate) trait GmpHandler<I: Ip, C>: DeviceIdContext<AnyDevice> {
         device: &Self::DeviceId,
         group_addr: MulticastAddr<I::Addr>,
     ) -> GroupLeaveResult;
+}
+
+impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpStateContext<I, C>>
+    GmpQueryHandler<I, C> for SC
+{
+    fn gmp_is_in_group(
+        &mut self,
+        device: &Self::DeviceId,
+        group_addr: MulticastAddr<I::Addr>,
+    ) -> bool {
+        self.with_gmp_state(device, |groups| groups.contains(&group_addr))
+    }
 }
 
 impl<I: IpExt, C: GmpNonSyncContext<I, SC::DeviceId>, SC: GmpContext<I, C>> GmpHandler<I, C>
@@ -877,7 +899,7 @@ impl<DeviceId, I: Ip, C: RngContext + TimerContext<GmpDelayedReportTimerId<I::Ad
 }
 
 /// An extension trait to [`Ip`].
-trait IpExt: Ip {
+pub(super) trait IpExt: Ip {
     /// Returns true iff GMP should be performed for the multicast group.
     fn should_perform_gmp(addr: MulticastAddr<Self::Addr>) -> bool;
 }
@@ -887,17 +909,36 @@ pub(crate) struct GmpState<'a, A: IpAddress, GroupState> {
     pub(crate) groups: &'a mut MulticastGroupSet<A, GroupState>,
 }
 
-/// Provides common functionality for GMP context implementations.
-///
-/// This trait implements portions of a group management protocol.
-trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
+/// Provides access to GMP state.
+trait GmpStateContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     type ProtocolSpecific: ProtocolSpecific;
-    type Err;
     type GroupState: From<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>
         + Into<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>
         + AsMut<GmpStateMachine<C::Instant, Self::ProtocolSpecific>>;
+
+    /// Calls the function with immutable access to the [`MulticastGroupSet`].
+    fn with_gmp_state<O, F: FnOnce(&MulticastGroupSet<I::Addr, Self::GroupState>) -> O>(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
+    /// Calls the function with a boolean indicating whether GMP is disabled and
+    /// an mutable reference to GMP state.
+    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, I::Addr, Self::GroupState>) -> O>(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+}
+
+/// Provides common functionality for GMP context implementations.
+///
+/// This trait implements portions of a group management protocol.
+trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>: GmpStateContext<I, C> {
+    type Err;
 
     /// Sends a GMP message.
     fn send_message(
@@ -917,14 +958,6 @@ trait GmpContext<I: IpExt, C: GmpNonSyncContext<I, Self::DeviceId>>:
     );
 
     fn not_a_member_err(addr: I::Addr) -> Self::Err;
-
-    /// Calls the function with a boolean indicating whether GMP is disabled and
-    /// an mutable reference to GMP state.
-    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, I::Addr, Self::GroupState>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O;
 }
 
 fn gmp_handle_timer<I, C, SC>(

@@ -59,7 +59,7 @@ use crate::{
     error::{ExistsError, NotFoundError},
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
-        forwarding::{Destination, ForwardingTable, NextHop},
+        forwarding::{Destination, ForwardingTable, IpForwardingDeviceContext, NextHop},
         gmp::igmp::IgmpPacketHandler,
         icmp::{
             BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpSockets,
@@ -75,7 +75,6 @@ use crate::{
             BufferIpSocketHandler, DefaultSendOptions, IpSock, IpSockRoute, IpSockRouteError,
             IpSockUnroutableError, IpSocketContext, IpSocketHandler,
         },
-        types::RawMetric,
     },
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
@@ -510,7 +509,7 @@ impl IpLayerIpExt for Ipv6 {
 // reference.
 pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IpDeviceContext<I, C>;
+        + IpForwardingDeviceContext;
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<
@@ -531,7 +530,7 @@ pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> 
     ) -> O;
 }
 
-pub(crate) trait Ipv4StateContext<C>: IpStateContext<Ipv4, C> {
+pub(crate) trait Ipv4StateContext<C> {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O;
 }
 
@@ -578,9 +577,6 @@ pub(crate) trait IpDeviceContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice>
 
     /// Returns the hop limit.
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8;
-
-    /// Gets the routing metric for a device.
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric;
 
     /// Returns the MTU of the device.
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu;
@@ -771,8 +767,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    IpStateContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<
+        NonSyncCtx: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::IpStateRoutingTable<Ipv4>>,
+    > IpStateContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type IpDeviceIdCtx<'a> =
         Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv4>>;
@@ -802,8 +800,10 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     }
 }
 
-impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    IpStateContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<
+        NonSyncCtx: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::IpStateRoutingTable<Ipv6>>,
+    > IpStateContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     type IpDeviceIdCtx<'a> =
         Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::IpStateRoutingTable<Ipv6>>;
@@ -2473,7 +2473,7 @@ impl<
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv6, C, B> + IpStateContext<Ipv6, C> + NonTestCtxMarker,
+        SC: BufferIpDeviceContext<Ipv6, C, B> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv6, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(

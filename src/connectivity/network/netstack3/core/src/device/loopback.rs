@@ -537,10 +537,7 @@ mod tests {
         context::testutil::FakeInstant,
         device::{DeviceId, Mtu},
         error::NotFoundError,
-        ip::device::{
-            state::{AssignedAddress, IpDeviceState},
-            IpDeviceIpExt, IpDeviceStateAccessor,
-        },
+        ip::device::{state::AssignedAddress, IpDeviceAddressesAccessor, IpDeviceIpExt},
         testutil::{
             FakeEventDispatcherConfig, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
         },
@@ -575,7 +572,7 @@ mod tests {
     fn test_loopback_add_remove_addrs<I: Ip + TestIpExt + IpDeviceIpExt>()
     where
         for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, Unlocked>:
-            IpDeviceStateAccessor<I, FakeInstant, DeviceId = DeviceId<FakeNonSyncCtx>>,
+            IpDeviceAddressesAccessor<I, FakeInstant, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
         let mut sync_ctx = &sync_ctx;
@@ -586,13 +583,10 @@ mod tests {
         crate::device::testutil::enable_device(&mut sync_ctx, &mut non_sync_ctx, &device);
 
         let get_addrs = || {
-            crate::ip::device::IpDeviceStateAccessor::<I, _>::with_ip_device_state(
+            crate::ip::device::IpDeviceAddressesAccessor::<I, _>::with_ip_device_addresses(
                 &mut Locked::new(sync_ctx),
                 &device,
-                |state| {
-                    let state: &IpDeviceState<_, _> = state.as_ref();
-                    state.addrs.iter().map(AssignedAddress::addr).collect::<Vec<_>>()
-                },
+                |addrs| addrs.iter().map(AssignedAddress::addr).collect::<Vec<_>>(),
             )
         };
 

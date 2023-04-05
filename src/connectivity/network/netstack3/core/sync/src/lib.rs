@@ -39,7 +39,7 @@ impl<T> Mutex<T> {
 }
 
 /// A [`std::sync::RwLock`] assuming lock poisoning will never occur.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct RwLock<T>(std::sync::RwLock<T>);
 
 /// Lock guard for read access to a [`RwLock`].

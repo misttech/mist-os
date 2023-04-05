@@ -674,10 +674,10 @@ mod tests {
         device: &DeviceId<crate::testutil::FakeNonSyncCtx>,
         addr: UnicastAddr<Ipv6Addr>,
     ) -> Option<AddressState> {
-        crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+        crate::ip::device::IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
             &mut Locked::new(sync_ctx),
             device,
-            |state| state.ip_state.addrs.find(&addr).map(|a| a.state),
+            |addrs| addrs.find(&addr).map(|a| a.state),
         )
     }
 

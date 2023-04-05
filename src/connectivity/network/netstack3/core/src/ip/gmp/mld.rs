@@ -39,8 +39,8 @@ use crate::{
     ip::{
         gmp::{
             gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateMachine, IpExt,
-            ProtocolSpecific, QueryTarget,
+            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
+            GmpStateMachine, IpExt, MulticastGroupSet, ProtocolSpecific, QueryTarget,
         },
         AnyDevice, DeviceIdContext,
     },
@@ -76,15 +76,17 @@ impl<DeviceId, C: RngContext + TimerContext<MldDelayedReportTimerId<DeviceId>>>
 {
 }
 
-/// The execution context for the Multicast Listener Discovery (MLD) protocol.
-pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
+/// Provides access to MLD state.
+pub(crate) trait MldStateContext<C: MldNonSyncContext<Self::DeviceId>>:
+    DeviceIdContext<AnyDevice>
 {
-    /// Gets the IPv6 link local address on `device`.
-    fn get_ipv6_link_local_addr(
+    /// Calls the function with an immutable reference to the device's MLD
+    /// state.
+    fn with_mld_state<O, F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
         &mut self,
         device: &Self::DeviceId,
-    ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>>;
+        cb: F,
+    ) -> O;
 
     /// Calls the function with a mutable reference to the device's MLD state
     /// and whether or not MLD is enabled for the `device`.
@@ -93,6 +95,17 @@ pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
         device: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
+
+/// The execution context for the Multicast Listener Discovery (MLD) protocol.
+pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
+    MldStateContext<C> + SendFrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
+{
+    /// Gets the IPv6 link local address on `device`.
+    fn get_ipv6_link_local_addr(
+        &mut self,
+        device: &Self::DeviceId,
+    ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>>;
 }
 
 /// A handler for incoming MLD packets.
@@ -186,10 +199,32 @@ impl IpExt for Ipv6 {
     }
 }
 
-impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> for SC {
+impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldStateContext<C>> GmpStateContext<Ipv6, C> for SC {
     type ProtocolSpecific = MldProtocolSpecific;
-    type Err = MldError;
     type GroupState = MldGroupState<C::Instant>;
+
+    fn with_gmp_state<
+        O,
+        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<C::Instant>>) -> O,
+    >(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_mld_state(device, cb)
+    }
+
+    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_mld_state_mut(device, cb)
+    }
+}
+
+impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> for SC {
+    type Err = MldError;
 
     fn send_message(
         &mut self,
@@ -234,14 +269,6 @@ impl<C: MldNonSyncContext<SC::DeviceId>, SC: MldContext<C>> GmpContext<Ipv6, C> 
 
     fn not_a_member_err(addr: Ipv6Addr) -> Self::Err {
         Self::Err::NotAMember { addr }
-    }
-
-    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv6Addr, MldGroupState<C::Instant>>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        self.with_mld_state_mut(device, cb)
     }
 }
 
@@ -489,12 +516,18 @@ mod tests {
     type FakeNonSyncCtxImpl =
         crate::context::testutil::FakeNonSyncCtx<MldDelayedReportTimerId<FakeDeviceId>, (), ()>;
 
-    impl MldContext<FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
-        fn get_ipv6_link_local_addr(
+    impl MldStateContext<FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+        fn with_mld_state<
+            O,
+            F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<FakeInstant>>) -> O,
+        >(
             &mut self,
-            _device: &FakeDeviceId,
-        ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
-            self.get_ref().ipv6_link_local
+            &FakeDeviceId: &FakeDeviceId,
+            cb: F,
+        ) -> O {
+            let FakeMldCtx { groups, mld_enabled: _, ipv6_link_local: _, ip_device_id_ctx: _ } =
+                self.get_ref();
+            cb(groups)
         }
 
         fn with_mld_state_mut<
@@ -508,6 +541,15 @@ mod tests {
             let FakeMldCtx { groups, mld_enabled, ipv6_link_local: _, ip_device_id_ctx: _ } =
                 self.get_mut();
             cb(GmpState { enabled: *mld_enabled, groups })
+        }
+    }
+
+    impl MldContext<FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+        fn get_ipv6_link_local_addr(
+            &mut self,
+            _device: &FakeDeviceId,
+        ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
+            self.get_ref().ipv6_link_local
         }
     }
 

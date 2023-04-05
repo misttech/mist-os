@@ -1607,7 +1607,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use core::{convert::Infallible as Never, marker::PhantomData};
+    use core::{convert::Infallible as Never, marker::PhantomData, ops::DerefMut as _};
 
     use derivative::Derivative;
     use ip_test_macro::ip_test;
@@ -1929,10 +1929,13 @@ mod test {
 
         let HopLimits { mut unicast, multicast } = DEFAULT_HOP_LIMITS;
         unicast = unicast.checked_add(1).unwrap();
-        let default_hop_limit =
-            &mut sync_ctx.state.get_device_state_mut(&FakeDeviceId).default_hop_limit;
-        assert_ne!(*default_hop_limit, unicast);
-        *default_hop_limit = unicast;
+        {
+            let mut default_hop_limit =
+                sync_ctx.state.get_device_state(&FakeDeviceId).default_hop_limit.write();
+            let default_hop_limit = default_hop_limit.deref_mut();
+            assert_ne!(*default_hop_limit, unicast);
+            *default_hop_limit = unicast;
+        }
         assert_eq!(
             get_ip_hop_limits(&mut sync_ctx, &non_sync_ctx, unbound),
             HopLimits { unicast, multicast }
@@ -2029,7 +2032,7 @@ mod test {
             (MultipleDevicesId::B, multicast_addr2, true),
         ] {
             assert_eq!(
-                sync_ctx.get_device_state(&device).multicast_groups.contains(&addr),
+                sync_ctx.get_device_state(&device).multicast_groups.read().contains(&addr),
                 expected,
                 "device={}, addr={}",
                 device,
@@ -2054,7 +2057,7 @@ mod test {
             (MultipleDevicesId::B, multicast_addr2, remove_device_b),
         ] {
             assert_eq!(
-                sync_ctx.get_device_state(&device).multicast_groups.contains(&addr),
+                sync_ctx.get_device_state(&device).multicast_groups.read().contains(&addr),
                 expected,
                 "device={}, addr={}",
                 device,

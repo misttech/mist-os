@@ -22,7 +22,7 @@ use crate::{
 
 #[derive(Default)]
 #[cfg_attr(test, derive(Debug, Eq, PartialEq))]
-pub(super) struct Ipv6RouteDiscoveryState {
+pub(crate) struct Ipv6RouteDiscoveryState {
     // The valid (non-zero lifetime) discovered routes.
     //
     // Routes with a finite lifetime must have a timer set; routes with an

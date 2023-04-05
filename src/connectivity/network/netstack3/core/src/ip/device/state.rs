@@ -8,6 +8,7 @@ use alloc::vec::Vec;
 use core::{fmt::Debug, num::NonZeroU8, time::Duration};
 
 use derivative::Derivative;
+use lock_order::lock::{LockFor, RwLockFor};
 use net_types::{
     ip::{AddrSubnet, GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     SpecifiedAddr, UnicastAddr, Witness,
@@ -20,7 +21,7 @@ use crate::{
         device::{route_discovery::Ipv6RouteDiscoveryState, slaac::SlaacConfiguration},
         gmp::{igmp::IgmpGroupState, mld::MldGroupState, MulticastGroupSet},
     },
-    sync::RwLock,
+    sync::{Mutex, RwLock},
     Instant,
 };
 
@@ -114,22 +115,120 @@ pub(crate) struct IpDeviceState<Instant: crate::Instant, I: Ip + IpDeviceStateIp
     /// Detection).
     ///
     /// Does not contain any duplicates.
-    pub addrs: IpDeviceAddresses<Instant, I>,
+    pub addrs: RwLock<IpDeviceAddresses<Instant, I>>,
 
     /// Multicast groups this device has joined.
-    pub multicast_groups: MulticastGroupSet<I::Addr, I::GmpState<Instant>>,
+    pub multicast_groups: RwLock<MulticastGroupSet<I::Addr, I::GmpState<Instant>>>,
 
     /// The default TTL (IPv4) or hop limit (IPv6) for outbound packets sent
     /// over this device.
-    pub default_hop_limit: NonZeroU8,
+    pub default_hop_limit: RwLock<NonZeroU8>,
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv4>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv4>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv4>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv4.ip_state.addrs.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv4.ip_state.addrs.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv4>> for DualStackIpDeviceState<I> {
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv4Addr, IgmpGroupState<I>>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv4.ip_state.multicast_groups.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv4.ip_state.multicast_groups.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv4>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv4.ip_state.default_hop_limit.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv4.ip_state.default_hop_limit.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceAddresses<Ipv6>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, IpDeviceAddresses<I, Ipv6>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, IpDeviceAddresses<I, Ipv6>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv6.ip_state.addrs.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv6.ip_state.addrs.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceGmp<Ipv6>> for DualStackIpDeviceState<I> {
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, MulticastGroupSet<Ipv6Addr, MldGroupState<I>>>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv6.ip_state.multicast_groups.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv6.ip_state.multicast_groups.write()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceDefaultHopLimit<Ipv6>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, NonZeroU8>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroU8>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv6.ip_state.default_hop_limit.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv6.ip_state.default_hop_limit.write()
+    }
 }
 
 impl<Instant: crate::Instant, I: IpDeviceStateIpExt> Default for IpDeviceState<Instant, I> {
     fn default() -> IpDeviceState<Instant, I> {
         IpDeviceState {
             addrs: Default::default(),
-            multicast_groups: MulticastGroupSet::default(),
-            default_hop_limit: DEFAULT_HOP_LIMIT,
+            multicast_groups: Default::default(),
+            default_hop_limit: RwLock::new(DEFAULT_HOP_LIMIT),
         }
     }
 }
@@ -200,7 +299,24 @@ impl<Instant: crate::Instant, I: IpDeviceStateIpExt> IpDeviceAddresses<Instant, 
 /// The state common to all IPv4 devices.
 pub(crate) struct Ipv4DeviceState<I: Instant> {
     pub(crate) ip_state: IpDeviceState<I, Ipv4>,
-    pub(super) config: Ipv4DeviceConfiguration,
+    pub(super) config: RwLock<Ipv4DeviceConfiguration>,
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceConfiguration>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4DeviceConfiguration>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv4.config.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv4.config.write()
+    }
 }
 
 impl<I: Instant> Default for Ipv4DeviceState<I> {
@@ -218,12 +334,6 @@ impl<I: Instant> AsRef<IpDeviceState<I, Ipv4>> for Ipv4DeviceState<I> {
 impl<I: Instant> AsMut<IpDeviceState<I, Ipv4>> for Ipv4DeviceState<I> {
     fn as_mut(&mut self) -> &mut IpDeviceState<I, Ipv4> {
         &mut self.ip_state
-    }
-}
-
-impl<I: Instant> AsRef<IpDeviceConfiguration> for Ipv4DeviceState<I> {
-    fn as_ref(&self) -> &IpDeviceConfiguration {
-        &self.config.ip_config
     }
 }
 
@@ -327,6 +437,62 @@ impl AsMut<IpDeviceConfiguration> for Ipv6DeviceConfiguration {
     }
 }
 
+impl<I: Instant> RwLockFor<crate::lock_ordering::Ipv6DeviceRetransTimeout>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, NonZeroDuration>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, NonZeroDuration>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv6.retrans_timer.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv6.retrans_timer.write()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouteDiscovery>
+    for DualStackIpDeviceState<I>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, Ipv6RouteDiscoveryState>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.ipv6.route_discovery.lock()
+    }
+}
+
+impl<I: Instant> LockFor<crate::lock_ordering::Ipv6DeviceRouterSolicitations>
+    for DualStackIpDeviceState<I>
+{
+    type Data<'l> = crate::sync::LockGuard<'l, Option<NonZeroU8>>
+        where
+            Self: 'l;
+    fn lock(&self) -> Self::Data<'_> {
+        self.ipv6.router_soliciations_remaining.lock()
+    }
+}
+
+impl<I: Instant> RwLockFor<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>
+    for DualStackIpDeviceState<I>
+{
+    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceConfiguration>
+        where
+            Self: 'l;
+    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6DeviceConfiguration>
+        where
+            Self: 'l;
+    fn read_lock(&self) -> Self::ReadData<'_> {
+        self.ipv6.config.read()
+    }
+    fn write_lock(&self) -> Self::WriteData<'_> {
+        self.ipv6.config.write()
+    }
+}
+
 /// The state common to all IPv6 devices.
 pub(crate) struct Ipv6DeviceState<I: Instant> {
     /// The time between retransmissions of Neighbor Solicitation messages to a
@@ -338,19 +504,19 @@ pub(crate) struct Ipv6DeviceState<I: Instant> {
     /// See RetransTimer in [RFC 4861 section 6.3.2] for more details.
     ///
     /// [RFC 4861 section 6.3.2]: https://tools.ietf.org/html/rfc4861#section-6.3.2
-    pub(crate) retrans_timer: NonZeroDuration,
-    pub(super) route_discovery: Ipv6RouteDiscoveryState,
-    pub(super) router_soliciations_remaining: Option<NonZeroU8>,
+    pub(crate) retrans_timer: RwLock<NonZeroDuration>,
+    pub(super) route_discovery: Mutex<Ipv6RouteDiscoveryState>,
+    pub(super) router_soliciations_remaining: Mutex<Option<NonZeroU8>>,
     pub(crate) ip_state: IpDeviceState<I, Ipv6>,
-    pub(crate) config: Ipv6DeviceConfiguration,
+    pub(crate) config: RwLock<Ipv6DeviceConfiguration>,
 }
 
 impl<I: Instant> Default for Ipv6DeviceState<I> {
     fn default() -> Ipv6DeviceState<I> {
         Ipv6DeviceState {
-            retrans_timer: RETRANS_TIMER_DEFAULT,
+            retrans_timer: RwLock::new(RETRANS_TIMER_DEFAULT),
             route_discovery: Default::default(),
-            router_soliciations_remaining: None,
+            router_soliciations_remaining: Default::default(),
             ip_state: Default::default(),
             config: Default::default(),
         }
@@ -369,21 +535,15 @@ impl<I: Instant> AsMut<IpDeviceState<I, Ipv6>> for Ipv6DeviceState<I> {
     }
 }
 
-impl<I: Instant> AsRef<IpDeviceConfiguration> for Ipv6DeviceState<I> {
-    fn as_ref(&self) -> &IpDeviceConfiguration {
-        &self.config.ip_config
-    }
-}
-
 /// IPv4 and IPv6 state combined.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct DualStackIpDeviceState<I: Instant> {
     /// IPv4 state.
-    pub ipv4: RwLock<Ipv4DeviceState<I>>,
+    pub ipv4: Ipv4DeviceState<I>,
 
     /// IPv6 state.
-    pub ipv6: RwLock<Ipv6DeviceState<I>>,
+    pub ipv6: Ipv6DeviceState<I>,
 }
 
 /// The various states an IP address can be on an interface.

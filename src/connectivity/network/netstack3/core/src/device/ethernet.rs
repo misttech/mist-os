@@ -60,10 +60,7 @@ use crate::{
         RecvIpFrameMeta,
     },
     ip::{
-        device::{
-            nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
-            state::{DualStackIpDeviceState, Ipv4DeviceState, Ipv6DeviceState},
-        },
+        device::nud::{BufferNudContext, BufferNudHandler, NudContext, NudState, NudTimerId},
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
@@ -95,17 +92,24 @@ impl<DeviceId, C: CounterContext + RngContext + TimerContext<EthernetTimerId<Dev
 {
 }
 
-/// The execution context for an Ethernet device.
-pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>>:
+/// Provides access to an ethernet device's static state.
+pub(crate) trait EthernetIpLinkDeviceStaticStateContext:
     DeviceIdContext<EthernetLinkDevice>
 {
-    /// Calls the function with the ethernet device's static state.
+    /// Calls the function with an immutable reference to the ethernet device's
+    /// static state.
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
         &mut self,
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
 
+/// Provides access to an ethernet device's dynamic state.
+pub(crate) trait EthernetIpLinkDeviceDynamicStateContext<
+    C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>,
+>: EthernetIpLinkDeviceStaticStateContext
+{
     /// Calls the function with the ethernet device's static state and immutable
     /// reference to the dynamic state.
     fn with_ethernet_device_state<
@@ -129,10 +133,8 @@ pub(crate) trait EthernetIpLinkDeviceContext<C: EthernetIpLinkDeviceNonSyncConte
     ) -> O;
 }
 
-impl<
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
-    > EthernetIpLinkDeviceContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L> EthernetIpLinkDeviceStaticStateContext
+    for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
         &mut self,
@@ -143,7 +145,13 @@ impl<
             cb(state.unlocked_access::<crate::lock_ordering::EthernetDeviceStaticState>())
         })
     }
+}
 
+impl<
+        NonSyncCtx: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::EthernetDeviceDynamicState>,
+    > EthernetIpLinkDeviceDynamicStateContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+{
     fn with_ethernet_device_state<
         O,
         F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
@@ -183,11 +191,11 @@ impl<
 
 /// A shorthand for `BufferIpLinkDeviceContext` with all of the appropriate type
 /// arguments fixed to their Ethernet values.
-pub(super) trait BufferEthernetIpLinkDeviceContext<
+pub(super) trait BufferEthernetIpLinkDeviceDynamicStateContext<
     C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>,
     B: BufferMut,
 >:
-    EthernetIpLinkDeviceContext<C>
+    EthernetIpLinkDeviceDynamicStateContext<C>
     + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv4>>
     + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv6>>
 {
@@ -196,10 +204,10 @@ pub(super) trait BufferEthernetIpLinkDeviceContext<
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         B: BufferMut,
-        SC: EthernetIpLinkDeviceContext<C>
+        SC: EthernetIpLinkDeviceDynamicStateContext<C>
             + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
             + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv6>>,
-    > BufferEthernetIpLinkDeviceContext<C, B> for SC
+    > BufferEthernetIpLinkDeviceDynamicStateContext<C, B> for SC
 {
 }
 
@@ -212,8 +220,8 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
     ) -> NonZeroDuration {
         with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
-            let ipv6 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>();
-            ipv6.retrans_timer
+            let x = state.read_lock::<crate::lock_ordering::Ipv6DeviceRetransTimeout>().clone();
+            x
         })
     }
 
@@ -269,7 +277,7 @@ fn send_ip_frame_to_dst<
     B: BufferMut,
     S: Serializer<Buffer = B>,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
 >(
     sync_ctx: &mut SC,
@@ -478,40 +486,6 @@ impl<I: Instant, S> RwLockFor<crate::lock_ordering::EthernetDeviceDynamicState>
     }
 }
 
-impl<I: Instant> RwLockFor<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>
-    for DualStackIpDeviceState<I>
-{
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv4DeviceState<I>>
-        where
-            Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv4DeviceState<I>>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
-        self.ipv4.read()
-    }
-    fn write_lock(&self) -> Self::WriteData<'_> {
-        self.ipv4.write()
-    }
-}
-
-impl<I: Instant> RwLockFor<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>
-    for DualStackIpDeviceState<I>
-{
-    type ReadData<'l> = crate::sync::RwLockReadGuard<'l, Ipv6DeviceState<I>>
-        where
-            Self: 'l;
-    type WriteData<'l> = crate::sync::RwLockWriteGuard<'l, Ipv6DeviceState<I>>
-        where
-            Self: 'l;
-    fn read_lock(&self) -> Self::ReadData<'_> {
-        self.ipv6.read()
-    }
-    fn write_lock(&self) -> Self::WriteData<'_> {
-        self.ipv6.write()
-    }
-}
-
 impl<I: Instant, S> RwLockFor<crate::lock_ordering::DeviceSockets>
     for IpLinkDeviceState<I, S, EthernetDeviceState>
 {
@@ -687,7 +661,7 @@ impl<D> From<NudTimerId<Ipv6, EthernetLinkDevice, D>> for EthernetTimerId<D> {
 /// Handle an Ethernet timer firing.
 pub(super) fn handle_timer<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + TimerHandler<C, NudTimerId<Ipv6, EthernetLinkDevice, SC::DeviceId>>
         + TimerHandler<C, ArpTimerId<EthernetLinkDevice, SC::DeviceId>>,
 >(
@@ -728,7 +702,7 @@ impl_timer_context!(
 pub(super) fn send_ip_frame<
     B: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
         + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
     A: IpAddress,
@@ -770,7 +744,8 @@ where
 pub(super) fn receive_frame<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     B: BufferMut,
-    SC: BufferEthernetIpLinkDeviceContext<C, B> + ArpPacketHandler<B, EthernetLinkDevice, C>,
+    SC: BufferEthernetIpLinkDeviceDynamicStateContext<C, B>
+        + ArpPacketHandler<B, EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -840,7 +815,7 @@ pub(super) fn receive_frame<
 /// Set the promiscuous mode flag on `device_id`.
 pub(super) fn set_promiscuous_mode<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
     sync_ctx: &mut SC,
     _ctx: &mut C,
@@ -869,7 +844,7 @@ pub(super) fn set_promiscuous_mode<
 /// `join_ip_multicast` joins an L3 multicast group.
 pub(super) fn join_link_multicast<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
     sync_ctx: &mut SC,
     _ctx: &mut C,
@@ -916,7 +891,7 @@ pub(super) fn join_link_multicast<
 /// If `device_id` is not in the multicast group `multicast_addr`.
 pub(super) fn leave_link_multicast<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
     sync_ctx: &mut SC,
     _ctx: &mut C,
@@ -948,10 +923,7 @@ pub(super) fn leave_link_multicast<
 }
 
 /// Get the routing metric associated with this device.
-pub(super) fn get_routing_metric<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
->(
+pub(super) fn get_routing_metric<SC: EthernetIpLinkDeviceStaticStateContext>(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
 ) -> RawMetric {
@@ -961,7 +933,7 @@ pub(super) fn get_routing_metric<
 /// Get the MTU associated with this device.
 pub(super) fn get_mtu<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
@@ -980,7 +952,7 @@ pub(super) fn get_mtu<
 #[cfg(test)]
 pub(super) fn insert_static_arp_table_entry<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C> + NudHandler<Ipv4, EthernetLinkDevice, C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C> + NudHandler<Ipv4, EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1004,7 +976,7 @@ pub(super) fn insert_static_arp_table_entry<
 #[cfg(test)]
 pub(super) fn insert_ndp_table_entry<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C> + NudHandler<Ipv6, EthernetLinkDevice, C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C> + NudHandler<Ipv6, EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1024,7 +996,7 @@ pub(super) fn insert_ndp_table_entry<
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         B: BufferMut,
-        SC: EthernetIpLinkDeviceContext<C>
+        SC: EthernetIpLinkDeviceDynamicStateContext<C>
             + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
     > SendFrameContext<C, B, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
 {
@@ -1051,9 +1023,9 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
     ) -> Option<Ipv4Addr> {
         with_ethernet_state(self, device_id, |mut state| {
             let mut state = state.cast();
-            let ipv4 = state.read_lock::<crate::lock_ordering::EthernetDeviceIpState<Ipv4>>();
-            let ret = ipv4.ip_state.addrs.iter().next().cloned().map(|addr| addr.addr().get());
-            ret
+            let ipv4 = state.read_lock::<crate::lock_ordering::IpDeviceAddresses<Ipv4>>();
+            let x = ipv4.iter().next().cloned().map(|addr| addr.addr().get());
+            x
         })
     }
 
@@ -1097,7 +1069,7 @@ impl<
 pub(super) fn get_mac<
     'a,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
     sync_ctx: &'a mut SC,
     device_id: &SC::DeviceId,
@@ -1107,7 +1079,7 @@ pub(super) fn get_mac<
 
 pub(super) fn set_mtu<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceContext<C>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>,
 >(
     sync_ctx: &mut SC,
     device_id: &SC::DeviceId,
@@ -1205,7 +1177,7 @@ mod tests {
     type FakeCtx =
         crate::context::testutil::FakeSyncCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
 
-    impl EthernetIpLinkDeviceContext<FakeNonSyncCtx> for FakeCtx {
+    impl EthernetIpLinkDeviceStaticStateContext for FakeCtx {
         fn with_static_ethernet_device_state<O, F: FnOnce(&StaticEthernetDeviceState) -> O>(
             &mut self,
             &FakeDeviceId: &FakeDeviceId,
@@ -1213,7 +1185,9 @@ mod tests {
         ) -> O {
             cb(&self.get_ref().static_state)
         }
+    }
 
+    impl EthernetIpLinkDeviceDynamicStateContext<FakeNonSyncCtx> for FakeCtx {
         fn with_ethernet_device_state<
             O,
             F: FnOnce(&StaticEthernetDeviceState, &DynamicEthernetDeviceState) -> O,
@@ -1383,17 +1357,17 @@ mod tests {
     ) -> bool {
         match addr.into() {
             IpAddr::V4(addr) => {
-                crate::ip::device::IpDeviceStateAccessor::<Ipv4, _>::with_ip_device_state(
+                crate::ip::device::IpDeviceAddressesAccessor::<Ipv4, _>::with_ip_device_addresses(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |state| state.ip_state.addrs.iter().any(|a| a.addr() == addr),
+                    |addrs| addrs.iter().any(|a| a.addr() == addr),
                 )
             }
             IpAddr::V6(addr) => {
-                crate::ip::device::IpDeviceStateAccessor::<Ipv6, _>::with_ip_device_state(
+                crate::ip::device::IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
                     &mut Locked::new(sync_ctx),
                     device,
-                    |state| state.ip_state.addrs.iter().any(|a| a.addr() == addr),
+                    |addrs| addrs.iter().any(|a| a.addr() == addr),
                 )
             }
         }
@@ -2305,9 +2279,9 @@ mod tests {
                 .unwrap()
                 .ip
                 .ipv6
-                .read()
                 .ip_state
                 .addrs
+                .read()
                 .iter()
                 .map(|entry| entry.addr_sub().addr())
                 .collect::<Vec<_>>(),
@@ -2331,9 +2305,9 @@ mod tests {
             .unwrap()
             .ip
             .ipv6
-            .read()
             .ip_state
             .addrs
+            .read()
             .iter()
             .map(|entry| entry.addr_sub().addr().get())
             .collect();

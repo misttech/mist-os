@@ -5,10 +5,11 @@
 //! The integrations for protocols built on top of an IP device.
 
 use alloc::boxed::Box;
-use core::{marker::PhantomData, num::NonZeroU8};
+use core::{marker::PhantomData, num::NonZeroU8, ops::Deref as _};
 
+use lock_order::{relation::LockBefore, Locked};
 use net_types::{
-    ip::{AddrSubnet, GenericOverIp, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    ip::{AddrSubnet, Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     LinkLocalUnicastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, Serializer};
@@ -18,7 +19,8 @@ use packet_formats::icmp::{
 };
 
 use crate::{
-    context::SendFrameContext,
+    context::{InstantContext, SendFrameContext},
+    device::{AnyDevice, DeviceIdContext},
     error::{ExistsError, NotFoundError},
     ip::{
         self,
@@ -35,20 +37,18 @@ use crate::{
                 SlaacStateContext,
             },
             state::{
-                AddrConfig, AddressState, IpDeviceConfiguration, IpDeviceState, IpDeviceStateIpExt,
-                Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddressEntry,
-                Ipv6DeviceConfiguration, Ipv6DeviceState, SlaacConfig,
+                AddrConfig, AddressState, IpDeviceConfiguration, Ipv4DeviceConfiguration,
+                Ipv6AddressEntry, Ipv6DeviceConfiguration, SlaacConfig,
             },
-            IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateAccessor, RemovedReason,
+            IpDeviceAddressesAccessor, IpDeviceIpExt, IpDeviceNonSyncContext, RemovedReason,
         },
         gmp::{
-            igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata},
-            mld::{MldContext, MldFrameMetadata, MldGroupState},
-            GmpHandler, GmpState,
+            igmp::{IgmpContext, IgmpGroupState, IgmpPacketMetadata, IgmpStateContext},
+            mld::{MldContext, MldFrameMetadata, MldGroupState, MldStateContext},
+            GmpHandler, GmpQueryHandler, GmpState, MulticastGroupSet,
         },
-        types::RawMetric,
         AddressStatus, IpLayerIpExt, IpLayerNonSyncContext, Ipv4PresentAddressStatus,
-        Ipv6PresentAddressStatus, DEFAULT_TTL,
+        Ipv6PresentAddressStatus, NonSyncContext, SyncCtx, DEFAULT_TTL,
     },
 };
 
@@ -72,8 +72,8 @@ fn with_iter_slaac_addrs_mut<
     device_id: &SC::DeviceId,
     cb: F,
 ) -> O {
-    SC::with_ip_device_state_mut(sync_ctx, device_id, |state| {
-        cb(Box::new(state.ip_state.addrs.iter_mut().filter_map(
+    SC::with_ip_device_addresses_mut(sync_ctx, device_id, |addrs| {
+        cb(Box::new(addrs.iter_mut().filter_map(
             |Ipv6AddressEntry { addr_sub, state: _, config, deprecated }| match config {
                 AddrConfig::Slaac(config) => {
                     Some(SlaacAddressEntryMut { addr_sub: *addr_sub, config, deprecated })
@@ -109,8 +109,8 @@ impl<
         cb: F,
     ) -> O {
         let SlaacAddrs { sync_ctx, device_id, _marker } = self;
-        sync_ctx.with_ip_device_state(device_id, |state| {
-            cb(Box::new(state.ip_state.addrs.iter().cloned().filter_map(
+        sync_ctx.with_ip_device_addresses(device_id, |addrs| {
+            cb(Box::new(addrs.iter().cloned().filter_map(
                 |Ipv6AddressEntry { addr_sub, state: _, config, deprecated }| match config {
                     AddrConfig::Slaac(config) => {
                         Some(SlaacAddressEntry { addr_sub, config, deprecated })
@@ -192,24 +192,18 @@ impl<
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        let (config, dad_transmits, retrans_timer) =
-            self.with_ip_device_state(&device_id, |state| {
-                let Ipv6DeviceState {
-                    retrans_timer,
-                    route_discovery: _,
-                    router_soliciations_remaining: _,
-                    ip_state: _,
-                    config:
-                        Ipv6DeviceConfiguration {
-                            dad_transmits,
-                            max_router_solicitations: _,
-                            slaac_config,
-                            ip_config: _,
-                        },
-                } = state;
+        let (config, dad_transmits) =
+            self.with_ip_device_configuration(&device_id, |config, _ctx| {
+                let Ipv6DeviceConfiguration {
+                    dad_transmits,
+                    max_router_solicitations: _,
+                    slaac_config,
+                    ip_config: _,
+                } = config;
 
-                (*slaac_config, *dad_transmits, retrans_timer.get())
+                (*slaac_config, *dad_transmits)
             });
+        let retrans_timer = self.with_retrans_timer(device_id, |retrans_timer| retrans_timer.get());
         let interface_identifier =
             SC::get_eui64_iid(self, device_id).unwrap_or_else(Default::default);
 
@@ -227,25 +221,36 @@ impl<
     }
 }
 
-impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<Ipv6, C>>
-    Ipv6RouteDiscoveryStateContext<C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetDeviceIpState<Ipv6>>>
+    Ipv6RouteDiscoveryStateContext<C> for Locked<&SyncCtx<C>, L>
 {
     fn with_discovered_routes_mut<F: FnOnce(&mut Ipv6RouteDiscoveryState)>(
         &mut self,
-        device_id: &SC::DeviceId,
+        device_id: &Self::DeviceId,
         cb: F,
     ) {
-        self.with_ip_device_state_mut(&device_id, |state| cb(&mut state.route_discovery))
+        crate::device::with_ip_device_state(self, device_id, |mut state| {
+            let mut state = state.lock::<crate::lock_ordering::Ipv6DeviceRouteDiscovery>();
+            cb(&mut state)
+        })
     }
 }
 
-impl<
-        C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-        SC: device::BufferIpDeviceContext<Ipv4, C, EmptyBuf>,
-    > IgmpContext<C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>>
+    IgmpStateContext<C> for Locked<&SyncCtx<C>, L>
 {
-    fn get_ip_addr_subnet(&mut self, device: &SC::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
-        get_ipv4_addr_subnet(self, device)
+    fn with_igmp_state<
+        O,
+        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<C::Instant>>) -> O,
+    >(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        crate::device::with_ip_device_state(self, device, |mut state| {
+            let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
+            cb(&state)
+        })
     }
 
     fn with_igmp_state_mut<
@@ -256,19 +261,25 @@ impl<
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_ip_device_state_mut(device, |state| {
-            let Ipv4DeviceState {
-                ip_state,
-                config:
-                    Ipv4DeviceConfiguration {
-                        ip_config:
-                            IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
-                    },
-            } = state;
+        crate::device::with_ip_device_state(self, device, |mut state| {
+            let (config, mut locked) =
+                state.read_lock_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv4>>();
+            let Ipv4DeviceConfiguration {
+                ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+            } = config.deref();
+            let mut state = locked.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv4>>();
 
             let enabled = *ip_enabled && *gmp_enabled;
-            cb(GmpState { enabled, groups: &mut ip_state.multicast_groups })
+            cb(GmpState { enabled, groups: &mut state })
         })
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>> IgmpContext<C>
+    for Locked<&SyncCtx<C>, L>
+{
+    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
+        get_ipv4_addr_subnet(self, device)
     }
 }
 
@@ -287,23 +298,20 @@ impl<
     }
 }
 
-impl<
-        C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>,
-        SC: device::BufferIpDeviceContext<Ipv6, C, EmptyBuf>,
-    > MldContext<C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>>
+    MldStateContext<C> for Locked<&SyncCtx<C>, L>
 {
-    fn get_ipv6_link_local_addr(
+    fn with_mld_state<
+        O,
+        F: FnOnce(&MulticastGroupSet<Ipv6Addr, MldGroupState<C::Instant>>) -> O,
+    >(
         &mut self,
-        device: &SC::DeviceId,
-    ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
-        self.with_ip_device_state(device, |state| {
-            state.ip_state.addrs.iter().find_map(|a| {
-                if a.state.is_assigned() {
-                    LinkLocalUnicastAddr::new(a.addr_sub().addr())
-                } else {
-                    None
-                }
-            })
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        crate::device::with_ip_device_state(self, device, |mut state| {
+            let state = state.read_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+            cb(&state)
         })
     }
 
@@ -312,24 +320,43 @@ impl<
         device: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_ip_device_state_mut(device, |state| {
-            let Ipv6DeviceState {
-                retrans_timer: _,
-                route_discovery: _,
-                router_soliciations_remaining: _,
-                ip_state,
-                config:
-                    Ipv6DeviceConfiguration {
-                        dad_transmits: _,
-                        max_router_solicitations: _,
-                        slaac_config: _,
-                        ip_config:
-                            IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
-                    },
-            } = state;
+        crate::device::with_ip_device_state(self, device, |mut state| {
+            let (config, mut locked) =
+                state.read_lock_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>();
+            let Ipv6DeviceConfiguration {
+                dad_transmits: _,
+                max_router_solicitations: _,
+                slaac_config: _,
+                ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled, forwarding_enabled: _ },
+            } = config.deref();
+            let mut state = locked.write_lock::<crate::lock_ordering::IpDeviceGmp<Ipv6>>();
+
             let enabled = *ip_enabled && *gmp_enabled;
-            cb(GmpState { enabled, groups: &mut ip_state.multicast_groups })
+            cb(GmpState { enabled, groups: &mut state })
         })
+    }
+}
+
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> MldContext<C>
+    for Locked<&SyncCtx<C>, L>
+{
+    fn get_ipv6_link_local_addr(
+        &mut self,
+        device: &Self::DeviceId,
+    ) -> Option<LinkLocalUnicastAddr<Ipv6Addr>> {
+        device::IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            self,
+            device,
+            |addrs| {
+                addrs.iter().find_map(|a| {
+                    if a.state.is_assigned() {
+                        LinkLocalUnicastAddr::new(a.addr_sub().addr())
+                    } else {
+                        None
+                    }
+                })
+            },
+        )
     }
 }
 
@@ -342,15 +369,17 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContex
         addr: UnicastAddr<Ipv6Addr>,
         cb: F,
     ) -> O {
-        self.with_ip_device_state_mut(device_id, |state| {
-            cb(DadStateRef {
-                address_state: state
-                    .ip_state
-                    .addrs
-                    .find_mut(&addr)
-                    .map(|Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| state),
-                retrans_timer: &state.retrans_timer,
-                max_dad_transmits: &state.config.dad_transmits,
+        let retrans_timer = self.with_retrans_timer(device_id, |s| *s);
+
+        self.with_ip_device_configuration(device_id, |config, mut sync_ctx| {
+            sync_ctx.with_ip_device_addresses_mut(device_id, |addrs| {
+                cb(DadStateRef {
+                    address_state: addrs.find_mut(&addr).map(
+                        |Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| state,
+                    ),
+                    retrans_timer: &retrans_timer,
+                    max_dad_transmits: &config.dad_transmits,
+                })
             })
         })
     }
@@ -382,10 +411,10 @@ impl<
     }
 }
 
-impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContext<C>>
-    Ipv6DeviceRsContext<C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::DeviceLayerState>>
+    Ipv6DeviceRsContext<C> for Locked<&SyncCtx<C>, L>
 {
-    type LinkLayerAddr = SC::LinkLayerAddr;
+    type LinkLayerAddr = <Self as device::Ipv6DeviceContext<C>>::LinkLayerAddr;
 
     fn with_rs_remaining_mut_and_max<
         O,
@@ -395,20 +424,24 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContex
         device_id: &Self::DeviceId,
         cb: F,
     ) -> O {
-        self.with_ip_device_state_mut(&device_id, |state| {
-            cb(&mut state.router_soliciations_remaining, state.config.max_router_solicitations)
+        crate::device::with_ip_device_state(self, device_id, |mut state| {
+            let (config, mut locked) =
+                state.read_lock_and::<crate::lock_ordering::IpDeviceConfiguration<Ipv6>>();
+            let mut state = locked.lock::<crate::lock_ordering::Ipv6DeviceRouterSolicitations>();
+            cb(&mut state, config.max_router_solicitations)
         })
     }
 
-    fn get_link_layer_addr_bytes(&mut self, device_id: &SC::DeviceId) -> Option<SC::LinkLayerAddr> {
+    fn get_link_layer_addr_bytes(
+        &mut self,
+        device_id: &Self::DeviceId,
+    ) -> Option<Self::LinkLayerAddr> {
         device::Ipv6DeviceContext::get_link_layer_addr_bytes(self, device_id)
     }
 }
 
-impl<
-        C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId> + IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-        SC: ip::BufferIpLayerHandler<Ipv6, C, EmptyBuf> + device::Ipv6DeviceContext<C>,
-    > Ipv6LayerRsContext<C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>> Ipv6LayerRsContext<C>
+    for Locked<&SyncCtx<C>, L>
 {
     fn send_rs_packet<
         S: Serializer<Buffer = EmptyBuf>,
@@ -421,13 +454,17 @@ impl<
         body: F,
     ) -> Result<(), S> {
         let dst_ip = Ipv6::ALL_ROUTERS_LINK_LOCAL_MULTICAST_ADDRESS.into_specified();
-        let src_ip = self.with_ip_device_state(device_id, |state| {
-            crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
-                dst_ip,
-                device_id,
-                state.ip_state.addrs.iter().map(move |a| (a, device_id.clone())),
-            )
-        });
+        let src_ip = device::IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            self,
+            device_id,
+            |addrs| {
+                crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
+                    dst_ip,
+                    device_id,
+                    addrs.iter().map(move |a| (a, device_id.clone())),
+                )
+            },
+        );
         crate::ip::icmp::send_ndp_packet(
             self,
             ctx,
@@ -446,50 +483,71 @@ impl<
 /// This is functionally identical to using `Iterator::filter_map` on the
 /// provided devices and yielding devices with the address assigned (and the
 /// status), but is named so that it can be used as an associated type.
-pub(crate) struct FilterPresentWithDevices<I: Ip, Devices, Accessor, Instant> {
+pub(crate) struct FilterPresentWithDevices<
+    I: IpLayerIpExt,
+    Devices: Iterator<Item = Accessor::DeviceId>,
+    Accessor: DeviceIdContext<AnyDevice>,
+    C,
+> {
     devices: Devices,
     addr: SpecifiedAddr<I::Addr>,
     state_accessor: Accessor,
-    _marker: PhantomData<Instant>,
+    assignment_state: fn(
+        &mut Accessor,
+        &Accessor::DeviceId,
+        SpecifiedAddr<I::Addr>,
+    ) -> AddressStatus<I::AddressStatus>,
+    _marker: PhantomData<C>,
 }
 
-impl<I: Ip, Devices, Accessor, Instant> FilterPresentWithDevices<I, Devices, Accessor, Instant> {
-    fn new(devices: Devices, state_accessor: Accessor, addr: SpecifiedAddr<I::Addr>) -> Self {
-        Self { devices, addr, state_accessor, _marker: PhantomData }
+impl<
+        I: IpLayerIpExt,
+        Devices: Iterator<Item = Accessor::DeviceId>,
+        Accessor: DeviceIdContext<AnyDevice>,
+        C,
+    > FilterPresentWithDevices<I, Devices, Accessor, C>
+{
+    fn new(
+        devices: Devices,
+        state_accessor: Accessor,
+        assignment_state: fn(
+            &mut Accessor,
+            &Accessor::DeviceId,
+            SpecifiedAddr<I::Addr>,
+        ) -> AddressStatus<I::AddressStatus>,
+        addr: SpecifiedAddr<I::Addr>,
+    ) -> Self {
+        Self { devices, addr, state_accessor, assignment_state, _marker: PhantomData }
     }
 }
 
 impl<
         's,
-        Instant: crate::Instant,
+        C: InstantContext,
         I: Ip + IpLayerIpExt + IpDeviceIpExt,
         Devices: Iterator<Item = Accessor::DeviceId>,
-        Accessor: IpDeviceStateAccessor<I, Instant>,
-    > Iterator for FilterPresentWithDevices<I, Devices, Accessor, Instant>
+        Accessor: IpDeviceAddressesAccessor<I, C::Instant> + GmpQueryHandler<I, C>,
+    > Iterator for FilterPresentWithDevices<I, Devices, Accessor, C>
 where
-    <I as IpDeviceIpExt>::State<Instant>: 's,
+    <I as IpDeviceIpExt>::State<C::Instant>: 's,
 {
     type Item = (Accessor::DeviceId, I::AddressStatus);
     fn next(&mut self) -> Option<Self::Item> {
-        let Self { devices, addr, state_accessor, _marker } = self;
+        let Self { devices, addr, state_accessor, assignment_state, _marker } = self;
         devices
-            .filter_map(|d| {
-                match state_accessor
-                    .with_ip_device_state(&d, |state| assignment_state(*addr, state))
-                {
-                    AddressStatus::Present(status) => Some((d, status)),
-                    AddressStatus::Unassigned => None,
-                }
+            .filter_map(|d| match assignment_state(state_accessor, &d, *addr) {
+                AddressStatus::Present(status) => Some((d, status)),
+                AddressStatus::Unassigned => None,
             })
             .next()
     }
 }
 
-impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<Ipv4, C>>
-    ip::IpDeviceContext<Ipv4, C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    ip::IpDeviceContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-    fn is_ip_device_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
-        is_ip_device_enabled(self, device_id)
+    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_device_enabled::<Ipv4, _, _>(self, device_id)
     }
 
     fn get_local_addr_for_remote(
@@ -497,13 +555,15 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         device_id: &Self::DeviceId,
         _remote: SpecifiedAddr<Ipv4Addr>,
     ) -> Option<SpecifiedAddr<Ipv4Addr>> {
-        self.with_ip_device_state(device_id, |state| {
-            state.ip_state.addrs.iter().next().map(|subnet| subnet.addr())
-        })
+        device::IpDeviceAddressesAccessor::<Ipv4, _>::with_ip_device_addresses(
+            self,
+            device_id,
+            |addrs| addrs.iter().next().map(|subnet| subnet.addr()),
+        )
     }
 
     type DeviceAndAddressStatusIter<'a, 's> =
-        FilterPresentWithDevices<Ipv4, SC::DevicesIter<'a>, SC::DeviceStateAccessor<'a>, C::Instant> where
+        FilterPresentWithDevices<Ipv4, <Self as device::IpDeviceContext<Ipv4, C>>::DevicesIter<'a>, <Self as device::IpDeviceContext<Ipv4, C>>::DeviceAddressAndGroupsAccessor<'a>, C> where
                 Self: 's;
 
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
@@ -511,8 +571,8 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
         addr: SpecifiedAddr<Ipv4Addr>,
         cb: F,
     ) -> R {
-        self.with_devices_and_state(|devices, state| {
-            cb(FilterPresentWithDevices::new(devices, state, addr))
+        device::IpDeviceContext::<Ipv4, _>::with_devices_and_state(self, |devices, state| {
+            cb(FilterPresentWithDevices::new(devices, state, assignment_state_v4, addr))
         })
     }
 
@@ -525,31 +585,27 @@ impl<C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>, SC: device::IpDeviceContext<
             return AddressStatus::Present(Ipv4PresentAddressStatus::LimitedBroadcast);
         }
 
-        self.with_ip_device_state(device_id, |state| assignment_state_v4(dst_ip, &state.ip_state))
+        assignment_state_v4(self, device_id, dst_ip)
     }
 
-    fn is_device_forwarding_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
-        is_ip_forwarding_enabled(self, device_id)
+    fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_forwarding_enabled::<Ipv4, _, _>(self, device_id)
     }
 
-    fn get_hop_limit(&mut self, _device_id: &SC::DeviceId) -> NonZeroU8 {
+    fn get_hop_limit(&mut self, _device_id: &Self::DeviceId) -> NonZeroU8 {
         DEFAULT_TTL
     }
 
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        device::IpDeviceContext::get_routing_metric(self, device_id)
-    }
-
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        self.get_mtu(device_id)
+        device::IpDeviceContext::<Ipv4, _>::get_mtu(self, device_id)
     }
 }
 
-impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<Ipv6, C>>
-    ip::IpDeviceContext<Ipv6, C> for SC
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+    ip::IpDeviceContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
-    fn is_ip_device_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
-        is_ip_device_enabled(self, device_id)
+    fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_device_enabled::<Ipv6, _, _>(self, device_id)
     }
 
     fn get_local_addr_for_remote(
@@ -557,18 +613,22 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         device_id: &Self::DeviceId,
         remote: SpecifiedAddr<Ipv6Addr>,
     ) -> Option<SpecifiedAddr<Ipv6Addr>> {
-        self.with_ip_device_state(device_id, |state| {
-            crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
-                remote,
-                device_id,
-                state.ip_state.addrs.iter().map(move |a| (a, device_id.clone())),
-            )
-            .map(|a| a.into_specified())
-        })
+        device::IpDeviceAddressesAccessor::<Ipv6, _>::with_ip_device_addresses(
+            self,
+            device_id,
+            |addrs| {
+                crate::ip::socket::ipv6_source_address_selection::select_ipv6_source_address(
+                    remote,
+                    device_id,
+                    addrs.iter().map(move |a| (a, device_id.clone())),
+                )
+                .map(|a| a.into_specified())
+            },
+        )
     }
 
     type DeviceAndAddressStatusIter<'a, 's> =
-        FilterPresentWithDevices<Ipv6, SC::DevicesIter<'a>, SC::DeviceStateAccessor<'a>, C::Instant> where
+        FilterPresentWithDevices<Ipv6, <Self as device::IpDeviceContext<Ipv6, C>>::DevicesIter<'a>, <Self as device::IpDeviceContext<Ipv6, C>>::DeviceAddressAndGroupsAccessor<'a>, C> where
                 Self: 's;
 
     fn with_address_statuses<'a, F: FnOnce(Self::DeviceAndAddressStatusIter<'_, 'a>) -> R, R>(
@@ -576,8 +636,8 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         addr: SpecifiedAddr<Ipv6Addr>,
         cb: F,
     ) -> R {
-        self.with_devices_and_state(|devices, state| {
-            cb(FilterPresentWithDevices::new(devices, state, addr))
+        device::IpDeviceContext::<Ipv6, _>::with_devices_and_state(self, |devices, state| {
+            cb(FilterPresentWithDevices::new(devices, state, assignment_state_v6, addr))
         })
     }
 
@@ -586,85 +646,71 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::IpDeviceContext<
         addr: SpecifiedAddr<Ipv6Addr>,
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<Ipv6 as IpLayerIpExt>::AddressStatus> {
-        self.with_ip_device_state(device_id, |state| assignment_state_v6(addr, &state.ip_state))
+        assignment_state_v6(self, device_id, addr)
     }
 
-    fn is_device_forwarding_enabled(&mut self, device_id: &SC::DeviceId) -> bool {
-        is_ip_forwarding_enabled(self, device_id)
+    fn is_device_forwarding_enabled(&mut self, device_id: &Self::DeviceId) -> bool {
+        is_ip_forwarding_enabled::<Ipv6, _, _>(self, device_id)
     }
 
-    fn get_hop_limit(&mut self, device_id: &SC::DeviceId) -> NonZeroU8 {
+    fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         get_ipv6_hop_limit(self, device_id)
     }
 
-    fn get_routing_metric(&mut self, device_id: &Self::DeviceId) -> RawMetric {
-        device::IpDeviceContext::get_routing_metric(self, device_id)
-    }
-
     fn get_mtu(&mut self, device_id: &Self::DeviceId) -> Mtu {
-        self.get_mtu(device_id)
+        device::IpDeviceContext::<Ipv6, _>::get_mtu(self, device_id)
     }
 }
 
-fn assignment_state<I: IpLayerIpExt + IpDeviceIpExt, Instant: crate::Instant>(
-    addr: SpecifiedAddr<I::Addr>,
-    state: &impl AsRef<IpDeviceState<Instant, I>>,
-) -> AddressStatus<I::AddressStatus> {
-    let dev_state = state.as_ref();
-    #[derive(GenericOverIp)]
-    struct WrapDeviceState<'a, I: Ip + IpDeviceStateIpExt, Instant: crate::Instant>(
-        &'a IpDeviceState<Instant, I>,
-    );
-
-    #[derive(GenericOverIp)]
-    struct WrapAddressStatus<I: Ip + IpLayerIpExt>(AddressStatus<I::AddressStatus>);
-    let WrapAddressStatus(status) = I::map_ip(
-        (addr, WrapDeviceState(dev_state)),
-        |(addr, WrapDeviceState(state))| WrapAddressStatus(assignment_state_v4(addr, state)),
-        |(addr, WrapDeviceState(state))| WrapAddressStatus(assignment_state_v6(addr, state)),
-    );
-    status
-}
-
-fn assignment_state_v4<Instant: crate::Instant>(
+fn assignment_state_v4<
+    C: InstantContext,
+    SC: IpDeviceAddressesAccessor<Ipv4, C::Instant> + GmpQueryHandler<Ipv4, C>,
+>(
+    sync_ctx: &mut SC,
+    device: &SC::DeviceId,
     addr: SpecifiedAddr<Ipv4Addr>,
-    dev_state: &IpDeviceState<Instant, Ipv4>,
 ) -> AddressStatus<Ipv4PresentAddressStatus> {
     if MulticastAddr::new(addr.get())
-        .map_or(false, |addr| dev_state.multicast_groups.contains(&addr))
+        .map_or(false, |addr| GmpQueryHandler::gmp_is_in_group(sync_ctx, device, addr))
     {
         return AddressStatus::Present(Ipv4PresentAddressStatus::Multicast);
     }
 
-    dev_state
-        .addrs
-        .iter()
-        .find_map(|dev_addr| {
-            let (dev_addr, subnet) = dev_addr.addr_subnet();
+    sync_ctx.with_ip_device_addresses(device, |addrs| {
+        addrs
+            .iter()
+            .find_map(|dev_addr| {
+                let (dev_addr, subnet) = dev_addr.addr_subnet();
 
-            if dev_addr == addr {
-                Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
-            } else if addr.get() == subnet.broadcast() {
-                Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
-            } else {
-                None
-            }
-        })
-        .unwrap_or(AddressStatus::Unassigned)
+                if dev_addr == addr {
+                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::Unicast))
+                } else if addr.get() == subnet.broadcast() {
+                    Some(AddressStatus::Present(Ipv4PresentAddressStatus::SubnetBroadcast))
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(AddressStatus::Unassigned)
+    })
 }
 
-fn assignment_state_v6<Instant: crate::Instant>(
+fn assignment_state_v6<
+    C: InstantContext,
+    SC: IpDeviceAddressesAccessor<Ipv6, C::Instant> + GmpQueryHandler<Ipv6, C>,
+>(
+    sync_ctx: &mut SC,
+    device: &SC::DeviceId,
     addr: SpecifiedAddr<Ipv6Addr>,
-    dev_state: &IpDeviceState<Instant, Ipv6>,
 ) -> AddressStatus<Ipv6PresentAddressStatus> {
     if MulticastAddr::new(addr.get())
-        .map_or(false, |addr| dev_state.multicast_groups.contains(&addr))
+        .map_or(false, |addr| GmpQueryHandler::gmp_is_in_group(sync_ctx, device, addr))
     {
-        AddressStatus::Present(Ipv6PresentAddressStatus::Multicast)
-    } else {
-        dev_state.addrs.find(&*addr).map(|addr| addr.state).map_or(
-            AddressStatus::Unassigned,
-            |state| match state {
+        return AddressStatus::Present(Ipv6PresentAddressStatus::Multicast);
+    }
+
+    sync_ctx.with_ip_device_addresses(device, |addrs| {
+        addrs.find(&*addr).map(|addr| addr.state).map_or(AddressStatus::Unassigned, |state| {
+            match state {
                 AddressState::Assigned => {
                     AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
                 }
@@ -672,9 +718,9 @@ fn assignment_state_v6<Instant: crate::Instant>(
                 | AddressState::Tentative { dad_transmits_remaining: _ } => {
                     AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
                 }
-            },
-        )
-    }
+            }
+        })
+    })
 }
 
 impl<

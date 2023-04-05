@@ -35,8 +35,8 @@ use crate::{
     ip::{
         gmp::{
             gmp_handle_timer, handle_query_message, handle_report_message, GmpContext,
-            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateMachine, IpExt,
-            ProtocolSpecific, QueryTarget,
+            GmpDelayedReportTimerId, GmpMessage, GmpMessageType, GmpState, GmpStateContext,
+            GmpStateMachine, IpExt, MulticastGroupSet, ProtocolSpecific, QueryTarget,
         },
         AnyDevice, DeviceIdContext,
     },
@@ -71,12 +71,20 @@ impl<DeviceId, C: RngContext + TimerContext<IgmpTimerId<DeviceId>>> IgmpNonSyncC
 {
 }
 
-/// The execution context for the Internet Group Management Protocol (IGMP).
-pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
+/// Provides access to IGMP state.
+pub(crate) trait IgmpStateContext<C: IgmpNonSyncContext<Self::DeviceId>>:
+    DeviceIdContext<AnyDevice>
 {
-    /// Gets an IP address and subnet associated with this device.
-    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
+    /// Calls the function with an immutable reference to the device's IGMP
+    /// state.
+    fn with_igmp_state<
+        O,
+        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<C::Instant>>) -> O,
+    >(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O;
 
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.
@@ -85,6 +93,14 @@ pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
         device: &Self::DeviceId,
         cb: F,
     ) -> O;
+}
+
+/// The execution context for the Internet Group Management Protocol (IGMP).
+pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
+    IgmpStateContext<C> + SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
+{
+    /// Gets an IP address and subnet associated with this device.
+    fn get_ip_addr_subnet(&mut self, device: &Self::DeviceId) -> Option<AddrSubnet<Ipv4Addr>>;
 }
 
 /// A handler for incoming IGMP packets.
@@ -178,10 +194,32 @@ impl IpExt for Ipv4 {
     }
 }
 
-impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C> for SC {
+impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpStateContext<C>> GmpStateContext<Ipv4, C> for SC {
     type ProtocolSpecific = Igmpv2ProtocolSpecific;
-    type Err = IgmpError;
     type GroupState = IgmpGroupState<C::Instant>;
+
+    fn with_gmp_state<
+        O,
+        F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<C::Instant>>) -> O,
+    >(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_igmp_state(device, cb)
+    }
+
+    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<C::Instant>>) -> O>(
+        &mut self,
+        device: &Self::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_igmp_state_mut(device, cb)
+    }
+}
+
+impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C> for SC {
+    type Err = IgmpError;
 
     fn send_message(
         &mut self,
@@ -243,14 +281,6 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> GmpContext<Ipv4, C
     fn not_a_member_err(addr: Ipv4Addr) -> Self::Err {
         Self::Err::NotAMember { addr }
     }
-
-    fn with_gmp_state_mut<O, F: FnOnce(GmpState<'_, Ipv4Addr, IgmpGroupState<C::Instant>>) -> O>(
-        &mut self,
-        device: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        self.with_igmp_state_mut(device, cb)
-    }
 }
 
 #[derive(Debug, Error)]
@@ -302,7 +332,7 @@ impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>>
     fn handle_timer(&mut self, ctx: &mut C, timer: IgmpTimerId<SC::DeviceId>) {
         match timer {
             IgmpTimerId::Gmp(id) => gmp_handle_timer(self, ctx, id),
-            IgmpTimerId::V1RouterPresent { device } => IgmpContext::with_igmp_state_mut(
+            IgmpTimerId::V1RouterPresent { device } => IgmpStateContext::with_igmp_state_mut(
                 self,
                 &device,
                 |GmpState { enabled: _, groups }| {
@@ -573,9 +603,18 @@ mod tests {
     type FakeNonSyncCtx =
         crate::context::testutil::FakeNonSyncCtx<IgmpTimerId<FakeDeviceId>, (), ()>;
 
-    impl IgmpContext<FakeNonSyncCtx> for FakeSyncCtx {
-        fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
-            self.get_ref().addr_subnet
+    impl IgmpStateContext<FakeNonSyncCtx> for FakeSyncCtx {
+        fn with_igmp_state<
+            O,
+            F: FnOnce(&MulticastGroupSet<Ipv4Addr, IgmpGroupState<FakeInstant>>) -> O,
+        >(
+            &mut self,
+            &FakeDeviceId: &FakeDeviceId,
+            cb: F,
+        ) -> O {
+            let FakeIgmpCtx { groups, igmp_enabled: _, addr_subnet: _, ip_device_id_ctx: _ } =
+                self.get_ref();
+            cb(groups)
         }
 
         fn with_igmp_state_mut<
@@ -589,6 +628,12 @@ mod tests {
             let FakeIgmpCtx { groups, igmp_enabled, addr_subnet: _, ip_device_id_ctx: _ } =
                 self.get_mut();
             cb(GmpState { enabled: *igmp_enabled, groups })
+        }
+    }
+
+    impl IgmpContext<FakeNonSyncCtx> for FakeSyncCtx {
+        fn get_ip_addr_subnet(&mut self, _device: &FakeDeviceId) -> Option<AddrSubnet<Ipv4Addr>> {
+            self.get_ref().addr_subnet
         }
     }
 

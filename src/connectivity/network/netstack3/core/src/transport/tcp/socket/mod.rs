@@ -3389,10 +3389,11 @@ mod tests {
             addrs: impl IntoIterator<Item = Self::Addr>,
             prefix: u8,
         ) -> IpDeviceState<FakeInstant, Self> {
-            let mut device_state = IpDeviceState::default();
+            let device_state = IpDeviceState::default();
             for addr in addrs {
                 device_state
                     .addrs
+                    .write()
                     .add(AddrSubnet::new(addr, prefix).unwrap())
                     .expect("failed to add address");
             }
@@ -3409,10 +3410,11 @@ mod tests {
             addrs: impl IntoIterator<Item = Self::Addr>,
             prefix: u8,
         ) -> IpDeviceState<FakeInstant, Self> {
-            let mut device_state = IpDeviceState::default();
+            let device_state = IpDeviceState::default();
             for addr in addrs {
                 device_state
                     .addrs
+                    .write()
                     .add(Ipv6AddressEntry::new(
                         AddrSubnet::new(addr, prefix).unwrap(),
                         AddressState::Assigned,

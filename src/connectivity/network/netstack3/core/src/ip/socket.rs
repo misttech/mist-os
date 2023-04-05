@@ -942,7 +942,7 @@ pub(crate) mod testutil {
     {
         fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
             device.map_or(DEFAULT_HOP_LIMITS, |device| {
-                let hop_limit = self.get_device_state(device).default_hop_limit;
+                let hop_limit = self.get_device_state(device).default_hop_limit.read().clone();
                 HopLimits { unicast: hop_limit, multicast: DEFAULT_HOP_LIMITS.multicast }
             })
         }
@@ -1006,6 +1006,7 @@ pub(crate) mod testutil {
                             .get(&device)
                             .unwrap()
                             .addrs
+                            .read()
                             .iter()
                             .map(|e| e.addr())
                             .next()
@@ -1016,6 +1017,7 @@ pub(crate) mod testutil {
                             .get(&device)
                             .unwrap()
                             .addrs
+                            .read()
                             .iter()
                             .any(|e| e.addr() == local_ip)
                             .then(|| local_ip)
@@ -1127,21 +1129,17 @@ pub(crate) mod testutil {
         ) -> impl Iterator<Item = D> + '_ {
             let Self { table: _, device_state, ip_device_id_ctx: _ } = self;
             Box::new(device_state.iter().filter_map(move |(device, state)| {
-                state.addrs.find(&addr).map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
+                state
+                    .addrs
+                    .read()
+                    .find(&addr)
+                    .map(|_: &I::AssignedAddress<FakeInstant>| device.clone())
             }))
         }
 
         pub(crate) fn get_device_state(&self, device: &D) -> &IpDeviceState<FakeInstant, I> {
             let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             device_state.get(device).unwrap_or_else(|| panic!("no device {}", device))
-        }
-
-        pub(crate) fn get_device_state_mut(
-            &mut self,
-            device: &D,
-        ) -> &mut IpDeviceState<FakeInstant, I> {
-            let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
-            device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device))
         }
 
         pub(crate) fn multicast_memberships(
@@ -1153,8 +1151,10 @@ pub(crate) mod testutil {
                 .flat_map(|(device, device_state)| {
                     device_state
                         .multicast_groups
+                        .read()
                         .iter_counts()
                         .map(|(addr, count)| ((device.clone(), *addr), count))
+                        .collect::<Vec<_>>()
                 })
                 .collect()
         }
@@ -1175,7 +1175,7 @@ pub(crate) mod testutil {
             let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
-            state.multicast_groups.join_multicast_group(ctx, addr)
+            state.multicast_groups.write().join_multicast_group(ctx, addr)
         }
 
         fn leave_multicast_group(
@@ -1187,7 +1187,7 @@ pub(crate) mod testutil {
             let Self { device_state, table: _, ip_device_id_ctx: _ } = self;
             let state =
                 device_state.get_mut(device).unwrap_or_else(|| panic!("no device {}", device));
-            state.multicast_groups.leave_multicast_group(addr)
+            state.multicast_groups.write().leave_multicast_group(addr)
         }
     }
 
@@ -1276,12 +1276,14 @@ pub(crate) mod testutil {
                             |(device_state, ip)| {
                                 device_state
                                     .addrs
+                                    .write()
                                     .add(AddrSubnet::new(ip.get(), 32).unwrap())
                                     .expect("add address")
                             },
                             |(device_state, ip)| {
                                 device_state
                                     .addrs
+                                    .write()
                                     .add(Ipv6AddressEntry::new(
                                         AddrSubnet::new(ip.get(), 128).unwrap(),
                                         AddressState::Assigned,

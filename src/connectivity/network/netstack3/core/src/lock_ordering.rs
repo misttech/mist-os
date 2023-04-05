@@ -120,6 +120,14 @@ pub(crate) struct UdpSockets<I>(PhantomData<I>, Never);
 
 pub(crate) enum Ipv4StateNextPacketId {}
 
+pub(crate) struct IpDeviceConfiguration<I>(PhantomData<I>, Never);
+pub(crate) struct IpDeviceGmp<I>(PhantomData<I>, Never);
+pub(crate) struct IpDeviceAddresses<I>(PhantomData<I>, Never);
+pub(crate) struct IpDeviceDefaultHopLimit<I>(PhantomData<I>, Never);
+pub(crate) enum Ipv6DeviceRouterSolicitations {}
+pub(crate) enum Ipv6DeviceRouteDiscovery {}
+pub(crate) enum Ipv6DeviceRetransTimeout {}
+
 // This is not a real lock level, but it is useful for writing bounds that
 // require "before IPv4" or "before IPv6".
 pub(crate) struct IpState<I>(PhantomData<I>, Never);
@@ -169,7 +177,10 @@ impl_lock_after!(IcmpTokenBucket<Ipv6> => TcpSockets<Ipv4>);
 impl_lock_after!(TcpSockets<Ipv4> => TcpSockets<Ipv6>);
 impl_lock_after!(TcpSockets<Ipv6> => UdpSockets<Ipv4>);
 impl_lock_after!(UdpSockets<Ipv4> => UdpSockets<Ipv6>);
-impl_lock_after!(UdpSockets<Ipv6> => IpState<Ipv4>);
+impl_lock_after!(UdpSockets<Ipv6> => IpStateRoutingTable<Ipv4>);
+impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);
+impl_lock_after!(IpStateRoutingTable<Ipv6> => IpState<Ipv4>);
+impl_lock_after!(IpState<Ipv4> => IpState<Ipv6>);
 
 impl_lock_after!(IpState<Ipv4> => IpStatePmtuCache<Ipv4>);
 impl_lock_after!(IpState<Ipv6> => IpStatePmtuCache<Ipv6>);
@@ -178,28 +189,30 @@ impl_lock_after!(IpState<Ipv6> => IpStateFragmentCache<Ipv6>);
 impl_lock_after!(IpState<Ipv4> => EthernetIpv4Arp);
 impl_lock_after!(IpState<Ipv6> => EthernetIpv6Nud);
 
-// Ideally we'd say `SomeUpperLockA => SomeLowerLock` and then separately
-// `SomeUpperLockB => SomeLowerLock`. The compiler doesn't like that because
-// it introduces duplicate blanket impls of `LockAfter<L> for SomeLowerLock`
-// that we need to get the transitivity of lock ordering. It's safe to linearize
-// IPv4 and IPv6 state access and it lets us continue getting transitivity, so
-// we do that here.
-impl_lock_after!(IpState<Ipv4> => IpStateRoutingTable<Ipv4>);
-impl_lock_after!(IpStateRoutingTable<Ipv4> => IpState<Ipv6>);
-impl_lock_after!(IpState<Ipv6> => IpStateRoutingTable<Ipv6>);
-
 // The loopback data path operates at L3 so we can enqueue packets without going
 // through the device layer lock.
 impl_lock_after!(IpState<Ipv6> => LoopbackTxQueue);
 impl_lock_after!(IpState<Ipv6> => EthernetTxQueue);
 impl_lock_after!(LoopbackTxQueue => LoopbackRxQueue);
 
-impl_lock_after!(IpStateRoutingTable<Ipv6> => AnyDeviceSockets);
-
+impl_lock_after!(IpState<Ipv6> => AnyDeviceSockets);
 impl_lock_after!(AnyDeviceSockets => DeviceLayerState);
 impl_lock_after!(DeviceLayerState => EthernetDeviceIpState<Ipv4>);
+
 // TODO(https://fxbug.dev/120973): Double-check that locking IPv4 ethernet state
 // before IPv6 is correct and won't interfere with dual-stack sockets.
-impl_lock_after!(EthernetDeviceIpState<Ipv4> => EthernetDeviceIpState<Ipv6>);
+impl_lock_after!(EthernetDeviceIpState<Ipv4> => IpDeviceConfiguration<Ipv4>);
+impl_lock_after!(IpDeviceConfiguration<Ipv4> => IpDeviceGmp<Ipv4>);
+impl_lock_after!(IpDeviceGmp<Ipv4> => IpDeviceAddresses<Ipv4>);
+impl_lock_after!(IpDeviceAddresses<Ipv4> => IpDeviceDefaultHopLimit<Ipv4>);
+impl_lock_after!(IpDeviceDefaultHopLimit<Ipv4> => EthernetDeviceIpState<Ipv6>);
+impl_lock_after!(EthernetDeviceIpState<Ipv6> => IpDeviceConfiguration<Ipv6>);
+impl_lock_after!(IpDeviceConfiguration<Ipv6> => IpDeviceGmp<Ipv6>);
+impl_lock_after!(IpDeviceGmp<Ipv6> => IpDeviceAddresses<Ipv6>);
+impl_lock_after!(IpDeviceAddresses<Ipv6> => IpDeviceDefaultHopLimit<Ipv6>);
+impl_lock_after!(IpDeviceDefaultHopLimit<Ipv6> => Ipv6DeviceRouterSolicitations);
+impl_lock_after!(Ipv6DeviceRouterSolicitations => Ipv6DeviceRouteDiscovery);
+impl_lock_after!(Ipv6DeviceRouteDiscovery => Ipv6DeviceRetransTimeout);
+
 impl_lock_after!(DeviceLayerState => EthernetDeviceDynamicState);
 impl_lock_after!(DeviceLayerState => DeviceSockets);
