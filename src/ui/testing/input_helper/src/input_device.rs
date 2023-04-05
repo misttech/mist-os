@@ -6,7 +6,7 @@ use fidl_fuchsia_input_report::InputDeviceGetFeatureReportResult;
 
 use {
     crate::input_reports_reader::InputReportsReader,
-    anyhow::{format_err, Context as _, Error},
+    anyhow::{Context as _, Error},
     fidl::endpoints::ServerEnd,
     fidl::Error as FidlError,
     fidl_fuchsia_input_report::{
@@ -39,7 +39,7 @@ pub(crate) struct InputDevice {
     report_sender: futures::channel::mpsc::UnboundedSender<InputReport>,
 
     /// `Task` to keep serving the `fuchsia.input.report.InputDevice` protocol.
-    _input_device_task: fasync::Task<Result<(), Error>>,
+    _input_device_task: fasync::Task<()>,
 }
 
 impl InputDevice {
@@ -67,50 +67,37 @@ impl InputDevice {
     }
 
     /// Returns a `Future` which resolves when all input reports for this device
-    /// have been sent to the FIDL peer, or when an error occurs.
-    ///
-    /// The possible errors are implementation-specific, but may include:
-    /// * Errors reading from the FIDL peer
-    /// * Errors writing to the FIDL peer
-    ///
-    /// # Resolves to
-    /// * `Ok(())` if all reports were written successfully
-    /// * `Err` otherwise
+    /// have been sent to the FIDL peer.
     ///
     /// # Note
     /// When the future resolves, input reports may still be sitting unread in the
     /// channel to the FIDL peer.
     #[cfg(test)]
-    pub(super) async fn flush(self) -> Result<(), Error> {
+    pub(super) async fn flush(self) {
         let Self { _input_device_task: input_device_task, report_sender } = self;
         std::mem::drop(report_sender); // Drop `report_sender` to close channel.
         input_device_task.await
     }
 
     /// Returns a `Future` which resolves when all `InputReport`s for this device
-    /// have been sent to a `fuchsia.input.InputReportsReader` client, or when
-    /// an error occurs.
+    /// have been sent to a `fuchsia.input.InputReportsReader` client.
     ///
-    /// # Resolves to
-    /// * `Ok(())` if all reports were written successfully
-    /// * `Err` otherwise. For example:
-    ///   * The `fuchsia.input.InputDevice` client sent an invalid request.
-    ///   * A FIDL error occurred while trying to read a FIDL request.
-    ///   * A FIDL error occurred while trying to write a FIDL response.
+    /// # Notes
+    /// * This function `panic()`s on error, to ensure that the error is reported
+    ///   synchronously. Otherwise, the original error might lead to additional errors, and
+    ///   make the integration tests that use this library harder to debug.
+    /// * When the `Future` resolves, `InputReports` may still be sitting unread in the
+    ///   channel to the `fuchsia.input.InputReportsReader` client. (The client will
+    ///   typically be an input pipeline implementation.)
     ///
     /// # Corner cases
     /// Resolves to `Err` if the `fuchsia.input.InputDevice` client did not call
     /// `GetInputReportsReader()`, even if no `InputReport`s were queued.
-    ///
-    /// # Note
-    /// When the `Future` resolves, `InputReports` may still be sitting unread in the
-    /// channel to the `fuchsia.input.InputReportsReader` client. (The client will
-    /// typically be an input pipeline implementation.)
     async fn serve_reports(
         request_stream: InputDeviceRequestStream,
         descriptor: DeviceDescriptor,
         report_receiver: futures::channel::mpsc::UnboundedReceiver<InputReport>,
-    ) -> Result<(), Error> {
+    ) {
         // Process `fuchsia.input.report.InputDevice` requests, waiting for the `InputDevice`
         // client to provide a `ServerEnd<InputReportsReader>` by calling `GetInputReportsReader()`.
         let mut input_reports_reader_server_end_stream = request_stream
@@ -119,12 +106,11 @@ impl InputDevice {
             let reader_server_end = input_reports_reader_server_end_stream
                 .next()
                 .await
-                .ok_or(format_err!("stream ended without a call to GetInputReportsReader"))?
-                .context("handling InputDeviceRequest")?;
+                .unwrap_or_else(|| panic!("stream ended without a call to GetInputReportsReader"));
             InputReportsReader {
-                request_stream: reader_server_end
-                    .into_stream()
-                    .context("converting ServerEnd<InputReportsReader>")?,
+                request_stream: reader_server_end.into_stream().unwrap_or_else(|e| {
+                    panic!("failed to convert ServerEnd<InputReportsReader>: {e}")
+                }),
                 report_receiver,
             }
             .into_future()
@@ -135,16 +121,13 @@ impl InputDevice {
         // This time, receiving a `ServerEnd<InputReportsReaderMarker>` will be an `Err`.
         let input_device_server_fut = async {
             match input_reports_reader_server_end_stream.next().await {
-                Some(Ok(_server_end)) => {
+                Some(_server_end) => {
                     // There are no obvious "best" semantics for how to handle multiple
                     // `GetInputReportsReader` calls, and there is no current need to
                     // do so. Instead of taking a guess at what the client might want
-                    // in such a case, just return `Err`.
-                    Err(format_err!(
-                        "InputDevice does not support multiple GetInputReportsReader calls"
-                    ))
+                    // in such a case, just `panic()`.
+                    panic!("InputDevice does not support multiple GetInputReportsReader calls")
                 }
-                Some(Err(e)) => Err(e.context("handling InputDeviceRequest")),
                 None => Ok(()),
             }
         };
@@ -161,52 +144,44 @@ impl InputDevice {
         .await
         .factor_first()
         .0
+        .unwrap_or_else(|e| panic!("processing FIDL requests: {e}"))
     }
 
     /// Processes a single request from an `InputDeviceRequestStream`
     ///
     /// # Returns
-    /// * Some(Ok(ServerEnd<InputReportsReaderMarker>)) if the request yielded an
+    /// * Some(ServerEnd<InputReportsReaderMarker>) if the request yielded an
     ///   `InputReportsReader`. `InputDevice` should route its `InputReports` to the yielded
     ///   `InputReportsReader`.
-    /// * Some(Err) if the request yielded an `Error`
     /// * None if the request was fully processed by `handle_device_request()`
+    ///
+    /// # Note
+    /// * This function `panic()`s on error. See `serve_reports()` for the reason why.
     fn handle_device_request(
         request: Result<InputDeviceRequest, FidlError>,
         descriptor: &DeviceDescriptor,
-    ) -> Option<Result<ServerEnd<InputReportsReaderMarker>, Error>> {
+    ) -> Option<ServerEnd<InputReportsReaderMarker>> {
         match request {
             Ok(InputDeviceRequest::GetInputReportsReader { reader: reader_server_end, .. }) => {
-                Some(Ok(reader_server_end))
+                Some(reader_server_end)
             }
             Ok(InputDeviceRequest::GetDescriptor { responder }) => {
                 match responder.send(descriptor.clone()) {
                     Ok(()) => None,
-                    Err(e) => {
-                        Some(Err(anyhow::Error::from(e).context("sending GetDescriptor response")))
-                    }
+                    Err(e) => panic!("failed to send GetDescriptor response: {e}"),
                 }
             }
             Ok(InputDeviceRequest::GetFeatureReport { responder }) => {
                 let mut result: InputDeviceGetFeatureReportResult = Ok(FeatureReport::EMPTY);
                 match responder.send(&mut result) {
                     Ok(()) => None,
-                    Err(e) => Some(Err(
-                        anyhow::Error::from(e).context("sending GetFeatureReport response")
-                    )),
+                    Err(e) => panic!("failed to send GetFeatureReport response: {e}"),
                 }
             }
             Err(e) => {
-                // Fail fast.
-                //
-                // Panic here, since we don't have a good way to report an error from a
-                // background task. InputDevice::flush() exists, but this is unlikely
-                // to be called in tests, and it may get called way too late, after
-                // an error in this background task already caused some other error.
-                panic!("InputDevice got an error while reading request: {:?}", &e);
+                panic!("failed to read `InputReportsReader` request: {:?}", &e);
             }
             _ => {
-                // See the previous branch.
                 panic!(
                     "InputDevice::handle_device_request does not support this request: {:?}",
                     &request
@@ -235,6 +210,15 @@ mod tests {
             let input_device_server_fut =
                 Box::new(InputDevice::new(request_stream, DeviceDescriptor::EMPTY)).flush();
             let get_feature_report_fut = proxy.get_feature_report();
+
+            // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
+            // reports reader, to help debug integration test failures where no component
+            // read events from the fake device.
+            let (_input_reports_reader_proxy, input_reports_reader_server_end) =
+                endpoints::create_proxy::<InputReportsReaderMarker>()
+                    .context("internal error creating InputReportsReader proxy and server end")?;
+            let _ = proxy.get_input_reports_reader(input_reports_reader_server_end);
+
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
 
             let (_, get_feature_report_result) =
@@ -262,6 +246,15 @@ mod tests {
             let input_device_server_fut =
                 Box::new(InputDevice::new(request_stream, make_touchscreen_descriptor())).flush();
             let get_descriptor_fut = proxy.get_descriptor();
+
+            // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
+            // reports reader, to help debug integration test failures where no component
+            // read events from the fake device.
+            let (_input_reports_reader_proxy, input_reports_reader_server_end) =
+                endpoints::create_proxy::<InputReportsReaderMarker>()
+                    .context("internal error creating InputReportsReader proxy and server end")?;
+            let _ = proxy.get_input_reports_reader(input_reports_reader_server_end);
+
             std::mem::drop(proxy); // Drop `proxy` to terminate `request_stream`.
 
             let (_, get_descriptor_result) =
@@ -341,7 +334,7 @@ mod tests {
             futures::task::Poll,
         };
 
-        mod yields_ok_after_all_reports_are_sent_to_input_reports_reader {
+        mod resolves_after_all_reports_are_sent_to_input_reports_reader {
             use {super::*, assert_matches::assert_matches};
 
             #[test]
@@ -362,10 +355,7 @@ mod tests {
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
                 std::mem::drop(input_device_proxy); // Close device request channel.
-                assert_matches!(
-                    executor.run_until_stalled(&mut input_device_fut),
-                    Poll::Ready(Ok(()))
-                );
+                assert_matches!(executor.run_until_stalled(&mut input_device_fut), Poll::Ready(()));
             }
 
             #[test]
@@ -385,10 +375,7 @@ mod tests {
                 let _input_reports_fut = input_reports_reader_proxy.read_input_reports();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
-                assert_matches!(
-                    executor.run_until_stalled(&mut input_device_fut),
-                    Poll::Ready(Ok(()))
-                );
+                assert_matches!(executor.run_until_stalled(&mut input_device_fut), Poll::Ready(()));
             }
 
             #[test]
@@ -400,18 +387,16 @@ mod tests {
                 let _input_reports_fut = input_reports_reader_proxy.read_input_reports();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
-                assert_matches!(
-                    executor.run_until_stalled(&mut input_device_fut),
-                    Poll::Ready(Ok(()))
-                );
+                assert_matches!(executor.run_until_stalled(&mut input_device_fut), Poll::Ready(()));
             }
         }
 
-        mod yields_err_if_peer_closed_device_channel_without_calling_get_input_reports_reader {
+        mod panics_if_peer_closed_device_channel_without_calling_get_input_reports_reader {
             use super::*;
             use assert_matches::assert_matches;
 
             #[test]
+            #[should_panic]
             fn if_reports_were_available() {
                 let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
@@ -426,23 +411,22 @@ mod tests {
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
                 std::mem::drop(input_device_proxy);
-                assert_matches!(
-                    executor.run_until_stalled(&mut input_device_fut),
-                    Poll::Ready(Err(_))
-                )
+
+                // Run the executor until the `InputDevice` causes a panic.
+                assert_matches!(executor.run_until_stalled(&mut input_device_fut), Poll::Pending);
             }
 
             #[test]
+            #[should_panic]
             fn even_if_no_reports_were_available() {
                 let mut executor = fasync::TestExecutor::new();
                 let (input_device_proxy, input_device) = make_input_device_proxy_and_struct();
                 let input_device_fut = input_device.flush();
                 pin_mut!(input_device_fut);
                 std::mem::drop(input_device_proxy);
-                assert_matches!(
-                    executor.run_until_stalled(&mut input_device_fut),
-                    Poll::Ready(Err(_))
-                )
+
+                // Run the executor until the `InputDevice` causes a panic.
+                assert_matches!(executor.run_until_stalled(&mut input_device_fut), Poll::Pending);
             }
         }
 

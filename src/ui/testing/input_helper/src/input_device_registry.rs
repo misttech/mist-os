@@ -203,6 +203,7 @@ mod tests {
         crate::input_device::InputDevice,
         anyhow::format_err,
         fidl_fuchsia_input_injection::{InputDeviceRegistryMarker, InputDeviceRegistryRequest},
+        fidl_fuchsia_input_report::InputReportsReaderMarker,
         fuchsia_async as fasync,
         futures::{pin_mut, task::Poll, StreamExt},
         test_case::test_case,
@@ -294,6 +295,15 @@ mod tests {
             // is the expected type.
             let input_device_get_descriptor_fut = input_device_proxy.get_descriptor();
             let input_device_server_fut = input_device.flush();
+
+            // Avoid unrelated `panic()`: `InputDevice` requires clients to get an input
+            // reports reader, to help debug integration test failures where no component
+            // read events from the fake device.
+            let (_input_reports_reader_proxy, input_reports_reader_server_end) =
+                endpoints::create_proxy::<InputReportsReaderMarker>()
+                    .context("internal error creating InputReportsReader proxy and server end")?;
+            let _ = input_device_proxy.get_input_reports_reader(input_reports_reader_server_end);
+
             std::mem::drop(input_device_proxy); // Terminate stream served by `input_device_server_fut`.
 
             let (_server_result, get_descriptor_result) =
