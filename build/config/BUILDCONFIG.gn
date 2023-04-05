@@ -1025,7 +1025,30 @@ foreach(_target_type,
       # If the action is either setting that it doesn't have hermetic_deps, or
       # if it's using the hermetic_action_ignored_prefixes, make sure that it's
       # in the non-hermetic targets allow-list.
-      if (!hermetic_deps || defined(hermetic_action_ignored_prefixes)) {
+      if (defined(hermetic_action_ignored_prefixes)) {
+        # Ignoring only the toolchain directories is specially exempted.  These
+        # are plumbed by toolchain_utils_action() because toolchain binaries
+        # might access other parts of the toolchain installation.
+        _ignored_prefixes_imports = {
+          # The path prefix for each toolchain is in a .gni file;
+          # BUILDCONFIG.gn can't directly import those .gni files because
+          # there's a circularity.  But the template expansion can do the
+          # imports where they'll happen in an initialized toolchain context.
+          import("//build/config/clang/clang.gni")
+          import("//build/toolchain/zircon/gcc.gni")
+        }
+        _ignored_prefixes_allowlist = [
+          # The clang and gcc toolchains are identified by the "bin/"
+          # subdirectory of their installation, so the parent of that directory
+          # is what's in the ignored-prefixes list.
+          get_path_info(_ignored_prefixes_imports.clang_prefix, "dir"),
+          get_path_info(_ignored_prefixes_imports.gcc_tool_dir, "dir"),
+        ]
+      }
+      if (!hermetic_deps ||
+          (defined(hermetic_action_ignored_prefixes) &&
+           filter_exclude(hermetic_action_ignored_prefixes,
+                          _ignored_prefixes_allowlist) != [])) {
         deps += [ "//build:non_hermetic_deps" ]
       }
       if (!hermetic_deps) {
