@@ -205,7 +205,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/x64.gni:63
+From //boards/x64.gni:64
 
 **Overridden from the default:** `""`
 
@@ -225,7 +225,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/x64.gni:61
+From //boards/x64.gni:62
 
 **Overridden from the default:** `""`
 
@@ -595,7 +595,7 @@ From //build/board.gni:105
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:90
+From //boards/x64.gni:91
 
 **Overridden from the default:** `false`
 
@@ -953,7 +953,7 @@ From //build/images/args.gni:29
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:58
+From //boards/x64.gni:59
 
 **Overridden from the default:** `false`
 
@@ -4048,7 +4048,7 @@ From //build/board.gni:109
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:x64"`
 
-From //boards/x64.gni:92
+From //boards/x64.gni:93
 
 **Overridden from the default:** `false`
 
@@ -5555,7 +5555,7 @@ From //build/board.gni:128
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/x64.gni:95
+From //boards/x64.gni:96
 
 **Overridden from the default:** `[]`
 
@@ -5576,7 +5576,7 @@ From //build/board.gni:127
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/x64.gni:94
+From //boards/x64.gni:95
 
 **Overridden from the default:** `"//boards/partitions:default"`
 
@@ -8249,7 +8249,7 @@ From //build/images/args.gni:26
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:59
+From //boards/x64.gni:60
 
 **Overridden from the default:** `false`
 
@@ -8442,7 +8442,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:57
+From //boards/x64.gni:58
 
 **Overridden from the default:** `false`
 
@@ -8706,7 +8706,7 @@ From //build/board.gni:112
 
 **Current value for `target_cpu = "x64"`:** `"//boards/images:zedboot_default"`
 
-From //boards/x64.gni:93
+From //boards/x64.gni:94
 
 **Overridden from the default:** `false`
 
