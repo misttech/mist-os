@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use {
-    crate::config_management,
+    crate::config_management::{self},
     fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     wlan_common::{
-        self, bss::BssDescription, channel::Channel, security::SecurityAuthenticator,
-        sequestered::Sequestered,
+        self, bss::BssDescription, channel::Channel, hasher::WlanHasher,
+        security::SecurityAuthenticator, sequestered::Sequestered,
     },
     wlan_metrics_registry::{
         PolicyConnectionAttemptMigratedMetricDimensionReason,
@@ -116,7 +116,7 @@ pub struct Bss {
     /// Compatibility with this device's network stack.
     pub compatibility: Option<wlan_common::scan::Compatibility>,
     /// The BSS description with information that SME needs for connecting.
-    pub bss_description: fidl_internal::BssDescription,
+    pub bss_description: Sequestered<fidl_internal::BssDescription>,
 }
 
 impl Bss {
@@ -172,29 +172,33 @@ impl PartialEq<TrackedBss> for BssDescription {
     }
 }
 
-// TODO(fxbug.dev/116570): This type should not derive `PartialEq`. Equality is only queried in
-//                         tests and it is unclear what exactly equality should mean in production
-//                         (i.e., what exactly should be considered; sequestered fields should not,
-//                         for example).
 /// Candidate BSS observed in a scan.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug, Clone)]
+#[cfg_attr(test, derive(PartialEq))]
+pub struct InternalSavedNetworkData {
+    pub has_ever_connected: bool,
+    pub recent_failures: Vec<config_management::ConnectFailure>,
+    pub past_connections: config_management::PastConnectionsByBssid,
+}
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ScannedCandidate {
     pub network: NetworkIdentifier,
+    pub security_type_detailed: SecurityTypeDetailed,
     pub credential: config_management::Credential,
-    pub bss_description: Sequestered<fidl_internal::BssDescription>,
-    pub observation: ScanObservation,
-    pub has_multiple_bss_candidates: bool,
+    pub bss: Bss,
+    pub network_has_multiple_bss: bool,
     pub authenticator: SecurityAuthenticator,
+    pub saved_network_info: InternalSavedNetworkData,
+    pub hasher: WlanHasher,
 }
 
-// TODO(fxbug.dev/116570): This type should not derive `PartialEq`. Equality is only queried in
-//                         tests and it is unclear what exactly equality should mean in production
-//                         (i.e., what exactly should be considered).
 /// Selected network candidate for a connection.
 ///
 /// This type is a promotion of a scanned candidate and provides the necessary data required to
 /// establish a connection.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(PartialEq))]
 pub struct ConnectSelection {
     pub target: ScannedCandidate,
     pub reason: ConnectReason,

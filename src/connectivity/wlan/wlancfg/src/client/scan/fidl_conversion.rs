@@ -359,7 +359,8 @@ mod tests {
                             rssi_dbm: 0,
                             snr_db: 1,
                             channel: types::WlanChan::new(1, types::Cbw::Cbw20),
-                        ),
+                        )
+                        .into(),
                     },
                     types::Bss {
                         bssid: types::Bssid([7, 8, 9, 10, 11, 12]),
@@ -378,7 +379,8 @@ mod tests {
                             rssi_dbm: 13,
                             snr_db: 3,
                             channel: types::WlanChan::new(11, types::Cbw::Cbw20),
-                        ),
+                        )
+                        .into(),
                     },
                 ],
                 compatibility: types::Compatibility::Supported,
@@ -403,7 +405,8 @@ mod tests {
                         rssi_dbm: 7,
                         snr_db: 2,
                         channel: types::WlanChan::new(8, types::Cbw::Cbw20),
-                    ),
+                    )
+                    .into(),
                 }],
                 compatibility: types::Compatibility::Supported,
             },

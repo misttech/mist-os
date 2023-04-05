@@ -12,7 +12,8 @@ use {
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    fidl_fuchsia_location_sensor as fidl_location_sensor, fidl_fuchsia_wlan_policy as fidl_policy,
+    fidl_fuchsia_location_sensor as fidl_location_sensor,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme,
     fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
     fuchsia_component::client::connect_to_protocol,
@@ -369,6 +370,7 @@ fn bss_to_network_map(
                 protection,
             })
             .or_insert(vec![]);
+
         // Check if this BSSID is already in the hashmap
         if !entry.iter().any(|existing_bss| existing_bss.bssid == scan_result.bss_description.bssid)
         {
@@ -385,7 +387,9 @@ fn bss_to_network_map(
                     types::ScanObservation::Passive
                 },
                 compatibility: scan_result.compatibility,
-                bss_description: scan_result.bss_description.into(),
+                bss_description: wlan_common::sequestered::Sequestered::from(
+                    fidl_internal::BssDescription::from(scan_result.bss_description),
+                ),
             });
         };
     }
@@ -688,7 +692,7 @@ mod tests {
                         compatibility: Compatibility::expect_some([
                             SecurityDescriptor::WPA3_PERSONAL,
                         ]),
-                        bss_description: sme_result_1.bss_description.clone(),
+                        bss_description: sme_result_1.bss_description.clone().into(),
                     },
                     types::Bss {
                         bssid: types::Bssid([7, 8, 9, 10, 11, 12]),
@@ -698,7 +702,7 @@ mod tests {
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
                         observation: observation,
                         compatibility: None,
-                        bss_description: sme_result_3.bss_description.clone(),
+                        bss_description: sme_result_3.bss_description.clone().into(),
                     },
                 ],
                 compatibility: types::Compatibility::Supported,
@@ -714,7 +718,7 @@ mod tests {
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),
                     observation: observation,
                     compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-                    bss_description: sme_result_2.bss_description.clone(),
+                    bss_description: sme_result_2.bss_description.clone().into(),
                 }],
                 compatibility: types::Compatibility::Supported,
             },
@@ -1107,7 +1111,7 @@ mod tests {
                 channel: types::WlanChan::new(1, types::Cbw::Cbw20),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
-                bss_description: first_result.bss_description.clone(),
+                bss_description: first_result.bss_description.clone().into(),
             },
             types::Bss {
                 bssid: types::Bssid([1, 2, 3, 4, 5, 6]),
@@ -1117,7 +1121,7 @@ mod tests {
                 channel: types::WlanChan::new(101, types::Cbw::Cbw40),
                 observation: types::ScanObservation::Passive,
                 compatibility: Compatibility::expect_some([SecurityDescriptor::WPA3_PERSONAL]),
-                bss_description: second_result.bss_description.clone(),
+                bss_description: second_result.bss_description.clone().into(),
             },
         ];
 

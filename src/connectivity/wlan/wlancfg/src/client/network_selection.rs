@@ -7,12 +7,12 @@ use {
         client::{
             scan::{self, ScanReason},
             state_machine::PeriodicConnectionStats,
-            types,
+            types::{self, Bss, InternalSavedNetworkData, SecurityType, SecurityTypeDetailed},
         },
         config_management::{
-            network_config::{AddAndGetRecent, PastConnectionsByBssid},
-            select_authentication_method, select_subset_potentially_hidden_networks,
-            ConnectFailure, Credential, FailureReason, SavedNetworksManagerApi,
+            network_config::AddAndGetRecent, select_authentication_method,
+            select_subset_potentially_hidden_networks, Credential, FailureReason,
+            SavedNetworksManagerApi,
         },
         telemetry::{self, TelemetryEvent, TelemetrySender},
     },
@@ -30,10 +30,11 @@ use {
     log::{debug, error, info, trace, warn},
     std::{
         collections::{HashMap, HashSet},
-        convert::TryInto as _,
         sync::Arc,
     },
-    wlan_common::{self, hasher::WlanHasher},
+    wlan_common::{
+        self, hasher::WlanHasher, security::SecurityAuthenticator, sequestered::Sequestered,
+    },
     wlan_inspect::wrappers::InspectWlanChan,
     wlan_metrics_registry::{
         SavedNetworkInScanResultMigratedMetricDimensionBssCount,
@@ -45,9 +46,6 @@ use {
         SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
     },
 };
-
-const RECENT_FAILURE_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 5); // 5 minutes
-const RECENT_DISCONNECT_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 15); // 15 minutes
 
 /// Above or at this RSSI, we'll give 5G networks a preference
 const RSSI_CUTOFF_5G_PREFERENCE: i16 = -64;
@@ -62,9 +60,11 @@ const SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED: i16 = 30;
 /// of time before disconncting. This amount is the same as the penalty for 4 failed connect
 /// attempts to a BSS.
 const SCORE_PENALTY_FOR_SHORT_CONNECTION: i16 = 20;
-// Threshold for what we consider a short time to be connected
-pub const SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(7 * 60);
+/// Threshold for what we consider a short time to be connected
+const SHORT_CONNECT_DURATION: zx::Duration = zx::Duration::from_seconds(7 * 60);
 
+const RECENT_DISCONNECT_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 15); // 15 minutes
+const RECENT_FAILURE_WINDOW: zx::Duration = zx::Duration::from_seconds(60 * 5); // 5 minutes
 const INSPECT_EVENT_LIMIT_FOR_NETWORK_SELECTIONS: usize = 10;
 
 pub struct NetworkSelector {
@@ -75,162 +75,6 @@ pub struct NetworkSelector {
     _inspect_node_root: Arc<Mutex<InspectNode>>,
     inspect_node_for_network_selections: Arc<Mutex<AutoPersist<InspectBoundedListNode>>>,
     telemetry_sender: TelemetrySender,
-}
-#[derive(Debug, PartialEq, Clone)]
-struct InternalSavedNetworkData {
-    network_id: types::NetworkIdentifier,
-    credential: Credential,
-    has_ever_connected: bool,
-    recent_failures: Vec<ConnectFailure>,
-    past_connections: PastConnectionsByBssid,
-}
-
-// TODO(fxbug.dev/113029): Consider merging InternalBSS into ScannedCandidate. This (or making
-// InternalBss public) will need to occur in order to make some NetworkSelector methods public.
-#[derive(Debug, Clone, PartialEq)]
-struct InternalBss {
-    saved_network_info: InternalSavedNetworkData,
-    scanned_bss: types::Bss,
-    security_type_detailed: types::SecurityTypeDetailed,
-    multiple_bss_candidates: bool,
-    hasher: WlanHasher,
-}
-
-impl InternalBss {
-    /// This function scores a BSS based on 3 factors: (1) RSSI (2) whether the BSS is 2.4 or 5 GHz
-    /// and (3) recent failures to connect to this BSS. No single factor is enough to decide which
-    /// BSS to connect to.
-    fn score(&self) -> i16 {
-        let mut score = self.scanned_bss.rssi as i16;
-        let channel = self.scanned_bss.channel;
-
-        // If the network is 5G and has a strong enough RSSI, give it a bonus
-        if channel.is_5ghz() && score >= RSSI_CUTOFF_5G_PREFERENCE {
-            score = score.saturating_add(RSSI_5G_PREFERENCE_BOOST);
-        }
-
-        // Penalize APs with recent failures to connect
-        let matching_failures = self
-            .saved_network_info
-            .recent_failures
-            .iter()
-            .filter(|failure| failure.bssid == self.scanned_bss.bssid);
-        for failure in matching_failures {
-            // Count failures for rejected credentials higher since we probably won't succeed
-            // another try with the same credentials.
-            if failure.reason == FailureReason::CredentialRejected {
-                score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED);
-            } else {
-                score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_FAILURE);
-            }
-        }
-        // Penalize APs with recent short connections before disconnecting.
-        let short_connection_score: i16 = self
-            .recent_short_connections()
-            .try_into()
-            .unwrap_or_else(|_| i16::MAX)
-            .saturating_mul(SCORE_PENALTY_FOR_SHORT_CONNECTION);
-
-        return score.saturating_sub(short_connection_score);
-    }
-
-    fn recent_failure_count(&self) -> u64 {
-        self.saved_network_info
-            .recent_failures
-            .iter()
-            .filter(|failure| failure.bssid == self.scanned_bss.bssid)
-            .count()
-            .try_into()
-            .unwrap_or_else(|e| {
-                error!("{}", e);
-                u64::MAX
-            })
-    }
-
-    fn recent_short_connections(&self) -> usize {
-        self.saved_network_info
-            .past_connections
-            .get_list_for_bss(&self.scanned_bss.bssid)
-            .get_recent(fasync::Time::now() - RECENT_DISCONNECT_WINDOW)
-            .iter()
-            .filter(|d| d.connection_uptime < SHORT_CONNECT_DURATION)
-            .collect::<Vec<_>>()
-            .len()
-    }
-
-    fn saved_security_type_to_string(&self) -> String {
-        match self.saved_network_info.network_id.security_type {
-            types::SecurityType::None => "open",
-            types::SecurityType::Wep => "WEP",
-            types::SecurityType::Wpa => "WPA1",
-            types::SecurityType::Wpa2 => "WPA2",
-            types::SecurityType::Wpa3 => "WPA3",
-        }
-        .to_string()
-    }
-
-    fn scanned_security_type_to_string(&self) -> String {
-        match self.security_type_detailed {
-            types::SecurityTypeDetailed::Unknown => "unknown",
-            types::SecurityTypeDetailed::Open => "open",
-            types::SecurityTypeDetailed::Wep => "WEP",
-            types::SecurityTypeDetailed::Wpa1 => "WPA1",
-            types::SecurityTypeDetailed::Wpa1Wpa2PersonalTkipOnly => "WPA1/2Tk",
-            types::SecurityTypeDetailed::Wpa2PersonalTkipOnly => "WPA2Tk",
-            types::SecurityTypeDetailed::Wpa1Wpa2Personal => "WPA1/2",
-            types::SecurityTypeDetailed::Wpa2Personal => "WPA2",
-            types::SecurityTypeDetailed::Wpa2Wpa3Personal => "WPA2/3",
-            types::SecurityTypeDetailed::Wpa3Personal => "WPA3",
-            types::SecurityTypeDetailed::Wpa2Enterprise => "WPA2Ent",
-            types::SecurityTypeDetailed::Wpa3Enterprise => "WPA3Ent",
-        }
-        .to_string()
-    }
-
-    fn to_string_without_pii(&self) -> String {
-        let channel = self.scanned_bss.channel;
-        let rssi = self.scanned_bss.rssi;
-        let recent_failure_count = self.recent_failure_count();
-        let recent_short_connection_count = self.recent_short_connections();
-        format!(
-            "{}({:4}), {}({:6}), {:>4}dBm, channel {:8}, score {:4}{}{}{}{}",
-            self.hasher.hash_ssid(&self.saved_network_info.network_id.ssid),
-            self.saved_security_type_to_string(),
-            self.hasher.hash_mac_addr(&self.scanned_bss.bssid.0),
-            self.scanned_security_type_to_string(),
-            rssi,
-            channel,
-            self.score(),
-            if !self.scanned_bss.is_compatible() { ", NOT compatible" } else { "" },
-            if recent_failure_count > 0 {
-                format!(", {} recent failures", recent_failure_count)
-            } else {
-                "".to_string()
-            },
-            if recent_short_connection_count > 0 {
-                format!(", {} recent short disconnects", recent_short_connection_count)
-            } else {
-                "".to_string()
-            },
-            if !self.saved_network_info.has_ever_connected { ", never used yet" } else { "" },
-        )
-    }
-}
-impl WriteInspect for InternalBss {
-    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
-        inspect_insert!(writer, var key: {
-            ssid_hash: self.hasher.hash_ssid(&self.saved_network_info.network_id.ssid),
-            bssid_hash: self.hasher.hash_mac_addr(&self.scanned_bss.bssid.0),
-            rssi: self.scanned_bss.rssi,
-            score: self.score(),
-            security_type_saved: self.saved_security_type_to_string(),
-            security_type_scanned: format!("{}", wlan_common::bss::Protection::from(self.security_type_detailed)),
-            channel: InspectWlanChan(&self.scanned_bss.channel.into()),
-            compatible: self.scanned_bss.is_compatible(),
-            recent_failure_count: self.recent_failure_count(),
-            saved_network_has_ever_connected: self.saved_network_info.has_ever_connected,
-        });
-    }
 }
 
 impl NetworkSelector {
@@ -266,10 +110,10 @@ impl NetworkSelector {
 
     /// Scans and compiles list of BSSs that appear in the scan and belong to currently saved
     /// networks.
-    async fn find_available_bss_list(
+    async fn find_available_bss_candidate_list(
         &self,
         network: Option<types::NetworkIdentifier>,
-    ) -> Vec<InternalBss> {
+    ) -> Vec<types::ScannedCandidate> {
         let scan_for_candidates = || async {
             if let Some(ref network) = network {
                 self.scan_requester
@@ -369,43 +213,49 @@ impl NetworkSelector {
         }
     }
 
-    /// BSS selection. Selects the best from a list of InternalBss that are available for
-    /// connection. Converts to ScannedCandidate.
-    async fn select_bss(&self, allowed_bss_list: Vec<InternalBss>) -> Option<InternalBss> {
-        if allowed_bss_list.is_empty() {
+    /// BSS selection. Selects the best from a list of candidates that are available for
+    /// connection.
+    async fn select_bss(
+        &self,
+        allowed_candidate_list: Vec<types::ScannedCandidate>,
+    ) -> Option<types::ScannedCandidate> {
+        if allowed_candidate_list.is_empty() {
             info!("No BSSs available to select from.");
         } else {
-            info!("Selecting from {} BSSs found for allowed networks", allowed_bss_list.len());
+            info!(
+                "Selecting from {} BSSs found for allowed networks",
+                allowed_candidate_list.len()
+            );
         }
 
         let mut inspect_node = self.inspect_node_for_network_selections.lock().await;
 
-        let selected = allowed_bss_list
+        let selected = allowed_candidate_list
             .iter()
-            .inspect(|&bss| {
-                info!("{}", bss.to_string_without_pii());
+            .inspect(|&candidate| {
+                info!("{}", candidate.to_string_without_pii());
             })
-            .filter(|&bss| {
+            .filter(|&candidate| {
                 // Filter out incompatible BSSs
-                if !bss.scanned_bss.is_compatible() {
-                    trace!("BSS is incompatible, filtering: {:?}", bss);
+                if !candidate.bss.is_compatible() {
+                    trace!("BSS is incompatible, filtering: {:?}", candidate);
                     return false;
                 };
                 true
             })
-            .max_by_key(|&bss| bss.score());
+            .max_by_key(|&candidate| candidate.score());
 
         // Log the candidates into Inspect
         inspect_log!(
             inspect_node.get_mut(),
-            candidates: InspectList(&allowed_bss_list),
+            candidates: InspectList(&allowed_candidate_list),
             selected?: selected
         );
 
-        if let Some(bss) = selected {
+        if let Some(candidate) = selected {
             info!("Selected BSS:");
-            info!("{}", bss.to_string_without_pii());
-            Some(bss.clone())
+            info!("{}", candidate.to_string_without_pii());
+            Some(candidate.clone())
         } else {
             None
         }
@@ -420,77 +270,42 @@ impl NetworkSelector {
         network: Option<types::NetworkIdentifier>,
     ) -> Option<types::ScannedCandidate> {
         // Scan for BSSs belonging to saved networks.
-        let available_bss_list = self.find_available_bss_list(network.clone()).await;
+        let available_candidate_list =
+            self.find_available_bss_candidate_list(network.clone()).await;
 
         // Network selection.
-        let available_networks: HashSet<types::NetworkIdentifier> = available_bss_list
-            .iter()
-            .map(|bss| bss.saved_network_info.network_id.clone())
-            .collect();
+        let available_networks: HashSet<types::NetworkIdentifier> =
+            available_candidate_list.iter().map(|candidate| candidate.network.clone()).collect();
         let selected_networks = self.select_networks(available_networks, &network);
 
         // Filter down to only BSSs in the selected networks.
-        let allowed_bss_list = available_bss_list
+        let allowed_candidate_list = available_candidate_list
             .iter()
-            .filter(|bss| selected_networks.contains(&bss.saved_network_info.network_id))
+            .filter(|candidate| selected_networks.contains(&candidate.network))
             .cloned()
             .collect();
 
         // BSS Selection.
-        let selection = match self.select_bss(allowed_bss_list).await {
-            Some(mut bss) => {
+        let selection = match self.select_bss(allowed_candidate_list).await {
+            Some(mut candidate) => {
                 if network.is_some() {
                     // Strip scan observation type, because the candidate was discovered via a
                     // directed active scan, so we cannot know if it is discoverable via a passive
                     // scan.
-                    bss.scanned_bss.observation = types::ScanObservation::Unknown;
+                    candidate.bss.observation = types::ScanObservation::Unknown;
                 }
-                // TODO(fxbug.dev/120520): Move this compatibility logic to `select_bss`, so that
-                // incompatible BSSs cannot be selected. This will then allow the authentication
-                // selection to be made infallible.
-                let mutual_security_protocols = match bss.scanned_bss.compatibility.as_ref() {
-                    Some(compatibility) => compatibility.mutual_security_protocols().clone(),
-                    None => {
-                        error!("The selected BSS lacks compatibility information");
-                        return None;
-                    }
-                };
-                let authenticator = match select_authentication_method(
-                    mutual_security_protocols.clone(),
-                    &bss.saved_network_info.credential,
-                ) {
-                    Some(authenticator) => authenticator,
-                    None => {
-                        error!(
-                            "Failed to negotiate authentication for network with mutually supported
-                            security protocols: {:?}, and credential type: {:?}.",
-                            mutual_security_protocols.clone(),
-                            &bss.saved_network_info.credential.type_str()
-                        );
-                        return None;
-                    }
-                };
-                // Convert to ScannedCandidate
-                let selected_candidate = types::ScannedCandidate {
-                    network: bss.saved_network_info.network_id.clone(),
-                    credential: bss.saved_network_info.credential.clone(),
-                    bss_description: bss.scanned_bss.bss_description.clone().into(),
-                    observation: bss.scanned_bss.observation,
-                    has_multiple_bss_candidates: bss.multiple_bss_candidates,
-                    authenticator,
-                };
                 // If it was observed passively, augment with active scan.
-                match bss.scanned_bss.observation {
+                match candidate.bss.observation {
                     types::ScanObservation::Passive => Some(
-                        augment_bss_with_active_scan(
-                            selected_candidate,
-                            bss.scanned_bss.channel,
-                            bss.scanned_bss.bssid,
+                        augment_bss_candidate_with_active_scan(
+                            candidate.clone(),
+                            candidate.bss.channel,
+                            candidate.bss.bssid,
                             self.scan_requester.clone(),
                         )
                         .await,
                     ),
-                    _ => Some(selected_candidate),
+                    _ => Some(candidate),
                 }
             }
             None => None,
@@ -502,8 +317,8 @@ impl NetworkSelector {
                 Some(_) => telemetry::NetworkSelectionType::Directed,
                 None => telemetry::NetworkSelectionType::Undirected,
             },
-            num_candidates: (!available_bss_list.is_empty())
-                .then_some(available_bss_list.len())
+            num_candidates: (!available_candidate_list.is_empty())
+                .then_some(available_candidate_list.len())
                 .ok_or(()),
             selected_any: selection.is_some(),
         });
@@ -512,13 +327,36 @@ impl NetworkSelector {
     }
 }
 
-/// Merge the saved networks and scan results into a vector of BSSs that correspond to a saved
-/// network.
+fn get_authenticator(bss: &Bss, credential: &Credential) -> Option<SecurityAuthenticator> {
+    let mutual_security_protocols = match bss.compatibility.as_ref() {
+        Some(compatibility) => compatibility.mutual_security_protocols().clone(),
+        None => {
+            error!("BSS ({:?}) lacks compatibility information", bss.bssid.clone());
+            return None;
+        }
+    };
+
+    match select_authentication_method(mutual_security_protocols.clone(), credential) {
+        Some(authenticator) => Some(authenticator),
+        None => {
+            error!(
+                "Failed to negotiate authentication for BSS ({:?}) with mutually supported
+                security protocols: {:?}, and credential type: {:?}.",
+                bss.bssid,
+                mutual_security_protocols.clone(),
+                credential.type_str()
+            );
+            None
+        }
+    }
+}
+/// Merge the saved networks and scan results into a vector of BSS candidates that correspond to a
+/// saved network.
 async fn merge_saved_networks_and_scan_data(
     saved_network_manager: &Arc<dyn SavedNetworksManagerApi>,
     mut scan_results: Vec<types::ScanResult>,
     hasher: &WlanHasher,
-) -> Vec<InternalBss> {
+) -> Vec<types::ScannedCandidate> {
     let mut merged_networks = vec![];
     for mut scan_result in scan_results.drain(..) {
         for saved_config in saved_network_manager
@@ -527,16 +365,22 @@ async fn merge_saved_networks_and_scan_data(
         {
             let multiple_bss_candidates = scan_result.entries.len() > 1;
             for bss in scan_result.entries.drain(..) {
-                merged_networks.push(InternalBss {
-                    scanned_bss: bss,
-                    multiple_bss_candidates,
+                let authenticator = match get_authenticator(&bss, &saved_config.credential) {
+                    Some(authenticator) => authenticator,
+                    None => {
+                        error!("Failed to create authenticator for bss candidate {:?} (SSID: {:?}). Removing from candidates.", bss.bssid, hasher.hash_ssid(&saved_config.ssid));
+                        continue;
+                    }
+                };
+                let scanned_candidate = types::ScannedCandidate {
+                    network: types::NetworkIdentifier {
+                        ssid: saved_config.ssid.clone(),
+                        security_type: saved_config.security_type,
+                    },
                     security_type_detailed: scan_result.security_type_detailed,
+                    credential: saved_config.credential.clone(),
+                    network_has_multiple_bss: multiple_bss_candidates,
                     saved_network_info: InternalSavedNetworkData {
-                        network_id: types::NetworkIdentifier {
-                            ssid: saved_config.ssid.clone(),
-                            security_type: saved_config.security_type,
-                        },
-                        credential: saved_config.credential.clone(),
                         has_ever_connected: saved_config.has_ever_connected,
                         recent_failures: saved_config
                             .perf_stats
@@ -544,17 +388,155 @@ async fn merge_saved_networks_and_scan_data(
                             .get_recent_for_network(fasync::Time::now() - RECENT_FAILURE_WINDOW),
                         past_connections: saved_config.perf_stats.past_connections.clone(),
                     },
+                    bss,
                     hasher: hasher.clone(),
-                })
+                    authenticator,
+                };
+                merged_networks.push(scanned_candidate)
             }
         }
     }
     merged_networks
 }
 
+impl types::ScannedCandidate {
+    pub fn score(&self) -> i16 {
+        let mut score = self.bss.rssi as i16;
+        let channel = self.bss.channel;
+
+        // If the network is 5G and has a strong enough RSSI, give it a bonus
+        if channel.is_5ghz() && score >= RSSI_CUTOFF_5G_PREFERENCE {
+            score = score.saturating_add(RSSI_5G_PREFERENCE_BOOST);
+        }
+
+        // Penalize APs with recent failures to connect
+        let matching_failures = self
+            .saved_network_info
+            .recent_failures
+            .iter()
+            .filter(|failure| failure.bssid == self.bss.bssid);
+        for failure in matching_failures {
+            // Count failures for rejected credentials higher since we probably won't succeed
+            // another try with the same credentials.
+            if failure.reason == FailureReason::CredentialRejected {
+                score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_CREDENTIAL_REJECTED);
+            } else {
+                score = score.saturating_sub(SCORE_PENALTY_FOR_RECENT_FAILURE);
+            }
+        }
+        // Penalize APs with recent short connections before disconnecting.
+        let short_connection_score: i16 = self
+            .recent_short_connections()
+            .try_into()
+            .unwrap_or_else(|_| i16::MAX)
+            .saturating_mul(SCORE_PENALTY_FOR_SHORT_CONNECTION);
+
+        return score.saturating_sub(short_connection_score);
+    }
+
+    pub fn recent_failure_count(&self) -> u64 {
+        self.saved_network_info
+            .recent_failures
+            .iter()
+            .filter(|failure| failure.bssid == self.bss.bssid)
+            .count()
+            .try_into()
+            .unwrap_or_else(|e| {
+                error!("{}", e);
+                u64::MAX
+            })
+    }
+    pub fn recent_short_connections(&self) -> usize {
+        self.saved_network_info
+            .past_connections
+            .get_list_for_bss(&self.bss.bssid)
+            .get_recent(fasync::Time::now() - RECENT_DISCONNECT_WINDOW)
+            .iter()
+            .filter(|d| d.connection_uptime < SHORT_CONNECT_DURATION)
+            .collect::<Vec<_>>()
+            .len()
+    }
+
+    pub fn saved_security_type_to_string(&self) -> String {
+        match self.network.security_type {
+            SecurityType::None => "open",
+            SecurityType::Wep => "WEP",
+            SecurityType::Wpa => "WPA1",
+            SecurityType::Wpa2 => "WPA2",
+            SecurityType::Wpa3 => "WPA3",
+        }
+        .to_string()
+    }
+
+    pub fn scanned_security_type_to_string(&self) -> String {
+        match self.security_type_detailed {
+            SecurityTypeDetailed::Unknown => "unknown",
+            SecurityTypeDetailed::Open => "open",
+            SecurityTypeDetailed::Wep => "WEP",
+            SecurityTypeDetailed::Wpa1 => "WPA1",
+            SecurityTypeDetailed::Wpa1Wpa2PersonalTkipOnly => "WPA1/2Tk",
+            SecurityTypeDetailed::Wpa2PersonalTkipOnly => "WPA2Tk",
+            SecurityTypeDetailed::Wpa1Wpa2Personal => "WPA1/2",
+            SecurityTypeDetailed::Wpa2Personal => "WPA2",
+            SecurityTypeDetailed::Wpa2Wpa3Personal => "WPA2/3",
+            SecurityTypeDetailed::Wpa3Personal => "WPA3",
+            SecurityTypeDetailed::Wpa2Enterprise => "WPA2Ent",
+            SecurityTypeDetailed::Wpa3Enterprise => "WPA3Ent",
+        }
+        .to_string()
+    }
+
+    pub fn to_string_without_pii(&self) -> String {
+        let channel = self.bss.channel;
+        let rssi = self.bss.channel;
+        let recent_failure_count = self.recent_failure_count();
+        let recent_short_connection_count = self.recent_short_connections();
+
+        format!(
+            "{}({:4}), {}({:6}), {:>4}dBm, channel {:8}, score {:4}{}{}{}{}",
+            self.hasher.hash_ssid(&self.network.ssid),
+            self.saved_security_type_to_string(),
+            self.hasher.hash_mac_addr(&self.bss.bssid.0),
+            self.scanned_security_type_to_string(),
+            rssi,
+            channel,
+            self.score(),
+            if !self.bss.is_compatible() { ", NOT compatible" } else { "" },
+            if recent_failure_count > 0 {
+                format!(", {} recent failures", recent_failure_count)
+            } else {
+                "".to_string()
+            },
+            if recent_short_connection_count > 0 {
+                format!(", {} recent short disconnects", recent_short_connection_count)
+            } else {
+                "".to_string()
+            },
+            if !self.saved_network_info.has_ever_connected { ", never used yet" } else { "" },
+        )
+    }
+}
+
+impl WriteInspect for types::ScannedCandidate {
+    fn write_inspect(&self, writer: &InspectNode, key: impl Into<StringReference>) {
+        inspect_insert!(writer, var key: {
+            ssid_hash: self.hasher.hash_ssid(&self.network.ssid),
+            bssid_hash: self.hasher.hash_mac_addr(&self.bss.bssid.0),
+            rssi: self.bss.rssi,
+            score: self.score(),
+            security_type_saved: self.saved_security_type_to_string(),
+            security_type_scanned: format!("{}", wlan_common::bss::Protection::from(self.security_type_detailed)),
+            channel: InspectWlanChan(&self.bss.channel.into()),
+            compatible: self.bss.is_compatible(),
+            recent_failure_count: self.recent_failure_count(),
+            saved_network_has_ever_connected: self.saved_network_info.has_ever_connected,
+        });
+    }
+}
+
 /// If a BSS was discovered via a passive scan, we need to perform an active scan on it to discover
 /// all the information potentially needed by the SME layer.
-async fn augment_bss_with_active_scan(
+async fn augment_bss_candidate_with_active_scan(
     scanned_candidate: types::ScannedCandidate,
     channel: types::WlanChan,
     bssid: types::Bssid,
@@ -567,8 +549,8 @@ async fn augment_bss_with_active_scan(
         channel: types::WlanChan,
         bssid: types::Bssid,
         scan_requester: Arc<dyn scan::ScanRequestApi>,
-    ) -> Result<fidl_internal::BssDescription, ()> {
-        match scanned_candidate.observation {
+    ) -> Result<Sequestered<fidl_internal::BssDescription>, ()> {
+        match scanned_candidate.bss.observation {
             types::ScanObservation::Passive => {
                 info!("Performing directed active scan on selected network")
             }
@@ -615,10 +597,11 @@ async fn augment_bss_with_active_scan(
     }
 
     match get_enhanced_bss_description(&scanned_candidate, channel, bssid, scan_requester).await {
-        Ok(new_bss_description) => types::ScannedCandidate {
-            bss_description: new_bss_description.into(),
-            ..scanned_candidate
-        },
+        Ok(new_bss_description) => {
+            let updated_scanned_bss =
+                Bss { bss_description: new_bss_description, ..scanned_candidate.bss.clone() };
+            types::ScannedCandidate { bss: updated_scanned_bss, ..scanned_candidate }
+        }
         Err(()) => scanned_candidate,
     }
 }
@@ -633,14 +616,14 @@ pub fn score_connection_quality(_connection_stats: &PeriodicConnectionStats) -> 
 }
 
 fn record_metrics_on_scan(
-    mut merged_networks: Vec<InternalBss>,
+    mut merged_networks: Vec<types::ScannedCandidate>,
     telemetry_sender: &TelemetrySender,
 ) {
     let mut metric_events = vec![];
-    let mut merged_network_map: HashMap<types::NetworkIdentifier, Vec<InternalBss>> =
+    let mut merged_network_map: HashMap<types::NetworkIdentifier, Vec<types::ScannedCandidate>> =
         HashMap::new();
     for bss in merged_networks.drain(..) {
-        merged_network_map.entry(bss.saved_network_info.network_id.clone()).or_default().push(bss);
+        merged_network_map.entry(bss.network.clone()).or_default().push(bss);
     }
 
     let num_saved_networks_observed = merged_network_map.len();
@@ -665,10 +648,7 @@ fn record_metrics_on_scan(
         });
 
         // Check if the network was found via active scan.
-        if bsss
-            .iter()
-            .any(|bss| matches!(bss.scanned_bss.observation, types::ScanObservation::Active))
-        {
+        if bsss.iter().any(|bss| matches!(bss.bss.observation, types::ScanObservation::Active)) {
             num_actively_scanned_networks += 1;
         };
     }
@@ -720,13 +700,14 @@ mod tests {
         crate::{
             config_management::{
                 network_config::{PastConnectionData, PastConnectionsByBssid},
-                SavedNetworksManager,
+                ConnectFailure, FailureReason, SavedNetworksManager,
             },
             util::testing::{
                 create_inspect_persistence_channel, create_wlan_hasher,
                 fakes::{FakeSavedNetworksManager, FakeScanRequester},
-                generate_channel, generate_random_bss, generate_random_scan_result,
-                random_connection_data,
+                generate_channel, generate_random_bss, generate_random_bss_with_compatibility,
+                generate_random_saved_network_data, generate_random_scan_result,
+                generate_random_scanned_candidate, random_connection_data,
             },
         },
         fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
@@ -790,25 +771,25 @@ mod tests {
         }
     }
 
-    fn generate_random_saved_network() -> (types::NetworkIdentifier, InternalSavedNetworkData) {
-        let mut rng = rand::thread_rng();
-        let net_id = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from(format!("saved network rand {}", rng.gen::<i32>()))
-                .expect("Failed to create random SSID from String"),
-            security_type: types::SecurityType::Wpa,
+    fn generate_candidate_for_scoring(
+        rssi: i8,
+        snr_db: i8,
+        channel: types::WlanChan,
+    ) -> types::ScannedCandidate {
+        let bss = types::Bss {
+            rssi,
+            snr_db,
+            channel: channel,
+            bss_description: fidl_internal::BssDescription {
+                rssi_dbm: rssi,
+                snr_db,
+                channel: channel.into(),
+                ..random_fidl_bss_description!()
+            }
+            .into(),
+            ..generate_random_bss_with_compatibility()
         };
-        (
-            net_id.clone(),
-            InternalSavedNetworkData {
-                network_id: net_id,
-                credential: Credential::Password(
-                    format!("password {}", rng.gen::<i32>()).as_bytes().to_vec(),
-                ),
-                has_ever_connected: false,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-        )
+        types::ScannedCandidate { bss, ..generate_random_scanned_candidate() }
     }
 
     #[fuchsia::test]
@@ -851,13 +832,35 @@ mod tests {
             types::ScanResult {
                 ssid: test_ssid_1.clone(),
                 security_type_detailed: test_security_1,
-                entries: vec![generate_random_bss(), generate_random_bss(), generate_random_bss()],
+                entries: vec![
+                    types::Bss {
+                        compatibility: Compatibility::expect_some([
+                            SecurityDescriptor::WPA3_PERSONAL,
+                        ]),
+                        ..generate_random_bss()
+                    },
+                    types::Bss {
+                        compatibility: Compatibility::expect_some([
+                            SecurityDescriptor::WPA3_PERSONAL,
+                        ]),
+                        ..generate_random_bss()
+                    },
+                    types::Bss {
+                        compatibility: Compatibility::expect_some([
+                            SecurityDescriptor::WPA3_PERSONAL,
+                        ]),
+                        ..generate_random_bss()
+                    },
+                ],
                 compatibility: types::Compatibility::Supported,
             },
             types::ScanResult {
                 ssid: test_ssid_2.clone(),
                 security_type_detailed: test_security_2,
-                entries: vec![generate_random_bss()],
+                entries: vec![types::Bss {
+                    compatibility: Compatibility::expect_some([SecurityDescriptor::WPA1]),
+                    ..generate_random_bss()
+                }],
                 compatibility: types::Compatibility::DisallowedNotSupported,
             },
         ];
@@ -911,59 +914,76 @@ mod tests {
             time: failure_time,
             reason: FailureReason::CredentialRejected,
         }];
-        let hasher = WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes());
         let expected_internal_data_1 = InternalSavedNetworkData {
-            network_id: test_id_1.clone(),
-            credential: credential_1.clone(),
             has_ever_connected: true,
             recent_failures: recent_failures.clone(),
             past_connections: PastConnectionsByBssid::new(),
         };
-        let expected_result = vec![
-            InternalBss {
+        let hasher = create_wlan_hasher();
+        let wpa3_authenticator = select_authentication_method(
+            HashSet::from([SecurityDescriptor::WPA3_PERSONAL]),
+            &credential_1,
+        )
+        .unwrap();
+        let open_authenticator =
+            select_authentication_method(HashSet::from([SecurityDescriptor::WPA1]), &credential_2)
+                .unwrap();
+        let expected_results = vec![
+            types::ScannedCandidate {
+                network: test_id_1.clone(),
+                credential: credential_1.clone(),
+                network_has_multiple_bss: true,
                 security_type_detailed: test_security_1,
                 saved_network_info: expected_internal_data_1.clone(),
-                scanned_bss: mock_scan_results[0].entries[0].clone(),
-                multiple_bss_candidates: true,
+                bss: mock_scan_results[0].entries[0].clone(),
+                authenticator: wpa3_authenticator.clone(),
                 hasher: hasher.clone(),
             },
-            InternalBss {
+            types::ScannedCandidate {
+                network: test_id_1.clone(),
+                credential: credential_1.clone(),
+                network_has_multiple_bss: true,
                 security_type_detailed: test_security_1,
                 saved_network_info: expected_internal_data_1.clone(),
-                scanned_bss: mock_scan_results[0].entries[1].clone(),
-                multiple_bss_candidates: true,
+                bss: mock_scan_results[0].entries[1].clone(),
+                authenticator: wpa3_authenticator.clone(),
                 hasher: hasher.clone(),
             },
-            InternalBss {
+            types::ScannedCandidate {
+                network: test_id_1.clone(),
+                credential: credential_1.clone(),
+                network_has_multiple_bss: true,
                 security_type_detailed: test_security_1,
-                saved_network_info: expected_internal_data_1,
-                scanned_bss: mock_scan_results[0].entries[2].clone(),
-                multiple_bss_candidates: true,
+                saved_network_info: expected_internal_data_1.clone(),
+                bss: mock_scan_results[0].entries[2].clone(),
+                authenticator: wpa3_authenticator.clone(),
                 hasher: hasher.clone(),
             },
-            InternalBss {
+            types::ScannedCandidate {
+                network: test_id_2.clone(),
+                credential: credential_2.clone(),
+                network_has_multiple_bss: false,
                 security_type_detailed: test_security_2,
                 saved_network_info: InternalSavedNetworkData {
-                    network_id: test_id_2.clone(),
-                    credential: credential_2.clone(),
                     has_ever_connected: false,
                     recent_failures: Vec::new(),
                     past_connections: PastConnectionsByBssid::new(),
                 },
-                scanned_bss: mock_scan_results[1].entries[0].clone(),
-                multiple_bss_candidates: false,
+                bss: mock_scan_results[1].entries[0].clone(),
+                authenticator: open_authenticator.clone(),
                 hasher: hasher.clone(),
             },
         ];
 
         // validate the function works
-        let result = merge_saved_networks_and_scan_data(
+        let results = merge_saved_networks_and_scan_data(
             &test_values.real_saved_network_manager,
             mock_scan_results,
             &hasher,
         )
         .await;
-        assert_eq!(result, expected_result);
+
+        assert_eq!(results, expected_results);
     }
 
     #[test_case(types::Bss {
@@ -987,27 +1007,9 @@ mod tests {
     #[fuchsia::test(add_test_attr = false)]
     fn scoring_test(bss: types::Bss, expected_score: i16) {
         let _exec = fasync::TestExecutor::new_with_fake_time();
-        let mut rng = rand::thread_rng();
-
-        let network_id = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("test").unwrap(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        let internal_bss = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id,
-                credential: Credential::None,
-                has_ever_connected: rng.gen::<bool>(),
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        };
-
-        assert_eq!(internal_bss.score(), expected_score)
+        let scanned_candidate =
+            types::ScannedCandidate { bss: bss.clone(), ..generate_random_scanned_candidate() };
+        assert_eq!(scanned_candidate.score(), expected_score)
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1016,7 +1018,7 @@ mod tests {
             types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
         let bss_better =
             types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
-        let (_test_id, mut internal_data) = generate_random_saved_network();
+        let mut internal_data = generate_random_saved_network_data();
         let short_uptime = zx::Duration::from_seconds(30);
         let okay_uptime = zx::Duration::from_minutes(100);
         // Record a short uptime for the worse network and a long enough uptime for the better one.
@@ -1024,20 +1026,14 @@ mod tests {
         let okay_uptime_data = past_connection_with_bssid_uptime(bss_better.bssid, okay_uptime);
         internal_data.past_connections.add(bss_worse.bssid, short_uptime_data);
         internal_data.past_connections.add(bss_better.bssid, okay_uptime_data);
-        let bss_worse = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: internal_data.clone(),
-            scanned_bss: bss_worse.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        };
-        let bss_better = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
+        let shared_candidate_data = types::ScannedCandidate {
             saved_network_info: internal_data,
-            scanned_bss: bss_better.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
+            ..generate_random_scanned_candidate()
         };
+        let bss_worse = types::ScannedCandidate { bss: bss_worse, ..shared_candidate_data.clone() };
+        let bss_better =
+            types::ScannedCandidate { bss: bss_better, ..shared_candidate_data.clone() };
+
         // Check that the better BSS has a higher score than the worse BSS.
         assert!(bss_better.score() > bss_worse.score());
     }
@@ -1048,55 +1044,41 @@ mod tests {
             types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
         let bss_better =
             types::Bss { rssi: -60, channel: generate_channel(3), ..generate_random_bss() };
-        let (_test_id, mut internal_data) = generate_random_saved_network();
+        let mut internal_data = generate_random_saved_network_data();
         // Add many test failures for the worse BSS and one for the better BSS
         let mut failures = vec![connect_failure_with_bssid(bss_worse.bssid); 12];
         failures.push(connect_failure_with_bssid(bss_better.bssid));
         internal_data.recent_failures = failures;
-        let bss_worse = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: internal_data.clone(),
-            scanned_bss: bss_worse.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        };
-        let bss_better = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
+        let shared_candidate_data = types::ScannedCandidate {
             saved_network_info: internal_data,
-            scanned_bss: bss_better.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
+            ..generate_random_scanned_candidate()
         };
+        let bss_worse = types::ScannedCandidate { bss: bss_worse, ..shared_candidate_data.clone() };
+        let bss_better =
+            types::ScannedCandidate { bss: bss_better, ..shared_candidate_data.clone() };
         // Check that the better BSS has a higher score than the worse BSS.
         assert!(bss_better.score() > bss_worse.score());
     }
 
     #[fasync::run_singlethreaded(test)]
-    async fn test_score_bss_prefers_stronger_with_failures() {
+    async fn test_score_bss_prefers_strong_5ghz_with_failures() {
         // Test test that if one network has a few network failures but is 5 Ghz instead of 2.4,
         // the 5 GHz network has a higher score.
         let bss_worse =
             types::Bss { rssi: -35, channel: generate_channel(3), ..generate_random_bss() };
         let bss_better =
             types::Bss { rssi: -35, channel: generate_channel(36), ..generate_random_bss() };
-        let (_test_id, mut internal_data) = generate_random_saved_network();
+        let mut internal_data = generate_random_saved_network_data();
         // Set the failure list to have 0 failures for the worse BSS and 4 failures for the
         // stronger BSS.
         internal_data.recent_failures = vec![connect_failure_with_bssid(bss_better.bssid); 2];
-        let bss_worse = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: internal_data.clone(),
-            scanned_bss: bss_worse.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        };
-        let bss_better = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
+        let shared_candidate_data = types::ScannedCandidate {
             saved_network_info: internal_data,
-            scanned_bss: bss_better.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
+            ..generate_random_scanned_candidate()
         };
+        let bss_worse = types::ScannedCandidate { bss: bss_worse, ..shared_candidate_data.clone() };
+        let bss_better =
+            types::ScannedCandidate { bss: bss_better, ..shared_candidate_data.clone() };
         assert!(bss_better.score() > bss_worse.score());
     }
 
@@ -1109,7 +1091,7 @@ mod tests {
             types::Bss { rssi: -30, channel: generate_channel(44), ..generate_random_bss() };
         let bss_better =
             types::Bss { rssi: -30, channel: generate_channel(44), ..generate_random_bss() };
-        let (_test_id, mut internal_data) = generate_random_saved_network();
+        let mut internal_data = generate_random_saved_network_data();
         // Add many test failures for the worse BSS and one for the better BSS
         let mut failures = vec![connect_failure_with_bssid(bss_better.bssid); 4];
         failures.push(ConnectFailure {
@@ -1118,21 +1100,13 @@ mod tests {
             reason: FailureReason::CredentialRejected,
         });
         internal_data.recent_failures = failures;
-
-        let bss_worse = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: internal_data.clone(),
-            scanned_bss: bss_worse.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        };
-        let bss_better = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
+        let shared_candidate_data = types::ScannedCandidate {
             saved_network_info: internal_data,
-            scanned_bss: bss_better.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
+            ..generate_random_scanned_candidate()
         };
+        let bss_worse = types::ScannedCandidate { bss: bss_worse, ..shared_candidate_data.clone() };
+        let bss_better =
+            types::ScannedCandidate { bss: bss_better, ..shared_candidate_data.clone() };
 
         assert!(bss_better.score() > bss_worse.score());
     }
@@ -1140,7 +1114,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn score_many_penalties_do_not_cause_panic() {
         let bss = types::Bss { rssi: -80, channel: generate_channel(1), ..generate_random_bss() };
-        let (_test_id, mut internal_data) = generate_random_saved_network();
+        let mut internal_data = generate_random_saved_network_data();
         // Add 10 general failures and 10 rejected credentials failures
         internal_data.recent_failures = vec![connect_failure_with_bssid(bss.bssid); 10];
         for _ in 0..1200 {
@@ -1155,15 +1129,13 @@ mod tests {
         for _ in 0..10 {
             internal_data.past_connections.add(bss.bssid, data);
         }
-        let internal_bss = InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: internal_data.clone(),
-            scanned_bss: bss.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
+        let scanned_candidate = types::ScannedCandidate {
+            bss,
+            saved_network_info: internal_data,
+            ..generate_random_scanned_candidate()
         };
 
-        assert_eq!(internal_bss.score(), i16::MIN);
+        assert_eq!(scanned_candidate.score(), i16::MIN);
     }
 
     #[fuchsia::test]
@@ -1171,100 +1143,29 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        // build networks list
-        let test_id_1 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
-        let test_id_2 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("bar").unwrap(),
-            security_type: types::SecurityType::Wpa,
-        };
-        let credential_2 = Credential::Password("bar_pass".as_bytes().to_vec());
+        let mut candidates = vec![];
 
-        let mut networks = vec![];
-
-        let security_protocol_1 = SecurityDescriptor::WPA3_PERSONAL;
-        let bss_1 = types::Bss {
-            compatibility: Compatibility::expect_some([security_protocol_1]),
-            rssi: -14,
-            channel: generate_channel(36),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_1.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        let security_protocol_2 = SecurityDescriptor::WPA1;
-        let bss_2 = types::Bss {
-            compatibility: Compatibility::expect_some([security_protocol_2]),
-            rssi: -10,
-            channel: generate_channel(1),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa1,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_2.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        let security_protocol_3 = SecurityDescriptor::WPA2_PERSONAL;
-        let bss_3 = types::Bss {
-            compatibility: Compatibility::expect_some([security_protocol_3]),
-            rssi: -8,
-            channel: generate_channel(1),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa1,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_2.clone(),
-                credential: credential_2.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_3.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
+        candidates.push(generate_candidate_for_scoring(-30, 30, generate_channel(36)));
+        candidates.push(generate_candidate_for_scoring(-30, 30, generate_channel(1)));
+        candidates.push(generate_candidate_for_scoring(-20, 30, generate_channel(1)));
 
         // there's a network on 5G, it should get a boost and be selected
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[0].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[0].clone())
         );
 
         // make the 5GHz network into a 2.4GHz network
-        let mut modified_network = networks[0].clone();
+        let mut modified_network = candidates[0].clone();
         let modified_bss =
-            types::Bss { channel: generate_channel(6), ..modified_network.scanned_bss.clone() };
-        modified_network.scanned_bss = modified_bss;
-        networks[0] = modified_network;
+            types::Bss { channel: generate_channel(6), ..modified_network.bss.clone() };
+        modified_network.bss = modified_bss;
+        candidates[0] = modified_network;
 
         // all networks are 2.4GHz, strongest RSSI network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[2].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[2].clone())
         );
     }
 
@@ -1273,91 +1174,36 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        // build networks list
-        let test_id_1 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
-        let test_id_2 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("bar").unwrap(),
-            security_type: types::SecurityType::Wpa,
-        };
-        let credential_2 = Credential::Password("bar_pass".as_bytes().to_vec());
+        let mut candidates = vec![];
 
-        let mut networks = vec![];
-
-        let mutual_security_protocols_1 =
-            [SecurityDescriptor::WPA2_PERSONAL, SecurityDescriptor::WPA3_PERSONAL];
-        let bss_1 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_1),
-            rssi: -34,
-            channel: generate_channel(3),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa1Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_1.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        let mutual_security_protocols_2 =
-            [SecurityDescriptor::WPA2_PERSONAL, SecurityDescriptor::WPA3_PERSONAL];
-        let bss_2 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_2),
-            rssi: -50,
-            channel: generate_channel(3),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa1Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_2.clone(),
-                credential: credential_2.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_2.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
+        candidates.push(generate_candidate_for_scoring(-25, 30, generate_channel(1)));
+        candidates.push(generate_candidate_for_scoring(-30, 30, generate_channel(1)));
 
         // stronger network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[0].clone()),
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[0].clone()),
         );
 
         // mark the stronger network as having some failures
         let num_failures = 4;
-        networks[0].saved_network_info.recent_failures =
-            vec![connect_failure_with_bssid(bss_1.bssid); num_failures];
-        networks[1].saved_network_info.recent_failures =
-            vec![connect_failure_with_bssid(bss_1.bssid); num_failures];
+        candidates[0].saved_network_info.recent_failures =
+            vec![connect_failure_with_bssid(candidates[0].bss.bssid); num_failures];
 
         // weaker network (with no failures) returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[1].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[1].clone())
         );
 
         // give them both the same number of failures
-        networks[1].saved_network_info.recent_failures =
-            vec![connect_failure_with_bssid(bss_2.bssid); num_failures];
+        candidates[1].saved_network_info.recent_failures =
+            vec![connect_failure_with_bssid(candidates[1].bss.bssid); num_failures];
 
         // stronger network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[0].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[0].clone())
         );
     }
 
@@ -1366,80 +1212,35 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        // Build network list with one network.
-        let network_id = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa2,
-        };
-        let credential = Credential::Password(b"password".to_vec());
-
-        let mut bss_list = vec![];
+        let mut candidates = vec![];
 
         // Add two BSSs, both compatible to start.
-        let bss_1 = types::Bss {
-            rssi: -14,
-            channel: generate_channel(1),
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            ..generate_random_bss()
-        };
-        bss_list.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: network_id.clone(),
-                credential: credential.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_1.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        // Add a compatible BSS with significantly worse RSSI.
-        let bss_2 = types::Bss {
-            rssi: -90,
-            channel: generate_channel(1),
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            ..generate_random_bss()
-        };
-        bss_list.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: network_id.clone(),
-                credential: credential.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_2.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
+        candidates.push(generate_candidate_for_scoring(-14, 30, generate_channel(1)));
+        candidates.push(generate_candidate_for_scoring(-90, 30, generate_channel(1)));
 
         // The stronger BSS is selected initially.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(bss_list.clone())),
-            Some(bss_list[0].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[0].clone())
         );
 
         // Make the stronger BSS incompatible.
-        bss_list[0].scanned_bss.compatibility = None;
+        candidates[0].bss.compatibility = None;
 
         // The weaker, but still compatible, BSS is selected.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(bss_list.clone())),
-            Some(bss_list[1].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[1].clone())
         );
 
         // TODO(fxbug.dev/120520): After `select_bss` filters out incompatible BSSs, this None
         // compatibility should change to a Some, to test that logic.
         // Make both BSSs incompatible.
-        bss_list[1].scanned_bss.compatibility = None;
+        candidates[1].bss.compatibility = None;
 
         // No BSS is selected.
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(bss_list.clone())),
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
             None
         );
     }
@@ -1449,89 +1250,18 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        // build networks list
-        let test_id_1 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        let credential_1 = Credential::Password("foo_pass".as_bytes().to_vec());
-        let test_id_2 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("bar").unwrap(),
-            security_type: types::SecurityType::Wpa,
-        };
-        let credential_2 = Credential::Password("bar_pass".as_bytes().to_vec());
-
-        let mut networks = vec![];
-
-        let mutual_security_protocols_1 = [SecurityDescriptor::WPA2_PERSONAL];
-        let bss_1 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_1),
-            rssi: -14,
-            channel: generate_channel(1),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_1.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        let bss_2 = types::Bss {
-            compatibility: None,
-            rssi: -10,
-            channel: generate_channel(1),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_1.clone(),
-                credential: credential_1.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_2.clone(),
-            multiple_bss_candidates: true,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
-
-        let mutual_security_protocols_3 = [SecurityDescriptor::WPA2_PERSONAL];
-        let bss_3 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_3),
-            rssi: -12,
-            channel: generate_channel(1),
-            ..generate_random_bss()
-        };
-        networks.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_2.clone(),
-                credential: credential_2.clone(),
-                has_ever_connected: true,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
-            },
-            scanned_bss: bss_3.clone(),
-            multiple_bss_candidates: false,
-            hasher: WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes()),
-        });
+        let mut candidates = vec![];
+        candidates.push(generate_candidate_for_scoring(-50, 30, generate_channel(1)));
+        candidates.push(generate_candidate_for_scoring(-60, 30, generate_channel(3)));
+        candidates.push(generate_candidate_for_scoring(-20, 30, generate_channel(6)));
 
         // stronger network returned
         assert_eq!(
-            exec.run_singlethreaded(test_values.network_selector.select_bss(networks.clone())),
-            Some(networks[2].clone())
+            exec.run_singlethreaded(test_values.network_selector.select_bss(candidates.clone())),
+            Some(candidates[2].clone())
         );
 
-        let fidl_channel = fidl_common::WlanChannel::from(networks[2].scanned_bss.channel);
+        let fidl_channel = fidl_common::WlanChannel::from(candidates[2].bss.channel);
         assert_data_tree!(test_values.inspector, root: {
             net_select_test: {
                 "network_selection": {
@@ -1549,20 +1279,20 @@ mod tests {
                             },
                         },
                         "selected": {
-                            ssid_hash: networks[2].hasher.hash_ssid(&networks[2].saved_network_info.network_id.ssid),
-                            bssid_hash: networks[2].hasher.hash_mac_addr(&networks[2].scanned_bss.bssid.0),
-                            rssi: i64::from(networks[2].scanned_bss.rssi),
-                            score: i64::from(networks[2].score()),
-                            security_type_saved: networks[2].saved_security_type_to_string(),
-                            security_type_scanned: format!("{}", wlan_common::bss::Protection::from(networks[2].security_type_detailed)),
+                            ssid_hash: candidates[2].hasher.hash_ssid(&candidates[2].network.ssid),
+                            bssid_hash: candidates[2].hasher.hash_mac_addr(&candidates[2].bss.bssid.0),
+                            rssi: i64::from(candidates[2].bss.rssi),
+                            score: i64::from(candidates[2].score()),
+                            security_type_saved: candidates[2].saved_security_type_to_string(),
+                            security_type_scanned: format!("{}", wlan_common::bss::Protection::from(candidates[2].security_type_detailed)),
                             channel: {
                                 cbw: inspect::testing::AnyProperty,
                                 primary: u64::from(fidl_channel.primary),
                                 secondary80: u64::from(fidl_channel.secondary80),
                             },
-                            compatible: networks[2].scanned_bss.compatibility.is_some(),
-                            recent_failure_count: networks[2].recent_failure_count(),
-                            saved_network_has_ever_connected: networks[2].saved_network_info.has_ever_connected,
+                            compatible: candidates[2].bss.compatibility.is_some(),
+                            recent_failure_count: candidates[2].recent_failure_count(),
+                            saved_network_has_ever_connected: candidates[2].saved_network_info.has_ever_connected,
                         },
                     }
                 }
@@ -1591,39 +1321,16 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn augment_bss_with_active_scan_doesnt_run_on_actively_found_networks() {
+    fn augment_bss_candidate_with_active_scan_doesnt_run_on_actively_found_networks() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
+        let mut candidate = generate_random_scanned_candidate();
+        candidate.bss.observation = types::ScanObservation::Active;
 
-        let test_id_1 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        let mutual_security_protocols_1 = [SecurityDescriptor::WPA3_PERSONAL];
-        let bss_1 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_1),
-            rssi: -14,
-            channel: generate_channel(36),
-            ..generate_random_bss()
-        };
-
-        let candidate = types::ScannedCandidate {
-            network: test_id_1.clone(),
-            credential: TEST_PASSWORD.clone(),
-            bss_description: bss_1.bss_description.clone().into(),
-            observation: types::ScanObservation::Active,
-            has_multiple_bss_candidates: false,
-            authenticator: select_authentication_method(
-                mutual_security_protocols_1.into(),
-                &TEST_PASSWORD,
-            )
-            .unwrap(),
-        };
-
-        let fut = augment_bss_with_active_scan(
+        let fut = augment_bss_candidate_with_active_scan(
             candidate.clone(),
-            bss_1.channel,
-            bss_1.bssid,
+            candidate.bss.channel,
+            candidate.bss.bssid,
             test_values.scan_requester.clone(),
         );
         pin_mut!(fut);
@@ -1635,38 +1342,17 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn augment_bss_with_active_scan_runs_on_passively_found_networks() {
+    fn augment_bss_candidate_with_active_scan_runs_on_passively_found_networks() {
         let mut exec = fasync::TestExecutor::new();
         let test_values = exec.run_singlethreaded(test_setup(true));
 
-        let scan_channel = generate_channel(36);
-        let test_id_1 = types::NetworkIdentifier {
-            ssid: types::Ssid::try_from("foo").unwrap(),
-            security_type: types::SecurityType::Wpa3,
-        };
-        let mutual_security_protocols_1 = [SecurityDescriptor::WPA2_PERSONAL];
-        let bss_1 = types::Bss {
-            compatibility: Compatibility::expect_some(mutual_security_protocols_1),
-            ..generate_random_bss()
-        };
+        let mut passively_scanned_candidate = generate_random_scanned_candidate();
+        passively_scanned_candidate.bss.observation = types::ScanObservation::Passive;
 
-        let scanned_candidate = types::ScannedCandidate {
-            network: test_id_1.clone(),
-            credential: TEST_PASSWORD.clone(),
-            bss_description: bss_1.bss_description.clone().into(),
-            observation: types::ScanObservation::Passive,
-            has_multiple_bss_candidates: true,
-            authenticator: select_authentication_method(
-                mutual_security_protocols_1.into(),
-                &TEST_PASSWORD,
-            )
-            .unwrap(),
-        };
-
-        let fut = augment_bss_with_active_scan(
-            scanned_candidate.clone(),
-            scan_channel,
-            bss_1.bssid,
+        let fut = augment_bss_candidate_with_active_scan(
+            passively_scanned_candidate.clone(),
+            passively_scanned_candidate.bss.channel,
+            passively_scanned_candidate.bss.bssid,
             test_values.scan_requester.clone(),
         );
         pin_mut!(fut);
@@ -1675,15 +1361,15 @@ mod tests {
         let new_bss_desc = random_fidl_bss_description!();
         exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![
             types::ScanResult {
-                ssid: test_id_1.ssid.clone(),
-                security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
+                ssid: passively_scanned_candidate.network.ssid.clone(),
+                security_type_detailed: passively_scanned_candidate.security_type_detailed,
                 compatibility: types::Compatibility::Supported,
                 entries: vec![types::Bss {
-                    bssid: bss_1.bssid,
+                    bssid: passively_scanned_candidate.bss.bssid,
                     compatibility: wlan_common::scan::Compatibility::expect_some([
-                        wlan_common::security::SecurityDescriptor::WPA3_PERSONAL,
+                        wlan_common::security::SecurityDescriptor::WPA1,
                     ]),
-                    bss_description: new_bss_desc.clone(),
+                    bss_description: new_bss_desc.clone().into(),
                     ..generate_random_bss()
                 }],
             },
@@ -1693,13 +1379,23 @@ mod tests {
         // The connect_req comes out the other side with the new bss_description
         assert_eq!(
             &candidate,
-            &types::ScannedCandidate { bss_description: new_bss_desc.into(), ..scanned_candidate },
+            &types::ScannedCandidate {
+                bss: types::Bss {
+                    bss_description: new_bss_desc.into(),
+                    ..passively_scanned_candidate.bss.clone()
+                },
+                ..passively_scanned_candidate.clone()
+            },
         );
 
         // Check the right scan request was sent
         assert_eq!(
             *exec.run_singlethreaded(test_values.scan_requester.scan_requests.lock()),
-            vec![(ScanReason::BssSelectionAugmentation, vec![test_id_1.ssid], vec![scan_channel])]
+            vec![(
+                ScanReason::BssSelectionAugmentation,
+                vec![passively_scanned_candidate.network.ssid.clone()],
+                vec![passively_scanned_candidate.bss.channel]
+            )]
         );
     }
 
@@ -1736,7 +1432,7 @@ mod tests {
                     compatibility: wlan_common::scan::Compatibility::expect_some(
                         mutual_security_protocols_1,
                     ),
-                    bss_description: bss_desc_1.clone(),
+                    bss_description: bss_desc_1.clone().into(),
                     ..generate_random_bss()
                 }],
             },
@@ -1746,7 +1442,7 @@ mod tests {
 
         // Run the scan, specifying the desired network
         let network_selection_fut =
-            network_selector.find_available_bss_list(Some(test_id_1.clone()));
+            network_selector.find_available_bss_candidate_list(Some(test_id_1.clone()));
         pin_mut!(network_selection_fut);
         let results = exec.run_singlethreaded(&mut network_selection_fut);
         assert_eq!(results.len(), 1);
@@ -1820,7 +1516,7 @@ mod tests {
                         compatibility: wlan_common::scan::Compatibility::expect_some(
                             mutual_security_protocols,
                         ),
-                        bss_description: bss_desc.clone(),
+                        bss_description: bss_desc.clone().into(),
                         ..generate_random_bss()
                     }],
                 },
@@ -1837,7 +1533,7 @@ mod tests {
                         compatibility: wlan_common::scan::Compatibility::expect_some(
                             mutual_security_protocols,
                         ),
-                        bss_description: bss_desc.clone(),
+                        bss_description: bss_desc.clone().into(),
                         ..generate_random_bss()
                     }],
                 },
@@ -1855,7 +1551,7 @@ mod tests {
                         compatibility: wlan_common::scan::Compatibility::expect_some(
                             mutual_security_protocols,
                         ),
-                        bss_description: bss_desc.clone(),
+                        bss_description: bss_desc.clone().into(),
                         ..generate_random_bss()
                     }],
                 },
@@ -1867,7 +1563,7 @@ mod tests {
                         compatibility: wlan_common::scan::Compatibility::expect_some(
                             mutual_security_protocols,
                         ),
-                        bss_description: bss_desc.clone(),
+                        bss_description: bss_desc.clone().into(),
                         ..generate_random_bss()
                     }],
                 },
@@ -1877,7 +1573,7 @@ mod tests {
         }
 
         // Run the scan(s)
-        let network_selection_fut = network_selector.find_available_bss_list(None);
+        let network_selection_fut = network_selector.find_available_bss_candidate_list(None);
         pin_mut!(network_selection_fut);
         let results = exec.run_singlethreaded(&mut network_selection_fut);
         assert_eq!(results.len(), 2);
@@ -2059,19 +1755,20 @@ mod tests {
 
         // An additional directed active scan should be made for the selected network
         let bss_desc1_active = random_fidl_bss_description!();
+        let new_bss = types::Bss {
+            compatibility: wlan_common::scan::Compatibility::expect_some(
+                mutual_security_protocols_1,
+            ),
+            bssid: bssid_1,
+            bss_description: bss_desc1_active.clone().into(),
+            ..generate_random_bss()
+        };
         exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![
             types::ScanResult {
                 ssid: test_id_1.ssid.clone(),
                 security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                 compatibility: types::Compatibility::Supported,
-                entries: vec![types::Bss {
-                    compatibility: wlan_common::scan::Compatibility::expect_some(
-                        mutual_security_protocols_1,
-                    ),
-                    bssid: bssid_1,
-                    bss_description: bss_desc1_active.clone(),
-                    ..generate_random_bss()
-                }],
+                entries: vec![new_bss.clone()],
             },
             generate_random_scan_result(),
         ])));
@@ -2081,21 +1778,13 @@ mod tests {
         pin_mut!(network_selection_fut);
         let results =
             exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
-        let mutual_security_protocols = [SecurityDescriptor::WPA3_PERSONAL];
+        assert_eq!(&results.network, &test_id_1.clone());
         assert_eq!(
-            &results,
-            &types::ScannedCandidate {
-                network: test_id_1.clone(),
-                credential: credential_1.clone(),
-                bss_description: bss_desc1_active.into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: false,
-                authenticator: select_authentication_method(
-                    mutual_security_protocols.into(),
-                    &credential_1
-                )
-                .unwrap()
-            },
+            &results.bss,
+            &types::Bss {
+                bss_description: bss_desc1_active.clone().into(),
+                ..mock_passive_scan_results[0].entries[0].clone()
+            }
         );
 
         // Check that the right scan requests were sent
@@ -2185,20 +1874,23 @@ mod tests {
         // Prep the scan results
         let mutual_security_protocols_1 = [SecurityDescriptor::WPA3_PERSONAL];
         let bss_desc_1 = random_fidl_bss_description!();
+        let scanned_bss = types::Bss {
+            // This network is WPA3, but should still match against the desired WPA2 network
+            compatibility: wlan_common::scan::Compatibility::expect_some(
+                mutual_security_protocols_1,
+            ),
+            bss_description: bss_desc_1.clone().into(),
+            // Observation should be unknown, since we didn't try a passive scan.
+            observation: types::ScanObservation::Unknown,
+            ..generate_random_bss()
+        };
         exec.run_singlethreaded(test_values.scan_requester.add_scan_result(Ok(vec![
             types::ScanResult {
                 ssid: test_id_1.ssid.clone(),
                 // This network is WPA3, but should still match against the desired WPA2 network
                 security_type_detailed: types::SecurityTypeDetailed::Wpa3Personal,
                 compatibility: types::Compatibility::Supported,
-                entries: vec![types::Bss {
-                    // This network is WPA3, but should still match against the desired WPA2 network
-                    compatibility: wlan_common::scan::Compatibility::expect_some(
-                        mutual_security_protocols_1,
-                    ),
-                    bss_description: bss_desc_1.clone(),
-                    ..generate_random_bss()
-                }],
+                entries: vec![scanned_bss.clone()],
             },
             generate_random_scan_result(),
             generate_random_scan_result(),
@@ -2210,23 +1902,10 @@ mod tests {
         pin_mut!(network_selection_fut);
         let results =
             exec.run_singlethreaded(&mut network_selection_fut).expect("no selected candidate");
-        assert_eq!(
-            &results,
-            &types::ScannedCandidate {
-                network: test_id_1.clone(),
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_desc_1.into(),
-                // A passive scan is never performed in the tested code path, so the
-                // observation mode cannot be known and this field should be `Unknown`.
-                observation: types::ScanObservation::Unknown,
-                has_multiple_bss_candidates: false,
-                authenticator: select_authentication_method(
-                    mutual_security_protocols_1.into(),
-                    &TEST_PASSWORD
-                )
-                .unwrap()
-            },
-        );
+        assert_eq!(&results.network, &test_id_1);
+        assert_eq!(&results.security_type_detailed, &types::SecurityTypeDetailed::Wpa3Personal);
+        assert_eq!(&results.credential, &TEST_PASSWORD.clone());
+        assert_eq!(&results.bss, &scanned_bss);
 
         // Check that the right scan request was sent
         assert_eq!(
@@ -2324,84 +2003,49 @@ mod tests {
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
 
         // create some identifiers
-        let test_ssid_1 = types::Ssid::try_from("foo").unwrap();
         let test_id_1 = types::NetworkIdentifier {
-            ssid: test_ssid_1.clone(),
+            ssid: types::Ssid::try_from("foo").unwrap().clone(),
             security_type: types::SecurityType::Wpa3,
         };
-        let test_ssid_2 = types::Ssid::try_from("bar").unwrap();
+
         let test_id_2 = types::NetworkIdentifier {
-            ssid: test_ssid_2.clone(),
+            ssid: types::Ssid::try_from("bar").unwrap().clone(),
             security_type: types::SecurityType::Wpa,
         };
 
-        let hasher = WlanHasher::new(rand::thread_rng().gen::<u64>().to_le_bytes());
         let mut mock_scan_results = vec![];
 
-        let test_network_info_1 = InternalSavedNetworkData {
-            network_id: test_id_1.clone(),
-            credential: Credential::Password("foo_pass".as_bytes().to_vec()),
-            has_ever_connected: false,
-            recent_failures: Vec::new(),
-            past_connections: PastConnectionsByBssid::new(),
-        };
-        let test_bss_1 = types::Bss {
-            observation: types::ScanObservation::Passive,
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            ..generate_random_bss()
-        };
-        mock_scan_results.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: test_network_info_1.clone(),
-            scanned_bss: test_bss_1.clone(),
-            multiple_bss_candidates: true,
-            hasher: hasher.clone(),
-        });
-
-        let test_bss_2 = types::Bss {
-            observation: types::ScanObservation::Passive,
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            ..generate_random_bss()
-        };
-        mock_scan_results.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: test_network_info_1.clone(),
-            scanned_bss: test_bss_2.clone(),
-            multiple_bss_candidates: true,
-            hasher: hasher.clone(),
-        });
-
-        // mark one BSS as found in active scan
-        let test_bss_3 = types::Bss {
-            observation: types::ScanObservation::Active,
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            ..generate_random_bss()
-        };
-        mock_scan_results.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: test_network_info_1.clone(),
-            scanned_bss: test_bss_3.clone(),
-            multiple_bss_candidates: true,
-            hasher: hasher.clone(),
-        });
-
-        let test_bss_4 = types::Bss {
-            observation: types::ScanObservation::Passive,
-            compatibility: Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
-            ..generate_random_bss()
-        };
-        mock_scan_results.push(InternalBss {
-            security_type_detailed: types::SecurityTypeDetailed::Wpa2PersonalTkipOnly,
-            saved_network_info: InternalSavedNetworkData {
-                network_id: test_id_2.clone(),
-                credential: Credential::Password("bar_pass".as_bytes().to_vec()),
-                has_ever_connected: false,
-                recent_failures: Vec::new(),
-                past_connections: PastConnectionsByBssid::new(),
+        mock_scan_results.push(types::ScannedCandidate {
+            network: test_id_1.clone(),
+            bss: types::Bss {
+                observation: types::ScanObservation::Passive,
+                ..generate_random_bss()
             },
-            scanned_bss: test_bss_4.clone(),
-            multiple_bss_candidates: false,
-            hasher: hasher.clone(),
+            ..generate_random_scanned_candidate()
+        });
+        mock_scan_results.push(types::ScannedCandidate {
+            network: test_id_1.clone(),
+            bss: types::Bss {
+                observation: types::ScanObservation::Passive,
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        });
+        mock_scan_results.push(types::ScannedCandidate {
+            network: test_id_1.clone(),
+            bss: types::Bss {
+                observation: types::ScanObservation::Active,
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
+        });
+        mock_scan_results.push(types::ScannedCandidate {
+            network: test_id_2.clone(),
+            bss: types::Bss {
+                observation: types::ScanObservation::Passive,
+                ..generate_random_bss()
+            },
+            ..generate_random_scanned_candidate()
         });
 
         record_metrics_on_scan(mock_scan_results, &telemetry_sender);

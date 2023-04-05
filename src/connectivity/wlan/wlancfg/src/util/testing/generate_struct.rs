@@ -4,7 +4,10 @@
 #![cfg(test)]
 
 use {
-    crate::client::types,
+    crate::{
+        client::types,
+        config_management::{Credential, HistoricalListsByBssid},
+    },
     fidl_fuchsia_wlan_common_security as fidl_security,
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
@@ -13,6 +16,7 @@ use {
     std::convert::TryFrom,
     wlan_common::{
         channel::{Cbw, Channel},
+        hasher::WlanHasher,
         random_fidl_bss_description,
         scan::Compatibility,
         security::{wep, wpa, SecurityAuthenticator, SecurityDescriptor},
@@ -21,6 +25,10 @@ use {
 
 pub fn generate_ssid(ssid: &str) -> types::Ssid {
     types::Ssid::try_from(ssid).unwrap()
+}
+
+pub fn generate_security_type_detailed() -> types::SecurityTypeDetailed {
+    types::SecurityTypeDetailed::from_primitive(rand::thread_rng().gen_range(0..11)).unwrap()
 }
 
 pub fn generate_random_channel() -> Channel {
@@ -100,7 +108,31 @@ pub fn generate_random_bss() -> types::Bss {
             rssi_dbm: rssi,
             channel: channel,
             snr_db: snr_db,
-        ),
+        )
+        .into(),
+    }
+}
+
+pub fn generate_random_bss_with_compatibility() -> types::Bss {
+    types::Bss {
+        compatibility: match rand::thread_rng().gen_range(0..3) {
+            0 => Compatibility::expect_some([SecurityDescriptor::OPEN]),
+            1 => Compatibility::expect_some([SecurityDescriptor::WPA2_PERSONAL]),
+            2 => Compatibility::expect_some([
+                SecurityDescriptor::WPA2_PERSONAL,
+                SecurityDescriptor::WPA3_PERSONAL,
+            ]),
+            _ => panic!(),
+        },
+        ..generate_random_bss()
+    }
+}
+
+pub fn generate_random_saved_network_data() -> types::InternalSavedNetworkData {
+    types::InternalSavedNetworkData {
+        has_ever_connected: rand::thread_rng().gen::<bool>(),
+        recent_failures: Vec::new(),
+        past_connections: HistoricalListsByBssid::new(),
     }
 }
 
@@ -118,6 +150,20 @@ pub fn generate_random_scan_result() -> types::ScanResult {
             2 => types::Compatibility::DisallowedInsecure,
             _ => panic!(),
         },
+    }
+}
+
+pub fn generate_random_connect_reason() -> types::ConnectReason {
+    let mut rng = rand::thread_rng();
+    match rng.gen_range(0..6) {
+        0 => types::ConnectReason::RetryAfterDisconnectDetected,
+        1 => types::ConnectReason::RetryAfterFailedConnectAttempt,
+        2 => types::ConnectReason::FidlConnectRequest,
+        3 => types::ConnectReason::ProactiveNetworkSwitch,
+        4 => types::ConnectReason::RegulatoryChangeReconnect,
+        5 => types::ConnectReason::IdleInterfaceAutoconnect,
+        6 => types::ConnectReason::NewSavedNetworkAutoconnect,
+        _ => panic!(),
     }
 }
 
@@ -237,5 +283,27 @@ pub fn generate_random_authenticator() -> SecurityAuthenticator {
             .into(),
         }),
         _ => panic!(),
+    }
+}
+
+pub fn generate_random_scanned_candidate() -> types::ScannedCandidate {
+    let mut rng = rand::thread_rng();
+    let random_config = generate_random_fidl_network_config();
+    types::ScannedCandidate {
+        network: random_config.id.unwrap().clone().into(),
+        security_type_detailed: generate_security_type_detailed(),
+        credential: Credential::try_from(random_config.credential.unwrap().clone()).unwrap(),
+        bss: generate_random_bss_with_compatibility(),
+        network_has_multiple_bss: rng.gen::<bool>(),
+        authenticator: generate_random_authenticator(),
+        saved_network_info: generate_random_saved_network_data(),
+        hasher: WlanHasher::new(rng.gen::<u64>().to_le_bytes()),
+    }
+}
+
+pub fn generate_connect_selection() -> types::ConnectSelection {
+    types::ConnectSelection {
+        target: generate_random_scanned_candidate(),
+        reason: generate_random_connect_reason(),
     }
 }

@@ -402,7 +402,7 @@ async fn connecting_state<'a>(
     // Release the sequestered BSS description. While considered a "black box" elsewhere, the state
     // machine uses this by design to construct its AP state and to report telemetry.
     let bss_description =
-        Sequestered::release(options.connect_selection.target.bss_description.clone());
+        Sequestered::release(options.connect_selection.target.bss.bss_description.clone());
     let ap_state = types::ApState::from(
         BssDescription::try_from(bss_description.clone()).map_err(|error| {
             // This only occurs if an invalid `BssDescription` is received from SME, which should
@@ -419,7 +419,7 @@ async fn connecting_state<'a>(
     let mut sme_connect_request = fidl_sme::ConnectRequest {
         ssid: options.connect_selection.target.network.ssid.to_vec(),
         bss_description,
-        multiple_bss_candidates: options.connect_selection.target.has_multiple_bss_candidates,
+        multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
         authentication: options.connect_selection.target.authenticator.clone().into(),
         deprecated_scan_type: fidl_fuchsia_wlan_common::ScanType::Active,
     };
@@ -444,7 +444,7 @@ async fn connecting_state<'a>(
             &options.connect_selection.target.credential,
             ap_state.original().bssid,
             sme_result,
-            options.connect_selection.target.observation,
+            options.connect_selection.target.bss.observation,
         )
         .await;
 
@@ -453,7 +453,7 @@ async fn connecting_state<'a>(
         ap_state: ap_state.clone(),
         result: sme_result,
         policy_connect_reason: Some(options.connect_selection.reason),
-        multiple_bss_candidates: options.connect_selection.target.has_multiple_bss_candidates,
+        multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
         iface_id: common_options.iface_id,
     });
 
@@ -472,10 +472,7 @@ async fn connecting_state<'a>(
                 currently_fulfilled_connection: options.connect_selection.clone(),
                 connect_txn_stream: connect_txn.take_event_stream(),
                 ap_state: Box::new(ap_state),
-                multiple_bss_candidates: options
-                    .connect_selection
-                    .target
-                    .has_multiple_bss_candidates,
+                multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
                 connection_attempt_time: start_time,
                 time_to_connect: fasync::Time::now() - start_time,
             };
@@ -804,6 +801,7 @@ pub fn convert_manual_connect_to_disconnect_reason(
 
 #[cfg(test)]
 mod tests {
+
     use {
         super::*,
         crate::{
@@ -815,7 +813,7 @@ mod tests {
             util::{
                 listener,
                 testing::{
-                    generate_disconnect_info, generate_random_authenticator, poll_sme_req,
+                    generate_connect_selection, generate_disconnect_info, poll_sme_req,
                     random_connection_data, ConnectResultRecord, ConnectionRecord,
                     FakeSavedNetworksManager,
                 },
@@ -829,12 +827,8 @@ mod tests {
         lazy_static::lazy_static,
         pin_utils::pin_mut,
         std::convert::TryFrom,
-        test_case::test_case,
         test_util::{assert_gt, assert_lt},
-        wlan_common::{
-            assert_variant, bss::Protection, random_bss_description, random_fidl_bss_description,
-            security::SecurityDescriptor,
-        },
+        wlan_common::{assert_variant, sequestered::Sequestered},
         wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason,
     };
 
@@ -971,23 +965,9 @@ mod tests {
         let saved_networks_manager = Arc::new(saved_networks);
         test_values.common_options.saved_networks_manager = saved_networks_manager.clone();
 
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: next_network_ssid.clone());
-
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
-                credential: TEST_WEP_PSK.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
         // Store the network in the saved_networks_manager, so we can record connection success
         let save_fut = saved_networks_manager.store(
@@ -1021,10 +1001,10 @@ mod tests {
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.bss_description, bss_description);
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -1039,10 +1019,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Connecting,
                 status: None,
             }],
@@ -1062,10 +1039,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Connected,
                 status: None,
             }],
@@ -1081,10 +1055,6 @@ mod tests {
             saved_networks_manager.lookup(&connect_selection.target.network.clone()),
         );
         assert_eq!(true, saved_networks[0].has_ever_connected);
-        assert_eq!(
-            network_config::PROB_HIDDEN_IF_CONNECT_PASSIVE,
-            saved_networks[0].hidden_probability
-        );
 
         // Progress the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -1105,22 +1075,10 @@ mod tests {
             exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
         let saved_networks_manager = Arc::new(saved_networks);
         test_values.common_options.saved_networks_manager = saved_networks_manager.clone();
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
-                credential: TEST_WEP_PSK.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
         // Store the network in the saved_networks_manager
         let save_fut = saved_networks_manager.store(
@@ -1148,10 +1106,10 @@ mod tests {
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.bss_description, bss_description);
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
                 ctrl
@@ -1162,10 +1120,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Connecting,
                 status: None,
             }],
@@ -1199,30 +1154,20 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(123));
         let mut test_values = test_setup();
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let id = types::NetworkIdentifier {
-            ssid: next_network_ssid.clone(),
-            security_type: types::SecurityType::Wep,
-        };
+
         let connection_attempt_time = fasync::Time::now();
 
-        let bss_description = random_fidl_bss_description!(Wep, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: id.clone(),
-                credential: TEST_WEP_PSK.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Active,
-                has_multiple_bss_candidates: false,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
         // Set how the SavedNetworksManager should respond to lookup_compatible for the scan.
-        let expected_config =
-            network_config::NetworkConfig::new(id.clone(), TEST_WEP_PSK.clone(), false)
-                .expect("failed to create network config");
+        let expected_config = network_config::NetworkConfig::new(
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            connect_selection.target.saved_network_info.has_ever_connected,
+        )
+        .expect("failed to create network config");
         test_values.saved_networks_manager.set_lookup_compatible_response(vec![expected_config]);
 
         let connecting_options =
@@ -1241,10 +1186,10 @@ mod tests {
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.bss_description, bss_description.clone());
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
-                assert_eq!(req.multiple_bss_candidates, false);
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                 // Send connection response.
                 exec.set_fake_time(fasync::Time::after(time_to_connect));
                 let (_stream, ctrl) = txn.expect("connect txn unused")
@@ -1260,10 +1205,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Connecting,
                 status: None,
             }],
@@ -1281,10 +1223,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wep,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Connected,
                 status: None,
             }],
@@ -1298,11 +1237,11 @@ mod tests {
         // Check that the saved networks manager has the connection result recorded
         assert_variant!(test_values.saved_networks_manager.get_recorded_connect_reslts().as_slice(), [data] => {
             let expected_connect_result = ConnectResultRecord {
-                 id: id.clone(),
-                 credential: TEST_WEP_PSK.clone(),
+                 id: connect_selection.target.network.clone(),
+                 credential: connect_selection.target.credential.clone(),
                  bssid: types::Bssid(bss_description.bssid),
                  connect_result: fake_successful_connect_result(),
-                 scan_type: types::ScanObservation::Active,
+                 scan_type: connect_selection.target.bss.observation,
             };
             assert_eq!(data, &expected_connect_result);
         });
@@ -1312,8 +1251,8 @@ mod tests {
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state })) => {
                 assert_eq!(bss_description, ap_state.original().clone().into());
-                assert!(!multiple_bss_candidates);
-                assert_eq!(policy_connect_reason, Some(types::ConnectReason::FidlConnectRequest));
+                assert_eq!(multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
+                assert_eq!(policy_connect_reason, Some(connect_selection.reason));
                 assert_eq!(result, fake_successful_connect_result());
             }
         );
@@ -1336,8 +1275,8 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         let expected_recorded_connection = ConnectionRecord {
-            id: id.clone(),
-            credential: TEST_WEP_PSK.clone(),
+            id: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: types::Bssid(bss_description.bssid),
                 connection_attempt_time,
@@ -1360,114 +1299,15 @@ mod tests {
         });
     }
 
-    #[test_case(types::SecurityType::Wpa3)]
-    #[test_case(types::SecurityType::Wpa2)]
-    #[fuchsia::test(add_test_attr = false)]
-    fn connecting_state_successfully_connects_wpa2wpa3(type_: types::SecurityType) {
-        let mut exec = fasync::TestExecutor::new();
-        // Do test set up manually to get stash server
-        let (_client_req_sender, client_req_stream) = mpsc::channel(1);
-        let (update_sender, _update_receiver) = mpsc::unbounded();
-        let (sme_proxy, sme_server) =
-            create_proxy::<fidl_sme::ClientSmeMarker>().expect("failed to create an sme channel");
-        let sme_req_stream = sme_server.into_stream().expect("could not create SME request stream");
-        let (saved_networks, mut stash_server) =
-            exec.run_singlethreaded(SavedNetworksManager::new_and_stash_server());
-        let saved_networks_manager = Arc::new(saved_networks);
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (stats_sender, _stats_receiver) = mpsc::unbounded();
-        let (defect_sender, _defect_receiver) = mpsc::unbounded();
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description =
-            random_fidl_bss_description!(Wpa2Wpa3, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: type_,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Active,
-                has_multiple_bss_candidates: false,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
-
-        // Store the network in the saved_networks_manager, so we can record connection success
-        let save_fut = saved_networks_manager.store(
-            connect_selection.target.network.clone(),
-            connect_selection.target.credential.clone(),
-        );
-        pin_mut!(save_fut);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Pending);
-        process_stash_write(&mut exec, &mut stash_server);
-        assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
-
-        // Check that the saved networks manager has the expected initial data
-        let saved_networks = exec.run_singlethreaded(
-            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
-        );
-        assert_eq!(false, saved_networks[0].has_ever_connected);
-        assert!(saved_networks[0].hidden_probability > 0.0);
-
-        let connecting_options =
-            ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
-        let common_options = CommonStateOptions {
-            proxy: sme_proxy,
-            req_stream: client_req_stream.fuse(),
-            update_sender,
-            saved_networks_manager: saved_networks_manager.clone(),
-            telemetry_sender,
-            iface_id: 1,
-            stats_sender,
-            defect_sender,
-        };
-        let initial_state = connecting_state(common_options, connecting_options);
-        let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
-
-        // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Ensure the WPA2/WPA3 network was selected for connection and a connect request is sent to
-        // the SME.
-        let sme_fut = sme_req_stream.into_future();
-        pin_mut!(sme_fut);
-        assert_variant!(
-            poll_sme_req(&mut exec, &mut sme_fut),
-            Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, .. }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
-                assert_eq!(req.bss_description, bss_description);
-                assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
-            }
-        );
-    }
-
     #[fuchsia::test]
     fn connecting_state_fails_to_connect_and_retries() {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+
         let connecting_options =
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
         let initial_state = connecting_state(test_values.common_options, connecting_options);
@@ -1483,7 +1323,7 @@ mod tests {
         let mut connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.to_vec());
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -1503,7 +1343,7 @@ mod tests {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
                 id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
+                    ssid: connect_selection.target.network.ssid.clone(),
                     security_type: types::SecurityType::Wpa2,
                 },
                 state: fidl_policy::ConnectionState::Connecting,
@@ -1525,10 +1365,11 @@ mod tests {
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
             Ok(Some(TelemetryEvent::ConnectResult { iface_id: 1, policy_connect_reason, result, multiple_bss_candidates, ap_state })) => {
-                assert_eq!(bss_description, *ap_state.original());
-                assert!(multiple_bss_candidates);
-                assert_eq!(policy_connect_reason, Some(types::ConnectReason::FidlConnectRequest));
+                assert_eq!(bss_description, ap_state.original().clone().into());
+                assert_eq!(multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
+                assert_eq!(policy_connect_reason, Some(connect_selection.reason));
                 assert_eq!(result, connect_result);
+
             }
         );
 
@@ -1547,9 +1388,9 @@ mod tests {
         connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
-                assert_eq!(req.bss_description, bss_description.clone().into());
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.to_vec());
+                assert_eq!(req.bss_description, Sequestered::release(connect_selection.target.bss.bss_description));
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -1586,7 +1427,7 @@ mod tests {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
                 id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
+                    ssid: connect_selection.target.network.ssid.clone(),
                     security_type: types::SecurityType::Wpa2,
                 },
                 state: fidl_policy::ConnectionState::Connected,
@@ -1637,33 +1478,20 @@ mod tests {
             defect_sender,
         };
 
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let next_security_type = types::SecurityType::None;
-        let next_network_identifier = types::NetworkIdentifier {
-            ssid: next_network_ssid.clone(),
-            security_type: next_security_type,
-        };
-        let config_net_id = next_network_identifier.clone();
-        let bss_description = random_fidl_bss_description!(Open, ssid: next_network_ssid.clone());
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+
         // save network to check that failed connect is recorded
         assert!(exec
-            .run_singlethreaded(
-                saved_networks_manager.store(config_net_id.clone(), Credential::None),
-            )
+            .run_singlethreaded(saved_networks_manager.store(
+                connect_selection.target.network.clone(),
+                connect_selection.target.credential.clone()
+            ),)
             .expect("Failed to save network")
             .is_none());
         let before_recording = fasync::Time::now();
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: next_network_identifier,
-                credential: Credential::None,
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+
         let connecting_options = ConnectingOptions {
             connect_selection: connect_selection.clone(),
             attempt_counter: MAX_CONNECTION_ATTEMPTS - 1,
@@ -1681,10 +1509,10 @@ mod tests {
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.bss_description, bss_description.clone());
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -1706,10 +1534,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: next_security_type,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Failed,
                 status: Some(fidl_policy::DisconnectStatus::ConnectionFailed),
             }],
@@ -1721,7 +1546,9 @@ mod tests {
         });
 
         // Check that failure was recorded in SavedNetworksManager
-        let mut configs = exec.run_singlethreaded(saved_networks_manager.lookup(&config_net_id));
+        let mut configs = exec.run_singlethreaded(
+            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
+        );
         let network_config = configs.pop().expect("Failed to get saved network");
         let mut failures =
             network_config.perf_stats.connect_failures.get_recent_for_network(before_recording);
@@ -1764,34 +1591,21 @@ mod tests {
             defect_sender,
         };
 
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let next_network_identifier = types::NetworkIdentifier {
-            ssid: next_network_ssid.clone(),
-            security_type: types::SecurityType::Wpa2,
-        };
-        let config_net_id = next_network_identifier.clone();
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+
         // save network to check that failed connect is recorded
         let saved_networks_manager = common_options.saved_networks_manager.clone();
         assert!(exec
-            .run_singlethreaded(
-                saved_networks_manager.store(config_net_id.clone(), TEST_PASSWORD.clone()),
-            )
+            .run_singlethreaded(saved_networks_manager.store(
+                connect_selection.target.network.clone(),
+                connect_selection.target.credential.clone()
+            ),)
             .expect("Failed to save network")
             .is_none());
         let before_recording = fasync::Time::now();
 
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: next_network_identifier,
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::ProactiveNetworkSwitch,
-        };
         let connecting_options = ConnectingOptions {
             connect_selection: connect_selection.clone(),
             attempt_counter: MAX_CONNECTION_ATTEMPTS - 1,
@@ -1809,10 +1623,10 @@ mod tests {
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.bss_description, bss_description.clone());
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -1835,10 +1649,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Failed,
                 status: Some(fidl_policy::DisconnectStatus::CredentialsFailed),
             }],
@@ -1850,7 +1661,9 @@ mod tests {
         });
 
         // Check that failure was recorded in SavedNetworksManager
-        let mut configs = exec.run_singlethreaded(saved_networks_manager.lookup(&config_net_id));
+        let mut configs = exec.run_singlethreaded(
+            saved_networks_manager.lookup(&connect_selection.target.network.clone()),
+        );
         let network_config = configs.pop().expect("Failed to get saved network");
         let mut failures =
             network_config.perf_stats.connect_failures.get_recent_for_network(before_recording);
@@ -1866,22 +1679,9 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Active,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
 
         let connecting_options =
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
@@ -1899,7 +1699,7 @@ mod tests {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
                 id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
+                    ssid: connect_selection.target.network.ssid.clone(),
                     security_type: types::SecurityType::Wpa2,
                 },
                 state: fidl_policy::ConnectionState::Connecting,
@@ -1928,10 +1728,10 @@ mod tests {
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
                 assert_eq!(req.bss_description, bss_description);
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.multiple_bss_candidates, connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -1949,10 +1749,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Connected,
                 status: None,
             }],
@@ -1978,22 +1775,7 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let test_values = test_setup();
 
-        let first_network_ssid = types::Ssid::try_from("foo").unwrap();
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: first_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: first_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Active,
-                has_multiple_bss_candidates: false,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
 
         let connecting_options =
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
@@ -2009,40 +1791,27 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn connected_state_gets_disconnect_selection() {
+    fn connected_state_gets_disconnect_request() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
-        let network_ssid = types::Ssid::try_from("test").unwrap();
-        let id = types::NetworkIdentifier {
-            ssid: network_ssid.clone(),
-            security_type: types::SecurityType::Wpa2,
-        };
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: id.clone(),
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RegulatoryChangeReconnect,
-        };
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connection_attempt_time = fasync::Time::now();
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection,
-            multiple_bss_candidates: true,
-            ap_state: Box::new(bss_description.clone().into()),
+            currently_fulfilled_connection: connect_selection.clone(),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            ap_state: Box::new(ap_state.clone()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
@@ -2084,7 +1853,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: id.clone(),
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Disconnected,
                 status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
             }],
@@ -2104,17 +1873,17 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting: false,
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::FidlStopClientConnectionsRequest),
-                    ap_state: bss_description.clone().into(),
+                    ap_state: ap_state.clone(),
                 });
             });
         });
 
         // The disconnect should have been recorded for the saved network config.
         let expected_recorded_connection = ConnectionRecord {
-            id: id.clone(),
-            credential: TEST_PASSWORD.clone(),
+            id: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: bss_description.bssid,
+                bssid: ap_state.original().bssid,
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
@@ -2143,35 +1912,20 @@ mod tests {
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let network_ssid = types::Ssid::try_from("flaky-network").unwrap();
-        let security = types::SecurityType::Wpa2;
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
         // Save the network in order to later record the disconnect to it.
         let save_fut = test_values.saved_networks_manager.store(
-            network_config::NetworkIdentifier {
-                ssid: network_ssid.clone(),
-                security_type: security,
-            },
-            TEST_PASSWORD.clone(),
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
         );
         pin_mut!(save_fut);
         assert_variant!(exec.run_until_stalled(&mut save_fut), Poll::Ready(Ok(None)));
 
-        // Build the values for the connected state.
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let bssid = bss_description.bssid;
-        let id = types::NetworkIdentifier { ssid: network_ssid, security_type: security };
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: id.clone(),
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RetryAfterFailedConnectAttempt,
-        };
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
@@ -2180,8 +1934,8 @@ mod tests {
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            multiple_bss_candidates: true,
-            ap_state: Box::new(bss_description.clone().into()),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            ap_state: Box::new(ap_state.clone()),
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
@@ -2206,10 +1960,10 @@ mod tests {
 
         // The disconnect should have been recorded for the saved network config.
         let expected_recorded_connection = ConnectionRecord {
-            id: id.clone(),
-            credential: TEST_PASSWORD.clone(),
+            id: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid,
+                bssid: ap_state.original().bssid,
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
@@ -2237,7 +1991,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting,
                     disconnect_source: fidl_disconnect_info.disconnect_source,
-                    ap_state: bss_description.into(),
+                    ap_state: ap_state.clone(),
                 });
             });
         });
@@ -2251,31 +2005,20 @@ mod tests {
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let network_ssid = types::Ssid::try_from("test").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: network_ssid,
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RegulatoryChangeReconnect,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection,
-            ap_state: Box::new(bss_description.into()),
-            multiple_bss_candidates: true,
+            currently_fulfilled_connection: connect_selection.clone(),
+            ap_state: Box::new(ap_state.clone()),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
@@ -2342,29 +2085,18 @@ mod tests {
         exec.set_fake_time(connection_attempt_time);
         let test_values = test_setup();
 
-        let network_ssid = types::Ssid::try_from("flaky-network").unwrap();
-        let security = types::SecurityType::Wpa2;
-        let id = network_config::NetworkIdentifier {
-            ssid: network_ssid.clone(),
-            security_type: security,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+
         // Setup for network selection in the connecting state to select the intended network.
-        let expected_config =
-            network_config::NetworkConfig::new(id.clone(), TEST_PASSWORD.clone(), false)
-                .expect("failed to create network config");
+        let expected_config = network_config::NetworkConfig::new(
+            connect_selection.target.network.clone(),
+            connect_selection.target.credential.clone(),
+            false,
+        )
+        .expect("failed to create network config");
         test_values.saved_networks_manager.set_lookup_compatible_response(vec![expected_config]);
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: id.clone(),
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: false,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
 
         let connecting_options =
             ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
@@ -2406,8 +2138,8 @@ mod tests {
 
         // The connection data should have been recorded at disconnect.
         let expected_recorded_connection = ConnectionRecord {
-            id: id.clone(),
-            credential: TEST_PASSWORD.clone(),
+            id: connect_selection.target.network.clone(),
+            credential: connect_selection.target.credential.clone(),
             data: PastConnectionData {
                 bssid: types::Bssid(bss_description.bssid),
                 connection_attempt_time,
@@ -2436,30 +2168,19 @@ mod tests {
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let network_ssid = types::Ssid::try_from("test").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RegulatoryChangeReconnect,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(bss_description.into()),
-            multiple_bss_candidates: true,
+            ap_state: Box::new(ap_state.clone()),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
@@ -2492,35 +2213,25 @@ mod tests {
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let first_network_ssid = types::Ssid::try_from("foo").unwrap();
-        let second_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: first_network_ssid.clone());
-        let id_1 = types::NetworkIdentifier {
-            ssid: first_network_ssid.clone(),
-            security_type: types::SecurityType::Wpa2,
+        let first_connect_selection = generate_connect_selection();
+        let first_bss_desc =
+            Sequestered::release(first_connect_selection.target.bss.bss_description.clone());
+        let first_ap_state =
+            types::ApState::from(BssDescription::try_from(first_bss_desc.clone()).unwrap());
+        let second_connect_selection = types::ConnectSelection {
+            reason: types::ConnectReason::ProactiveNetworkSwitch,
+            ..generate_connect_selection()
         };
-        let credential_1 = Credential::Password(b"some-password".to_vec());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: id_1.clone(),
-                credential: credential_1.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::IdleInterfaceAutoconnect,
-        };
+
         let (connect_txn_proxy, _connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connection_attempt_time = fasync::Time::now();
         let time_to_connect = zx::Duration::from_seconds(10);
         let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(bss_description.clone().into()),
-            multiple_bss_candidates: true,
+            currently_fulfilled_connection: first_connect_selection.clone(),
+            ap_state: Box::new(first_ap_state.clone()),
+            multiple_bss_candidates: first_connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time,
             time_to_connect,
@@ -2538,24 +2249,8 @@ mod tests {
         exec.set_fake_time(disconnect_time);
 
         // Send a different connect request
-        let second_bss_desc = random_fidl_bss_description!(Wpa2, ssid: second_network_ssid.clone());
         let mut client = Client::new(test_values.client_req_sender);
-        let credential_2 = Credential::Password(b"password".to_vec());
-        let connect_selection2 = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: second_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: credential_2.clone(),
-                bss_description: second_bss_desc.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::ProactiveNetworkSwitch,
-        };
-        client.connect(connect_selection2.clone()).expect("failed to make request");
+        client.connect(second_connect_selection.clone()).expect("failed to make request");
 
         // Run the state machine
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
@@ -2575,8 +2270,7 @@ mod tests {
         let connect_txn_handle = assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, second_network_ssid.to_vec());
-                assert_eq!(req.bss_description, second_bss_desc.clone());
+                assert_eq!(req.ssid, second_connect_selection.target.network.ssid.clone().to_vec());
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -2593,7 +2287,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: id_1.clone(),
+                id: first_connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Disconnected,
                 status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
             }],
@@ -2612,7 +2306,7 @@ mod tests {
                     connected_duration: 12.hours(),
                     is_sme_reconnecting: false,
                     disconnect_source: fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::ProactiveNetworkSwitch),
-                    ap_state: bss_description.clone().into(),
+                    ap_state: first_ap_state.clone(),
                 });
             });
         });
@@ -2622,7 +2316,7 @@ mod tests {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
                 id: types::NetworkIdentifier {
-                    ssid: second_network_ssid.clone(),
+                    ssid: second_connect_selection.target.network.ssid.clone(),
                     security_type: types::SecurityType::Wpa2,
                 },
                 state: fidl_policy::ConnectionState::Connecting,
@@ -2639,7 +2333,7 @@ mod tests {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
                 id: types::NetworkIdentifier {
-                    ssid: second_network_ssid.clone(),
+                    ssid: second_connect_selection.target.network.ssid.clone(),
                     security_type: types::SecurityType::Wpa2,
                 },
                 state: fidl_policy::ConnectionState::Connected,
@@ -2663,18 +2357,18 @@ mod tests {
 
         // Check that the first connection was recorded
         let expected_recorded_connection = ConnectionRecord {
-            id: id_1.clone(),
-            credential: credential_1.clone(),
+            id: first_connect_selection.target.network.clone(),
+            credential: first_connect_selection.target.credential.clone(),
             data: PastConnectionData {
-                bssid: bss_description.bssid,
+                bssid: types::Bssid(first_bss_desc.bssid),
                 connection_attempt_time,
                 time_to_connect,
                 disconnect_time,
                 connection_uptime: zx::Duration::from_hours(12),
                 disconnect_reason: types::DisconnectReason::ProactiveNetworkSwitch,
                 signal_data_at_disconnect: bss_selection::SignalData::new(
-                    bss_description.rssi_dbm,
-                    bss_description.snr_db,
+                    first_bss_desc.rssi_dbm,
+                    first_bss_desc.snr_db,
                     bss_selection::EWMA_SMOOTHING_FACTOR,
                     bss_selection::EWMA_VELOCITY_SMOOTHING_FACTOR,
                 ),
@@ -2692,23 +2386,11 @@ mod tests {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let test_values = test_setup();
 
-        let network_ssid = types::Ssid::try_from("foo").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RegulatoryChangeReconnect,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
@@ -2716,8 +2398,8 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(bss_description.clone().into()),
-            multiple_bss_candidates: true,
+            ap_state: Box::new(ap_state.clone()),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
@@ -2757,31 +2439,20 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
-        let network_ssid = types::Ssid::try_from("foo").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::IdleInterfaceAutoconnect,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
         let (connect_txn_proxy, connect_txn_stream) =
             create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
                 .expect("failed to create a connect txn channel");
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(bss_description.into()),
-            multiple_bss_candidates: true,
+            ap_state: Box::new(ap_state.clone()),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
@@ -2820,24 +2491,11 @@ mod tests {
     fn connected_state_notified_of_network_disconnect_sme_reconnect_unsuccessfully() {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         let mut test_values = test_setup();
-
-        let network_ssid = types::Ssid::try_from("foo").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(bss_description.clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::IdleInterfaceAutoconnect,
-        };
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         // Set the start time of the connection
         let start_time = fasync::Time::now();
@@ -2849,8 +2507,8 @@ mod tests {
         let connect_txn_handle = connect_txn_stream.control_handle();
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(bss_description.clone().into()),
-            multiple_bss_candidates: true,
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             connection_attempt_time: fasync::Time::now(),
             time_to_connect: zx::Duration::from_seconds(10),
@@ -2904,10 +2562,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
+                id: connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Disconnected,
                 status: Some(fidl_policy::DisconnectStatus::ConnectionFailed),
             }],
@@ -2927,22 +2582,45 @@ mod tests {
         let mut test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let network_ssid = types::Ssid::try_from("test").unwrap();
+        // Set initial RSSI and SNR values
+        let mut connect_selection = generate_connect_selection();
         let init_rssi = -40;
         let init_snr = 30;
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone(), rssi_dbm: init_rssi, snr_db: init_snr);
+        connect_selection.target.bss.rssi = init_rssi;
+        connect_selection.target.bss.snr_db = init_snr;
+
+        let mut bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        bss_description.rssi_dbm = init_rssi;
+        bss_description.snr_db = init_snr;
+        connect_selection.target.bss.bss_description = bss_description.clone().into();
+
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
         // Add a PastConnectionData for the connected network to be send in BSS quality data.
         let mut past_connections = PastConnectionList::new();
         let mut past_connection_data = random_connection_data();
-        past_connection_data.bssid = bss_description.bssid;
+        past_connection_data.bssid = ieee80211::Bssid(bss_description.bssid);
         past_connections.add(past_connection_data);
         let mut saved_networks_manager = FakeSavedNetworksManager::new();
         saved_networks_manager.past_connections_response = past_connections.clone();
         test_values.common_options.saved_networks_manager = Arc::new(saved_networks_manager);
 
         // Set up the state machine, starting at the connected state.
-        let (initial_state, connect_txn_stream) =
-            connected_state_setup(test_values.common_options, bss_description.clone());
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            currently_fulfilled_connection: connect_selection.clone(),
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
@@ -2970,10 +2648,6 @@ mod tests {
         assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
         // Verify that connection stats are sent out
-        let id = types::NetworkIdentifier {
-            ssid: network_ssid,
-            security_type: types::SecurityType::Wpa2,
-        };
         let stats = test_values
             .stats_receiver
             .try_next()
@@ -2981,7 +2655,7 @@ mod tests {
             .expect("next connection stats is missing");
         // Test setup always use iface ID 1.
         assert_eq!(stats.iface_id, 1);
-        assert_eq!(stats.id, id);
+        assert_eq!(stats.id, connect_selection.target.network.clone());
         // EWMA RSSI and SNR should be between the initial and the newest values.
         let ewma_rssi_1 = stats.quality_data.signal_data.ewma_rssi;
         assert_lt!(ewma_rssi_1.get(), init_rssi as f64);
@@ -2995,7 +2669,10 @@ mod tests {
         // Check that the BssQualityData includes the past connection data.
         assert_eq!(stats.quality_data.past_connections_list, past_connections.clone());
         // Check that the channel is included.
-        assert_eq!(stats.quality_data.channel, bss_description.channel);
+        assert_eq!(
+            stats.quality_data.channel,
+            wlan_common::channel::Channel::from(bss_description.channel)
+        );
 
         // Send a second signal report with higher RSSI and SNR than the previous reports.
         let rssi_1 = -30;
@@ -3022,7 +2699,7 @@ mod tests {
             .expect("failed to get connection stats")
             .expect("next connection stats is missing");
         assert_eq!(stats.iface_id, 1);
-        assert_eq!(stats.id, id);
+        assert_eq!(stats.id, connect_selection.target.network.clone());
         // Check that EWMA RSSI and SNR values are greater than the previous values.
         assert_gt!(stats.quality_data.signal_data.ewma_rssi.get(), ewma_rssi_1.get());
         assert_gt!(stats.quality_data.signal_data.ewma_snr.get(), ewma_snr_1.get());
@@ -3031,7 +2708,10 @@ mod tests {
         // Check that the BssQualityData includes the past connection data.
         assert_eq!(stats.quality_data.past_connections_list, past_connections);
         // Check that the channel is included.
-        assert_eq!(stats.quality_data.channel, bss_description.channel);
+        assert_eq!(
+            stats.quality_data.channel,
+            wlan_common::channel::Channel::from(bss_description.channel)
+        );
     }
 
     #[fuchsia::test]
@@ -3042,19 +2722,38 @@ mod tests {
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let network_ssid = types::Ssid::try_from("test").unwrap();
+        let mut connect_selection = generate_connect_selection();
         let init_rssi = -75;
         let init_snr = 30;
-        let bss_description = random_bss_description!(
-            Wpa2,
-            ssid: network_ssid.clone(),
-            rssi_dbm: init_rssi,
-            snr_db: init_snr,
-        );
+
+        // Set initial RSSI and SNR values
+        connect_selection.target.bss.rssi = init_rssi;
+        connect_selection.target.bss.snr_db = init_snr;
+
+        // Set initial RSSI and SNR values in bss description
+        let mut bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        bss_description.rssi_dbm = init_rssi;
+        bss_description.snr_db = init_snr;
+        connect_selection.target.bss.bss_description = bss_description.clone().into();
+
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
 
         // Set up the state machine, starting at the connected state.
-        let (initial_state, connect_txn_stream) =
-            connected_state_setup(test_values.common_options, bss_description.clone());
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            currently_fulfilled_connection: connect_selection.clone(),
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
@@ -3087,10 +2786,26 @@ mod tests {
         let test_values = test_setup();
         let mut telemetry_receiver = test_values.telemetry_receiver;
 
-        let network_ssid = types::Ssid::try_from("test").unwrap();
-        let bss_description = random_bss_description!(Wpa2, ssid: network_ssid.clone());
-        let (initial_state, connect_txn_stream) =
-            connected_state_setup(test_values.common_options, bss_description);
+        let connect_selection = generate_connect_selection();
+        let bss_description =
+            Sequestered::release(connect_selection.target.bss.bss_description.clone());
+        let ap_state =
+            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+
+        // Set up the state machine, starting at the connected state.
+        let (connect_txn_proxy, connect_txn_stream) =
+            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
+                .expect("failed to create a connect txn channel");
+        let options = ConnectedOptions {
+            currently_fulfilled_connection: connect_selection.clone(),
+            ap_state: Box::new(ap_state),
+            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
+            connect_txn_stream: connect_txn_proxy.take_event_stream(),
+            connection_attempt_time: fasync::Time::now(),
+            time_to_connect: zx::Duration::from_seconds(10),
+        };
+        let initial_state = connected_state(test_values.common_options, options);
+
         let connect_txn_handle = connect_txn_stream.control_handle();
         let fut = run_state_machine(initial_state);
         pin_mut!(fut);
@@ -3126,53 +2841,6 @@ mod tests {
                 assert_eq!(info.ap_state.tracked.channel.primary, 10);
             });
         });
-    }
-
-    // Set up connected state, returning its fut, connect_txn_stream, and a view into
-    // BssDescription held by the connected state
-    fn connected_state_setup(
-        common_options: CommonStateOptions,
-        bss_description: BssDescription,
-    ) -> (impl Future<Output = Result<State, ExitReason>>, fidl_sme::ConnectTransactionRequestStream)
-    {
-        let ap_state = types::ApState::from(bss_description);
-        let protection = ap_state.original().protection();
-        let security_protocol = match protection {
-            Protection::Open => SecurityDescriptor::OPEN,
-            Protection::Wep => SecurityDescriptor::WEP,
-            Protection::Wpa1 => SecurityDescriptor::WPA1,
-            Protection::Wpa2Personal => SecurityDescriptor::WPA2_PERSONAL,
-            Protection::Wpa3Personal => SecurityDescriptor::WPA3_PERSONAL,
-            _ => panic!("unsupported BssDescription protection type for unit tests."),
-        };
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: ap_state.original().ssid.clone(),
-                    security_type: security_protocol.into(),
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: fidl_internal::BssDescription::from(ap_state.original().clone())
-                    .into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RegulatoryChangeReconnect,
-        };
-        let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection,
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: true,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
-        };
-        let initial_state = connected_state(common_options, options);
-        (initial_state, connect_txn_stream)
     }
 
     #[fuchsia::test]
@@ -3224,34 +2892,22 @@ mod tests {
         let mut exec = fasync::TestExecutor::new();
         let mut test_values = test_setup();
 
-        let previous_network_ssid = types::Ssid::try_from("foo").unwrap();
-        let next_network_ssid = types::Ssid::try_from("bar").unwrap();
-        let bss_description = random_fidl_bss_description!(Wpa2, ssid: next_network_ssid.clone());
-        let connect_selection = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: next_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
-                credential: TEST_PASSWORD.clone(),
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::ProactiveNetworkSwitch,
-        };
+        let previous_connect_selection = generate_connect_selection();
+        let next_connect_selection = generate_connect_selection();
+
+        let bss_description =
+            Sequestered::release(next_connect_selection.target.bss.bss_description.clone());
+
         let (disconnect_sender, mut disconnect_receiver) = oneshot::channel();
-        let connecting_options =
-            ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
+        let connecting_options = ConnectingOptions {
+            connect_selection: next_connect_selection.clone(),
+            attempt_counter: 0,
+        };
         // Include both a "previous" and "next" network
         let disconnecting_options = DisconnectingOptions {
             disconnect_responder: Some(disconnect_sender),
             previous_network: Some((
-                types::NetworkIdentifier {
-                    ssid: previous_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
+                previous_connect_selection.target.network.clone(),
                 fidl_policy::DisconnectStatus::ConnectionStopped,
             )),
             next_network: Some(connecting_options),
@@ -3281,10 +2937,7 @@ mod tests {
         let client_state_update = ClientStateUpdate {
             state: fidl_policy::WlanClientState::ConnectionsEnabled,
             networks: vec![ClientNetworkState {
-                id: types::NetworkIdentifier {
-                    ssid: previous_network_ssid.clone(),
-                    security_type: types::SecurityType::Wpa2,
-                },
+                id: previous_connect_selection.target.network.clone(),
                 state: fidl_policy::ConnectionState::Disconnected,
                 status: Some(fidl_policy::DisconnectStatus::ConnectionStopped),
             }],
@@ -3301,10 +2954,10 @@ mod tests {
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ClientSmeRequest::Connect{ req, txn, control_handle: _ }) => {
-                assert_eq!(req.ssid, next_network_ssid.to_vec());
+                assert_eq!(req.ssid, next_connect_selection.target.network.ssid.clone().to_vec());
                 assert_eq!(req.deprecated_scan_type, fidl_fuchsia_wlan_common::ScanType::Active);
                 assert_eq!(req.bss_description, bss_description.clone());
-                assert_eq!(req.multiple_bss_candidates, true);
+                assert_eq!(req.multiple_bss_candidates, next_connect_selection.target.network_has_multiple_bss);
                  // Send connection response.
                 let (_stream, ctrl) = txn.expect("connect txn unused")
                     .into_stream_and_control_handle().expect("error accessing control handle");
@@ -3352,22 +3005,7 @@ mod tests {
         pin_mut!(sme_fut);
 
         // Create a connect request so that the state machine does not immediately exit.
-        let ssid = types::Ssid::try_from("no_password").unwrap();
-        let bss_description = random_fidl_bss_description!(Open, ssid: ssid.clone());
-        let connect_req = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid,
-                    security_type: types::SecurityType::None,
-                },
-                credential: Credential::None,
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::IdleInterfaceAutoconnect,
-        };
+        let connect_selection = generate_connect_selection();
 
         let fut = serve(
             0,
@@ -3376,7 +3014,7 @@ mod tests {
             client_req_stream,
             test_values.common_options.update_sender,
             test_values.common_options.saved_networks_manager,
-            Some(connect_req),
+            Some(connect_selection),
             test_values.common_options.telemetry_sender,
             test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
@@ -3414,23 +3052,8 @@ mod tests {
 
         let sme_event_stream = sme_proxy.take_event_stream();
 
-        let ssid = types::Ssid::try_from("no_password").unwrap();
-        let bss_description = random_fidl_bss_description!(Open, ssid: ssid.clone());
         // Create a connect request so that the state machine does not immediately exit.
-        let connect_req = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid,
-                    security_type: types::SecurityType::None,
-                },
-                credential: Credential::None,
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
 
         let fut = serve(
             0,
@@ -3439,7 +3062,7 @@ mod tests {
             client_req_stream,
             test_values.common_options.update_sender,
             test_values.common_options.saved_networks_manager,
-            Some(connect_req),
+            Some(connect_selection),
             test_values.common_options.telemetry_sender,
             test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
@@ -3475,23 +3098,7 @@ mod tests {
         pin_mut!(sme_fut);
 
         // Create a connect request so that the state machine does not immediately exit.
-        let ssid = "no_password".as_bytes().to_vec();
-        let bss_description = random_fidl_bss_description!(Open);
-        let connect_req = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid: types::Ssid::try_from(ssid.clone()).unwrap(),
-                    security_type: types::SecurityType::None,
-                },
-                credential: Credential::None,
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::RegulatoryChangeReconnect,
-        };
-
+        let connect_selection = generate_connect_selection();
         let fut = serve(
             0,
             sme_proxy,
@@ -3499,7 +3106,7 @@ mod tests {
             client_req_stream,
             test_values.common_options.update_sender,
             test_values.common_options.saved_networks_manager,
-            Some(connect_req),
+            Some(connect_selection),
             test_values.common_options.telemetry_sender,
             test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
@@ -3568,22 +3175,7 @@ mod tests {
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
 
         // Create a connect request so that the state machine does not immediately exit.
-        let ssid = types::Ssid::try_from("no_password").unwrap();
-        let bss_description = random_fidl_bss_description!(Open, ssid: ssid.clone());
-        let connect_req = types::ConnectSelection {
-            target: types::ScannedCandidate {
-                network: types::NetworkIdentifier {
-                    ssid,
-                    security_type: types::SecurityType::None,
-                },
-                credential: Credential::None,
-                bss_description: bss_description.clone().into(),
-                observation: types::ScanObservation::Passive,
-                has_multiple_bss_candidates: true,
-                authenticator: generate_random_authenticator(),
-            },
-            reason: types::ConnectReason::FidlConnectRequest,
-        };
+        let connect_selection = generate_connect_selection();
 
         let fut = serve(
             0,
@@ -3592,7 +3184,7 @@ mod tests {
             client_req_stream,
             test_values.common_options.update_sender,
             test_values.common_options.saved_networks_manager,
-            Some(connect_req),
+            Some(connect_selection),
             test_values.common_options.telemetry_sender,
             test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
