@@ -67,6 +67,8 @@ pte_t* riscv64_get_kernel_ptable() { return riscv64_kernel_translation_table; }
 
 namespace {
 
+uint64_t riscv_asid_mask;
+
 KCOUNTER(cm_flush_all, "mmu.consistency_manager.flush_all")
 KCOUNTER(cm_flush_all_replacing, "mmu.consistency_manager.flush_all_replacing")
 KCOUNTER(cm_single_tlb_invalidates, "mmu.consistency_manager.single_tlb_invalidate")
@@ -246,7 +248,7 @@ class Riscv64ArchVmAspace::ConsistencyManager {
 
  private:
   // Maximum number of TLB entries we will queue before switching to ASID invalidation.
-  static constexpr size_t kMaxPendingTlbs = 0;
+  static constexpr size_t kMaxPendingTlbs = 8;
 
   // Pending TLBs to flush are stored as 63 bits, with the bottom bit stolen to store the terminal
   // flag. 63 bits is more than enough as these entries are page aligned at the minimum.
@@ -455,11 +457,13 @@ ssize_t Riscv64ArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, si
       // Recurse a level.
       UnmapPageTable(vaddr, vaddr_rem, chunk_size, level - 1, next_page_table, cm);
 
+      LTRACEF_LEVEL(2, "exited recursion: back at level %u\n", level);
+
       // if we unmapped an entire page table leaf and/or the unmap made the level below us empty,
       // free the page table
       if (chunk_size == block_size || page_table_is_clear(next_page_table)) {
-        LTRACEF("pte %p[0x%lx] = 0 (was page table phys %#lx)\n", page_table, index,
-                page_table_paddr);
+        LTRACEF("pte %p[0x%lx] = 0 (was page table phys %#lx virt %p)\n", page_table, index,
+                page_table_paddr, next_page_table);
         update_pte(&page_table[index], 0);
 
         // We can safely defer TLB flushing as the consistency manager will not return the backing
@@ -927,7 +931,7 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, EnlargeOpera
 
   // TODO-rvbringup: enlarge was added, add proper support
   if (enlarge == EnlargeOperation::Yes) {
-    PANIC_UNIMPLEMENTED;
+    // PANIC_UNIMPLEMENTED;
   }
 
   DEBUG_ASSERT(tt_virt_);
@@ -1011,7 +1015,7 @@ zx_status_t Riscv64ArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
   canary_.Assert();
 
   // TODO-rvbringup: terminal action was added, add proper support
-  PANIC_UNIMPLEMENTED;
+  // PANIC_UNIMPLEMENTED;
 
   if (!IS_PAGE_ALIGNED(vaddr) || !IsValidVaddr(vaddr)) {
     return ZX_ERR_INVALID_ARGS;
@@ -1097,7 +1101,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
       }
       asid_ = status.value();
     } else {
-      PANIC_UNIMPLEMENTED;
+      return ZX_ERR_NOT_SUPPORTED;
     }
 
     // allocate a top level page table to serve as the translation table
@@ -1225,6 +1229,27 @@ vaddr_t Riscv64ArchVmAspace::PickSpot(vaddr_t base, vaddr_t end, vaddr_t align, 
                                       uint mmu_flags) {
   canary_.Assert();
   return PAGE_ALIGN(base);
+}
+
+void riscv64_mmu_early_init() {
+  // figure out the number of support ASID bits by writing all 1s to
+  // the asid field in satp and seeing which ones 'stick'
+  auto satp_orig = riscv64_csr_read(satp);
+  auto satp = satp_orig | (RISCV64_SATP_ASID_MASK << RISCV64_SATP_ASID_SHIFT);
+  riscv64_csr_write(satp, satp);
+  riscv_asid_mask = (riscv64_csr_read(satp) >> RISCV64_SATP_ASID_SHIFT) & RISCV64_SATP_ASID_MASK;
+  riscv64_csr_write(satp, satp_orig);
+
+  // zero the bottom of the kernel page table to remove any left over boot mappings
+  memset(riscv64_get_kernel_ptable(), 0, PAGE_SIZE / 2);
+
+  // globally TLB flush
+  asm("sfence.vma  zero, zero" ::: "memory");
+}
+
+void riscv64_mmu_init() {
+  dprintf(INFO, "RISCV: MMU enabled sv39\n");
+  dprintf(INFO, "RISCV: MMU ASID mask %#lx\n", riscv_asid_mask);
 }
 
 void Riscv64VmICacheConsistencyManager::SyncAddr(vaddr_t start, size_t len) {

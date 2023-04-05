@@ -84,6 +84,9 @@ const uint16_t MMU_RISCV64_UNUSED_ASID = 0;
 const uint16_t MMU_RISCV64_FIRST_USER_ASID = 1;
 const uint16_t MMU_RISCV64_MAX_USER_ASID = MMU_RISCV64_GLOBAL_ASID - 1;
 
+void riscv64_mmu_early_init();
+void riscv64_mmu_init();
+
 #endif  // __ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_RISCV64_MMU_H_

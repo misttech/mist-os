@@ -19,6 +19,7 @@
 #include <arch/mp.h>
 #include <arch/ops.h>
 #include <arch/regs.h>
+#include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <arch/vm.h>
 #include <kernel/percpu.h>
@@ -71,7 +72,10 @@ void riscv64_cpu_early_init() {
                     RISCV64_CSR_SIE_SIE | RISCV64_CSR_SIE_TIE | RISCV64_CSR_SIE_EIE);
 }
 
-void arch_early_init() { riscv64_cpu_early_init(); }
+void arch_early_init() {
+  riscv64_cpu_early_init();
+  riscv64_mmu_early_init();
+}
 
 void arch_prevm_init() {}
 
@@ -81,7 +85,6 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   dprintf(INFO, "RISCV: mvendorid %#lx marchid %#lx mimpid %#lx\n",
           sbi_call(SBI_GET_MVENDORID).value, sbi_call(SBI_GET_MARCHID).value,
           sbi_call(SBI_GET_MIMPID).value);
-  dprintf(INFO, "RISCV: MMU enabled sv39\n");
   dprintf(INFO, "RISCV: SBI impl id %#lx version %#lx\n", sbi_call(SBI_GET_SBI_IMPL_ID).value,
           sbi_call(SBI_GET_SBI_IMPL_VERSION).value);
 
@@ -92,6 +95,8 @@ void arch_init() TA_NO_THREAD_SAFETY_ANALYSIS {
   dprintf(INFO, "RISCV: SBI extension RFENCE %ld\n",
           sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_RFENCE).value);
   dprintf(INFO, "RISCV: SBI extension HSM %ld\n", sbi_call(SBI_PROBE_EXTENSION, SBI_EXT_HSM).value);
+
+  riscv64_mmu_init();
 
   // TODO-rvbringup: this should move to platform
 #if 0
