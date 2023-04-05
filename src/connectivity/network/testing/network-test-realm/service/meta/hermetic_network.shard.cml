@@ -49,11 +49,6 @@
             to: [ "#dhcpd" ],
         },
         {
-            protocol: [ "fuchsia.net.neighbor.Controller" ],
-            from: "#netstack",
-            to: [ "#dhcpd" ],
-        },
-        {
             protocol: [ "fuchsia.net.routes.State" ],
             from: "#netstack",
             to: [ "#dns-resolver" ],
