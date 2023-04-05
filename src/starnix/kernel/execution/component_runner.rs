@@ -4,20 +4,23 @@
 
 use crate::device::run_component_features;
 use ::runner::{get_program_string, get_program_strvec};
-use anyhow::{anyhow, Error};
+use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner::{ComponentControllerMarker, ComponentStartInfo};
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::ffi::CString;
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 use std::sync::Arc;
 
-use crate::auth::{Credentials, FsCred};
+use crate::auth::Credentials;
 use crate::execution::{
-    container::Container, create_filesystem_from_spec, create_remotefs_filesystem, execute_task,
-    get_pkg_hash, parse_numbered_handles,
+    container::Container, create_filesystem_from_spec, execute_task, parse_numbered_handles,
 };
+use crate::fs::fuchsia::RemoteFs;
 use crate::fs::*;
 use crate::logging::{log_error, log_info};
 use crate::task::*;
@@ -35,7 +38,7 @@ use crate::types::*;
 ///   - an absolute path, in which case the path is treated as a path into the root filesystem that
 ///     is mounted by the container's configuration
 ///   - relative path, in which case the binary is read from the component's package (which is
-///     mounted at /container/pkg/{HASH}.)
+///     mounted at /container/component/{random}/pkg.)
 pub async fn start_component(
     mut start_info: ComponentStartInfo,
     controller: ServerEnd<ComponentControllerMarker>,
@@ -49,38 +52,48 @@ pub async fn start_component(
         start_info.program,
     );
 
-    let mut ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
-    let pkg = fio::DirectorySynchronousProxy::new(
-        ns.iter_mut()
-            .find(|entry| entry.path == Some("/pkg".to_string()))
-            .ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?
-            .directory
-            .take()
-            .ok_or_else(|| anyhow!("Missing directory handlee in pkg namespace entry"))?
-            .into_channel(),
-    );
-    // Mount the package directory.
-    let pkg_directory = mount_component_pkg_data(&container, &pkg)?;
-    let resolve_template = |value: &str| value.replace("{pkg_path}", &pkg_directory);
+    let component_path = generate_component_path(&container)?;
 
-    if let Some(directory) = ns
-        .iter_mut()
-        .find(|entry| entry.path == Some("/custom_artifacts".to_string()))
-        .and_then(|entry| entry.directory.take())
-    {
-        let custom_artifacts = fio::DirectorySynchronousProxy::new(directory.into_channel());
-        mount_custom_artifacts(&container, &custom_artifacts)?;
+    let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
+
+    let mut maybe_pkg = None;
+    for entry in ns {
+        let dir_path = if let Some(dir_path) = entry.path {
+            dir_path
+        } else {
+            continue;
+        };
+
+        let directory = if let Some(directory) = entry.directory {
+            directory
+        } else {
+            continue;
+        };
+
+        match dir_path.as_str() {
+            "/svc" => continue,
+            "/custom_artifacts" | "/test_data" => {
+                // Mount custom_artifacts and test_data directory at root of container
+                // We may want to transition to have these directories unique per component
+                let dir_proxy = fio::DirectorySynchronousProxy::new(directory.into_channel());
+                mount(&container, &dir_proxy, &dir_path)?;
+            }
+            _ => {
+                let dir_proxy = fio::DirectorySynchronousProxy::new(directory.into_channel());
+                mount(&container, &dir_proxy, &format!("{component_path}/{dir_path}"))?;
+                if dir_path == "/pkg" {
+                    maybe_pkg = Some(dir_proxy);
+                }
+            }
+        }
     }
 
-    // Mount `/test_data`, used for gtest output files.
-    if let Some(directory) = ns
-        .iter_mut()
-        .find(|entry| entry.path == Some("/test_data".to_string()))
-        .and_then(|entry| entry.directory.take())
-    {
-        let test_data = fio::DirectorySynchronousProxy::new(directory.into_channel());
-        mount_test_data(&container, &test_data)?;
-    }
+    let pkg = maybe_pkg.ok_or_else(|| anyhow!("Missing /pkg entry in namespace"))?;
+    let pkg_directory = format!("{component_path}/pkg");
+
+    let resolve_template = |value: &str| {
+        value.replace("{pkg_path}", &pkg_directory).replace("{component_path}", &component_path)
+    };
 
     let args = get_program_strvec(&start_info, "args")
         .map(|args| {
@@ -165,79 +178,73 @@ pub async fn start_component(
     Ok(())
 }
 
-/// Attempts to mount the component's package directory in a content addressed directory in the
-/// container's filesystem. This allows components to bundle their own binary in their package,
-/// instead of relying on it existing in the system image of the container.
-fn mount_component_pkg_data(
-    container: &Container,
-    pkg: &fio::DirectorySynchronousProxy,
-) -> Result<String, Error> {
-    const COMPONENT_PKG_ROOT_DIRECTORY: &str = "/container/pkg/";
+// Returns /container/component/{random} that doesn't already exist
+fn generate_component_path(container: &Container) -> Result<String, Error> {
+    // Checking container directory already exists
+    let mount_point = container.system_task.lookup_path_from_root(b"/container/component/")?;
 
-    // Read the package content file and hash it as the name of the mount.
-    let hash = get_pkg_hash(pkg)?;
-    let pkg_path = COMPONENT_PKG_ROOT_DIRECTORY.to_owned() + &hash;
+    // Find /container/component/{random} that doesn't already exist
+    let component_path = loop {
+        let random_string: String =
+            thread_rng().sample_iter(&Alphanumeric).take(10).map(char::from).collect();
 
-    // If the directory already exist, return it.
-    match container.system_task.lookup_path_from_root(pkg_path.as_bytes()) {
-        Ok(_) => {
-            return Ok(pkg_path);
-        }
-        Err(errno) if errno == ENOENT => {}
-        err @ Err(_) => {
-            err?;
-        }
-    }
-
-    // Create the new directory.
-    let mount_point = {
-        let pkg_dir =
-            container.system_task.lookup_path_from_root(COMPONENT_PKG_ROOT_DIRECTORY.as_bytes())?;
-        pkg_dir.entry.create_node(
+        // This returns EEXIST if /container/component/{random} already exists.
+        // If so, try again with another {random} string.
+        match mount_point.create_node(
             &container.system_task,
-            hash.as_bytes(),
+            random_string.as_bytes(),
             mode!(IFDIR, 0o755),
             DeviceType::NONE,
-            FsCred::root(),
-        )?;
-        container.system_task.lookup_path_from_root(pkg_path.as_bytes())?
+        ) {
+            Ok(_) => break format!("/container/component/{random_string}"),
+            Err(errno) if errno == EEXIST => {}
+            Err(e) => bail!(e),
+        };
     };
 
-    // Create the filesystem and mount it.
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-    let fs = create_remotefs_filesystem(&container.kernel, pkg, rights, ".")?;
-    mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
-    Ok(pkg_path)
+    Ok(component_path)
 }
 
-fn mount_custom_artifacts(
+fn mount(
     container: &Container,
-    custom_artifacts: &fio::DirectorySynchronousProxy,
+    directory: &fio::DirectorySynchronousProxy,
+    path: &str,
 ) -> Result<(), Error> {
-    const PATH: &str = "/custom_artifacts";
+    // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
+    // Iterate through each component directory starting from the parent and
+    // create it if it doesn't exist.
+    let mut current_node = container.system_task.lookup_path_from_root(b".")?;
+    let mut context = LookupContext::default();
 
-    // Create the new directory.
-    let mount_point = container.system_task.lookup_path_from_root(PATH.as_bytes())?;
+    // Extract each component using Path::new(path).components(). For example,
+    // Path::new("/foo/bar").components() will return [RootDir, Normal("foo"), Normal("bar")].
+    // We're not interested in the RootDir, so we drop the prefix "/" if it exists.
+    let path = if let Some(path) = path.strip_prefix('/') { path } else { path };
 
-    // Create the filesystem and mount it.
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-    let fs = create_remotefs_filesystem(&container.kernel, custom_artifacts, rights, ".")?;
-    mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
-    Ok(())
-}
+    for sub_dir in Path::new(path).components() {
+        let sub_dir = sub_dir.as_os_str().as_bytes();
 
-fn mount_test_data(
-    container: &Container,
-    test_data: &fio::DirectorySynchronousProxy,
-) -> Result<(), Error> {
-    const PATH: &str = "/test_data";
+        current_node = match current_node.create_node(
+            &container.system_task,
+            sub_dir,
+            mode!(IFDIR, 0o755),
+            DeviceType::NONE,
+        ) {
+            Ok(node) => node,
+            Err(errno) if errno == EEXIST || errno == ENOTDIR => {
+                current_node.lookup_child(&container.system_task, &mut context, sub_dir)?
+            }
+            Err(e) => bail!(e),
+        };
+    }
 
-    // Create the new directory.
-    let mount_point = container.system_task.lookup_path_from_root(PATH.as_bytes())?;
+    let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
+    zx::Status::ok(status)?;
 
-    // Create the filesystem and mount it.
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-    let fs = create_remotefs_filesystem(&container.kernel, test_data, rights, ".")?;
-    mount_point.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
+    let (client_end, server_end) = zx::Channel::create();
+    directory.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, ServerEnd::new(server_end))?;
+
+    let fs = RemoteFs::new_fs(&container.kernel, client_end, rights)?;
+    current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
     Ok(())
 }

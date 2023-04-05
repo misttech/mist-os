@@ -473,7 +473,6 @@
                 "#gunit_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
-                "#starnix-tests",
                 "#starnix_test_runners",
             ],
         },
@@ -482,6 +481,7 @@
             from: "self",
             as: "data",
             to: [
+                "#starnix-tests",
                 "#system-tests",
                 "#tests",
             ],

@@ -306,13 +306,28 @@ template("gvisor_test_component") {
     outputs = [ "data/tests/${test_name}" ]
   }
 
+  _storage_shard = "meta/gvisor_use_tmp_storage.shard.cml"
+  if (defined(invoker.use_persistent_storage) &&
+      invoker.use_persistent_storage) {
+    _storage_shard = "meta/gvisor_use_persistent_storage.shard.cml"
+  }
+  _manifest_label = "${test_name}.cml"
+  cmc_merge(_manifest_label) {
+    sources = [
+      "meta/${test_name}.cml",
+      _storage_shard,
+    ]
+  }
+  _outputs = get_target_outputs(":${_manifest_label}")
+  _manifest_file = _outputs[0]
+
   fuchsia_test_component(target_name) {
     forward_variables_from(invoker, "*")
 
     testonly = true
     check_references = false
 
-    manifest = "meta/" + target_name + ".cml"
+    manifest = _manifest_file
 
     use_expectations = false
     if (defined(invoker.use_expectations)) {
@@ -325,13 +340,17 @@ template("gvisor_test_component") {
       deps = [ ":gvisor_test" ]
     }
 
-    deps += [ ":${test_name}_bin" ]
+    deps += [
+      ":${_manifest_label}",
+      ":${test_name}_bin",
+    ]
   }
 }
 
 foreach(test_name, gvisor_tests) {
   gvisor_test_component(test_name) {
     use_expectations = true
+    use_persistent_storage = false
   }
 }
 

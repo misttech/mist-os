@@ -323,16 +323,16 @@ fn create_fs_context(
         anyhow::bail!("how did a bind mount manage to get created as the root?")
     };
 
-    // Create a layered fs to handle /container and /container/pkg
+    // Create a layered fs to handle /container and /container/component
     // /container will mount the container pkg
-    // /container/pkg will be a tmpfs where component using the starnix kernel will have their package
-    // mounted.
+    // /container/component will be a tmpfs where component using the starnix kernel will have their
+    // package mounted.
     let kernel = task.kernel();
     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
     let container_fs = LayeredFs::new_fs(
         kernel,
         create_remotefs_filesystem(kernel, pkg_dir_proxy, rights, "data")?,
-        BTreeMap::from([(b"pkg".to_vec(), TmpFs::new_fs(kernel))]),
+        BTreeMap::from([(b"component".to_vec(), TmpFs::new_fs(kernel))]),
     );
     let mut mappings =
         vec![(b"container".to_vec(), container_fs), (b"data".to_vec(), TmpFs::new_fs(kernel))];

@@ -340,15 +340,6 @@ pub fn create_remotefs_filesystem(
     RemoteFs::new_fs(kernel, root.into_channel(), rights).map_err(|e| e.into())
 }
 
-/// Returns a hash representing the fuchsia package `pkg`.
-///
-/// The implementation is hashing /meta/content
-pub fn get_pkg_hash(pkg: &fio::DirectorySynchronousProxy) -> Result<String, Error> {
-    let buffer = syncio::directory_read_file(pkg, "/meta", zx::Time::INFINITE)?;
-    let hash = std::str::from_utf8(&buffer)?;
-    Ok(hash.to_string())
-}
-
 pub fn create_filesystem_from_spec<'a>(
     task: &CurrentTask,
     pkg: &fio::DirectorySynchronousProxy,

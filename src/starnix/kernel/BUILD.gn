@@ -115,6 +115,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:regex",
     "//third_party/rust_crates:scopeguard",
