@@ -74,4 +74,6 @@ LogSeverity GetMinLogLevel();
 
 }  // namespace syslog
 
+namespace fuchsia_logging = syslog;
+
 #endif  // LIB_SYSLOG_CPP_LOG_SETTINGS_H_

@@ -41,4 +41,6 @@ inline LogSeverity LOG_LEVEL(int8_t level) { return level; }
 
 }  // namespace syslog
 
+namespace fuchsia_logging = syslog;
+
 #endif  // LIB_SYSLOG_CPP_LOG_LEVEL_H_

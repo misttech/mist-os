@@ -285,6 +285,8 @@ bool ShouldCreateLogMessage(LogSeverity severity);
 
 }  // namespace syslog
 
+namespace fuchsia_logging = syslog;
+
 #define FX_LOG_STREAM(severity, tag) \
   ::syslog::LogMessage(::syslog::LOG_##severity, __FILE__, __LINE__, nullptr, tag).stream()
 
