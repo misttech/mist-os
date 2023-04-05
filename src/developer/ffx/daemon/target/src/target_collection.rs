@@ -149,7 +149,26 @@ impl TargetCollection {
                         addr = address_match()
                     );
                     to_update.replace(target.clone());
-                    network_changed = !address_match();
+
+                    // The effect of returning true for network_changed
+                    // is to trigger reconnecting the host_pipe to the target.
+                    // The main reason to do this is for user mode networking
+                    // with an emulator, where the port mapped to SSH changes,
+                    // but the host pipe is using the old port mapped to an old
+                    // instance.
+                    //
+                    // A side-effect of this physical targets that respond to
+                    // mDNS on IPv4 and IPv6, the address will change quickly
+                    // as the target is coming up, this can cause a lot of
+                    // confusion and race conditions.
+                    //
+                    // To avoid that, only return network changed if the port
+                    // is specified as well as a change.
+                    network_changed = if let Some(target_ssh_port) = target.ssh_port() {
+                        new_port.unwrap_or_default() != target_ssh_port
+                    } else {
+                        false
+                    };
                     break;
                 }
             }
