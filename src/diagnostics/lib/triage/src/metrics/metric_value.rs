@@ -30,8 +30,6 @@ pub enum MetricValue {
 #[derive(Deserialize, Clone, Serialize)]
 pub enum Problem {
     Missing(String),
-    /// Multiple errors were encountered in evaluating the expression.
-    Multiple(Vec<Problem>),
     /// An unknown (not supported yet) value that is present but cannot be used in computation.
     UnhandledType(String),
     /// An error in the grammar or semantics of a .triage file, usually detectable by inspection.
@@ -44,6 +42,23 @@ pub enum Problem {
     Ignore(Vec<Problem>),
     /// An error which can occur in evaluation of an expression.
     EvaluationError(String),
+}
+
+impl Problem {
+    // Ranks problems in order of severity; bigger numbers are worse.
+    // This is NOT an API or contract. The ranking can change between program versions.
+    // Multiple problems can share a rank.
+    pub(crate) fn severity(&self) -> i32 {
+        match self {
+            Problem::Ignore(_) => 1,
+            Problem::Missing(_) => 2,
+            Problem::UnhandledType(_) => 3,
+            Problem::ValueError(_) => 4,
+            Problem::EvaluationError(_) => 5,
+            Problem::SyntaxError(_) => 6,
+            Problem::InternalBug(_) => 7,
+        }
+    }
 }
 
 impl PartialEq for MetricValue {
@@ -164,13 +179,6 @@ impl std::fmt::Debug for Problem {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &*self {
             Problem::Missing(s) => write!(f, "Missing: {}", s),
-            Problem::Multiple(problems) => {
-                write!(f, "MultipleErrors: [")?;
-                for problem in problems.iter() {
-                    write!(f, "{:?}; ", problem)?;
-                }
-                write!(f, "]")
-            }
             Problem::Ignore(problems) => {
                 if problems.len() == 1 {
                     write!(f, "Ignore: {:?}", problems[0])
@@ -326,16 +334,6 @@ pub(crate) mod test {
                 MetricValue::Problem(Problem::UnhandledType("Where is Foo?".to_string()))
             ),
             "UnhandledType: Where is Foo?"
-        );
-        assert_eq!(
-            format!(
-                "{}",
-                MetricValue::Problem(Problem::Multiple(vec![
-                    Problem::SyntaxError("Where is Foo?".to_string()),
-                    Problem::ValueError("Where is Bar?".to_string()),
-                ]))
-            ),
-            "MultipleErrors: [SyntaxError: Where is Foo?; ValueError: Where is Bar?; ]"
         );
         assert_eq!(
             format!(

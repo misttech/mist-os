@@ -316,28 +316,6 @@ fn evaluation_error(message: impl AsRef<str>) -> MetricValue {
     MetricValue::Problem(Problem::EvaluationError(message.as_ref().to_string()))
 }
 
-/// If Problem is a Multiple and all its entries are Ignore, combines them. Otherwise just
-/// returns the Problem.
-fn bubble_up_ignore(problem: Problem) -> Problem {
-    match problem {
-        Problem::Multiple(problems) => {
-            let contains_non_ignore = problems.iter().any(|p| !matches!(p, Problem::Ignore(_)));
-            if contains_non_ignore {
-                Problem::Multiple(problems)
-            } else {
-                Problem::Ignore(
-                    problems
-                        .into_iter()
-                        .filter_map(|p| if let Problem::Ignore(v) = p { Some(v) } else { None })
-                        .flatten()
-                        .collect(),
-                )
-            }
-        }
-        problem => problem,
-    }
-}
-
 pub fn safe_float_to_int(float: f64) -> Option<i64> {
     if !float.is_finite() {
         return None;
@@ -907,8 +885,7 @@ impl<'a> MetricState<'a> {
         match self.evaluate(namespace, &operands[0]) {
             MetricValue::Vector(items) => {
                 let errors = items
-                    .clone()
-                    .into_iter()
+                    .iter()
                     .filter_map(|item| match item {
                         MetricValue::Problem(problem) => Some(problem),
                         _ => None,
@@ -916,16 +893,7 @@ impl<'a> MetricState<'a> {
                     .collect::<Vec<_>>();
                 return match errors.len() {
                     0 => MetricValue::Int(items.len() as i64),
-                    1 => MetricValue::Problem(errors[0].clone()),
-                    _ => MetricValue::Problem(bubble_up_ignore(Problem::Multiple(
-                        errors
-                            .iter()
-                            .map(|e| {
-                                let p: Problem = e.clone(); // Without this, clone() gives another &Problem
-                                p
-                            })
-                            .collect(),
-                    ))),
+                    _ => MetricValue::Problem(Self::important_problem(errors)),
                 };
             }
             bad => value_error(format!("Count only works on vectors, not {}", bad)),
@@ -1012,6 +980,19 @@ impl<'a> MetricState<'a> {
         }
     }
 
+    // Prioritizes significant problems over Unhandled and Missing, and Missing over Unhandled.
+    // Don't call with a vector that might be empty.
+    fn important_problem(problems: Vec<&Problem>) -> Problem {
+        match problems.len() {
+            0 => Problem::InternalBug("Didn't find a Problem".to_string()),
+            len => {
+                let mut p = problems.clone();
+                p.sort_by_cached_key(|p| p.severity());
+                p[len - 1].clone()
+            }
+        }
+    }
+
     fn apply_boolean_function(
         &self,
         namespace: &str,
@@ -1025,11 +1006,8 @@ impl<'a> MetricState<'a> {
         let args = map_vec_r(&operand_values, |operand| unwrap_for_math(operand));
         match (args[0], args[1]) {
             // TODO(fxbug.dev/58922): Refactor all the arg-sanitizing boilerplate into one function
-            (MetricValue::Problem(p1), MetricValue::Problem(p2)) => {
-                MetricValue::Problem(bubble_up_ignore(Problem::Multiple(vec![
-                    p1.clone(),
-                    p2.clone(),
-                ])))
+            (MetricValue::Problem(p), MetricValue::Problem(q)) => {
+                MetricValue::Problem(Self::important_problem(vec![p, q]))
             }
             (MetricValue::Problem(p), _) => MetricValue::Problem(p.clone()),
             (_, MetricValue::Problem(p)) => MetricValue::Problem(p.clone()),
@@ -1089,7 +1067,7 @@ impl<'a> MetricState<'a> {
     }
 
     // Returns Bool true if the given metric is Unhandled, or a vector with one Unhandled (which
-    // may be returned by fetch()), or a Multiple containing only Unhandled.
+    // may be returned by fetch()).
     // Returns false if the metric is a non-Problem value.
     // Propagates non-Unhandled Problems.
     fn is_unhandled_type(&self, namespace: &str, operands: &Vec<ExpressionTree>) -> MetricValue {
@@ -1102,15 +1080,6 @@ impl<'a> MetricState<'a> {
         let value = self.evaluate(namespace, &operands[0]);
         MetricValue::Bool(match value {
             MetricValue::Problem(Problem::UnhandledType(_)) => true,
-            MetricValue::Problem(Problem::Multiple(ref problems)) => {
-                if problems.iter().filter(|p| matches!(p, Problem::UnhandledType(_))).count()
-                    == problems.len()
-                {
-                    true
-                } else {
-                    return value.clone();
-                }
-            }
 
             // TODO(fxbug.dev/58922): Well-designed errors and special cases, not hacks
             // is_unhandled_type() returns false on an empty vector, while is_missing() returns
@@ -1139,16 +1108,6 @@ impl<'a> MetricState<'a> {
         let value = self.evaluate(namespace, &operands[0]);
         MetricValue::Bool(match value {
             MetricValue::Problem(Problem::Missing(_)) => true,
-            MetricValue::Problem(Problem::Multiple(ref problems)) => {
-                if problems.iter().filter(|p| matches!(p, Problem::Missing(_))).count()
-                    == problems.len()
-                {
-                    true
-                } else {
-                    return value.clone();
-                }
-            }
-
             // TODO(fxbug.dev/58922): Well-designed errors and special cases, not hacks
             MetricValue::Vector(contents) if contents.len() == 0 => true,
             MetricValue::Vector(contents) if contents.len() == 1 => match contents[0] {
@@ -1277,6 +1236,28 @@ pub(crate) mod test {
             FileDataFetcher::new(&NO_PAYLOAD_F);
         static ref BAD_PAYLOAD_FETCHER: FileDataFetcher<'static> =
             FileDataFetcher::new(&BAD_PAYLOAD_F);
+    }
+
+    #[fuchsia::test]
+    fn focus_on_important_errors() {
+        let metrics = HashMap::new();
+        let state = MetricState::new(&metrics, Fetcher::FileData(EMPTY_FILE_FETCHER.clone()), None);
+        let major = Problem::SyntaxError("Bad".to_string());
+        let minor = Problem::Ignore(vec![Problem::Missing("Not a big deal".to_string())]);
+        let major_arg = ExpressionTree::Value(MetricValue::Problem(major.clone()));
+        let minor_arg = ExpressionTree::Value(MetricValue::Problem(minor));
+        assert_problem!(
+            state.apply_boolean_function(
+                "",
+                &|a, b| a == b,
+                &vec![minor_arg.clone(), major_arg.clone()]
+            ),
+            "SyntaxError: Bad"
+        );
+        assert_problem!(
+            state.apply_boolean_function("", &|a, b| a == b, &vec![major_arg, minor_arg]),
+            "SyntaxError: Bad"
+        );
     }
 
     #[fuchsia::test]
@@ -1698,76 +1679,25 @@ pub(crate) mod test {
     }
 
     #[fuchsia::test]
-    fn test_bubble_up_ignore() {
-        let simple_foo = Problem::ValueError("foo".to_string());
-        let simple_bar = Problem::ValueError("bar".to_string());
-        let ignore_foo = Problem::Ignore(vec![simple_foo.clone()]);
-        let ignore_bar = Problem::Ignore(vec![simple_bar.clone()]);
-        let dont_ignore_fb = Problem::Multiple(vec![simple_foo.clone(), simple_bar.clone()]);
-        let dont_ignore_fi = Problem::Multiple(vec![simple_foo.clone(), ignore_bar.clone()]);
-        let dont_ignore_ib = Problem::Multiple(vec![ignore_foo.clone(), simple_bar.clone()]);
-        let ignore_fb = Problem::Multiple(vec![ignore_foo.clone(), ignore_bar.clone()]);
-
-        assert_problem!(MetricValue::Problem(bubble_up_ignore(simple_foo)), "ValueError: foo");
-        assert_problem!(MetricValue::Problem(bubble_up_ignore(simple_bar)), "ValueError: bar");
-        assert_problem!(
-            MetricValue::Problem(bubble_up_ignore(ignore_foo)),
-            "Ignore: ValueError: foo"
-        );
-        assert_problem!(
-            MetricValue::Problem(bubble_up_ignore(ignore_bar)),
-            "Ignore: ValueError: bar"
-        );
-        assert_problem!(
-            MetricValue::Problem(bubble_up_ignore(dont_ignore_fb)),
-            "MultipleErrors: [ValueError: foo; ValueError: bar; ]"
-        );
-        assert_problem!(
-            MetricValue::Problem(bubble_up_ignore(dont_ignore_fi)),
-            "MultipleErrors: [ValueError: foo; Ignore: ValueError: bar; ]"
-        );
-        assert_problem!(
-            MetricValue::Problem(bubble_up_ignore(dont_ignore_ib)),
-            "MultipleErrors: [Ignore: ValueError: foo; ValueError: bar; ]"
-        );
-        assert_problem!(
-            MetricValue::Problem(bubble_up_ignore(ignore_fb)),
-            "Ignore: [ValueError: foo; ValueError: bar; ]"
-        );
-    }
-
-    #[fuchsia::test]
     fn test_ignores_in_expressions() {
         let dbz = "ValueError: Division by zero";
         assert_problem!(eval!("Count([1, 2, 3/0])"), dbz);
-        assert_problem!(
-            eval!("Count([1/0, 2, 3/0])"),
-            format!("MultipleErrors: [{}; {}; ]", dbz, dbz)
-        );
-        assert_problem!(eval!("Count([1/?0, 2, 3/?0])"), format!("Ignore: [{}; {}; ]", dbz, dbz));
-        assert_problem!(
-            eval!("Count([1/0, 2, 3/?0])"),
-            format!("MultipleErrors: [{}; Ignore: {}; ]", dbz, dbz)
-        );
+        assert_problem!(eval!("Count([1/0, 2, 3/0])"), dbz);
+        assert_problem!(eval!("Count([1/?0, 2, 3/?0])"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("Count([1/0, 2, 3/?0])"), dbz);
         // And() short-circuits so it will only see the first error
         assert_problem!(eval!("And(1 > 0, 3/0 > 0)"), dbz);
         assert_problem!(eval!("And(1/0 > 0, 3/0 > 0)"), dbz);
         assert_problem!(eval!("And(1/?0 > 0, 3/?0 > 0)"), format!("Ignore: {}", dbz));
         assert_problem!(eval!("And(1/?0 > 0, 3/0 > 0)"), format!("Ignore: {}", dbz));
         assert_problem!(eval!("1 == 3/0"), dbz);
-        assert_problem!(eval!("1/0 == 3/0"), format!("MultipleErrors: [{}; {}; ]", dbz, dbz));
-        assert_problem!(eval!("1/?0 == 3/?0"), format!("Ignore: [{}; {}; ]", dbz, dbz));
-        assert_problem!(
-            eval!("1/?0 == 3/0"),
-            format!("MultipleErrors: [Ignore: {}; {}; ]", dbz, dbz)
-        );
+        assert_problem!(eval!("1/0 == 3/0"), dbz);
+        assert_problem!(eval!("1/?0 == 3/?0"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("1/?0 == 3/0"), dbz);
         assert_problem!(eval!("1 + 3/0"), dbz);
-        assert_problem!(eval!("1/0 + 3/0"), format!("MultipleErrors: [{}; {}; ]", dbz, dbz));
-        assert_problem!(eval!("1/?0 + 3/?0"), format!("Ignore: [{}; {}; ]", dbz, dbz));
-        assert_problem!(
-            eval!("1/?0 + 3/0"),
-            format!("MultipleErrors: [Ignore: {}; {}; ]", dbz, dbz)
-        );
+        assert_problem!(eval!("1/0 + 3/0"), dbz);
+        assert_problem!(eval!("1/?0 + 3/?0"), format!("Ignore: {}", dbz));
+        assert_problem!(eval!("1/?0 + 3/0"), dbz);
     }
 
     /// Make sure that checked divide doesn't hide worse errors in its arguments
@@ -1777,7 +1707,7 @@ pub(crate) mod test {
         assert_problem!(eval!("(1+'a')/1"), san);
         assert_problem!(eval!("(1+'a')/?1"), san);
         assert_problem!(eval!("1/?(1+'a')"), san);
-        assert_problem!(eval!("(1+'a')/?(1+'a')"), format!("MultipleErrors: [{}; {}; ]", san, san));
+        assert_problem!(eval!("(1+'a')/?(1+'a')"), san);
         // If the numerator has a Problem and the denominator doesn't, it won't get to the divide
         // logic, so both / and /? won't observe the "division by zero"
         assert_problem!(eval!("(1+'a')/0"), san);
@@ -1785,10 +1715,7 @@ pub(crate) mod test {
         assert_problem!(eval!("(1+'a')//1"), san);
         assert_problem!(eval!("(1+'a')//?1"), san);
         assert_problem!(eval!("1//?(1+'a')"), san);
-        assert_problem!(
-            eval!("(1+'a')//?(1+'a')"),
-            format!("MultipleErrors: [{}; {}; ]", san, san)
-        );
+        assert_problem!(eval!("(1+'a')//?(1+'a')"), san);
         assert_problem!(eval!("(1+'a')//0"), san);
         assert_problem!(eval!("(1+'a')//?0"), san);
     }

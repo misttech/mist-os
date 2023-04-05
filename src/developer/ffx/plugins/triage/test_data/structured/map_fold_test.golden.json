@@ -1954,14 +1954,7 @@
                         },
                         {
                             "Problem": {
-                                "Multiple": [
-                                    {
-                                        "Missing": "Every value was missing"
-                                    },
-                                    {
-                                        "Missing": "Every value was missing"
-                                    }
-                                ]
+                                "Missing": "Every value was missing"
                             }
                         },
                         {
@@ -2173,14 +2166,7 @@
                     "Vector": [
                         {
                             "Problem": {
-                                "Multiple": [
-                                    {
-                                        "Missing": "Every value was missing"
-                                    },
-                                    {
-                                        "Missing": "Every value was missing"
-                                    }
-                                ]
+                                "Missing": "Every value was missing"
                             }
                         }
                     ]

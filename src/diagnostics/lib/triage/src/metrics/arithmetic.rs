@@ -98,6 +98,7 @@ fn promote_type(operands: &Vec<MetricValue>) -> Result<PromotedOperands, MetricV
     let mut int_vec = Vec::with_capacity(operands.len());
     let mut float_vec = Vec::with_capacity(operands.len());
     let mut error_vec = Vec::with_capacity(operands.len());
+    let mut non_numeric_error = None;
     for o in operands.iter() {
         match super::unwrap_for_math(o) {
             MetricValue::Int(value) => {
@@ -108,10 +109,10 @@ fn promote_type(operands: &Vec<MetricValue>) -> Result<PromotedOperands, MetricV
                 float_vec.push(*value);
             }
             MetricValue::Problem(problem) => {
-                error_vec.push(problem.clone());
+                error_vec.push(problem);
             }
             bad_type => {
-                error_vec.push(Problem::Missing(format!("{} not numeric", bad_type)));
+                non_numeric_error = Some(Problem::Missing(format!("{} not numeric", bad_type)));
             }
         }
     }
@@ -121,10 +122,10 @@ fn promote_type(operands: &Vec<MetricValue>) -> Result<PromotedOperands, MetricV
     if float_vec.len() == operands.len() {
         return Ok(PromotedOperands::Float(float_vec));
     }
-    if error_vec.len() == 1 {
-        return Err(MetricValue::Problem(error_vec.swap_remove(0)));
+    if non_numeric_error.is_some() {
+        error_vec.push(&non_numeric_error.as_ref().unwrap());
     }
-    return Err(MetricValue::Problem(super::bubble_up_ignore(Problem::Multiple(error_vec))));
+    return Err(MetricValue::Problem(super::MetricState::important_problem(error_vec)));
 }
 
 // Correct operation of this file is tested in parse.rs.
