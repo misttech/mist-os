@@ -216,8 +216,6 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
     all_environment_names: HashSet<&'a str>,
-    all_events: HashSet<&'a str>,
-    all_event_streams: HashSet<&'a str>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
     target_ids: IdMap<'a>,
     errors: Vec<Error>,
@@ -531,17 +529,6 @@ impl<'a> ValidationContext<'a> {
             fdecl::Capability::Resolver(resolver) => {
                 self.validate_resolver_decl(&resolver, as_builtin)
             }
-            fdecl::Capability::Event(event) => {
-                if as_builtin {
-                    self.validate_event_decl(&event)
-                } else {
-                    self.errors.push(Error::invalid_capability_type(
-                        "Component",
-                        "capability",
-                        "event",
-                    ))
-                }
-            }
             fdecl::Capability::EventStream(event) => {
                 if as_builtin {
                     self.validate_event_stream_decl(&event)
@@ -549,7 +536,7 @@ impl<'a> ValidationContext<'a> {
                     self.errors.push(Error::invalid_capability_type(
                         "Component",
                         "capability",
-                        "event",
+                        "event_stream",
                     ))
                 }
             }
@@ -572,14 +559,6 @@ impl<'a> ValidationContext<'a> {
     }
 
     fn validate_use_decls(&mut self, uses: &'a [fdecl::Use]) {
-        // Validate all events first so that we keep track of them for validation of event_streams.
-        for use_ in uses.iter() {
-            match use_ {
-                fdecl::Use::Event(e) => self.validate_event(e),
-                _ => {}
-            }
-        }
-
         // Validate individual fields.
         for use_ in uses.iter() {
             self.validate_use_decl(&use_);
@@ -636,18 +615,6 @@ impl<'a> ValidationContext<'a> {
                 check_name(u.source_name.as_ref(), "UseStorage", "source_name", &mut self.errors);
                 check_path(u.target_path.as_ref(), "UseStorage", "target_path", &mut self.errors);
                 check_use_availability("UseStorage", u.availability.as_ref(), &mut self.errors);
-            }
-            fdecl::Use::EventStreamDeprecated(e) => {
-                self.validate_event_stream_deprecated(e);
-                check_use_availability(
-                    "UseEventStreamDeprecated",
-                    e.availability.as_ref(),
-                    &mut self.errors,
-                );
-            }
-            fdecl::Use::Event(_) => {
-                // Skip events. We must have already validated by this point.
-                // See `validate_use_decls`.
             }
             fdecl::Use::EventStream(u) => {
                 self.validate_event_stream(u);
@@ -789,65 +756,6 @@ impl<'a> ValidationContext<'a> {
         for (used_path, capability) in used_paths.iter() {
             if used_path.as_str() == "/pkg" || used_path.starts_with("/pkg/") {
                 self.errors.push(Error::pkg_path_overlap(capability.decl, *used_path));
-            }
-        }
-    }
-
-    fn validate_event(&mut self, event: &'a fdecl::UseEvent) {
-        self.validate_use_source(
-            event.source.as_ref(),
-            event.source_name.as_ref(),
-            event.dependency_type.as_ref(),
-            event.availability.as_ref(),
-            "UseEvent",
-            "source",
-        );
-        if let Some(fdecl::Ref::Self_(_)) = event.source {
-            self.errors.push(Error::invalid_field("UseEvent", "source"));
-        }
-        check_name(event.source_name.as_ref(), "UseEvent", "source_name", &mut self.errors);
-        check_name(event.target_name.as_ref(), "UseEvent", "target_name", &mut self.errors);
-        if let Some(target_name) = event.target_name.as_ref() {
-            if !self.all_events.insert(target_name) {
-                self.errors.push(Error::duplicate_field("UseEvent", "target_name", target_name));
-            }
-        }
-    }
-
-    fn validate_event_stream_deprecated(
-        &mut self,
-        event_stream: &'a fdecl::UseEventStreamDeprecated,
-    ) {
-        check_name(event_stream.name.as_ref(), "UseEventStream", "name", &mut self.errors);
-        if let Some(name) = event_stream.name.as_ref() {
-            if !self.all_event_streams.insert(name) {
-                self.errors.push(Error::duplicate_field("UseEventStream", "name", name));
-            }
-        }
-        match event_stream.subscriptions.as_ref() {
-            None => {
-                self.errors.push(Error::missing_field("UseEventStream", "subscriptions"));
-            }
-            Some(subscriptions) if subscriptions.is_empty() => {
-                self.errors.push(Error::empty_field("UseEventStream", "subscriptions"));
-            }
-            Some(subscriptions) => {
-                for subscription in subscriptions {
-                    check_name(
-                        subscription.event_name.as_ref(),
-                        "UseEventStream",
-                        "event_name",
-                        &mut self.errors,
-                    );
-                    let event_name = subscription.event_name.clone().unwrap_or_default();
-                    if !self.all_events.contains(event_name.as_str()) {
-                        self.errors.push(Error::event_stream_event_not_found(
-                            "UseEventStream",
-                            "events",
-                            event_name,
-                        ));
-                    }
-                }
             }
         }
     }
@@ -1306,15 +1214,6 @@ impl<'a> ValidationContext<'a> {
         }
         check_name(source_name, decl, "source_name", &mut self.errors);
         check_name(target_name, decl, "target_name", &mut self.errors);
-    }
-
-    fn validate_event_decl(&mut self, event: &'a fdecl::Event) {
-        if check_name(event.name.as_ref(), "Event", "name", &mut self.errors) {
-            let name = event.name.as_ref().unwrap();
-            if !self.all_capability_ids.insert(name) {
-                self.errors.push(Error::duplicate_field("Event", "name", name.as_str()));
-            }
-        }
     }
 
     fn validate_event_stream_decl(&mut self, event: &'a fdecl::EventStream) {
@@ -1923,9 +1822,6 @@ impl<'a> ValidationContext<'a> {
                     DependencyNode::try_from_ref(o.target.as_ref()),
                 );
             }
-            fdecl::Offer::Event(e) => {
-                self.validate_event_offer_fields(e, offer_type);
-            }
             fdecl::Offer::EventStream(e) => {
                 self.validate_event_stream_offer_fields(e, offer_type);
             }
@@ -2132,56 +2028,6 @@ impl<'a> ValidationContext<'a> {
             }
         }
         check_name(event_stream.target_name.as_ref(), decl, "target_name", &mut self.errors);
-    }
-
-    fn validate_event_offer_fields(&mut self, event: &'a fdecl::OfferEvent, offer_type: OfferType) {
-        let decl = "OfferEvent";
-        check_offer_name(
-            event.source_name.as_ref(),
-            decl,
-            "source_name",
-            offer_type,
-            &mut self.errors,
-        );
-
-        // Only parent, framework, and void are valid.
-        match event.source {
-            Some(fdecl::Ref::Parent(_) | fdecl::Ref::Framework(_) | fdecl::Ref::VoidType(_)) => {}
-            Some(_) => {
-                self.errors.push(Error::invalid_field(decl, "source"));
-            }
-            None => {
-                self.errors.push(Error::missing_field(decl, "source"));
-            }
-        };
-
-        check_route_availability(
-            decl,
-            event.availability.as_ref(),
-            event.source.as_ref(),
-            event.source_name.as_ref(),
-            &mut self.errors,
-        );
-
-        let target_id = self.validate_offer_target(&event.target, decl, "target", offer_type);
-        if let (Some(target_id), Some(target_name)) = (target_id, event.target_name.as_ref()) {
-            // Assuming the target_name is valid, ensure the target_name isn't already used.
-            if let Some(_) = self
-                .target_ids
-                .entry(target_id)
-                .or_insert(HashMap::new())
-                .insert(target_name, AllowableIds::One)
-            {
-                self.errors.push(Error::duplicate_field(decl, "target_name", target_name as &str));
-            }
-        }
-        check_offer_name(
-            event.target_name.as_ref(),
-            decl,
-            "target_name",
-            offer_type,
-            &mut self.errors,
-        );
     }
 
     /// Check a `ChildRef` contains a valid child that exists.
@@ -2970,26 +2816,16 @@ mod tests {
                         target_path: None,
                         ..fdecl::UseStorage::EMPTY
                     }),
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: None,
+                    fdecl::Use::EventStream(fdecl::UseEventStream {
                         source_name: None,
-                        target_name: None,
-                        filter: None,
-                        ..fdecl::UseEvent::EMPTY
-                    }),
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: None,
-                        subscriptions: None,
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
+                        source: None,
+                        target_path: None,
+                        ..fdecl::UseEventStream::EMPTY
                     }),
                 ]);
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::missing_field("UseEvent", "source"),
-                Error::missing_field("UseEvent", "source_name"),
-                Error::missing_field("UseEvent", "target_name"),
                 Error::missing_field("UseService", "source"),
                 Error::missing_field("UseService", "source_name"),
                 Error::missing_field("UseService", "target_path"),
@@ -3003,8 +2839,9 @@ mod tests {
                 Error::missing_field("UseStorage", "source_name"),
                 Error::missing_field("UseStorage", "target_path"),
                 Error::missing_field("UseStorage", "target_path"),
-                Error::missing_field("UseEventStream", "name"),
-                Error::missing_field("UseEventStream", "subscriptions"),
+                Error::invalid_field("UseEventStream", "source"),
+                Error::missing_field("UseEventStream", "target_path"),
+                Error::missing_field("UseEventStream", "source_name"),
             ])),
         },
         test_validate_missing_program_info => {
@@ -3104,53 +2941,6 @@ mod tests {
                 Error::invalid_field("UseStorage", "target_path"),
             ])),
         },
-        test_validate_uses_invalid_identifiers_event => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                        source_name: Some("/foo".to_string()),
-                        target_name: Some("/foo".to_string()),
-                        filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                        ..fdecl::UseEvent::EMPTY
-                    }),
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                        source_name: Some("started".to_string()),
-                        target_name: Some("started".to_string()),
-                        filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                        ..fdecl::UseEvent::EMPTY
-                    }),
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: Some("bar".to_string()),
-                        subscriptions: Some(vec!["a".to_string(), "b".to_string()].into_iter().map(|name| fdecl::EventSubscription {
-                            event_name: Some(name),
-                            ..fdecl::EventSubscription::EMPTY
-                        }).collect()),
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
-                    }),
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: Some("bleep".to_string()),
-                        subscriptions: Some(vec![fdecl::EventSubscription {
-                            event_name: Some("started".to_string()),
-                            ..fdecl::EventSubscription::EMPTY
-                        }]),
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
-                    }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_field("UseEvent", "source"),
-                Error::invalid_field("UseEvent", "source_name"),
-                Error::invalid_field("UseEvent", "target_name"),
-                Error::event_stream_event_not_found("UseEventStream", "events", "a".to_string()),
-                Error::event_stream_event_not_found("UseEventStream", "events", "b".to_string()),
-            ])),
-        },
         test_validate_uses_missing_source => {
             input = {
                 fdecl::Component {
@@ -3199,20 +2989,11 @@ mod tests {
                             subdir: None,
                             ..fdecl::UseDirectory::EMPTY
                         }),
-                        fdecl::Use::Event(fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef{ name: "no-such-child".to_string(), collection: None})),
-                            source_name: Some("abc".to_string()),
-                            target_name: Some("abc".to_string()),
-                            filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                            ..fdecl::UseEvent::EMPTY
-                        }),
                     ]),
                     ..new_component_decl()
                 }
             },
             result = Err(ErrorList::new(vec![
-                Error::invalid_child("UseEvent", "source", "no-such-child"),
                 Error::invalid_child("UseProtocol", "source", "no-such-child"),
                 Error::invalid_child("UseService", "source", "no-such-child"),
                 Error::invalid_child("UseDirectory", "source", "no-such-child"),
@@ -3251,14 +3032,6 @@ mod tests {
                             subdir: None,
                             ..fdecl::UseDirectory::EMPTY
                         }),
-                        fdecl::Use::Event(fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef{ name: "child".to_string(), collection: None})),
-                            source_name: Some("abc".to_string()),
-                            target_name: Some("abc".to_string()),
-                            filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                            ..fdecl::UseEvent::EMPTY
-                        })
                     ]),
                     offers: Some(vec![
                         fdecl::Offer::Service(fdecl::OfferService {
@@ -3796,14 +3569,6 @@ mod tests {
                             subdir: None,
                             ..fdecl::UseDirectory::EMPTY
                         }),
-                        fdecl::Use::Event(fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::WeakForMigration),
-                            source: Some(fdecl::Ref::Child(fdecl::ChildRef{ name: "child".to_string(), collection: None})),
-                            source_name: Some("abc".to_string()),
-                            target_name: Some("abc".to_string()),
-                            filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                            ..fdecl::UseEvent::EMPTY
-                        })
                     ]),
                     offers: Some(vec![
                         fdecl::Offer::Service(fdecl::OfferService {
@@ -3845,28 +3610,6 @@ mod tests {
             },
             result = Err(ErrorList::new(vec![
                 Error::invalid_field("UseProtocol", "dependency_type"),
-            ])),
-        },
-        test_validate_has_events_in_event_stream => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: Some("bar".to_string()),
-                        subscriptions: None,
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
-                    }),
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: Some("barbar".to_string()),
-                        subscriptions: Some(vec![]),
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
-                    }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::missing_field("UseEventStream", "subscriptions"),
-                Error::empty_field("UseEventStream", "subscriptions"),
             ])),
         },
         test_validate_event_stream_offer_valid_decls => {
@@ -4599,20 +4342,10 @@ mod tests {
                         target_path: Some(format!("/{}", "e".repeat(1024))),
                         ..fdecl::UseStorage::EMPTY
                     }),
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some(format!("{}", "a".repeat(101))),
-                        target_name: Some(format!("{}", "a".repeat(101))),
-                        filter: None,
-                        ..fdecl::UseEvent::EMPTY
-                    }),
                 ]);
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::field_too_long_with_max("UseEvent", "source_name", 100),
-                Error::field_too_long_with_max("UseEvent", "target_name", 100),
                 Error::field_too_long_with_max("UseService", "source_name", 100),
                 Error::field_too_long_with_max("UseService", "target_path", 1024),
                 Error::field_too_long_with_max("UseProtocol", "source_name", 100),
@@ -4655,61 +4388,6 @@ mod tests {
             result = Err(ErrorList::new(vec![
                 Error::duplicate_field("UseProtocol", "path", "/bar"),
                 Error::duplicate_field("UseDirectory", "path", "/bar"),
-            ])),
-        },
-        test_validate_events_can_come_before_or_after_event_stream => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                        source_name: Some("started".to_string()),
-                        target_name: Some("started".to_string()),
-                        filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                        ..fdecl::UseEvent::EMPTY
-                    }),
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: Some("bar".to_string()),
-                        subscriptions: Some(
-                            vec!["started".to_string(), "stopped".to_string()]
-                                .into_iter()
-                                .map(|name| fdecl::EventSubscription {
-                                    event_name: Some(name),
-                                    ..fdecl::EventSubscription::EMPTY
-                                })
-                                .collect()
-                            ),
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
-                    }),
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                        source_name: Some("stopped".to_string()),
-                        target_name: Some("stopped".to_string()),
-                        filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                        ..fdecl::UseEvent::EMPTY
-                    }),
-                ]);
-                decl
-            },
-            result = Ok(()),
-        },
-        test_validate_uses_invalid_self_source => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                        source_name: Some("started".to_string()),
-                        target_name: Some("foo_started".to_string()),
-                        ..fdecl::UseEvent::EMPTY
-                    }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_field("UseEvent", "source"),
             ])),
         },
         // exposes
@@ -5719,14 +5397,6 @@ mod tests {
                         target_name: None,
                         ..fdecl::OfferRunner::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: None,
-                        source_name: None,
-                        target: None,
-                        target_name: None,
-                        filter: None,
-                        ..fdecl::OfferEvent::EMPTY
-                    })
                 ]);
                 decl
             },
@@ -5759,11 +5429,6 @@ mod tests {
                 Error::missing_field("OfferRunner", "target"),
                 Error::missing_field("OfferRunner", "target_name"),
                 //Error::missing_field("OfferRunner", "availability"),
-                Error::missing_field("OfferEvent", "source_name"),
-                Error::missing_field("OfferEvent", "source"),
-                Error::missing_field("OfferEvent", "target"),
-                Error::missing_field("OfferEvent", "target_name"),
-                //Error::missing_field("OfferEvent", "availability"),
             ])),
         },
         test_validate_offers_long_identifiers => {
@@ -5905,17 +5570,6 @@ mod tests {
                         target_name: Some("d".repeat(101)),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some(format!("{}", "a".repeat(101))),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "a".repeat(101),
-                            collection: None
-                        })),
-                        target_name: Some(format!("{}", "a".repeat(101))),
-                        filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
                 ]);
                 decl
             },
@@ -5948,9 +5602,6 @@ mod tests {
                 Error::field_too_long("OfferResolver", "source_name"),
                 Error::field_too_long("OfferResolver", "target.collection.name"),
                 Error::field_too_long("OfferResolver", "target_name"),
-                Error::field_too_long("OfferEvent", "source_name"),
-                Error::field_too_long("OfferEvent", "target.child.name"),
-                Error::field_too_long("OfferEvent", "target_name"),
             ])),
         },
         test_validate_offers_extraneous => {
@@ -6199,17 +5850,6 @@ mod tests {
                         target_name: Some("pkg!".to_string()),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some("/path".to_string()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "%bad".to_string(),
-                            collection: None,
-                        })),
-                        target_name: Some("/path".to_string()),
-                        filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                        ..fdecl::OfferEvent::EMPTY
-                    })
                 ]);
                 decl
             },
@@ -6235,9 +5875,6 @@ mod tests {
                 Error::invalid_field("OfferResolver", "source_name"),
                 Error::invalid_field("OfferResolver", "target.child.name"),
                 Error::invalid_field("OfferResolver", "target_name"),
-                Error::invalid_field("OfferEvent", "source_name"),
-                Error::invalid_field("OfferEvent", "target.child.name"),
-                Error::invalid_field("OfferEvent", "target_name"),
             ])),
         },
         test_validate_offers_target_equals_source => {
@@ -6633,28 +6270,6 @@ mod tests {
                         target_name: Some("duplicated".to_string()),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some("stopped".to_string()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "netstack".to_string(),
-                            collection: None,
-                        })),
-                        target_name: Some("started".to_string()),
-                        filter: None,
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some("started_on_x".to_string()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "netstack".to_string(),
-                            collection: None,
-                        })),
-                        target_name: Some("started".to_string()),
-                        filter: None,
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
                 ]);
                 decl.children = Some(vec![
                     fdecl::Child{
@@ -6684,7 +6299,6 @@ mod tests {
                 Error::duplicate_field("OfferDirectory", "target_name", "assets"),
                 Error::duplicate_field("OfferRunner", "target_name", "duplicated"),
                 Error::duplicate_field("OfferResolver", "target_name", "duplicated"),
-                Error::duplicate_field("OfferEvent", "target_name", "started"),
             ])),
         },
         test_validate_offers_target_invalid => {
@@ -6825,29 +6439,6 @@ mod tests {
                         target_name: Some("pkg".to_string()),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source_name: Some("started".to_string()),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        target_name: Some("started".to_string()),
-                        target: Some(fdecl::Ref::Child(
-                            fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            }
-                        )),
-                        filter: None,
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source_name: Some("started".to_string()),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        target_name: Some("started".to_string()),
-                        target: Some(fdecl::Ref::Collection(
-                        fdecl::CollectionRef { name: "modular".to_string(), }
-                        )),
-                        filter: None,
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
                 ]);
                 decl
             },
@@ -6864,8 +6455,6 @@ mod tests {
                 Error::invalid_collection("OfferRunner", "target", "modular"),
                 Error::invalid_child("OfferResolver", "target", "netstack"),
                 Error::invalid_collection("OfferResolver", "target", "modular"),
-                Error::invalid_child("OfferEvent", "target", "netstack"),
-                Error::invalid_collection("OfferEvent", "target", "modular"),
             ])),
         },
         test_validate_offers_invalid_source_collection => {
@@ -6929,14 +6518,6 @@ mod tests {
                         target_name: Some("e".to_string()),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Collection(fdecl::CollectionRef { name: "col".to_string() })),
-                        source_name: Some("f".to_string()),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef { name: "child".to_string(), collection: None })),
-                        target_name: Some("f".to_string()),
-                        filter: None,
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
                 ]);
                 decl
             },
@@ -6946,7 +6527,6 @@ mod tests {
                 Error::invalid_field("OfferStorage", "source"),
                 Error::invalid_field("OfferRunner", "source"),
                 Error::invalid_field("OfferResolver", "source"),
-                Error::invalid_field("OfferEvent", "source"),
             ])),
         },
         test_validate_offers_source_collection => {
@@ -6982,60 +6562,6 @@ mod tests {
                 decl
             },
             result = Ok(()),
-        },
-        test_validate_offers_event_from_realm => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.offers = Some(
-                    vec![
-                        fdecl::Ref::Self_(fdecl::SelfRef {}),
-                        fdecl::Ref::Child(fdecl::ChildRef {name: "netstack".to_string(), collection: None }),
-                        fdecl::Ref::Collection(fdecl::CollectionRef {name: "modular".to_string() }),
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    .map(|(i, source)| {
-                        fdecl::Offer::Event(fdecl::OfferEvent {
-                            source: Some(source),
-                            source_name: Some("started".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some(format!("started_{}", i)),
-
-                            filter: Some(fdata::Dictionary { entries: None, ..fdata::Dictionary::EMPTY }),
-                            ..fdecl::OfferEvent::EMPTY
-                        })
-                    })
-                    .collect());
-                decl.children = Some(vec![
-                    fdecl::Child{
-                        name: Some("netstack".to_string()),
-                        url: Some("fuchsia-pkg://fuchsia.com/netstack/stable#meta/netstack.cm".to_string()),
-                        startup: Some(fdecl::StartupMode::Eager),
-                        on_terminate: None,
-                        environment: None,
-                        ..fdecl::Child::EMPTY
-                    },
-                ]);
-                decl.collections = Some(vec![
-                    fdecl::Collection {
-                        name: Some("modular".to_string()),
-                        durability: Some(fdecl::Durability::Transient),
-                        environment: None,
-                        allowed_offers: Some(fdecl::AllowedOffers::StaticOnly),
-                        allow_long_names: None,
-                        ..fdecl::Collection::EMPTY
-                    },
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::invalid_field("OfferEvent", "source"),
-                Error::invalid_field("OfferEvent", "source"),
-                Error::invalid_field("OfferEvent", "source"),
-            ])),
         },
         test_validate_offers_long_dependency_cycle => {
             input = {
@@ -9017,10 +8543,6 @@ mod tests {
                     rights: None,
                     ..fdecl::Directory::EMPTY
                 }),
-                fdecl::Capability::Event(fdecl::Event {
-                    name: None,
-                    ..fdecl::Event::EMPTY
-                }),
             ],
             as_builtin = false,
             result = Err(ErrorList::new(vec![
@@ -9029,7 +8551,6 @@ mod tests {
                 Error::missing_field("Directory", "name"),
                 Error::missing_field("Directory", "source_path"),
                 Error::missing_field("Directory", "rights"),
-                Error::invalid_capability_type("Component", "capability", "event")
             ])),
         },
         test_validate_builtin_capabilities_individually_ok => {
@@ -9059,10 +8580,6 @@ mod tests {
                     name: Some("foo_resolver".into()),
                     source_path: None,
                     ..fdecl::Resolver::EMPTY
-                }),
-                fdecl::Capability::Event(fdecl::Event {
-                    name: Some("foo_event".into()),
-                    ..fdecl::Event::EMPTY
                 }),
             ],
             as_builtin = true,
@@ -9096,10 +8613,6 @@ mod tests {
                     source_path:  Some("/foo".into()),
                     ..fdecl::Resolver::EMPTY
                 }),
-                fdecl::Capability::Event(fdecl::Event {
-                    name: None,
-                    ..fdecl::Event::EMPTY
-                }),
                 fdecl::Capability::Storage(fdecl::Storage {
                     name: None,
                     ..fdecl::Storage::EMPTY
@@ -9118,7 +8631,6 @@ mod tests {
                 Error::extraneous_source_path("Runner", "/foo"),
                 Error::missing_field("Resolver", "name"),
                 Error::extraneous_source_path("Resolver", "/foo"),
-                Error::missing_field("Event", "name"),
                 Error::invalid_capability_type("RuntimeConfig", "capability", "storage"),
             ])),
         },
@@ -9386,16 +8898,6 @@ mod tests {
                         })),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
-                        source_name: Some("thung5".repeat(26)),
-                        target_name: Some("thung5".repeat(26)),
-                        target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                            name: "foo".to_string(),
-                            collection: Some("foo".to_string()),
-                        })),
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
                 ],
                 &fdecl::Component {
                     capabilities: Some(vec![fdecl::Capability::Protocol(fdecl::Protocol {
@@ -9453,12 +8955,6 @@ mod tests {
                         target_name: Some("thung4".to_string()),
                         ..fdecl::OfferResolver::EMPTY
                     }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
-                        source_name: Some("thung5".to_string()),
-                        target_name: Some("thung5".to_string()),
-                        ..fdecl::OfferEvent::EMPTY
-                    }),
                 ],
                 &fdecl::Component {
                     capabilities: Some(vec![fdecl::Capability::Protocol(fdecl::Protocol {
@@ -9476,7 +8972,6 @@ mod tests {
                 Error::missing_field("OfferStorage", "target"),
                 Error::missing_field("OfferRunner", "target"),
                 Error::missing_field("OfferResolver", "target"),
-                Error::missing_field("OfferEvent", "target"),
             ]))
         );
     }
@@ -9507,7 +9002,6 @@ mod tests {
                     fdecl::Offer::Storage(fdecl::OfferStorage::EMPTY),
                     fdecl::Offer::Runner(fdecl::OfferRunner::EMPTY),
                     fdecl::Offer::Resolver(fdecl::OfferResolver::EMPTY),
-                    fdecl::Offer::Event(fdecl::OfferEvent::EMPTY),
                 ],
                 &fdecl::Component::EMPTY
             ),
@@ -9537,10 +9031,6 @@ mod tests {
                 Error::missing_field("OfferResolver", "source_name"),
                 Error::missing_field("OfferResolver", "target"),
                 Error::missing_field("OfferResolver", "target_name"),
-                Error::missing_field("OfferEvent", "source_name"),
-                Error::missing_field("OfferEvent", "source"),
-                Error::missing_field("OfferEvent", "target"),
-                Error::missing_field("OfferEvent", "target_name"),
             ]))
         );
     }

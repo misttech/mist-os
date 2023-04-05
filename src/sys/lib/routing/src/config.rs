@@ -625,9 +625,6 @@ fn parse_capability_policy(
                         component_internal::AllowlistedCapability::Directory(_) => {
                             Ok(CapabilityTypeName::Directory)
                         }
-                        component_internal::AllowlistedCapability::Event(_) => {
-                            Ok(CapabilityTypeName::Event)
-                        }
                         component_internal::AllowlistedCapability::Protocol(_) => {
                             Ok(CapabilityTypeName::Protocol)
                         }
@@ -882,17 +879,6 @@ mod tests {
                             ]),
                             ..component_internal::CapabilityAllowlistEntry::EMPTY
                         },
-                        component_internal::CapabilityAllowlistEntry {
-                            source_moniker: Some("/foo/bar".to_string()),
-                            source_name: Some("running".to_string()),
-                            source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                            capability: Some(component_internal::AllowlistedCapability::Event(component_internal::AllowlistedEvent::EMPTY)),
-                            target_monikers: Some(vec![
-                                "/foo/bar".to_string(),
-                                "/foo/bar/**".to_string()
-                            ]),
-                            ..component_internal::CapabilityAllowlistEntry::EMPTY
-                        },
                     ]), ..component_internal::CapabilityPolicyAllowlists::EMPTY}),
                     debug_registration_policy: Some(component_internal::DebugRegistrationPolicyAllowlists{
                         allowlist: Some(vec![
@@ -955,10 +941,6 @@ mod tests {
                         source_path: None,
                         ..fdecl::Protocol::EMPTY
                     }),
-                   fdecl::Capability::Event(fdecl::Event {
-                       name: Some("bar_event".into()),
-                        ..fdecl::Event::EMPTY
-                    }),
                 ]),
                 root_component_url: Some(FOO_PKG_URL.to_string()),
                 component_id_index_path: Some("/boot/config/component_id_index".to_string()),
@@ -1001,17 +983,6 @@ mod tests {
                             AllowlistEntryBuilder::new().exact("bootstrap").build(),
                             AllowlistEntryBuilder::new().exact("core").any_descendant(),
                             AllowlistEntryBuilder::new().exact("core").exact("test_manager").any_descendant_in_collection("tests"),
-                        ].iter().cloned())
-                        ),
-                        (CapabilityAllowlistKey {
-                            source_moniker: ExtendedMoniker::ComponentInstance(AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap()),
-                            source_name: CapabilityName::from("running"),
-                            source: CapabilityAllowlistSource::Framework,
-                            capability: CapabilityTypeName::Event,
-                        },
-                        HashSet::from_iter(vec![
-                            AllowlistEntryBuilder::new().exact("foo").exact("bar").build(),
-                            AllowlistEntryBuilder::new().exact("foo").exact("bar").any_descendant(),
                         ].iter().cloned())
                         ),
                     ].iter().cloned()),
@@ -1095,9 +1066,6 @@ mod tests {
                     cm_rust::CapabilityDecl::Protocol(cm_rust::ProtocolDecl {
                         name: "foo_protocol".into(),
                         source_path: None,
-                    }),
-                    cm_rust::CapabilityDecl::Event(cm_rust::EventDecl {
-                        name: "bar_event".into(),
                     }),
                 ],
                 root_component_url: Some(Url::new(FOO_PKG_URL.to_string()).unwrap()),

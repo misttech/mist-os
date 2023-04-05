@@ -17,12 +17,12 @@ use {
         Availability, CapabilityDecl, CapabilityName, CapabilityPath, CapabilityTypeName, ChildRef,
         ComponentDecl, DependencyType, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl,
         ExposeEventStreamDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeServiceDecl,
-        ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferEventDecl,
-        OfferEventStreamDecl, OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
-        OfferTarget, ProtocolDecl, RegistrationSource, ResolverDecl, ResolverRegistration,
-        RunnerDecl, RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
-        UseDirectoryDecl, UseEventDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl,
-        UseSource, UseStorageDecl,
+        ExposeSource, ExposeTarget, OfferDecl, OfferDirectoryDecl, OfferEventStreamDecl,
+        OfferProtocolDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
+        ProtocolDecl, RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl,
+        RunnerRegistration, ServiceDecl, StorageDecl, StorageDirectorySource, UseDecl,
+        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        UseStorageDecl,
     },
     cm_rust_testing::{
         ChildDeclBuilder, ComponentDeclBuilder, DirectoryDeclBuilder, EnvironmentDeclBuilder,
@@ -277,17 +277,6 @@ impl RoutingTestForAnalyzer {
                     .ok_or(TestModelError::UseDeclNotFound),
                 expected_res,
             ),
-            CheckUse::Event { request, expected_res, .. } => {
-                let find_decl = decl.uses.iter().find_map(|u| match u {
-                    UseDecl::Event(d) if (d.target_name == request.event_name) => Some(d.clone()),
-                    _ => None,
-                });
-                let decl_result = match find_decl {
-                    Some(d) => Ok(UseDecl::Event(d)),
-                    None => Err(TestModelError::UseDeclNotFound),
-                };
-                (decl_result, expected_res)
-            }
             CheckUse::Protocol { path, expected_res, .. } => (
                 decl.uses
                     .iter()
@@ -368,7 +357,7 @@ impl RoutingTestForAnalyzer {
                     .ok_or(TestModelError::ExposeDeclNotFound),
                 expected_res,
             ),
-            CheckUse::Event { .. } | CheckUse::Storage { .. } | CheckUse::StorageAdmin { .. } => {
+            CheckUse::Storage { .. } | CheckUse::StorageAdmin { .. } => {
                 panic!("attempted to use from expose for unsupported capability type")
             }
         }
@@ -1800,25 +1789,24 @@ mod tests {
     ///    \
     ///     b
     ///
-    /// a: offers framework event "started" to b as "started_on_a"
+    /// a: offers framework protocol "fuchsia.component.Realm" to b
     /// a: offers built-in protocol "fuchsia.sys2.EventSource" to b
-    /// b: uses "started_on_a" as "started"
+    /// b: uses protocol "fuchsia.component.Realm"
     /// b: uses protocol "fuchsia.sys2.EventSource"
     #[fuchsia::test]
     async fn route_map_use_from_framework_and_builtin() {
-        let offer_event_decl = OfferDecl::Event(OfferEventDecl {
+        let offer_realm_decl = OfferDecl::Protocol(OfferProtocolDecl {
             source: OfferSource::Framework,
-            source_name: "started".into(),
-            target_name: "started_on_a".into(),
+            source_name: "fuchsia.component.Realm".try_into().unwrap(),
+            target_name: "fuchsia.component.Realm".try_into().unwrap(),
             target: OfferTarget::static_child("b".to_string()),
-            filter: None,
+            dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
-        let use_event_decl = UseDecl::Event(UseEventDecl {
+        let use_realm_decl = UseDecl::Protocol(UseProtocolDecl {
             source: UseSource::Parent,
-            source_name: "started_on_a".into(),
-            target_name: "started".into(),
-            filter: None,
+            source_name: "fuchsia.component.Realm".try_into().unwrap(),
+            target_path: "/svc/fuchsia.component.Realm".try_into().unwrap(),
             dependency_type: DependencyType::Strong,
             availability: Availability::Required,
         });
@@ -1847,7 +1835,7 @@ mod tests {
             (
                 "a",
                 ComponentDeclBuilder::new()
-                    .offer(offer_event_decl.clone())
+                    .offer(offer_realm_decl.clone())
                     .offer(offer_event_source_decl.clone())
                     .add_lazy_child("b")
                     .build(),
@@ -1855,8 +1843,8 @@ mod tests {
             (
                 "b",
                 ComponentDeclBuilder::new()
+                    .use_(use_realm_decl.clone())
                     .use_(use_event_source_decl.clone())
-                    .use_(use_event_decl.clone())
                     .build(),
             ),
         ];
@@ -1867,23 +1855,23 @@ mod tests {
 
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
-        let event_route_results = test.model.check_use_capability(&use_event_decl, &b_component);
-        assert_eq!(event_route_results.len(), 1);
-        let event_route_result = &event_route_results[0];
-        assert!(event_route_result.error.is_none());
+        let realm_route_results = test.model.check_use_capability(&use_realm_decl, &b_component);
+        assert_eq!(realm_route_results.len(), 1);
+        let realm_route_result = &realm_route_results[0];
+        assert_matches!(realm_route_result.error, None);
 
         assert_eq!(
-            event_route_result.route,
+            realm_route_result.route,
             vec![
                 RouteSegment::UseBy {
                     moniker: vec!["b"].try_into().unwrap(),
-                    capability: use_event_decl
+                    capability: use_realm_decl
                 },
                 RouteSegment::OfferBy {
                     moniker: AbsoluteMoniker::root(),
-                    capability: offer_event_decl
+                    capability: offer_realm_decl
                 },
-                RouteSegment::ProvideFromFramework { capability: "started".into() }
+                RouteSegment::ProvideFromFramework { capability: "fuchsia.component.Realm".into() }
             ]
         );
 
@@ -1891,7 +1879,7 @@ mod tests {
             test.model.check_use_capability(&use_event_source_decl, &b_component);
         assert_eq!(event_source_route_results.len(), 1);
         let event_source_route_result = &event_source_route_results[0];
-        assert!(event_source_route_result.error.is_none());
+        assert_matches!(event_source_route_result.error, None);
 
         assert_eq!(
             event_source_route_result.route,
@@ -2281,8 +2269,8 @@ mod tests {
     ///    Requires resolver "base" to resolve child "c", routed successfully from "env".
     ///    Uses directory "bar_data", routed successfully from parent.
     ///    Exposes "bad_protocol" from child, routing should fail.
-    ///    Uses event "started", but routing is not checked because the "event" capability type is not
-    ///    selected.
+    ///    Uses event stream "started", but routing is not checked because the "event stream"
+    ///    capability type is not selected.
     /// c: is resolved by resolver "base" from grandparent.
     #[fuchsia::test]
     async fn route_maps_all_routes_for_instance() {
@@ -2334,12 +2322,12 @@ mod tests {
             target: ExposeTarget::Parent,
             availability: cm_rust::Availability::Required,
         });
-        let use_event_decl = UseDecl::Event(UseEventDecl {
+        let use_event_decl = UseDecl::EventStream(UseEventStreamDecl {
             source: UseSource::Parent,
             source_name: "started_on_a".into(),
-            target_name: "started".into(),
+            target_path: "/started".try_into().unwrap(),
             filter: None,
-            dependency_type: DependencyType::Strong,
+            scope: None,
             availability: Availability::Required,
         });
 

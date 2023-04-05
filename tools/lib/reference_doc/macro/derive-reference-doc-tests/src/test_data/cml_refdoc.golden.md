@@ -336,7 +336,6 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `storage`: (_optional `string`_) The [name](#name) for this storage capability.
 - `runner`: (_optional `string`_) The [name](#name) for this runner capability.
 - `resolver`: (_optional `string`_) The [name](#name) for this resolver capability.
-- `event`: (_optional `string`_) The [name](#name) for this event capability.
 - `event_stream`: (_optional `string or array of strings`_) The [name](#name) for this event_stream capability.
 - `path`: (_optional `string`_) The path within the [outgoing directory][glossary.outgoing directory] of the component's
     program to source the capability.
@@ -392,8 +391,6 @@ this component and the capability's source.
 - `protocol`: (_optional `string or array of strings`_) When using a protocol capability, the [name](#name) of a [protocol capability][doc-protocol].
 - `directory`: (_optional `string`_) When using a directory capability, the [name](#name) of a [directory capability][doc-directory].
 - `storage`: (_optional `string`_) When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
-- `event`: (_optional `string or array of strings`_) When using an event capability, the [name](#name) of an [event capability][doc-event].
-- `event_stream_deprecated`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
 - `event_stream`: (_optional `string or array of strings`_) When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
     - `parent`: The component's parent.
@@ -418,7 +415,6 @@ this component and the capability's source.
 - `filter`: (_optional `object`_) (`event_stream` only) Capability requested event streams require especifying a filter
     referring to the protocol to which the events in the event stream apply. The content of the
     filter will be an object mapping from "name" to the "protocol name".
-- `subscriptions`: (_optional `string`_) Deprecated and unusable. In the process of being removed.
 - `dependency`: (_optional `string`_) `dependency` _(optional)_: The type of dependency between the source and
     this component, one of:
     - `strong`: a strong dependency, which is used to determine shutdown
@@ -458,7 +454,7 @@ use: [
         path: "/data",
     },
     {
-        event: [
+        event_stream: [
             "started",
             "stopped",
         ],
@@ -549,7 +545,6 @@ instance or a [child collection][doc-collections].
 - `runner`: (_optional `string or array of strings`_) When routing a runner, the [name](#name) of a [runner capability][doc-runners].
 - `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
 - `storage`: (_optional `string or array of strings`_) When routing a storage capability, the [name](#name) of a [storage capability][doc-storage].
-- `event`: (_optional `string or array of strings`_) When routing an event, the [name](#name) of the [event][doc-event].
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
     - `parent`: The component's parent. This source can be used for all
         capability types.
@@ -647,7 +642,7 @@ offer: [
         to: [ "#user-shell" ],
     },
     {
-        event: "stopped",
+        event_stream: "stopped",
         from: "framework",
         to: [ "#logger" ],
     },

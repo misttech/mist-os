@@ -88,69 +88,6 @@ fn main() {
                 availability: Some(Availability::Required),
                 ..UseProtocol::EMPTY
             }),
-            Use::Event(UseEvent {
-                dependency_type: Some(DependencyType::Strong),
-                source: Some(Ref::Framework(FrameworkRef {})),
-                source_name: Some("started".to_string()),
-                target_name: Some("began".to_string()),
-                filter: None,
-                availability: Some(Availability::Required),
-                ..UseEvent::EMPTY
-            }),
-            Use::Event(UseEvent {
-                dependency_type: Some(DependencyType::Strong),
-                source: Some(Ref::Parent(ParentRef {})),
-                source_name: Some("destroyed".to_string()),
-                target_name: Some("destroyed".to_string()),
-                filter: None,
-                availability: Some(Availability::Required),
-                ..UseEvent::EMPTY
-            }),
-            Use::Event(UseEvent {
-                dependency_type: Some(DependencyType::Strong),
-                source: Some(Ref::Parent(ParentRef {})),
-                source_name: Some("stopped".to_string()),
-                target_name: Some("stopped".to_string()),
-                filter: None,
-                availability: Some(Availability::Required),
-                ..UseEvent::EMPTY
-            }),
-            Use::Event(UseEvent {
-                dependency_type: Some(DependencyType::Strong),
-                source: Some(Ref::Parent(ParentRef {})),
-                source_name: Some("directory_ready".to_string()),
-                target_name: Some("diagnostics_ready".to_string()),
-                filter: Some(fdata::Dictionary {
-                    entries: Some(vec![fdata::DictionaryEntry {
-                        key: "path".to_string(),
-                        value: Some(Box::new(fdata::DictionaryValue::Str(
-                            "diagnostics".to_string(),
-                        ))),
-                    }]),
-                    ..fdata::Dictionary::EMPTY
-                }),
-                availability: Some(Availability::Optional),
-                ..UseEvent::EMPTY
-            }),
-            Use::EventStreamDeprecated(UseEventStreamDeprecated {
-                name: Some("my_stream".to_string()),
-                subscriptions: Some(vec![
-                    EventSubscription {
-                        event_name: Some("began".to_string()),
-                        ..EventSubscription::EMPTY
-                    },
-                    EventSubscription {
-                        event_name: Some("destroyed".to_string()),
-                        ..EventSubscription::EMPTY
-                    },
-                    EventSubscription {
-                        event_name: Some("diagnostics_ready".to_string()),
-                        ..EventSubscription::EMPTY
-                    },
-                ]),
-                availability: Some(Availability::Required),
-                ..UseEventStreamDeprecated::EMPTY
-            }),
             Use::EventStream(UseEventStream {
                 source_name: Some("events".to_string()),
                 source: Some(Ref::Parent(ParentRef {})),
@@ -264,15 +201,6 @@ fn main() {
                 dependency_type: Some(DependencyType::Strong),
                 availability: Some(Availability::Required),
                 ..OfferProtocol::EMPTY
-            }),
-            Offer::Event(OfferEvent {
-                source: Some(Ref::Parent(ParentRef {})),
-                source_name: Some("stopped".to_string()),
-                target: Some(Ref::Child(ChildRef { name: "logger".to_string(), collection: None })),
-                target_name: Some("stopped-logger".to_string()),
-                filter: None,
-                availability: Some(Availability::Required),
-                ..OfferEvent::EMPTY
             }),
             Offer::EventStream(OfferEventStream {
                 source_name: Some("directory_ready".to_string()),

@@ -130,11 +130,6 @@ pub async fn populate_and_get_logsink_decl<'a>(
             cm_rust::UseDecl::Storage(_) => {
                 add_storage_use(&mut ns, &mut directory_waiters, use_, component).await?;
             }
-            cm_rust::UseDecl::Event(_) | cm_rust::UseDecl::EventStreamDeprecated(_) => {
-                // Event capabilities are handled in model::model,
-                // as these are capabilities used by the framework itself
-                // and not given to components directly.
-            }
             cm_rust::UseDecl::EventStream(s) => {
                 add_service_or_protocol_use(
                     &mut svc_dirs,

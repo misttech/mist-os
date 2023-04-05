@@ -469,7 +469,6 @@ impl RoutingTest {
                 UseDecl::Service(s) => Some(s.target_path.dirname.into()),
                 UseDecl::Protocol(s) => Some(s.target_path.dirname.into()),
                 UseDecl::Storage(s) => Some(s.target_path.to_string()),
-                UseDecl::Event(_) | UseDecl::EventStreamDeprecated(_) => None,
                 UseDecl::EventStream(s) => {
                     // TODO(fxbug.dev/81980): Route EventStream path
                     Some(s.target_path.dirname.into())
@@ -801,9 +800,6 @@ impl RoutingTestModel for RoutingTest {
                     .await;
                 }
             }
-            CheckUse::Event { request: _, expected_res: _ } => {
-                unreachable!("Legacy events no longer supported");
-            }
             CheckUse::EventStream { path, .. } => {
                 // Fails if the component did not use the protocol EventStream or if the event is
                 // not allowed.
@@ -852,9 +848,6 @@ impl RoutingTestModel for RoutingTest {
             }
             CheckUse::StorageAdmin { .. } => {
                 panic!("unimplemented");
-            }
-            CheckUse::Event { .. } => {
-                panic!("event capabilities can't be exposed");
             }
             CheckUse::EventStream { .. } => {
                 panic!("unimplemented");

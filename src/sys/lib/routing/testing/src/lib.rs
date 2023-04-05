@@ -41,7 +41,6 @@ use {
             CapabilityAllowlistSource, DebugCapabilityAllowlistEntry, DebugCapabilityKey,
         },
         error::RoutingError,
-        event::EventSubscription,
         mapper::NoopRouteMapper,
         route_capability, RouteRequest, RouteSource,
     },
@@ -154,10 +153,6 @@ pub enum CheckUse {
         from_cm_namespace: bool,
 
         storage_subdir: Option<String>,
-        expected_res: ExpectedResult,
-    },
-    Event {
-        request: EventSubscription,
         expected_res: ExpectedResult,
     },
     EventStream {

@@ -7,9 +7,9 @@ use {
         error::Error, offer_to_all_would_duplicate, AnyRef, AsClause, Availability, Capability,
         CapabilityClause, Child, Collection, ConfigKey, ConfigNestedValueType, ConfigValueType,
         DebugRegistration, Document, Environment, EnvironmentExtends, EnvironmentRef, EventScope,
-        EventSubscriptionsClause, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer,
-        OfferFromRef, OfferToRef, OneOrMany, Path, PathClause, Program, ResolverRegistration,
-        RightsClause, RunnerRegistration, SourceAvailability, Use, UseFromRef,
+        Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef, OfferToRef, OneOrMany,
+        Path, PathClause, Program, ResolverRegistration, RightsClause, RunnerRegistration,
+        SourceAvailability, Use, UseFromRef,
     },
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -266,58 +266,6 @@ fn translate_use(
                 target_path: Some(target_path.into()),
                 availability: Some(availability),
                 ..fdecl::UseStorage::EMPTY
-            }));
-        } else if let Some(n) = &use_.event {
-            let source = extract_use_event_source(use_)?;
-            let target_names = all_target_capability_names(use_, use_)
-                .ok_or_else(|| Error::internal("no capability"))?;
-            let source_names = n.to_vec();
-            let availability = extract_use_availability(use_)?;
-            for target_name in target_names {
-                // When multiple source names are provided, there is no way to alias each one, so
-                // source_name == target_name,
-                // When one source name is provided, source_name may be aliased to a different
-                // target_name, so we use source_names[0] to derive the source_name.
-                let source_name = if source_names.len() == 1 {
-                    source_names[0].clone()
-                } else {
-                    target_name.clone()
-                };
-                out_uses.push(fdecl::Use::Event(fdecl::UseEvent {
-                    source: Some(clone_ref(&source)?),
-                    source_name: Some(source_name.into()),
-                    target_name: Some(target_name.into()),
-                    // We have already validated that none will be present if we were using many
-                    // events.
-                    filter: match use_.filter.clone() {
-                        Some(dict) => Some(dictionary_from_map(dict)?),
-                        None => None,
-                    },
-                    dependency_type: Some(
-                        use_.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
-                    ),
-                    availability: Some(availability),
-                    ..fdecl::UseEvent::EMPTY
-                }));
-            }
-        } else if let Some(name) = &use_.event_stream_deprecated {
-            let opt_subscriptions = use_.event_subscriptions();
-            let availability = extract_use_availability(use_)?;
-            out_uses.push(fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                name: Some(name.to_string()),
-                availability: Some(availability),
-                subscriptions: opt_subscriptions.map(|subscriptions| {
-                    subscriptions
-                        .iter()
-                        .flat_map(|subscription| {
-                            subscription.event.iter().map(move |event| fdecl::EventSubscription {
-                                event_name: Some(event.to_string()),
-                                ..fdecl::EventSubscription::EMPTY
-                            })
-                        })
-                        .collect()
-                }),
-                ..fdecl::UseEventStreamDeprecated::EMPTY
             }));
         } else if let Some(names) = &use_.event_stream {
             let source_names: Vec<String> =
@@ -777,38 +725,6 @@ fn translate_offer(
                     ..fdecl::OfferResolver::EMPTY
                 }));
             }
-        } else if let Some(n) = offer.event() {
-            let entries = extract_offer_sources_and_targets(
-                offer,
-                n,
-                all_capability_names,
-                all_children,
-                all_collections,
-            )?;
-            for (source, source_name, target, target_name) in entries {
-                let (source, availability) = derive_source_and_availability(
-                    offer.availability.as_ref(),
-                    source,
-                    offer.source_availability.as_ref(),
-                    all_capability_names,
-                    all_children,
-                    all_collections,
-                );
-                out_offers.push(fdecl::Offer::Event(fdecl::OfferEvent {
-                    source: Some(source),
-                    source_name: Some(source_name.into()),
-                    target: Some(target),
-                    target_name: Some(target_name.into()),
-                    // We have already validated that none will be present if we were using many
-                    // events.
-                    filter: match &offer.filter {
-                        Some(dict) => Some(dictionary_from_map(dict.clone())?),
-                        None => None,
-                    },
-                    availability: Some(availability),
-                    ..fdecl::OfferEvent::EMPTY
-                }));
-            }
         } else if let Some(n) = offer.event_stream() {
             let entries = extract_offer_sources_and_targets(
                 offer,
@@ -1174,23 +1090,6 @@ fn clone_ref(ref_: &fdecl::Ref) -> Result<fdecl::Ref, Error> {
     }
 }
 
-fn extract_use_event_source(in_obj: &Use) -> Result<fdecl::Ref, Error> {
-    match in_obj.from.as_ref() {
-        Some(UseFromRef::Parent) => Ok(fdecl::Ref::Parent(fdecl::ParentRef {})),
-        Some(UseFromRef::Framework) => Ok(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-        Some(UseFromRef::Named(name)) => {
-            Ok(fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() }))
-        }
-        Some(UseFromRef::Debug) => {
-            Err(Error::internal(format!("Debug source provided for \"use event\"")))
-        }
-        Some(UseFromRef::Self_) => {
-            Err(Error::internal(format!("Self source not supported for \"use event\"")))
-        }
-        None => Err(Error::internal(format!("No source \"from\" provided for \"use\""))),
-    }
-}
-
 fn extract_use_subdir(in_obj: &Use) -> Option<cm::RelativePath> {
     in_obj.subdir.clone()
 }
@@ -1416,9 +1315,6 @@ where
     } else if let Some(_) = in_obj.storage() {
         let path = to_obj.path().expect("no path on use storage");
         Some(OneOrMany::One(path.clone()))
-    } else if let Some(_) = in_obj.event_stream_deprecated() {
-        let path = to_obj.path().expect("no path on event stream");
-        Some(OneOrMany::One(path.clone()))
     } else if let Some(_) = in_obj.event_stream() {
         let default_path = Path::new("/svc/fuchsia.component.EventStream".to_string()).unwrap();
         let path = to_obj.path().unwrap_or(&default_path);
@@ -1485,8 +1381,6 @@ where
         } else if let Some(n) = in_obj.runner() {
             Some(n.clone())
         } else if let Some(n) = in_obj.resolver() {
-            Some(n.clone())
-        } else if let Some(n) = in_obj.event() {
             Some(n.clone())
         } else if let Some(n) = in_obj.event_stream() {
             Some(n.clone())
@@ -1617,16 +1511,6 @@ pub fn translate_capabilities(
                 source_path: source_path,
                 ..fdecl::Resolver::EMPTY
             }));
-        } else if let Some(n) = &capability.event {
-            if !as_builtin {
-                return Err(Error::internal(format!(
-                    "event capabilities may only be declared as built-in capabilities"
-                )));
-            }
-            out_capabilities.push(fdecl::Capability::Event(fdecl::Event {
-                name: Some(n.clone().into()),
-                ..fdecl::Event::EMPTY
-            }));
         } else if let Some(ns) = &capability.event_stream {
             if !as_builtin {
                 return Err(Error::internal(format!(
@@ -1719,9 +1603,9 @@ mod tests {
         crate::{
             create_offer, error::Error, AnyRef, AsClause, Capability, CapabilityClause, Child,
             Collection, DebugRegistration, Document, Environment, EnvironmentExtends,
-            EnvironmentRef, EventSubscriptionsClause, Expose, ExposeFromRef, ExposeToRef,
-            FromClause, Offer, OfferFromRef, OneOrMany, Path, PathClause, Program,
-            ResolverRegistration, RightsClause, RunnerRegistration, Use, UseFromRef,
+            EnvironmentRef, Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef,
+            OneOrMany, Path, PathClause, Program, ResolverRegistration, RightsClause,
+            RunnerRegistration, Use, UseFromRef,
         },
         assert_matches::assert_matches,
         cm_types::{self as cm, Name},
@@ -2523,25 +2407,6 @@ mod tests {
                     },
                     { "storage": "hippos", "path": "/hippos" },
                     { "storage": "cache", "path": "/tmp" },
-                    { "event": "destroyed", "from": "parent" },
-                    { "event": ["started", "stopped"], "from": "framework" },
-                    {
-                        "event": "directory_ready",
-                        "as": "diagnostics",
-                        "from": "parent",
-                        "filter": { "name": "diagnostics" }
-                    },
-                    {
-                        "event_stream_deprecated": "foo_stream",
-                        "subscriptions": [
-                            {
-                                "event": [ "started", "diagnostics" ],
-                            },
-                            {
-                                "event": [ "destroyed" ],
-                            }
-                        ]
-                    },
                     {
                         "event_stream": "bar_stream",
                     },
@@ -2665,77 +2530,6 @@ mod tests {
                             ..fdecl::UseStorage::EMPTY
                         }
                     ),
-                    fdecl::Use::Event (
-                        fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            source_name: Some("destroyed".to_string()),
-                            target_name: Some("destroyed".to_string()),
-                            filter: None,
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Use::Event (
-                        fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                            source_name: Some("started".to_string()),
-                            target_name: Some("started".to_string()),
-                            filter: None,
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Use::Event (
-                        fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                            source_name: Some("stopped".to_string()),
-                            target_name: Some("stopped".to_string()),
-                            filter: None,
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Use::Event (
-                        fdecl::UseEvent {
-                            dependency_type: Some(fdecl::DependencyType::Strong),
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            source_name: Some("directory_ready".to_string()),
-                            target_name: Some("diagnostics".to_string()),
-                            filter: Some(fdata::Dictionary {
-                                entries: Some(vec![
-                                    fdata::DictionaryEntry {
-                                        key: "name".to_string(),
-                                        value: Some(Box::new(fdata::DictionaryValue::Str("diagnostics".to_string()))),
-                                    },
-                                ]),
-                                ..fdata::Dictionary::EMPTY
-                            }),
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::UseEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Use::EventStreamDeprecated(fdecl::UseEventStreamDeprecated {
-                        name: Some("foo_stream".to_string()),
-                        subscriptions: Some(vec![
-                            fdecl::EventSubscription {
-                                event_name: Some("started".to_string()),
-                                ..fdecl::EventSubscription::EMPTY
-                            },
-                            fdecl::EventSubscription {
-                                event_name: Some("diagnostics".to_string()),
-                                ..fdecl::EventSubscription::EMPTY
-                            },
-                            fdecl::EventSubscription {
-                                event_name: Some("destroyed".to_string()),
-                                ..fdecl::EventSubscription::EMPTY
-                            },
-                        ]),
-                        availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseEventStreamDeprecated::EMPTY
-                    }),
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source_name: Some("bar_stream".to_string()),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
@@ -3215,29 +3009,6 @@ mod tests {
                         "to": "#netstack",
                     },
                     {
-                        "event": "destroyed",
-                        "from": "framework",
-                        "to": [ "#netstack"],
-                        "as": "destroyed_net"
-                    },
-                    {
-                        "event": [ "stopped", "started" ],
-                        "from": "parent",
-                        "to": [ "#modular" ],
-                    },
-                    {
-                        "event": "directory_ready",
-                        "from": "parent",
-                        "to": [ "#netstack" ],
-                        "as": "net-ready",
-                        "filter": {
-                            "name": [
-                                "diagnostics",
-                                "foo"
-                            ],
-                        }
-                    },
-                    {
                         "resolver": "my_resolver",
                         "from": "parent",
                         "to": [ "#modular" ],
@@ -3570,70 +3341,6 @@ mod tests {
                             })),
                             target_name: Some("runner_b".to_string()),
                             ..fdecl::OfferRunner::EMPTY
-                        }
-                    ),
-                    fdecl::Offer::Event (
-                        fdecl::OfferEvent {
-                            source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                            source_name: Some("destroyed".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("destroyed_net".to_string()),
-                            filter: None,
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Offer::Event (
-                        fdecl::OfferEvent {
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            source_name: Some("stopped".to_string()),
-                            target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
-                                name: "modular".to_string(),
-                            })),
-                            target_name: Some("stopped".to_string()),
-                            filter: None,
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Offer::Event (
-                        fdecl::OfferEvent {
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            source_name: Some("started".to_string()),
-                            target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
-                                name: "modular".to_string(),
-                            })),
-                            target_name: Some("started".to_string()),
-                            filter: None,
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEvent::EMPTY
-                        }
-                    ),
-                    fdecl::Offer::Event (
-                        fdecl::OfferEvent {
-                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                            source_name: Some("directory_ready".to_string()),
-                            target: Some(fdecl::Ref::Child(fdecl::ChildRef {
-                                name: "netstack".to_string(),
-                                collection: None,
-                            })),
-                            target_name: Some("net-ready".to_string()),
-                            filter: Some(fdata::Dictionary {
-                                entries: Some(vec![
-                                    fdata::DictionaryEntry {
-                                        key: "name".to_string(),
-                                        value: Some(Box::new(fdata::DictionaryValue::StrVec(
-                                            vec!["diagnostics".to_string(), "foo".to_string()]
-                                        ))),
-                                    },
-                                ]),
-                                ..fdata::Dictionary::EMPTY
-                            }),
-                            availability: Some(fdecl::Availability::Required),
-                            ..fdecl::OfferEvent::EMPTY
                         }
                     ),
                     fdecl::Offer::Resolver (

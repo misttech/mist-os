@@ -61,8 +61,6 @@ std::optional<R> VisitOffer(fdecl::Offer& offer, F apply) {
       return apply(offer.runner());
     case fdecl::Offer::Tag::kResolver:
       return apply(offer.resolver());
-    case fdecl::Offer::Tag::kEvent:
-      return apply(offer.event());
     case fdecl::Offer::Tag::kEventStream:
       return apply(offer.event_stream());
     default:

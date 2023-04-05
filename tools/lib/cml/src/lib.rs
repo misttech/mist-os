@@ -26,7 +26,6 @@ use {
         fmt,
         hash::Hash,
         num::NonZeroU32,
-        ops::Deref,
         path,
         str::FromStr,
     },
@@ -66,11 +65,12 @@ pub enum CapabilityId {
     UsedDirectory(Path),
     // A storage in a `use` declaration has a target path in the component's namespace.
     UsedStorage(Path),
+    // An event stream in a `use` declaration has a target path in the component's namespace.
+    UsedEventStream(Path),
     Storage(Name),
     Runner(Name),
     Resolver(Name),
-    Event(Name),
-    EventStream(Path),
+    EventStream(Name),
 }
 
 /// Generates a `Vec<Name>` -> `Vec<CapabilityId>` conversion function.
@@ -102,10 +102,10 @@ impl CapabilityId {
             CapabilityId::UsedProtocol(_) => "protocol",
             CapabilityId::UsedDirectory(_) => "directory",
             CapabilityId::UsedStorage(_) => "storage",
+            CapabilityId::UsedEventStream(_) => "event_stream",
             CapabilityId::Storage(_) => "storage",
             CapabilityId::Runner(_) => "runner",
             CapabilityId::Resolver(_) => "resolver",
-            CapabilityId::Event(_) => "event",
             CapabilityId::EventStream(_) => "event_stream",
         }
     }
@@ -117,7 +117,7 @@ impl CapabilityId {
             CapabilityId::UsedProtocol(p) => path::Path::new(p.as_str()).parent(),
             CapabilityId::UsedDirectory(p) => Some(path::Path::new(p.as_str())),
             CapabilityId::UsedStorage(p) => Some(path::Path::new(p.as_str())),
-            CapabilityId::EventStream(p) => path::Path::new(p.as_str()).parent(),
+            CapabilityId::UsedEventStream(p) => path::Path::new(p.as_str()).parent(),
             _ => None,
         }
     }
@@ -155,31 +155,11 @@ impl CapabilityId {
                 return Err(Error::validate("\"path\" should be present for `use storage`."));
             }
             return Ok(vec![CapabilityId::UsedStorage(use_.path.as_ref().unwrap().clone())]);
-        } else if let Some(OneOrMany::One(n)) = use_.event.as_ref() {
-            return Ok(vec![CapabilityId::Event(alias_or_name(use_.r#as.as_ref(), n))]);
-        } else if let Some(OneOrMany::Many(events)) = use_.event.as_ref() {
-            return match (use_.r#as.as_ref(), use_.filter.as_ref(), events.len()) {
-                (Some(alias), _, 1) => Ok(vec![CapabilityId::Event(alias.clone())]),
-                (None, Some(_), 1) => Ok(vec![CapabilityId::Event(events[0].clone())]),
-                (Some(_), None, _) => Err(Error::validate(
-                    "\"as\" can only be specified when one `event` is supplied",
-                )),
-                (None, Some(_), _) => Err(Error::validate(
-                    "\"filter\" can only be specified when one `event` is supplied",
-                )),
-                (Some(_), Some(_), _) => Err(Error::validate(
-                    "\"as\",\"filter\" can only be specified when one `event` is supplied",
-                )),
-                (None, None, _) => Ok(events
-                    .iter()
-                    .map(|event: &Name| CapabilityId::Event(event.clone()))
-                    .collect()),
-            };
         } else if let Some(_) = use_.event_stream() {
             if let Some(path) = use_.path() {
-                return Ok(vec![CapabilityId::EventStream(path.clone())]);
+                return Ok(vec![CapabilityId::UsedEventStream(path.clone())]);
             }
-            return Ok(vec![CapabilityId::EventStream(Path::new(
+            return Ok(vec![CapabilityId::UsedEventStream(Path::new(
                 "/svc/fuchsia.component.EventStream".to_string(),
             )?)]);
         }
@@ -250,14 +230,8 @@ impl CapabilityId {
                 None,
                 capability.capability_type(),
             )?));
-        } else if let Some(n) = capability.event() {
-            return Ok(Self::events_from(Self::get_one_or_many_names(
-                n,
-                None,
-                capability.capability_type(),
-            )?));
         } else if let Some(n) = capability.event_stream() {
-            return Ok(Self::events_from(Self::get_one_or_many_names(
+            return Ok(Self::event_streams_from(Self::get_one_or_many_names(
                 n,
                 None,
                 capability.capability_type(),
@@ -328,33 +302,8 @@ impl CapabilityId {
                 alias,
                 clause.capability_type(),
             )?));
-        } else if let Some(events) = clause.event() {
-            return match events {
-                event @ OneOrMany::One(_) => Ok(Self::events_from(Self::get_one_or_many_names(
-                    event,
-                    alias,
-                    clause.capability_type(),
-                )?)),
-                OneOrMany::Many(events) => match (alias, clause.filter(), events.len()) {
-                    (Some(alias), _, 1) => Ok(vec![CapabilityId::Event(alias.clone())]),
-                    (None, Some(_), 1) => Ok(vec![CapabilityId::Event(events[0].clone())]),
-                    (Some(_), None, _) => Err(Error::validate(
-                        "\"as\" can only be specified when one `event` is supplied",
-                    )),
-                    (None, Some(_), _) => Err(Error::validate(
-                        "\"filter\" can only be specified when one `event` is supplied",
-                    )),
-                    (Some(_), Some(_), _) => Err(Error::validate(
-                        "\"as\",\"filter\" can only be specified when one `event` is supplied",
-                    )),
-                    (None, None, _) => Ok(events
-                        .iter()
-                        .map(|event: &Name| CapabilityId::Event(event.clone()))
-                        .collect()),
-                },
-            };
         } else if let Some(event_stream) = clause.event_stream() {
-            return Ok(Self::events_from(Self::get_one_or_many_names(
+            return Ok(Self::event_streams_from(Self::get_one_or_many_names(
                 event_stream,
                 alias,
                 clause.capability_type(),
@@ -422,7 +371,7 @@ impl CapabilityId {
     capability_ids_from_names!(storages_from, CapabilityId::Storage);
     capability_ids_from_names!(runners_from, CapabilityId::Runner);
     capability_ids_from_names!(resolvers_from, CapabilityId::Resolver);
-    capability_ids_from_names!(events_from, CapabilityId::Event);
+    capability_ids_from_names!(event_streams_from, CapabilityId::EventStream);
     capability_ids_from_paths!(used_services_from, CapabilityId::UsedService);
     capability_ids_from_paths!(used_protocols_from, CapabilityId::UsedProtocol);
 }
@@ -435,12 +384,12 @@ impl fmt::Display for CapabilityId {
             | CapabilityId::Storage(n)
             | CapabilityId::Runner(n)
             | CapabilityId::Resolver(n)
-            | CapabilityId::Event(n) => n.as_str(),
+            | CapabilityId::EventStream(n) => n.as_str(),
             CapabilityId::UsedService(p)
             | CapabilityId::UsedProtocol(p)
             | CapabilityId::UsedDirectory(p)
-            | CapabilityId::UsedStorage(p) => p.as_str(),
-            CapabilityId::EventStream(p) => p.as_str(),
+            | CapabilityId::UsedStorage(p)
+            | CapabilityId::UsedEventStream(p) => p.as_str(),
             CapabilityId::Protocol(p) | CapabilityId::Directory(p) => p.as_str(),
         };
         write!(f, "{}", s)
@@ -731,12 +680,6 @@ pub enum RegistrationRef {
     Parent,
     /// A reference to this component.
     Self_,
-}
-
-#[derive(Deserialize, Debug, PartialEq, Clone, Serialize)]
-#[serde(deny_unknown_fields)]
-pub struct EventSubscription {
-    pub event: OneOrMany<Name>,
 }
 
 /// A right or bundle of rights to apply to a directory.
@@ -1156,11 +1099,13 @@ macro_rules! flatten_field {
 // flatten_docs updates one or more Documents by expanding fields where one entry
 // can represent multiple capabilities. This prepares the Document to be merged with
 // the correct deduplication behavior.
+//
+// TODO(fxbug.dev/124675): Remove this macro and handle OneOrMany(Many) directly.
 macro_rules! flatten_docs {
     ($($doc: ident),+ ) => {
         $({
-            flatten_field!($doc, r#use, protocol, service, event);
-            flatten_field!($doc, offer, protocol, service, event);
+            flatten_field!($doc, r#use, protocol, service);
+            flatten_field!($doc, offer, protocol, service);
             flatten_field!($doc, expose, protocol, service);
             flatten_field!($doc, capabilities, protocol, service);
         })+
@@ -1348,26 +1293,6 @@ impl Document {
 
     pub fn includes(&self) -> Vec<String> {
         self.include.clone().unwrap_or_default()
-    }
-
-    pub fn all_event_names(&self) -> Result<Vec<Name>, Error> {
-        let mut all_events: Vec<Name> = vec![];
-        if let Some(uses) = self.r#use.as_ref() {
-            for use_ in uses.iter() {
-                if let Some(event) = &use_.event {
-                    let alias = use_.r#as();
-                    let events: Vec<_> = event.to_vec();
-                    if events.len() == 1 {
-                        let event_name = alias_or_name(alias, &events[0]).clone();
-                        all_events.push(event_name);
-                    } else {
-                        let mut events = events.into_iter().cloned().collect();
-                        all_events.append(&mut events);
-                    }
-                }
-            }
-        }
-        Ok(all_events)
     }
 
     pub fn all_children_names(&self) -> Vec<&Name> {
@@ -1803,10 +1728,6 @@ pub struct Capability {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolver: Option<Name>,
 
-    /// The [name](#name) for this event capability.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event: Option<Name>,
-
     /// The [name](#name) for this event_stream capability.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub event_stream: Option<OneOrMany<Name>>,
@@ -1883,23 +1804,6 @@ pub struct DebugRegistration {
     /// If specified, the name that the capability in `protocol` should be made
     /// available as to clients. Disallowed if `protocol` is an array.
     pub r#as: Option<Name>,
-}
-
-/// A list of event modes.
-#[derive(CheckedVec, Debug, PartialEq, Clone)]
-#[checked_vec(
-    expected = "a nonempty array of event subscriptions",
-    min_length = 1,
-    unique_items = false
-)]
-pub struct EventSubscriptions(pub Vec<EventSubscription>);
-
-impl Deref for EventSubscriptions {
-    type Target = Vec<EventSubscription>;
-
-    fn deref(&self) -> &Vec<EventSubscription> {
-        &self.0
-    }
 }
 
 #[derive(Debug, PartialEq, Default, Serialize)]
@@ -1995,7 +1899,7 @@ impl<'de> de::Deserialize<'de> for Program {
 ///         path: "/data",
 ///     },
 ///     {
-///         event: [
+///         event_stream: [
 ///             "started",
 ///             "stopped",
 ///         ],
@@ -2022,15 +1926,6 @@ pub struct Use {
     /// When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage: Option<Name>,
-
-    /// When using an event capability, the [name](#name) of an [event capability][doc-event].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event: Option<OneOrMany<Name>>,
-
-    // TODO(fxbug.dev/81980): remove.
-    /// Deprecated and unusable. In the process of being removed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_stream_deprecated: Option<Name>,
 
     /// When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -2080,11 +1975,6 @@ pub struct Use {
     /// filter will be an object mapping from "name" to the "protocol name".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub filter: Option<Map<String, Value>>,
-
-    // TODO(fxbug.dev/81980): remove.
-    /// Deprecated and unusable. In the process of being removed.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub subscriptions: Option<EventSubscriptions>,
 
     /// `dependency` _(optional)_: The type of dependency between the source and
     /// this component, one of:
@@ -2251,7 +2141,7 @@ pub struct Expose {
 ///         to: [ "#user-shell" ],
 ///     },
 ///     {
-///         event: "stopped",
+///         event_stream: "stopped",
 ///         from: "framework",
 ///         to: [ "#logger" ],
 ///     },
@@ -2284,10 +2174,6 @@ pub struct Offer {
     /// When routing a storage capability, the [name](#name) of a [storage capability][doc-storage].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage: Option<OneOrMany<Name>>,
-
-    /// When routing an event, the [name](#name) of the [event][doc-event].
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event: Option<OneOrMany<Name>>,
 
     /// `from`: The source of the capability, one of:
     /// - `parent`: The component's parent. This source can be used for all
@@ -2514,8 +2400,6 @@ pub trait CapabilityClause {
     fn storage(&self) -> Option<OneOrMany<Name>>;
     fn runner(&self) -> Option<OneOrMany<Name>>;
     fn resolver(&self) -> Option<OneOrMany<Name>>;
-    fn event(&self) -> Option<OneOrMany<Name>>;
-    fn event_stream_deprecated(&self) -> Option<Name>;
     fn event_stream(&self) -> Option<OneOrMany<Name>>;
 
     /// Returns the name of the capability for display purposes.
@@ -2537,8 +2421,7 @@ pub trait CapabilityClause {
             self.storage(),
             self.runner(),
             self.resolver(),
-            self.event(),
-            self.event_stream_deprecated().map(|n| OneOrMany::One(n)),
+            self.event_stream(),
         ];
         res.into_iter()
             .map(|o| o.map(|o| o.into_iter().collect::<Vec<Name>>()).unwrap_or(vec![]))
@@ -2557,10 +2440,6 @@ pub trait PathClause {
 
 pub trait FilterClause {
     fn filter(&self) -> Option<&Map<String, Value>>;
-}
-
-pub trait EventSubscriptionsClause {
-    fn event_subscriptions(&self) -> Option<&EventSubscriptions>;
 }
 
 pub trait RightsClause {
@@ -2586,14 +2465,8 @@ impl CapabilityClause for Capability {
     fn resolver(&self) -> Option<OneOrMany<Name>> {
         self.resolver.as_ref().map(|n| OneOrMany::One(n.clone()))
     }
-    fn event(&self) -> Option<OneOrMany<Name>> {
-        self.event.as_ref().map(|n| OneOrMany::One(n.clone()))
-    }
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
-    }
-    fn event_stream_deprecated(&self) -> Option<Name> {
-        None
     }
     fn capability_type(&self) -> &'static str {
         if self.service.is_some() {
@@ -2608,8 +2481,6 @@ impl CapabilityClause for Capability {
             "runner"
         } else if self.resolver.is_some() {
             "resolver"
-        } else if self.event.is_some() {
-            "event"
         } else if self.event_stream.is_some() {
             "event_stream"
         } else {
@@ -2620,16 +2491,7 @@ impl CapabilityClause for Capability {
         "capability"
     }
     fn supported(&self) -> &[&'static str] {
-        &[
-            "service",
-            "protocol",
-            "directory",
-            "storage",
-            "runner",
-            "resolver",
-            "event",
-            "event_stream",
-        ]
+        &["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
     }
 }
 
@@ -2676,13 +2538,7 @@ impl CapabilityClause for DebugRegistration {
     fn resolver(&self) -> Option<OneOrMany<Name>> {
         None
     }
-    fn event(&self) -> Option<OneOrMany<Name>> {
-        None
-    }
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
-        None
-    }
-    fn event_stream_deprecated(&self) -> Option<Name> {
         None
     }
     fn capability_type(&self) -> &'static str {
@@ -2737,12 +2593,6 @@ impl CapabilityClause for Use {
     fn resolver(&self) -> Option<OneOrMany<Name>> {
         None
     }
-    fn event(&self) -> Option<OneOrMany<Name>> {
-        self.event.clone()
-    }
-    fn event_stream_deprecated(&self) -> Option<Name> {
-        self.event_stream_deprecated.clone()
-    }
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
     }
@@ -2755,10 +2605,6 @@ impl CapabilityClause for Use {
             "directory"
         } else if self.storage.is_some() {
             "storage"
-        } else if self.event.is_some() {
-            "event"
-        } else if self.event_stream_deprecated.is_some() {
-            "event_stream_deprecated"
         } else if self.event_stream.is_some() {
             "event_stream"
         } else {
@@ -2769,16 +2615,7 @@ impl CapabilityClause for Use {
         "use"
     }
     fn supported(&self) -> &[&'static str] {
-        &[
-            "service",
-            "protocol",
-            "directory",
-            "storage",
-            "runner",
-            "event",
-            "event_stream",
-            "event_stream_deprecated",
-        ]
+        &["service", "protocol", "directory", "storage", "runner", "event_stream"]
     }
 }
 
@@ -2812,12 +2649,6 @@ impl RightsClause for Use {
     }
 }
 
-impl EventSubscriptionsClause for Use {
-    fn event_subscriptions(&self) -> Option<&EventSubscriptions> {
-        self.subscriptions.as_ref()
-    }
-}
-
 impl CapabilityClause for Expose {
     fn service(&self) -> Option<OneOrMany<Name>> {
         self.service.as_ref().map(|n| n.clone())
@@ -2836,12 +2667,6 @@ impl CapabilityClause for Expose {
     }
     fn resolver(&self) -> Option<OneOrMany<Name>> {
         self.resolver.clone()
-    }
-    fn event(&self) -> Option<OneOrMany<Name>> {
-        None
-    }
-    fn event_stream_deprecated(&self) -> Option<Name> {
-        None
     }
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
@@ -2920,14 +2745,8 @@ impl CapabilityClause for Offer {
     fn resolver(&self) -> Option<OneOrMany<Name>> {
         self.resolver.clone()
     }
-    fn event(&self) -> Option<OneOrMany<Name>> {
-        self.event.clone()
-    }
     fn event_stream(&self) -> Option<OneOrMany<Name>> {
         self.event_stream.clone()
-    }
-    fn event_stream_deprecated(&self) -> Option<Name> {
-        None
     }
     fn capability_type(&self) -> &'static str {
         if self.service.is_some() {
@@ -2942,8 +2761,6 @@ impl CapabilityClause for Offer {
             "runner"
         } else if self.resolver.is_some() {
             "resolver"
-        } else if self.event.is_some() {
-            "event"
         } else if self.event_stream.is_some() {
             "event_stream"
         } else {
@@ -2954,16 +2771,7 @@ impl CapabilityClause for Offer {
         "offer"
     }
     fn supported(&self) -> &[&'static str] {
-        &[
-            "service",
-            "protocol",
-            "directory",
-            "storage",
-            "runner",
-            "resolver",
-            "event",
-            "event_stream",
-        ]
+        &["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
     }
 }
 
@@ -3204,7 +3012,6 @@ pub fn create_offer(
         runner: None,
         resolver: None,
         storage: None,
-        event: None,
         dependency: None,
         rights: None,
         subdir: None,
@@ -3406,7 +3213,6 @@ mod tests {
             storage: None,
             runner: None,
             resolver: None,
-            event: None,
             from: OneOrMany::One(OfferFromRef::Self_),
             to: OneOrMany::Many(vec![]),
             r#as: None,
@@ -3433,11 +3239,8 @@ mod tests {
             r#as: None,
             rights: None,
             subdir: None,
-            event: None,
-            event_stream_deprecated: None,
             event_stream: None,
             filter: None,
-            subscriptions: None,
             dependency: None,
             availability: None,
         }
@@ -3486,14 +3289,16 @@ mod tests {
                 path: Some(cm_types::Path::new("/svc/myevent".to_string()).unwrap()),
                 ..empty_use()
             },)?,
-            vec![CapabilityId::EventStream("/svc/myevent".parse().unwrap()),]
+            vec![CapabilityId::UsedEventStream("/svc/myevent".parse().unwrap()),]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
                 event_stream: Some(OneOrMany::One(Name::try_new("test".to_string()).unwrap())),
                 ..empty_use()
             },)?,
-            vec![CapabilityId::EventStream("/svc/fuchsia.component.EventStream".parse().unwrap()),]
+            vec![CapabilityId::UsedEventStream(
+                "/svc/fuchsia.component.EventStream".parse().unwrap()
+            ),]
         );
         assert_eq!(
             CapabilityId::from_use(&Use {
@@ -3990,12 +3795,6 @@ mod tests {
         ; "merge duplicate capabilities service use clause"
     )]
     #[test_case(
-        document(json!({ "use": [{ "event": "EventFoo", "from": "self"}]})),
-        document(json!({ "use": [{ "event": ["EventFoo", "EventBar"], "from": "self"}]})),
-        document(json!({ "use": [{ "event": "EventFoo", "from": "self" },{"event": "EventBar", "from": "self"}]}))
-        ; "merge duplicate capabilities events use clause"
-    )]
-    #[test_case(
         document(json!({ "offer": [{ "protocol": "foo.bar.Baz", "from": "self", "to": "#elements"}], "collections" :[{"name": "elements", "durability": "transient" }]})),
         document(json!({ "offer": [{ "protocol": ["foo.bar.Baz", "some.other.Protocol"], "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]})),
         document(json!({ "offer": [{ "protocol": "foo.bar.Baz", "from": "self", "to": "#elements" },{"protocol": "some.other.Protocol", "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]}))
@@ -4006,12 +3805,6 @@ mod tests {
         document(json!({ "offer": [{ "service": ["foo.bar.Baz", "some.other.Service"], "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]})),
         document(json!({ "offer": [{ "service": "foo.bar.Baz", "from": "self", "to": "#elements" },{"service": "some.other.Service", "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]}))
         ; "merge duplicate capabilities service offer clause"
-    )]
-    #[test_case(
-        document(json!({ "offer": [{ "event": "EventFoo", "from": "self", "to": "#elements"}], "collections" :[{"name": "elements", "durability": "transient" }]})),
-        document(json!({ "offer": [{ "event": ["EventFoo", "EventBar"], "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]})),
-        document(json!({ "offer": [{ "event": "EventFoo", "from": "self", "to": "#elements" },{"event": "EventBar", "from": "self", "to": "#elements"}], "collections":[{"name": "elements", "durability": "transient"}]}))
-        ; "merge duplicate capabilities events offer clause"
     )]
     #[test_case(
         document(json!({ "expose": [{ "protocol": "foo.bar.Baz", "from": "self"}]})),
@@ -4076,14 +3869,6 @@ mod tests {
         "use multiple from self"
     )]
     #[test_case(
-        &document(json!({ "use": [{ "event": "EventFoo", "from": "self"}]}));
-        "use event from self"
-    )]
-    #[test_case(
-        &document(json!({ "use": [{ "event": ["EventFoo", "EventBar"], "from": "self"}]}));
-        "use events from self"
-    )]
-    #[test_case(
         &document(json!({
             "offer": [{ "protocol": "foo.bar.Baz", "from": "self", "to": "#elements"}],
             "collections" :[{"name": "elements", "durability": "transient" }]
@@ -4098,12 +3883,6 @@ mod tests {
             ],
             "collections":[ {"name": "elements", "durability": "transient"} ]}));
         "service offers"
-    )]
-    #[test_case(
-        &document(json!({
-            "offer": [{ "event": "EventFoo", "from": "self", "to": "#elements"}],
-            "collections" :[{"name": "elements", "durability": "transient" }]}));
-        "offer event to collection"
     )]
     #[test_case(
         &document(json!({ "expose": [{ "protocol": ["foo.bar.Baz", "some.other.Protocol"], "from": "self"}]}));

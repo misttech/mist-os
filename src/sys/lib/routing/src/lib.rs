@@ -32,7 +32,6 @@ use {
         },
         environment::DebugRegistration,
         error::RoutingError,
-        event::EventFilter,
         mapper::DebugRouteMapper,
         path::PathBufExt,
         rights::Rights,
@@ -43,13 +42,12 @@ use {
         walk_state::WalkState,
     },
     cm_rust::{
-        Availability, CapabilityName, DirectoryDecl, EventDecl, ExposeDirectoryDecl,
-        ExposeEventStreamDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
-        ExposeServiceDecl, ExposeSource, OfferDirectoryDecl, OfferEventDecl, OfferEventStreamDecl,
-        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
-        OfferStorageDecl, RegistrationDeclCommon, RegistrationSource, ResolverDecl,
-        ResolverRegistration, RunnerDecl, RunnerRegistration, SourceName, StorageDecl,
-        StorageDirectorySource, UseDirectoryDecl, UseEventDecl, UseEventStreamDecl,
+        Availability, CapabilityName, DirectoryDecl, ExposeDirectoryDecl, ExposeEventStreamDecl,
+        ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource,
+        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
+        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
+        RegistrationSource, ResolverDecl, ResolverRegistration, RunnerDecl, RunnerRegistration,
+        SourceName, StorageDecl, StorageDirectorySource, UseDirectoryDecl, UseEventStreamDecl,
         UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -79,7 +77,6 @@ pub enum RouteRequest {
 
     // Route a capability from a UseDecl.
     UseDirectory(UseDirectoryDecl),
-    UseEvent(UseEventDecl),
     UseEventStream(UseEventStreamDecl),
     UseProtocol(UseProtocolDecl),
     UseService(UseServiceDecl),
@@ -87,7 +84,6 @@ pub enum RouteRequest {
 
     // Route a capability from an OfferDecl.
     OfferDirectory(OfferDirectoryDecl),
-    OfferEvent(OfferEventDecl),
     OfferEventStream(OfferEventStreamDecl),
     OfferProtocol(OfferProtocolDecl),
     OfferService(OfferServiceDecl),
@@ -104,7 +100,6 @@ impl RouteRequest {
         use crate::RouteRequest::*;
         match self {
             UseDirectory(UseDirectoryDecl { availability, .. })
-            | UseEvent(UseEventDecl { availability, .. })
             | UseEventStream(UseEventStreamDecl { availability, .. })
             | UseProtocol(UseProtocolDecl { availability, .. })
             | UseService(UseServiceDecl { availability, .. })
@@ -122,7 +117,6 @@ impl RouteRequest {
             | StorageBackingDirectory(_) => false,
 
             OfferDirectory(OfferDirectoryDecl { availability, .. })
-            | OfferEvent(OfferEventDecl { availability, .. })
             | OfferEventStream(OfferEventStreamDecl { availability, .. })
             | OfferProtocol(OfferProtocolDecl { availability, .. })
             | OfferService(OfferServiceDecl { availability, .. })
@@ -195,7 +189,6 @@ where
         RouteRequest::UseDirectory(use_directory_decl) => {
             route_directory(use_directory_decl, target, mapper).await
         }
-        RouteRequest::UseEvent(use_event_decl) => route_event(use_event_decl, target, mapper).await,
         RouteRequest::UseEventStream(use_event_stream_decl) => {
             route_event_stream(use_event_stream_decl, target, mapper).await
         }
@@ -221,9 +214,6 @@ where
         }
         RouteRequest::OfferService(offer_service_decl) => {
             route_service_from_offer(offer_service_decl, target, mapper).await
-        }
-        RouteRequest::OfferEvent(offer_event_decl) => {
-            route_event_from_offer(offer_event_decl, target, mapper).await
         }
         RouteRequest::OfferEventStream(offer_event_stream_decl) => {
             route_event_stream_from_offer(offer_event_stream_decl, target, mapper).await
@@ -388,39 +378,6 @@ where
             target.clone(),
             allowed_sources,
             &mut availability_visitor,
-            mapper,
-            &mut route,
-        )
-        .await?;
-    Ok(RouteSource::new(source))
-}
-
-async fn route_event_from_offer<C, M>(
-    offer_decl: OfferEventDecl,
-    target: &Arc<C>,
-    mapper: &mut M,
-) -> Result<RouteSource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    M: DebugRouteMapper + 'static,
-{
-    let allowed_sources =
-        AllowedSourcesBuilder::new().framework(InternalCapability::Event).builtin();
-    let mut state = EventState {
-        filter_state: WalkState::at(EventFilter::new(offer_decl.filter.clone())),
-        availability_state: AvailabilityState(offer_decl.availability.clone().into()),
-    };
-
-    let mut route = vec![];
-
-    let source = RoutingStrategy::new()
-        .use_::<UseEventDecl>()
-        .offer::<OfferEventDecl>()
-        .route_from_offer(
-            offer_decl,
-            target.clone(),
-            allowed_sources,
-            &mut state,
             mapper,
             &mut route,
         )
@@ -1034,64 +991,6 @@ where
     Ok(RouteSource::new(source))
 }
 
-/// State accumulated from routing an Event capability to its source.
-struct EventState {
-    filter_state: WalkState<EventFilter>,
-    availability_state: AvailabilityState,
-}
-
-impl OfferVisitor for EventState {
-    type OfferDecl = OfferEventDecl;
-
-    fn visit(&mut self, offer: &OfferEventDecl) -> Result<(), RoutingError> {
-        self.availability_state.advance(&offer.availability)?;
-        let event_filter = Some(EventFilter::new(offer.filter.clone()));
-        match &offer.source {
-            OfferSource::Parent => {
-                self.filter_state = self.filter_state.advance(event_filter)?;
-            }
-            OfferSource::Framework => {
-                self.filter_state = self.filter_state.finalize(event_filter)?;
-            }
-            _ => unreachable!("no other valid sources"),
-        }
-        Ok(())
-    }
-}
-
-impl CapabilityVisitor for EventState {
-    type CapabilityDecl = EventDecl;
-}
-
-/// Routes an Event capability from `target` to its source, starting from `use_decl`.
-async fn route_event<C, M>(
-    use_decl: UseEventDecl,
-    target: &Arc<C>,
-    mapper: &mut M,
-) -> Result<RouteSource<C>, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-    M: DebugRouteMapper + 'static,
-{
-    let allowed_sources =
-        AllowedSourcesBuilder::new().framework(InternalCapability::Event).builtin();
-    let mut state = EventState {
-        filter_state: WalkState::at(EventFilter::new(
-            use_decl.filter.clone().map(|value| value.into_iter().collect()),
-        )),
-        availability_state: AvailabilityState(use_decl.availability.clone().into()),
-    };
-
-    let source = RoutingStrategy::new()
-        .use_::<UseEventDecl>()
-        .offer::<OfferEventDecl>()
-        .route(use_decl, target.clone(), allowed_sources, &mut state, mapper)
-        .await?;
-
-    target.policy_checker().can_route_capability(&source, target.abs_moniker())?;
-    Ok(RouteSource::new(source))
-}
-
 /// Routes an EventStream capability from `target` to its source, starting from `use_decl`.
 async fn route_event_stream<C, M>(
     use_decl: UseEventStreamDecl,
@@ -1616,44 +1515,12 @@ impl ErrorNotFoundInChild for ExposeResolverDecl {
     }
 }
 
-impl ErrorNotFoundInChild for UseEventDecl {
-    fn error_not_found_in_child(
-        moniker: AbsoluteMoniker,
-        child_moniker: ChildMoniker,
-        capability_name: CapabilityName,
-    ) -> RoutingError {
-        RoutingError::UseFromChildExposeNotFound {
-            child_moniker,
-            moniker,
-            capability_id: capability_name.into(),
-        }
-    }
-}
-
-impl ErrorNotFoundFromParent for UseEventDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: CapabilityName,
-    ) -> RoutingError {
-        RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
 impl ErrorNotFoundFromParent for UseEventStreamDecl {
     fn error_not_found_from_parent(
         moniker: AbsoluteMoniker,
         capability_name: CapabilityName,
     ) -> RoutingError {
         RoutingError::UseFromParentNotFound { moniker, capability_id: capability_name.into() }
-    }
-}
-
-impl ErrorNotFoundFromParent for OfferEventDecl {
-    fn error_not_found_from_parent(
-        moniker: AbsoluteMoniker,
-        capability_name: CapabilityName,
-    ) -> RoutingError {
-        RoutingError::OfferFromParentNotFound { moniker, capability_id: capability_name.into() }
     }
 }
 

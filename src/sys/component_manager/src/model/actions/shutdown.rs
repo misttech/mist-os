@@ -14,7 +14,7 @@ use {
         ExposeDecl, OfferDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl,
         OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
         RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseDecl,
-        UseDirectoryDecl, UseEventDecl, UseProtocolDecl, UseServiceDecl, UseSource,
+        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseServiceDecl, UseSource,
     },
     flyweights::FlyStr,
     futures::future::select_all,
@@ -433,25 +433,22 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
             UseDecl::Service(UseServiceDecl { source: UseSource::Child(name), .. })
             | UseDecl::Protocol(UseProtocolDecl { source: UseSource::Child(name), .. })
             | UseDecl::Directory(UseDirectoryDecl { source: UseSource::Child(name), .. })
-            | UseDecl::Event(UseEventDecl { source: UseSource::Child(name), .. }) => name,
+            | UseDecl::EventStream(UseEventStreamDecl { source: UseSource::Child(name), .. }) => {
+                name
+            }
             UseDecl::Service(_)
             | UseDecl::Protocol(_)
             | UseDecl::Directory(_)
-            | UseDecl::Event(_)
             | UseDecl::Storage(_)
-            | UseDecl::EventStreamDeprecated(_) => {
+            | UseDecl::EventStream(_) => {
                 // capabilities which cannot or are not used from a child can be ignored.
-                continue;
-            }
-            UseDecl::EventStream(_) => {
                 continue;
             }
         };
         match use_ {
             UseDecl::Protocol(UseProtocolDecl { dependency_type, .. })
             | UseDecl::Service(UseServiceDecl { dependency_type, .. })
-            | UseDecl::Directory(UseDirectoryDecl { dependency_type, .. })
-            | UseDecl::Event(UseEventDecl { dependency_type, .. }) => {
+            | UseDecl::Directory(UseDirectoryDecl { dependency_type, .. }) => {
                 if dependency_type == &DependencyType::Weak
                     || dependency_type == &DependencyType::WeakForMigration
                 {
@@ -459,7 +456,7 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
                     continue;
                 }
             }
-            UseDecl::Storage(_) | UseDecl::EventStreamDeprecated(_) | UseDecl::EventStream(_) => {
+            UseDecl::Storage(_) | UseDecl::EventStream(_) => {
                 // Any other capability type cannot be marked as weak, so we can proceed
             }
         }
@@ -577,10 +574,6 @@ fn get_dependency_from_offer(
             None
         }
 
-        OfferDecl::Event(_) => {
-            // Events aren't tracked as dependencies for shutdown.
-            None
-        }
         OfferDecl::EventStream(_) => {
             // Event streams aren't tracked as dependencies for shutdown.
             None

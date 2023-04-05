@@ -193,7 +193,7 @@ type JobPolicyAllowlists = table {
 /// Represents the class of capabilities supported to be allowlisted.
 type AllowlistedCapability = flexible union {
     1: directory AllowlistedDirectory;
-    2: event AllowlistedEvent;
+    2: reserved;
     3: protocol AllowlistedProtocol;
     4: service AllowlistedService;
     5: storage AllowlistedStorage;
@@ -202,8 +202,6 @@ type AllowlistedCapability = flexible union {
 };
 
 type AllowlistedDirectory = table {};
-
-type AllowlistedEvent = table {};
 
 type AllowlistedProtocol = table {};
 

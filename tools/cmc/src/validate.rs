@@ -13,7 +13,6 @@ use {
         util,
     },
     cm_json::{JsonSchema, CMX_SCHEMA},
-    cm_types::Name,
     directed_graph::{self, DirectedGraph},
     serde_json::Value,
     std::{
@@ -158,7 +157,6 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a cml::Name>,
     all_resolvers: HashSet<&'a cml::Name>,
     all_environment_names: HashSet<&'a cml::Name>,
-    all_event_names: HashSet<cml::Name>,
     all_capability_names: HashSet<cml::Name>,
 }
 
@@ -187,7 +185,6 @@ impl<'a> ValidationContext<'a> {
             all_runners: HashSet::new(),
             all_resolvers: HashSet::new(),
             all_environment_names: HashSet::new(),
-            all_event_names: HashSet::new(),
             all_capability_names: HashSet::new(),
         }
     }
@@ -232,7 +229,6 @@ impl<'a> ValidationContext<'a> {
         self.all_runners = self.document.all_runner_names().into_iter().collect();
         self.all_resolvers = self.document.all_resolver_names().into_iter().collect();
         self.all_environment_names = self.document.all_environment_names().into_iter().collect();
-        self.all_event_names = self.document.all_event_names()?.into_iter().collect();
         self.all_capability_names = self.document.all_capability_names();
 
         // Validate "children".
@@ -519,28 +515,20 @@ impl<'a> ValidationContext<'a> {
         if use_.directory.is_some() && use_.r#as.is_some() {
             return Err(Error::validate("\"as\" cannot be used with \"directory\""));
         }
-        if use_.event.is_some() && use_.from.is_none() {
-            return Err(Error::validate("\"from\" should be present with \"event\""));
-        }
         if use_.event_stream.is_some() && use_.from.is_none() {
             return Err(Error::validate("\"from\" should be present with \"event_stream\""));
         }
         if use_.event_stream.is_some() && use_.availability.is_some() {
             return Err(Error::validate("\"availability\" cannot be used with \"event_stream\""));
         }
-        if use_.event.is_none() && use_.event_stream.is_none() && use_.filter.is_some() {
-            return Err(Error::validate(
-                "\"filter\" can only be used with \"event\" or \"event_stream\"",
-            ));
+        if use_.event_stream.is_none() && use_.filter.is_some() {
+            return Err(Error::validate("\"filter\" can only be used with \"event_stream\""));
         }
         if use_.storage.is_some() && use_.from.is_some() {
             return Err(Error::validate("\"from\" cannot be used with \"storage\""));
         }
         if use_.storage.is_some() && use_.r#as.is_some() {
             return Err(Error::validate("\"as\" cannot be used with \"storage\""));
-        }
-        if use_.from == Some(cml::UseFromRef::Self_) && use_.event.is_some() {
-            return Err(Error::validate("\"from: self\" cannot be used with \"event\""));
         }
         if use_.from == Some(cml::UseFromRef::Self_) && use_.event_stream.is_some() {
             return Err(Error::validate("\"from: self\" cannot be used with \"event_stream\""));
@@ -560,39 +548,6 @@ impl<'a> ValidationContext<'a> {
                     self.add_strong_dep(Some(name), source, target, strong_dependencies);
                 }
             }
-        }
-
-        match (use_.event_stream_deprecated.as_ref(), use_.subscriptions.as_ref()) {
-            (Some(_), Some(subscriptions)) => {
-                let event_names = subscriptions
-                    .iter()
-                    .map(|subscription| subscription.event.to_vec())
-                    .flatten()
-                    .collect::<Vec<&Name>>();
-
-                let mut unique_event_names = HashSet::new();
-                for event_name in event_names {
-                    if !unique_event_names.insert(event_name) {
-                        return Err(Error::validate(format!(
-                            "Event \"{}\" is duplicated in event stream subscriptions.",
-                            event_name,
-                        )));
-                    }
-                    if !self.all_event_names.contains(event_name) {
-                        return Err(Error::validate(format!(
-                            "Event \"{}\" in event stream not found in any \"use\" declaration.",
-                            event_name
-                        )));
-                    }
-                }
-            }
-            (None, Some(_)) => {
-                return Err(Error::validate("\"event_stream\" must be named."));
-            }
-            (Some(_), None) => {
-                return Err(Error::validate("\"event_stream\" must have subscriptions."));
-            }
-            (None, None) => {}
         }
 
         // Disallow multiple capability ids of the same name.
@@ -812,7 +767,9 @@ impl<'a> ValidationContext<'a> {
         }
         if let Some(event_stream) = &expose.event_stream {
             if event_stream.iter().len() > 1 && expose.r#as.is_some() {
-                return Err(Error::validate(format!("as cannot be used with multiple events")));
+                return Err(Error::validate(format!(
+                    "as cannot be used with multiple event streams"
+                )));
             }
             if let Some(cml::ExposeToRef::Framework) = &expose.to {
                 return Err(Error::validate(format!("cannot expose an event_stream to framework")));
@@ -993,12 +950,12 @@ impl<'a> ValidationContext<'a> {
         }
 
         // Ensure that only events can have filter.
-        match (&offer.event, &offer.event_stream, &offer.filter) {
-            (None, None, Some(_)) => Err(Error::validate(
-                "\"filter\" can only be used with \"event\" or \"event_stream\"",
-            )),
-            (None, Some(OneOrMany::Many(_)), Some(_)) => {
-                Err(Error::validate("\"filter\" cannot be used with multiple events."))
+        match (&offer.event_stream, &offer.filter) {
+            (None, Some(_)) => {
+                Err(Error::validate("\"filter\" can only be used with \"event_stream\""))
+            }
+            (Some(OneOrMany::Many(_)), Some(_)) => {
+                Err(Error::validate("\"filter\" cannot be used with multiple event streams"))
             }
 
             _ => Ok(()),
@@ -2522,7 +2479,7 @@ mod tests {
         let input = r##"{
     "use": [
         {
-            "event": "started",
+            "protocol": "foo",
             "from": "bad",
         },
     ],
@@ -2533,19 +2490,6 @@ mod tests {
             Err(Error::Parse { err, location: Some(l), filename: Some(f) })
                 if &err == "invalid value: string \"bad\", expected \"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", or none" &&
                 l == Location { line: 5, column: 21 } &&
-                f.ends_with("/test.cml")
-        );
-
-        let input = r##"{
-    "use": [
-        { "event": "started" },
-    ],
-}"##;
-        let result = write_and_validate("test.cml", input.as_bytes());
-        assert_matches!(
-            result,
-            Err(Error::Validate { schema_name: None, err, filename: Some(f) })
-                if &err == "\"from\" should be present with \"event\"" &&
                 f.ends_with("/test.cml")
         );
     }
@@ -2623,17 +2567,6 @@ mod tests {
                   },
                   { "storage": "data", "path": "/example" },
                   { "storage": "cache", "path": "/tmp" },
-                  { "event": [ "started", "stopped"], "from": "parent" },
-                  { "event": [ "launched"], "from": "framework" },
-                  { "event": "destroyed", "from": "framework", "as": "destroyed_x" },
-                  {
-                    "event": "directory_ready_diagnostics",
-                    "as": "directory_ready",
-                    "from": "parent",
-                    "filter": {
-                        "name": "diagnositcs"
-                    }
-                  },
                   {
                    "event_stream": ["started", "stopped", "running"],
                    "scope":["#test"],
@@ -2653,14 +2586,6 @@ mod tests {
             }),
             Ok(())
         ),
-        test_cml_use_event_missing_from(
-            json!({
-                "use": [
-                    { "event": "started" },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"from\" should be present with \"event\""
-        ),
         test_cml_expose_event_stream_multiple_as(
             json!({
                 "expose": [
@@ -2671,7 +2596,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "as cannot be used with multiple events"
+            Err(Error::Validate { err, .. }) if &err == "as cannot be used with multiple event streams"
         ),
         test_cml_offer_event_stream_multiple_filter(
             json!({
@@ -2684,7 +2609,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "\"filter\" cannot be used with multiple events."
+            Err(Error::Validate { err, .. }) if &err == "\"filter\" cannot be used with multiple event streams"
         ),
         test_cml_offer_event_stream_capability_requested_not_from_framework(
             json!({
@@ -2875,17 +2800,6 @@ mod tests {
             }),
             Err(Error::Parse { err, .. }) if &err == "invalid value: string \"my_stream\", expected a path with leading `/` and non-empty segments"
         ),
-        test_cml_use_event_self_ref(
-            json!({
-                "use": [
-                    {
-                        "event": "started",
-                        "from": "self",
-                    },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"from: self\" cannot be used with \"event\""
-        ),
         test_cml_use_event_stream_self_ref(
             json!({
                 "use": [
@@ -2903,7 +2817,7 @@ mod tests {
             json!({
                 "use": [ { "path": "/svc/fuchsia.logger.Log" } ]
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"event\", \"event_stream\", \"event_stream_deprecated\""
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"event_stream\""
         ),
         test_cml_use_as_with_protocol(
             json!({
@@ -3003,7 +2917,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event`, `event_stream_deprecated`, `event_stream`, `from`, `path`, `rights`, `subdir`, `as`, `scope`, `filter`, `subscriptions`, `dependency`, `availability`"
+            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `from`, `path`, `rights`, `subdir`, `as`, `scope`, `filter`, `dependency`, `availability`"
         ),
 
         test_cml_use_disallows_nested_dirs_directory(
@@ -3081,30 +2995,7 @@ mod tests {
                     { "directory": "foobar", "path": "/foo/bar", "rights": [ "r*" ], "filter": {"path": "/diagnostics"} },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be used with \"event\" or \"event_stream\""
-        ),
-        test_cml_use_bad_as_in_event(
-            json!({
-                "use": [
-                    {
-                        "event": ["destroyed", "stopped"],
-                        "from": "parent",
-                        "as": "gone"
-                    }
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\" can only be specified when one `event` is supplied"
-        ),
-        test_cml_use_invalid_from_in_event(
-            json!({
-                "use": [
-                    {
-                        "event": ["destroyed"],
-                        "from": "debug"
-                    }
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "only \"protocol\" supports source from \"debug\""
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
         ),
         test_cml_availability_not_supported_for_event_streams(
             json!({
@@ -3117,126 +3008,6 @@ mod tests {
                 ]
             }),
             Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"availability\" cannot be used with \"event_stream\""
-        ),
-        test_cml_use_duplicate_events(
-            json!({
-                "use": [
-                    {
-                        "event": ["destroyed", "started"],
-                        "from": "parent",
-                    },
-                    {
-                        "event": ["destroyed"],
-                        "from": "parent",
-                    }
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"destroyed\" is a duplicate \"use\" target event"
-        ),
-        test_cml_use_event_stream_missing_events(
-            json!({
-                "use": [
-                    {
-                        "event_stream_deprecated": "stream",
-                        "subscriptions": [
-                            {
-                                "event": "destroyed",
-                            }
-                        ],
-                    },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Event \"destroyed\" in event stream not found in any \"use\" declaration."
-        ),
-        test_cml_use_event_stream_missing_deprecated_events(
-            json!({
-                "use": [
-                    {
-                        "event_stream_deprecated": "stream",
-                        "subscriptions": [
-                            {
-                                "event": "destroyed",
-                            }
-                        ],
-                    },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Event \"destroyed\" in event stream not found in any \"use\" declaration."
-        ),
-        test_cml_use_event_stream_duplicate_registration(
-            json!({
-                "use": [
-                    {
-                        "event": [ "destroyed" ],
-                        "from": "parent",
-                    },
-                    {
-                        "event_stream_deprecated": "stream",
-                        "subscriptions": [
-                            {
-                                "event": "destroyed",
-                            },
-                            {
-                                "event": "destroyed",
-                            }
-                        ],
-                    },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "Event \"destroyed\" is duplicated in event stream subscriptions."
-        ),
-        test_cml_use_event_stream_missing_subscriptions(
-            json!({
-                "use": [
-                    {
-                        "event": [ "destroyed" ],
-                        "from": "parent",
-                    },
-                    {
-                        "event_stream_deprecated": "test",
-                    },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"event_stream\" must have subscriptions."
-        ),
-        test_cml_use_event_stream_missing_name(
-            json!({
-                "use": [
-                    {
-                        "event": [ "destroyed" ],
-                        "from": "parent",
-                    },
-                    {
-                        "event_stream_deprecated": "test",
-                    },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"event_stream\" must have subscriptions."
-        ),
-        test_cml_use_bad_filter_in_event(
-            json!({
-                "use": [
-                    {
-                        "event": ["destroyed", "stopped"],
-                        "filter": {"path": "/diagnostics"},
-                        "from": "parent"
-                    }
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be specified when one `event` is supplied"
-        ),
-        test_cml_use_bad_filter_and_as_in_event(
-            json!({
-                "use": [
-                    {
-                        "event": ["destroyed", "stopped"],
-                        "from": "framework",
-                        "as": "gone",
-                        "filter": {"path": "/diagnostics"}
-                    }
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"as\",\"filter\" can only be specified when one `event` is supplied"
         ),
         test_cml_use_from_child_offer_cycle_strong(
             json!({
@@ -3864,15 +3635,6 @@ mod tests {
                         "from": "parent",
                         "to": [ "#modular" ],
                     },
-                    {
-                        "event": "directory_ready",
-                        "from": "parent",
-                        "to": [ "#modular" ],
-                        "as": "capability-ready-for-modular",
-                        "filter": {
-                            "name": "modular"
-                        }
-                    },
                 ],
                 "children": [
                     {
@@ -4127,22 +3889,6 @@ mod tests {
                 } ],
                 "offer": [
                     { "resolver": "base", "from": "#coll", "to": [ "#echo_server" ] },
-                ]
-            }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
-        ),
-        test_cml_offer_event_from_collection_invalid(
-            json!({
-                "collections": [ {
-                    "name": "coll",
-                    "durability": "transient",
-                } ],
-                "children": [ {
-                    "name": "echo_server",
-                    "url": "fuchsia-pkg://fuchsia.com/echo/stable#meta/echo_server.cm",
-                } ],
-                "offer": [
-                    { "event": "started", "from": "#coll", "to": [ "#echo_server" ] },
                 ]
             }),
             Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"offer\" source \"#coll\" does not appear in \"children\""
@@ -4716,7 +4462,7 @@ mod tests {
                     },
                 ],
             }),
-            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be used with \"event\" or \"event_stream\""
+            Err(Error::Validate { schema_name: None, err, .. }) if &err == "\"filter\" can only be used with \"event_stream\""
         ),
 
         // children
@@ -5286,7 +5032,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "`capability` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"resolver\", \"event\", \"event_stream\""
+            Err(Error::Validate { err, .. }) if &err == "`capability` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"resolver\", \"event_stream\""
         ),
         test_cml_resolver_missing_path(
             json!({

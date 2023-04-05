@@ -261,7 +261,6 @@ impl CapabilityRouteController {
     fn parse_capability_type(name: &str) -> Result<CapabilityTypeName> {
         match name {
             "directory" => Ok(CapabilityTypeName::Directory),
-            "event" => Ok(CapabilityTypeName::Event),
             "event_stream" => Ok(CapabilityTypeName::EventStream),
             "protocol" => Ok(CapabilityTypeName::Protocol),
             "resolver" => Ok(CapabilityTypeName::Resolver),

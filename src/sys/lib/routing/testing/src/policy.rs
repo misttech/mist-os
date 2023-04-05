@@ -77,9 +77,9 @@ where
                 source_moniker: ExtendedMoniker::ComponentInstance(
                     AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap(),
                 ),
-                source_name: CapabilityName::from("running"),
+                source_name: CapabilityName::from("fuchsia.component.Realm"),
                 source: CapabilityAllowlistSource::Framework,
-                capability: CapabilityTypeName::Event,
+                capability: CapabilityTypeName::Protocol,
             },
             vec![
                 AllowlistEntryBuilder::new().exact("foo").exact("bar").build(),
@@ -89,8 +89,10 @@ where
         let global_policy_checker = GlobalPolicyChecker::new(config_builder.build());
         let component = self.make_component(vec!["foo:0", "bar:0"].try_into().unwrap());
 
-        let event_capability = CapabilitySourceInterface::<C>::Framework {
-            capability: InternalCapability::Event(CapabilityName::from("running")),
+        let protocol_capability = CapabilitySourceInterface::<C>::Framework {
+            capability: InternalCapability::Protocol(CapabilityName::from(
+                "fuchsia.component.Realm",
+            )),
             component: component.as_weak(),
         };
         let valid_path_0 = AbsoluteMoniker::try_from(vec!["foo", "bar"]).unwrap();
@@ -99,19 +101,19 @@ where
         let invalid_path_1 = AbsoluteMoniker::try_from(vec!["foo", "bar", "foobar"]).unwrap();
 
         assert_matches!(
-            global_policy_checker.can_route_capability(&event_capability, &valid_path_0),
+            global_policy_checker.can_route_capability(&protocol_capability, &valid_path_0),
             Ok(())
         );
         assert_matches!(
-            global_policy_checker.can_route_capability(&event_capability, &valid_path_1),
+            global_policy_checker.can_route_capability(&protocol_capability, &valid_path_1),
             Ok(())
         );
         assert_matches!(
-            global_policy_checker.can_route_capability(&event_capability, &invalid_path_0),
+            global_policy_checker.can_route_capability(&protocol_capability, &invalid_path_0),
             Err(_)
         );
         assert_matches!(
-            global_policy_checker.can_route_capability(&event_capability, &invalid_path_1),
+            global_policy_checker.can_route_capability(&protocol_capability, &invalid_path_1),
             Err(_)
         );
         Ok(())

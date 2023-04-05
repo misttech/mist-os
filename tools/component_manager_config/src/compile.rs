@@ -116,7 +116,6 @@ pub struct ChildPolicyAllowlists {
 #[serde(rename_all = "lowercase")]
 pub enum CapabilityTypeName {
     Directory,
-    Event,
     Protocol,
     Service,
     Storage,
@@ -129,9 +128,6 @@ impl Into<component_internal::AllowlistedCapability> for CapabilityTypeName {
         match &self {
             CapabilityTypeName::Directory => component_internal::AllowlistedCapability::Directory(
                 component_internal::AllowlistedDirectory::EMPTY,
-            ),
-            CapabilityTypeName::Event => component_internal::AllowlistedCapability::Event(
-                component_internal::AllowlistedEvent::EMPTY,
             ),
             CapabilityTypeName::Protocol => component_internal::AllowlistedCapability::Protocol(
                 component_internal::AllowlistedProtocol::EMPTY,
@@ -416,9 +412,6 @@ impl Config {
                 "\"resolver\" is not supported for namespace capabilities",
             ));
         }
-        if capability.event.is_some() {
-            return Err(Error::validate("\"event\" is not supported for namespace capabilities"));
-        }
 
         // Disallow multiple capability ids of the same name.
         let capability_ids = cml::CapabilityId::from_capability(capability)?;
@@ -538,13 +531,6 @@ mod tests {
                         capability: "protocol",
                         target_monikers: ["/root", "/root/bootstrap", "/root/core"],
                     },
-                    {
-                        source_moniker: "/foo/bar",
-                        source_name: "running",
-                        source: "framework",
-                        capability: "event",
-                        target_monikers: ["/foo/bar", "/foo/bar/baz"],
-                    },
                 ],
                 debug_registration_policy: [
                     {
@@ -587,9 +573,6 @@ mod tests {
                     resolver: "foo_resolver",
                 },
                 {
-                    event: "foo_event",
-                },
-                {
                     event_stream: "foo_event_stream",
                 }
             ],
@@ -619,37 +602,20 @@ mod tests {
                         ..component_internal::JobPolicyAllowlists::EMPTY
                     }),
                     capability_policy: Some(component_internal::CapabilityPolicyAllowlists {
-                        allowlist: Some(vec![
-                            component_internal::CapabilityAllowlistEntry {
-                                source_moniker: Some("<component_manager>".to_string()),
-                                source_name: Some("fuchsia.kernel.RootResource".to_string()),
-                                source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                                capability: Some(
-                                    component_internal::AllowlistedCapability::Protocol(
-                                        component_internal::AllowlistedProtocol::EMPTY
-                                    )
-                                ),
-                                target_monikers: Some(vec![
-                                    "/root".to_string(),
-                                    "/root/bootstrap".to_string(),
-                                    "/root/core".to_string()
-                                ]),
-                                ..component_internal::CapabilityAllowlistEntry::EMPTY
-                            },
-                            component_internal::CapabilityAllowlistEntry {
-                                source_moniker: Some("/foo/bar".to_string()),
-                                capability: Some(component_internal::AllowlistedCapability::Event(
-                                    component_internal::AllowlistedEvent::EMPTY
-                                )),
-                                source_name: Some("running".to_string()),
-                                source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef {})),
-                                target_monikers: Some(vec![
-                                    "/foo/bar".to_string(),
-                                    "/foo/bar/baz".to_string()
-                                ]),
-                                ..component_internal::CapabilityAllowlistEntry::EMPTY
-                            },
-                        ]),
+                        allowlist: Some(vec![component_internal::CapabilityAllowlistEntry {
+                            source_moniker: Some("<component_manager>".to_string()),
+                            source_name: Some("fuchsia.kernel.RootResource".to_string()),
+                            source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
+                            capability: Some(component_internal::AllowlistedCapability::Protocol(
+                                component_internal::AllowlistedProtocol::EMPTY
+                            )),
+                            target_monikers: Some(vec![
+                                "/root".to_string(),
+                                "/root/bootstrap".to_string(),
+                                "/root/core".to_string()
+                            ]),
+                            ..component_internal::CapabilityAllowlistEntry::EMPTY
+                        },]),
                         ..component_internal::CapabilityPolicyAllowlists::EMPTY
                     }),
                     debug_registration_policy: Some(
@@ -716,10 +682,6 @@ mod tests {
                         name: Some("foo_resolver".into()),
                         source_path: None,
                         ..fdecl::Resolver::EMPTY
-                    }),
-                    fdecl::Capability::Event(fdecl::Event {
-                        name: Some("foo_event".into()),
-                        ..fdecl::Event::EMPTY
                     }),
                     fdecl::Capability::EventStream(fdecl::EventStream {
                         name: Some("foo_event_stream".into()),
@@ -790,20 +752,6 @@ mod tests {
                 compile_str(input),
                 Err(Error::Validate { schema_name: None, err, .. } )
                     if &err == "\"path\" should be present with \"directory\""
-            );
-        }
-        {
-            let input = r#"{
-            namespace_capabilities: [
-                {
-                    event: "foo",
-                },
-            ],
-        }"#;
-            assert_matches!(
-                compile_str(input),
-                Err(Error::Validate { schema_name: None, err, .. } )
-                    if &err == "\"event\" is not supported for namespace capabilities"
             );
         }
     }

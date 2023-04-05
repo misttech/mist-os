@@ -12,10 +12,10 @@ use {
     },
     anyhow::{anyhow, Context, Result},
     cm_rust::{
-        CapabilityDecl, CapabilityPath, CapabilityTypeName, ComponentDecl, ExposeDecl,
-        ExposeDeclCommon, ExposeEventStreamDecl, OfferDecl, OfferDeclCommon, OfferEventStreamDecl,
-        OfferTarget, ProgramDecl, ResolverRegistration, SourceName, UseDecl, UseDeclCommon,
-        UseEventStreamDecl, UseStorageDecl,
+        CapabilityDecl, CapabilityTypeName, ComponentDecl, ExposeDecl, ExposeDeclCommon,
+        ExposeEventStreamDecl, OfferDecl, OfferDeclCommon, OfferEventStreamDecl, OfferTarget,
+        ProgramDecl, ResolverRegistration, SourceName, UseDecl, UseDeclCommon, UseEventStreamDecl,
+        UseStorageDecl,
     },
     config_encoder::ConfigFields,
     fidl::prelude::*,
@@ -635,11 +635,6 @@ impl ComponentModelForAnalyzer {
                 let route_request = RouteRequest::OfferService(offer_decl);
                 (capability, route_request)
             }
-            OfferDecl::Event(offer_decl) => {
-                let capability = offer_decl.source_name.clone();
-                let route_request = RouteRequest::OfferEvent(offer_decl);
-                (capability, route_request)
-            }
             OfferDecl::EventStream(offer_decl) => {
                 let capability = offer_decl.source_name.clone();
                 let route_request = RouteRequest::OfferEventStream(offer_decl);
@@ -785,31 +780,7 @@ impl ComponentModelForAnalyzer {
                     return vec![];
                 }
 
-                (result.map_err(|e| e.into()), vec![route], capability)
-            }
-            UseDecl::Event(use_event_decl) => {
-                let capability = use_event_decl.target_name.clone();
-                if self.uses_event_source_protocol(&target.decl) {
-                    let (result, route) =
-                        Self::route_capability_sync(RouteRequest::UseEvent(use_event_decl), target);
-
-                    // Ignore any route that failed due to a void offer to a target with an
-                    // optional dependency on the capability.
-                    if let Err(RoutingError::AvailabilityRoutingError(
-                        AvailabilityRoutingError::OfferFromVoidToOptionalTarget,
-                    )) = result
-                    {
-                        return vec![];
-                    }
-
-                    (result.map_err(|e| e.into()), vec![route], capability)
-                } else {
-                    (
-                        Err(AnalyzerModelError::MissingEventSourceProtocol(capability.to_string())),
-                        vec![],
-                        capability,
-                    )
-                }
+                (result.map_err(|e| AnalyzerModelError::from(e)), vec![route], capability)
             }
             UseDecl::Protocol(use_protocol_decl) => {
                 let capability = use_protocol_decl.source_name.clone();
@@ -874,7 +845,6 @@ impl ComponentModelForAnalyzer {
                     (Err(err), route) => (Err(err.into()), vec![route], capability),
                 }
             }
-            _ => unimplemented![],
         };
         match route_result {
             (Ok(source), routes, capability) => match self.check_use_source(&source) {
@@ -1131,19 +1101,6 @@ impl ComponentModelForAnalyzer {
                 component.abs_moniker().to_string(),
             )),
         }
-    }
-
-    fn uses_event_source_protocol(&self, decl: &ComponentDecl) -> bool {
-        decl.uses.iter().any(|u| match u {
-            UseDecl::Protocol(p) => {
-                p.target_path
-                    == CapabilityPath {
-                        dirname: "/svc".into(),
-                        basename: "fuchsia.sys2.EventSource".into(),
-                    }
-            }
-            _ => false,
-        })
     }
 
     // Routes a capability from a `ComponentInstanceForAnalyzer` and panics if the future returned by

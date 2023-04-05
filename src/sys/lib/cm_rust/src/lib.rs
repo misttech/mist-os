@@ -257,8 +257,6 @@ pub enum UseDecl {
     Protocol(UseProtocolDecl),
     Directory(UseDirectoryDecl),
     Storage(UseStorageDecl),
-    Event(UseEventDecl),
-    EventStreamDeprecated(UseEventStreamDeprecatedDecl),
     EventStream(UseEventStreamDecl),
 }
 
@@ -336,33 +334,10 @@ impl UseDeclCommon for UseStorageDecl {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseEvent")]
-pub struct UseEventDecl {
-    pub source: UseSource,
-    pub source_name: CapabilityName,
-    pub target_name: CapabilityName,
-    pub filter: Option<BTreeMap<String, DictionaryValue>>,
-    pub dependency_type: DependencyType,
-    #[fidl_decl(default)]
-    pub availability: Availability,
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::EventSubscription")]
 pub struct EventSubscription {
     pub event_name: String,
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseEventStreamDeprecated")]
-pub struct UseEventStreamDeprecatedDecl {
-    pub name: CapabilityName,
-    pub subscriptions: Vec<EventSubscription>,
-    #[fidl_decl(default)]
-    pub availability: Availability,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -392,7 +367,6 @@ pub enum OfferDecl {
     Storage(OfferStorageDecl),
     Runner(OfferRunnerDecl),
     Resolver(OfferResolverDecl),
-    Event(OfferEventDecl),
     EventStream(OfferEventStreamDecl),
 }
 
@@ -528,19 +502,6 @@ pub struct OfferResolverDecl {
     pub target_name: CapabilityName,
 }
 
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferEvent")]
-pub struct OfferEventDecl {
-    pub source: OfferSource,
-    pub source_name: CapabilityName,
-    pub target: OfferTarget,
-    pub target_name: CapabilityName,
-    pub filter: Option<BTreeMap<String, DictionaryValue>>,
-    #[fidl_decl(default)]
-    pub availability: Availability,
-}
-
 impl SourceName for OfferDecl {
     fn source_name(&self) -> &CapabilityName {
         match &self {
@@ -550,7 +511,6 @@ impl SourceName for OfferDecl {
             OfferDecl::Storage(o) => o.source_name(),
             OfferDecl::Runner(o) => o.source_name(),
             OfferDecl::Resolver(o) => o.source_name(),
-            OfferDecl::Event(o) => o.source_name(),
             OfferDecl::EventStream(o) => o.source_name(),
         }
     }
@@ -563,9 +523,7 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Protocol(u) => u.source(),
             UseDecl::Directory(u) => u.source(),
             UseDecl::Storage(u) => u.source(),
-            UseDecl::Event(u) => u.source(),
             UseDecl::EventStream(u) => u.source(),
-            UseDecl::EventStreamDeprecated(_) => unimplemented!(),
         }
     }
 
@@ -575,9 +533,7 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Protocol(u) => u.availability(),
             UseDecl::Directory(u) => u.availability(),
             UseDecl::Storage(u) => u.availability(),
-            UseDecl::Event(u) => u.availability(),
             UseDecl::EventStream(u) => u.availability(),
-            UseDecl::EventStreamDeprecated(_) => unimplemented!(),
         }
     }
 }
@@ -591,7 +547,6 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Storage(o) => o.target_name(),
             OfferDecl::Runner(o) => o.target_name(),
             OfferDecl::Resolver(o) => o.target_name(),
-            OfferDecl::Event(o) => o.target_name(),
             OfferDecl::EventStream(o) => o.target_name(),
         }
     }
@@ -604,7 +559,6 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Storage(o) => o.target(),
             OfferDecl::Runner(o) => o.target(),
             OfferDecl::Resolver(o) => o.target(),
-            OfferDecl::Event(o) => o.target(),
             OfferDecl::EventStream(o) => o.target(),
         }
     }
@@ -617,7 +571,6 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Storage(o) => o.source(),
             OfferDecl::Runner(o) => o.source(),
             OfferDecl::Resolver(o) => o.source(),
-            OfferDecl::Event(o) => o.source(),
             OfferDecl::EventStream(o) => o.source(),
         }
     }
@@ -630,7 +583,6 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Storage(o) => o.availability(),
             OfferDecl::Runner(o) => o.availability(),
             OfferDecl::Resolver(o) => o.availability(),
-            OfferDecl::Event(o) => o.availability(),
             OfferDecl::EventStream(o) => o.availability(),
         }
     }
@@ -806,7 +758,6 @@ pub enum CapabilityDecl {
     Storage(StorageDecl),
     Runner(RunnerDecl),
     Resolver(ResolverDecl),
-    Event(EventDecl),
     EventStream(EventStreamDecl),
 }
 
@@ -819,7 +770,6 @@ impl CapabilityDeclCommon for CapabilityDecl {
             Self::Storage(c) => c.name(),
             Self::Runner(c) => c.name(),
             Self::Resolver(c) => c.name(),
-            Self::Event(c) => c.name(),
             Self::EventStream(c) => c.name(),
         }
     }
@@ -888,13 +838,6 @@ pub struct ResolverDecl {
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::Event")]
-pub struct EventDecl {
-    pub name: CapabilityName,
-}
-
-#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "fdecl::EventStream")]
 pub struct EventStreamDecl {
     pub name: CapabilityName,
@@ -909,7 +852,6 @@ impl CapabilityDecl {
             CapabilityDecl::Runner(decl) => decl.name(),
             CapabilityDecl::Service(decl) => decl.name(),
             CapabilityDecl::Storage(decl) => decl.name(),
-            CapabilityDecl::Event(decl) => decl.name(),
             CapabilityDecl::EventStream(decl) => decl.name(),
         }
     }
@@ -922,7 +864,6 @@ impl CapabilityDecl {
             CapabilityDecl::Runner(decl) => decl.source_path.as_ref(),
             CapabilityDecl::Service(decl) => decl.source_path.as_ref(),
             CapabilityDecl::Storage(_) => None,
-            CapabilityDecl::Event(_) => None,
             CapabilityDecl::EventStream(_) => None,
         }
     }
@@ -1576,15 +1517,12 @@ impl UseDecl {
             UseDecl::Directory(d) => Some(&d.target_path),
             UseDecl::Storage(d) => Some(&d.target_path),
             UseDecl::EventStream(d) => Some(&d.target_path),
-            UseDecl::Event(_) | UseDecl::EventStreamDeprecated(_) => None,
         }
     }
 
     pub fn name(&self) -> Option<&CapabilityName> {
         match self {
-            UseDecl::Event(event_decl) => Some(&event_decl.source_name),
             UseDecl::Storage(storage_decl) => Some(&storage_decl.source_name),
-            UseDecl::EventStreamDeprecated(event_stream_decl) => Some(&event_stream_decl.name),
             UseDecl::EventStream(_) => None,
             UseDecl::Service(_) | UseDecl::Protocol(_) | UseDecl::Directory(_) => None,
         }
@@ -1594,9 +1532,7 @@ impl UseDecl {
 impl SourceName for UseDecl {
     fn source_name(&self) -> &CapabilityName {
         match self {
-            UseDecl::Event(event_decl) => &event_decl.source_name,
             UseDecl::Storage(storage_decl) => &storage_decl.source_name,
-            UseDecl::EventStreamDeprecated(event_stream_decl) => &event_stream_decl.name,
             UseDecl::Service(service_decl) => &service_decl.source_name,
             UseDecl::Protocol(protocol_decl) => &protocol_decl.source_name,
             UseDecl::Directory(directory_decl) => &directory_decl.source_name,
@@ -1719,8 +1655,6 @@ pub trait CapabilityDeclCommon: Send + Sync {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CapabilityTypeName {
     Directory,
-    Event,
-    EventStreamDeprecated,
     EventStream,
     Protocol,
     Resolver,
@@ -1733,8 +1667,6 @@ impl fmt::Display for CapabilityTypeName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let display_name = match &self {
             CapabilityTypeName::Directory => "directory",
-            CapabilityTypeName::Event => "event",
-            CapabilityTypeName::EventStreamDeprecated => "event_stream_deprecated",
             CapabilityTypeName::EventStream => "event_stream",
             CapabilityTypeName::Protocol => "protocol",
             CapabilityTypeName::Resolver => "resolver",
@@ -1753,8 +1685,6 @@ impl From<&UseDecl> for CapabilityTypeName {
             UseDecl::Protocol(_) => Self::Protocol,
             UseDecl::Directory(_) => Self::Directory,
             UseDecl::Storage(_) => Self::Storage,
-            UseDecl::Event(_) => Self::Event,
-            UseDecl::EventStreamDeprecated(_) => Self::EventStreamDeprecated,
             UseDecl::EventStream(_) => Self::EventStream,
         }
     }
@@ -1767,7 +1697,6 @@ impl From<&OfferDecl> for CapabilityTypeName {
             OfferDecl::Protocol(_) => Self::Protocol,
             OfferDecl::Directory(_) => Self::Directory,
             OfferDecl::Storage(_) => Self::Storage,
-            OfferDecl::Event(_) => Self::Event,
             OfferDecl::Runner(_) => Self::Runner,
             OfferDecl::Resolver(_) => Self::Resolver,
             OfferDecl::EventStream(_) => Self::EventStream,
@@ -2287,7 +2216,7 @@ pub enum Error {
 
 #[cfg(test)]
 mod tests {
-    use {super::*, fidl_fuchsia_component_decl as fdecl, maplit::btreemap, std::convert::TryInto};
+    use {super::*, fidl_fuchsia_component_decl as fdecl, std::convert::TryInto};
 
     macro_rules! test_try_from_decl {
         (
@@ -2489,23 +2418,6 @@ mod tests {
                         availability: Some(fdecl::Availability::Optional),
                         ..fdecl::UseStorage::EMPTY
                     }),
-                    fdecl::Use::Event(fdecl::UseEvent {
-                        dependency_type: Some(fdecl::DependencyType::Strong),
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some("directory_ready".to_string()),
-                        target_name: Some("diagnostics_ready".to_string()),
-                        filter: Some(fdata::Dictionary{
-                            entries: Some(vec![
-                               fdata::DictionaryEntry {
-                                   key: "path".to_string(),
-                                   value: Some(Box::new(fdata::DictionaryValue::Str("/diagnostics".to_string()))),
-                               },
-                            ]),
-                            ..fdata::Dictionary::EMPTY
-                        }),
-                        availability: Some(fdecl::Availability::Required),
-                        ..fdecl::UseEvent::EMPTY
-                    }),
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source: Some(fdecl::Ref::Child(fdecl::ChildRef {
                             collection: None,
@@ -2664,28 +2576,6 @@ mod tests {
                         )),
                         target_name: Some("pkg".to_string()),
                         ..fdecl::OfferResolver::EMPTY
-                    }),
-                    fdecl::Offer::Event(fdecl::OfferEvent {
-                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
-                        source_name: Some("started".to_string()),
-                        target: Some(fdecl::Ref::Child(
-                           fdecl::ChildRef {
-                               name: "echo".to_string(),
-                               collection: None,
-                           }
-                        )),
-                        target_name: Some("mystarted".to_string()),
-                        filter: Some(fdata::Dictionary {
-                            entries: Some(vec![
-                               fdata::DictionaryEntry {
-                                   key: "path".to_string(),
-                                   value: Some(Box::new(fdata::DictionaryValue::Str("/a".to_string()))),
-                               },
-                            ]),
-                            ..fdata::Dictionary::EMPTY
-                        }),
-                        availability: Some(fdecl::Availability::Optional),
-                        ..fdecl::OfferEvent::EMPTY
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -2954,17 +2844,6 @@ mod tests {
                             target_path: "/temp".try_into().unwrap(),
                             availability: Availability::Optional,
                         }),
-                        UseDecl::Event(UseEventDecl {
-                            dependency_type: DependencyType::Strong,
-                            source: UseSource::Parent,
-                            source_name: "directory_ready".into(),
-                            target_name: "diagnostics_ready".into(),
-                            filter:
-                            Some(btreemap!{"path".to_string() =>
-                                DictionaryValue::Str("/diagnostics".to_string())
-                            }),
-                            availability: Availability::Required,
-                        }),
                         UseDecl::EventStream(UseEventStreamDecl {
                             source: UseSource::Child("test".to_string()),
                             scope: Some(vec![EventScope::Child(ChildRef{ name: "a".into(), collection: None}), EventScope::Collection("b".to_string())]),
@@ -3065,18 +2944,6 @@ mod tests {
                             source_name: "pkg".try_into().unwrap(),
                             target: OfferTarget::static_child("echo".to_string()),
                             target_name: "pkg".try_into().unwrap(),
-                        }),
-                        OfferDecl::Event(OfferEventDecl {
-                            source: OfferSource::Parent,
-                            source_name: "started".into(),
-                            target: OfferTarget::static_child("echo".to_string()),
-                            target_name: "mystarted".into(),
-                            filter: Some(
-                                btreemap!{
-                                    "path".to_string() => DictionaryValue::Str("/a".to_string())
-                                }
-                            ),
-                            availability: Availability::Optional,
                         }),
                         OfferDecl::Service(OfferServiceDecl {
                                     source: OfferSource::Parent,
