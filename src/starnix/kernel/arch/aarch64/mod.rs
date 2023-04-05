@@ -7,3 +7,4 @@ pub mod registers;
 pub mod signal_handling;
 pub mod syscalls;
 pub mod task;
+pub mod vdso;
