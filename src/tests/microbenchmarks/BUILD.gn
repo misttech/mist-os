@@ -109,19 +109,11 @@ executable("fuchsia_microbenchmarks_bin") {
   sources = fuchsia_microbenchmark_sources
   if (is_fuchsia && !exclude_testonly_syscalls) {
     sources += [
-      # Uses `zx_restricted_*()` which is available in the 'next' vdso but
-      # not the 'direct' vdso.
+      # Uses `zx_restricted_*()` which is available in the 'next' vdso.
       "restricted_enter.cc",
     ]
   }
 
-  deps = fuchsia_microbenchmark_deps
-}
-
-executable("direct_mode_microbenchmarks_bin") {
-  output_name = "direct_mode_microbenchmarks"
-  testonly = true
-  sources = fuchsia_microbenchmark_sources
   deps = fuchsia_microbenchmark_deps
 }
 
@@ -206,23 +198,6 @@ fuchsia_unittest_package("fuchsia_microbenchmarks") {
     ":no_op_executable",
     ":round_trips_helper",
   ]
-}
-
-fuchsia_unittest_package("direct_mode_microbenchmarks") {
-  manifest = "meta/direct_mode_microbenchmarks.cml"
-
-  deps = [
-    ":context_switch_overhead_helper",
-    ":direct_mode_microbenchmarks_bin",
-    ":get_info_helper",
-    ":no_op_executable",
-    ":round_trips_helper",
-    "//src/lib/direct-mode:bin",
-  ]
-
-  test_specs = {
-    environments = guest_envs
-  }
 }
 
 if (is_linux) {
@@ -328,7 +303,6 @@ group("tests") {
     deps += [ ":fuchsia_microbenchmarks_host($host_toolchain)" ]
   }
   if (target_cpu == "x64" && !is_asan) {
-    deps += [ ":direct_mode_microbenchmarks" ]
     if (host_os == "linux") {
       deps += [
         ":starnix_microbenchmarks_perftestmode",

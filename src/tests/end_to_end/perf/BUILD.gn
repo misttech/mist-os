@@ -35,7 +35,6 @@ test_list = [
 ]
 
 if (target_cpu == "x64" && !is_asan) {
-  test_list += [ "direct_mode_benchmarks_test" ]
   if (host_os == "linux") {
     test_list += [
       "starnix_benchmarks_test",
@@ -184,7 +183,6 @@ if (is_host) {
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
     "fuchsia.kernel.boot.txt",
-    "fuchsia.microbenchmarks.direct_mode.txt",
     "fuchsia.microbenchmarks.tracing.txt",
     "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
     "fuchsia.microbenchmarks.starnix.txt",
@@ -283,7 +281,6 @@ group("package_deps") {
     public_deps += [
       # This is used by starnix benchmarks.
       "//src/proc/tests/android/gvisor:starnix_gvisor_benchmarks",
-      "//src/tests/microbenchmarks:direct_mode_microbenchmarks",
     ]
     if (host_os == "linux") {
       public_deps +=
