@@ -31,6 +31,7 @@ group("tests") {
     "lib:tests",
     "light:tests",
     "scenic:tests",
+    "testing:tests",
     "tests",
     "tools:tests",
     "wayland:tests",
