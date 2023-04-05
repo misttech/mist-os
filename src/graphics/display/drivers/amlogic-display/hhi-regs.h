@@ -7,6 +7,11 @@
 
 #include <hwreg/bitfields.h>
 
+// The register definitions here are from AMLogic A311D Datasheet version 08.
+//
+// This datasheet is distributed by Khadas for the VIM3, at
+// https://dl.khadas.com/hardware/VIM3/Datasheet/A311D_Datasheet_08_Wesion.pdf
+
 #define READ32_HHI_REG(a) hhi_mmio_->Read32(a)
 #define WRITE32_HHI_REG(a, v) hhi_mmio_->Write32(v, a)
 
@@ -50,12 +55,14 @@
 #define HHI_HDMI_PLL_CNTL5 (0x0cd << 2)
 #define HHI_HDMI_PLL_CNTL6 (0x0ce << 2)
 #define HHI_HDMI_PLL_STS (0x0cf << 2)
+#define HHI_HDMI_PLL_VLOCK_CNTL (0x0d1 << 2)
 #define HHI_HDMI_PHY_CNTL0 (0xe8 << 2)
 #define HHI_HDMI_PHY_CNTL1 (0xe9 << 2)
 #define HHI_HDMI_PHY_CNTL2 (0xea << 2)
 #define HHI_HDMI_PHY_CNTL3 (0xeb << 2)
 #define HHI_HDMI_PHY_CNTL4 (0xec << 2)
 #define HHI_HDMI_PHY_CNTL5 (0xed << 2)
+#define HHI_HDMI_PHY_STATUS (0xee << 2)
 
 #define ENCL_VIDEO_FILT_CTRL (0x1cc2 << 2)
 #define ENCL_VIDEO_MAX_PXCNT (0x1cb0 << 2)
@@ -196,6 +203,9 @@
 
 namespace amlogic_display {
 
+// A311D datasheet Section 8.7.5 "Registers"
+
+// HHI_HDMI_PLL_CNTL0
 class HhiHdmiPllCntlReg : public hwreg::RegisterBase<HhiHdmiPllCntlReg, uint32_t> {
  public:
   DEF_BIT(31, hdmi_dpll_lock);
@@ -212,6 +222,7 @@ class HhiHdmiPllCntlReg : public hwreg::RegisterBase<HhiHdmiPllCntlReg, uint32_t
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntlReg>(HHI_HDMI_PLL_CNTL0); }
 };
 
+// HHI_HDMI_PLL_CNTL1
 class HhiHdmiPllCntl1Reg : public hwreg::RegisterBase<HhiHdmiPllCntl1Reg, uint32_t> {
  public:
   DEF_FIELD(18, 0, hdmi_dpll_frac);
@@ -219,6 +230,7 @@ class HhiHdmiPllCntl1Reg : public hwreg::RegisterBase<HhiHdmiPllCntl1Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntl1Reg>(HHI_HDMI_PLL_CNTL1); }
 };
 
+// HHI_HDMI_PLL_CNTL2
 class HhiHdmiPllCntl2Reg : public hwreg::RegisterBase<HhiHdmiPllCntl2Reg, uint32_t> {
  public:
   DEF_FIELD(22, 20, hdmi_dpll_fref_sel);
@@ -231,6 +243,7 @@ class HhiHdmiPllCntl2Reg : public hwreg::RegisterBase<HhiHdmiPllCntl2Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntl2Reg>(HHI_HDMI_PLL_CNTL2); }
 };
 
+// HHI_HDMI_PLL_CNTL3
 class HhiHdmiPllCntl3Reg : public hwreg::RegisterBase<HhiHdmiPllCntl3Reg, uint32_t> {
  public:
   DEF_BIT(31, hdmi_dpll_afc_bypass);
@@ -259,6 +272,7 @@ class HhiHdmiPllCntl3Reg : public hwreg::RegisterBase<HhiHdmiPllCntl3Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntl3Reg>(HHI_HDMI_PLL_CNTL3); }
 };
 
+// HHI_HDMI_PLL_CNTL4
 class HhiHdmiPllCntl4Reg : public hwreg::RegisterBase<HhiHdmiPllCntl4Reg, uint32_t> {
  public:
   DEF_FIELD(30, 28, hdmi_dpll_alpha);
@@ -273,6 +287,7 @@ class HhiHdmiPllCntl4Reg : public hwreg::RegisterBase<HhiHdmiPllCntl4Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntl4Reg>(HHI_HDMI_PLL_CNTL4); }
 };
 
+// HHI_HDMI_PLL_CNTL5
 class HhiHdmiPllCntl5Reg : public hwreg::RegisterBase<HhiHdmiPllCntl5Reg, uint32_t> {
  public:
   DEF_FIELD(30, 28, hdmi_dpll_adj_vco_ldo);
@@ -283,6 +298,28 @@ class HhiHdmiPllCntl5Reg : public hwreg::RegisterBase<HhiHdmiPllCntl5Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntl5Reg>(HHI_HDMI_PLL_CNTL5); }
 };
 
+// HHI_HDMI_PLL_CNTL6
+class HhiHdmiPllCntl6Reg : public hwreg::RegisterBase<HhiHdmiPllCntl6Reg, uint32_t> {
+  DEF_FIELD(31, 30, hdmi_dpll_afc_hold_t);
+  DEF_FIELD(29, 28, hdmi_dpll_lkw_sel);
+  DEF_FIELD(27, 26, hdmi_dpll_dco_sdm_clk_sel);
+  DEF_FIELD(25, 24, hdmi_dpll_afc_in);
+  DEF_FIELD(23, 22, hdmi_dpll_afc_nt);
+
+  // Bit 20 is also mentioned as vlock_cntl_en by all other HDMI PLL register
+  // descriptions.
+  DEF_FIELD(21, 20, hdmi_dpll_vc_in);
+
+  DEF_FIELD(19, 18, hdmi_dpll_lock_long);
+  DEF_FIELD(17, 16, hdmi_dpll_freq_shift_v);
+  DEF_FIELD(14, 12, hdmi_dpll_data_sel);
+  DEF_FIELD(10, 8, hdmi_dpll_sdmnc_ulms);
+  DEF_FIELD(6, 0, hdmi_dpll_sdmnc_power);
+
+  static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllCntl6Reg>(HHI_HDMI_PLL_CNTL6); }
+};
+
+// HHI_HDMI_PLL_STS
 class HhiHdmiPllStsReg : public hwreg::RegisterBase<HhiHdmiPllStsReg, uint32_t> {
  public:
   DEF_BIT(31, hdmi_dpll_lock);
@@ -292,6 +329,17 @@ class HhiHdmiPllStsReg : public hwreg::RegisterBase<HhiHdmiPllStsReg, uint32_t> 
   DEF_FIELD(9, 0, hdmi_dpll_out_rsv);
 
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllStsReg>(HHI_HDMI_PLL_STS); }
+};
+
+// HHI_HDMI_PLL_VLOCK_CNTL
+class HhiHdmiPllVlockCntl : public hwreg::RegisterBase<HhiHdmiPllVlockCntl, uint32_t> {
+ public:
+  // 1: vlock_adj_en_to_pll
+  // 0: hi_hdmi_pll_cntl3[19]
+  DEF_BIT(1, vlock_adj_en_to_pll_sel);
+  DEF_BIT(0, hdmi_pll_vlock_cntl_en);
+
+  static auto Get() { return hwreg::RegisterAddr<HhiHdmiPllVlockCntl>(HHI_HDMI_PLL_VLOCK_CNTL); }
 };
 
 class HhiVidClkCntlReg : public hwreg::RegisterBase<HhiVidClkCntlReg, uint32_t> {
@@ -341,6 +389,9 @@ class HhiVidClkDivReg : public hwreg::RegisterBase<HhiVidClkDivReg, uint32_t> {
   static auto Get() { return hwreg::RegisterAddr<HhiVidClkDivReg>(HHI_VID_CLK_DIV); }
 };
 
+//
+// A311D datasheet Section 8.7.1.3 "HDMI Clock Tree" Figure 8-12 "HDMI Clock
+// Tree"
 class HhiVidPllClkDivReg : public hwreg::RegisterBase<HhiVidPllClkDivReg, uint32_t> {
  public:
   DEF_BIT(19, clk_final_en);
@@ -352,6 +403,8 @@ class HhiVidPllClkDivReg : public hwreg::RegisterBase<HhiVidPllClkDivReg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiVidPllClkDivReg>(HHI_VID_PLL_CLK_DIV); }
 };
 
+//
+// A311D datasheet Section 8.7.1.3 "HDMI Clock Tree"
 class HhiHdmiClkCntlReg : public hwreg::RegisterBase<HhiHdmiClkCntlReg, uint32_t> {
  public:
   DEF_FIELD(19, 16, crt_hdmi_pixel_clk_sel);
@@ -385,6 +438,7 @@ class HhiGclkMpeg2Reg : public hwreg::RegisterBase<HhiGclkMpeg2Reg, uint32_t> {
   static auto Get() { return hwreg::RegisterAddr<HhiGclkMpeg2Reg>(HHI_GCLK_MPEG2); }
 };
 
+// HHI_HDMI_PHY_CNTL0
 class HhiHdmiPhyCntl0Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl0Reg, uint32_t> {
  public:
   DEF_FIELD(31, 16, hdmi_ctl1);
@@ -393,6 +447,7 @@ class HhiHdmiPhyCntl0Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl0Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyCntl0Reg>(HHI_HDMI_PHY_CNTL0); }
 };
 
+// HHI_HDMI_PHY_CNTL1
 class HhiHdmiPhyCntl1Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl1Reg, uint32_t> {
  public:
   DEF_FIELD(31, 30, new_prbs_mode);
@@ -419,13 +474,37 @@ class HhiHdmiPhyCntl1Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl1Reg, uint32
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyCntl1Reg>(HHI_HDMI_PHY_CNTL1); }
 };
 
+// HHI_HDMI_PHY_CNTL2
+class HhiHdmiPhyCntl2Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl2Reg, uint32_t> {
+ public:
+  DEF_BIT(8, test_error);
+  DEF_FIELD(7, 0, hdmi_regrd);
+
+  static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyCntl2Reg>(HHI_HDMI_PHY_CNTL2); }
+};
+
+// HHI_HDMI_PHY_CNTL3
 class HhiHdmiPhyCntl3Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl3Reg, uint32_t> {
  public:
-  // Undocumented
+  // All bits reserved
 
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyCntl3Reg>(HHI_HDMI_PHY_CNTL3); }
 };
 
+// HHI_HDMI_PHY_CNTL4
+class HhiHdmiPhyCntl4Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl4Reg, uint32_t> {
+ public:
+  DEF_FIELD(31, 24, new_prbs_err_thr);
+  DEF_FIELD(21, 20, dtest_sel);
+  DEF_BIT(19, new_prbs_clr_ber_meter);
+  DEF_BIT(17, new_prbs_freez_ber);
+  DEF_BIT(16, new_prbs_inverse_in);
+  DEF_FIELD(15, 14, new_prbs_mode);
+
+  static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyCntl4Reg>(HHI_HDMI_PHY_CNTL4); }
+};
+
+// HHI_HDMI_PHY_CNTL5
 class HhiHdmiPhyCntl5Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl5Reg, uint32_t> {
  public:
   DEF_FIELD(31, 24, new_pbrs_err_thr);
@@ -437,6 +516,19 @@ class HhiHdmiPhyCntl5Reg : public hwreg::RegisterBase<HhiHdmiPhyCntl5Reg, uint32
 
   static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyCntl5Reg>(HHI_HDMI_PHY_CNTL5); }
 };
+
+// HHI_HDMI_PHY_STATUS
+class HhiHdmiPhyStatusReg : public hwreg::RegisterBase<HhiHdmiPhyStatusReg, uint32_t> {
+ public:
+  DEF_BIT(29, prbs_enabled);
+  DEF_BIT(28, test_error);
+  DEF_BIT(24, new_prbs_pattern_nok);
+  DEF_BIT(20, new_prbs_lock);
+  DEF_FIELD(19, 0, new_prbs_ber_meter);
+
+  static auto Get() { return hwreg::RegisterAddr<HhiHdmiPhyStatusReg>(HHI_HDMI_PHY_STATUS); }
+};
+
 
 }  // namespace amlogic_display
 

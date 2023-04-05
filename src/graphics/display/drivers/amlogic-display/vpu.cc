@@ -234,6 +234,11 @@ void Vpu::ConfigureClock() {
   WRITE32_REG(VPU, VPU_RDARB_MODE_L2C1, 0x900000);
   WRITE32_REG(VPU, VPU_WRARB_MODE_L2C1, 0x20000);
 }
+
+// The power gates documented in A311D datasheet Section 8.7.5 "Register
+// Description", entries for HHI_VPU_MEM_PD_REG0, HHI_VPU_MEM_PD_REG1,
+// HHI_VPU_MEM_PD_REG2
+
 /*
  *  Power Table
  *  <vpu module>          <register>           <bit> <len>

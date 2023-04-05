@@ -108,6 +108,9 @@ class AmlHdmiDevice : public DeviceType, public HdmiIpBase, public fbl::RefCount
   };
 
   // For unit testing
+  //
+  // `mmio` is the region documented as HDMITX in Section 8.1 "Memory Map" of
+  // the AMLogic A311D datasheet.
   AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer mmio, std::unique_ptr<hdmi_dw::HdmiDw> hdmi_dw)
       : DeviceType(parent),
         pdev_(parent),
