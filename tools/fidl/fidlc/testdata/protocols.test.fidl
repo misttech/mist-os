@@ -144,8 +144,6 @@ closed protocol WithProtocolEnds {
 };
 
 closed protocol ManyParameters {
-    // TODO(fxbug.dev/76655): Support an arbitrary number of parameters in Rust.
-    @bindings_denylist("rust")
     strict Fifteen(struct {
         p1 bool;
         p2 bool;

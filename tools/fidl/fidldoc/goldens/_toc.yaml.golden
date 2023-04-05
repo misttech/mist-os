@@ -134,6 +134,9 @@ toc:
   - title: test.transitivedependenciescompose
     path: /test.transitivedependenciescompose
     version_added: ""
+  - title: test.typesinprotocols
+    path: /test.typesinprotocols
+    version_added: ""
   - title: test.union
     path: /test.union
     version_added: ""

@@ -48,6 +48,10 @@ import("//build/fidl/toolchain.gni")
 # Please keep sorted by name.
 fidl_testdata_info = [
   {
+    name = "aliases"
+    target = "//tools/fidl/fidlc/testdata/aliases:test.aliases"
+  },
+  {
     name = "anonymous"
     target = "//tools/fidl/fidlc/testdata:test.anonymous"
     build_denylist = [
@@ -444,8 +448,8 @@ fidl_testdata_info = [
     ]
   },
   {
-    name = "aliases"
-    target = "//tools/fidl/fidlc/testdata/aliases:test.aliases"
+    name = "types_in_protocols"
+    target = "//tools/fidl/fidlc/testdata:test.typesinprotocols"
   },
   {
     name = "union"

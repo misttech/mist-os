@@ -40,6 +40,7 @@ standalone_libraries = [
   "string_arrays.test.fidl",
   "struct.test.fidl",
   "table.test.fidl",
+  "types_in_protocols.test.fidl",
   "union.test.fidl",
   "union_sandwich.test.fidl",
   "unknown_interactions.test.fidl",

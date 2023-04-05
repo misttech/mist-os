@@ -495,6 +495,146 @@ fidl_struct! {
     align_v2: 4,
 }
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct ManyParametersFifteenRequest {
+    pub p1: bool,
+    pub p2: bool,
+    pub p3: bool,
+    pub p4: bool,
+    pub p5: bool,
+    pub p6: bool,
+    pub p7: bool,
+    pub p8: bool,
+    pub p9: bool,
+    pub p10: bool,
+    pub p11: bool,
+    pub p12: bool,
+    pub p13: bool,
+    pub p14: bool,
+    pub p15: bool,
+}
+
+impl fidl::encoding::TopLevel for ManyParametersFifteenRequest {}
+
+fidl_struct! {
+    name: ManyParametersFifteenRequest,
+    members: [
+        p1 {
+            ty: bool,
+            index: 0,
+            typevar: T0,
+            offset_v1: 0,
+            offset_v2: 0,
+        },
+        p2 {
+            ty: bool,
+            index: 1,
+            typevar: T1,
+            offset_v1: 1,
+            offset_v2: 1,
+        },
+        p3 {
+            ty: bool,
+            index: 2,
+            typevar: T2,
+            offset_v1: 2,
+            offset_v2: 2,
+        },
+        p4 {
+            ty: bool,
+            index: 3,
+            typevar: T3,
+            offset_v1: 3,
+            offset_v2: 3,
+        },
+        p5 {
+            ty: bool,
+            index: 4,
+            typevar: T4,
+            offset_v1: 4,
+            offset_v2: 4,
+        },
+        p6 {
+            ty: bool,
+            index: 5,
+            typevar: T5,
+            offset_v1: 5,
+            offset_v2: 5,
+        },
+        p7 {
+            ty: bool,
+            index: 6,
+            typevar: T6,
+            offset_v1: 6,
+            offset_v2: 6,
+        },
+        p8 {
+            ty: bool,
+            index: 7,
+            typevar: T7,
+            offset_v1: 7,
+            offset_v2: 7,
+        },
+        p9 {
+            ty: bool,
+            index: 8,
+            typevar: T8,
+            offset_v1: 8,
+            offset_v2: 8,
+        },
+        p10 {
+            ty: bool,
+            index: 9,
+            typevar: T9,
+            offset_v1: 9,
+            offset_v2: 9,
+        },
+        p11 {
+            ty: bool,
+            index: 10,
+            typevar: T10,
+            offset_v1: 10,
+            offset_v2: 10,
+        },
+        p12 {
+            ty: bool,
+            index: 11,
+            typevar: T11,
+            offset_v1: 11,
+            offset_v2: 11,
+        },
+        p13 {
+            ty: bool,
+            index: 12,
+            typevar: T12,
+            offset_v1: 12,
+            offset_v2: 12,
+        },
+        p14 {
+            ty: bool,
+            index: 13,
+            typevar: T13,
+            offset_v1: 13,
+            offset_v2: 13,
+        },
+        p15 {
+            ty: bool,
+            index: 14,
+            typevar: T14,
+            offset_v1: 14,
+            offset_v2: 14,
+        },
+    ],
+    padding_v1: [
+    ],
+    padding_v2: [
+    ],
+    size_v1: 15,
+    size_v2: 15,
+    align_v1: 1,
+    align_v2: 1,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct MethodWithUnionUnionMethodRequest {
     pub u: TheUnion,
@@ -3010,7 +3150,26 @@ impl fidl::endpoints::ProtocolMarker for ManyParametersMarker {
     const DEBUG_NAME: &'static str = "(anonymous) ManyParameters";
 }
 
-pub trait ManyParametersProxyInterface: Send + Sync {}
+pub trait ManyParametersProxyInterface: Send + Sync {
+    fn r#fifteen(
+        &self,
+        p1: bool,
+        p2: bool,
+        p3: bool,
+        p4: bool,
+        p5: bool,
+        p6: bool,
+        p7: bool,
+        p8: bool,
+        p9: bool,
+        p10: bool,
+        p11: bool,
+        p12: bool,
+        p13: bool,
+        p14: bool,
+        p15: bool,
+    ) -> Result<(), fidl::Error>;
+}
 
 #[derive(Debug)]
 #[cfg(target_os = "fuchsia")]
@@ -3033,6 +3192,30 @@ impl ManyParametersSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ManyParametersEvent, fidl::Error> {
         ManyParametersEvent::decode(self.client.wait_for_event(deadline)?)
+    }
+    pub fn r#fifteen(
+        &self,
+        mut p1: bool,
+        mut p2: bool,
+        mut p3: bool,
+        mut p4: bool,
+        mut p5: bool,
+        mut p6: bool,
+        mut p7: bool,
+        mut p8: bool,
+        mut p9: bool,
+        mut p10: bool,
+        mut p11: bool,
+        mut p12: bool,
+        mut p13: bool,
+        mut p14: bool,
+        mut p15: bool,
+    ) -> Result<(), fidl::Error> {
+        self.client.send::<ManyParametersFifteenRequest, false>(
+            (p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15),
+            0x59233bcecd338967,
+            fidl::encoding::DynamicFlags::empty(),
+        )
     }
 }
 
@@ -3072,9 +3255,56 @@ impl ManyParametersProxy {
     pub fn take_event_stream(&self) -> ManyParametersEventStream {
         ManyParametersEventStream { event_receiver: self.client.take_event_receiver() }
     }
+    pub fn r#fifteen(
+        &self,
+        mut p1: bool,
+        mut p2: bool,
+        mut p3: bool,
+        mut p4: bool,
+        mut p5: bool,
+        mut p6: bool,
+        mut p7: bool,
+        mut p8: bool,
+        mut p9: bool,
+        mut p10: bool,
+        mut p11: bool,
+        mut p12: bool,
+        mut p13: bool,
+        mut p14: bool,
+        mut p15: bool,
+    ) -> Result<(), fidl::Error> {
+        ManyParametersProxyInterface::r#fifteen(
+            self, p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15,
+        )
+    }
 }
 
-impl ManyParametersProxyInterface for ManyParametersProxy {}
+impl ManyParametersProxyInterface for ManyParametersProxy {
+    fn r#fifteen(
+        &self,
+        mut p1: bool,
+        mut p2: bool,
+        mut p3: bool,
+        mut p4: bool,
+        mut p5: bool,
+        mut p6: bool,
+        mut p7: bool,
+        mut p8: bool,
+        mut p9: bool,
+        mut p10: bool,
+        mut p11: bool,
+        mut p12: bool,
+        mut p13: bool,
+        mut p14: bool,
+        mut p15: bool,
+    ) -> Result<(), fidl::Error> {
+        self.client.send::<ManyParametersFifteenRequest, false>(
+            (p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15),
+            0x59233bcecd338967,
+            fidl::encoding::DynamicFlags::empty(),
+        )
+    }
+}
 
 pub struct ManyParametersEventStream {
     event_receiver: fidl::client::EventReceiver,
@@ -3199,6 +3429,43 @@ impl futures::Stream for ManyParametersRequestStream {
             }
 
             std::task::Poll::Ready(Some(match header.ordinal() {
+                0x59233bcecd338967 => {
+                    let mut req = fidl::new_empty!(ManyParametersFifteenRequest);
+                    fidl::duration_begin!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "name" => "test.protocols/ManyParametersFifteenRequest");
+                    fidl::trace_blob!("fidl:blob", "decode", bytes);
+                    if header.dynamic_flags().contains(fidl::encoding::DynamicFlags::BYTE_OVERFLOW)
+                    {
+                        Err(fidl::Error::LargeMessageImpossible)?;
+                    }
+                    fidl::encoding::Decoder::decode_into::<ManyParametersFifteenRequest>(
+                        &header,
+                        _body_bytes,
+                        handles,
+                        &mut req,
+                    )?;
+                    fidl::duration_end!("fidl", "decode", "bindings" => _FIDL_TRACE_BINDINGS_RUST, "size" => bytes.len() as u32, "handle_count" => handles.len() as u32);
+                    let control_handle = ManyParametersControlHandle { inner: this.inner.clone() };
+
+                    Ok(ManyParametersRequest::Fifteen {
+                        p1: req.p1,
+                        p2: req.p2,
+                        p3: req.p3,
+                        p4: req.p4,
+                        p5: req.p5,
+                        p6: req.p6,
+                        p7: req.p7,
+                        p8: req.p8,
+                        p9: req.p9,
+                        p10: req.p10,
+                        p11: req.p11,
+                        p12: req.p12,
+                        p13: req.p13,
+                        p14: req.p14,
+                        p15: req.p15,
+
+                        control_handle,
+                    })
+                }
                 _ => Err(fidl::Error::UnknownOrdinal {
                     ordinal: header.ordinal(),
                     protocol_name:
@@ -3209,12 +3476,79 @@ impl futures::Stream for ManyParametersRequestStream {
     }
 }
 #[derive(Debug)]
-pub enum ManyParametersRequest {}
+pub enum ManyParametersRequest {
+    Fifteen {
+        p1: bool,
+        p2: bool,
+        p3: bool,
+        p4: bool,
+        p5: bool,
+        p6: bool,
+        p7: bool,
+        p8: bool,
+        p9: bool,
+        p10: bool,
+        p11: bool,
+        p12: bool,
+        p13: bool,
+        p14: bool,
+        p15: bool,
+        control_handle: ManyParametersControlHandle,
+    },
+}
 
 impl ManyParametersRequest {
+    #[allow(irrefutable_let_patterns)]
+    pub fn into_fifteen(
+        self,
+    ) -> Option<(
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        bool,
+        ManyParametersControlHandle,
+    )> {
+        if let ManyParametersRequest::Fifteen {
+            p1,
+            p2,
+            p3,
+            p4,
+            p5,
+            p6,
+            p7,
+            p8,
+            p9,
+            p10,
+            p11,
+            p12,
+            p13,
+            p14,
+            p15,
+            control_handle,
+        } = self
+        {
+            Some((p1, p2, p3, p4, p5, p6, p7, p8, p9, p10, p11, p12, p13, p14, p15, control_handle))
+        } else {
+            None
+        }
+    }
+
     /// Name of the method defined in FIDL
     pub fn method_name(&self) -> &'static str {
-        match *self {}
+        match *self {
+            ManyParametersRequest::Fifteen { .. } => "fifteen",
+        }
     }
 }
 

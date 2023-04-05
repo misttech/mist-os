@@ -1,0 +1,153 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library test.typesinprotocols;
+
+type Bits = bits {
+    VAL = 1;
+};
+type Enum = enum {
+    VAL = 1;
+};
+type Struct = struct {};
+type Table = table {};
+type Union = union {
+    1: b bool;
+};
+
+type Basic = struct {
+    uint8 uint8;
+    uint16 uint16;
+    uint32 uint32;
+    uint64 uint64;
+    int8 int8;
+    int16 int16;
+    int32 int32;
+    int64 int64;
+    float32 float32;
+    float64 float64;
+    string string;
+    opt_string string:optional;
+};
+
+type Compound = struct {
+    bits Bits;
+    enum Enum;
+    struct Struct;
+    table Table;
+    union Union;
+    opt_struct box<Struct>;
+    opt_union Union:optional;
+};
+
+type ArrayBasic = struct {
+    array_uint8 array<uint8, 5>;
+    array_uint16 array<uint16, 5>;
+    array_uint32 array<uint32, 5>;
+    array_uint64 array<uint64, 5>;
+    array_int8 array<int8, 5>;
+    array_int16 array<int16, 5>;
+    array_int32 array<int32, 5>;
+    array_int64 array<int64, 5>;
+    array_float32 array<float32, 5>;
+    array_float64 array<float64, 5>;
+    array_string array<string, 5>;
+    array_opt_string array<string:optional, 5>;
+};
+
+type ArrayCompound = struct {
+    array_bits array<Bits, 5>;
+    array_enum array<Enum, 5>;
+    array_struct array<Struct, 5>;
+    array_table array<Table, 5>;
+    array_union array<Union, 5>;
+
+    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
+    @bindings_denylist("rust")
+    array_opt_struct array<box<Struct>, 5>;
+    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
+    @bindings_denylist("rust")
+    array_opt_union array<Union:optional, 5>;
+};
+
+type VectorBasic = struct {
+    vector_uint8 vector<uint8>;
+    vector_uint16 vector<uint16>;
+    vector_uint32 vector<uint32>;
+    vector_uint64 vector<uint64>;
+    vector_int8 vector<int8>;
+    vector_int16 vector<int16>;
+    vector_int32 vector<int32>;
+    vector_int64 vector<int64>;
+    vector_float32 vector<float32>;
+    vector_float64 vector<float64>;
+    vector_string vector<string>;
+    vector_opt_string vector<string:optional>;
+};
+
+type VectorCompound = struct {
+    vector_bits vector<Bits>;
+    vector_enum vector<Enum>;
+    vector_struct vector<Struct>;
+    vector_table vector<Table>;
+    vector_union vector<Union>;
+    vector_opt_struct vector<box<Struct>>;
+    vector_opt_union vector<Union:optional>;
+};
+
+type VectorOptional = struct {
+    opt_vector_uint8 vector<uint8>:optional;
+    opt_vector_string vector<string>:optional;
+
+    // TODO(fxbug.dev/124974): Fix libfuzzer. Also denied in HLCPP since libfuzzer uses it.
+    @bindings_denylist("hlcpp, libfuzzer")
+    opt_vector_struct vector<Struct>:optional;
+
+    opt_vector_opt_struct vector<box<Struct>>:optional;
+};
+
+type ArrayVectorNested = struct {
+    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
+    @bindings_denylist("rust")
+    array_array_uint8 array<array<uint8, 5>, 5>;
+    // TODO(fxbug.dev/54368): Fix issues with parameter type conversion.
+    @bindings_denylist("rust")
+    array_vector_uint8 array<vector<uint8>, 5>;
+
+    vector_array_uint8 vector<array<uint8, 5>>;
+    vector_vector_uint8 vector<vector<uint8>>;
+};
+
+protocol Protocol {
+    OneWayBasic(Basic);
+    TwoWayBasic(Basic) -> (Basic);
+    -> EventBasic(Basic);
+
+    OneWayCompound(Compound);
+    TwoWayCompound(Compound) -> (Compound);
+    -> EventCompound(Compound);
+
+    OneWayArrayBasic(ArrayBasic);
+    TwoWayArrayBasic(ArrayBasic) -> (ArrayBasic);
+    -> EventArrayBasic(ArrayBasic);
+
+    OneWayArrayCompound(ArrayCompound);
+    TwoWayArrayCompound(ArrayCompound) -> (ArrayCompound);
+    -> EventArrayCompound(ArrayCompound);
+
+    OneWayVectorBasic(VectorBasic);
+    TwoWayVectorBasic(VectorBasic) -> (VectorBasic);
+    -> EventVectorBasic(VectorBasic);
+
+    OneWayVectorCompound(VectorCompound);
+    TwoWayVectorCompound(VectorCompound) -> (VectorCompound);
+    -> EventVectorCompound(VectorCompound);
+
+    OneWayVectorOptional(VectorOptional);
+    TwoWayVectorOptional(VectorOptional) -> (VectorOptional);
+    -> EventVectorOptional(VectorOptional);
+
+    OneWayArrayVectorNested(ArrayVectorNested);
+    TwoWayArrayVectorNested(ArrayVectorNested) -> (ArrayVectorNested);
+    -> EventArrayVectorNested(ArrayVectorNested);
+};
