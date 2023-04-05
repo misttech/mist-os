@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::arch::signal_handling::{
-    align_stack_pointer, restore_registers, update_register_state_for_restart, SignalStackFrame,
-    RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
+use crate::arch::{
+    registers::RegisterState,
+    signal_handling::{
+        align_stack_pointer, restore_registers, update_register_state_for_restart,
+        SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
+    },
 };
 use crate::logging::{log_trace, log_warn};
 use crate::mm::MemoryAccessor;

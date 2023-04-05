@@ -6,6 +6,7 @@ use fuchsia_zircon as zx;
 
 use std::sync::Arc;
 
+use crate::arch::registers::RegisterState;
 use crate::mm::vmo::round_up_to_increment;
 use crate::mm::{DesiredAddress, MappingName, MappingOptions, PAGE_SIZE};
 use crate::signals::*;

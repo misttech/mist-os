@@ -4,6 +4,7 @@
 
 use fuchsia_zircon as zx;
 
+use crate::arch::registers::RegisterState;
 use crate::signals::*;
 use crate::task::*;
 use crate::types::*;

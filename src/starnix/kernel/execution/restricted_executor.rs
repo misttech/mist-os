@@ -14,13 +14,14 @@ use std::sync::Arc;
 use super::shared::{
     as_exception_info, execute_syscall, process_completed_syscall, read_channel_sync, TaskInfo,
 };
+use crate::arch::registers::RegisterState;
 use crate::logging::{log_error, log_trace, log_warn, set_zx_name};
 use crate::mm::MemoryManager;
 use crate::signals::{deliver_signal, SignalActions, SignalInfo};
 use crate::syscalls::decls::SyscallDecl;
 use crate::task::{
-    CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, RegisterState, Task,
-    ThreadGroup, ThreadGroupWriteGuard,
+    CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, ThreadGroup,
+    ThreadGroupWriteGuard,
 };
 use crate::types::*;
 

@@ -308,6 +308,7 @@ rustc_binary("starnix_kernel_bin") {
     sources += [
       "arch/x64/loader.rs",
       "arch/x64/mod.rs",
+      "arch/x64/registers.rs",
       "arch/x64/signal_handling.rs",
       "arch/x64/syscalls.rs",
       "task/task_x64.rs",
@@ -316,6 +317,7 @@ rustc_binary("starnix_kernel_bin") {
     sources += [
       "arch/aarch64/loader.rs",
       "arch/aarch64/mod.rs",
+      "arch/aarch64/registers.rs",
       "arch/aarch64/signal_handling.rs",
       "arch/aarch64/syscalls.rs",
       "task/task_arm64.rs",
