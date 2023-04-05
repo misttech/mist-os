@@ -32,6 +32,7 @@ group("benchmarks") {
   testonly = true
   deps = [
     "inspect:benchmarks",
+    "log:benchmarks",
     "selectors:benchmarks",
   ]
 }

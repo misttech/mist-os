@@ -8,6 +8,11 @@ group("log") {
   ]
 }
 
+group("benchmarks") {
+  testonly = true
+  deps = [ "bench" ]
+}
+
 group("tests") {
   testonly = true
   deps = [
