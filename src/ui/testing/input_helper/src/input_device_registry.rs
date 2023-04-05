@@ -208,11 +208,11 @@ mod tests {
         test_case::test_case,
     };
 
-    #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry);
+    #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry, -1, 1, -1, 1);
                 "touchscreen_device")]
     #[test_case(&|registry| InputDeviceRegistry::add_media_buttons_device(registry);
                 "media_buttons_device")]
-    #[test_case(&|registry| InputDeviceRegistry::add_media_buttons_device(registry);
+    #[test_case(&|registry| InputDeviceRegistry::add_keyboard_device(registry);
                 "keyboard_device")]
     fn add_device_invokes_fidl_register_method_exactly_once(
         add_device_method: &dyn Fn(&mut super::InputDeviceRegistry) -> Result<InputDevice, Error>,
@@ -235,7 +235,7 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry) =>
+    #[test_case(&|registry| InputDeviceRegistry::add_touchscreen_device(registry, -1, 1, -1, 1) =>
                 matches Ok(DeviceDescriptor {
                     touch: Some(TouchDescriptor {
                         input: Some(TouchInputDescriptor { .. }),

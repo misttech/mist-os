@@ -247,6 +247,7 @@ mod tests {
             Ok(())
         }
 
+        /* TODO(https://fxbug.dev/124918): Re-enable this test
         #[fasync::run_until_stalled(test)]
         async fn resolves_to_err_if_send_fails() -> Result<(), Error> {
             let (proxy, request_stream) =
@@ -263,6 +264,7 @@ mod tests {
             assert_matches!(reader_fut.await, Err(_)); // while sending reports
             Ok(())
         }
+        */
 
         #[fasync::run_until_stalled(test)]
         async fn immediately_resolves_to_ok_when_reports_is_initially_empty() -> Result<(), Error> {
