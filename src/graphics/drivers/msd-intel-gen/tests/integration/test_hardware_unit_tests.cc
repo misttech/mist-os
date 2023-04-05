@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/fdio/directory.h>
+#include <lib/fit/defer.h>
 #include <lib/zx/channel.h>
 #include <magma_intel_gen_defs.h>
 
@@ -16,34 +17,29 @@
 // unload the normal MSD to replace it with the test MSD so we can run those tests and query the
 // test results.
 // TODO(fxbug.dev/13208) - enable
-TEST(HardwareUnitTests, All) {
 #if ENABLE_HARDWARE_UNIT_TESTS
-  auto test_base = std::make_unique<magma::TestDeviceBase>(MAGMA_VENDOR_ID_INTEL);
-  fidl::ClientEnd parent_device = test_base->GetParentDevice();
-
-  test_base->ShutdownDevice();
-  test_base.reset();
+TEST(HardwareUnitTests, All) {
+#else
+TEST(HardwareUnitTests, DISABLED_All) {
+#endif
+  fidl::ClientEnd parent_device =
+      magma::TestDeviceBase::GetParentDeviceFromId(MAGMA_VENDOR_ID_INTEL);
 
   const char* kTestDriverPath = "libmsd_intel_test.cm";
   // The test driver will run unit tests on startup.
-  magma::TestDeviceBase::BindDriver(parent_device, kTestDriverPath);
+  magma::TestDeviceBase::RebindDevice(parent_device, kTestDriverPath);
 
-  test_base = std::make_unique<magma::TestDeviceBase>(MAGMA_VENDOR_ID_INTEL);
+  // Reload the production driver so later tests shouldn't be affected.
+  auto cleanup = fit::defer([&]() { magma::TestDeviceBase::RebindDevice(parent_device); });
+
+  magma::TestDeviceBase test_base(MAGMA_VENDOR_ID_INTEL);
 
   // TODO(https://fxbug.dev/112484): This relies on multiplexing.
   fidl::UnownedClientEnd<fuchsia_gpu_magma::TestDevice> channel{
-      test_base->channel().channel()->borrow()};
+      test_base.channel().channel()->borrow()};
+
   const fidl::WireResult result = fidl::WireCall(channel)->GetUnitTestStatus();
 
   EXPECT_EQ(ZX_OK, result.status()) << "Device connection lost, check syslog for any errors.";
   EXPECT_EQ(ZX_OK, result->status) << "Tests reported errors, check syslog.";
-
-  test_base->ShutdownDevice();
-  test_base.reset();
-
-  // Reload the production driver so later tests shouldn't be affected.
-  magma::TestDeviceBase::AutobindDriver(parent_device);
-#else
-  GTEST_SKIP();
-#endif
 }
