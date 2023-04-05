@@ -400,6 +400,9 @@ pub(crate) enum AddressState {
     /// When `dad_transmits_remaining` is `None`, then no more DAD messages need
     /// to be sent and DAD may be resolved.
     Tentative { dad_transmits_remaining: Option<NonZeroU8> },
+
+    /// The address has not yet been initialized.
+    Uninitialized,
 }
 
 impl AddressState {
@@ -412,7 +415,8 @@ impl AddressState {
     pub(crate) fn is_tentative(self) -> bool {
         match self {
             AddressState::Assigned => false,
-            AddressState::Tentative { dad_transmits_remaining: _ } => true,
+            AddressState::Uninitialized
+            | AddressState::Tentative { dad_transmits_remaining: _ } => true,
         }
     }
 }

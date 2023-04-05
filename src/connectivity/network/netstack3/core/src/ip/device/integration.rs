@@ -350,6 +350,7 @@ impl<C: IpDeviceNonSyncContext<Ipv6, SC::DeviceId>, SC: device::Ipv6DeviceContex
                     .find_mut(&addr)
                     .map(|Ipv6AddressEntry { addr_sub: _, state, config: _, deprecated: _ }| state),
                 retrans_timer: &state.retrans_timer,
+                max_dad_transmits: &state.config.dad_transmits,
             })
         })
     }
@@ -667,7 +668,8 @@ fn assignment_state_v6<Instant: crate::Instant>(
                 AddressState::Assigned => {
                     AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
                 }
-                AddressState::Tentative { dad_transmits_remaining: _ } => {
+                AddressState::Uninitialized
+                | AddressState::Tentative { dad_transmits_remaining: _ } => {
                     AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
                 }
             },

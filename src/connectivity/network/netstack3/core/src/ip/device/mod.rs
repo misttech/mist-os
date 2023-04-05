@@ -551,7 +551,8 @@ impl<
         })?;
 
         match address_state {
-            AddressState::Tentative { dad_transmits_remaining: _ } => {
+            AddressState::Uninitialized
+            | AddressState::Tentative { dad_transmits_remaining: _ } => {
                 del_ipv6_addr_with_reason(
                     self,
                     ctx,
@@ -607,12 +608,12 @@ fn enable_ipv6_device<
     // assigned the address and we wouldn't have responded to its DAD
     // solicitations.
     sync_ctx
-        .with_ip_device_state_mut(device_id, |state| {
+        .with_ip_device_state(device_id, |state| {
             let Ipv6DeviceState {
                 ip_state,
                 config:
                     Ipv6DeviceConfiguration {
-                        dad_transmits,
+                        dad_transmits: _,
                         max_router_solicitations: _,
                         slaac_config: _,
                         ip_config:
@@ -626,13 +627,11 @@ fn enable_ipv6_device<
                 router_soliciations_remaining: _,
                 route_discovery: _,
             } = state;
-            let dad_transmits = *dad_transmits;
 
             ip_state
                 .addrs
-                .iter_mut()
-                .map(|Ipv6AddressEntry { addr_sub, state, config: _, deprecated: _ }| {
-                    *state = AddressState::Tentative { dad_transmits_remaining: dad_transmits };
+                .iter()
+                .map(|Ipv6AddressEntry { addr_sub, state: _, config: _, deprecated: _ }| {
                     addr_sub.ipv6_unicast_addr()
                 })
                 .collect::<Vec<_>>()
@@ -644,7 +643,7 @@ fn enable_ipv6_device<
                 addr: addr.into_specified(),
                 state: IpAddressState::Tentative,
             });
-            DadHandler::do_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
+            DadHandler::start_duplicate_address_detection(sync_ctx, ctx, device_id, addr);
         });
 
     // TODO(https://fxbug.dev/95946): Generate link-local address with opaque
@@ -974,7 +973,7 @@ pub(crate) fn add_ipv6_addr_subnet<
                 ref mut ip_state,
                 config:
                     Ipv6DeviceConfiguration {
-                        dad_transmits,
+                        dad_transmits: _,
                         max_router_solicitations: _,
                         slaac_config: _,
                         ip_config: IpDeviceConfiguration { ip_enabled, gmp_enabled: _, forwarding_enabled: _ },
@@ -988,7 +987,7 @@ pub(crate) fn add_ipv6_addr_subnet<
                 .addrs
                 .add(Ipv6AddressEntry::new(
                     addr_sub,
-                    AddressState::Tentative { dad_transmits_remaining: *dad_transmits },
+                    AddressState::Uninitialized,
                     config,
                 ))
                 .map(|()| *ip_enabled)
@@ -1016,13 +1015,13 @@ pub(crate) fn add_ipv6_addr_subnet<
             ctx.on_event(IpDeviceEvent::AddressAdded {
                 device: device_id.clone(),
                 addr: addr_sub.to_witness(),
-                state: state,
+                state,
             });
 
             // NB: We don't start DAD if the device is disabled. DAD will be
             // performed when the device is enabled for all addressed.
             if ip_enabled {
-                DadHandler::do_duplicate_address_detection(
+                DadHandler::start_duplicate_address_detection(
                     sync_ctx,
                     ctx,
                     device_id,
@@ -1901,7 +1900,7 @@ mod tests {
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                     device: weak_device_id.clone(),
                     addr: ll_addr.to_witness(),
-                    state: IpAddressState::Tentative
+                    state: IpAddressState::Tentative,
                 }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::EnabledChanged {
                     device: weak_device_id.clone(),
@@ -1925,8 +1924,8 @@ mod tests {
             [DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressAdded {
                 device: weak_device_id.clone(),
                 addr: assigned_addr.to_witness(),
-                state: IpAddressState::Tentative
-            })]
+                state: IpAddressState::Tentative,
+            }),]
         );
 
         // When DAD fails, an event should be emitted and the address should be

@@ -1261,7 +1261,10 @@ fn receive_ndp_packet<
                                 Ipv6::ALL_NODES_LINK_LOCAL_MULTICAST_ADDRESS.into_specified(),
                             );
                         }
-                        Some(AddressState::Tentative { dad_transmits_remaining: _ }) => {
+                        Some(
+                            AddressState::Uninitialized
+                            | AddressState::Tentative { dad_transmits_remaining: _ },
+                        ) => {
                             // Nothing further to do in response to DAD
                             // messages.
                         }
@@ -1362,11 +1365,12 @@ fn receive_ndp_packet<
                             // TODO(https://fxbug.dev/36238): Signal to bindings
                             // that a duplicate address is detected.
                             error!(
-                            "NA from {} with target address {} that is also assigned on device {}",
-                            src_ip, target_address, device_id
-                        );
+                                "NA from {} with target address {} that is also assigned on device {}",
+                                src_ip, target_address, device_id
+                            );
                         }
-                        AddressState::Tentative { dad_transmits_remaining: _ } => (),
+                        AddressState::Uninitialized
+                        | AddressState::Tentative { dad_transmits_remaining: _ } => (),
                     }
 
                     // Nothing further to do for an NA from a neighbor that
