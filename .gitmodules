@@ -608,3 +608,8 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/google/liblc3
 	name = third_party/github.com/google/liblc3
 	ignore = all
+[submodule "third_party/android/platform/packages/modules/Bluetooth/src"]
+	path = third_party/android/platform/packages/modules/Bluetooth/src
+	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/packages/modules/Bluetooth
+	name = third_party/android.googlesource.com/platform/packages/modules/Bluetooth
+	ignore = all
