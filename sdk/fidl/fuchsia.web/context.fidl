@@ -77,24 +77,26 @@ type ContextFeatureFlags = strict bits : uint64 {
     /// - [`fuchsia.vulkan.loader/Loader`]
     VULKAN = 0x4;
 
-    /// Enables hardware video decoding. `VULKAN` must be enabled as well. Requires the following
-    /// service:
+    /// Enables hardware video decoding.
+    /// [`ContextFeatureFlags.VULKAN`] must be enabled as well.
+    /// Requires the following service:
     /// - [`fuchsia.mediacodec/CodecFactory`]
     HARDWARE_VIDEO_DECODER = 0x8;
 
     /// Disables video codecs that cannot be decoded in hardware.
     /// Software decoders will only be used as fallbacks for hardware decoders, such as when
     /// insufficient resources are available.
-    /// Requires the `HARDWARE_VIDEO_DECODER` flag.
+    /// Requires [`ContextFeatureFlags.HARDWARE_VIDEO_DECODER`].
     HARDWARE_VIDEO_DECODER_ONLY = 0x10;
 
-    /// Enables Widevine CDM modules for EME API. `VULKAN` feature must be enabled as well.
+    /// Enables Widevine CDM modules for EME API.
+    /// [`ContextFeatureFlags.VULKAN`] must be enabled as well.
     /// Requires [`fuchsia.media.drm/Widevine`] service. Requires that a `cdm_data_directory` be
     /// specified in [`CreateContextParams`].
     WIDEVINE_CDM = 0x20;
 
     /// Allows embedders to render web content without graphical output or Scenic.
-    /// Not compatible with the `VULKAN` flag.
+    /// Not compatible with [`ContextFeatureFlags.VULKAN`].
     HEADLESS = 0x40;
 
     /// Report telemetry data to the [`fuchsia.legacymetrics/MetricsRecorder`].
@@ -106,8 +108,8 @@ type ContextFeatureFlags = strict bits : uint64 {
 
     /// Enables the use of onscreen virtual keyboards. The implementation will manage the state of
     /// the keyboard in response to input/focus events in web content.
-    /// Requires the [`fuchsia.input.virtualkeyboard/ControllerCreator`] service and the
-    /// `KEYBOARD` ContextFeatureFlag.
+    /// Requires the [`fuchsia.input.virtualkeyboard/ControllerCreator`] service and
+    /// [`ContextFeatureFlags.KEYBOARD`].
     VIRTUAL_KEYBOARD = 0x200;
 
     /// Disables dynamic generation of machine-code from scripts (e.g. JavaScript) and other
@@ -128,7 +130,7 @@ type CreateContextParams = resource table {
     /// - [`fuchsia.device/NameProvider`]
     /// - [`fuchsia.fonts/Provider`]
     /// - [`fuchsia.intl/PropertyProvider`]
-    /// - [`fuchsia.kernel/VmexResource`] (unless [`DISABLE_DYNAMIC_CODE_GENERATION`] is set)
+    /// - [`fuchsia.kernel/VmexResource`] (unless [`ContextFeatureFlags.DISABLE_DYNAMIC_CODE_GENERATION`] is set)
     /// - [`fuchsia.logger/LogSink`]
     /// - [`fuchsia.memorypressure/Provider`]
     /// - [`fuchsia.process/Launcher`]
