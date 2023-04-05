@@ -126,8 +126,16 @@ def _apply_policy_and_overrides(
     return classification
 
 
-def _print_verification_errors(classification: LicensesClassifications):
-    verification_messages = classification.verification_errors()
+def _print_verification_errors(
+        classifications: LicensesClassifications, preamble_file_path):
+    if preamble_file_path:
+        with open(preamble_file_path, 'r') as preamble_file:
+            preamble_text = preamble_file.read()
+            _log("=====================")
+            _log(preamble_text)
+            _log("=====================")
+
+    verification_messages = classifications.verification_errors()
 
     message_count = len(verification_messages)
     max_verification_errors = 100
@@ -135,12 +143,11 @@ def _print_verification_errors(classification: LicensesClassifications):
     if message_count > max_verification_errors:
         verification_messages = verification_messages[0:max_verification_errors]
 
-    if verification_messages:
-        for i in range(0, len(verification_messages)):
-            _log(f"==========================")
-            _log(f"VERIFICATION MESSAGE {i+1}/{message_count}:")
-            _log(f"==========================")
-            _log(verification_messages[i])
+    for i in range(0, len(verification_messages)):
+        _log(f"==========================")
+        _log(f"VERIFICATION MESSAGE {i+1}/{message_count}:")
+        _log(f"==========================")
+        _log(verification_messages[i])
 
     if message_count > max_verification_errors:
         _log(
@@ -196,6 +203,15 @@ def main():
     )
 
     parser.add_argument(
+        '--failure_message_preamble',
+        help='''Path to a text file that contains a failure message preamble.
+The message will be pre-pended to the standard generated failure message,
+allowing downstream customers to provide project specific instructions.
+''',
+        required=False,
+    )
+
+    parser.add_argument(
         '--output_file',
         help='Where to write the output json',
         required=True,
@@ -238,36 +254,11 @@ def main():
     if args.fail_on_disallowed_conditions:
         if classification.failed_verifications_count() > 0:
             _log("ERROR: Licenses verification failed.")
-            _print_verification_errors(classification)
+            _print_verification_errors(
+                classification,
+                preamble_file_path=args.failure_message_preamble)
             sys.exit(-1)
 
-
-# The text below is not a real license text.
-_UNENCUMBERED_LICENSE = '''
-This is free and unencumbered software released into the public domain.
-
-Anyone is free to copy, modify, publish, use, compile, sell, or distribute
-this software, either in source code form or as a compiled binary, for any
-purpose, commercial or non-commercial, and by any means.
-
-In jurisdictions that recognize copyright laws, the author or authors of this
-software dedicate any and all copyright interest in the software to the public
-domain. We make this dedication for the benefit of the public at large and to
-the detriment of our heirs and
-
-successors. We intend this dedication to be an overt act of relinquishment in
-perpetuity of all present and future rights to this software under copyright
-law.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
-ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-For more information, please refer to <http://unlicense.org/>
-'''
 
 if __name__ == '__main__':
     main()

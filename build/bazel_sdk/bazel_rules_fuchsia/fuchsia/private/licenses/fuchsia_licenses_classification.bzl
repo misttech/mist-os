@@ -21,6 +21,9 @@ def _fuchsia_licenses_classification_impl(ctx):
         arguments.extend(ctx.attr.allowed_conditions)
     if ctx.attr.fail_on_disallowed_conditions:
         arguments.append("--fail_on_disallowed_conditions=True")
+    if ctx.file.failure_message_preamble:
+        inputs.extend(ctx.file.failure_message_preamble)
+        arguments.append("--failure_message_preamble=%s" % ctx.file.failure_message_preamble.path)
     if ctx.files.policy_override_rules:
         inputs.extend(ctx.files.policy_override_rules)
         arguments.append("--policy_override_rules")
@@ -105,7 +108,15 @@ and build identify_license to match their organization OSS compliance policies.
         "fail_on_disallowed_conditions": attr.bool(
             doc = """The rule will fail if identified licenses map to disallowed conditions.""",
             mandatory = False,
-            default = False,
+            default = True,
+        ),
+        "failure_message_preamble": attr.label(
+            doc = """A text file that contains a failure message preamble.
+The message will be pre-pended to the standard generated failure message,
+allowing downstream customers to provide project specific instructions, such
+as documentation or persons of contact.""",
+            mandatory = False,
+            allow_single_file = True,
         ),
         "_generate_licenses_classification_tool": attr.label(
             executable = True,
