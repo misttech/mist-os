@@ -423,8 +423,9 @@ def get_git_head_path(git_path: str) -> str:
     git_dir = os.path.join(git_path, '.git')
     if os.path.isfile(git_dir):
         with open(git_dir) as f:
+            # Example: "gitdir: ../../.git/modules/third_party/example"
             submodule_dir = f.readlines()[0].split()[1]
-        git_dir = os.path.join(git_dir, submodule_dir)
+        git_dir = os.path.join(git_path, submodule_dir)
 
     return os.path.join(git_dir, 'HEAD')
 
