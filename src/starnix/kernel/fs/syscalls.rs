@@ -534,7 +534,7 @@ pub fn sys_truncate(
 pub fn sys_ftruncate(current_task: &CurrentTask, fd: FdNumber, length: off_t) -> Result<(), Errno> {
     let length = length.try_into().map_err(|_| errno!(EINVAL))?;
     let file = current_task.files.get_unless_opath(fd)?;
-    file.ftruncate(length)?;
+    file.ftruncate(current_task, length)?;
     Ok(())
 }
 

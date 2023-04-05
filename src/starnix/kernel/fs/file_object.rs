@@ -827,14 +827,14 @@ impl FileObject {
         self.ops().fcntl(self, current_task, cmd, arg)
     }
 
-    pub fn ftruncate(&self, length: u64) -> Result<(), Errno> {
+    pub fn ftruncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
         // The file must be opened with write permissions. Otherwise
         // truncating it is forbidden.
         if !self.can_write() {
             return error!(EINVAL);
         }
 
-        self.node().ftruncate(length)
+        self.node().ftruncate(current_task, length)
     }
 
     pub fn fallocate(&self, offset: u64, length: u64) -> Result<(), Errno> {

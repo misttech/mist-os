@@ -1119,10 +1119,6 @@
                 "IntervalTimerTest.IgnoredSignalCountsAsOverrun",
                 "TimerTest.ProcessKilledOnCPUSoftLimit",
 
-                // truncate_test
-                "FixtureTruncateTest.Truncate",
-                "FixtureTruncateTest.Ftruncate",
-
                 // uidgid_test - https://fxbug.dev/79438
                 "UidGidRootTest.SetgidNotFromThreadGroupLeader",
 

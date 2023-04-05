@@ -13,6 +13,7 @@ use crate::fs::pipe::Pipe;
 use crate::fs::socket::*;
 use crate::fs::*;
 use crate::lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use crate::signals::*;
 use crate::task::*;
 use crate::types::as_any::AsAny;
 use crate::types::*;
@@ -726,6 +727,10 @@ impl FsNode {
         }
 
         self.check_access(current_task, Access::WRITE)?;
+        if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
+            send_signal(current_task, SignalInfo::default(SIGXFSZ));
+            return error!(EFBIG);
+        }
         self.ops().truncate(self, length)?;
         self.update_ctime_mtime();
         Ok(())
@@ -733,7 +738,7 @@ impl FsNode {
 
     /// Avoid calling this method directly. You probably want to call `FileObject::ftruncate()`
     /// which will also perform all file-descriptor based verifications.
-    pub fn ftruncate(&self, length: u64) -> Result<(), Errno> {
+    pub fn ftruncate(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
         if self.is_dir() {
             // When truncating a file descriptor, if the descriptor references a directory,
             // return EINVAL. This is different from the truncate() syscall which returns EISDIR.
@@ -756,6 +761,11 @@ impl FsNode {
         //
         // "With ftruncate(), the file must be open for writing; with truncate(),
         // the file must be writable."
+
+        if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
+            send_signal(current_task, SignalInfo::default(SIGXFSZ));
+            return error!(EFBIG);
+        }
         self.ops().truncate(self, length)?;
         self.update_ctime_mtime();
         Ok(())
