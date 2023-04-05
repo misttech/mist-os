@@ -769,7 +769,7 @@ pub(super) mod ipv6_source_address_selection {
         use net_types::ip::AddrSubnet;
 
         use super::*;
-        use crate::ip::device::state::{AddrConfig, AddressState};
+        use crate::ip::device::state::{AddrConfig, Ipv6DadState};
 
         #[test]
         fn test_select_ipv6_source_address() {
@@ -814,7 +814,7 @@ pub(super) mod ipv6_source_address_selection {
                 let new_addr_entry = |bytes, prefix_len| {
                     Ipv6AddressEntry::<()>::new(
                         AddrSubnet::new(Ipv6Addr::from_bytes(bytes), prefix_len).unwrap(),
-                        AddressState::Assigned,
+                        Ipv6DadState::Assigned,
                         AddrConfig::Manual,
                     )
                 };
@@ -856,7 +856,7 @@ pub(super) mod ipv6_source_address_selection {
                 let new_addr_entry = |addr| {
                     Ipv6AddressEntry::<()>::new(
                         AddrSubnet::new(addr, 128).unwrap(),
-                        AddressState::Assigned,
+                        Ipv6DadState::Assigned,
                         AddrConfig::Manual,
                     )
                 };
@@ -898,7 +898,7 @@ pub(crate) mod testutil {
         },
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId},
         ip::{
-            device::state::{AddrConfig, AddressState, AssignedAddress as _, IpDeviceState},
+            device::state::{AddrConfig, AssignedAddress as _, IpDeviceState, Ipv6DadState},
             forwarding::ForwardingTable,
             testutil::FakeIpDeviceIdCtx,
             types::{Metric, RawMetric},
@@ -1286,7 +1286,7 @@ pub(crate) mod testutil {
                                     .write()
                                     .add(Ipv6AddressEntry::new(
                                         AddrSubnet::new(ip.get(), 128).unwrap(),
-                                        AddressState::Assigned,
+                                        Ipv6DadState::Assigned,
                                         AddrConfig::Manual,
                                     ))
                                     .expect("add address")

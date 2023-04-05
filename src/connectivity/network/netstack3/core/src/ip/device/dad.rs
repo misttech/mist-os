@@ -13,7 +13,7 @@ use packet_formats::{icmp::ndp::NeighborSolicitation, utils::NonZeroDuration};
 use crate::{
     context::{EventContext, TimerContext, TimerHandler},
     device::AnyDevice,
-    ip::{device::state::AddressState, DeviceIdContext},
+    ip::{device::state::Ipv6DadState, DeviceIdContext},
 };
 
 /// A timer ID for duplicate address detection.
@@ -28,7 +28,7 @@ pub(super) struct DadStateRef<'a> {
     /// A mutable reference to an address' state.
     ///
     /// `None` if the address is not recognized.
-    pub(super) address_state: Option<&'a mut AddressState>,
+    pub(super) address_state: Option<&'a mut Ipv6DadState>,
     /// The time between DAD message retransmissions.
     pub(super) retrans_timer: &'a NonZeroDuration,
     /// The maximum number of DAD messages to send.
@@ -141,21 +141,21 @@ fn do_duplicate_address_detection<C: DadNonSyncContext<SC::DeviceId>, SC: DadCon
             match variation {
                 DoDadVariation::Start => {
                     *address_state =
-                        AddressState::Tentative { dad_transmits_remaining: *max_dad_transmits };
+                        Ipv6DadState::Tentative { dad_transmits_remaining: *max_dad_transmits };
                 }
                 DoDadVariation::Continue => {}
             }
 
             let remaining = match address_state {
-                AddressState::Tentative { dad_transmits_remaining } => dad_transmits_remaining,
-                AddressState::Uninitialized | AddressState::Assigned => {
+                Ipv6DadState::Tentative { dad_transmits_remaining } => dad_transmits_remaining,
+                Ipv6DadState::Uninitialized | Ipv6DadState::Assigned => {
                     panic!("expected address to be tentative; addr={}", addr)
                 }
             };
 
             match remaining {
                 None => {
-                    *address_state = AddressState::Assigned;
+                    *address_state = Ipv6DadState::Assigned;
                     ctx.on_event(DadEvent::AddressAssigned { device: device_id.clone(), addr });
                     false
                 }
@@ -274,7 +274,7 @@ mod tests {
 
     struct FakeDadContext {
         addr: UnicastAddr<Ipv6Addr>,
-        state: AddressState,
+        state: Ipv6DadState,
         retrans_timer: NonZeroDuration,
         max_dad_transmits: Option<NonZeroU8>,
         ip_device_id_ctx: FakeIpDeviceIdCtx<FakeDeviceId>,
@@ -344,7 +344,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
-                state: AddressState::Tentative { dad_transmits_remaining: None },
+                state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
                 ip_device_id_ctx: Default::default(),
@@ -363,7 +363,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
-                state: AddressState::Tentative { dad_transmits_remaining: None },
+                state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
                 ip_device_id_ctx: Default::default(),
@@ -381,7 +381,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
-                state: AddressState::Assigned,
+                state: Ipv6DadState::Assigned,
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
                 ip_device_id_ctx: Default::default(),
@@ -398,7 +398,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
-                state: AddressState::Tentative { dad_transmits_remaining: None },
+                state: Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 retrans_timer: RETRANS_TIMER,
                 max_dad_transmits: None,
                 ip_device_id_ctx: Default::default(),
@@ -416,7 +416,7 @@ mod tests {
             max_dad_transmits: _,
             ip_device_id_ctx: _,
         } = sync_ctx.get_ref();
-        assert_eq!(*state, AddressState::Assigned);
+        assert_eq!(*state, Ipv6DadState::Assigned);
         assert_eq!(
             non_sync_ctx.take_events(),
             &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: DAD_ADDRESS }][..]
@@ -440,7 +440,7 @@ mod tests {
             max_dad_transmits: _,
             ip_device_id_ctx: _,
         } = sync_ctx.get_ref();
-        assert_eq!(*state, AddressState::Tentative { dad_transmits_remaining });
+        assert_eq!(*state, Ipv6DadState::Tentative { dad_transmits_remaining });
         let frames = sync_ctx.frames();
         assert_eq!(frames.len(), frames_len, "frames = {:?}", frames);
         let (DadMessageMeta { dst_ip, message }, frame) =
@@ -465,7 +465,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
-                state: AddressState::Tentative {
+                state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },
                 retrans_timer: RETRANS_TIMER,
@@ -499,7 +499,7 @@ mod tests {
             max_dad_transmits: _,
             ip_device_id_ctx: _,
         } = sync_ctx.get_ref();
-        assert_eq!(*state, AddressState::Assigned);
+        assert_eq!(*state, Ipv6DadState::Assigned);
         assert_eq!(
             non_sync_ctx.take_events(),
             &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: DAD_ADDRESS }][..]
@@ -515,7 +515,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeCtxImpl::with_state(FakeDadContext {
                 addr: DAD_ADDRESS,
-                state: AddressState::Tentative {
+                state: Ipv6DadState::Tentative {
                     dad_transmits_remaining: NonZeroU8::new(DAD_TRANSMITS_REQUIRED),
                 },
                 retrans_timer: RETRANS_TIMER,

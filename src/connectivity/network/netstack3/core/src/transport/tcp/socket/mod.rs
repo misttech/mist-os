@@ -3026,7 +3026,7 @@ mod tests {
         device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
         ip::{
             device::state::{
-                AddrConfig, AddressState, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry,
+                AddrConfig, IpDeviceState, IpDeviceStateIpExt, Ipv6AddressEntry, Ipv6DadState,
             },
             socket::{
                 testutil::{FakeBufferIpSocketCtx, FakeDeviceConfig, FakeIpSocketCtx},
@@ -3417,7 +3417,7 @@ mod tests {
                     .write()
                     .add(Ipv6AddressEntry::new(
                         AddrSubnet::new(addr, prefix).unwrap(),
-                        AddressState::Assigned,
+                        Ipv6DadState::Assigned,
                         AddrConfig::Manual,
                     ))
                     .expect("failed to add address");

@@ -37,8 +37,8 @@ use crate::{
                 SlaacStateContext,
             },
             state::{
-                AddrConfig, AddressState, IpDeviceConfiguration, Ipv4DeviceConfiguration,
-                Ipv6AddressEntry, Ipv6DeviceConfiguration, SlaacConfig,
+                AddrConfig, IpDeviceConfiguration, Ipv4DeviceConfiguration, Ipv6AddressEntry,
+                Ipv6DadState, Ipv6DeviceConfiguration, SlaacConfig,
             },
             IpDeviceAddressesAccessor, IpDeviceIpExt, IpDeviceNonSyncContext, RemovedReason,
         },
@@ -711,11 +711,11 @@ fn assignment_state_v6<
     sync_ctx.with_ip_device_addresses(device, |addrs| {
         addrs.find(&*addr).map(|addr| addr.state).map_or(AddressStatus::Unassigned, |state| {
             match state {
-                AddressState::Assigned => {
+                Ipv6DadState::Assigned => {
                     AddressStatus::Present(Ipv6PresentAddressStatus::UnicastAssigned)
                 }
-                AddressState::Uninitialized
-                | AddressState::Tentative { dad_transmits_remaining: _ } => {
+                Ipv6DadState::Uninitialized
+                | Ipv6DadState::Tentative { dad_transmits_remaining: _ } => {
                     AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
                 }
             }

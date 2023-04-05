@@ -546,9 +546,9 @@ pub(crate) struct DualStackIpDeviceState<I: Instant> {
     pub ipv6: Ipv6DeviceState<I>,
 }
 
-/// The various states an IP address can be on an interface.
+/// The various states DAD may be in for an address.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum AddressState {
+pub(crate) enum Ipv6DadState {
     /// The address is assigned to an interface and can be considered bound to
     /// it (all packets destined to the address will be accepted).
     Assigned,
@@ -565,18 +565,18 @@ pub(crate) enum AddressState {
     Uninitialized,
 }
 
-impl AddressState {
+impl Ipv6DadState {
     /// Is this address assigned?
     pub(crate) fn is_assigned(self) -> bool {
-        self == AddressState::Assigned
+        self == Ipv6DadState::Assigned
     }
 
     /// Is this address tentative?
     pub(crate) fn is_tentative(self) -> bool {
         match self {
-            AddressState::Assigned => false,
-            AddressState::Uninitialized
-            | AddressState::Tentative { dad_transmits_remaining: _ } => true,
+            Ipv6DadState::Assigned => false,
+            Ipv6DadState::Uninitialized
+            | Ipv6DadState::Tentative { dad_transmits_remaining: _ } => true,
         }
     }
 }
@@ -643,7 +643,7 @@ impl<Instant> AddrConfig<Instant> {
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) struct Ipv6AddressEntry<Instant> {
     pub(crate) addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-    pub(crate) state: AddressState,
+    pub(crate) state: Ipv6DadState,
     pub(crate) config: AddrConfig<Instant>,
     pub(crate) deprecated: bool,
 }
@@ -651,7 +651,7 @@ pub(crate) struct Ipv6AddressEntry<Instant> {
 impl<Instant> Ipv6AddressEntry<Instant> {
     pub(crate) fn new(
         addr_sub: AddrSubnet<Ipv6Addr, UnicastAddr<Ipv6Addr>>,
-        state: AddressState,
+        state: Ipv6DadState,
         config: AddrConfig<Instant>,
     ) -> Self {
         Self { addr_sub, state, config, deprecated: false }
@@ -691,7 +691,7 @@ mod tests {
         assert_eq!(
             ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN).unwrap(),
-                AddressState::Tentative { dad_transmits_remaining: None },
+                Ipv6DadState::Tentative { dad_transmits_remaining: None },
                 AddrConfig::Slaac(SlaacConfig::Static { valid_until: Lifetime::Infinite }),
             )),
             Ok(())
@@ -701,7 +701,7 @@ mod tests {
         assert_eq!(
             ipv6.add(Ipv6AddressEntry::new(
                 AddrSubnet::new(ADDRESS, PREFIX_LEN + 1).unwrap(),
-                AddressState::Assigned,
+                Ipv6DadState::Assigned,
                 AddrConfig::Manual,
             )),
             Err(ExistsError)

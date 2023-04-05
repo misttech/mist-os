@@ -36,9 +36,9 @@ use crate::{
             router_solicitation::{RsHandler, RsTimerId},
             slaac::{SlaacHandler, SlaacTimerId},
             state::{
-                AddrConfig, AddressState, DelIpv6AddrReason, IpDeviceAddresses,
-                IpDeviceConfiguration, IpDeviceState, IpDeviceStateIpExt, Ipv4DeviceConfiguration,
-                Ipv4DeviceState, Ipv6AddressEntry, Ipv6DeviceConfiguration, Ipv6DeviceState,
+                AddrConfig, DelIpv6AddrReason, IpDeviceAddresses, IpDeviceConfiguration,
+                IpDeviceState, IpDeviceStateIpExt, Ipv4DeviceConfiguration, Ipv4DeviceState,
+                Ipv6AddressEntry, Ipv6DadState, Ipv6DeviceConfiguration, Ipv6DeviceState,
             },
         },
         gmp::{
@@ -552,7 +552,7 @@ pub(crate) trait Ipv6DeviceHandler<C>: IpDeviceHandler<Ipv6, C> {
         ctx: &mut C,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
-    ) -> Option<AddressState>;
+    ) -> Option<Ipv6DadState>;
 
     /// Sets the link MTU for the device.
     fn set_link_mtu(&mut self, device_id: &Self::DeviceId, mtu: Mtu);
@@ -586,7 +586,7 @@ impl<
         ctx: &mut C,
         device_id: &Self::DeviceId,
         addr: UnicastAddr<Ipv6Addr>,
-    ) -> Option<AddressState> {
+    ) -> Option<Ipv6DadState> {
         let address_state = self.with_ip_device_addresses(device_id, |addrs| {
             addrs.iter().find_map(
                 |Ipv6AddressEntry { addr_sub, state: address_state, config: _, deprecated: _ }| {
@@ -596,8 +596,8 @@ impl<
         })?;
 
         match address_state {
-            AddressState::Uninitialized
-            | AddressState::Tentative { dad_transmits_remaining: _ } => {
+            Ipv6DadState::Uninitialized
+            | Ipv6DadState::Tentative { dad_transmits_remaining: _ } => {
                 del_ipv6_addr_with_reason(
                     self,
                     ctx,
@@ -607,7 +607,7 @@ impl<
                 )
                 .unwrap();
             }
-            AddressState::Assigned => (),
+            Ipv6DadState::Assigned => (),
         }
         Some(address_state)
     }
@@ -995,7 +995,7 @@ pub(crate) fn add_ipv6_addr_subnet<
         .with_ip_device_configuration(device_id, |config, mut sync_ctx| {
             sync_ctx.with_ip_device_addresses_mut(device_id, |addrs| {
                 addrs
-                    .add(Ipv6AddressEntry::new(addr_sub, AddressState::Uninitialized, addr_config))
+                    .add(Ipv6AddressEntry::new(addr_sub, Ipv6DadState::Uninitialized, addr_config))
                     .map(|()| config.ip_config.ip_enabled)
             })
         })
@@ -1916,7 +1916,7 @@ mod tests {
                 &device_id,
                 assigned_addr.ipv6_unicast_addr()
             ),
-            Some(AddressState::Tentative { dad_transmits_remaining: None })
+            Some(Ipv6DadState::Tentative { dad_transmits_remaining: None })
         );
 
         assert_eq!(

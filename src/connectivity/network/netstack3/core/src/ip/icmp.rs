@@ -51,7 +51,7 @@ use crate::{
             nud::NudIpHandler,
             route_discovery::{Ipv6DiscoveredRoute, RouteDiscoveryHandler},
             slaac::SlaacHandler,
-            state::AddressState,
+            state::Ipv6DadState,
             IpDeviceHandler, Ipv6DeviceHandler,
         },
         gmp::mld::MldPacketHandler,
@@ -1248,7 +1248,7 @@ fn receive_ndp_packet<
                         &device_id,
                         target_address,
                     ) {
-                        Some(AddressState::Assigned) => {
+                        Some(Ipv6DadState::Assigned) => {
                             // Address is assigned to us to we let the
                             // remote node performing DAD that we own the
                             // address.
@@ -1262,8 +1262,8 @@ fn receive_ndp_packet<
                             );
                         }
                         Some(
-                            AddressState::Uninitialized
-                            | AddressState::Tentative { dad_transmits_remaining: _ },
+                            Ipv6DadState::Uninitialized
+                            | Ipv6DadState::Tentative { dad_transmits_remaining: _ },
                         ) => {
                             // Nothing further to do in response to DAD
                             // messages.
@@ -1346,7 +1346,7 @@ fn receive_ndp_packet<
             ) {
                 Some(status) => {
                     match status {
-                        AddressState::Assigned => {
+                        Ipv6DadState::Assigned => {
                             // A neighbor is advertising that it owns an address
                             // that we also have assigned. This is out of scope
                             // for DAD.
@@ -1369,8 +1369,8 @@ fn receive_ndp_packet<
                                 src_ip, target_address, device_id
                             );
                         }
-                        AddressState::Uninitialized
-                        | AddressState::Tentative { dad_transmits_remaining: _ } => (),
+                        Ipv6DadState::Uninitialized
+                        | Ipv6DadState::Tentative { dad_transmits_remaining: _ } => (),
                     }
 
                     // Nothing further to do for an NA from a neighbor that
@@ -4209,7 +4209,7 @@ mod tests {
             _ctx: &mut Fakev6NonSyncCtx,
             _device_id: &Self::DeviceId,
             _addr: UnicastAddr<Ipv6Addr>,
-        ) -> Option<AddressState> {
+        ) -> Option<Ipv6DadState> {
             unimplemented!()
         }
 
