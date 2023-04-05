@@ -54,7 +54,7 @@ func (cmd *productListCmd) SetFlags(f *flag.FlagSet) {
 	f.StringVar(&cmd.gcsBucket, "bucket", "", "GCS bucket from which to read the files from.")
 	f.StringVar(&cmd.buildIDs, "build_ids", "", "Comma separated list of build_ids.")
 	f.StringVar(&cmd.outDir, "out_dir", "", "Directory to write out_file_name to.")
-	f.StringVar(&cmd.outputProductListFileName, "out_file_name", "product_list.json", "Name of the output file containing the product bundle to transfer lookup information.")
+	f.StringVar(&cmd.outputProductListFileName, "out_file_name", "product_bundles.json", "Name of the output file containing the product bundle to transfer lookup information.")
 }
 
 func (cmd *productListCmd) parseFlags() error {

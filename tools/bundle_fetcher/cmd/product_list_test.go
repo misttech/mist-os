@@ -78,7 +78,7 @@ func TestProductListParseFlags(t *testing.T) {
 
 func TestGetProductListFromJSON(t *testing.T) {
 	contents := map[string][]byte{
-		"some/valid/product_list.json": []byte(`[{
+		"some/valid/product_bundles.json": []byte(`[{
 			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
 			"name": "fake_product.x64",
 			"path": "obj/build/images/fuchsia/product_bundle",
@@ -86,12 +86,12 @@ func TestGetProductListFromJSON(t *testing.T) {
 			"transfer_manifest_path": "obj/build/images/fuchsia/transfer.json",
 			"transfer_manifest_url": "file://obj/build/images/fuchsia/transfer.json"
 		  }]`),
-		"invalid/product_list.json": []byte(`[{
+		"invalid/product_bundles.json": []byte(`[{
 			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
 			"path": "obj/build/images/fuchsia/product_bundle",
 			"product_version": "fake_version"
 		  }]`),
-		"non-list/product_list.json": []byte(`{
+		"non-list/product_bundles.json": []byte(`{
 			"label": "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
 			"name": "fake_product.x64",
 			"path": "obj/build/images/fuchsia/product_bundle",
@@ -107,8 +107,8 @@ func TestGetProductListFromJSON(t *testing.T) {
 		expectedErrMessage  string
 	}{
 		{
-			name:                "valid product_list.json",
-			productListJSONPath: "some/valid/product_list.json",
+			name:                "valid product_bundles.json",
+			productListJSONPath: "some/valid/product_bundles.json",
 			expectedOutput: &build.ProductBundlesManifest{
 				build.ProductBundle{
 					Label:                "//build/images/fuchsia:product_bundle(//build/toolchain/fuchsia:x64)",
@@ -121,13 +121,13 @@ func TestGetProductListFromJSON(t *testing.T) {
 			},
 		},
 		{
-			name:                "not a list product_list.json",
-			productListJSONPath: "non-list/product_list.json",
+			name:                "not a list product_bundles.json",
+			productListJSONPath: "non-list/product_bundles.json",
 			expectedErrMessage:  "json: cannot unmarshal object into Go value of type []build.ProductBundle",
 		},
 		{
-			name:                "missing something product_list.json",
-			productListJSONPath: "invalid/product_list.json",
+			name:                "missing something product_bundles.json",
+			productListJSONPath: "invalid/product_bundles.json",
 			expectedErrMessage:  "error, the product name is empty",
 		},
 	}
