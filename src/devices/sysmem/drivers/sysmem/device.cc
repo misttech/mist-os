@@ -18,6 +18,7 @@
 #include <lib/zx/event.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/threads.h>
 
 #include <algorithm>
 #include <memory>
@@ -209,6 +210,16 @@ Device::Device(zx_device_t* parent_device, Driver* parent_driver)
   ZX_DEBUG_ASSERT(parent_driver_);
   zx_status_t status = loop_.StartThread("sysmem", &loop_thrd_);
   ZX_ASSERT(status == ZX_OK);
+
+  const char* role_name = "fuchsia.devices.sysmem.drivers.sysmem.device";
+  const zx_status_t role_status = device_set_profile_by_role(
+      parent_device, thrd_get_zx_handle(loop_thrd_), role_name, strlen(role_name));
+  if (role_status != ZX_OK) {
+    LOG(WARNING,
+        "Failed to set loop thread role to \"%s\": %s. Thread will run at default priority.",
+        role_name, zx_status_get_string(role_status));
+  }
+
   // Up until DdkAdd, all access to member variables must happen on this thread.
   loop_checker_.emplace(fit::thread_checker());
 }
