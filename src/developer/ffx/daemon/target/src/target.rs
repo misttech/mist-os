@@ -956,8 +956,8 @@ impl Target {
                     // weird that self is already gone, but ¯\_(ツ)_/¯
                     return;
                 };
-                let state = target.state.borrow();
-                if let TargetConnectionState::Rcs(rcs) = &*state {
+                let state = target.state.borrow().clone();
+                if let TargetConnectionState::Rcs(rcs) = state {
                     if knock_rcs(&rcs.proxy).await.is_ok() {
                         return;
                     }
