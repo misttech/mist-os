@@ -259,9 +259,9 @@ fpromise::promise<inspect::Inspector> DriverRunner::Inspect() const {
 
   // Make the orphaned devices inspect nodes.
   auto orphans = inspector.GetRoot().CreateChild("orphan_nodes");
-  for (size_t i = 0; i < orphaned_nodes_.size(); i++) {
-    if (auto node = orphaned_nodes_[i].lock()) {
-      orphans.RecordString(std::to_string(i), node->MakeComponentMoniker());
+  for (auto& [moniker, node] : orphaned_nodes_) {
+    if (auto locked_node = node.lock()) {
+      orphans.RecordString("moniker", moniker);
     }
   }
 
@@ -321,15 +321,14 @@ void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callba
     return;
   }
 
-  // Clear our stored vector of orphaned nodes, we will repopulate it with the
-  // new orphans.
-  std::vector<std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);
+  // Clear our stored map of orphaned nodes. It will be repopulated with in Bind().
+  std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);
   orphaned_nodes_ = {};
 
   std::shared_ptr<BindResultTracker> tracker =
       std::make_shared<BindResultTracker>(orphaned_nodes.size(), std::move(result_callback));
 
-  for (auto& weak_node : orphaned_nodes) {
+  for (auto& [path, weak_node] : orphaned_nodes) {
     auto node = weak_node.lock();
     if (!node) {
       tracker->ReportNoBind();
@@ -453,7 +452,10 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     Node& node = *shared_node;
     auto driver_node = &node;
     auto orphaned = [this, &driver_node] {
-      orphaned_nodes_.push_back(driver_node->weak_from_this());
+      auto moniker = driver_node->MakeComponentMoniker();
+      ZX_ASSERT_MSG(orphaned_nodes_.emplace(moniker, driver_node->weak_from_this()).second,
+                    "Multiple nodes with the component moniker '%s' are added to orphaned nodes",
+                    moniker.c_str());
     };
 
     if (!result.ok()) {
@@ -549,6 +551,7 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
     }
 
     driver_node->OnBind();
+    orphaned_nodes_.erase(driver_node->MakeComponentMoniker());
     report_no_bind.cancel();
     if (result_tracker) {
       result_tracker->ReportSuccessfulBind(driver_node->MakeComponentMoniker(),

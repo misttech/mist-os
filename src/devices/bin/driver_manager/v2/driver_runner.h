@@ -144,8 +144,8 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
 
   // Orphaned nodes are nodes that have failed to bind to a driver, either
   // because no matching driver could be found, or because the matching driver
-  // failed to start.
-  std::vector<std::weak_ptr<Node>> orphaned_nodes_;
+  // failed to start. Maps the node's component moniker to its weak pointer.
+  std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes_;
 };
 
 }  // namespace dfv2
