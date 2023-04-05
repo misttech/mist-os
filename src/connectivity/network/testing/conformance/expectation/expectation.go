@@ -18,11 +18,11 @@ import (
 var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[parseoutput.CaseIdentifier]outcome.Outcome {
 	m := make(map[parseoutput.CaseIdentifier]outcome.Outcome)
 
-	addAllExpectations := func(suite string, expects map[AnvlCaseNumber]outcome.Outcome) {
+	addAllExpectations := func(suite string, plt platform.Platform, expects map[AnvlCaseNumber]outcome.Outcome) {
 		for k, v := range expects {
 			ident := parseoutput.CaseIdentifier{
 				SuiteName:   strings.ToUpper(suite),
-				Platform:    platform.NS2.String(),
+				Platform:    plt.String(),
 				MajorNumber: k.MajorNumber,
 				MinorNumber: k.MinorNumber,
 			}
@@ -31,30 +31,34 @@ var expectations map[parseoutput.CaseIdentifier]outcome.Outcome = func() map[par
 	}
 
 	// keep-sorted start
-	addAllExpectations("arp", arpExpectations)
-	addAllExpectations("dhcp-client", dhcpClientExpectations)
-	addAllExpectations("dhcp-server", dhcpServerExpectations)
-	addAllExpectations("dhcpv6-client", dhcpv6ClientExpectations)
-	addAllExpectations("icmp", icmpExpectations)
-	addAllExpectations("icmpv6", icmpv6Expectations)
-	addAllExpectations("icmpv6-router", icmpv6RouterExpectations)
-	addAllExpectations("igmp", igmpExpectations)
-	addAllExpectations("igmpv3", igmpv3Expectations)
-	addAllExpectations("ip", ipExpectations)
-	addAllExpectations("ipv6", ipv6Expectations)
-	addAllExpectations("ipv6-mld", ipv6MldExpectations)
-	addAllExpectations("ipv6-mldv2", ipv6Mldv2Expectations)
-	addAllExpectations("ipv6-ndp", ipv6ndpExpectations)
-	addAllExpectations("ipv6-pmtu", ipv6PmtuExpectations)
-	addAllExpectations("ipv6-router", ipv6RouterExpectations)
-	addAllExpectations("tcp-advanced", tcpAdvancedExpectations)
-	addAllExpectations("tcp-advanced-v6", tcpAdvancedV6Expectations)
-	addAllExpectations("tcp-core", tcpCoreExpectations)
-	addAllExpectations("tcp-core-v6", tcpcorev6Expectations)
-	addAllExpectations("tcp-highperf", tcpHighperfExpectations)
-	addAllExpectations("tcp-highperf-v6", tcpHighperfV6Expectations)
-	addAllExpectations("udp", udpExpectations)
-	addAllExpectations("udp-v6", udpV6Expectations)
+	addAllExpectations("arp", platform.NS2, arpExpectations)
+	addAllExpectations("dhcp-client", platform.NS2, dhcpClientExpectations)
+	addAllExpectations("dhcp-server", platform.NS2, dhcpServerExpectations)
+	addAllExpectations("dhcpv6-client", platform.NS2, dhcpv6ClientExpectations)
+	addAllExpectations("icmp", platform.NS2, icmpExpectations)
+	addAllExpectations("icmpv6", platform.NS2, icmpv6Expectations)
+	addAllExpectations("icmpv6-router", platform.NS2, icmpv6RouterExpectations)
+	addAllExpectations("igmp", platform.NS2, igmpExpectations)
+	addAllExpectations("igmpv3", platform.NS2, igmpv3Expectations)
+	addAllExpectations("ip", platform.NS2, ipExpectations)
+	addAllExpectations("ipv6", platform.NS2, ipv6Expectations)
+	addAllExpectations("ipv6-mld", platform.NS2, ipv6MldExpectations)
+	addAllExpectations("ipv6-mldv2", platform.NS2, ipv6Mldv2Expectations)
+	addAllExpectations("ipv6-ndp", platform.NS2, ipv6ndpExpectations)
+	addAllExpectations("ipv6-pmtu", platform.NS2, ipv6PmtuExpectations)
+	addAllExpectations("ipv6-router", platform.NS2, ipv6RouterExpectations)
+	addAllExpectations("tcp-advanced", platform.NS2, tcpAdvancedExpectations)
+	addAllExpectations("tcp-advanced-v6", platform.NS2, tcpAdvancedV6Expectations)
+	addAllExpectations("tcp-core", platform.NS2, tcpCoreExpectations)
+	addAllExpectations("tcp-core-v6", platform.NS2, tcpcorev6Expectations)
+	addAllExpectations("tcp-highperf", platform.NS2, tcpHighperfExpectations)
+	addAllExpectations("tcp-highperf-v6", platform.NS2, tcpHighperfV6Expectations)
+	addAllExpectations("udp", platform.NS2, udpExpectations)
+	addAllExpectations("udp-v6", platform.NS2, udpV6Expectations)
+	// keep-sorted end
+
+	// keep-sorted start
+	addAllExpectations("ip", platform.NS3, ipExpectationsNS3)
 	// keep-sorted end
 
 	return m

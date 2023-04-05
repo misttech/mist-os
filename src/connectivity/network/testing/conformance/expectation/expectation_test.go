@@ -15,26 +15,46 @@ import (
 
 func TestGetExpectation(t *testing.T) {
 	const (
-		SuiteName          string          = "ARP"
-		MajorNumber        int             = 1
-		MinorNumber        int             = 1
-		MissingMinorNumber int             = 2
-		ExpectedResult     outcome.Outcome = outcome.Pass
+		SuiteName string = "IP"
+		// Use IP-5.6 since the expected outcome differs between stacks.
+		MajorNumber        int = 5
+		MinorNumber        int = 6
+		MissingMinorNumber int = 2
 	)
-	result, ok := GetExpectation(parseoutput.CaseIdentifier{platform.NS2.String(), SuiteName, MajorNumber, MinorNumber})
-	if !ok {
-		t.Fatalf("expectation missing for %s %d.%d", SuiteName, MajorNumber, MinorNumber)
+	var platforms = []struct {
+		name           string
+		plt            platform.Platform
+		expectedResult outcome.Outcome
+	}{
+		{
+			name:           "ns2",
+			plt:            platform.NS2,
+			expectedResult: outcome.Pass,
+		},
+		{
+			name:           "ns3",
+			plt:            platform.NS3,
+			expectedResult: outcome.Fail,
+		},
 	}
-	if result != ExpectedResult {
-		t.Errorf("wrong expectation for %s %d.%d: got = %s, want = %s", SuiteName, MajorNumber, MinorNumber, result, ExpectedResult)
-	}
+	for _, platform := range platforms {
+		t.Run(platform.name, func(t *testing.T) {
+			result, ok := GetExpectation(parseoutput.CaseIdentifier{platform.plt.String(), SuiteName, MajorNumber, MinorNumber})
+			if !ok {
+				t.Fatalf("expectation missing for %s %d.%d", SuiteName, MajorNumber, MinorNumber)
+			}
+			if result != platform.expectedResult {
+				t.Errorf("wrong expectation for %s %d.%d: got = %s, want = %s", SuiteName, MajorNumber, MinorNumber, result, platform.expectedResult)
+			}
 
-	os.Setenv("ANVL_DEFAULT_EXPECTATION_PASS", "true")
-	result, ok = GetExpectation(parseoutput.CaseIdentifier{platform.NS2.String(), SuiteName, MajorNumber, MissingMinorNumber})
-	if !ok {
-		t.Fatalf("expectation missing for %s %d.%d", SuiteName, MajorNumber, MissingMinorNumber)
-	}
-	if result != ExpectedResult {
-		t.Errorf("wrong expectation for %s %d.%d: got = %s, want = %s", SuiteName, MajorNumber, MissingMinorNumber, result, ExpectedResult)
+			os.Setenv("ANVL_DEFAULT_EXPECTATION_PASS", "true")
+			result, ok = GetExpectation(parseoutput.CaseIdentifier{platform.plt.String(), SuiteName, MajorNumber, MissingMinorNumber})
+			if !ok {
+				t.Fatalf("expectation missing for %s %d.%d", SuiteName, MajorNumber, MissingMinorNumber)
+			}
+			if result != outcome.Pass {
+				t.Errorf("wrong expectation for %s %d.%d: got = %s, want = %s", SuiteName, MajorNumber, MissingMinorNumber, result, outcome.Pass)
+			}
+		})
 	}
 }
