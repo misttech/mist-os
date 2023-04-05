@@ -7,7 +7,6 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_factory_lowpan::{FactoryRegisterMarker, FactoryRegisterProxyInterface};
 use fidl_fuchsia_lowpan_driver::{RegisterMarker, RegisterProxyInterface};
-use fuchsia_async as fasync;
 use fuchsia_component::client::connect_to_protocol;
 use futures::prelude::*;
 use lowpan_driver_common::{
@@ -67,10 +66,8 @@ where
     Ok(())
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["lowpan-dummy-driver"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["lowpan-dummy-driver"]).context("initialize logging")?;
-
     let name = "lowpan0";
 
     let device = DummyDevice::default();

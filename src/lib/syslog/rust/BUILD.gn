@@ -49,7 +49,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/connectivity/bluetooth/tools/bt-snoop:*",
   "//src/connectivity/location/emergency:*",
   "//src/connectivity/location/regulatory_region:*",
-  "//src/connectivity/lowpan/drivers/lowpan-dummy-driver:*",
   "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
   "//src/connectivity/lowpan/lib/lowpan_driver_common:*",
   "//src/connectivity/lowpan/lib/openthread_fuchsia:*",
