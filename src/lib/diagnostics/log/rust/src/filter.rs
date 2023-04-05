@@ -79,7 +79,6 @@ impl InterestFilter {
         }
     }
 
-    #[allow(unused)] // TODO(fxbug.dev/62858) remove attribute
     pub fn enabled_for_testing(&self, _file: &str, _line: u32, record: &Record) -> bool {
         let min_severity = self.min_severity.read().unwrap();
         record.severity >= *min_severity

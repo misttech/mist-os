@@ -55,7 +55,7 @@ impl Header {
     fn set_len(&mut self, new_len: usize) {
         assert_eq!(new_len % 8, 0, "encoded message must be 8-byte aligned");
         #[allow(clippy::bool_to_int_with_if)]
-        self.set_size_words((new_len / 8) as u16 + if new_len % 8 > 0 { 1 } else { 0 });
+        self.set_size_words((new_len / 8) as u16 + u16::from(new_len % 8 > 0))
     }
 }
 

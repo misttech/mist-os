@@ -84,12 +84,10 @@ fn parse_argument_internal<'a>(buf: &'a [u8], state: &mut ParseState) -> ParseRe
     let arg_ty = ArgType::try_from(header.raw_type()).map_err(nom::Err::Failure)?;
 
     let (after_name, name) = string_ref(header.name_ref(), after_header, false)?;
-    #[allow(clippy::single_match)]
-    match (&state, &name) {
-        (ParseState::Initial, StringRef::Inline(Cow::Borrowed("message"))) => {
-            *state = ParseState::InMessage;
-        }
-        _ => {}
+    if matches!(state, ParseState::Initial)
+        && matches!(&name, StringRef::Inline(Cow::Borrowed("message")))
+    {
+        *state = ParseState::InMessage;
     }
     let (value, after_value) = match arg_ty {
         ArgType::Null => (Value::UnsignedInt(1), after_name),
@@ -135,18 +133,16 @@ fn string_ref(
         // zero out the top bit
         let name_len = (ref_mask & !(1 << 15)) as usize;
         let (after_name, name) = take(name_len)(buf)?;
-        #[allow(clippy::needless_late_init)]
-        let parsed;
-        if support_invalid_utf8 {
-            parsed = match std::str::from_utf8(name) {
+        let parsed = if support_invalid_utf8 {
+            match std::str::from_utf8(name) {
                 Ok(valid) => Cow::Borrowed(valid),
                 Err(_) => String::from_utf8_lossy(name),
-            };
+            }
         } else {
-            parsed = Cow::Borrowed(
+            Cow::Borrowed(
                 std::str::from_utf8(name).map_err(|e| nom::Err::Error(ParseError::from(e)))?,
-            );
-        }
+            )
+        };
         let (_padding, after_padding) = after_name.split_at(after_name.len() % 8);
 
         (after_padding, StringRef::Inline(parsed))
