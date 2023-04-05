@@ -11,7 +11,7 @@ use {
     fidl_fuchsia_io as fio,
     fidl_fuchsia_pkg::{GetBlobError, GetMetadataError},
     fidl_fuchsia_pkg_ext::{BlobId, RepositoryUrl},
-    fuchsia_syslog::fx_log_info,
+    tracing::info,
 };
 
 pub struct LocalMirrorManager {
@@ -59,7 +59,7 @@ impl LocalMirrorManager {
                 ServerEnd::new(metadata.into_channel()),
             )
             .map_err(|e| {
-                fx_log_info!("while opening metadata {}: {:#}", path, anyhow!(e));
+                info!("while opening metadata {}: {:#}", path, anyhow!(e));
                 GetMetadataError::ErrorOpeningMetadata
             })
     }
@@ -84,7 +84,7 @@ impl LocalMirrorManager {
                 ServerEnd::new(blob.into_channel()),
             )
             .map_err(|e| {
-                fx_log_info!("while opening blob {}: {:#}", path, anyhow!(e));
+                info!("while opening blob {}: {:#}", path, anyhow!(e));
                 GetBlobError::ErrorOpeningBlob
             })
     }
