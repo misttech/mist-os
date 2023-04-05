@@ -5,6 +5,7 @@
 use fuchsia_runtime::utc_time;
 use fuchsia_zircon as zx;
 
+use super::uapi::stat_t;
 use crate::fs::{
     syscalls::{
         poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,

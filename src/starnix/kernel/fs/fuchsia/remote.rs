@@ -11,6 +11,7 @@ use syncio::{
     ZxioSignals,
 };
 
+use crate::arch::uapi::{blksize_t, nlink_t};
 use crate::auth::FsCred;
 use crate::fs::buffers::{InputBuffer, OutputBuffer};
 use crate::fs::*;

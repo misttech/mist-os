@@ -6,6 +6,7 @@ use std::convert::TryInto;
 use std::sync::Arc;
 use std::usize;
 
+use crate::arch::uapi::stat_t;
 use crate::fs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::fs::eventfd::*;
 use crate::fs::fuchsia::*;

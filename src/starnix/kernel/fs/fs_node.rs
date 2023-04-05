@@ -6,6 +6,7 @@ use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::{Arc, Weak};
 
+use crate::arch::uapi::{blksize_t, nlink_t, stat_t};
 use crate::auth::FsCred;
 use crate::device::DeviceMode;
 use crate::fs::pipe::Pipe;

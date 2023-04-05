@@ -4,6 +4,7 @@
 
 use std::sync::{Arc, Weak};
 
+use crate::arch::uapi::blksize_t;
 use crate::auth::FsCred;
 use crate::device::terminal::*;
 use crate::device::DeviceOps;

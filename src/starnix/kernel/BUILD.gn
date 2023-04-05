@@ -318,6 +318,7 @@ rustc_binary("starnix_kernel_bin") {
     "${arch_dir}/signal_handling.rs",
     "${arch_dir}/syscalls.rs",
     "${arch_dir}/task.rs",
+    "${arch_dir}/uapi.rs",
     "${arch_dir}/vdso.rs",
   ]
 

@@ -5,6 +5,7 @@
 use std::convert::TryInto;
 use std::sync::Arc;
 
+use crate::arch::uapi::blksize_t;
 use crate::fs::{buffers::*, *};
 use crate::lock::Mutex;
 use crate::mm::MemoryAccessorExt;

@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use super::directory_file::MemoryDirectoryFile;
 use super::*;
+use crate::arch::uapi::blksize_t;
 use crate::auth::FsCred;
 use crate::lock::{Mutex, MutexGuard};
 use crate::logging::not_implemented;
