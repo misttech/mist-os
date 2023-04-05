@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fuchsia_runtime::utc_time;
+use fuchsia_zircon as zx;
+
 use crate::fs::{
     syscalls::{
         poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
@@ -10,11 +13,10 @@ use crate::fs::{
     },
     DirentSink, DirentSink32, EpollEvent, FdNumber,
 };
+use crate::mm::MemoryAccessorExt;
+use crate::syscalls::not_implemented;
 use crate::task::{syscalls::do_clone, CurrentTask};
-use crate::types::{
-    clone_args, error, pid_t, pollfd, stat_t, DeviceType, Errno, FileMode, OpenFlags, SigSet,
-    UserAddress, UserCString, UserRef, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CSIGNAL,
-};
+use crate::types::*;
 
 pub fn sys_access(
     current_task: &CurrentTask,
@@ -22,6 +24,32 @@ pub fn sys_access(
     mode: u32,
 ) -> Result<(), Errno> {
     sys_faccessat(current_task, FdNumber::AT_FDCWD, user_path, mode)
+}
+
+pub fn sys_arch_prctl(
+    current_task: &mut CurrentTask,
+    code: u32,
+    addr: UserAddress,
+) -> Result<(), Errno> {
+    match code {
+        ARCH_SET_FS => {
+            current_task.registers.fs_base = addr.ptr() as u64;
+            Ok(())
+        }
+        ARCH_SET_GS => {
+            current_task.registers.gs_base = addr.ptr() as u64;
+            Ok(())
+        }
+        _ => {
+            not_implemented!(
+                current_task,
+                "arch_prctl: Unknown code: code=0x{:x} addr={}",
+                code,
+                addr
+            );
+            error!(ENOSYS)
+        }
+    }
 }
 
 pub fn sys_chmod(
@@ -120,6 +148,10 @@ pub fn sys_getdents(
     Ok(sink.actual())
 }
 
+pub fn sys_getpgrp(current_task: &CurrentTask) -> Result<pid_t, Errno> {
+    Ok(current_task.thread_group.read().process_group.leader)
+}
+
 pub fn sys_inotify_init(current_task: &CurrentTask) -> Result<FdNumber, Errno> {
     sys_inotify_init1(current_task, 0)
 }
@@ -213,8 +245,31 @@ pub fn sys_symlink(
     sys_symlinkat(current_task, user_target, FdNumber::AT_FDCWD, user_path)
 }
 
+pub fn sys_time(
+    current_task: &CurrentTask,
+    time_addr: UserRef<__kernel_time_t>,
+) -> Result<__kernel_time_t, Errno> {
+    let time =
+        (utc_time().into_nanos() / zx::Duration::from_seconds(1).into_nanos()) as __kernel_time_t;
+    if !time_addr.is_null() {
+        current_task.mm.write_object(time_addr, &time)?;
+    }
+    Ok(time)
+}
+
 pub fn sys_unlink(current_task: &CurrentTask, user_path: UserCString) -> Result<(), Errno> {
     sys_unlinkat(current_task, FdNumber::AT_FDCWD, user_path, 0)
+}
+
+pub fn sys_vfork(current_task: &CurrentTask) -> Result<pid_t, Errno> {
+    do_clone(
+        current_task,
+        &clone_args {
+            flags: (CLONE_VFORK | CLONE_VM) as u64,
+            exit_signal: SIGCHLD.number() as u64,
+            ..Default::default()
+        },
+    )
 }
 
 #[cfg(test)]
@@ -246,5 +301,24 @@ mod tests {
         let _file_handle = current_task.open_file(path, OpenFlags::RDONLY)?;
         assert!(!current_task.files.get_fd_flags(fd)?.contains(FdFlags::CLOEXEC));
         Ok(())
+    }
+
+    #[::fuchsia::test]
+    fn test_time() {
+        let (_kernel, current_task) = create_kernel_and_task();
+        let time1 = sys_time(&current_task, Default::default()).expect("time");
+        assert!(time1 > 0);
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<__kernel_time_t>() as u64,
+        );
+        zx::Duration::from_seconds(2).sleep();
+        let time2 = sys_time(&current_task, address.into()).expect("time");
+        assert!(time2 >= time1 + 2);
+        assert!(time2 < time1 + 10);
+        let time3: __kernel_time_t =
+            current_task.mm.read_object(address.into()).expect("read_object");
+        assert_eq!(time2, time3);
     }
 }

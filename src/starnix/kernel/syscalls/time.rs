@@ -210,19 +210,6 @@ pub fn sys_nanosleep(
     sys_clock_nanosleep(current_task, CLOCK_REALTIME, 0, user_request, user_remaining)
 }
 
-#[cfg(target_arch = "x86_64")]
-pub fn sys_time(
-    current_task: &CurrentTask,
-    time_addr: UserRef<__kernel_time_t>,
-) -> Result<__kernel_time_t, Errno> {
-    let time =
-        (utc_time().into_nanos() / zx::Duration::from_seconds(1).into_nanos()) as __kernel_time_t;
-    if !time_addr.is_null() {
-        current_task.mm.write_object(time_addr, &time)?;
-    }
-    Ok(time)
-}
-
 /// Returns the cpu time for the task with the given `pid`.
 ///
 /// Returns EINVAL if no such task can be found.
@@ -421,26 +408,6 @@ mod test {
         );
 
         thread.join().expect("join");
-    }
-
-    #[cfg(target_arch = "x86_64")]
-    #[::fuchsia::test]
-    fn test_time() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let time1 = sys_time(&current_task, Default::default()).expect("time");
-        assert!(time1 > 0);
-        let address = map_memory(
-            &current_task,
-            UserAddress::default(),
-            std::mem::size_of::<__kernel_time_t>() as u64,
-        );
-        zx::Duration::from_seconds(2).sleep();
-        let time2 = sys_time(&current_task, address.into()).expect("time");
-        assert!(time2 >= time1 + 2);
-        assert!(time2 < time1 + 10);
-        let time3: __kernel_time_t =
-            current_task.mm.read_object(address.into()).expect("read_object");
-        assert_eq!(time2, time3);
     }
 
     #[::fuchsia::test]
