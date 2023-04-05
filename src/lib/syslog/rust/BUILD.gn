@@ -52,7 +52,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
   "//src/connectivity/lowpan/lib/lowpan_driver_common:*",
   "//src/connectivity/lowpan/lib/openthread_fuchsia:*",
-  "//src/connectivity/lowpan/lib/openthread_rust:*",
   "//src/connectivity/lowpan/service:*",
   "//src/connectivity/ppp/lib/ppp_packet:*",
   "//src/connectivity/ppp/lib/ppp_protocol:*",

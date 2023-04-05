@@ -69,7 +69,6 @@ pub(crate) mod prelude_internal {
     pub use core::convert::TryFrom;
     pub use core::convert::TryInto;
     pub use futures::prelude::*;
-    pub use log::{debug, error, info, trace, warn};
     pub use num::FromPrimitive as _;
     pub(crate) use ot::ascii_dump;
     pub use ot::Result;
@@ -82,4 +81,5 @@ pub(crate) mod prelude_internal {
     pub use std::marker::PhantomData;
     pub use std::os::raw::c_char;
     pub use std::ptr::null;
+    pub use tracing::{debug, error, info, trace, warn};
 }

@@ -8,7 +8,6 @@
 //! be implemented properly in this crate.
 
 use crate::prelude_internal::*;
-pub use fuchsia_syslog::macros::*;
 use fuchsia_zircon_status::Status as ZxStatus;
 
 impl From<ot::Error> for ZxStatus {

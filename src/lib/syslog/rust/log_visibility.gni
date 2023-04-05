@@ -46,7 +46,6 @@ third_party_rust_crate_log_visibility = [
   "//src/connectivity/lowpan/drivers/lowpan-ot-driver:*",
   "//src/connectivity/lowpan/lib/lowpan_driver_common:*",
   "//src/connectivity/lowpan/lib/openthread_fuchsia:*",
-  "//src/connectivity/lowpan/lib/openthread_rust:*",
   "//src/connectivity/network/net-cli:*",
   "//src/connectivity/network/netstack3:*",
   "//src/connectivity/network/netstack3/core:*",
