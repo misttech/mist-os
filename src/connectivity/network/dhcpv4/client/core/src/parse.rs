@@ -5,10 +5,10 @@
 //! Parsing and serialization of DHCP messages
 
 #[todo_unused("https://fxbug.dev/81593")]
-use packet::{InnerPacketBuilder, ParseBuffer as _, Serializer};
+use packet::ParseBuffer as _;
+use packet::{InnerPacketBuilder, Serializer};
 #[todo_unused("https://fxbug.dev/81593")]
 use packet_formats::ip::IpPacket as _;
-#[todo_unused("https://fxbug.dev/81593")]
 use std::num::NonZeroU16;
 use todo_unused::todo_unused;
 
@@ -60,10 +60,8 @@ pub(crate) fn parse_dhcp_message_from_ip_packet(
     dhcp_protocol::Message::from_buffer(udp_packet.body()).map_err(ParseError::Dhcp)
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 const DEFAULT_TTL: u8 = 64;
 
-#[todo_unused("https://fxbug.dev/81593")]
 /// Serializes a DHCP message to the bytes of an IP packet. Includes IP header
 /// but not link-layer headers.
 pub(crate) fn serialize_dhcp_message_to_ip_packet(

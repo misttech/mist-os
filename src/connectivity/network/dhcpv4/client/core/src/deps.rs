@@ -6,29 +6,41 @@
 //! core, and provides fake implementations of these dependencies for testing
 //! purposes.
 
-use todo_unused::todo_unused;
+use async_trait::async_trait;
+use fuchsia_async as fasync;
+use rand::Rng;
 
-#[todo_unused("https://fxbug.dev/81593")]
-use {async_trait::async_trait, rand::Rng};
-
-#[todo_unused("https://fxbug.dev/81593")]
 /// Provides access to random number generation.
-pub(crate) trait RngProvider {
+pub trait RngProvider {
     type RNG: Rng + ?Sized;
     fn get_rng(&mut self) -> &mut Self::RNG;
 }
 
-#[derive(Clone, Copy, PartialEq)]
-pub(crate) struct DatagramInfo<T> {
-    pub(crate) length: usize,
-    pub(crate) address: T,
+impl RngProvider for rand::rngs::StdRng {
+    type RNG = Self;
+    fn get_rng(&mut self) -> &mut Self::RNG {
+        self
+    }
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
-#[derive(Debug)]
-pub(crate) enum SocketError {}
+#[derive(Clone, Copy, PartialEq)]
+pub struct DatagramInfo<T> {
+    pub length: usize,
+    pub address: T,
+}
 
-#[todo_unused("https://fxbug.dev/81593")]
+#[derive(thiserror::Error, Debug)]
+pub enum SocketError {
+    #[error("failed to open socket: {0}")]
+    FailedToOpen(anyhow::Error),
+    #[error("tried to bind socket on nonexistent interface")]
+    NoInterface,
+    #[error("unsupported hardware type")]
+    UnsupportedHardwareType,
+    #[error("socket error: {0}")]
+    Other(std::io::Error),
+}
+
 // While #[async_trait] causes the Futures returned by the trait functions to be
 // heap-allocated, we accept this because the DHCP client sends messages
 // infrequently (once every few seconds), and because we expect
@@ -36,7 +48,7 @@ pub(crate) enum SocketError {}
 // TODO(https://fxbug.dev/122464): use async_fn_in_trait instead.
 #[async_trait(?Send)]
 /// Abstracts sending and receiving datagrams on a socket.
-pub(crate) trait Socket<T> {
+pub trait Socket<T> {
     /// Sends a datagram containing the contents of `buf` to `addr`.
     async fn send_to(&self, buf: &[u8], addr: T) -> Result<(), SocketError>;
 
@@ -45,7 +57,6 @@ pub(crate) trait Socket<T> {
     async fn recv_from(&self, buf: &mut [u8]) -> Result<DatagramInfo<T>, SocketError>;
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 // While #[async_trait] causes the Futures returned by the trait functions to be
 // heap-allocated, we accept this because we expect creating a socket to be an
 // infrequent operation, and because we expect async_fn_in_trait to be
@@ -53,7 +64,7 @@ pub(crate) trait Socket<T> {
 // TODO(https://fxbug.dev/122464): use async_fn_in_trait instead.
 #[async_trait(?Send)]
 /// Provides access to AF_PACKET sockets.
-pub(crate) trait PacketSocketProvider {
+pub trait PacketSocketProvider {
     type Sock: Socket<net_types::ethernet::Mac>;
 
     /// Gets a packet socket bound to the device on which the DHCP client
@@ -62,17 +73,24 @@ pub(crate) trait PacketSocketProvider {
     async fn get_packet_socket(&self) -> Result<Self::Sock, SocketError>;
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 /// A type representing an instant in time.
-pub(crate) trait Instant:
-    Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync
-{
+pub trait Instant: Sized + Ord + Copy + Clone + std::fmt::Debug + Send + Sync {
     /// Returns the time `self + duration`. Panics if `self + duration` would
     /// overflow the underlying instant storage type.
     fn add(&self, duration: std::time::Duration) -> Self;
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
+impl Instant for fasync::Time {
+    fn add(&self, duration: std::time::Duration) -> Self {
+        // On host builds, fasync::Duration is simply an alias for
+        // std::time::Duration, making the `duration.into()` appear useless.
+        #[allow(clippy::useless_conversion)]
+        {
+            *self + duration.into()
+        }
+    }
+}
+
 // While #[async_trait] causes the Futures returned by the trait functions to be
 // heap-allocated, we accept this because waiting until a given time is expected
 // to be time-consuming (by definition), and because we expect async_fn_in_trait
@@ -80,7 +98,7 @@ pub(crate) trait Instant:
 // TODO(https://fxbug.dev/122464): use async_fn_in_trait instead.
 #[async_trait(?Send)]
 /// Provides access to system-time-related operations.
-pub(crate) trait Clock {
+pub trait Clock {
     /// The type representing monotonic system time.
     type Instant: Instant;
 
@@ -248,7 +266,7 @@ pub(crate) mod testutil {
     }
 
     pub(crate) fn run_until_next_timers_fire<F>(
-        executor: &mut fuchsia_async::TestExecutor,
+        executor: &mut fasync::TestExecutor,
         time: &Rc<RefCell<FakeTimeController>>,
         main_future: &mut F,
     ) -> std::task::Poll<F::Output>

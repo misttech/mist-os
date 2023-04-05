@@ -1,0 +1,21 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    actions: [
+        {
+            type: "expect_pass",
+            matchers: [
+                "*",
+            ],
+        },
+        {
+            type: "expect_pass_with_err_logs",
+            matchers: [
+                // The DHCP client logs an error when it closes a ClientProvider
+                // due to two overlapping clients running on the same interface.
+                "provider::test::client_provider_two_overlapping_clients_on_same_interface",
+            ],
+        },
+    ],
+}

@@ -6,52 +6,87 @@
 
 use todo_unused::todo_unused;
 
-#[todo_unused("https://fxbug.dev/81593")]
 use crate::deps::{self, Instant as _};
-#[todo_unused("https://fxbug.dev/81593")]
 use dhcp_protocol::{AtLeast, AtMostBytes};
-#[todo_unused("https://fxbug.dev/81593")]
-use futures::{pin_mut, select, FutureExt as _};
-#[todo_unused("https://fxbug.dev/81593")]
+use futures::{channel::mpsc, pin_mut, select, FutureExt as _, StreamExt as _};
 use rand::Rng as _;
-#[todo_unused("https://fxbug.dev/81593")]
 use std::{net::Ipv4Addr, num::NonZeroU32};
 
-#[todo_unused("https://fxbug.dev/81593")]
-const SERVER_PORT: std::num::NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT);
+pub const SERVER_PORT: std::num::NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT);
 
-#[todo_unused("https://fxbug.dev/81593")]
-const CLIENT_PORT: std::num::NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::CLIENT_PORT);
+pub const CLIENT_PORT: std::num::NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::CLIENT_PORT);
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
-#[todo_unused("https://fxbug.dev/81593")]
 #[derive(thiserror::Error, Debug)]
-enum Error {
+pub enum Error {
     #[error("error while using socket: {0:?}")]
     Socket(deps::SocketError),
 }
 
+/// The reason the DHCP client exited.
+pub enum ExitReason {
+    GracefulShutdown,
+}
+
+/// All possible core state machine states.
+pub enum State {
+    Init(Init),
+    Selecting(Selecting),
+}
+
+/// The next step to take after running the core state machine for one step.
+pub enum Step {
+    NextState(State),
+    Exit(ExitReason),
+}
+
+impl State {
+    pub async fn run(
+        &self,
+        config: &ClientConfig,
+        packet_socket_provider: &impl deps::PacketSocketProvider,
+        rng: &mut impl deps::RngProvider,
+        clock: &impl deps::Clock,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
+    ) -> Result<Step, Error> {
+        match self {
+            State::Init(init) => Ok(Step::NextState(State::Selecting(init.do_init(rng)))),
+            State::Selecting(selecting) => match selecting
+                .do_selecting(config, packet_socket_provider, rng, clock, stop_receiver)
+                .await?
+            {
+                SelectingOutcome::GracefulShutdown => Ok(Step::Exit(ExitReason::GracefulShutdown)),
+            },
+        }
+    }
+}
+
+impl Default for State {
+    fn default() -> Self {
+        State::Init(Init::default())
+    }
+}
+
 /// Configuration for the DHCP client to be used while negotiating with DHCP
 /// servers.
-#[todo_unused("https://fxbug.dev/81593")]
 #[derive(Clone)]
-struct ClientConfig {
+pub struct ClientConfig {
     /// The hardware address of the interface on which the DHCP client is run.
-    client_hardware_address: net_types::ethernet::Mac,
+    pub client_hardware_address: net_types::ethernet::Mac,
     /// If set, a unique-on-the-local-network string to be used to identify this
     /// device while negotiating with DHCP servers.
-    client_identifier: Option<AtLeast<2, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>>>,
+    pub client_identifier:
+        Option<AtLeast<2, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<u8>>>>,
     /// A list of parameters to request from DHCP servers.
-    parameter_request_list: Option<
+    pub parameter_request_list: Option<
         AtLeast<1, AtMostBytes<{ dhcp_protocol::U8_MAX_AS_USIZE }, Vec<dhcp_protocol::OptionCode>>>,
     >,
     /// If set, the preferred IP address lease time in seconds.
-    preferred_lease_time_secs: Option<NonZeroU32>,
+    pub preferred_lease_time_secs: Option<NonZeroU32>,
     /// If set, the IP address to request from DHCP servers.
-    requested_ip_address: Option<Ipv4Addr>,
+    pub requested_ip_address: Option<Ipv4Addr>,
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 #[derive(Clone, Debug, PartialEq)]
 struct DiscoverOptions {
     xid: TransactionId,
@@ -64,7 +99,6 @@ struct DiscoverOptions {
 /// client and a server."
 ///
 /// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.3.1
-#[todo_unused("https://fxbug.dev/81593")]
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct TransactionId(
     // While the DHCP RFC does not require that the XID be nonzero, it's helpful
@@ -75,13 +109,12 @@ struct TransactionId(
 
 /// The initial state as depicted in the state-transition diagram in [RFC 2131].
 /// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.4
-#[todo_unused("https://fxbug.dev/81593")]
-struct Init {}
+#[derive(Default)]
+pub struct Init {}
 
-#[todo_unused("https://fxbug.dev/81593")]
 impl Init {
     /// Generates a random transaction ID, and transitions to Selecting.
-    fn do_init(&self, rng: &mut impl deps::RngProvider) -> Selecting {
+    pub fn do_init(&self, rng: &mut impl deps::RngProvider) -> Selecting {
         let discover_options = DiscoverOptions {
             xid: TransactionId(NonZeroU32::new(rng.get_rng().gen_range(1..=u32::MAX)).unwrap()),
         };
@@ -89,7 +122,6 @@ impl Init {
     }
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 async fn send_with_retransmits<T: Clone + Send>(
     time: &impl deps::Clock,
     retransmit_schedule: impl Iterator<Item = std::time::Duration>,
@@ -106,7 +138,6 @@ async fn send_with_retransmits<T: Clone + Send>(
     Ok(())
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 fn default_retransmit_schedule(
     rng: &mut (impl rand::Rng + ?Sized),
 ) -> impl Iterator<Item = std::time::Duration> + '_ {
@@ -131,12 +162,11 @@ fn default_retransmit_schedule(
         })
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 // This is assumed to be an appropriate buffer size due to Ethernet's common MTU
 // of 1500 bytes.
+#[todo_unused("https://fxbug.dev/81593")]
 const BUFFER_SIZE: usize = 1500;
 
-#[todo_unused("https://fxbug.dev/81593")]
 fn build_discover(
     ClientConfig {
         client_hardware_address,
@@ -182,34 +212,36 @@ fn build_discover(
     }
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 #[derive(Debug)]
-enum SelectingOutcome {
+pub enum SelectingOutcome {
+    GracefulShutdown,
     // TODO(https://fxbug.dev/123520): Implement receiving offers.
 }
 
 /// The Selecting state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.4
-#[todo_unused("https://fxbug.dev/81593")]
-struct Selecting {
+pub struct Selecting {
     discover_options: DiscoverOptions,
 }
 
-#[todo_unused("https://fxbug.dev/81593")]
 impl Selecting {
     /// Executes the Selecting state.
     ///
     /// Transmits (and retransmits, if necessary) DHCPDISCOVER messages, and
     /// receives DHCPOFFER messages, on a packet socket. Tries to select a
     /// DHCPOFFER. If successful, transitions to Requesting.
-    async fn do_selecting(
+    pub async fn do_selecting(
         &self,
         client_config: &ClientConfig,
         packet_socket_provider: &impl deps::PacketSocketProvider,
         rng: &mut impl deps::RngProvider,
         time: &impl deps::Clock,
+        stop_receiver: &mut mpsc::UnboundedReceiver<()>,
     ) -> Result<SelectingOutcome, Error> {
+        // TODO(https://fxbug.dev/124724): avoid dropping/recreating the packet
+        // socket unnecessarily by taking an `&impl
+        // deps::Socket<net_types::ethernet::Mac>` here instead.
         let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
         let Selecting { discover_options } = self;
         let message = build_discover(client_config, discover_options);
@@ -222,17 +254,27 @@ impl Selecting {
             SERVER_PORT,
         );
 
-        // TODO(https://fxbug.dev/123520): Interrupt this when receiving offers.
-        send_with_retransmits(
+        let send_fut = send_with_retransmits(
             time,
             default_retransmit_schedule(rng.get_rng()),
             message.as_ref(),
             &socket,
             /* dest= */ net_types::ethernet::Mac::BROADCAST,
         )
-        .await?;
+        .fuse();
 
-        unreachable!("should never stop retransmitting DHCPDISCOVER unless we hit an error");
+        pin_mut!(send_fut);
+
+        // TODO(https://fxbug.dev/123520): Interrupt this when receiving offers.
+        select! {
+            send_result = send_fut => {
+                send_result?;
+                unreachable!("should never stop retransmitting DHCPDISCOVER unless we hit an error");
+            },
+            () = stop_receiver.select_next_some() => {
+                Ok(SelectingOutcome::GracefulShutdown)
+            },
+        }
     }
 }
 
@@ -244,8 +286,9 @@ mod test {
         FakeTimeController,
     };
     use crate::deps::{Clock as _, DatagramInfo, Socket as _};
+    use assert_matches::assert_matches;
     use fuchsia_async as fasync;
-    use futures::StreamExt as _;
+    use futures::channel::mpsc;
 
     fn initialize_logging() {
         let subscriber = tracing_subscriber::fmt()
@@ -287,6 +330,70 @@ mod test {
     }
 
     #[test]
+    fn do_selecting_obeys_graceful_shutdown() {
+        initialize_logging();
+
+        let mut executor = fasync::TestExecutor::new();
+        let time = FakeTimeController::new();
+
+        let selecting = Selecting {
+            discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+        };
+        let mut rng = FakeRngProvider::new(0);
+
+        let (_server_end, client_end) = FakeSocket::new_pair();
+        let test_socket_provider = FakeSocketProvider::new(client_end);
+
+        let client_config = test_client_config();
+
+        let (stop_sender, mut stop_receiver) = mpsc::unbounded();
+
+        let selecting_fut = selecting
+            .do_selecting(
+                &client_config,
+                &test_socket_provider,
+                &mut rng,
+                &time,
+                &mut stop_receiver,
+            )
+            .fuse();
+
+        let time = &time;
+
+        let wait_fut = async {
+            // Wait some arbitrary amount of time to ensure `do_selecting` is waiting on a reply.
+            // Note that this is fake time, not 30 actual seconds.
+            time.wait_until(std::time::Duration::from_secs(30)).await;
+        }
+        .fuse();
+
+        pin_mut!(selecting_fut, wait_fut);
+
+        let main_future = async {
+            select! {
+                _ = selecting_fut => unreachable!("should keep retransmitting DHCPDISCOVER forever"),
+                () = wait_fut => (),
+            }
+        };
+        pin_mut!(main_future);
+
+        loop {
+            match run_until_next_timers_fire(&mut executor, time, &mut main_future) {
+                std::task::Poll::Ready(()) => break,
+                std::task::Poll::Pending => (),
+            }
+        }
+
+        stop_sender.unbounded_send(()).expect("sending stop signal should succeed");
+
+        let selecting_result = selecting_fut.now_or_never().expect(
+            "selecting_fut should complete after single poll after stop signal has been sent",
+        );
+
+        assert_matches!(selecting_result, Ok(SelectingOutcome::GracefulShutdown));
+    }
+
+    #[test]
     fn do_selecting_sends_discover() {
         initialize_logging();
 
@@ -303,8 +410,17 @@ mod test {
 
         let client_config = test_client_config();
 
-        let selecting_fut =
-            selecting.do_selecting(&client_config, &test_socket_provider, &mut rng, &time).fuse();
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+
+        let selecting_fut = selecting
+            .do_selecting(
+                &client_config,
+                &test_socket_provider,
+                &mut rng,
+                &time,
+                &mut stop_receiver,
+            )
+            .fuse();
 
         let time = &time;
 
