@@ -15,6 +15,7 @@
 #include <zircon/types.h>
 
 #include <arch/arch_ops.h>
+#include <arch/crashlog.h>
 #include <arch/exception.h>
 #include <arch/regs.h>
 #include <arch/riscv64/user_copy.h>
@@ -59,40 +60,27 @@ bool arch_install_exception_context(Thread* thread, const arch_exception_context
 void arch_remove_exception_context(Thread* thread) {}
 
 void PrintFrame(FILE* f, const iframe_t& frame) {
-  fprintf(f, "iframe %p:\n", &frame);
-  fprintf(f,
-          "epc    %#18" PRIx64 " x1/ra  %#18" PRIx64 " x2/sp   %#18" PRIx64 " x3/gp   %#18" PRIx64
-          "\n",
-          frame.regs.pc, frame.regs.ra, frame.regs.sp, frame.regs.gp);
-  fprintf(f,
-          "x4/tp  %#18" PRIx64 " x5/t0  %#18" PRIx64 " x6/t1   %#18" PRIx64 " x7/t2   %#18" PRIx64
-          "\n",
-          frame.regs.tp, frame.regs.t0, frame.regs.t1, frame.regs.t2);
-  fprintf(f,
-          "x8/s0  %#18" PRIx64 " x9/s1  %#18" PRIx64 " x10/a0  %#18" PRIx64 " x11/a1  %#18" PRIx64
-          "\n",
-          frame.regs.s0, frame.regs.s1, frame.regs.a0, frame.regs.a1);
-  fprintf(f,
-          "x12/a2 %#18" PRIx64 " x13/a3 %#18" PRIx64 " x14/a4  %#18" PRIx64 " x15/a5  %#18" PRIx64
-          "\n",
-          frame.regs.a2, frame.regs.a3, frame.regs.a4, frame.regs.a5);
-  fprintf(f,
-          "x16/a6 %#18" PRIx64 " x17/a7 %#18" PRIx64 " x18/s2  %#18" PRIx64 " x19/s3  %#18" PRIx64
-          "\n",
-          frame.regs.a6, frame.regs.a7, frame.regs.s2, frame.regs.s3);
-  fprintf(f,
-          "x20/s4 %#18" PRIx64 " x21/s5 %#18" PRIx64 " x22/s6  %#18" PRIx64 " x23/s7  %#18" PRIx64
-          "\n",
-          frame.regs.s4, frame.regs.s5, frame.regs.s6, frame.regs.s7);
-  fprintf(f,
-          "x24/s8 %#18" PRIx64 " x25/s9 %#18" PRIx64 " x26/s10 %#18" PRIx64 " x27/s11 %#18" PRIx64
-          "\n",
-          frame.regs.s8, frame.regs.s9, frame.regs.s10, frame.regs.s11);
-  fprintf(f,
-          "x28/t3 %#18" PRIx64 " x29/t4 %#18" PRIx64 " x30/t5  %#18" PRIx64 " x31/t6  %#18" PRIx64
-          "\n",
-          frame.regs.t3, frame.regs.t4, frame.regs.t5, frame.regs.t6);
-  fprintf(f, "status %#18" PRIx64 "\n", frame.status);
+  // Define a shorter macro to keep the code formatter from badly wrapping the following code.
+#define fpr(args...) fprintf(f, args)
+  fpr("iframe %p:\n", &frame);
+  fpr("epc    %#18" PRIx64 " x1/ra  %#18" PRIx64 " x2/sp   %#18" PRIx64 " x3/gp   %#18" PRIx64 "\n",
+      frame.regs.pc, frame.regs.ra, frame.regs.sp, frame.regs.gp);
+  fpr("x4/tp  %#18" PRIx64 " x5/t0  %#18" PRIx64 " x6/t1   %#18" PRIx64 " x7/t2   %#18" PRIx64 "\n",
+      frame.regs.tp, frame.regs.t0, frame.regs.t1, frame.regs.t2);
+  fpr("x8/s0  %#18" PRIx64 " x9/s1  %#18" PRIx64 " x10/a0  %#18" PRIx64 " x11/a1  %#18" PRIx64 "\n",
+      frame.regs.s0, frame.regs.s1, frame.regs.a0, frame.regs.a1);
+  fpr("x12/a2 %#18" PRIx64 " x13/a3 %#18" PRIx64 " x14/a4  %#18" PRIx64 " x15/a5  %#18" PRIx64 "\n",
+      frame.regs.a2, frame.regs.a3, frame.regs.a4, frame.regs.a5);
+  fpr("x16/a6 %#18" PRIx64 " x17/a7 %#18" PRIx64 " x18/s2  %#18" PRIx64 " x19/s3  %#18" PRIx64 "\n",
+      frame.regs.a6, frame.regs.a7, frame.regs.s2, frame.regs.s3);
+  fpr("x20/s4 %#18" PRIx64 " x21/s5 %#18" PRIx64 " x22/s6  %#18" PRIx64 " x23/s7  %#18" PRIx64 "\n",
+      frame.regs.s4, frame.regs.s5, frame.regs.s6, frame.regs.s7);
+  fpr("x24/s8 %#18" PRIx64 " x25/s9 %#18" PRIx64 " x26/s10 %#18" PRIx64 " x27/s11 %#18" PRIx64 "\n",
+      frame.regs.s8, frame.regs.s9, frame.regs.s10, frame.regs.s11);
+  fpr("x28/t3 %#18" PRIx64 " x29/t4 %#18" PRIx64 " x30/t5  %#18" PRIx64 " x31/t6  %#18" PRIx64 "\n",
+      frame.regs.t3, frame.regs.t4, frame.regs.t5, frame.regs.t6);
+  fpr("status %#18" PRIx64 "\n", frame.status);
+#undef fpr
 }
 
 static const char* cause_to_string(long cause) {
@@ -141,7 +129,8 @@ static const char* cause_to_string(long cause) {
 }
 
 // Prints exception details and then panics.
-__NO_RETURN __NO_INLINE static void exception_die(iframe_t* iframe, const char* format, ...) {
+__NO_RETURN __NO_INLINE static void exception_die(iframe_t* iframe, long cause, uint64_t tval,
+                                                  const char* format, ...) {
   platform_panic_start();
 
   va_list args;
@@ -149,25 +138,37 @@ __NO_RETURN __NO_INLINE static void exception_die(iframe_t* iframe, const char* 
   vprintf(format, args);
   va_end(args);
 
-  /* fatal exception, die here */
+  // Print the interrupt frame and some additional details.
   PrintFrame(stdout, *iframe);
+  printf("cause  %18" PRIi64 " %s\n", cause, cause_to_string(cause));
+  printf("tval   %#18" PRIx64 "\n", tval);
+
+  // Fill in the crashlog.
+  g_crashlog.regs.iframe = iframe;
+  g_crashlog.regs.cause = cause;
+  g_crashlog.regs.tval = tval;
 
   platform_halt(HALT_ACTION_HALT, ZirconCrashReason::Panic);
 }
 
-__NO_RETURN __NO_INLINE static void fatal_exception(long cause, struct iframe_t* frame) {
+__NO_RETURN __NO_INLINE static void fatal_exception(long cause, uint64_t tval,
+                                                    struct iframe_t* frame) {
   if (cause < 0) {
-    exception_die(frame, "unhandled interrupt cause %#lx, epc %#lx, tval %#lx cpu %u\n", cause,
-                  frame->regs.pc, riscv64_csr_read(RISCV64_CSR_STVAL), arch_curr_cpu_num());
-  } else {
-    exception_die(frame, "unhandled exception cause %#lx (%s), epc %#lx, tval %#lx, cpu %u\n",
-                  cause, cause_to_string(cause), frame->regs.pc,
+    exception_die(frame, cause, tval,
+                  "unhandled interrupt cause %#lx, epc %#lx, tval %#lx cpu %u\n", frame->regs.pc,
                   riscv64_csr_read(RISCV64_CSR_STVAL), arch_curr_cpu_num());
+  } else {
+    exception_die(frame, cause, tval,
+                  "unhandled exception cause %#lx (%s), epc %#lx, tval %#lx, cpu %u\n", cause,
+                  cause_to_string(cause), frame->regs.pc, riscv64_csr_read(RISCV64_CSR_STVAL),
+                  arch_curr_cpu_num());
   }
 }
 
-static void riscv64_page_fault_handler(long cause, struct iframe_t* frame, bool user) {
-  vaddr_t tval = riscv64_csr_read(RISCV64_CSR_STVAL);
+static void riscv64_page_fault_handler(long cause, uint64_t tval, struct iframe_t* frame,
+                                       bool user) {
+  // TODO-rvbringup: deal with the fact that riscv exceptions don't specify if it's a permission
+  // or page-not-present failure.
   uint pf_flags = VMM_PF_FLAG_NOT_PRESENT;
   pf_flags |= (cause == RISCV64_EXCEPTION_STORE_PAGE_FAULT) ? VMM_PF_FLAG_WRITE : 0;
   pf_flags |= (cause == RISCV64_EXCEPTION_INS_PAGE_FAULT) ? VMM_PF_FLAG_INSTRUCTION : 0;
@@ -180,7 +181,7 @@ static void riscv64_page_fault_handler(long cause, struct iframe_t* frame, bool 
   uint64_t dfr = Thread::Current::Get()->arch().data_fault_resume;
   if (unlikely(!user) && unlikely(!dfr)) {
     // Any page fault in kernel mode that's not during user-copy is a bug.
-    exception_die(frame, "Page fault in kernel: %s, %s, address %#lx\n",
+    exception_die(frame, cause, tval, "Page fault in kernel: %s, %s, address %#lx\n",
                   (pf_flags & VMM_PF_FLAG_INSTRUCTION) ? "instruction" : "data",
                   (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
   }
@@ -216,14 +217,16 @@ static void riscv64_page_fault_handler(long cause, struct iframe_t* frame, bool 
     }
   }
 
-  exception_die(frame, "Page fault in kernel: %s, %s, address %#lx\n",
+  exception_die(frame, cause, tval, "Page fault in kernel: %s, %s, address %#lx\n",
                 (pf_flags & VMM_PF_FLAG_INSTRUCTION) ? "instruction" : "data",
                 (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
 }
 
-static void riscv64_illegal_instruction_handler(long cause, struct iframe_t* frame, bool user) {
+static void riscv64_illegal_instruction_handler(long cause, uint64_t tval, struct iframe_t* frame,
+                                                bool user) {
   // TODO-rvbringup: actually implement lazy FPU context switch
-  exception_die(frame, "unimplemented illegal instruction handler: from_user %u\n", user);
+  exception_die(frame, cause, tval, "unimplemented illegal instruction handler: from_user %u\n",
+                user);
 #if 0
   // If the FPU is already enabled this is bad.
   if ((frame->status & RISCV64_CSR_SSTATUS_FS) != RISCV64_CSR_SSTATUS_FS_OFF) {
@@ -235,11 +238,7 @@ static void riscv64_illegal_instruction_handler(long cause, struct iframe_t* fra
 #endif
 }
 
-static void riscv64_syscall_handler(struct iframe_t* frame, bool user) {
-  if (unlikely(!user)) {
-    exception_die(frame, "syscall from supervisor mode\n");
-  }
-
+static void riscv64_syscall_handler(struct iframe_t* frame) {
   // Push the PC forward over the ECALL instruction. By definition the ECALL instruction
   // is 32 bits wide, and cannot be implemented as a compressed 16 bit instruction.
   frame->regs.pc += 0x4;
@@ -282,7 +281,8 @@ extern "C" void riscv64_exception_handler(long cause, struct iframe_t* frame) {
         platform_irq(frame);
         break;
       default:
-        fatal_exception(cause, frame);
+        // Pass a zero tval here, since it's not supposed to be set for interrupts.
+        fatal_exception(cause, 0, frame);
     }
 
     bool do_preempt = int_handler_finish(&state);
@@ -291,21 +291,28 @@ extern "C" void riscv64_exception_handler(long cause, struct iframe_t* frame) {
       Thread::Current::Preempt();
     }
   } else {
-    // all synchronous traps go here
+    // All synchronous traps go here.
+
+    // Sample tval here and pass down in case any of the exceptions handlers need it
+    // or to be captured in a crash log.
+    uint64_t tval = riscv64_csr_read(RISCV64_CSR_STVAL);
     switch (cause) {
       case RISCV64_EXCEPTION_INS_PAGE_FAULT:
       case RISCV64_EXCEPTION_LOAD_PAGE_FAULT:
       case RISCV64_EXCEPTION_STORE_PAGE_FAULT:
-        riscv64_page_fault_handler(cause, frame, user);
+        riscv64_page_fault_handler(cause, tval, frame, user);
         break;
       case RISCV64_EXCEPTION_ILLEGAL_INS:
-        riscv64_illegal_instruction_handler(cause, frame, user);
+        riscv64_illegal_instruction_handler(cause, tval, frame, user);
         break;
       case RISCV64_EXCEPTION_ENV_CALL_U_MODE:
-        riscv64_syscall_handler(frame, user);
+        if (unlikely(!user)) {
+          exception_die(frame, cause, tval, "syscall from supervisor mode\n");
+        }
+        riscv64_syscall_handler(frame);
         break;
       default:
-        fatal_exception(cause, frame);
+        fatal_exception(cause, tval, frame);
     }
   }
 }
