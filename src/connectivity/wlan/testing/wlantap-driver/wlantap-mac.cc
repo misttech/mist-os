@@ -250,15 +250,6 @@ struct WlantapMacImpl : WlantapMac,
     }
   }
 
-  virtual void Status(uint32_t status) override {
-    std::lock_guard<std::mutex> guard(lock_);
-    auto arena = fdf::Arena::Create(0, 0);
-    auto result = wlan_softmac_ifc_client_.sync().buffer(*arena)->Status(status);
-    if (!result.ok()) {
-      zxlogf(ERROR, "Failed to send status up. Status: %d\n", result.status());
-    }
-  }
-
   virtual void ReportTxStatus(const wlan_common::WlanTxStatus& ts) override {
     std::lock_guard<std::mutex> guard(lock_);
     auto arena = fdf::Arena::Create(0, 0);

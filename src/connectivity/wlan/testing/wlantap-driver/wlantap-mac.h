@@ -32,7 +32,6 @@ class WlantapMac {
   };
 
   virtual void Rx(const fidl::VectorView<uint8_t>& data, const wlan_tap::WlanRxInfo& rx_info) = 0;
-  virtual void Status(uint32_t status) = 0;
 
   virtual void ReportTxStatus(const wlan_common::WlanTxStatus& ts) = 0;
 

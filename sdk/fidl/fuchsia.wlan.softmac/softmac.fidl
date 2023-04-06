@@ -202,11 +202,6 @@ type WlanBeaconConfiguration = table {
 @transport("Driver")
 @banjo_layout("ddk-interface")
 protocol WlanSoftmacIfc {
-    /// Report the status of the softmac device.
-    Status(struct {
-        status uint32;
-    }) -> ();
-
     /// Forward up a packet received over the wireless medium.
     Recv(struct {
         packet WlanRxPacket;

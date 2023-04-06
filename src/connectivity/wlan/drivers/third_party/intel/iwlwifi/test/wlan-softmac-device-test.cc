@@ -148,11 +148,6 @@ class WlanSoftmacDeviceTest : public SingleApTest,
     server_completion_.Wait();
   }
 
-  void Status(StatusRequestView request, fdf::Arena& arena,
-              StatusCompleter::Sync& completer) override {
-    // Overriding the virtual function, not being used at this point.
-    completer.buffer(arena).Reply();
-  }
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override {
     recv_called_ = true;
     completer.buffer(arena).Reply();

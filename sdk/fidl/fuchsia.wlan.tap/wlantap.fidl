@@ -112,10 +112,6 @@ protocol WlantapPhy {
         data vector<uint8>:MAX;
         info WlanRxInfo;
     });
-    /// The device report its status to the driver. (Not used).
-    Status(struct {
-        st uint32;
-    });
     /// For rate selection (Minstrel), the device's last frame transmission is a success/failure,
     /// with a certain number of retries.
     ReportTxStatus(struct {

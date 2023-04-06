@@ -106,8 +106,6 @@ class Device : public DeviceInterface,
   const security_support_t& GetSecuritySupport() const final;
   const spectrum_management_support_t& GetSpectrumManagementSupport() const final;
 
-  void Status(StatusRequestView request, fdf::Arena& arena,
-              StatusCompleter::Sync& completer) override;
   void Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) override;
   void ReportTxStatus(ReportTxStatusRequestView request, fdf::Arena& arena,
                       ReportTxStatusCompleter::Sync& completer) override;

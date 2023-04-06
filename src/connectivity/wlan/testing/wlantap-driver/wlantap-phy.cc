@@ -221,19 +221,6 @@ struct WlantapPhy : public fidl::WireServer<fuchsia_wlan_tap::WlantapPhy>, Wlant
     zxlogf(DEBUG, "%s: Rx done", name_.c_str());
   }
 
-  void Status(StatusRequestView request, StatusCompleter::Sync& completer) override {
-    zxlogf(INFO, "%s: Status(%u)", name_.c_str(), request->st);
-    std::lock_guard<std::mutex> guard(wlantap_mac_lock_);
-
-    if (!wlantap_mac_) {
-      zxlogf(ERROR, "No WlantapMac present.");
-      return;
-    }
-
-    wlantap_mac_->Status(request->st);
-    zxlogf(DEBUG, "%s: Status done", name_.c_str());
-  }
-
   void ReportTxStatus(ReportTxStatusRequestView request,
                       ReportTxStatusCompleter::Sync& completer) override {
     std::lock_guard<std::mutex> guard(wlantap_mac_lock_);

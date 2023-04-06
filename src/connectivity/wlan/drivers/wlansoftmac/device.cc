@@ -612,7 +612,6 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   // the server end of WlanSoftmacifc FIDL protocol, and this set of function pointers will be
   // called in the handler functions of FIDL server end.
   wlan_softmac_ifc_protocol_ops_.reset(new wlan_softmac_ifc_protocol_ops_t{
-      .status = ifc->ops->status,
       .recv = ifc->ops->recv,
       .report_tx_status = ifc->ops->report_tx_status,
       .notify_scan_complete = ifc->ops->scan_complete,
@@ -984,12 +983,6 @@ zx_status_t Device::ClearAssoc(const uint8_t peer_addr[fuchsia_wlan_ieee80211_MA
     return result->error_value();
   }
   return ZX_OK;
-}
-
-void Device::Status(StatusRequestView request, fdf::Arena& arena,
-                    StatusCompleter::Sync& completer) {
-  // No one is using this function right now, saving ink for the mid product.
-  ZX_PANIC("Status is not supportted.");
 }
 
 void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) {
