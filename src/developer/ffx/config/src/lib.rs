@@ -12,6 +12,7 @@ use crate::{
 };
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{Context, Result};
+use std::sync::Mutex;
 use std::{convert::From, io::Write};
 
 pub mod api;
@@ -30,13 +31,16 @@ mod storage;
 pub use api::query::{BuildOverride, ConfigQuery, SelectMode};
 pub use config_macros::FfxConfigBacked;
 
-pub use cache::invalidate as cache_invalidate;
-pub use cache::{global_env, global_env_context, init, test_init, TestEnv};
+pub use environment::{test_init, TestEnv};
 pub use environment::{Environment, EnvironmentContext};
 pub use sdk::{self, Sdk, SdkRoot};
 pub use storage::ConfigMap;
 
 pub use ssh_key::SshKeyFiles;
+
+lazy_static::lazy_static! {
+    static ref ENV: Mutex<Option<EnvironmentContext>> = Mutex::default();
+}
 
 /// The levels of configuration possible
 // If you edit this enum, make sure to also change the enum counter below to match.
@@ -83,6 +87,39 @@ impl argh::FromArgValue for ConfigLevel {
             )),
         }
     }
+}
+
+pub fn global_env_context() -> Option<EnvironmentContext> {
+    ENV.lock().unwrap().clone()
+}
+
+pub async fn global_env() -> Result<Environment> {
+    let context =
+        global_env_context().context("Tried to load global environment before configuration")?;
+
+    match context.load().await {
+        Err(err) => {
+            tracing::error!("failed to load environment, reverting to default: {}", err);
+            Environment::new_empty(context).await
+        }
+        Ok(ctx) => Ok(ctx),
+    }
+}
+
+/// Initialize the configuration. Only the first call in a process runtime takes effect, so users must
+/// call this early with the required values, such as in main() in the ffx binary.
+pub async fn init(context: &EnvironmentContext) -> Result<()> {
+    let env = context.env_file_path()?;
+    if !env.is_file() {
+        tracing::debug!("initializing environment {}", env.display());
+        Environment::init_env_file(&env).await?;
+    }
+    let mut env_lock = ENV.lock().unwrap();
+    if env_lock.is_some() {
+        anyhow::bail!("Attempted to set the global environment more than once in a process invocation, outside of a test");
+    }
+    env_lock.replace(context.clone());
+    Ok(())
 }
 
 /// Creates a [`ConfigQuery`] against the global config cache and environment.

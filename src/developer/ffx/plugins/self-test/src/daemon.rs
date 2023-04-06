@@ -18,10 +18,6 @@ pub(crate) async fn test_echo() -> Result<()> {
 
 pub(crate) async fn test_config_flag() -> Result<()> {
     let isolate = new_isolate("daemon-config-flag").await?;
-    // Until the cache is managed on a per-isolate basis, we need to
-    // invalidate the cache explicitly for the config values to be
-    // picked up correctly -- TODO(fxb/124465).
-    ffx_config::cache_invalidate().await;
     let mut daemon = ffx_daemon::run_daemon(isolate.env_context()).await?;
 
     // wait a bit to make sure the daemon has had a chance to start up, then check that it's

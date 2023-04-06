@@ -27,14 +27,14 @@ pub type ConfigMap = Map<String, Value>;
 
 /// An individually loaded configuration file, including the path it came from
 /// if it was loaded from disk.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConfigFile {
     path: Option<PathBuf>,
     contents: ConfigMap,
     dirty: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Config {
     default: ConfigMap,
     global: Option<ConfigFile>,

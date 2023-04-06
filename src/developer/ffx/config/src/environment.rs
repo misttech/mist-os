@@ -18,8 +18,10 @@ use std::{
     io::{BufReader, Read, Write},
     path::{Path, PathBuf},
     process::Command,
+    sync::Arc,
     time::Duration,
 };
+use tempfile::{NamedTempFile, TempDir};
 use thiserror::Error;
 use tracing::{error, info};
 
@@ -90,13 +92,24 @@ pub enum ExecutableKind {
 }
 
 /// Contextual information about where this instance of ffx is running
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct EnvironmentContext {
     kind: EnvironmentKind,
     exe_kind: ExecutableKind,
     env_vars: Option<EnvVars>,
     runtime_args: ConfigMap,
     env_file_path: Option<PathBuf>,
+    pub(crate) cache: Arc<crate::cache::Cache>,
+}
+
+impl std::cmp::PartialEq for EnvironmentContext {
+    fn eq(&self, other: &Self) -> bool {
+        self.kind == other.kind
+            && self.exe_kind == other.exe_kind
+            && self.env_vars == other.env_vars
+            && self.runtime_args == other.runtime_args
+            && self.env_file_path == other.env_file_path
+    }
 }
 
 #[derive(Error, Debug)]
@@ -114,7 +127,8 @@ impl EnvironmentContext {
         runtime_args: ConfigMap,
         env_file_path: Option<PathBuf>,
     ) -> Self {
-        Self { kind, exe_kind, env_vars, runtime_args, env_file_path }
+        let cache = Arc::default();
+        Self { kind, exe_kind, env_vars, runtime_args, env_file_path, cache }
     }
 
     /// Initialize an environment type for an in tree context, rooted at `tree_root` and if
@@ -483,6 +497,10 @@ impl Environment {
         Self::load_with_lock(lockfile, path, context)
     }
 
+    pub fn context(&self) -> &EnvironmentContext {
+        &self.context
+    }
+
     /// Checks if we can manage to open the given environment file's lockfile,
     /// as well as each configuration file referenced by it, and returns the lockfile
     /// owner if we can't. Will return a normal error via result if any non-lockfile
@@ -526,7 +544,7 @@ impl Environment {
 
         Self::save_with_lock(_lock, path, &self.files)?;
 
-        crate::cache::invalidate().await;
+        crate::cache::invalidate(&self.context.cache).await;
 
         Ok(())
     }
@@ -749,6 +767,86 @@ impl fmt::Display for Environment {
     }
 }
 
+/// A structure that holds information about the test config environment for the duration
+/// of a test. This object must continue to exist for the duration of the test, or the test
+/// may fail.
+#[must_use = "This object must be held for the duration of a test (ie. `let _env = ffx_config::test_init()`) for it to operate correctly."]
+pub struct TestEnv {
+    pub env_file: NamedTempFile,
+    pub context: EnvironmentContext,
+    pub isolate_root: TempDir,
+    pub user_file: NamedTempFile,
+    _guard: async_lock::MutexGuardArc<()>,
+}
+
+impl TestEnv {
+    async fn new(_guard: async_lock::MutexGuardArc<()>) -> Result<Self> {
+        let env_file = NamedTempFile::new().context("tmp access failed")?;
+        let user_file = NamedTempFile::new().context("tmp access failed")?;
+        let isolate_root = tempfile::tempdir()?;
+
+        Environment::init_env_file(env_file.path()).await.context("initializing env file")?;
+
+        // Point the user config at a temporary file.
+        let user_file_path = user_file.path().to_owned();
+        let context = EnvironmentContext::isolated(
+            ExecutableKind::Test,
+            isolate_root.path().to_owned(),
+            HashMap::from_iter(std::env::vars()),
+            ConfigMap::default(),
+            Some(env_file.path().to_owned()),
+        );
+        let test_env = TestEnv { env_file, context, user_file, isolate_root, _guard };
+
+        let mut env = test_env.load().await;
+        env.set_user(Some(&user_file_path));
+        env.save().await.context("saving env file")?;
+
+        Ok(test_env)
+    }
+
+    pub async fn load(&self) -> Environment {
+        self.context.load().await.expect("opening test env file")
+    }
+}
+
+impl Drop for TestEnv {
+    fn drop(&mut self) {
+        // after the test, wipe out all the test configuration we set up. Explode if things aren't as we
+        // expect them.
+        let mut env = crate::ENV.lock().expect("Poisoned lock");
+        let env_prev = env.clone();
+        *env = None;
+        drop(env);
+
+        if let Some(env_prev) = env_prev {
+            assert_eq!(
+                env_prev,
+                self.context,
+                "environment context changed from isolated environment to {other:?} during test run somehow.",
+                other = env_prev
+            );
+        }
+
+        // since we're not running in async context during drop, we can't clear the cache unfortunately.
+    }
+}
+
+/// When running tests we usually just want to initialize a blank slate configuration, so
+/// use this for tests. You must hold the returned object object for the duration of the test, not doing so
+/// will result in strange behaviour.
+pub async fn test_init() -> Result<TestEnv> {
+    lazy_static::lazy_static! {
+        static ref TEST_LOCK: Arc<async_lock::Mutex<()>> = Arc::default();
+    }
+    let env = TestEnv::new(TEST_LOCK.lock_arc().await).await?;
+
+    // force an overwrite of the configuration setup
+    crate::init(&env.context).await?;
+
+    Ok(env)
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // tests
 
@@ -776,6 +874,7 @@ mod test {
                 env_vars: Default::default(),
                 runtime_args: Default::default(),
                 env_file_path: Default::default(),
+                cache: Default::default(),
             }
         }
     }
