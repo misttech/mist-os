@@ -146,8 +146,7 @@ class HttpUtilsTests(unittest.TestCase):
             self, mock_urlopen, mock_sleep) -> None:
         """Testcase for http_utils.send_http_request() failure case because of
         an exception."""
-        with self.assertRaisesRegex(errors.HttpRequestError,
-                                    "Failed to send the HTTP request"):
+        with self.assertRaises(errors.HttpRequestError):
             http_utils.send_http_request(
                 url=_PARAMS["url"],
                 interval=_PARAMS["interval"],

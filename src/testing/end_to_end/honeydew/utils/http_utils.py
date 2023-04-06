@@ -14,7 +14,7 @@ from honeydew import errors
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
-_TIMEOUTS: Dict[str, int] = {
+_TIMEOUTS: Dict[str, float] = {
     "HTTP_RESPONSE": 30,
 }
 
@@ -65,8 +65,6 @@ def send_http_request(
     headers["Content-Type"] = "application/json; charset=utf-8"
     headers["Content-Length"] = len(data_bytes)
 
-    err_msg: str = f"Failed to send the HTTP request to url={url} with " \
-              f"data={data} and headers={headers}"
     for attempt in range(1, attempts + 1):
         # if this is not first attempt wait for sometime before next retry.
         if attempt > 1:
@@ -88,11 +86,14 @@ def send_http_request(
                 if isinstance(err, exception_to_skip):
                     return {}
 
+            err_msg: str = f"Send the HTTP request to url={url} with " \
+              f"data={data} and headers={headers} failed with error: '{err}'"
+
             if attempt < attempts:
                 _LOGGER.warning(
-                    "Send HTTP request to url=%s with data=%s and headers=%s "
-                    "failed with error: '%s' on iteration %s/%s", url, data,
-                    headers, err, attempt, attempts)
+                    "%s on iteration %s/%s", err_msg, attempt, attempts)
                 continue
             raise errors.HttpRequestError(err_msg) from err
-    raise errors.HttpRequestError(err_msg)
+    raise errors.HttpRequestError(
+        f"Failed to send the HTTP request to url={url} with data={data} and "\
+        f"headers={headers}.")

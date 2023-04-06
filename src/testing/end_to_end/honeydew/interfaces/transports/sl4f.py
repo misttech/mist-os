@@ -7,6 +7,15 @@
 import abc
 from typing import Any, Dict, Iterable, Optional, Type
 
+TIMEOUTS: Dict[str, float] = {
+    "SL4F_RESPONSE": 30,
+}
+
+DEFAULTS: Dict[str, int] = {
+    "ATTEMPTS": 3,
+    "INTERVAL": 3,
+}
+
 
 class SL4F(abc.ABC):
     """Abstract base class for SL4F transport."""
@@ -25,8 +34,9 @@ class SL4F(abc.ABC):
         self,
         method: str,
         params: Optional[Dict[str, Any]] = None,
-        attempts: int = 3,
-        interval: int = 3,
+        timeout: float = TIMEOUTS["SL4F_RESPONSE"],
+        attempts: int = DEFAULTS["ATTEMPTS"],
+        interval: int = DEFAULTS["INTERVAL"],
         exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
     ) -> Dict[str, Any]:
         """Sends SL4F command from host to Fuchsia device and returns the
@@ -35,6 +45,7 @@ class SL4F(abc.ABC):
         Args:
             method: SL4F method.
             params: Any optional params needed for method param.
+            timeout: How long in sec to wait for SL4F response.
             attempts: number of attempts to try in case of a failure.
             interval: wait time in sec before each retry in case of a failure.
             exceptions_to_skip: Any non fatal exceptions for which retry will

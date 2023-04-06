@@ -451,7 +451,9 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
         mock_makedirs.assert_called_once_with(directory)
 
         mock_send_sl4f_command.assert_called_once_with(
-            self.fd_obj, method=fuchsia_device_base._SL4F_METHODS["Snapshot"])
+            self.fd_obj,
+            method=fuchsia_device_base._SL4F_METHODS["Snapshot"],
+            timeout=fuchsia_device_base._TIMEOUTS["SNAPSHOT"])
 
     # List all the tests related to private methods in alphabetical order
 
@@ -607,9 +609,25 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
                     "method": _MOCK_ARGS["sl4f_request"],
                     "optional_params": {
                         "params": {
-                            "message": "message"
+                            "message": "message",
                         },
                     },
+                    "mock_http_response": _MOCK_ARGS["sl4f_response"],
+                },),
+            (
+                {
+                    "label": "all_optional_params",
+                    "method": _MOCK_ARGS["sl4f_request"],
+                    "optional_params":
+                        {
+                            "params": {
+                                "message": "message",
+                            },
+                            "timeout": 3,
+                            "attempts": 3,
+                            "interval": 3,
+                            "exceptions_to_skip": []
+                        },
                     "mock_http_response": _MOCK_ARGS["sl4f_response"],
                 },),
         ],
@@ -622,9 +640,11 @@ class FuchsiaDeviceBaseTests(unittest.TestCase):
     def test_send_sl4f_command_success(
             self, parameterized_dict, mock_send_http_request) -> None:
         """Testcase for FuchsiaDeviceBase.send_sl4f_command() success case"""
-        method = parameterized_dict["method"]
+        method: str = parameterized_dict["method"]
+        optional_params: Dict[str, Any] = parameterized_dict["optional_params"]
 
-        response = self.fd_obj.send_sl4f_command(method=method)
+        response: Dict[str, Any] = self.fd_obj.send_sl4f_command(
+            method=method, **optional_params)
 
         self.assertEqual(response, parameterized_dict["mock_http_response"])
 

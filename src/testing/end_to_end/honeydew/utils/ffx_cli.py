@@ -15,7 +15,7 @@ _CMDS: Dict[str, str] = {
     "FUCHSIA_TARGETS_SHOW": "ffx -t {target} target show --json",
 }
 
-_TIMEOUTS: Dict[str, int] = {
+_TIMEOUTS: Dict[str, float] = {
     "FFX_CLI": 10,
 }
 

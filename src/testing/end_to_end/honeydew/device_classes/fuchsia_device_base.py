@@ -44,11 +44,11 @@ _SL4F_METHODS: Dict[str, str] = {
     "Snapshot": "feedback_data_provider_facade.GetSnapshot",
 }
 
-_TIMEOUTS: Dict[str, int] = {
+_TIMEOUTS: Dict[str, float] = {
     "BOOT_UP_COMPLETE": 60,
     "OFFLINE": 60,
     "ONLINE": 60,
-    "SL4F_RESPONSE": 30,
+    "SNAPSHOT": 60,
     "SSH_COMMAND_ARG": 3,
     "SSH_COMMAND_RESPONSE": 60,
 }
@@ -285,8 +285,9 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
         self,
         method: str,
         params: Optional[Dict[str, Any]] = None,
-        attempts: int = 3,
-        interval: int = 3,
+        timeout: float = sl4f.TIMEOUTS["SL4F_RESPONSE"],
+        attempts: int = sl4f.DEFAULTS["ATTEMPTS"],
+        interval: int = sl4f.DEFAULTS["INTERVAL"],
         exceptions_to_skip: Optional[Iterable[Type[Exception]]] = None
     ) -> Dict[str, Any]:
         """Sends SL4F command from host to Fuchsia device and returns the
@@ -339,6 +340,7 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
                 http_response: Dict[str, Any] = http_utils.send_http_request(
                     url,
                     data,
+                    timeout=timeout,
                     attempts=attempts,
                     interval=interval,
                     exceptions_to_skip=exceptions_to_skip)
@@ -390,8 +392,10 @@ class FuchsiaDeviceBase(fuchsia_device.FuchsiaDevice, sl4f.SL4F,
             snapshot_file = f"Snapshot_{self.name}_{timestamp}.zip"
         snapshot_file_path: str = os.path.join(directory, snapshot_file)
 
+        _LOGGER.info("Collecting snapshot on %s...", self.name)
+
         snapshot_resp: Dict[str, Any] = self.send_sl4f_command(
-            method=_SL4F_METHODS["Snapshot"])
+            method=_SL4F_METHODS["Snapshot"], timeout=_TIMEOUTS["SNAPSHOT"])
         snapshot_base64_encoded_str: str = snapshot_resp["result"]["zip"]
         snapshot_base64_decoded_bytes: bytes = base64.b64decode(
             snapshot_base64_encoded_str)
