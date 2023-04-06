@@ -32,6 +32,21 @@ export PPROF_BINARY_PATH=~/fuchsia/out/default/.build-id:~/fuchsia/prebuilt/thir
 pprof -http=":" my_snapshot.pb
 ```
 
+## Quickstart: Running the example
+
+```
+# Include heapdump's collector and the example component in the build.
+fx set ... --with src/performance/memory/heapdump/collector --with src/performance/memory/heapdump/example
+
+# Build and run Fuchsia as usual, then start the example component.
+ffx component run /core/ffx-laboratory:example fuchsia-pkg://fuchsia.com/heapdump-example#meta/heapdump-example.cm
+
+# Take a live snapshot and process it with pprof.
+ffx profile heapdump snapshot --by-name heapdump-example.cm --output-file my_snapshot.pb
+export PPROF_BINARY_PATH=...  # see previous section
+pprof -http=":" my_snapshot.pb
+```
+
 ## Design
 
 The instrumentation library intercepts all allocation and deallocation events,
