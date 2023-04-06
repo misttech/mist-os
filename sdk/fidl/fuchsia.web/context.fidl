@@ -180,6 +180,10 @@ type CreateContextParams = resource table {
     /// Enables Frames to be created with remote debugging enabled using the DevTools protocol. If
     /// `port` is 0, then an ephemeral port will be used, which can be queried via the
     /// [`Context.GetRemoteDebuggingPort`] API.
+    ///
+    /// Because remote debugging uses TCP, it is not valid to set a remote
+    /// debugging port without having also set [`ContextFeatureFlags.NETWORK`]
+    /// for the context.
     5: remote_debugging_port uint16;
 
     /// List of providers whose contents will be served by `fuchsia-dir://` URLs.

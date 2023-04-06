@@ -10,6 +10,10 @@ protocol Debug {
     /// subsequent DevTools events to the supplied `listener`. The callback indicates when the
     /// WebEngine is in a debuggable state. Events will be sent to every `listener` registered with
     /// this method.
+    ///
+    /// Because DevTools debugging is exposed using TCP as its transport, only
+    /// [`Context`]s created with access to network capabilities will report
+    /// themselves as available for debugging.
     EnableDevTools(resource struct {
         listener client_end:DevToolsListener;
     }) -> ();
