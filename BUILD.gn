@@ -164,6 +164,7 @@ build_api_module("api") {
     ":product_size_checker_output",
     ":rbe_config",
     ":sdk_archives",
+    ":test_components",
     ":test_durations",
     ":tests",
     ":tool_paths",
@@ -781,6 +782,40 @@ build_api_module("tests") {
   ]
 }
 
+# Test components in the build.
+#
+#  Creates list of test components and the realm to run them in if not running
+#  in the default hermetic realm.
+#
+# Type: list(scope)
+#
+#   * label
+#     - Required: GN label associated with the test component
+#     - Type: label_with_toolchain
+#
+#   * realm
+#     - Optional: Moniker of the realm to run the test in.
+#     - Type: Moniker inside the system topology.
+#
+build_api_module("test_components") {
+  testonly = true
+  data_keys = [ "test_components" ]
+  walk_keys = [ "test_components_barrier" ]
+  deps = [
+    # Pull in tests present in the assembled product image.
+    "//build/images:main_assembly",
+
+    # While these should be redundant with the above, they way in which they are
+    # redundant (included via the main assembly) is quite opaque, and so they
+    # are listed here for developers to be able to see (and to ensure that all
+    # developer-chosen tests are in the build api, catching any failures to
+    # include those tests in the assembly.
+    ":developer_base_packages",
+    ":developer_cache_packages",
+    ":developer_universe_packages",
+  ]
+}
+
 # The output location of test-list.json.
 #
 #   Creates a stable build API that users can use to programmatically retrieve
@@ -1384,6 +1419,7 @@ group("developer_base_driver_packages") {
 group("developer_base_packages") {
   testonly = base_cache_packages_testonly
   visibility = [
+    ":test_components",
     ":tests",
     "//build/images/*",
   ]
@@ -1396,6 +1432,7 @@ group("developer_base_packages") {
 group("developer_cache_packages") {
   testonly = base_cache_packages_testonly
   visibility = [
+    ":test_components",
     ":tests",
     "//build/images/*",
   ]
@@ -1406,6 +1443,7 @@ group("developer_cache_packages") {
 group("developer_universe_packages") {
   testonly = fuchsia_zbi_testonly
   visibility = [
+    ":test_components",
     ":tests",
     "//build/images/*",
   ]

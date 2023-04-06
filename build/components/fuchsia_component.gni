@@ -262,6 +262,11 @@ template("fuchsia_component") {
       cm_target = "${target_name}_manifest_compile"
       fuchsia_component_manifest(cm_target) {
         forward_variables_from(invoker, forwarded)
+        if (defined(metadata) && defined(metadata.test_components)) {
+          # empty it out so that same entry is not produced two times when
+          # walking the metadata
+          metadata.test_components = []
+        }
         if (!defined(component_name)) {
           component_name = invoker.target_name
         }
@@ -387,6 +392,9 @@ template("fuchsia_component") {
 
         test_component_manifest_program_barrier = []
         test_component_manifest_barrier = []
+
+        # no need to parse anymore deps. Will make the build little bit faster.
+        test_components_barrier = []
 
         # Don't collect expected includes via transitive deps of components
         expect_includes_barrier = []

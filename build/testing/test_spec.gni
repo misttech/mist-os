@@ -50,6 +50,10 @@ _max_severity_allowed_val = [
 #     [list of strings] In the case of a fuchsia test, this contains a set of
 #     paths to package manifests that describe the blobs needed by this test.
 #
+#   component_label (optional)
+#     [string] In case of test component, this describes the Gn label (with
+#     toolchain) of the fuchsia component.
+#
 #   deps (optional)
 #     [list of labels]: List of labels that the test depends on.
 #
@@ -393,6 +397,7 @@ template("test_spec") {
                                "path",
                                "package_url",
                                "package_label",
+                               "component_label",
                                "package_manifests",
                                "timeout_secs",
                                "build_rule",

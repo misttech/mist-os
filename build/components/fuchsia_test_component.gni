@@ -4,14 +4,36 @@
 
 import("fuchsia_component.gni")
 
+_type_moniker_map = {
+  system = "/core/testing:system-tests"
+}
+
 # Defines a Fuchsia component that is testonly.
 # See: https://fuchsia.dev/fuchsia-src/development/components/build
-#
-# This is a thin wrapper around `fuchsia_component()`
-# that sets `testonly = true`.
 template("fuchsia_test_component") {
   fuchsia_component(target_name) {
-    forward_variables_from(invoker, "*", [ "testonly" ])
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "testonly",
+                             "metadata",
+                           ])
     testonly = true
+    metadata = {
+      if (defined(invoker.metadata)) {
+        forward_variables_from(invoker.metadata, "*")
+      }
+
+      if (defined(test_type)) {
+        test_components = [
+          {
+            test_component = {
+              label = get_label_info(":$target_name", "label_with_toolchain")
+              moniker = _type_moniker_map[test_type]
+            }
+          },
+        ]
+      }
+    }
   }
 }

@@ -118,6 +118,7 @@ template("fuchsia_test_package") {
     test_deps = []
     foreach(test, invoker.test_components) {
       test_target_name = get_label_info(test, "name")
+      component_label = get_label_info(test, "label_with_toolchain")
       test_target = "${target_name}_test_" + test_target_name
       manifest_name = get_target_outputs(test)
       manifest_name = get_path_info(manifest_name[0], "file")
@@ -173,6 +174,7 @@ template("fuchsia_test_package") {
         target = get_label_info(":$target_name", "label_with_toolchain")
         wrapped_legacy_test = _wrapped_legacy_test
         package_label = package_label
+        component_label = component_label
         package_manifests = [ package_manifest ]
         package_url =
             "fuchsia-pkg://fuchsia.com/$package_name#meta/$manifest_name"
@@ -196,6 +198,11 @@ template("fuchsia_test_package") {
       deps += invoker.test_components
       deps += test_deps
       testonly = true
+      if (!defined(invoker.metadata)) {
+        metadata = {
+        }
+      }
+      metadata.test_components_barrier = invoker.test_components
 
       # Pass subpackages through a different parameter than the documented one,
       # so that the fuchsia_package() can identify these as from a test package.
