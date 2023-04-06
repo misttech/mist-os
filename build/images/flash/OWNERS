@@ -1,6 +1,6 @@
 per-file generate_flash_script.sh = file: /src/firmware/OWNERS
 
 # For virtual device related changes
-per-file BUILD.gn = doughertyda@google.com
+per-file BUILD.gn = wilkinsonclay@google.com
 
 # COMPONENT: Build
