@@ -43,6 +43,10 @@
             url: "fuchsia-pkg://fuchsia.com/elf-test-create-raw-processes-runner#meta/elf-test-create-raw-processes-runner.cm",
         },
         {
+            name: "elf_test_create_raw_processes_ambient_exec_runner",
+            url: "fuchsia-pkg://fuchsia.com/elf-test-create-raw-processes-ambient-exec-runner#meta/elf-test-create-raw-processes-ambient-exec-runner.cm",
+        },
+        {
             name: "fuzz_test_runner",
             url: "fuchsia-pkg://fuchsia.com/fuzz-test-runner#meta/fuzz-test-runner.cm",
         },
@@ -410,6 +414,7 @@
             from: "parent",
             to: [
                 "#elf_test_ambient_exec_runner",
+                "#elf_test_create_raw_processes_ambient_exec_runner",
                 "#elf_test_create_raw_processes_runner",
                 "#elf_test_runner",
                 "#fuzz_test_runner",
@@ -427,6 +432,7 @@
             from: "#lib_loader_cache",
             to: [
                 "#elf_test_ambient_exec_runner",
+                "#elf_test_create_raw_processes_ambient_exec_runner",
                 "#elf_test_create_raw_processes_runner",
                 "#elf_test_runner",
                 "#fuzz_test_runner",
