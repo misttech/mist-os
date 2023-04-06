@@ -381,8 +381,6 @@
                 "MMapTest.MapDevZeroSegfaultAfterUnmap",
                 "MMapTest.MapLocked",
                 "MMapTest.MprotectHugeLength",
-                "MMapTest.ExceedLimitData",
-                "MMapTest.ExceedLimitDataPrlimit",
                 "MMapTest.ExceedLimitDataPrlimitPID",
                 "MMapTest.NoExceedLimitAS",
                 "MMapTest.ExceedLimitAS",

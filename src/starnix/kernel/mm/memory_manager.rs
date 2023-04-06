@@ -1109,7 +1109,16 @@ impl MemoryManager {
         })
     }
 
-    pub fn set_brk(&self, addr: UserAddress) -> Result<UserAddress, Errno> {
+    pub fn set_brk(
+        &self,
+        current_task: &CurrentTask,
+        addr: UserAddress,
+    ) -> Result<UserAddress, Errno> {
+        let rlimit_data = std::cmp::min(
+            PROGRAM_BREAK_LIMIT,
+            current_task.thread_group.get_rlimit(Resource::DATA),
+        );
+
         let mut state = self.state.write();
 
         // Ensure that a program break exists by mapping at least one page.
@@ -1134,7 +1143,7 @@ impl MemoryManager {
             Some(brk) => brk,
         };
 
-        if addr < brk.base || addr > brk.base + PROGRAM_BREAK_LIMIT {
+        if addr < brk.base || addr > brk.base + rlimit_data {
             // The requested program break is out-of-range. We're supposed to simply
             // return the current program break.
             return Ok(brk.current);
@@ -1145,7 +1154,7 @@ impl MemoryManager {
         brk.current = addr;
 
         let old_end = range.end;
-        let new_end = (brk.current + 1u64).round_up(*PAGE_SIZE)?;
+        let new_end = (brk.current + 1u64).round_up(*PAGE_SIZE).unwrap();
 
         match new_end.cmp(&old_end) {
             std::cmp::Ordering::Less => {
@@ -1916,8 +1925,9 @@ mod tests {
         };
 
         // Initialize the program break.
-        let base_addr =
-            mm.set_brk(UserAddress::default()).expect("failed to set initial program break");
+        let base_addr = mm
+            .set_brk(&current_task, UserAddress::default())
+            .expect("failed to set initial program break");
         assert!(base_addr > UserAddress::default());
 
         // Check that the initial program break actually maps some memory.
@@ -1926,35 +1936,37 @@ mod tests {
         assert_eq!(range0.end, base_addr + *PAGE_SIZE);
 
         // Grow the program break by a tiny amount that does not actually result in a change.
-        let addr1 = mm.set_brk(base_addr + 1u64).expect("failed to grow brk");
+        let addr1 = mm.set_brk(&current_task, base_addr + 1u64).expect("failed to grow brk");
         assert_eq!(addr1, base_addr + 1u64);
         let range1 = get_range(&base_addr);
         assert_eq!(range1.start, range0.start);
         assert_eq!(range1.end, range0.end);
 
         // Grow the program break by a non-trival amount and observe the larger mapping.
-        let addr2 = mm.set_brk(base_addr + 24893u64).expect("failed to grow brk");
+        let addr2 = mm.set_brk(&current_task, base_addr + 24893u64).expect("failed to grow brk");
         assert_eq!(addr2, base_addr + 24893u64);
         let range2 = get_range(&base_addr);
         assert_eq!(range2.start, base_addr);
         assert_eq!(range2.end, addr2.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break and observe the smaller mapping.
-        let addr3 = mm.set_brk(base_addr + 14832u64).expect("failed to shrink brk");
+        let addr3 = mm.set_brk(&current_task, base_addr + 14832u64).expect("failed to shrink brk");
         assert_eq!(addr3, base_addr + 14832u64);
         let range3 = get_range(&base_addr);
         assert_eq!(range3.start, base_addr);
         assert_eq!(range3.end, addr3.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break close to zero and observe the smaller mapping.
-        let addr4 = mm.set_brk(base_addr + 3u64).expect("failed to drastically shrink brk");
+        let addr4 =
+            mm.set_brk(&current_task, base_addr + 3u64).expect("failed to drastically shrink brk");
         assert_eq!(addr4, base_addr + 3u64);
         let range4 = get_range(&base_addr);
         assert_eq!(range4.start, base_addr);
         assert_eq!(range4.end, addr4.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break close to zero and observe that the mapping is not entirely gone.
-        let addr5 = mm.set_brk(base_addr).expect("failed to drastically shrink brk to zero");
+        let addr5 =
+            mm.set_brk(&current_task, base_addr).expect("failed to drastically shrink brk to zero");
         assert_eq!(addr5, base_addr);
         let range5 = get_range(&base_addr);
         assert_eq!(range5.start, base_addr);
@@ -1971,8 +1983,9 @@ mod tests {
             state.mappings.get(addr).is_some()
         };
 
-        let brk_addr =
-            mm.set_brk(UserAddress::default()).expect("failed to set initial program break");
+        let brk_addr = mm
+            .set_brk(&current_task, UserAddress::default())
+            .expect("failed to set initial program break");
         assert!(brk_addr > UserAddress::default());
         assert!(has(&brk_addr));
 
