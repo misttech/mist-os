@@ -115,8 +115,9 @@ void FakeDisplay::DisplayControllerImplSetDisplayControllerInterface(
 zx_status_t FakeDisplay::ImportVmoImage(image_t* image, zx::vmo vmo, size_t offset) {
   zx_status_t status = ZX_OK;
 
-  auto import_info = std::make_unique<ImageInfo>();
-  if (import_info == nullptr) {
+  fbl::AllocChecker alloc_checker;
+  auto import_info = fbl::make_unique_checked<ImageInfo>(&alloc_checker);
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
   fbl::AutoLock lock(&image_lock_);
@@ -187,8 +188,9 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image, uint64
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
   zx_status_t status = ZX_OK;
-  auto import_info = std::make_unique<ImageInfo>();
-  if (import_info == nullptr) {
+  fbl::AllocChecker alloc_checker;
+  auto import_info = fbl::make_unique_checked<ImageInfo>(&alloc_checker);
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
@@ -428,8 +430,9 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImageForCapture(uint64_t col
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  auto import_capture = std::make_unique<ImageInfo>();
-  if (import_capture == nullptr) {
+  fbl::AllocChecker alloc_checker;
+  auto import_capture = fbl::make_unique_checked<ImageInfo>(&alloc_checker);
+  if (!alloc_checker.check()) {
     return ZX_ERR_NO_MEMORY;
   }
 
