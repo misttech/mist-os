@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    api::ConfigResult, cache::load_config, nested::RecursiveMap, validate_type, ConfigError,
-    ConfigLevel, ConfigValue, Environment, EnvironmentContext, ValueStrategy,
+    api::ConfigResult, nested::RecursiveMap, validate_type, ConfigError, ConfigLevel, ConfigValue,
+    Environment, EnvironmentContext, ValueStrategy,
 };
 use anyhow::{bail, Context, Result};
 use serde_json::Value;
@@ -92,7 +92,7 @@ impl<'a> ConfigQuery<'a> {
     }
 
     async fn get_config(&self, env: Environment) -> ConfigResult {
-        let config = load_config(env, self.build).await?;
+        let config = env.config_from_cache(self.build).await?;
         let read_guard = config.read().await;
         let result = match self {
             Self { name: Some(name), level: None, select, .. } => read_guard.get(*name, *select),
@@ -193,7 +193,7 @@ impl<'a> ConfigQuery<'a> {
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env().await?;
         env.populate_defaults(&level).await?;
-        let config = load_config(env, self.build).await?;
+        let config = env.config_from_cache(self.build).await?;
         let mut write_guard = config.write().await;
         write_guard.set(key, level, value)?;
         write_guard.save().await
@@ -202,7 +202,8 @@ impl<'a> ConfigQuery<'a> {
     /// Remove the value at the queried location.
     pub async fn remove(&self) -> Result<()> {
         let (key, level) = self.validate_write_query()?;
-        let config = load_config(self.get_env().await?, self.build).await?;
+        let env = self.get_env().await?;
+        let config = env.config_from_cache(self.build).await?;
         let mut write_guard = config.write().await;
         write_guard.remove(key, level)?;
         write_guard.save().await
@@ -214,7 +215,7 @@ impl<'a> ConfigQuery<'a> {
         let (key, level) = self.validate_write_query()?;
         let mut env = self.get_env().await?;
         env.populate_defaults(&level).await?;
-        let config = load_config(env, self.build).await?;
+        let config = env.config_from_cache(self.build).await?;
         let mut write_guard = config.write().await;
         if let Some(mut current) = write_guard.get_in_level(key, level) {
             if current.is_object() {

@@ -4,6 +4,7 @@
 
 use crate::{
     api::{value::ValueStrategy, ConfigError, ConfigValue},
+    storage::Config,
     BuildOverride, ConfigLevel, ConfigMap, ConfigQuery,
 };
 use anyhow::{bail, Context, Result};
@@ -99,7 +100,7 @@ pub struct EnvironmentContext {
     env_vars: Option<EnvVars>,
     runtime_args: ConfigMap,
     env_file_path: Option<PathBuf>,
-    pub(crate) cache: Arc<crate::cache::Cache>,
+    pub(crate) cache: Arc<crate::cache::Cache<Config>>,
 }
 
 impl std::cmp::PartialEq for EnvironmentContext {
@@ -547,6 +548,14 @@ impl Environment {
         crate::cache::invalidate(&self.context.cache).await;
 
         Ok(())
+    }
+
+    pub(crate) async fn config_from_cache(
+        self,
+        build_override: Option<BuildOverride<'_>>,
+    ) -> Result<Arc<async_lock::RwLock<Config>>> {
+        let build_dir = self.override_build_dir(build_override);
+        crate::cache::load_config(&self.context.cache, build_dir, || Config::from_env(&self)).await
     }
 
     fn load_with_lock(_lock: Lockfile, path: PathBuf, context: EnvironmentContext) -> Result<Self> {

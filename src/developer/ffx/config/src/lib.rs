@@ -2,13 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    api::{
-        validate_type,
-        value::{ConfigValue, ValueStrategy},
-        ConfigError,
-    },
-    cache::load_config,
+use crate::api::{
+    validate_type,
+    value::{ConfigValue, ValueStrategy},
+    ConfigError,
 };
 use analytics::{is_opted_in, set_opt_in_status};
 use anyhow::{Context, Result};
@@ -167,7 +164,7 @@ where
 }
 
 pub async fn print_config<W: Write>(ctx: &EnvironmentContext, mut writer: W) -> Result<()> {
-    let config = load_config(ctx.load().await?, None).await?;
+    let config = ctx.load().await?.config_from_cache(None).await?;
     let read_guard = config.read().await;
     writeln!(writer, "{}", *read_guard).context("displaying config")
 }
