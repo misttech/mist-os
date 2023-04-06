@@ -72,7 +72,7 @@ IncomingHeaderAndMessage IncomingHeaderAndMessage::FromEncodedCMessage(
 IncomingHeaderAndMessage::~IncomingHeaderAndMessage() = default;
 
 fidl_incoming_msg_t IncomingHeaderAndMessage::ReleaseToEncodedCMessage() && {
-  ZX_DEBUG_ASSERT(status() == ZX_OK);
+  ZX_DEBUG_ASSERT_MSG(status() == ZX_OK, "%s", status_string());
   fidl_incoming_msg_t msg = std::move(body_).ReleaseToEncodedCMessage();
   msg.bytes = bytes_.data();
   msg.num_bytes = static_cast<uint32_t>(bytes_.size());

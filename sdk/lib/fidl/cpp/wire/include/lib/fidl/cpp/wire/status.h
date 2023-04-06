@@ -8,14 +8,11 @@
 #include <lib/fidl/cpp/wire/internal/display_error.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <iosfwd>
 #include <optional>
-
-#ifdef __Fuchsia__
-#include <zircon/status.h>
-#endif  // __Fuchsia__
 
 namespace fidl {
 
@@ -294,10 +291,8 @@ class [[nodiscard]] Status {
     return status_;
   }
 
-#ifdef __Fuchsia__
   // Returns the string representation of the status value.
   [[nodiscard]] const char* status_string() const { return zx_status_get_string(status()); }
-#endif  // __Fuchsia__
 
   // A high-level reason for the failure.
   //
@@ -546,10 +541,8 @@ class UnbindInfo : private Status {
   // Prefer logging the |UnbindInfo| itself or via |FormatDescription|.
   using Status::status;
 
-#ifdef __Fuchsia__
   // Returns the string representation of the status value.
   using Status::status_string;
-#endif  // __Fuchsia__
 
   // Renders a full description of the cause of the unbinding.
   //
