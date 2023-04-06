@@ -10,6 +10,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/zx/fifo.h>
+#include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -138,7 +139,7 @@ static void fill_random(uint8_t* buf, uint64_t size) {
   }
 }
 
-zx::result<std::unique_ptr<block_client::Client>> CreateSession(
+zx::result<std::pair<fidl::ClientEnd<fuchsia_hardware_block::Session>, zx::fifo>> CreateRawSession(
     fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block) {
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_hardware_block::Session>();
   if (endpoints.is_error()) {
@@ -159,9 +160,17 @@ zx::result<std::unique_ptr<block_client::Client>> CreateSession(
   if (fifo_response.is_error()) {
     return zx::error(fifo_response.error_value());
   }
+  return zx::ok(std::make_pair(std::move(session), std::move(fifo_response->fifo)));
+}
 
-  return zx::ok(
-      std::make_unique<block_client::Client>(std::move(session), std::move(fifo_response->fifo)));
+zx::result<std::unique_ptr<block_client::Client>> CreateSession(
+    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block) {
+  zx::result result = CreateRawSession(block);
+  if (result.is_error()) {
+    return result.take_error();
+  }
+  auto& [session, fifo] = result.value();
+  return zx::ok(std::make_unique<block_client::Client>(std::move(session), std::move(fifo)));
 }
 
 TEST(BlkdevTests, blkdev_test_fifo_basic) {
@@ -287,16 +296,19 @@ struct TestVmoObject {
   zx::vmo vmo;
   fuchsia_hardware_block::wire::VmoId vmoid;
   std::unique_ptr<uint8_t[]> buf;
+
+  void RandomizeVmo(size_t block_size) {
+    vmo_size = block_size + (rand() % 5) * block_size;
+    ASSERT_OK(zx::vmo::create(vmo_size, 0, &vmo));
+    buf.reset(new uint8_t[vmo_size]);
+    fill_random(buf.get(), vmo_size);
+    ASSERT_OK(vmo.write(buf.get(), 0, vmo_size));
+  }
 };
 
 // Creates a VMO, fills it with data, and gives it to the block device.
-void CreateVmoHelper(block_client::Client& block_client, TestVmoObject& obj, size_t kBlockSize) {
-  obj.vmo_size = kBlockSize + (rand() % 5) * kBlockSize;
-  ASSERT_EQ(zx::vmo::create(obj.vmo_size, 0, &obj.vmo), ZX_OK, "Failed to create vmo");
-  obj.buf.reset(new uint8_t[obj.vmo_size]);
-  fill_random(obj.buf.get(), obj.vmo_size);
-  ASSERT_EQ(obj.vmo.write(obj.buf.get(), 0, obj.vmo_size), ZX_OK, "Failed to write to vmo");
-
+void CreateVmoHelper(block_client::Client& block_client, TestVmoObject& obj, size_t block_size) {
+  ASSERT_NO_FATAL_FAILURE(obj.RandomizeVmo(block_size));
   zx::result vmoid = block_client.RegisterVmo(obj.vmo);
   ASSERT_OK(vmoid);
   obj.vmoid.id = vmoid.value().TakeId();
@@ -428,8 +440,7 @@ TEST(BlkdevTests, blkdev_test_fifo_multiple_vmo_multithreaded) {
   }
 }
 
-// TODO(https://fxbug.dev/44600): Re-enable.
-TEST(BlkdevTests, DISABLED_blkdev_test_fifo_unclean_shutdown) {
+TEST(BlkdevTests, blkdev_test_fifo_unclean_shutdown) {
   // Set up the blkdev
   uint64_t kBlockSize, blk_count;
   fidl::ClientEnd<fuchsia_hardware_block::Block> client;
@@ -438,20 +449,26 @@ TEST(BlkdevTests, DISABLED_blkdev_test_fifo_unclean_shutdown) {
   std::vector<TestVmoObject> objs(10);
   groupid_t group = 0;
   {
-    zx::result block_client_ptr = CreateSession(client);
-    ASSERT_OK(block_client_ptr);
-    block_client::Client& block_client = *block_client_ptr.value();
+    // We intentionally create a raw session which does not clean up when going out of scope, so we
+    // trigger asynchronous cleanup.
+    zx::result result = CreateRawSession(client);
+    ASSERT_OK(result);
+    auto& [session, fifo] = result.value();
 
-    // Create multiple VMOs
+    // Create multiple VMOs.  We intentionally leak the vmoids, since once |session| goes out of
+    // scope the block server should clean the session up.
     for (auto& obj : objs) {
-      ASSERT_NO_FATAL_FAILURE(CreateVmoHelper(block_client, obj, kBlockSize));
+      ASSERT_NO_FATAL_FAILURE(obj.RandomizeVmo(kBlockSize));
+      zx::vmo dup;
+      ASSERT_OK(obj.vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup));
+      const fidl::WireResult result = fidl::WireCall(session)->AttachVmo(std::move(dup));
+      ASSERT_OK(result);
+      const fit::result response = result.value();
+      ASSERT_TRUE(response.is_ok(), "%s", zx_status_get_string(response.error_value()));
     }
   }
 
-  // Give the block server a moment to realize our side of the fifo has been closed
-  usleep(10000);
-
-  // The block server should still be functioning. We should be able to re-bind to it
+  // The block server should still be functioning. We should be able to re-bind to it.
   {
     zx::result block_client_ptr = CreateSession(client);
     ASSERT_OK(block_client_ptr);

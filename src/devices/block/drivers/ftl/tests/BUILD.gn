@@ -23,7 +23,7 @@ source_set("shared") {
 group("tests") {
   testonly = true
   deps = [
-    ":ftl-integration-package",  # Flaky Test, build only.
+    ":ftl-integration-package",
     ":ftl-test",
   ]
 }

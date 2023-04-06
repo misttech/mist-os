@@ -23,6 +23,8 @@ namespace block_client {
 // is threadsafe to support this many requests from different threads in parallel. Exceeding
 // MAX_TXN_GROUP_COUNT parallel transactions will block future requests until a transaction group
 // becomes available.
+//
+// When the Client is destroyed, its session will be synchronously closed.
 class Client {
  public:
   Client(fidl::ClientEnd<fuchsia_hardware_block::Session> session, zx::fifo fifo);
