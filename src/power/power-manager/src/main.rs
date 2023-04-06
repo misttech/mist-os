@@ -39,14 +39,11 @@ mod test;
 
 use crate::power_manager::PowerManager;
 use anyhow::Error;
-use fuchsia_async as fasync;
 use fuchsia_trace_provider;
 use log;
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    // Setup logging
-    fuchsia_syslog::init()?;
     log::info!("started");
 
     // Setup tracing
