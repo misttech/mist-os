@@ -187,7 +187,6 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image, uint64
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  zx_status_t status = ZX_OK;
   fbl::AllocChecker alloc_checker;
   auto import_info = fbl::make_unique_checked<ImageInfo>(&alloc_checker);
   if (!alloc_checker.check()) {
@@ -250,7 +249,7 @@ zx_status_t FakeDisplay::DisplayControllerImplImportImage(image_t* image, uint64
   import_info->vmo = std::move(vmos[index]);
   image->handle = reinterpret_cast<uint64_t>(import_info.get());
   imported_images_.push_back(std::move(import_info));
-  return status;
+  return ZX_OK;
 }
 
 void FakeDisplay::DisplayControllerImplReleaseImage(image_t* image) {
