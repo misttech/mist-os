@@ -580,6 +580,7 @@ void DisplayCompositor::ApplyLayerImage(const uint64_t layer_id, const ImageRect
                                         const allocation::ImageMetadata image,
                                         const scenic_impl::DisplayEventId wait_id,
                                         const scenic_impl::DisplayEventId signal_id) {
+  TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyLayerImage");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   const auto [src, dst] = DisplaySrcDstFrames::New(rectangle, image);
   FX_DCHECK(src.width && src.height) << "Source frame cannot be empty.";

@@ -1012,6 +1012,7 @@ void VkRenderer::BlitRenderTarget(escher::CommandBuffer* command_buffer,
                                   const escher::ImagePtr dest_image,
                                   const ImageMetadata& metadata) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
+  TRACE_DURATION("gfx", "VkRenderer::BlitRenderTarget");
 
   command_buffer->TransitionImageLayout(source_image, *source_image_layout,
                                         vk::ImageLayout::eTransferSrcOptimal);

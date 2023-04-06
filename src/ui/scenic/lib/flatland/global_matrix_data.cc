@@ -5,6 +5,7 @@
 #include "src/ui/scenic/lib/flatland/global_matrix_data.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include <cmath>
 #include <iterator>
@@ -491,6 +492,7 @@ GlobalRectangleVector ComputeGlobalRectangles(
 
 void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector* images_in_out,
                     uint64_t display_width, uint64_t display_height) {
+  TRACE_DURATION("gfx", "flatland::CullRectangles");
   FX_DCHECK(rectangles_in_out && images_in_out);
   FX_DCHECK(rectangles_in_out->size() == images_in_out->size());
   auto is_occluder = [display_width, display_height](

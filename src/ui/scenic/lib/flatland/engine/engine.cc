@@ -194,6 +194,7 @@ Renderables Engine::GetRenderables(const FlatlandDisplay& display) {
 }
 
 Engine::SceneState::SceneState(Engine& engine, TransformHandle root_transform) {
+  TRACE_DURATION("gfx", "flatland::Engine::SceneState");
   snapshot = engine.uber_struct_system_->Snapshot();
 
   const auto links = engine.link_system_->GetResolvedTopologyLinks();

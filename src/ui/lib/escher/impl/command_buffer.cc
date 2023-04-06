@@ -164,6 +164,7 @@ void CommandBuffer::TransitionImageLayout(const ImagePtr& image, vk::ImageLayout
                                           vk::ImageLayout new_layout,
                                           uint32_t src_queue_family_index,
                                           uint32_t dst_queue_family_index) {
+  TRACE_DURATION("gfx", "escher::CommandBuffer::TransitionImageLayout", "ptr", TA_POINTER(this));
   KeepAlive(image);
 
   vk::PipelineStageFlags src_stage_mask;

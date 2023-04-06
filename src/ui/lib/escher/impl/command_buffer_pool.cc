@@ -6,6 +6,7 @@
 
 #include "src/ui/lib/escher/impl/command_buffer_sequencer.h"
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
+#include "src/ui/lib/escher/util/trace_macros.h"
 
 namespace escher {
 namespace impl {
@@ -77,6 +78,8 @@ CommandBufferPool::~CommandBufferPool() {
 }
 
 CommandBuffer* CommandBufferPool::GetCommandBuffer() {
+  TRACE_DURATION("gfx", "escher::CommandBufferPool::GetCommandBuffer");
+
   // TODO: perhaps do when buffer is submitted?
   Cleanup();
 
@@ -104,6 +107,7 @@ CommandBuffer* CommandBufferPool::GetCommandBuffer() {
 }
 
 bool CommandBufferPool::Cleanup() {
+  TRACE_DURATION("gfx", "escher::CommandBufferPool::Cleanup");
   // TODO: add some guard against potential re-entrant calls resulting from
   // invocation of CommandBufferFinishedCallbacks.
 
