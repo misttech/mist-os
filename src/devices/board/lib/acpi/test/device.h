@@ -58,7 +58,7 @@ class Device {
 
   // Find a device by path. This implements the rules specified in the ACPI spec, v6.4, section 5.3,
   // with the exception of searching parents for single-component paths.
-  Device* FindByPath(std::string path);
+  Device* FindByPath(std::string_view path);
 
   // Return this device's absolute path.
   std::string GetAbsolutePath();
@@ -125,7 +125,7 @@ class Device {
                                 ACPI_PHYSICAL_ADDRESS address, uint32_t bit_width, UINT64* value);
 
  private:
-  Device* FindByPathInternal(std::string path);
+  Device* FindByPathInternal(std::string_view path);
   Device* LookupChild(std::string_view name);
 
   std::vector<ACPI_RESOURCE> resources_;

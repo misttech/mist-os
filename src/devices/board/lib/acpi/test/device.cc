@@ -15,7 +15,7 @@
 
 namespace acpi::test {
 
-Device* Device::FindByPath(std::string path) {
+Device* Device::FindByPath(std::string_view path) {
   if (path.empty()) {
     return nullptr;
   }
@@ -35,7 +35,7 @@ Device* Device::FindByPath(std::string path) {
   return FindByPathInternal(path);
 }
 
-Device* Device::FindByPathInternal(std::string path) {
+Device* Device::FindByPathInternal(std::string_view path) {
   if (path.empty()) {
     return this;
   }
@@ -171,7 +171,7 @@ acpi::status<> Device::InstallNotifyHandler(Acpi::NotifyHandlerCallable callback
 
 acpi::status<> Device::RemoveNotifyHandler(Acpi::NotifyHandlerCallable callback,
                                            uint32_t raw_mode) {
-  if (raw_mode != uint32_t(notify_handler_mode_.value())) {
+  if (raw_mode != static_cast<uint32_t>(notify_handler_mode_.value())) {
     return acpi::error(AE_BAD_PARAMETER);
   }
   if (callback != notify_handler_) {

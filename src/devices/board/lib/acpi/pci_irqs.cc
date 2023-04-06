@@ -1,6 +1,7 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 #include <assert.h>
 #include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <lib/pci/pciroot.h>
@@ -25,7 +26,7 @@
 // device has their interrupt status bit flipped. To properly configure these
 // legacy interrupts at the platform level we need to read the PCI Routing
 // Tables (_PRT) for each root port found. PCI Routing Tables represent a
-// mapping between a root device/function adddress and an Interrupt Link Device
+// mapping between a root device/function address and an Interrupt Link Device
 // (ILD) or hardware vector. This ILD contains a resource that details how it is
 // wired up, and how the interrupt needs to be configured. Using this we can
 // build a routing table between a given BDF pin and a hard vector in the bus
@@ -210,7 +211,7 @@ ACPI_STATUS GetPciRootIrqRouting(acpi::Acpi* acpi, ACPI_HANDLE root_obj,
   }
 
   // If there are any host bridges / pcie-to-pci bridges or other ports under
-  // the root then check them for PRTs as well. This is unncecessary in most
+  // the root then check them for PRTs as well. This is unnecessary in most
   // configurations.
   ACPI_HANDLE child = nullptr;
   while ((status = AcpiGetNextObject(ACPI_TYPE_DEVICE, root_obj, child, &child)) == AE_OK) {

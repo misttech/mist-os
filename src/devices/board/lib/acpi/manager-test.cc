@@ -4,6 +4,7 @@
 
 #include "src/devices/board/lib/acpi/manager.h"
 
+#include <lib/async-loop/testing/cpp/real_loop.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 
@@ -13,7 +14,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "lib/async-loop/testing/cpp/real_loop.h"
 #include "src/devices/board/lib/acpi/acpi.h"
 #include "src/devices/board/lib/acpi/manager-fuchsia.h"
 #include "src/devices/board/lib/acpi/test/mock-acpi.h"
@@ -21,10 +21,12 @@
 #include "src/devices/board/lib/acpi/test/null-iommu-manager.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
+namespace {
+
 using acpi::test::Device;
 
-static void ExpectProps(acpi::DeviceBuilder* b, std::vector<zx_device_prop_t> expected_dev,
-                        std::vector<zx_device_str_prop_t> expected_str) {
+void ExpectProps(acpi::DeviceBuilder* b, const std::vector<zx_device_prop_t>& expected_dev,
+                 const std::vector<zx_device_str_prop_t>& expected_str) {
   auto dev_props = b->GetDevProps();
   zxlogf(INFO, "size: %lu", dev_props.size());
   size_t left = expected_dev.size();
@@ -82,7 +84,7 @@ class AcpiManagerTest : public zxtest::Test, public loop_fixture::RealLoop {
       : mock_root_(MockDevice::FakeRootParent()), manager_(&acpi_, &iommu_, mock_root_.get()) {}
   void SetUp() override { acpi_.SetDeviceRoot(std::make_unique<Device>("\\")); }
 
-  void InsertDeviceBelow(std::string path, std::unique_ptr<Device> d) {
+  void InsertDeviceBelow(std::string_view path, std::unique_ptr<Device> d) {
     Device* parent = acpi_.GetDeviceRoot()->FindByPath(path);
     ASSERT_NE(parent, nullptr);
     parent->AddChild(std::move(d));
@@ -184,7 +186,7 @@ TEST_F(AcpiManagerTest, TestDeviceWithHidCid) {
                   }));
 }
 
-static constexpr acpi::Uuid kDevicePropertiesUuid =
+constexpr acpi::Uuid kDevicePropertiesUuid =
     acpi::Uuid::Create(0xdaffd814, 0x6eba, 0x4d8c, 0x8a91, 0xbc9bbf4aa301);
 
 TEST_F(AcpiManagerTest, TestDeviceWithDeviceTreeHid) {
@@ -511,3 +513,5 @@ TEST_F(AcpiManagerTest, TestInterruptsMakeFragments) {
   ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(mock_root_.get()));
   mock_root_.reset();
 }
+
+}  // namespace

@@ -45,10 +45,10 @@ zx_status_t resource_parse_memory(ACPI_RESOURCE* res, resource_memory_t* out) {
     case ACPI_RESOURCE_TYPE_MEMORY24: {
       ACPI_RESOURCE_MEMORY24* m24 = &res->Data.Memory24;
       out->writeable = !m24->WriteProtect;
-      out->minimum = (uint32_t)m24->Minimum << 8;
-      out->maximum = (uint32_t)m24->Maximum << 8;
+      out->minimum = static_cast<uint32_t>(m24->Minimum) << 8;
+      out->maximum = static_cast<uint32_t>(m24->Maximum) << 8;
       out->alignment = m24->Alignment ? m24->Alignment : 1U << 16;
-      out->address_length = (uint32_t)m24->AddressLength << 8;
+      out->address_length = static_cast<uint32_t>(m24->AddressLength) << 8;
       break;
     }
     case ACPI_RESOURCE_TYPE_MEMORY32: {

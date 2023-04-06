@@ -11,7 +11,8 @@
 
 #include "acpi-private.h"
 
-static inline void do_indent(unsigned int level) {
+namespace {
+inline void do_indent(unsigned int level) {
   while (level) {
     printf("  ");
     level--;
@@ -29,11 +30,11 @@ enum print_resource_request {
   POSSIBLE_RESOURCES,
 };
 
-static ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
-                                        enum print_resource_request type) {
+ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
+                                 enum print_resource_request type) {
   ACPI_BUFFER buffer = {
       .Length = ACPI_ALLOCATE_BUFFER,
-      .Pointer = NULL,
+      .Pointer = nullptr,
   };
   ACPI_STATUS status = AE_BAD_PARAMETER;
   if (type == POSSIBLE_RESOURCES) {
@@ -57,8 +58,8 @@ static ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
     INDENT_PRINTF("CRS:\n");
   }
 
-  uintptr_t entry_addr = (uintptr_t)buffer.Pointer;
-  ACPI_RESOURCE* res = (ACPI_RESOURCE*)entry_addr;
+  std::byte* entry_addr = static_cast<std::byte*>(buffer.Pointer);
+  ACPI_RESOURCE* res = reinterpret_cast<ACPI_RESOURCE*>(entry_addr);
   level += 1;
   while (res->Type != ACPI_RESOURCE_TYPE_END_TAG) {
     INDENT_PRINTF("Entry: ");
@@ -161,7 +162,7 @@ static ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
     level -= 1;
 
     entry_addr += res->Length;
-    res = (ACPI_RESOURCE*)entry_addr;
+    res = reinterpret_cast<ACPI_RESOURCE*>(entry_addr);
   }
   level -= 1;
 
@@ -169,26 +170,27 @@ static ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
   return AE_OK;
 }
 
-static ACPI_STATUS acpi_get_pcie_devices_crs(ACPI_HANDLE object, UINT32 nesting_level,
-                                             void* context, void** ret) {
+ACPI_STATUS acpi_get_pcie_devices_crs(ACPI_HANDLE object, UINT32 nesting_level, void* context,
+                                      void** ret) {
   printf("Found object %p\n", object);
   return acpi_print_resources(object, 1, CURRENT_RESOURCES);
 }
 
-[[maybe_unused]] static void acpi_debug_pcie_crs(void) {
-  ACPI_STATUS status = AcpiGetDevices((char*)"PNP0A08", acpi_get_pcie_devices_crs, NULL, NULL);
+[[maybe_unused]] void acpi_debug_pcie_crs() {
+  char hid[] = "PNP0A08";
+  ACPI_STATUS status = AcpiGetDevices(hid, acpi_get_pcie_devices_crs, nullptr, nullptr);
   if (status != AE_OK) {
     printf("Could not find PCIe root complex\n");
   }
 }
 
-static ACPI_STATUS acpi_print_prt(unsigned int level, ACPI_HANDLE object) {
+ACPI_STATUS acpi_print_prt(unsigned int level, ACPI_HANDLE object) {
   ACPI_STATUS status = AE_OK;
 
   ACPI_BUFFER buffer = {
       // Request that the ACPI subsystem allocate the buffer
       .Length = ACPI_ALLOCATE_BUFFER,
-      .Pointer = NULL,
+      .Pointer = nullptr,
   };
   status = AcpiGetIrqRoutingTable(object, &buffer);
   if (status != AE_OK) {
@@ -199,11 +201,11 @@ static ACPI_STATUS acpi_print_prt(unsigned int level, ACPI_HANDLE object) {
   }
   assert(buffer.Pointer);
 
-  uintptr_t entry_addr = (uintptr_t)buffer.Pointer;
+  std::byte* entry_addr = static_cast<std::byte*>(buffer.Pointer);
   ACPI_PCI_ROUTING_TABLE* entry;
-  for (entry = (ACPI_PCI_ROUTING_TABLE*)entry_addr; entry->Length != 0;
-       entry_addr += entry->Length, entry = (ACPI_PCI_ROUTING_TABLE*)entry_addr) {
-    assert(entry_addr <= (uintptr_t)buffer.Pointer + buffer.Length);
+  for (entry = reinterpret_cast<ACPI_PCI_ROUTING_TABLE*>(entry_addr); entry->Length != 0;
+       entry_addr += entry->Length, entry = reinterpret_cast<ACPI_PCI_ROUTING_TABLE*>(entry_addr)) {
+    assert(entry_addr <= static_cast<std::byte*>(buffer.Pointer) + buffer.Length);
 
     INDENT_PRINTF("Entry:\n");
     level += 1;
@@ -248,8 +250,8 @@ static ACPI_STATUS acpi_print_prt(unsigned int level, ACPI_HANDLE object) {
   return AE_OK;
 }
 
-static ACPI_STATUS acpi_get_pcie_devices_irq(ACPI_HANDLE object, UINT32 nesting_level,
-                                             void* context, void** ret) {
+ACPI_STATUS acpi_get_pcie_devices_irq(ACPI_HANDLE object, UINT32 nesting_level, void* context,
+                                      void** ret) {
   ACPI_STATUS status = acpi_print_prt(nesting_level, object);
   if (status != AE_OK) {
     printf("Failed to print PRT for root complex\n");
@@ -257,12 +259,13 @@ static ACPI_STATUS acpi_get_pcie_devices_irq(ACPI_HANDLE object, UINT32 nesting_
   }
 
   // Enumerate root ports
-  ACPI_HANDLE child = NULL;
-  while (1) {
+  ACPI_HANDLE child = nullptr;
+  while (true) {
     status = AcpiGetNextObject(ACPI_TYPE_DEVICE, object, child, &child);
     if (status == AE_NOT_FOUND) {
       break;
-    } else if (status != AE_OK) {
+    }
+    if (status != AE_OK) {
       printf("Failed to get next child object of root complex\n");
       return status;
     }
@@ -272,7 +275,8 @@ static ACPI_STATUS acpi_get_pcie_devices_irq(ACPI_HANDLE object, UINT32 nesting_
         .Length = sizeof(object),
         .Pointer = &object,
     };
-    status = AcpiEvaluateObject(child, (char*)"_ADR", NULL, &buffer);
+    char handle[] = "_ADR";
+    status = AcpiEvaluateObject(child, handle, nullptr, &buffer);
     if (status != AE_OK || buffer.Length < sizeof(object) || object.Type != ACPI_TYPE_INTEGER) {
       continue;
     }
@@ -288,32 +292,33 @@ static ACPI_STATUS acpi_get_pcie_devices_irq(ACPI_HANDLE object, UINT32 nesting_
   return AE_OK;
 }
 
-[[maybe_unused]] static void acpi_debug_pcie_irq_routing(void) {
-  ACPI_STATUS status = AcpiGetDevices((char*)"PNP0A08", acpi_get_pcie_devices_irq, NULL, NULL);
+[[maybe_unused]] void acpi_debug_pcie_irq_routing() {
+  char hid[] = "PNP0A08";
+  ACPI_STATUS status = AcpiGetDevices(hid, acpi_get_pcie_devices_irq, nullptr, nullptr);
   if (status != AE_OK) {
     printf("Could not enumerate PRTs\n");
   }
 }
 
-static ACPI_STATUS acpi_debug_print_device_name(ACPI_HANDLE object, UINT32 nesting_level,
-                                                void* context, void** ret) {
-  acpi::UniquePtr<ACPI_DEVICE_INFO> info;
-  if (auto res = acpi::GetObjectInfo(object); res.is_error()) {
-    return res.error_value();
-  } else {
-    info = std::move(res.value());
+ACPI_STATUS acpi_debug_print_device_name(ACPI_HANDLE object, UINT32 nesting_level, void* context,
+                                         void** ret) {
+  acpi::status info = acpi::GetObjectInfo(object);
+  if (info.is_error()) {
+    return info.error_value();
   }
 
   unsigned int level = nesting_level;
-  INDENT_PRINTF("%4s\n", (char*)&info->Name);
+  INDENT_PRINTF("%4s\n", reinterpret_cast<char*>(&info.value()->Name));
 
   return AE_OK;
 }
 
-[[maybe_unused]] static void acpi_debug_walk_ns(void) {
+[[maybe_unused]] void acpi_debug_walk_ns() {
   ACPI_STATUS status = AcpiWalkNamespace(ACPI_TYPE_DEVICE, ACPI_ROOT_OBJECT, INT_MAX,
-                                         acpi_debug_print_device_name, NULL, NULL, NULL);
+                                         acpi_debug_print_device_name, nullptr, nullptr, nullptr);
   if (status != AE_OK) {
     printf("Failed to walk namespace\n");
   }
 }
+
+}  // namespace
