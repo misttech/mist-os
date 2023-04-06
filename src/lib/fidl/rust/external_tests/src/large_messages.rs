@@ -97,13 +97,13 @@ fn server_runner(mut expected_str: &'static str, server_end: Channel) {
                 Ok(OverflowingProtocolRequest::Resourced {
                     str,
                     expect_handles,
-                    mut handles,
+                    handles,
                     responder,
                 }) => {
                     assert_eq!(&str, &expected_str);
                     validate_handle_array(&handles, expect_handles);
 
-                    responder.send(&str, expect_handles, &mut handles).unwrap();
+                    responder.send(&str, expect_handles, handles).unwrap();
                 }
                 Err(_) => panic!("unexpected err"),
             }
@@ -374,7 +374,7 @@ fn overflowing_resourced_63_handles_large_sync() {
     run_client_sync(LARGE_STR, |client| {
         let present = 63;
         let (out_str, out_present_handles, out_handles) = client
-            .resourced(LARGE_STR, present, &mut build_handle_array(present), Time::INFINITE)
+            .resourced(LARGE_STR, present, build_handle_array(present), Time::INFINITE)
             .unwrap();
 
         assert_eq!(&out_str, LARGE_STR);
@@ -388,7 +388,7 @@ fn overflowing_resourced_63_handles_small_sync() {
     run_client_sync(SMALL_STR, |client| {
         let present = 63;
         let (out_str, out_present_handles, out_handles) = client
-            .resourced(SMALL_STR, present, &mut build_handle_array(present), Time::INFINITE)
+            .resourced(SMALL_STR, present, build_handle_array(present), Time::INFINITE)
             .unwrap();
 
         assert_eq!(&out_str, SMALL_STR);
@@ -402,7 +402,7 @@ async fn overflowing_resourced_63_handles_large_async() {
     run_client_async(LARGE_STR, |client| async move {
         let present = 63;
         let (out_str, out_present_handles, out_handles) =
-            client.resourced(LARGE_STR, present, &mut build_handle_array(present)).await.unwrap();
+            client.resourced(LARGE_STR, present, build_handle_array(present)).await.unwrap();
 
         assert_eq!(&out_str, LARGE_STR);
         assert_eq!(out_present_handles, present);
@@ -416,7 +416,7 @@ async fn overflowing_resourced_63_handles_small_async() {
     run_client_async(SMALL_STR, |client| async move {
         let present = 63;
         let (out_str, out_present_handles, out_handles) =
-            client.resourced(SMALL_STR, present, &mut build_handle_array(present)).await.unwrap();
+            client.resourced(SMALL_STR, present, build_handle_array(present)).await.unwrap();
 
         assert_eq!(&out_str, SMALL_STR);
         assert_eq!(out_present_handles, present);
@@ -430,7 +430,7 @@ fn overflowing_resourced_64_handles_large_sync() {
     run_client_sync(LARGE_STR, |client| {
         let present = 64;
         let result =
-            client.resourced(LARGE_STR, present, &mut build_handle_array(present), Time::INFINITE);
+            client.resourced(LARGE_STR, present, build_handle_array(present), Time::INFINITE);
         assert_matches!(result, Err(fidl::Error::LargeMessage64Handles));
     })
 }
@@ -440,7 +440,7 @@ fn overflowing_resourced_64_handles_small_sync() {
     run_client_sync(SMALL_STR, |client| {
         let present = 64;
         let (out_str, out_present_handles, out_handles) = client
-            .resourced(SMALL_STR, present, &mut build_handle_array(present), Time::INFINITE)
+            .resourced(SMALL_STR, present, build_handle_array(present), Time::INFINITE)
             .unwrap();
 
         assert_eq!(&out_str, SMALL_STR);
@@ -453,7 +453,7 @@ fn overflowing_resourced_64_handles_small_sync() {
 async fn overflowing_resourced_64_handles_large_async() {
     run_client_async(LARGE_STR, |client| async move {
         let present = 64;
-        let result = client.resourced(LARGE_STR, present, &mut build_handle_array(present)).await;
+        let result = client.resourced(LARGE_STR, present, build_handle_array(present)).await;
         assert_matches!(result, Err(fidl::Error::LargeMessage64Handles));
     })
     .await
@@ -464,7 +464,7 @@ async fn overflowing_resourced_64_handles_small_async() {
     run_client_async(SMALL_STR, |client| async move {
         let present = 64;
         let (out_str, out_present_handles, out_handles) =
-            client.resourced(SMALL_STR, present, &mut build_handle_array(present)).await.unwrap();
+            client.resourced(SMALL_STR, present, build_handle_array(present)).await.unwrap();
 
         assert_eq!(&out_str, SMALL_STR);
         assert_eq!(out_present_handles, present);

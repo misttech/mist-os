@@ -794,7 +794,17 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 		t.ElementType = &el
 		t.Fidl = fmt.Sprintf("fidl::encoding::Array<%s, %d>", el.Fidl, *val.ElementCount)
 		t.Owned = fmt.Sprintf("[%s; %d]", el.Owned, *val.ElementCount)
-		t.Param = fmt.Sprintf("&mut [%s; %d]", el.Param, *val.ElementCount)
+		switch val.ElementType.Kind {
+		case fidlgen.StringType, fidlgen.HandleType, fidlgen.ArrayType, fidlgen.VectorType:
+			if el.IsResourceType() {
+				t.Param = t.Owned
+			} else {
+				t.Param = "&" + t.Owned
+			}
+		default:
+			// TODO(fxbug.dev/54368): This is the old type. Remove once the migration is done.
+			t.Param = fmt.Sprintf("&mut [%s; %d]", el.Param, *val.ElementCount)
+		}
 	case fidlgen.VectorType:
 		el := c.compileType(*val.ElementType)
 		t.ElementType = &el
@@ -896,11 +906,20 @@ func convertParamToEncodeExpr(v string, t Type) string {
 	case fidlgen.PrimitiveType, fidlgen.StringType, fidlgen.HandleType, fidlgen.RequestType:
 		return v
 	case fidlgen.ArrayType:
-		owned := convertMutRefParamToOwned(v, t)
-		if t.IsResourceType() {
-			return "&mut " + owned
+		switch t.ElementType.Kind {
+		case fidlgen.StringType, fidlgen.HandleType, fidlgen.ArrayType, fidlgen.VectorType:
+			if t.IsResourceType() {
+				return "&mut " + v
+			}
+			return v
+		default:
+			// TODO(fxbug.dev/54368): This is for the old type. Remove once the migration is done.
+			owned := convertMutRefParamToOwned(v, t)
+			if t.IsResourceType() {
+				return "&mut " + owned
+			}
+			return "&" + owned
 		}
-		return "&" + owned
 	case fidlgen.VectorType:
 		if t.ElementType.Kind == fidlgen.PrimitiveType {
 			return v
