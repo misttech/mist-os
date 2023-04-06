@@ -7,9 +7,7 @@
 use core::fmt::{Debug, Display, Formatter};
 
 use net_types::{
-    ip::{
-        GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither,
-    },
+    ip::{GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4Addr, Ipv6Addr, Subnet, SubnetEither},
     SpecifiedAddr,
 };
 
@@ -59,6 +57,15 @@ pub struct AddableEntry<A: IpAddress, D> {
     metric: AddableMetric,
 }
 
+// A mirror image of `AddableEntry` whose fields are public, allowing the entry
+// to be decomposed into its constituent parts.
+pub(super) struct DecomposedAddableEntry<A: IpAddress, D> {
+    pub(super) subnet: Subnet<A>,
+    pub(super) device: Option<D>,
+    pub(super) gateway: Option<SpecifiedAddr<A>>,
+    pub(super) metric: AddableMetric,
+}
+
 impl<D, A: IpAddress> AddableEntry<A, D> {
     /// Creates a new [`AddableEntry`] with a specified gateway.
     pub fn with_gateway(
@@ -74,6 +81,12 @@ impl<D, A: IpAddress> AddableEntry<A, D> {
     pub fn without_gateway(subnet: Subnet<A>, device: D, metric: AddableMetric) -> Self {
         Self { subnet, device: Some(device), gateway: None, metric }
     }
+
+    /// Convert the [`AddableEntry`] into a [`DecomposedAddableEntry`].
+    pub(super) fn decompose(self) -> DecomposedAddableEntry<A, D> {
+        let AddableEntry { subnet, device, gateway, metric } = self;
+        DecomposedAddableEntry { subnet, device, gateway, metric }
+    }
 }
 
 /// An IPv4 forwarding entry or an IPv6 forwarding entry.
@@ -82,13 +95,6 @@ impl<D, A: IpAddress> AddableEntry<A, D> {
 pub enum AddableEntryEither<D> {
     V4(AddableEntry<Ipv4Addr, D>),
     V6(AddableEntry<Ipv6Addr, D>),
-}
-
-pub(crate) struct DecomposedAddableEntryEither<D> {
-    pub(crate) subnet: SubnetEither,
-    pub(crate) device: Option<D>,
-    pub(crate) gateway: Option<IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>>>,
-    pub(crate) metric: AddableMetric,
 }
 
 impl<D> AddableEntryEither<D> {
@@ -101,28 +107,6 @@ impl<D> AddableEntryEither<D> {
             }
             SubnetEither::V6(subnet) => {
                 AddableEntry::without_gateway(subnet, device, metric).into()
-            }
-        }
-    }
-
-    /// Decomposes the `AddableEntryEither` into it's constituent parts:
-    pub(crate) fn decompose(self) -> DecomposedAddableEntryEither<D> {
-        match self {
-            AddableEntryEither::V4(AddableEntry { subnet, device, gateway, metric }) => {
-                DecomposedAddableEntryEither {
-                    subnet: subnet.into(),
-                    device,
-                    gateway: gateway.map(|gateway| gateway.into()),
-                    metric,
-                }
-            }
-            AddableEntryEither::V6(AddableEntry { subnet, device, gateway, metric }) => {
-                DecomposedAddableEntryEither {
-                    subnet: subnet.into(),
-                    device,
-                    gateway: gateway.map(|gateway| gateway.into()),
-                    metric,
-                }
             }
         }
     }

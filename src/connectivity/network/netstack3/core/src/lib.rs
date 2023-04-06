@@ -529,26 +529,13 @@ pub fn add_route<NonSyncCtx: NonSyncContext>(
     entry: ip::types::AddableEntryEither<DeviceId<NonSyncCtx>>,
 ) -> Result<(), ip::forwarding::AddRouteError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-
-    let ip::types::DecomposedAddableEntryEither { subnet, device, gateway, metric } =
-        entry.decompose();
-    match (device, gateway) {
-        (Some(device), None) => map_addr_version!(
-            subnet: SubnetEither;
-            crate::ip::forwarding::add_device_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, device, metric),
-            crate::ip::forwarding::add_device_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, device, metric)
-        )
-        .map_err(From::from),
-        (None, Some(next_hop)) => {
-            let next_hop = next_hop.into();
-            map_addr_version!(
-                (subnet: SubnetEither, next_hop: IpAddr);
-                crate::ip::forwarding::add_gateway_route::<Ipv4, _, _>(&mut sync_ctx, ctx, subnet, next_hop, metric),
-                crate::ip::forwarding::add_gateway_route::<Ipv6, _, _>(&mut sync_ctx, ctx, subnet, next_hop, metric),
-                unreachable!()
-            )
+    match entry {
+        ip::types::AddableEntryEither::V4(entry) => {
+            ip::forwarding::add_route::<Ipv4, _, _>(&mut sync_ctx, ctx, entry)
         }
-        x => todo!("TODO(https://fxbug.dev/96680): support setting gateway route with device; (device, gateway) = {:?}", x),
+        ip::types::AddableEntryEither::V6(entry) => {
+            ip::forwarding::add_route::<Ipv6, _, _>(&mut sync_ctx, ctx, entry)
+        }
     }
 }
 
@@ -576,6 +563,7 @@ mod tests {
         ip::{Ip, Ipv4, Ipv6},
         Witness,
     };
+    use test_case::test_case;
 
     use super::*;
     use crate::{
@@ -668,7 +656,9 @@ mod tests {
     }
 
     #[ip_test]
-    fn add_gateway_route<I: Ip + TestIpExt>() {
+    #[test_case(false; "without_specified_device")]
+    #[test_case(true; "with_specified_device")]
+    fn add_gateway_route<I: Ip + TestIpExt>(should_specify_device: bool) {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             Ctx::new_with_builder(crate::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
@@ -679,6 +669,15 @@ mod tests {
             |()| net_subnet_v6!("::0a00:0000/112"),
         );
 
+        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
+            &sync_ctx,
+            I::FAKE_CONFIG.local_mac,
+            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+        let gateway_device = should_specify_device.then_some(device_id.clone());
+
         // Attempt to add the gateway route when there is no known route to the
         // gateway.
         assert_eq!(
@@ -687,7 +686,7 @@ mod tests {
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
-                    None,
+                    gateway_device.clone(),
                     I::FAKE_CONFIG.remote_ip.into(),
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))
@@ -696,13 +695,6 @@ mod tests {
         );
 
         // Then, add a route to the gateway, and try again, expecting success.
-        let device_id: DeviceId<_> = crate::device::add_ethernet_device(
-            &sync_ctx,
-            I::FAKE_CONFIG.local_mac,
-            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .into();
         assert_eq!(
             crate::add_route(
                 &mut sync_ctx,
@@ -721,7 +713,7 @@ mod tests {
                 &mut non_sync_ctx,
                 AddableEntryEither::from(AddableEntry::with_gateway(
                     gateway_subnet,
-                    None,
+                    gateway_device,
                     I::FAKE_CONFIG.remote_ip.into(),
                     AddableMetric::ExplicitMetric(RawMetric(0))
                 ))

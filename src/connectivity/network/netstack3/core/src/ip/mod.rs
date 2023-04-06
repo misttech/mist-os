@@ -57,7 +57,7 @@ use crate::{
     context::{CounterContext, EventContext, InstantContext, NonTestCtxMarker, TimerHandler},
     data_structures::token_bucket::TokenBucket,
     device::{AnyDevice, DeviceId, DeviceIdContext, FrameDestination, Id, StrongId, WeakDeviceId},
-    error::{ExistsError, NotFoundError},
+    error::NotFoundError,
     ip::{
         device::{state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext},
         forwarding::{Destination, ForwardingTable, IpForwardingDeviceContext, NextHop},

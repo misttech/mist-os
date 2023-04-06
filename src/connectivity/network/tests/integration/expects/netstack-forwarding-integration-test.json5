@@ -9,11 +9,5 @@
                 "*",
             ],
         },
-        {
-            type: "expect_failure_with_err_logs",
-            matchers: [
-                "forwarding_ns3*",
-            ],
-        },
     ],
 }
