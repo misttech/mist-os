@@ -12,8 +12,11 @@ Usage:
 """
 
 import argparse
+import dataclasses
 import filecmp
+import glob
 import os
+import re
 import subprocess
 import shlex
 import sys
@@ -220,6 +223,13 @@ def remove_working_dir_abspaths(line: str, build_subdir: str) -> str:
                         '').replace(canonical_working_dir + os.path.sep, '')
 
 
+def _file_lines_matching(path: str, substr: str) -> Iterable[str]:
+    with open(path) as f:
+        for line in f:
+            if substr in line:
+                yield line
+
+
 def _transform_file_by_lines(
         src: str, dest: str, line_transform: Callable[[str], str]):
     with open(src) as f:
@@ -271,6 +281,181 @@ def _should_retry_remote_action(status: cl_utils.SubprocessResult) -> bool:
     return status.returncode in _RETRIABLE_REWRAPPER_STATUSES
 
 
+def _reproxy_log_dir() -> str:
+    # Set by build/rbe/fuchsia-reproxy-wrap.sh.
+    return os.env.get("RBE_reproxy_log_dir", None)
+
+
+def _rewrapper_log_dir() -> str:
+    # Set by build/rbe/fuchsia-reproxy-wrap.sh.
+    return os.env.get("RBE_log_dir", None)
+
+
+@dataclasses.dataclass
+class ReproxyLogEntry(object):
+    execution_id: str
+    action_digest: str
+    # add more useful fields as needed
+
+
+def _remove_prefix(text: str, prefix: str) -> str:
+    # Like string.removeprefix() in Python 3.9+
+    return text[len(prefix):] if text.startswith(prefix) else text
+
+
+def _remove_suffix(text: str, suffix: str) -> str:
+    # Like string.removesuffix() in Python 3.9+
+    return text[:-len(suffix)] if text.endswith(suffix) else text
+
+
+def _extract_proto_field_value(line: str, field_name: str) -> str:
+    return _remove_prefix(line, field_name + ':').strip(' "')
+
+
+def _parse_reproxy_log_record_lines(lines: Iterable[str]) -> ReproxyLogEntry:
+    """Extremely crude extraction of data from a .rrpl file.
+
+    Args:
+      lines: text from a rewrapper --action_log file
+
+    TODO: properly parse reclient proxy.LogRecord textproto, which
+      requires protoc -> .pb2.py from .protos from various sources.
+      See build/rbe/proto/refresh.sh.
+    """
+    execution_id = None
+    action_digest = None
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("execution_id:"):
+            execution_id = _extract_proto_field_value(stripped, "execution_id")
+        if stripped.startswith("action_digest:"):
+            action_digest = _extract_proto_field_value(
+                stripped, "action_digest")
+    return ReproxyLogEntry(
+        execution_id=execution_id,
+        action_digest=action_digest,
+    )
+
+
+def _parse_rewrapper_action_log(log: str) -> ReproxyLogEntry:
+    with open(log) as f:
+        return _parse_reproxy_log_record_lines(f.readlines())
+
+
+def _diagnose_fail_to_dial(line: str):
+    # Check connection to reproxy.
+    if "Fail to dial" in line:
+        print(line)
+        msg(
+            f'''"Fail to dial" could indicate that reproxy is not running.
+`reproxy` is launched automatically by `fx build`.
+If you are manually running a remote-wrapped build step,
+you may need to wrap your build command with:
+
+  {fuchsia.REPROXY_WRAP} -- command...
+
+'Proxy started successfully.' indicates that reproxy is running.
+''')
+
+
+def _diagnose_rbe_permissions(line: str):
+    # Check for permissions issues.
+    if "Error connecting to remote execution client: rpc error: code = PermissionDenied" in line:
+        print(line)
+        msg(
+            f'''You might not have permssion to access the RBE instance.
+Contact fuchsia-build-team@google.com for support.
+''')
+
+
+_REPROXY_ERROR_MISSING_FILE_RE = re.compile(
+    "Status:LocalErrorResultStatus.*Err:stat ([^:]+): no such file or directory"
+)
+
+
+def _diagnose_missing_input_file(line: str):
+    # Check for missing files.
+    # TODO(b/201697587): surface this diagnostic from rewrapper
+    match = _REPROXY_ERROR_MISSING_FILE_RE.match(line)
+    if match:
+        filename = match.group(1)
+        print(line)
+        if filename.startswith("out/"):
+            description = "generated file"
+        else:
+            description = "source"
+        msg(
+            f"Possibly missing a local input file for uploading: {filename} ({description})"
+        )
+
+
+def _diagnose_reproxy_error_line(line: str):
+    for check in (
+            _diagnose_fail_to_dial,
+            _diagnose_rbe_permissions,
+            _diagnose_missing_input_file,
+    ):
+        check(line)
+
+
+def analyze_rbe_logs(rewrapper_pid: int, action_log: str = None):
+    """Attempt to explain failure by examining various logs.
+
+    Prints additional diagnostics to stdout.
+
+    Args:
+      rewrapper_pid: process id of the failed rewrapper invocation.
+      action_log: The .rrpl file from `rewrapper --action_log=LOG`,
+        which is a proxy.LogRecord textproto.
+    """
+    # See build/rbe/fuchsia-reproxy-wrap.sh for the setup of these
+    # environment variables.
+    reproxy_logdir = _reproxy_log_dir()
+    if not reproxy_logdir:
+        return  # give up
+
+    rewrapper_logdir = _rewrapper_log_dir()
+    if not rewrapper_logdir:
+        return  # give up
+
+    # The reproxy.ERROR symlink is stable during a build.
+    reproxy_errors = os.path.join(reproxy_logdir, "reproxy.ERROR")
+
+    # Logs are named:
+    #   rewrapper.{host}.{user}.log.{severity}.{date}-{time}.{pid}
+    # The "rewrapper.{severity}" symlinks are useless because
+    # the link destination is constantly being updated during a build.
+    rewrapper_log_glob = os.path.join(
+        rewrapper_logdir, f"rewrapper.*.{rewrapper_pid}")
+    rewrapper_logs = glob.glob(rewrapper_log_glob)
+    if rewrapper_logs:
+        msg("See rewrapper logs:")
+        for log in rewrapper_logs:
+            print("  " + log)
+        print()  # blank line
+
+    if not os.path.isfile(action_log):
+        return
+
+    msg(f"Action log: {action_log}")
+    rewrapper_info = _parse_rewrapper_action_log(action_log)
+    execution_id = rewrapper_info.execution_id
+    action_digest = rewrapper_info.action_digest
+    print(f"  execution_id: {execution_id}")
+    print(f"  action_digest: {action_digest}")
+    print()  # blank line
+
+    if not os.path.isfile(reproxy_errors):
+        return
+
+    msg(f"Scanning {reproxy_errors} for clues:")
+    # Find the lines that mention this execution_id
+    for line in _file_lines_matching(reproxy_errors, execution_id):
+        _diagnose_reproxy_error_line(line)
+
+    # TODO: further analyze remote failures in --action_log (.rrpl)
+
+
 class RemoteAction(object):
     """RemoteAction represents a command that is to be executed remotely."""
 
@@ -280,7 +465,9 @@ class RemoteAction(object):
         command: Sequence[str],
         options: Sequence[str] = None,
         exec_root: Optional[str] = None,
-        working_dir: str = None,
+        working_dir: Optional[str] = None,
+        cfg: Optional[str] = None,
+        exec_strategy: Optional[str] = None,
         inputs: Sequence[str] = None,
         output_files: Sequence[str] = None,
         output_dirs: Sequence[str] = None,
@@ -288,6 +475,7 @@ class RemoteAction(object):
         auto_reproxy: bool = False,
         remote_log: str = "",
         fsatrace_path: str = "",
+        diagnose_nonzero: bool = False,
     ):
         """RemoteAction constructor.
 
@@ -295,6 +483,8 @@ class RemoteAction(object):
           rewrapper: path to rewrapper binary
           options: rewrapper options (not already covered by other parameters)
           command: the command to execute remotely
+          cfg: rewrapper config file (optional)
+          exec_strategy: rewrapper --exec_strategy (optional)
           exec_root: an absolute path location that is parent to all of this
             remote action's inputs and outputs.
           inputs: inputs needed for remote execution, relative to the current working dir.
@@ -322,10 +512,15 @@ class RemoteAction(object):
                 the trace name is "${output_files[0]}.remote-fsatrace"
               else:
                 the trace name "rbe-action-output.remote-fsatrace"
+          diagnose_nonzero: if True, attempt to examine logs and determine
+            a cause of error.
         """
         self._rewrapper = rewrapper
+        self._config = cfg  # can be None
+        self._exec_strategy = exec_strategy  # can be None
         self._save_temps = save_temps
         self._auto_reproxy = auto_reproxy
+        self._diagnose_nonzero = diagnose_nonzero
         self._working_dir = os.path.abspath(working_dir or os.curdir)
         self._exec_root = os.path.abspath(exec_root or PROJECT_ROOT)
         # Parse and strip out --remote-* flags from command.
@@ -359,8 +554,16 @@ class RemoteAction(object):
         self._cleanup_files = []
 
     @property
-    def exec_root(self) -> str:
+    def exec_root(self) -> Optional[str]:
         return self._exec_root
+
+    @property
+    def exec_strategy(self) -> Optional[str]:
+        return self._exec_strategy
+
+    @property
+    def config(self) -> str:
+        return self._config
 
     @property
     def _default_auxiliary_file_basename(self) -> str:
@@ -396,15 +599,33 @@ class RemoteAction(object):
         return self._fsatrace_path + '.so'
 
     @property
+    def _action_log(self) -> str:
+        # The --action_log is a single entry of the cumulative log
+        # of remote actions in the reproxy_*.rrpl file.
+        # The information contained in this log is the same,
+        # but is much easier to find than in the cumulative log.
+        return self._default_auxiliary_file_basename + '.rrpl'
+
+    @property
     def local_command(self) -> Sequence[str]:
         """This is the original command that would have been run locally.
         All of the --remote-* flags have been removed at this point.
         """
         return auto_env_prefix_command(self._remote_command)
 
+    def _generate_options(self) -> Iterable[str]:
+        if self.config:
+            yield '--cfg'
+            yield self.config
+
+        if self.exec_strategy:
+            yield f'--exec_strategy={self.exec_strategy}'
+
+        yield from self._options
+
     @property
     def options(self) -> Sequence[str]:
-        return self._options
+        return list(self._generate_options())
 
     @property
     def auto_reproxy(self) -> bool:
@@ -421,6 +642,10 @@ class RemoteAction(object):
     @property
     def remote_disable(self) -> bool:
         return self._remote_disable
+
+    @property
+    def diagnose_nonzero(self) -> bool:
+        return self._diagnose_nonzero
 
     def _relativize_path_to_exec_root(self, path: str) -> str:
         return relativize_to_exec_root(
@@ -477,7 +702,13 @@ class RemoteAction(object):
     def _generate_rewrapper_command_prefix(self) -> Iterable[str]:
         yield self._rewrapper
         yield f"--exec_root={self.exec_root}"
-        yield from self._options
+
+        if self.diagnose_nonzero:
+            # The .rrpl contains detailed information for improved
+            # diagnostics and troubleshooting.
+            yield f"--action_log={self._action_log}"
+
+        yield from self.options
 
         if self._inputs:
             # TODO(http://fxbug.dev/124186): use --input_list_paths only if list is sufficiently long
@@ -585,8 +816,23 @@ class RemoteAction(object):
             # Under certain error conditions, do a one-time retry
             # for flake/fault-tolerance.
             if _should_retry_remote_action(result):
-                return self._run_maybe_remotely().returncode
+                result = self._run_maybe_remotely()
 
+            if result.returncode == 0:  # success, nothing to see
+                return result.returncode
+            if not self.diagnose_nonzero:
+                return result.returncode
+
+            # Not an RBE issue if local execution failed.
+            exec_strategy = self.exec_strategy or "remote"  # rewrapper default
+            if exec_strategy in {"local", "remote_local_fallback"}:
+                return result.returncode
+
+            # Otherwise, continue to analyze log files
+            analyze_rbe_logs(
+                rewrapper_pid=result.pid,
+                action_log=self._action_log,
+            )
             return result.returncode
 
         finally:
@@ -838,6 +1084,12 @@ def inherit_main_arg_parser_flags(
         help="rewrapper config file.",
     )
     group.add_argument(
+        "--exec_strategy",
+        type=str,
+        choices=['local', 'remote', 'remote_local_fallback', 'racing'],
+        help="rewrapper execution strategy.",
+    )
+    group.add_argument(
         "--bindir",
         type=str,
         default=default_bindir,
@@ -900,6 +1152,13 @@ Otherwise, BASE will default to the first output file named.""",
         help=
         "In 'compare' mode, run both locally and remotely (sequentially) and compare outputs.  Exit non-zero (failure) if any of the outputs differs between the local and remote execution, even if those executions succeeded.  When used with --fsatrace-path, also compare file access traces.",
     )
+    group.add_argument(
+        "--diagnose-nonzero",
+        action="store_true",
+        default=False,
+        help=
+        """On nonzero exit statuses, attempt to diagnose potential RBE issues.  This scans various reproxy logs for information, and can be noisy."""
+    )
     # Positional args are the command and arguments to run.
     parser.add_argument(
         "command", nargs="*", help="The command to run remotely")
@@ -927,12 +1186,15 @@ def remote_action_from_args(
     """Construct a remote action based on argparse parameters."""
     return RemoteAction(
         rewrapper=os.path.join(main_args.bindir, "rewrapper"),
-        options=['--cfg', main_args.cfg] + (remote_options or []),
+        options=(remote_options or []),
         command=command or main_args.command,
+        cfg=main_args.cfg,
+        exec_strategy=main_args.exec_strategy,
         save_temps=main_args.save_temps,
         auto_reproxy=main_args.auto_reproxy,
         remote_log=main_args.remote_log,
         fsatrace_path=main_args.fsatrace_path,
+        diagnose_nonzero=main_args.diagnose_nonzero,
         **kwargs,
     )
 

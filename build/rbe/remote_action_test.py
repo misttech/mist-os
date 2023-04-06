@@ -5,6 +5,7 @@
 
 import argparse
 import contextlib
+import glob
 import io
 import os
 import subprocess
@@ -21,14 +22,6 @@ import cl_utils
 def _write_file_contents(path: str, contents: str):
     with open(path, 'w') as f:
         f.write(contents)
-
-
-def _fake_subprocess_result(returncode: int, stdout=None, stderr=None):
-    return cl_utils.SubprocessResult(
-        returncode=returncode,
-        stdout=stdout or [],
-        stderr=stderr or [],
-    )
 
 
 class FileMatchTests(unittest.TestCase):
@@ -130,6 +123,27 @@ class ExpandCommonFilesBetweenDirs(unittest.TestCase):
                             ('a/x', 'b/x'),
                             ('a/y/z', 'b/y/z'),
                         ])
+
+
+class FileLinesMatchingTests(unittest.TestCase):
+
+    def test_empty(self):
+        with mock.patch('builtins.open',
+                        mock.mock_open(read_data='')) as mock_file:
+            self.assertEqual(
+                list(
+                    remote_action._file_lines_matching(
+                        'log.txt', 'never-match')),
+                [],
+            )
+
+    def test_matches(self):
+        with mock.patch('builtins.open',
+                        mock.mock_open(read_data='ab\nbc\ncd\n')) as mock_file:
+            self.assertEqual(
+                list(remote_action._file_lines_matching('file.txt', 'c')),
+                ['bc\n', 'cd\n'],
+            )
 
 
 class ReclientCanonicalWorkingDirTests(unittest.TestCase):
@@ -276,6 +290,9 @@ class RemoteActionMainParserTests(unittest.TestCase):
         self.assertEqual(main_args.remote_log, '')
         self.assertFalse(main_args.save_temps)
         self.assertFalse(main_args.auto_reproxy)
+        self.assertEqual(main_args.fsatrace_path, '')
+        self.assertFalse(main_args.compare)
+        self.assertFalse(main_args.diagnose_nonzero)
         self.assertEqual(main_args.command, ['echo', 'hello'])
 
     def test_cfg(self):
@@ -340,6 +357,14 @@ class RemoteActionMainParserTests(unittest.TestCase):
         main_args, other = p.parse_known_args(
             ['--label=//build/this:that', '--', 'echo'])
         self.assertEqual(main_args.label, '//build/this:that')
+
+    def test_diagnose_nonzero(self):
+        p = self._make_main_parser()
+        main_args, other = p.parse_known_args(
+            ['--diagnose-nonzero', '--', 'echo'])
+        self.assertTrue(main_args.diagnose_nonzero)
+        action = remote_action.remote_action_from_args(main_args)
+        self.assertTrue(action.diagnose_nonzero)
 
     def test_remote_log_named(self):
         p = self._make_main_parser()
@@ -543,7 +568,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                                    return_value=0) as mock_local_launch:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_run_maybe_remotely',
-                                       return_value=_fake_subprocess_result(
+                                       return_value=cl_utils.SubprocessResult(
                                            0)) as mock_remote_launch:
                     with mock.patch.object(
                             remote_action.RemoteAction,
@@ -594,7 +619,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                                    return_value=0) as mock_local_launch:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_run_maybe_remotely',
-                                       return_value=_fake_subprocess_result(
+                                       return_value=cl_utils.SubprocessResult(
                                            0)) as mock_remote_launch:
                     with mock.patch.object(
                             remote_action.RemoteAction,
@@ -652,7 +677,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
                                    return_value=0) as mock_local_launch:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_run_maybe_remotely',
-                                       return_value=_fake_subprocess_result(
+                                       return_value=cl_utils.SubprocessResult(
                                            0)) as mock_remote_launch:
                     with mock.patch.object(remote_action, '_text_diff',
                                            return_value=0) as mock_trace_diff:
@@ -856,7 +881,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
             mock_input_list_file.assert_called_once()
             with mock.patch.object(
                     remote_action.RemoteAction, '_run_maybe_remotely',
-                    return_value=_fake_subprocess_result(0)) as mock_call:
+                    return_value=cl_utils.SubprocessResult(0)) as mock_call:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_cleanup') as mock_cleanup:
                     self.assertEqual(action.run(), 0)
@@ -876,7 +901,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         self.assertTrue(action.save_temps)
         with mock.patch.object(
                 remote_action.RemoteAction, '_run_maybe_remotely',
-                return_value=_fake_subprocess_result(0)) as mock_call:
+                return_value=cl_utils.SubprocessResult(0)) as mock_call:
             with mock.patch.object(remote_action.RemoteAction,
                                    '_cleanup') as mock_cleanup:
                 self.assertEqual(action.run(), 0)
@@ -909,7 +934,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         for exit_code in (1, 2):
             with mock.patch.object(remote_action.RemoteAction,
                                    '_run_maybe_remotely',
-                                   return_value=_fake_subprocess_result(
+                                   return_value=cl_utils.SubprocessResult(
                                        exit_code)) as mock_call:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_cleanup') as mock_cleanup:
@@ -931,7 +956,7 @@ class RemoteActionConstructionTests(unittest.TestCase):
         with mock.patch.object(
                 remote_action.RemoteAction,
                 '_run_maybe_remotely',
-                return_value=_fake_subprocess_result(
+                return_value=cl_utils.SubprocessResult(
                     returncode=2, stderr=['ERROR: file not found: /bin/smash',
                                           'going home now']),
         ) as mock_call:
@@ -958,9 +983,9 @@ class RemoteActionConstructionTests(unittest.TestCase):
                     '_run_maybe_remotely',
                     side_effect=[
                         # If at first you don't succeed,
-                        _fake_subprocess_result(exit_code),
+                        cl_utils.SubprocessResult(exit_code),
                         # try, try again (and succeed).
-                        _fake_subprocess_result(0),
+                        cl_utils.SubprocessResult(0),
                     ]) as mock_call:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_cleanup') as mock_cleanup:
@@ -986,9 +1011,9 @@ class RemoteActionConstructionTests(unittest.TestCase):
                     '_run_maybe_remotely',
                     side_effect=[
                         # If at first you don't succeed,
-                        _fake_subprocess_result(exit_code),
+                        cl_utils.SubprocessResult(exit_code),
                         # try, try again (and fail again).
-                        _fake_subprocess_result(exit_code),
+                        cl_utils.SubprocessResult(exit_code),
                     ]) as mock_call:
                 with mock.patch.object(remote_action.RemoteAction,
                                        '_cleanup') as mock_cleanup:
@@ -997,6 +1022,183 @@ class RemoteActionConstructionTests(unittest.TestCase):
             mock_cleanup.assert_called_once()
             # expect called twice, second time is the retry
             self.assertEqual(len(mock_call.call_args_list), 2)
+
+
+class RbeDiagnosticsTests(unittest.TestCase):
+
+    def _make_action(self, **kwargs):
+        command = ['echo', 'hello']
+        return remote_action.RemoteAction(
+            rewrapper='/path/to/rewrapper',
+            command=command,
+            exec_root='/path/to/project/root',
+            working_dir='/path/to/project/root/build/stuff/here',
+            **kwargs,
+        )
+
+    def test_analyze_conditions_positive(self):
+        action = self._make_action(diagnose_nonzero=True)
+
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(1)) as mock_run:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                with mock.patch.object(remote_action,
+                                       'analyze_rbe_logs') as mock_analyze:
+                    self.assertEqual(action.run(), 1)
+
+        mock_cleanup.assert_called_once()
+        mock_run.assert_called_once()
+        mock_analyze.assert_called_once()
+        args, kwargs = mock_analyze.call_args_list[0]
+        self.assertEqual(kwargs["action_log"], action._action_log)
+
+    def test_analyzing_not_requested(self):
+        action = self._make_action(diagnose_nonzero=False)
+
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(1)) as mock_run:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                with mock.patch.object(remote_action,
+                                       'analyze_rbe_logs') as mock_analyze:
+                    self.assertEqual(action.run(), 1)
+
+        mock_cleanup.assert_called_once()
+        mock_run.assert_called_once()
+        mock_analyze.assert_not_called()
+
+    def test_not_analyzing_on_success(self):
+        action = self._make_action(diagnose_nonzero=True)
+
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(0)) as mock_run:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                with mock.patch.object(remote_action,
+                                       'analyze_rbe_logs') as mock_analyze:
+                    self.assertEqual(action.run(), 0)
+
+        mock_cleanup.assert_called_once()
+        mock_run.assert_called_once()
+        mock_analyze.assert_not_called()
+
+    def test_not_analyzing_local_execution(self):
+        action = self._make_action(diagnose_nonzero=True, exec_strategy="local")
+
+        with mock.patch.object(
+                remote_action.RemoteAction, '_run_maybe_remotely',
+                return_value=cl_utils.SubprocessResult(1)) as mock_run:
+            with mock.patch.object(remote_action.RemoteAction,
+                                   '_cleanup') as mock_cleanup:
+                with mock.patch.object(remote_action,
+                                       'analyze_rbe_logs') as mock_analyze:
+                    self.assertEqual(action.run(), 1)
+
+        mock_cleanup.assert_called_once()
+        mock_run.assert_called_once()
+        mock_analyze.assert_not_called()
+
+    def test_analyze_flow(self):
+        pid = 6789
+        action_log = 'obj/my_action.rrpl'
+        fake_rewrapper_logs = [
+            f'/noisy/log/rewrapper.where.who.log.INFO.when.{pid}',
+            f'/noisy/log/rewrapper.where.who.log.ERROR.when.{pid}',
+        ]
+        unnamed_mocks = [
+            mock.patch.object(
+                remote_action,
+                '_reproxy_log_dir',
+                return_value='/path/to/tmp/reproxy.999999'),
+            mock.patch.object(
+                remote_action,
+                '_rewrapper_log_dir',
+                return_value='/path/to/tmp/reproxy.999999/wrapper/logz'),
+            mock.patch.object(os.path, 'isfile', return_value=True),
+        ]
+        with contextlib.ExitStack() as stack:
+            for m in unnamed_mocks:
+                stack.enter_context(m)
+
+            with mock.patch.object(
+                    glob, 'glob',
+                    return_value=fake_rewrapper_logs) as mock_glob:
+                with mock.patch.object(
+                        remote_action,
+                        '_parse_rewrapper_action_log') as mock_parse_action_log:
+                    with mock.patch.object(remote_action,
+                                           '_file_lines_matching',
+                                           return_value=['this is interesting'
+                                                        ]) as mock_read_log:
+                        with mock.patch.object(remote_action,
+                                               '_diagnose_reproxy_error_line'
+                                              ) as mock_diagnose_line:
+                            remote_action.analyze_rbe_logs(
+                                rewrapper_pid=pid,
+                                action_log=action_log,
+                            )
+        mock_glob.assert_called_once()
+        mock_read_log.assert_called_once()
+        mock_parse_action_log.assert_called_with(action_log)
+        mock_diagnose_line.assert_called()
+
+    def test_parse_reproxy_log_record_lines(self):
+        exec_id = "xx-yy-zzzz"
+        digest = "2afd98ae7274456b2bfc208e10f4cbe75fca88c2c41e352e57cb6b9ad840bf64/144"
+        log_lines = f"""
+command:  {{
+        identifiers:  {{
+                command_id:  "8ea55c85-0ae36078"
+                invocation_id:  "979eedda-4643-45da-af15-0d2f8531ba98"
+                tool_name:  "re-client"
+                execution_id:  "{exec_id}"
+        }}
+}}
+remote_metadata:  {{
+        command_digest:  "e9d024e5dc99438b08f4592a09379e65146149821480e2057c7afc285d30f090/181"
+        action_digest:  "{digest}"
+}}
+        """.splitlines()
+        log_entry = remote_action._parse_reproxy_log_record_lines(log_lines)
+        self.assertEqual(log_entry.execution_id, exec_id)
+        self.assertEqual(log_entry.action_digest, digest)
+
+    def test_diagnose_uninteresting_log_line(self):
+        line = "This diagnostic does not appear interesting."
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            remote_action._diagnose_reproxy_error_line(line)
+        self.assertEqual(f.getvalue(), '')
+
+    def test_diagnose_fail_to_dial(self):
+        line = "Fail to dial something something unix:///path/to/reproxy.socket"
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            remote_action._diagnose_reproxy_error_line(line)
+        self.assertIn("reproxy is not running", f.getvalue())
+
+    def test_diagnose_rbe_permissions(self):
+        line = "Error connecting to remote execution client: rpc error: code = PermissionDenied.  You have no power here!"
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            remote_action._diagnose_reproxy_error_line(line)
+        self.assertIn(
+            "You might not have permssion to access the RBE instance",
+            f.getvalue())
+
+    def test_diagnose_missing_input_file(self):
+        path = "../oops/did/I/forget/this.file"
+        line = f"Status:LocalErrorResultStatus ... Err:stat {path}: no such file or directory"
+        f = io.StringIO()
+        with contextlib.redirect_stdout(f):
+            remote_action._diagnose_reproxy_error_line(line)
+        self.assertIn(
+            f"missing a local input file for uploading: {path} (source)",
+            f.getvalue())
 
 
 class MainTests(unittest.TestCase):

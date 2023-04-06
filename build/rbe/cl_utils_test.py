@@ -219,18 +219,21 @@ class SubprocessCallTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, ['hello'])
         self.assertEqual(result.stderr, [])
+        self.assertGreater(result.pid, 0)
 
     def test_success_quiet(self):
         result = cl_utils.subprocess_call(['echo', 'hello'], quiet=True)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(result.stdout, ['hello'])  # still captured
         self.assertEqual(result.stderr, [])
+        self.assertGreater(result.pid, 0)
 
     def test_failure(self):
         result = cl_utils.subprocess_call(['false'])
         self.assertEqual(result.returncode, 1)
         self.assertEqual(result.stdout, [])
         self.assertEqual(result.stderr, [])
+        self.assertGreater(result.pid, 0)
 
     def test_error(self):
         result = cl_utils.subprocess_call(['ls', '/does/not/exist'])
@@ -239,6 +242,7 @@ class SubprocessCallTests(unittest.TestCase):
         self.assertEqual(result.stdout, [])
         self.assertIn('No such file or directory', result.stderr[0])
         self.assertIn('/does/not/exist', result.stderr[0])
+        self.assertGreater(result.pid, 0)
 
 if __name__ == '__main__':
     unittest.main()

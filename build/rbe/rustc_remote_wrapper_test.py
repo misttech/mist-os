@@ -333,7 +333,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         rlib = 'obj/foo.rlib'
         deps = ['../foo/src/other.rs']
         depfile_contents = [d + ':' for d in deps]
-        remote_flag = '--exec_strategy=local'
+        remote_flag = '--some_forwarded_rewrapper_flag=value'  # not real
         command = [compiler, source, '-o', rlib, f'--remote-flag={remote_flag}']
         r = rustc_remote_wrapper.RustRemoteAction(
             ['--'] + command,

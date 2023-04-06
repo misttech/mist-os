@@ -7,7 +7,6 @@
 
 import asyncio
 import collections
-import dataclasses
 
 import io
 import os
@@ -140,11 +139,19 @@ def last_value_of_dict_flag(
 # The following code implements subprocess 'tee' behavior based on:
 # https://stackoverflow.com/questions/2996887/how-to-replicate-tee-behavior-in-python-when-using-subprocess
 
-@dataclasses.dataclass
 class SubprocessResult(object):
-    returncode: int
-    stdout: Sequence[str]  # lines
-    stderr: Sequence[str]  # lines
+
+    def __init__(self,
+                 returncode: int,
+                 stdout: Sequence[str] = None,  # lines
+                 stderr: Sequence[str] = None,  # lines
+                 # The process id may come in handy when looking for logs
+                 pid: int = None,
+                 ):
+        self.returncode = returncode
+        self.stdout = stdout or []
+        self.stderr = stderr or []
+        self.pid = pid if pid is not None else -1
 
 
 async def _read_stream(stream: io.TextIOBase, callback: Callable[[str], None]):
@@ -181,6 +188,7 @@ async def _stream_subprocess(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         **popen_kwargs)
+    pid = p.pid
 
     out_text = []
     err_text = []
@@ -201,6 +209,7 @@ async def _stream_subprocess(
         returncode=await p.wait(),
         stdout=out_text,
         stderr=err_text,
+        pid=pid,
     )
 
 
