@@ -92,11 +92,29 @@ def _fuchsia_product_assembly_impl(ctx):
         progress_message = "Product Assembly for %s" % ctx.label.name,
     )
 
+    cache_package_list = ctx.actions.declare_file(ctx.label.name + "/bazel_cache_package_manifests.list")
+    base_package_list = ctx.actions.declare_file(ctx.label.name + "/bazel_base_package_manifests.list")
+    ctx.actions.run(
+        outputs = [cache_package_list, base_package_list],
+        inputs = [out_dir],
+        executable = ctx.executable._create_package_manifest_list,
+        arguments = [
+            "--images-config",
+            out_dir.path + "/image_assembly.json",
+            "--cache-package-manifest-list",
+            cache_package_list.path,
+            "--base-package-manifest-list",
+            base_package_list.path,
+        ],
+    )
+
+    deps = [out_dir, ffx_isolate_dir, cache_package_list, base_package_list] + ffx_inputs
+
     return [
-        DefaultInfo(files = depset(direct = [out_dir, ffx_isolate_dir] + ffx_inputs)),
+        DefaultInfo(files = depset(direct = deps)),
         OutputGroupInfo(
             debug_files = depset([ffx_isolate_dir]),
-            all_files = depset([out_dir, ffx_isolate_dir] + ffx_inputs),
+            all_files = depset(deps),
         ),
         FuchsiaProductAssemblyInfo(
             product_assembly_out = out_dir,
@@ -133,6 +151,11 @@ fuchsia_product_assembly = rule(
         "_sdk_manifest": attr.label(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
+        ),
+        "_create_package_manifest_list": attr.label(
+            default = "//fuchsia/tools:create_package_manifest_list",
+            executable = True,
+            cfg = "exec",
         ),
     },
 )

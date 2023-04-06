@@ -45,6 +45,12 @@ py_binary(
     python_version = "PY3",
 )
 
+py_binary(
+    name = "create_package_manifest_list",
+    srcs = ["create_package_manifest_list.py"],
+    python_version = "PY3",
+)
+
 py_library(
     name = "fuchsia_task_lib",
     srcs = ["fuchsia_task_lib.py"],
