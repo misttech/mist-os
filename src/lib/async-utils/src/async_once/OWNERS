@@ -1,5 +1,4 @@
 include /src/connectivity/network/OWNERS
 include /src/developer/ffx/OWNERS
 
-# COMPONENT: NetworkStack
 # COMPONENT: Tools>ffx
