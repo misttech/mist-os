@@ -36,7 +36,8 @@ constexpr uint32_t kTelCtrlPlanePktMax = 2048;
 
 AtDevice::AtDevice(zx_device_t* device) : Device(device) {}
 
-#define DEV(c) static_cast<AtDevice*>(c)
+static inline constexpr AtDevice* DEV(void* ctx) { return static_cast<AtDevice*>(ctx); }
+
 static zx_protocol_device_t at_fake_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
@@ -44,11 +45,9 @@ static zx_protocol_device_t at_fake_device_ops = {
     },
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
-    .message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) -> zx_status_t {
-      return DEV(ctx)->DdkMessage(msg, txn);
-    },
+    .message = [](void* ctx, fidl_incoming_msg_t* msg,
+                  device_fidl_txn_t* txn) { return DEV(ctx)->DdkMessage(msg, txn); },
 };
-#undef DEV
 
 static void sent_fake_at_msg(zx::channel& channel, uint8_t* resp, uint32_t resp_size) {
   zx_status_t status;
@@ -63,7 +62,7 @@ void AtDevice::SnoopCtrlMsg(uint8_t* snoop_data, uint32_t snoop_data_len,
                             fidl_tel_snoop::wire::Direction direction) {
   if (GetCtrlSnoopChannel()) {
     fidl_tel_snoop::wire::QmiMessage msg;
-    uint32_t current_length =
+    size_t current_length =
         std::min(static_cast<std::size_t>(snoop_data_len), sizeof(msg.opaque_bytes));
     msg.is_partial_copy = snoop_data_len > current_length;
     msg.direction = direction;
@@ -85,7 +84,8 @@ void AtDevice::ReplyCtrlMsg(uint8_t* req, uint32_t req_size, uint8_t* resp, uint
   zxlogf(INFO, "at-fake-driver: req %u %u %u %u with len %u", req[0], req[1], req[2], req[3],
          req_size);
   if (0 == memcmp(req, kAtCmdReqAtdStr.c_str(), kAtCmdReqAtdStr.size())) {
-    resp_size = std::min(kAtCmdRespNoCarrier.size(), static_cast<std::size_t>(resp_size));
+    resp_size = static_cast<uint32_t>(
+        std::min(kAtCmdRespNoCarrier.size(), static_cast<std::size_t>(resp_size)));
     memcpy(resp, kAtCmdRespNoCarrier.c_str(), resp_size);
     zxlogf(INFO, "at-fake-driver: resp %u %u %u %u with len %u", resp[0], resp[1], resp[2], resp[3],
            resp_size);
@@ -93,13 +93,15 @@ void AtDevice::ReplyCtrlMsg(uint8_t* req, uint32_t req_size, uint8_t* resp, uint
     SnoopCtrlMsg(resp, resp_size, fidl_tel_snoop::wire::Direction::kFromModem);
 
   } else if (0 == memcmp(req, kAtCmdReqAtCgmi.c_str(), kAtCmdReqAtCgmi.size())) {
-    resp_size = std::min(kAtCmdRespManuId.size(), static_cast<std::size_t>(resp_size));
+    resp_size = static_cast<uint32_t>(
+        std::min(kAtCmdRespManuId.size(), static_cast<std::size_t>(resp_size)));
     memcpy(resp, kAtCmdRespManuId.c_str(), resp_size);
     sent_fake_at_msg(GetCtrlChannel(), resp, resp_size);
     SnoopCtrlMsg(resp, resp_size, fidl_tel_snoop::wire::Direction::kFromModem);
 
   } else if (0 == memcmp(req, kInvalidUnicodeRequest.c_str(), kInvalidUnicodeRequest.size())) {
-    resp_size = std::min(kInvalidUnicodeResponseSize, static_cast<std::size_t>(resp_size));
+    resp_size = static_cast<uint32_t>(
+        std::min(kInvalidUnicodeResponseSize, static_cast<std::size_t>(resp_size)));
     memcpy(resp, kInvalidUnicodeResponse, resp_size);
     sent_fake_at_msg(GetCtrlChannel(), resp, resp_size);
     SnoopCtrlMsg(resp, resp_size, fidl_tel_snoop::wire::Direction::kFromModem);
@@ -115,7 +117,8 @@ void AtDevice::ReplyCtrlMsg(uint8_t* req, uint32_t req_size, uint8_t* resp, uint
 
   } else {
     zxlogf(ERROR, "at-fake-driver: unexpected at msg received");
-    resp_size = std::min(kAtCmdRespErr.size(), static_cast<std::size_t>(resp_size));
+    resp_size =
+        static_cast<uint32_t>(std::min(kAtCmdRespErr.size(), static_cast<std::size_t>(resp_size)));
     memcpy(resp, kAtCmdRespErr.c_str(), resp_size);
     sent_fake_at_msg(GetCtrlChannel(), resp, resp_size);
     SnoopCtrlMsg(resp, resp_size, fidl_tel_snoop::wire::Direction::kFromModem);

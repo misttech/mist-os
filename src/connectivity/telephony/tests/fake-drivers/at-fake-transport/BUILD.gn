@@ -13,11 +13,6 @@ driver_bind_rules("at_fake_bind") {
   deps = [ "//src/devices/bind/fuchsia.test.platform" ]
 }
 
-group("at-fake-transport") {
-  testonly = true
-  deps = [ ":tests" ]
-}
-
 group("tests") {
   testonly = true
   deps = [ ":at_fake_bind_test" ]
@@ -47,9 +42,6 @@ fuchsia_driver("fake_at_driver-driver") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]
-
-  # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-conversion" ]
 }
 
 fuchsia_driver_component("fake_at_driver") {
@@ -58,4 +50,12 @@ fuchsia_driver_component("fake_at_driver") {
   deps = [ ":fake_at_driver-driver" ]
   info = "fake_at_driver-info.json"
   colocate = true
+}
+
+group("at-fake-transport") {
+  testonly = true
+  deps = [
+    ":fake_at_driver",
+    ":tests",
+  ]
 }

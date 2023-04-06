@@ -37,15 +37,16 @@ def main():
 
     args = parser.parse_args()
 
-    driver_list = args.driver_list.read().splitlines()
-    allowlist = args.allowlist.read().splitlines()
+    driver_list = args.driver_list.read().splitlines(keepends=True)
+    allowlist = args.allowlist.read().splitlines(keepends=True)
 
     output_name = os.path.realpath(args.output.name)
     allowlist_name = os.path.realpath(args.allowlist.name)
 
     full_allowlist = set(allowlist)
     if args.allowlist_arch_specific:
-        full_allowlist.update(args.allowlist_arch_specific.read().splitlines())
+        full_allowlist.update(
+            args.allowlist_arch_specific.read().splitlines(keepends=True))
 
     error = False
     extra_drivers = {
@@ -83,7 +84,7 @@ def main():
 
     new_allowlist = set(allowlist)
     new_allowlist.update(extra_drivers)
-    args.output.write("\n".join(sorted(new_allowlist)))
+    args.output.writelines(sorted(new_allowlist))
 
     if error:
         raise Exception("Error encountered")

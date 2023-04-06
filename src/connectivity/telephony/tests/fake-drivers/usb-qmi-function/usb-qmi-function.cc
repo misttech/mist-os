@@ -39,7 +39,7 @@ constexpr uint8_t kQmiHwMemUninitVal = 170;
 
 size_t FakeUsbQmiFunction::UsbFunctionInterfaceGetDescriptorsSize() { return descriptor_size_; }
 
-static void ReplyQmiMsg(const void* req, uint32_t req_size, void* resp, size_t resp_buf_size,
+static void ReplyQmiMsg(const void* req, size_t req_size, void* resp, size_t resp_buf_size,
                         size_t* resp_size) {
   memset(resp, kQmiHwMemUninitVal, resp_buf_size);  // uninitialized buffer have value of 170 in hw
   const uint8_t* msg = static_cast<const uint8_t*>(req);
