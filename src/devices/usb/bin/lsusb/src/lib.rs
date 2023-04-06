@@ -62,6 +62,9 @@ async fn list_device(
 
     let device_desc_buf = device
         .get_device_descriptor()
+        .on_timeout(std::time::Duration::from_millis(200), || {
+            Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+        })
         .await
         .context(format!("DeviceGetDeviceDescriptor failed for {}", devname))?;
 
@@ -79,14 +82,19 @@ async fn list_device(
 
     let speed = device
         .get_device_speed()
+        .on_timeout(std::time::Duration::from_millis(200), || {
+            Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+        })
         .await
         .context(format!("DeviceGetDeviceSpeed failed for {}", devname))?;
 
     let string_manu_desc = get_string_descriptor(device, device_desc.i_manufacturer)
+        .on_timeout(std::time::Duration::from_millis(200), || Err(format_err!("Timeout")))
         .await
         .context(format!("DeviceGetStringDescriptor failed for {}", devname))?;
 
     let string_prod_desc = get_string_descriptor(device, device_desc.i_product)
+        .on_timeout(std::time::Duration::from_millis(200), || Err(format_err!("Timeout")))
         .await
         .context(format!("DeviceGetStringDescriptor failed for {}", devname))?;
 
@@ -127,6 +135,7 @@ async fn list_device(
         println!("  {:<33}{} {}", "iProduct", device_desc.i_product, string_prod_desc);
 
         let serial_number = get_string_descriptor(device, device_desc.i_serial_number)
+            .on_timeout(std::time::Duration::from_millis(200), || Err(format_err!("Timeout")))
             .await
             .context(format!("DeviceGetStringDescriptor failed for {}", devname))?;
 
@@ -138,6 +147,9 @@ async fn list_device(
             config = Some(
                 device
                     .get_configuration()
+                    .on_timeout(std::time::Duration::from_millis(200), || {
+                        Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+                    })
                     .await
                     .context(format!("DeviceGetConfiguration failed for {}", devname))?,
             );
@@ -145,6 +157,9 @@ async fn list_device(
 
         let (status, config_desc_data) = device
             .get_configuration_descriptor(config.unwrap())
+            .on_timeout(std::time::Duration::from_millis(200), || {
+                Err(fidl::Error::ClientRead(zx::Status::TIMED_OUT))
+            })
             .await
             .context(format!("DeviceGetConfigurationDescriptor failed for {}", devname))?;
 
@@ -164,6 +179,9 @@ async fn list_device(
                         "", "bConfigurationValue", config_desc.b_configuration_value
                     );
                     let config_str = get_string_descriptor(device, config_desc.i_configuration)
+                        .on_timeout(std::time::Duration::from_millis(200), || {
+                            Err(format_err!("Timeout"))
+                        })
                         .await
                         .context(format!("DeviceGetStringDescriptor failed for {}", devname))?;
                     println!(
@@ -185,6 +203,9 @@ async fn list_device(
                     println!("{:>6}{:<29}{}", "", "bInterfaceProtocol", info.b_interface_protocol);
 
                     let interface_str = get_string_descriptor(device, info.i_interface)
+                        .on_timeout(std::time::Duration::from_millis(200), || {
+                            Err(format_err!("Timeout"))
+                        })
                         .await
                         .context(format!("DeviceGetStringDescriptor failed for {}", devname))?;
                     println!("{:>6}{:<29}{}{}", "", "iInterface", info.i_interface, interface_str);
