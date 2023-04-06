@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/zircon-internal/unique-backtrace.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
 
@@ -18,5 +19,5 @@ extern "C" void __stack_chk_fail() {
   // If we're lucky the registers will still contain both the actual and
   // expected stack guard values so we can disambiguate stack corruption from
   // arch_thread / percpu struct corruption.
-  __builtin_trap();
+  CRASH_WITH_UNIQUE_BACKTRACE();
 }

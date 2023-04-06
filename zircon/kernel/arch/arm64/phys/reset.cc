@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/zircon-internal/unique-backtrace.h>
+
 #include <phys/main.h>
 
 #include "psci.h"
@@ -20,4 +22,4 @@ void ArchPanicReset() {
 
 // The weak definition here is used in the non-ZBI phys tests where the real
 // PSCI code isn't linked in at all.
-[[gnu::weak]] void ArmPsciReset() { __builtin_trap(); }
+[[gnu::weak]] void ArmPsciReset() { CRASH_WITH_UNIQUE_BACKTRACE(); }

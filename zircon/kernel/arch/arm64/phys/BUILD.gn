@@ -52,6 +52,7 @@ if (toolchain_environment == "kernel.phys" ||
       "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:stdio",
+      "//zircon/system/ulib/zircon-internal",
     ]
   }
 

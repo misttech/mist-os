@@ -36,6 +36,7 @@ static_library("libc") {
   deps = [
     ":ctype",
     "string",
+    "//zircon/system/ulib/zircon-internal",
   ]
 
   if (toolchain_environment == "kernel") {
