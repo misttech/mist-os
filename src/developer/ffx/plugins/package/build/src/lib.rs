@@ -11,6 +11,8 @@ pub use ffx_package_build_args::PackageBuildCommand;
 
 #[ffx_plugin()]
 pub async fn cmd_package(cmd: PackageBuildCommand) -> Result<()> {
-    cmd_package_build(cmd).await.map_err(|err| ffx_error!(err))?;
+    cmd_package_build(cmd)
+        .await
+        .map_err(|err| ffx_error!("Error: failed to build package: {err:?}"))?;
     Ok(())
 }

@@ -10,6 +10,8 @@ pub use ffx_repository_create_args::RepoCreateCommand;
 
 #[ffx_plugin("ffx_repository")]
 pub async fn cmd_repo_create(cmd: RepoCreateCommand) -> Result<()> {
-    package_tool::cmd_repo_create(cmd).await.map_err(|err| ffx_error!(err))?;
+    package_tool::cmd_repo_create(cmd)
+        .await
+        .map_err(|err| ffx_error!("Error: failed to create repository: {err:?}"))?;
     Ok(())
 }

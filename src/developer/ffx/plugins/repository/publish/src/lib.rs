@@ -10,6 +10,8 @@ pub use ffx_repository_publish_args::RepoPublishCommand;
 
 #[ffx_plugin()]
 pub async fn cmd_repo_publish(cmd: RepoPublishCommand) -> Result<()> {
-    package_tool::cmd_repo_publish(cmd).await.map_err(|err| ffx_error!(err))?;
+    package_tool::cmd_repo_publish(cmd)
+        .await
+        .map_err(|err| ffx_error!("Error: failed to publish packages to repository: {err:?}"))?;
     Ok(())
 }
