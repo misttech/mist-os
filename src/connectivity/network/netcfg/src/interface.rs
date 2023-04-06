@@ -5,7 +5,6 @@
 use {
     anyhow::Context as _,
     serde::{Deserialize, Serialize},
-    std::io::{Seek, SeekFrom},
     std::{fs, io, path},
 };
 
@@ -16,13 +15,6 @@ const INTERFACE_PREFIX_ETHERNET: &str = "eth";
 enum PersistentIdentifier {
     MacAddress(fidl_fuchsia_net_ext::MacAddress),
     TopologicalPath(String),
-}
-
-// TODO(https://fxbug.dev/118197): Remove this once we soak for some time to ensure no
-// devices using the iwlwifi driver are using the legacy config format.
-#[derive(Serialize, Deserialize, Debug)]
-struct LegacyConfig {
-    names: Vec<(PersistentIdentifier, String)>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
@@ -205,29 +197,7 @@ impl<'a> FileBackedConfig<'a> {
     pub fn load<P: AsRef<path::Path>>(path: &'a P) -> Result<Self, anyhow::Error> {
         let path = path.as_ref();
         let config = match fs::File::open(path) {
-            Ok(mut file) => Config::load(&file).or_else(|_| {
-                // Since deserialization as Config failed, try loading the file
-                // as the legacy config format.
-                let _seek = file.seek(SeekFrom::Start(0))?;
-                let legacy_config: LegacyConfig = serde_json::from_reader(&file)?;
-                // Transfer the values from the old format to the new format.
-                let new_config = Config {
-                    interfaces: legacy_config
-                        .names
-                        .into_iter()
-                        .map(|(id, name)| InterfaceConfig {
-                            id,
-                            device_class: if name.starts_with(INTERFACE_PREFIX_WLAN) {
-                                crate::InterfaceType::Wlan
-                            } else {
-                                crate::InterfaceType::Ethernet
-                            },
-                            name,
-                        })
-                        .collect::<Vec<_>>(),
-                };
-                Ok(new_config)
-            }),
+            Ok(file) => Config::load(&file),
             Err(error) => {
                 if error.kind() == io::ErrorKind::NotFound {
                     Ok(Config { interfaces: vec![] })
@@ -471,16 +441,13 @@ mod tests {
         let path = temp_dir.path().join("net.config.json");
 
         // query an existing interface with the same topo path and a different mac address
-        for (
-            _i,
-            FileBackedConfigTestCase {
-                topological_path,
-                mac,
-                interface_type,
-                want_name,
-                expected_size,
-            },
-        ) in test_cases.into_iter().enumerate()
+        for FileBackedConfigTestCase {
+            topological_path,
+            mac,
+            interface_type,
+            want_name,
+            expected_size,
+        } in test_cases
         {
             let mut interface_config =
                 FileBackedConfig::load(&path).expect("failed to load the interface config");
@@ -572,57 +539,5 @@ mod tests {
             interface_config.store().unwrap_err().downcast_ref::<io::Error>().unwrap().kind(),
             io::ErrorKind::NotFound
         );
-    }
-
-    #[test]
-    fn test_load_legacy_config_file() {
-        const ETHERNET_TOPO_PATH: &str =
-            "/dev/pci-00:15.0-fidl/xhci/usb/004/004/ifc-000/ax88179/ethernet";
-        const ETHERNET_NAME: &str = "ethx2";
-        const WLAN_TOPO_PATH: &str = "/dev/pci-00:14.0/ethernet";
-        const WLAN_NAME: &str = "wlanp0014";
-        let test_config = LegacyConfig {
-            names: vec![
-                (
-                    PersistentIdentifier::TopologicalPath(ETHERNET_TOPO_PATH.to_string()),
-                    ETHERNET_NAME.to_string(),
-                ),
-                (
-                    PersistentIdentifier::TopologicalPath(WLAN_TOPO_PATH.to_string()),
-                    WLAN_NAME.to_string(),
-                ),
-            ],
-        };
-
-        let temp_dir = tempfile::tempdir_in("/tmp").expect("failed to create the temp dir");
-        let path = temp_dir.path().join("net.config.json");
-        {
-            let file = fs::File::create(&path).expect("failed to open file for writing");
-
-            serde_json::to_writer_pretty(file, &test_config)
-                .expect("could not serialize config into temporary file");
-
-            let new_config =
-                FileBackedConfig::load(&path).expect("failed to load the interface config");
-            assert_eq!(
-                new_config.config,
-                Config {
-                    interfaces: vec![
-                        InterfaceConfig {
-                            id: PersistentIdentifier::TopologicalPath(
-                                ETHERNET_TOPO_PATH.to_string()
-                            ),
-                            name: ETHERNET_NAME.to_string(),
-                            device_class: crate::InterfaceType::Ethernet
-                        },
-                        InterfaceConfig {
-                            id: PersistentIdentifier::TopologicalPath(WLAN_TOPO_PATH.to_string()),
-                            name: WLAN_NAME.to_string(),
-                            device_class: crate::InterfaceType::Wlan
-                        },
-                    ]
-                }
-            )
-        }
     }
 }
