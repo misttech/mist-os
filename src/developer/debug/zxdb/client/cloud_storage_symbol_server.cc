@@ -32,9 +32,6 @@ constexpr char kClientId[] =
     "446450136466-2hr92jrq8e6i4tnsa56b52vacp7t3936"
     ".apps.googleusercontent.com";
 constexpr char kClientSecret[] = "uBfbay2KCy9t4QveJ-dOqHtp";
-
-constexpr char kAuthServer[] = "https://accounts.google.com/o/oauth2/v2/auth";
-constexpr char kScope[] = "https://www.googleapis.com/auth/devstorage.read_only";
 constexpr char kTokenServer[] = "https://www.googleapis.com/oauth2/v4/token";
 
 bool DocIsAuthInfo(const rapidjson::Document& document) {
@@ -143,26 +140,6 @@ Err CloudStorageSymbolServer::HandleRequestResult(Curl::Error result, long respo
   return out_err;
 }
 
-std::string CloudStorageSymbolServer::AuthInfo() const {
-  static std::string result;
-
-  if (state() != SymbolServer::State::kAuth) {
-    return "";
-  }
-
-  if (result.empty()) {
-    result = kAuthServer;
-    result += "?client_id=";
-    result += Curl::Escape(kClientId);
-    result += "&redirect_uri=urn:ietf:wg:oauth:2.0:oob";
-    result += "&response_type=code";
-    result += "&scope=";
-    result += Curl::Escape(kScope);
-  }
-
-  return result;
-}
-
 void CloudStorageSymbolServerImpl::DoAuthenticate(
     const std::map<std::string, std::string>& post_data, fit::callback<void(const Err&)> cb) {
   ChangeState(SymbolServer::State::kBusy);
@@ -243,36 +220,12 @@ void CloudStorageSymbolServerImpl::OnAuthenticationResponse(Curl::Error result,
   ChangeState(SymbolServer::State::kReady);
   cb(Err());
 
-  if (!new_refresh) {
-    return;
+  if (new_refresh) {
+    if (FILE* fp = GetGoogleApiAuthCache("wb")) {
+      fwrite(refresh_token_.data(), 1, refresh_token_.size(), fp);
+      fclose(fp);
+    }
   }
-
-  if (FILE* fp = GetGoogleApiAuthCache("wb")) {
-    fwrite(refresh_token_.data(), 1, refresh_token_.size(), fp);
-    fclose(fp);
-  }
-}
-
-void CloudStorageSymbolServer::Authenticate(const std::string& data,
-                                            fit::callback<void(const Err&)> cb) {
-  if (state() != SymbolServer::State::kAuth) {
-    debug::MessageLoop::Current()->PostTask(
-        FROM_HERE, [cb = std::move(cb)]() mutable { cb(Err("Authentication not required.")); });
-    return;
-  }
-
-  // Authenciate using zxdb's own client ID.
-  client_id_ = kClientId;
-  client_secret_ = kClientSecret;
-
-  std::map<std::string, std::string> post_data;
-  post_data["code"] = data;
-  post_data["client_id"] = kClientId;
-  post_data["client_secret"] = kClientSecret;
-  post_data["redirect_uri"] = "urn:ietf:wg:oauth:2.0:oob";
-  post_data["grant_type"] = "authorization_code";
-
-  DoAuthenticate(post_data, std::move(cb));
 }
 
 void CloudStorageSymbolServer::AuthRefresh() {

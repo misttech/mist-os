@@ -118,8 +118,6 @@ class InterceptionWorkflow : public zxdb::ComponentObserver {
                   const std::vector<std::string>& symbol_servers,
                   std::unique_ptr<SyscallDecoderDispatcher> syscall_decoder_dispatcher);
 
-  void AuthenticateServer(zxdb::SymbolServer* server);
-
   // Connect the workflow to the host/port pair given.  |and_then| is posted to
   // the loop on completion.
   void Connect(const std::string& host, uint16_t port, const SimpleErrorFunction& and_then);
@@ -200,8 +198,6 @@ class InterceptionWorkflow : public zxdb::ComponentObserver {
   bool delete_loop_;
   bool decode_events_ = true;
   bool shutdown_done_ = false;
-  bool server_authentication_error_ = false;
-  int remaining_authentications_ = 0;
 
   // All the processes for which the breapoints have been set.
   std::map<zx_koid_t, ConfiguredProcess> configured_processes_;

@@ -22,10 +22,6 @@ class CloudStorageSymbolServer : public SymbolServer {
   // gs://bucket/[namespace]
   CloudStorageSymbolServer(Session* session, const std::string& url);
 
-  // Implementation of SymbolServer
-  std::string AuthInfo() const override;
-  void Authenticate(const std::string& data, fit::callback<void(const Err&)> cb) override;
-
  protected:
   virtual void DoAuthenticate(const std::map<std::string, std::string>& data,
                               fit::callback<void(const Err&)> cb) = 0;
@@ -41,8 +37,8 @@ class CloudStorageSymbolServer : public SymbolServer {
   // Use the refresh token to get a new access token.
   void AuthRefresh();
 
-  // Load our saved refresh token from disk and reauthenticate.
-  // Returns whether the loading succeeds.
+  // Load authentication from debugger's config file. Returns whether the loading
+  // succeeds.
   bool LoadCachedAuth();
 
   // Load authentication from gcloud config file. Returns whether the loading succeeds.

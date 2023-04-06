@@ -70,7 +70,7 @@ const char kVersionHelp[] = R"(  --version
   -v
       Prints the version.)";
 
-const char kAuthHelp[] = R"(  --auth
+const char kAuthHelp[] = R"(  --auth [deprecated]
       Starts the authentication process for symbol servers.)";
 
 const char kOmitModuleLinesHelp[] = R"(  --omit-module-lines

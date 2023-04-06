@@ -248,31 +248,6 @@ void InterceptionWorkflow::Initialize(
   }
 }
 
-void InterceptionWorkflow::AuthenticateServer(zxdb::SymbolServer* server) {
-  std::string key;
-  std::cout << "To authenticate " << server->name()
-            << ", please supply an authentication token. You can retrieve a token from:\n"
-            << server->AuthInfo() << '\n'
-            << "Enter the server authentication key: ";
-  std::cin >> key;
-
-  // Do the authentication.
-  ++remaining_authentications_;
-  server->Authenticate(key, [this](const zxdb::Err& err) {
-    if (err.has_error()) {
-      FX_LOGS(ERROR) << "Server authentication failed: " << err.msg();
-      server_authentication_error_ = true;
-    }
-    if (--remaining_authentications_ == 0) {
-      if (server_authentication_error_) {
-        Shutdown();
-      } else {
-        FX_LOGS(INFO) << "Authentication successful";
-      }
-    }
-  });
-}
-
 void InterceptionWorkflow::Connect(const std::string& host, uint16_t port,
                                    const SimpleErrorFunction& and_then) {
   zxdb::SessionConnectionInfo connect_info = {zxdb::SessionConnectionType::kNetwork, host, port};

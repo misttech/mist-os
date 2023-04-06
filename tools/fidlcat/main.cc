@@ -206,31 +206,21 @@ int ConsoleMain(int argc, const char* argv[]) {
       auto start = std::make_shared<fit::deferred_callback>(
           [&workflow, &options, &params]() { EnqueueStartup(&workflow, options, params); });
       for (const auto& server : workflow.GetSymbolServers()) {
-        // The first time we connect to a server, we have to provide an authentication.
-        // After that, the key is cached.
-        if (server->state() == zxdb::SymbolServer::State::kAuth) {
-          workflow.AuthenticateServer(server);
-        }
-        fit::callback<void(zxdb::SymbolServer*, zxdb::SymbolServer::State)> state_change_callback =
-            [&workflow, start](zxdb::SymbolServer* server,
-                               zxdb::SymbolServer::State state) mutable {
-              if (state == zxdb::SymbolServer::State::kAuth) {
-                workflow.AuthenticateServer(server);
-              } else if (state == zxdb::SymbolServer::State::kUnreachable) {
-                FX_LOGS(ERROR) << "Can't connect to symbol server " << server->name();
-                start.reset();
-              } else if (state == zxdb::SymbolServer::State::kReady) {
-                FX_LOGS(INFO) << "Connected to symbol server " << server->name();
-                start.reset();
-              }
-            };
-        // The state_change_callback will not be called if the state is already kReady.
-        if (server->state() == zxdb::SymbolServer::State::kReady) {
-          state_change_callback(server, server->state());
-        } else {
-          // We want to know when all the symbol servers are ready. We can only start
-          //  monitoring when all the servers are ready.
-          server->set_state_change_callback(std::move(state_change_callback));
+        if (server->state() != zxdb::SymbolServer::State::kReady) {
+          server->set_state_change_callback([start](zxdb::SymbolServer* server,
+                                                    zxdb::SymbolServer::State state) mutable {
+            if (state == zxdb::SymbolServer::State::kUnreachable) {
+              FX_LOGS(ERROR) << "Can't connect to symbol server " << server->name();
+              FX_LOGS(ERROR)
+                  << "To authenticate, please run the following command and restart fidlcat\n\n"
+                     "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
+                     "For more information, please see fxbug.dev/119250.";
+              start.reset();
+            } else if (state == zxdb::SymbolServer::State::kReady) {
+              FX_LOGS(INFO) << "Connected to symbol server " << server->name();
+              start.reset();
+            }
+          });
         }
       }
     }

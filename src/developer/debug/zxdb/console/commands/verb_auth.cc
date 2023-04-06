@@ -14,36 +14,21 @@ namespace zxdb {
 
 namespace {
 
-const char kAuthShortHelp[] = "auth: Authenticate with a symbol server.";
+const char kAuthShortHelp[] = "auth: Authenticate with a symbol server. [deprecated]";
 const char kAuthHelp[] =
-    R"(auth [credentials]
+    R"(DEPRECATED auth [credentials]
 
-  Authenticates with a symbol server. What that meas will depend on the type of
-  authentication the sever supports. Run with no arguments to receive
-  instructions on how to proceed.
+  OOB auth workflow is deprecated (go/oauth-oob-deprecation). To authenticate, please run the
+  following command and restart zxdb
 
-  Must have a valid symbol server noun. See help for sym-server.
+    rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login
 
-Example
-
-  auth my_secret
-  sym-server 3 auth some_credential
+  For more information, please see fxbug.dev/119250.
 )";
 
 void RunVerbAuth(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
-  if (cmd.args().size() > 1u) {
-    return cmd_context->ReportError(Err("auth expects exactly one argument."));
-  }
-
-  if (!cmd.sym_server())
-    return cmd_context->ReportError(Err("No symbol server selected."));
-
-  if (cmd.sym_server()->state() != SymbolServer::State::kAuth) {
-    return cmd_context->ReportError(Err("Server is not requesting authentication."));
-  }
-
   cmd_context->Output(
-      "OOB auth workflow is deprecated (go/oauth-oob-deprecation). "
+      "This command and the OOB auth workflow are deprecated (go/oauth-oob-deprecation). "
       "To authenticate, please run the following command and restart zxdb\n\n"
       "  rm -f ~/.fuchsia/debug/googleapi_auth && gcloud auth application-default login\n\n"
       "For more information, please see fxbug.dev/119250.");

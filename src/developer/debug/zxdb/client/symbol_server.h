@@ -34,10 +34,6 @@ class SymbolServer : public ClientObject {
     kUnreachable,   // Too many failed downloads and the server is unusable.
   };
 
-  enum class AuthType {
-    kOAuth,
-  };
-
   static std::unique_ptr<SymbolServer> FromURL(Session* session, const std::string& url,
                                                bool require_authentication);
 
@@ -50,10 +46,6 @@ class SymbolServer : public ClientObject {
     state_change_callback_ = std::move(cb);
   }
 
-  AuthType auth_type() const { return AuthType::kOAuth; }
-
-  virtual std::string AuthInfo() const = 0;
-  virtual void Authenticate(const std::string& data, fit::callback<void(const Err&)> cb) = 0;
   virtual void Fetch(const std::string& build_id, DebugSymbolFileType file_type,
                      FetchCallback cb) = 0;
 
