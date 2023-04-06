@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 
 use {
-    fidl::endpoints::{ClientEnd, ServerEnd},
+    fidl::endpoints::ClientEnd,
     fidl_fuchsia_hardware_display::{self as display, ControllerEvent},
     fidl_fuchsia_io as fio,
-    fuchsia_async::{self as fasync, DurationExt, TimeoutExt},
+    fuchsia_async::{DurationExt as _, TimeoutExt as _},
+    fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_fs::directory::{WatchEvent, Watcher},
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{channel::mpsc, future, TryStreamExt},
     parking_lot::RwLock,
     std::{
         fmt,
-        fs::File,
         path::{Path, PathBuf},
         sync::Arc,
     },
@@ -82,8 +82,18 @@ impl Controller {
         let path = watch_first_file(DEV_DIR_PATH)
             .on_timeout(TIMEOUT.after_now(), || Err(Error::DeviceNotFound))
             .await?;
-        let proxy = connect_controller(&path).await?;
-        Self::init_with_proxy(proxy).await
+        let path = path.to_str().ok_or(Error::DevicePathInvalid)?;
+        let provider_proxy = connect_to_protocol_at_path::<display::ProviderMarker>(path)
+            .map_err(Error::DeviceConnectionError)?;
+
+        let (controller_proxy, controller_server_end) =
+            fidl::endpoints::create_proxy::<display::ControllerMarker>()?;
+
+        // TODO(fxbug.dev/125034): Consider supporting virtcon client
+        // connections.
+        let () = zx::Status::ok(provider_proxy.open_controller(controller_server_end).await?)?;
+
+        Self::init_with_proxy(controller_proxy).await
     }
 
     /// Initialize a `Controller` instance from a pre-established channel.
@@ -365,22 +375,6 @@ async fn watch_first_file(path: &str) -> Result<PathBuf> {
     Err(Error::DeviceNotFound)
 }
 
-// Establishes a fuchsia.hardware.display.Controller protocol channel to the display-controller
-// device with the given `dev_path` by connecting as a primary controller.
-// TODO(armansito): Consider supporting virtcon client connections.
-async fn connect_controller<P: AsRef<Path>>(dev_path: P) -> Result<display::ControllerProxy> {
-    let device = File::open(dev_path)?;
-    let provider = {
-        let channel = fdio::clone_channel(&device)?;
-        display::ProviderProxy::new(fasync::Channel::from_channel(channel)?)
-    };
-
-    let (local, remote) = zx::Channel::create();
-    let _ = zx::Status::ok(provider.open_controller(ServerEnd::new(remote)).await?)?;
-
-    Ok(display::ControllerProxy::new(fasync::Channel::from_channel(local)?))
-}
-
 // Waits for a single fuchsia.hardware.display.Controller.OnDisplaysChanged event and returns the
 // reported displays. By API contract, this event will fire at least once upon initial channel
 // connection if any displays are present. If no displays are present, then the returned Future
@@ -439,6 +433,9 @@ mod tests {
 
         Ok(())
     }
+
+    // TODO(fxbug.dev/125022): We should have an automated test verifying that
+    // the service provided by driver framework can be opened correctly.
 
     #[fuchsia::test]
     async fn test_init_with_displays() -> Result<()> {

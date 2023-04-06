@@ -42,6 +42,11 @@ pub enum Error {
     #[error("ran out of identifiers")]
     IdsExhausted,
 
+    /// Path to the device is invalid (e.g. containing invalid
+    /// characters).
+    #[error("invalid device path")]
+    DevicePathInvalid,
+
     /// Wrapper for errors from FIDL bindings.
     #[error("FIDL error: {0}")]
     FidlError(#[from] fidl::Error),
@@ -53,6 +58,10 @@ pub enum Error {
     /// Wrapper for errors from zircon syscalls.
     #[error("zircon error: {0}")]
     ZxError(#[from] zx::Status),
+
+    /// Wrapper for errors from FIDL device connections.
+    #[error("Device connection error: {0}")]
+    DeviceConnectionError(anyhow::Error),
 
     /// Wrapper for errors from fuchsia-fs.
     #[error("filesystem error: {0}")]
