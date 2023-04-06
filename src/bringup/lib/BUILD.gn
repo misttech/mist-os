@@ -8,5 +8,7 @@ group("lib") {
 
 group("boot_tests") {
   testonly = true
-  deps = [ "mexec:tests" ]
+  if (current_cpu != "riscv64") {  # mexec is not supported on RISC-V.
+    deps = [ "mexec:tests" ]
+  }
 }
