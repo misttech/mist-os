@@ -30,7 +30,6 @@ zx_protocol_device_t IntelHDADaiBase::DAI_DEVICE_THUNKS = []() {
     fidl::WireDispatch<fuchsia_hardware_audio::DaiConnector>(
         thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
         ddk::FromDeviceFIDLTransaction(txn));
-    return ZX_OK;
   };
   return sdt;
 }();

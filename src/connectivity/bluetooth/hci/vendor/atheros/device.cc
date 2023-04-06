@@ -43,13 +43,13 @@ static zx_protocol_device_t dev_proto = {
     .init = [](void* ctx) { return static_cast<Device*>(ctx)->DdkInit(); },
     .unbind = [](void* ctx) { return static_cast<Device*>(ctx)->DdkUnbind(); },
     .release = [](void* ctx) { return static_cast<Device*>(ctx)->DdkRelease(); },
-    .message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) -> zx_status_t {
-      Device* thiz = static_cast<Device*>(ctx);
-      fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
-          thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
-          ddk::FromDeviceFIDLTransaction(txn));
-      return ZX_OK;
-    },
+    .message =
+        [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+          Device* thiz = static_cast<Device*>(ctx);
+          fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
+              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
+              ddk::FromDeviceFIDLTransaction(txn));
+        },
 };
 
 Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, usb_protocol_t* usb)

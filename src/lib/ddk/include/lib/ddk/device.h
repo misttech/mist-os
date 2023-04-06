@@ -298,25 +298,21 @@ typedef struct zx_protocol_device {
   zx_status_t (*rxrpc)(void* ctx, zx_handle_t channel);
 
   //@ ## message
-  // Process a FIDL rpc message.  This is used to handle class or
-  // device specific messaging.  fuchsia.io.{Node,File,Device} are
-  // handles by the devhost itself.
+  // Process a FIDL rpc message. This is used to handle class or
+  // device specific messaging.
   //
   // The entire message becomes the responsibility of the driver,
   // including the handles.
   //
   // The txn provided to respond to the message is only valid for
-  // the duration of the message() call.  It must not be cached
+  // the duration of the message() call. It must not be retained
   // and used later.
   //
   // If this method wishes to respond asynchronously, the txn
-  // should be copied and the method should return ZX_ERR_ASYNC.
-  //
-  // If this method returns anything other than ZX_OK or
-  // ZX_ERR_ASYNC, the underlying connection is closed.
+  // should be copied.
   //
   // This hook will only be executed on the devhost's main thread.
-  zx_status_t (*message)(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
+  void (*message)(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
 
   //@ ## service_connect
   // Connect a runtime client to this device.

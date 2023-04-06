@@ -90,13 +90,12 @@ void VirtualAudioControlImpl::DdkRelease(void* ctx) {
 }
 
 // static
-zx_status_t VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t* msg,
-                                                device_fidl_txn_t* txn) {
+void VirtualAudioControlImpl::DdkMessage(void* ctx, fidl_incoming_msg_t* msg,
+                                         device_fidl_txn_t* txn) {
   VirtualAudioControlImpl* self = static_cast<VirtualAudioControlImpl*>(ctx);
   fidl::WireDispatch<fuchsia_virtualaudio::Control>(
       self, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
       ddk::FromDeviceFIDLTransaction(txn));
-  return ZX_OK;
 }
 
 namespace {

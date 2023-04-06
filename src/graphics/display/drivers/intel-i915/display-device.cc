@@ -26,7 +26,7 @@ namespace i915 {
 
 namespace {
 
-zx_status_t backlight_message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+void backlight_message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
   DisplayDevice* ptr;
   {
     fbl::AutoLock lock(&static_cast<display_ref_t*>(ctx)->mtx);
@@ -35,7 +35,6 @@ zx_status_t backlight_message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_t
   fidl::WireDispatch<fuchsia_hardware_backlight::Device>(
       ptr, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
       ddk::FromDeviceFIDLTransaction(txn));
-  return ZX_OK;
 }
 
 void backlight_release(void* ctx) { delete static_cast<display_ref_t*>(ctx); }

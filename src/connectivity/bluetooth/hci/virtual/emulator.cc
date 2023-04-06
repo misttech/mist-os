@@ -97,7 +97,6 @@ static zx_protocol_device_t bt_emulator_device_ops = {
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Emulator>(
               thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
-          return ZX_OK;
         },
 };
 
@@ -117,7 +116,6 @@ static zx_protocol_device_t bt_hci_device_ops = {
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
               thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
-          return ZX_OK;
         },
 };
 

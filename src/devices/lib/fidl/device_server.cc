@@ -8,6 +8,7 @@
 #include <lib/ddk/device.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/syslog/global.h>
+#include <zircon/errors.h>
 
 #include <string_view>
 
@@ -200,9 +201,9 @@ void DeviceServer::MessageDispatcher::dispatch_message(
   // Use shadowing lambda captures to ensure consumed values aren't used.
   [&, msg = std::move(msg).ReleaseToEncodedCMessage(), txn = Transaction(txn)]() mutable {
     device_fidl_txn_t ddk_txn = ddk::IntoDeviceFIDLTransaction(&txn);
-    if (zx_status_t status = parent_.controller_.MessageOp(&msg, &ddk_txn); status != ZX_OK) {
-      // Close the connection on any error.
-      static_cast<fidl::Transaction*>(&txn)->Close(status);
+    if (!parent_.controller_.MessageOp(&msg, &ddk_txn)) {
+      // The device doesn't implement zx_protocol_device::message.
+      static_cast<fidl::Transaction*>(&txn)->Close(ZX_ERR_NOT_SUPPORTED);
     }
     std::optional internal_error = txn.internal_error();
     if (!internal_error.has_value()) {

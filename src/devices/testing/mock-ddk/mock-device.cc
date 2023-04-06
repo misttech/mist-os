@@ -132,8 +132,12 @@ void MockDevice::ResumeNewOp(uint32_t requested_state) {
   Dispatch(ctx_, ops_->resume, requested_state);
 }
 
-zx_status_t MockDevice::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
-  return Dispatch(ctx_, ops_->message, ZX_ERR_NOT_SUPPORTED, msg, txn);
+bool MockDevice::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+  if (ops_->message) {
+    ops_->message(ctx_, msg, txn);
+    return true;
+  }
+  return false;
 }
 
 void MockDevice::ChildPreReleaseOp(void* child_ctx) {

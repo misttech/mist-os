@@ -194,11 +194,10 @@ class MessageableInternal : public fidl::WireServer<Protocol>, public base_mixin
   static constexpr void InitOp(zx_protocol_device_t* proto) { proto->message = Message; }
 
  private:
-  static zx_status_t Message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+  static void Message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
     fidl::WireDispatch<Protocol>(static_cast<D*>(ctx),
                                  fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
                                  ddk::FromDeviceFIDLTransaction(txn));
-    return ZX_OK;
   }
 };
 
@@ -361,7 +360,7 @@ class DeviceAddArgs {
   }
 
   DeviceAddArgs& operator=(const DeviceAddArgs& other) {
-    metadata_list_ = std::move(other.metadata_list_);
+    metadata_list_ = other.metadata_list_;
     args_ = other.args_;
     args_.metadata_list = metadata_list_.data();
     args_.metadata_count = metadata_list_.count();
@@ -472,7 +471,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return device_add(this->parent_, &args, &this->zxdev_);
   }
 
-  zx_status_t DdkAdd(DeviceAddArgs args) { return DdkAdd(args.get().name, args.get()); }
+  zx_status_t DdkAdd(const DeviceAddArgs& args) { return DdkAdd(args.get().name, args.get()); }
 
   zx_status_t DdkAdd(const char* name, uint32_t flags = 0) {
     return DdkAdd(ddk::DeviceAddArgs(name).set_flags(flags));
@@ -482,7 +481,7 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
     return device_add_composite(this->parent_, name, comp_desc);
   }
 
-  zx_status_t DdkAddCompositeNodeSpec(const char* name, CompositeNodeSpec spec) {
+  zx_status_t DdkAddCompositeNodeSpec(const char* name, const CompositeNodeSpec& spec) {
     return device_add_composite_spec(this->parent_, name, &spec.get());
   }
 

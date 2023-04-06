@@ -183,7 +183,11 @@ TEST_F(DeviceInspectTestCase, AddRemoveDevice) {
 TEST_F(DeviceInspectTestCase, CallStats) {
   fbl::RefPtr<zx_device> device;
   ASSERT_OK(zx_device::Create(&(driver_host()), "test-device", driver(), &device));
-  device->set_ops(&internal::kDeviceDefaultOps);
+  constexpr zx_protocol_device_t kOps = {
+      .message = [](void* ctx, fidl_incoming_msg_t* msg,
+                    device_fidl_txn_t* txn) { ASSERT_NULL(txn); },
+  };
+  device->set_ops(&kOps);
   device->vnode.reset();
 
   // Make op calls

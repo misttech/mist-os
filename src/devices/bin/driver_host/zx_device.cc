@@ -389,20 +389,23 @@ void zx_device::LogError(const char* error) {
 
 bool zx_device::IsUnbound() { return flags_ & DEV_FLAG_UNBINDING; }
 
-zx_status_t zx_device::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+bool zx_device::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+  if (!ops_->message) {
+    return false;
+  }
+
   libsync::Completion completion;
-  zx_status_t status;
 
   async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
     TraceLabelBuffer trace_label;
     TRACE_DURATION("driver_host:driver-hooks", get_trace_label("message", &trace_label));
     inspect_->MessageOpStats().Update();
-    status = Dispatch(ops_->message, ZX_ERR_NOT_SUPPORTED, msg, txn);
+    ops_->message(ctx(), msg, txn);
     completion.Signal();
   });
 
   completion.Wait();
-  return status;
+  return true;
 }
 
 zx_status_t zx_device::Rebind() {

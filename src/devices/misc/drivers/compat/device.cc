@@ -718,11 +718,12 @@ zx_status_t Device::GetMetadataSize(uint32_t type, size_t* out_size) {
   return device_server_.GetMetadataSize(type, out_size);
 }
 
-zx_status_t Device::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
-  if (!HasOp(ops_, &zx_protocol_device_t::message)) {
-    return ZX_ERR_NOT_SUPPORTED;
+bool Device::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+  if (HasOp(ops_, &zx_protocol_device_t::message)) {
+    ops_->message(compat_symbol_.context, msg, txn);
+    return true;
   }
-  return ops_->message(compat_symbol_.context, msg, txn);
+  return false;
 }
 
 zx::result<uint32_t> Device::SetPerformanceStateOp(uint32_t state) {
