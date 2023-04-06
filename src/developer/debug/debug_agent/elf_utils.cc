@@ -133,7 +133,35 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
   // Method 2: Read the memory map and probe the ELF magic. This is secondary because it cannot
   // obtain the debug_address, which is used for resolving TLS location.
   std::vector<debug_ipc::AddressRegion> address_regions = process.GetAddressSpace(0);
+
+  // When `-z noseparate-code` is enabled, multiple ELF segments could live on the same page and
+  // get mapped multiple times with different flags. For example,
+  //
+  // Program Headers:
+  //   Type           Offset   VirtAddr           PhysAddr           FileSiz  MemSiz   Flg Align
+  //   LOAD           0x000000 0x0000000000000000 0x0000000000000000 0x000858 0x000858 R   0x1000
+  //   LOAD           0x000860 0x0000000000001860 0x0000000000001860 0x000250 0x000250 R E 0x1000
+  //   LOAD           0x000ab0 0x0000000000002ab0 0x0000000000002ab0 0x000220 0x000220 RW  0x1000
+  //   LOAD           0x000cd0 0x0000000000003cd0 0x0000000000003cd0 0x000008 0x000008 RW  0x1000
+  //
+  // [zxdb] aspace
+  //           Start              End  Prot   Size     Koid       Offset  Cmt.Pgs  Name
+  //   0x15fb9584000    0x15fb9585000  r--      4K   479448          0x0        0  ...
+  //   0x15fb9585000    0x15fb9586000  r-x      4K   479449          0x0        0  ...
+  //   0x15fb9586000    0x15fb9587000  r--      4K   479450          0x0        0  ...
+  //   0x15fb9587000    0x15fb9588000  rw-      4K   479451          0x0        0  ...
+  //
+  // and the debugger will see four ELF headers from 0x15fb9584000 to 0x15fb9587000. The third has
+  // the same read-only protection at runtime because it contains read-only relocations.
+  //
+  // To solve this, we use a variable to track the end of the last module, and skip regions that
+  // overlap with the last module. Other solutions include checking the VMO offset (assuming ELF
+  // files always live from the beginning of VMOs), or checking whether build-id duplicates.
+  uint64_t end_of_last_module = 0;
   for (const auto& region : address_regions) {
+    if (region.base < end_of_last_module) {
+      continue;
+    }
     // ELF headers live in read-only regions.
     if (region.mmu_flags != ZX_VM_PERM_READ) {
       continue;
@@ -144,6 +172,11 @@ std::vector<debug_ipc::Module> GetElfModulesForProcess(const ProcessHandle& proc
     auto elf = elflib::ElfLib::Create(GetElfLibReader(process, region.base));
     if (!elf) {
       continue;
+    }
+    for (auto& phdr : elf->GetSegmentHeaders()) {
+      if (phdr.p_type == PT_LOAD) {
+        end_of_last_module = region.base + phdr.p_vaddr + phdr.p_memsz;
+      }
     }
 
     std::string name = region.name;
