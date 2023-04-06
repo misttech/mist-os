@@ -11,6 +11,7 @@
 #include "src/lib/storage/vfs/cpp/dir_test_util.h"
 
 namespace {
+
 using inspect::InspectTestHelper;
 class DriverHostInspectTestCase : public InspectTestHelper, public zxtest::Test {
  public:
@@ -24,7 +25,6 @@ class DriverHostInspectTestCase : public InspectTestHelper, public zxtest::Test 
   DriverHostInspect inspect_;
   async::Loop loop_;
 };
-}  // namespace
 
 TEST_F(DriverHostInspectTestCase, DirectoryEntries) {
   // Check that root inspect is created
@@ -191,10 +191,17 @@ TEST_F(DeviceInspectTestCase, CallStats) {
   device->vnode.reset();
 
   // Make op calls
-  fidl_incoming_msg_t dummy_msg = {};
-  fidl_message_header_t dummy_hdr = {};
-  dummy_msg.bytes = static_cast<void*>(&dummy_hdr);
-  static_cast<devfs_fidl::DeviceInterface*>(device.get())->MessageOp(&dummy_msg, nullptr);
+
+  fidl_message_header_t header;
+  fidl::InitTxnHeader(&header, /* txid */ 1,
+                      /* ordinal */ 1, fidl::MessageDynamicFlags::kStrictMethod);
+  constexpr zx_handle_t* const handles = nullptr;
+  constexpr fidl_channel_handle_metadata_t* const handle_metadata = nullptr;
+  static_cast<devfs_fidl::DeviceInterface*>(device.get())
+      ->MessageOp(
+          fidl::IncomingHeaderAndMessage::Create(reinterpret_cast<uint8_t*>(&header),
+                                                 sizeof(header), handles, handle_metadata, 0),
+          nullptr);
 
   {
     // Test InspectCallStats::Update() method
@@ -247,3 +254,5 @@ TEST_F(DeviceInspectTestCase, ParentChild) {
   parent->set_local_id(0);
   parent->vnode.reset();
 }
+
+}  // namespace

@@ -199,9 +199,9 @@ void DeviceServer::MessageDispatcher::dispatch_message(
   uint64_t ordinal = msg.header()->ordinal;
 
   // Use shadowing lambda captures to ensure consumed values aren't used.
-  [&, msg = std::move(msg).ReleaseToEncodedCMessage(), txn = Transaction(txn)]() mutable {
+  [&, txn = Transaction(txn)]() mutable {
     device_fidl_txn_t ddk_txn = ddk::IntoDeviceFIDLTransaction(&txn);
-    if (!parent_.controller_.MessageOp(&msg, &ddk_txn)) {
+    if (!parent_.controller_.MessageOp(std::move(msg), &ddk_txn)) {
       // The device doesn't implement zx_protocol_device::message.
       static_cast<fidl::Transaction*>(&txn)->Close(ZX_ERR_NOT_SUPPORTED);
     }

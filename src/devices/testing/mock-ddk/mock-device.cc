@@ -132,9 +132,10 @@ void MockDevice::ResumeNewOp(uint32_t requested_state) {
   Dispatch(ctx_, ops_->resume, requested_state);
 }
 
-bool MockDevice::MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+bool MockDevice::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t* txn) {
   if (ops_->message) {
-    ops_->message(ctx_, msg, txn);
+    fidl_incoming_msg_t fidl_msg = std::move(msg).ReleaseToEncodedCMessage();
+    ops_->message(ctx_, &fidl_msg, txn);
     return true;
   }
   return false;

@@ -49,7 +49,7 @@ class Device : public std::enable_shared_from_this<Device>,
   Device(device_t device, const zx_protocol_device_t* ops, Driver* driver,
          std::optional<Device*> parent, fdf::Logger* logger, async_dispatcher_t* dispatcher);
 
-  ~Device();
+  ~Device() override;
 
   zx_device_t* ZxDevice();
 
@@ -150,7 +150,7 @@ class Device : public std::enable_shared_from_this<Device>,
   // device_fidl::DeviceInterface APIs.
   void LogError(const char* error) override;
   bool IsUnbound() override;
-  bool MessageOp(fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) override;
+  bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t* txn) override;
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override;
   void Bind(BindRequestView request, BindCompleter::Sync& completer) override;
