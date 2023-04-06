@@ -224,11 +224,11 @@ impl<D> ConversionContext for D
 where
     D: AsRef<Devices<DeviceId<BindingsNonSyncCtxImpl>>>,
 {
-    fn get_core_id(&self, binding_id: u64) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
+    fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsNonSyncCtxImpl>> {
         self.as_ref().get_core_id(binding_id)
     }
 
-    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> u64 {
+    fn get_binding_id(&self, core_id: DeviceId<BindingsNonSyncCtxImpl>) -> BindingId {
         core_id.external_state().static_common_info().binding_id
     }
 }
@@ -566,7 +566,7 @@ impl BindingsNonSyncCtxImpl {
 
 fn set_interface_enabled(
     Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<crate::bindings::BindingsNonSyncCtxImpl>,
-    id: u64,
+    id: BindingId,
     should_enable: bool,
 ) -> Result<(), fidl_net_stack::Error> {
     let core_id = non_sync_ctx.devices.get_core_id(id).ok_or(fidl_net_stack::Error::NotFound)?;

@@ -24,6 +24,7 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
+    devices::BindingId,
     socket::{
         worker::{self, CloseResponder, SocketWorker},
         IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
@@ -168,6 +169,7 @@ impl<'a> RequestHandler<'a> {
         let device = match interface {
             fppacket::BoundInterfaceId::All(fppacket::Empty) => None,
             fppacket::BoundInterfaceId::Specified(id) => {
+                let id = BindingId::new(id).ok_or(DeviceNotFoundError.into_errno())?;
                 Some(id.try_into_core_with_ctx(non_sync_ctx).map_err(IntoErrno::into_errno)?)
             }
         };
@@ -361,7 +363,7 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties>
                 fppacket::HardwareAddress::Eui48(fidl_fuchsia_net::MacAddress { octets: [0; 6] }),
             ),
         };
-        let id = ctx.get_binding_id(device);
+        let id = ctx.get_binding_id(device).get();
         Ok(fppacket::InterfaceProperties { addr, id, type_: iface_type })
     }
 }

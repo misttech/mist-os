@@ -31,7 +31,7 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices::Devices,
+    devices::{BindingId, Devices},
     util::{ConversionContext as _, IntoFidl as _, TryIntoFidlWithContext as _},
     BindingsNonSyncCtxImpl, RequestStreamExt as _, DEFAULT_INTERFACE_METRIC, LOOPBACK_NAME,
 };
@@ -124,7 +124,7 @@ impl TestContext {
 /// track of configured interfaces during the setup procedure.
 pub(crate) struct TestStack {
     ctx: TestContext,
-    endpoint_ids: HashMap<String, u64>,
+    endpoint_ids: HashMap<String, BindingId>,
     // We must keep this sender around to prevent the control task from removing
     // the loopback interface.
     loopback_termination_sender:
@@ -188,7 +188,7 @@ impl TestStack {
     }
 
     /// Waits for interface with given `if_id` to come online.
-    pub(crate) async fn wait_for_interface_online(&mut self, if_id: u64) {
+    pub(crate) async fn wait_for_interface_online(&mut self, if_id: BindingId) {
         let watcher = self.new_interfaces_watcher().await;
         loop {
             let event = watcher.watch().await.expect("failed to watch");
@@ -200,11 +200,11 @@ impl TestStack {
                     continue;
                 }
                 fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                    assert_ne!(id, if_id, "interface {} removed while waiting online", if_id);
+                    assert_ne!(id, if_id.get(), "interface {} removed while waiting online", if_id);
                     continue;
                 }
             };
-            if id.expect("missing id") != if_id {
+            if id.expect("missing id") != if_id.get() {
                 continue;
             }
             if online.unwrap_or(false) {
@@ -215,13 +215,13 @@ impl TestStack {
 
     /// Gets an installed interface identifier from the configuration endpoint
     /// `index`.
-    pub(crate) fn get_endpoint_id(&self, index: usize) -> u64 {
+    pub(crate) fn get_endpoint_id(&self, index: usize) -> BindingId {
         self.get_named_endpoint_id(test_ep_name(index))
     }
 
     /// Gets an installed interface identifier from the configuration endpoint
     /// `name`.
-    pub(crate) fn get_named_endpoint_id(&self, name: impl Into<String>) -> u64 {
+    pub(crate) fn get_named_endpoint_id(&self, name: impl Into<String>) -> BindingId {
         *self.endpoint_ids.get(&name.into()).unwrap()
     }
 
@@ -429,7 +429,11 @@ impl TestSetupBuilder {
                     )
                     .context("create interface")?;
 
-                let if_id = interface_control.get_id().await.context("get id")?;
+                let if_id = interface_control
+                    .get_id()
+                    .await
+                    .context("get id")
+                    .and_then(|i| BindingId::new(i).ok_or(Error::msg("id is 0")))?;
 
                 // Detach interface_control for the same reason as
                 // device_control.
@@ -476,7 +480,7 @@ impl TestSetupBuilder {
                     stack
                         .add_forwarding_entry(&mut fidl_fuchsia_net_stack::ForwardingEntry {
                             subnet: subnet.into_fidl(),
-                            device_id: if_id,
+                            device_id: if_id.get(),
                             next_hop: None,
                             metric: 0,
                         })
@@ -543,7 +547,7 @@ async fn test_add_device_routes() {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
             prefix_len: 24,
         },
-        device_id: if_id,
+        device_id: if_id.get(),
         next_hop: None,
         metric: 0,
     };
@@ -552,7 +556,7 @@ async fn test_add_device_routes() {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
             prefix_len: 24,
         },
-        device_id: if_id,
+        device_id: if_id.get(),
         next_hop: None,
         metric: 0,
     };
@@ -575,7 +579,7 @@ async fn test_add_device_routes() {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
             prefix_len: 24,
         },
-        device_id: if_id,
+        device_id: if_id.get(),
         next_hop: None,
         metric: 0,
     };
@@ -589,7 +593,7 @@ async fn test_add_device_routes() {
             addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [10, 0, 0, 0] }),
             prefix_len: 64,
         },
-        device_id: if_id,
+        device_id: if_id.get(),
         next_hop: None,
         metric: 0,
     };
@@ -665,7 +669,7 @@ async fn test_list_del_routes() {
 
     let mut route1_fwd_entry = fidl_net_stack::ForwardingEntry {
         subnet: sub1.into_ext(),
-        device_id: if_id,
+        device_id: if_id.get(),
         next_hop: None,
         metric: 0,
     };
@@ -674,13 +678,13 @@ async fn test_list_del_routes() {
         // Automatically installed routes
         fidl_net_stack::ForwardingEntry {
             subnet: crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET.into_ext(),
-            device_id: loopback_id,
+            device_id: loopback_id.get(),
             next_hop: None,
             metric: crate::bindings::DEFAULT_LOW_PRIORITY_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: crate::bindings::IPV4_LIMITED_BROADCAST_SUBNET.into_ext(),
-            device_id: if_id,
+            device_id: if_id.get(),
             next_hop: None,
             metric: crate::bindings::DEFAULT_LOW_PRIORITY_METRIC,
         },
@@ -689,57 +693,57 @@ async fn test_list_del_routes() {
         // route2
         fidl_net_stack::ForwardingEntry {
             subnet: sub10.into_ext(),
-            device_id: if_id,
+            device_id: if_id.get(),
             next_hop: None,
             metric: 0,
         },
         // route3
         fidl_net_stack::ForwardingEntry {
             subnet: sub10.into_ext(),
-            device_id: if_id,
+            device_id: if_id.get(),
             next_hop: Some(Box::new(sub10_gateway.to_ip_addr().into_ext())),
             metric: 0,
         },
         // More automatically installed routes
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv4::LOOPBACK_SUBNET.into_ext(),
-            device_id: loopback_id,
+            device_id: loopback_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
-            device_id: loopback_id,
+            device_id: loopback_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv4::MULTICAST_SUBNET.into_ext(),
-            device_id: if_id,
+            device_id: if_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv6::LOOPBACK_SUBNET.into_ext(),
-            device_id: loopback_id,
+            device_id: loopback_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: net_subnet_v6!("fe80::/64").into_ext(),
-            device_id: if_id,
+            device_id: if_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
-            device_id: loopback_id,
+            device_id: loopback_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
         fidl_net_stack::ForwardingEntry {
             subnet: Ipv6::MULTICAST_SUBNET.into_ext(),
-            device_id: if_id,
+            device_id: if_id.get(),
             next_hop: None,
             metric: DEFAULT_INTERFACE_METRIC,
         },
@@ -791,7 +795,7 @@ async fn test_add_remote_routes() {
 
     let test_stack = t.get(0);
     let stack = test_stack.connect_stack().unwrap();
-    let device_id = test_stack.get_endpoint_id(1);
+    let device_id = test_stack.get_endpoint_id(1).get();
 
     let subnet = fidl_net::Subnet {
         addr: fidl_net::IpAddress::Ipv4(fidl_net::Ipv4Address { addr: [192, 168, 0, 0] }),
@@ -836,7 +840,7 @@ async fn test_add_remote_routes() {
 
 async fn get_slaac_secret<'s>(
     test_stack: &'s mut TestStack,
-    if_id: u64,
+    if_id: BindingId,
 ) -> Option<[u8; STABLE_IID_SECRET_KEY_BYTES]> {
     test_stack
         .with_ctx(|Ctx { sync_ctx, non_sync_ctx }| {
@@ -883,7 +887,7 @@ async fn test_ipv6_slaac_secret_stable() {
         )
         .expect("create interface");
 
-    let if_id = interface_control.get_id().await.unwrap();
+    let if_id = BindingId::new(interface_control.get_id().await.unwrap()).unwrap();
     let installed_secret =
         get_slaac_secret(test_stack, if_id).await.expect("has temporary address secret");
 

@@ -25,6 +25,7 @@ use net_types::{
     ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
 use netstack3_core::{
+    device::DeviceId,
     error::{LocalAddressError, NetstackError, RemoteAddressError, SocketError, ZonedAddressError},
     ip::socket::{IpSockCreationError, IpSockRouteError, IpSockSendError, IpSockUnroutableError},
     socket::datagram::{ConnectListenerError, SetMulticastMembershipError, SockCreationError},
@@ -33,8 +34,8 @@ use netstack3_core::{
 };
 
 use crate::bindings::{
-    devices::Devices,
-    util::{IntoCore as _, IntoFidl as _},
+    devices::{BindingId, Devices},
+    util::{DeviceNotFoundError, IntoCore as _, IntoFidl as _, TryIntoCoreWithContext},
     DeviceIdExt as _,
 };
 
@@ -60,14 +61,13 @@ pub(crate) async fn serve(
                     let mut response = {
                         let ctx = ctx.lock().await;
                         let Ctx { sync_ctx: _, non_sync_ctx } = &*ctx;
-                        let result = non_sync_ctx
-                            .devices
-                            .get_core_id(index)
-                            .map(|core_id| {
+                        BindingId::new(index)
+                            .ok_or(DeviceNotFoundError)
+                            .and_then(|id| id.try_into_core_with_ctx(non_sync_ctx))
+                            .map(|core_id: DeviceId<_>| {
                                 core_id.external_state().static_common_info().name.clone()
                             })
-                            .ok_or(zx::Status::NOT_FOUND.into_raw());
-                        result
+                            .map_err(|DeviceNotFoundError| zx::Status::NOT_FOUND.into_raw())
                     };
                     responder_send!(responder, &mut response);
                 }
@@ -78,7 +78,7 @@ pub(crate) async fn serve(
                         let devices = AsRef::<Devices<_>>::as_ref(&non_sync_ctx);
                         let result = devices
                             .get_device_by_name(&name)
-                            .map(|d| d.external_state().static_common_info().binding_id)
+                            .map(|d| d.external_state().static_common_info().binding_id.get())
                             .ok_or(zx::Status::NOT_FOUND.into_raw());
                         result
                     };

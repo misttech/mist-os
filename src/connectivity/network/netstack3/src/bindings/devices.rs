@@ -4,6 +4,7 @@
 
 use std::{
     collections::hash_map::HashMap,
+    num::NonZeroU64,
     ops::{Deref as _, DerefMut as _},
 };
 
@@ -29,7 +30,7 @@ use crate::bindings::{
 
 pub const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
-pub type BindingId = u64;
+pub type BindingId = NonZeroU64;
 
 /// Keeps tabs on devices.
 ///
@@ -47,7 +48,7 @@ pub struct Devices<C> {
 
 impl<C> Default for Devices<C> {
     fn default() -> Self {
-        Self { id_map: HashMap::new(), last_id: 0 }
+        Self { id_map: HashMap::new(), last_id: BindingId::MIN }
     }
 }
 
@@ -59,8 +60,9 @@ where
     #[must_use]
     pub fn alloc_new_id(&mut self) -> BindingId {
         let Self { id_map: _, last_id } = self;
-        *last_id += 1;
-        *last_id
+        let id = *last_id;
+        *last_id = last_id.checked_add(1).expect("exhausted binding device IDs");
+        id
     }
 
     /// Adds a new device.

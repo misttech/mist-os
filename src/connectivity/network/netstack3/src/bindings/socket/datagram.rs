@@ -2349,13 +2349,14 @@ where
             None => return Ok(None),
             Some(d) => d,
         };
-        let index = TryIntoFidlWithContext::<u64>::try_into_fidl_with_ctx(device, &non_sync_ctx)
-            .map_err(IntoErrno::into_errno)?;
-        Ok(non_sync_ctx.devices.get_core_id(index).map(|core_id| {
-            let state = core_id.external_state();
-            let StaticCommonInfo { binding_id: _, name } = state.static_common_info();
-            name.to_string()
-        }))
+        device
+            .upgrade()
+            .map(|core_id| {
+                let state = core_id.external_state();
+                let StaticCommonInfo { binding_id: _, name } = state.static_common_info();
+                Some(name.to_string())
+            })
+            .ok_or(fposix::Errno::Enodev)
     }
 
     async fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
@@ -3673,14 +3674,14 @@ mod tests {
             IpAddr::V4(mcast_addr) => {
                 proxy.add_ip_membership(&mut fposix_socket::IpMulticastMembership {
                     mcast_addr: mcast_addr.into_fidl(),
-                    iface: id,
+                    iface: id.get(),
                     ..Decodable::new_empty()
                 })
             }
             IpAddr::V6(mcast_addr) => {
                 proxy.add_ipv6_membership(&mut fposix_socket::Ipv6MulticastMembership {
                     mcast_addr: mcast_addr.into_fidl(),
-                    iface: id,
+                    iface: id.get(),
                     ..Decodable::new_empty()
                 })
             }

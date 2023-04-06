@@ -72,7 +72,7 @@ impl EventQueue {
             return Err(zx::Status::BUFFER_TOO_SMALL);
         }
         // NB: Compiler can't infer the parameter types.
-        let state_to_event = |(id, state): (&u64, &InterfaceState)| {
+        let state_to_event = |(id, state): (&BindingId, &InterfaceState)| {
             let InterfaceState {
                 properties: InterfaceProperties { name, device_class },
                 addresses,
@@ -82,7 +82,7 @@ impl EventQueue {
             } = state;
             finterfaces::Event::Existing(
                 finterfaces_ext::Properties {
-                    id: *id,
+                    id: id.get(),
                     name: name.clone(),
                     device_class: device_class.clone(),
                     online: *online,
@@ -431,7 +431,7 @@ impl Worker {
                     Some(old) => Err(WorkerError::AddedDuplicateInterface { interface: id, old }),
                     None => Ok(Some(finterfaces::Event::Added(
                         finterfaces_ext::Properties {
-                            id,
+                            id: id.get(),
                             name,
                             device_class,
                             online,
@@ -444,7 +444,7 @@ impl Worker {
                 }
             }
             InterfaceEvent::Removed(rm) => match state.remove(&rm) {
-                Some(InterfaceState { .. }) => Ok(Some(finterfaces::Event::Removed(rm))),
+                Some(InterfaceState { .. }) => Ok(Some(finterfaces::Event::Removed(rm.get()))),
                 None => Err(WorkerError::RemoveNonexistentInterface(rm)),
             },
             InterfaceEvent::Changed { id, event } => {
@@ -478,7 +478,7 @@ impl Worker {
                             None => {
                                 if visible {
                                     Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                                        id: Some(id),
+                                        id: Some(id.get()),
                                         addresses: Some(Self::collect_addresses(addresses)),
                                         ..finterfaces::Properties::EMPTY
                                     })))
@@ -514,7 +514,7 @@ impl Worker {
                         }
                         *visible = new_visibility;
                         Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                            id: Some(id),
+                            id: Some(id.get()),
                             addresses: Some(Self::collect_addresses(addresses)),
                             ..finterfaces::Properties::EMPTY
                         })))
@@ -526,7 +526,7 @@ impl Worker {
                         }) => {
                             if visible {
                                 Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                                    id: Some(id),
+                                    id: Some(id.get()),
                                     addresses: (Some(Self::collect_addresses(addresses))),
                                     ..finterfaces::Properties::EMPTY
                                 })))
@@ -541,7 +541,7 @@ impl Worker {
                         has_default_route: new_value,
                     } => {
                         let mut table = finterfaces::Properties {
-                            id: Some(id),
+                            id: Some(id.get()),
                             ..finterfaces::Properties::EMPTY
                         };
                         let (state, prop) = match version {
@@ -563,7 +563,7 @@ impl Worker {
                         Ok((*online != new_online).then(|| {
                             *online = new_online;
                             finterfaces::Event::Changed(finterfaces::Properties {
-                                id: Some(id),
+                                id: Some(id.get()),
                                 online: Some(new_online),
                                 ..finterfaces::Properties::EMPTY
                             })
@@ -690,6 +690,7 @@ mod tests {
     use futures::{Future, Stream};
     use itertools::Itertools as _;
     use net_types::ip::{AddrSubnet, IpAddress as _, Ipv6, Ipv6Addr};
+    use nonzero_ext::nonzero;
     use std::convert::{TryFrom as _, TryInto as _};
     use test_case::test_case;
 
@@ -736,12 +737,12 @@ mod tests {
         let () = watchers.try_collect().await.expect("watchers error");
     }
 
-    const IFACE1_ID: BindingId = 111;
+    const IFACE1_ID: BindingId = nonzero!(111u64);
     const IFACE1_NAME: &str = "iface1";
     const IFACE1_CLASS: finterfaces::DeviceClass =
         finterfaces::DeviceClass::Device(fhardware_network::DeviceClass::Ethernet);
 
-    const IFACE2_ID: BindingId = 222;
+    const IFACE2_ID: BindingId = nonzero!(222u64);
     const IFACE2_NAME: &str = "iface2";
     const IFACE2_CLASS: finterfaces::DeviceClass =
         finterfaces::DeviceClass::Loopback(finterfaces::Empty {});
@@ -768,7 +769,7 @@ mod tests {
             watcher.next().await,
             Some(finterfaces::Event::Added(
                 finterfaces_ext::Properties {
-                    id: IFACE1_ID,
+                    id: IFACE1_ID.get(),
                     addresses: Vec::new(),
                     online: false,
                     device_class: IFACE1_CLASS,
@@ -785,7 +786,7 @@ mod tests {
         );
         const ADDR_VALID_UNTIL: zx::Time = zx::Time::from_nanos(12345);
         const BASE_PROPERTIES: finterfaces::Properties =
-            finterfaces::Properties { id: Some(IFACE1_ID), ..finterfaces::Properties::EMPTY };
+            finterfaces::Properties { id: Some(IFACE1_ID.get()), ..finterfaces::Properties::EMPTY };
 
         for (event, expect) in [
             (
@@ -851,7 +852,7 @@ mod tests {
             new_watcher.next().await,
             Some(finterfaces::Event::Existing(
                 finterfaces_ext::Properties {
-                    id: IFACE1_ID,
+                    id: IFACE1_ID.get(),
                     name: IFACE1_NAME.to_string(),
                     device_class: IFACE1_CLASS,
                     online: true,
@@ -890,22 +891,20 @@ mod tests {
         );
         assert_matches!(
             watcher.next().await,
-            Some(finterfaces::Event::Added(
-                finterfaces::Properties {
-                    id: Some(id),
-                    ..
-                })) if id == IFACE1_ID
+            Some(finterfaces::Event::Added(finterfaces::Properties {
+                id: Some(id),
+                ..
+            })) if id == IFACE1_ID.get()
         );
         assert_matches!(
             watcher.next().await,
-            Some(finterfaces::Event::Added(
-                finterfaces::Properties {
-                    id: Some(id),
-                    ..
-                })) if id == IFACE2_ID
+            Some(finterfaces::Event::Added(finterfaces::Properties {
+                id: Some(id),
+                ..
+            })) if id == IFACE2_ID.get()
         );
         std::mem::drop(producer1);
-        assert_eq!(watcher.next().await, Some(finterfaces::Event::Removed(IFACE1_ID)));
+        assert_eq!(watcher.next().await, Some(finterfaces::Event::Removed(IFACE1_ID.get())));
 
         // Create new watcher and enumerate, only interface 2 should be
         // around now.
@@ -915,7 +914,7 @@ mod tests {
             Some(finterfaces::Event::Existing(finterfaces::Properties {
                 id: Some(id),
                 ..
-            })) if id == IFACE2_ID
+            })) if id == IFACE2_ID.get()
         );
         assert_eq!(new_watcher.next().await, Some(finterfaces::Event::Idle(finterfaces::Empty {})));
     }
@@ -948,7 +947,7 @@ mod tests {
             Worker::consume_event(&mut state, event.clone()),
             Ok(Some(finterfaces::Event::Added(
                 finterfaces_ext::Properties {
-                    id,
+                    id: id.get(),
                     name: initial_state.properties.name.clone(),
                     device_class: initial_state.properties.device_class.clone(),
                     online: false,
@@ -978,7 +977,7 @@ mod tests {
         // Remove interface.
         assert_eq!(
             Worker::consume_event(&mut state, InterfaceEvent::Removed(id)),
-            Ok(Some(finterfaces::Event::Removed(id)))
+            Ok(Some(finterfaces::Event::Removed(id.get())))
         );
         // State is updated.
         assert_eq!(state.get(&id), None);
@@ -1028,7 +1027,7 @@ mod tests {
 
         let expected_response =
             expected_visible.then_some(finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id),
+                id: Some(id.get()),
                 addresses: Some(vec![finterfaces_ext::Address {
                     addr: addr.clone().into_fidl(),
                     valid_until: valid_until.into_nanos(),
@@ -1116,7 +1115,7 @@ mod tests {
         // Tentative -> Assigned becomes Tentative -> Unavailable -> Assigned.
         // This allows us to verify that changes to Unavailable do not influence
         // the events observed by the client.
-        let maybe_change_state_to_unavailable = |state: &mut HashMap<u64, InterfaceState>| {
+        let maybe_change_state_to_unavailable = |state: &mut HashMap<_, InterfaceState>| {
             if !intersperse_unavailable {
                 return;
             }
@@ -1165,7 +1164,7 @@ mod tests {
         assert_eq!(
             Worker::consume_event(&mut state, event.clone()),
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id),
+                id: Some(id.get()),
                 addresses: Some(vec![finterfaces_ext::Address {
                     addr: subnet.into_fidl(),
                     valid_until: valid_until.into_nanos()
@@ -1202,7 +1201,7 @@ mod tests {
         assert_eq!(
             Worker::consume_event(&mut state, event.clone()),
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id),
+                id: Some(id.get()),
                 addresses: Some(Vec::new()),
                 ..finterfaces::Properties::EMPTY
             })))
@@ -1263,7 +1262,7 @@ mod tests {
             IpAddressState::Assigned => (
                 true,
                 Some(finterfaces::Event::Changed(finterfaces::Properties {
-                    id: Some(id),
+                    id: Some(id.get()),
                     addresses: Some(vec![finterfaces_ext::Address {
                         addr: addr.into_fidl(),
                         valid_until: valid_until.into_nanos(),
@@ -1305,7 +1304,7 @@ mod tests {
         assert_eq!(
             Worker::consume_event(&mut state, event.clone()),
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id),
+                id: Some(id.get()),
                 addresses: Some(Vec::new()),
                 ..finterfaces::Properties::EMPTY
             })))
@@ -1331,7 +1330,7 @@ mod tests {
                 InterfaceEvent::Changed { id, event: InterfaceUpdate::OnlineChanged(true) }
             ),
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id),
+                id: Some(id.get()),
                 online: Some(true),
                 ..finterfaces::Properties::EMPTY
             })))
@@ -1378,7 +1377,7 @@ mod tests {
                 }
             ),
             Ok(Some(finterfaces::Event::Changed(finterfaces::Properties {
-                id: Some(id),
+                id: Some(id.get()),
                 ..expect_set_props
             })))
         );
@@ -1426,6 +1425,7 @@ mod tests {
         let range = 1..=10;
         let producers = watcher1
             .zip(futures::stream::iter(range.clone().map(|i| {
+                let i = BindingId::new(i).unwrap();
                 let producer = interface_sink
                     .add_interface(
                         i,
@@ -1443,7 +1443,7 @@ mod tests {
                     finterfaces::Event::Added(finterfaces::Properties {
                         id: Some(id),
                         ..
-                    }) if id == i
+                    }) if id == i.get()
                 );
                 producer
             })
@@ -1479,10 +1479,10 @@ mod tests {
 
         // NB: Every round generates two events, addition and removal because we
         // drop the producer.
-        for i in 1..=(MAX_EVENTS / 2 + 1) {
+        for i in 1..=(MAX_EVENTS / 2 + 1).try_into().unwrap() {
             let _: InterfaceEventProducer = interface_sink
                 .add_interface(
-                    i.try_into().unwrap(),
+                    BindingId::new(i).unwrap(),
                     InterfaceProperties { name: format!("if{}", i), device_class: IFACE1_CLASS },
                 )
                 .expect("failed to add interface");
@@ -1545,7 +1545,7 @@ mod tests {
                 watcher.next().await,
                 Some(finterfaces::Event::Added(finterfaces::Properties {
                     id: Some(id), .. }
-                )) if id == IFACE1_ID
+                )) if id == IFACE1_ID.get()
             );
 
             let mut expect = vec![];
@@ -1563,10 +1563,10 @@ mod tests {
                 let addresses = assert_matches!(
                     watcher.next().await,
                     Some(finterfaces::Event::Changed(finterfaces::Properties{
-                        id: Some(IFACE1_ID),
+                        id: Some(id),
                         addresses: Some(addresses),
                         ..
-                    })) => addresses
+                    })) if id == IFACE1_ID.get() => addresses
                 );
                 let addresses = addresses
                     .into_iter()
@@ -1575,7 +1575,7 @@ mod tests {
                 assert_eq!(addresses, expect);
             }
             std::mem::drop(producer);
-            assert_eq!(watcher.next().await, Some(finterfaces::Event::Removed(IFACE1_ID)));
+            assert_eq!(watcher.next().await, Some(finterfaces::Event::Removed(IFACE1_ID.get())));
         }
     }
 

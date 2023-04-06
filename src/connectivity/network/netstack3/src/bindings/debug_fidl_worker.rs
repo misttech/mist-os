@@ -16,8 +16,10 @@ use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use tracing::{debug, error, warn};
 
 use crate::bindings::{
-    devices::LOOPBACK_MAC, interfaces_admin, util::IntoFidl, DeviceIdExt as _, DeviceSpecificInfo,
-    Netstack,
+    devices::{BindingId, LOOPBACK_MAC},
+    interfaces_admin,
+    util::IntoFidl,
+    DeviceIdExt as _, DeviceSpecificInfo, Netstack,
 };
 
 // Serve a stream of fuchsia.net.debug.Interfaces API requests for a single
@@ -51,7 +53,9 @@ async fn handle_get_admin(
 ) {
     debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetAdmin");
     let ctx = ns.ctx.lock().await;
-    let core_id = match ctx.non_sync_ctx.devices.get_core_id(interface_id) {
+    let core_id =
+        BindingId::new(interface_id).and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id));
+    let core_id = match core_id {
         Some(c) => c,
         None => {
             control.close_with_epitaph(zx::Status::NOT_FOUND).unwrap_or_else(|e| {
@@ -78,9 +82,8 @@ async fn handle_get_admin(
 async fn handle_get_mac(ns: &Netstack, interface_id: u64) -> fnet_debug::InterfacesGetMacResult {
     debug!(interface_id, "handling fuchsia.net.debug.Interfaces::GetMac");
     let ctx = ns.ctx.lock().await;
-    ctx.non_sync_ctx
-        .devices
-        .get_core_id(interface_id)
+    BindingId::new(interface_id)
+        .and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id))
         .ok_or(fnet_debug::InterfacesGetMacError::NotFound)
         .map(|core_id| {
             let mac = match core_id.external_state() {
@@ -97,7 +100,8 @@ async fn handle_get_port(
     port: ServerEnd<fhardware_network::PortMarker>,
 ) {
     let ctx = ns.ctx.lock().await;
-    let core_id = ctx.non_sync_ctx.devices.get_core_id(interface_id);
+    let core_id =
+        BindingId::new(interface_id).and_then(|id| ctx.non_sync_ctx.devices.get_core_id(id));
     let port_handler =
         core_id.as_ref().ok_or(zx::Status::NOT_FOUND).map(|core_id| core_id.external_state());
     let port_handler =

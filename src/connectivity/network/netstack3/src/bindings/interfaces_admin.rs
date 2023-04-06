@@ -619,7 +619,7 @@ async fn dispatch_control_request(
         fnet_interfaces_admin::ControlRequest::RemoveAddress { address, responder } => {
             responder.send(&mut Ok(remove_address(ctx, id, address).await))
         }
-        fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id),
+        fnet_interfaces_admin::ControlRequest::GetId { responder } => responder.send(id.get()),
         fnet_interfaces_admin::ControlRequest::SetConfiguration { config, responder } => {
             responder.send(&mut set_configuration(ctx, id, config).await)
         }
