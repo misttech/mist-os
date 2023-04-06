@@ -7180,7 +7180,7 @@ Supported modes are:
 
 **Current value (from the default):** `"copy"`
 
-From //src/sys/pkg/bin/package-tool/package-tool.gni:185
+From //src/sys/pkg/bin/package-tool/package-tool.gni:296
 
 ### restat_cc
 
