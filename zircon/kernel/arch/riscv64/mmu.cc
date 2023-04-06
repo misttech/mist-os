@@ -3,6 +3,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
+
 #include <align.h>
 #include <assert.h>
 #include <bits.h>
@@ -20,6 +21,7 @@
 #include <zircon/types.h>
 
 #include <arch/aspace.h>
+#include <arch/ops.h>
 #include <arch/riscv64/mmu.h>
 #include <arch/riscv64/sbi.h>
 #include <fbl/auto_lock.h>
@@ -1269,3 +1271,5 @@ void Riscv64VmICacheConsistencyManager::Finish() {
   // TODO(revest): Flush
   need_invalidate_ = false;
 }
+
+uint32_t arch_address_tagging_features() { return 0; }
