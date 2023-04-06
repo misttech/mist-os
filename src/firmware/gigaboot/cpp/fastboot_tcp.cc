@@ -7,6 +7,7 @@
 
 #include <lib/fit/result.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "fastboot.h"
 #include "gigaboot/src/inet6.h"
@@ -68,6 +69,14 @@ class TcpTransport : public TcpTransportInterface {
 };
 
 zx::result<> FastbootTcpMain() {
+  // Once |fb_tcp_socket| is initialized, parts of the struct are under control of the TCP driver
+  // and may be modified asynchronously. This means we cannot return until we successfully close
+  // the socket, or else we're likely to get stack corruption in the bytes that used to be part of
+  // |fb_tcp_socket|.
+  //
+  // We could potentially move this to the heap if we want to be able to return without closing the
+  // socket, but it doesn't seem necessary at this point; fastboot isn't part of the standard boot
+  // flow so it's probably OK to just abort() on TCP failure rather than trying to push through.
   tcp6_socket fb_tcp_socket = {};
   auto init_res = TcpInitialize(fb_tcp_socket);
   if (init_res.is_error()) {
@@ -93,10 +102,7 @@ zx::result<> FastbootTcpMain() {
       printf("Receive client connection\n");
       FastbootTcpSession(transport, fastboot);
       if (fastboot.IsContinue()) {
-        // Close is best effort since we're about to hand control over to the kernel.
-        mdns_stop(/* fastboot_tcp = */ true);
-        tcp6_close(&fb_tcp_socket);
-        return zx::ok();
+        break;
       }
 
       printf("Disconnecting tcp6...");
@@ -106,13 +112,32 @@ zx::result<> FastbootTcpMain() {
       }
 
       if (disconnect_res != TCP6_RESULT_SUCCESS) {
+        // Failed to disconnect; socket is in an unknown state and cannot be recovered. Do not
+        // return; see notes at the beginning of function.
         mdns_stop(/* fastboot_tcp = */ true);
-        printf("Failed to disconnect socket, %d\n", disconnect_res);
-        return zx::error(ZX_ERR_INTERNAL);
+        printf("FATAL: failed to disconnect socket, %d\n", disconnect_res);
+        abort();
       }
       printf("disconnected\n");
     }
   }
+
+  mdns_stop(/* fastboot_tcp = */ true);
+  while (true) {
+    auto result = tcp6_close(&fb_tcp_socket);
+    if (result == TCP6_RESULT_SUCCESS) {
+      break;
+    } else if (result == TCP6_RESULT_PENDING) {
+      continue;
+    } else {
+      // Failed to close; socket is in an unknown state and cannot be recovered. Do not return; see
+      // notes at the beginning of function.
+      printf("FATAL: failed to close socket, %d\n", result);
+      abort();
+    }
+  }
+
+  return zx::ok();
 }
 
 }  // namespace gigaboot
