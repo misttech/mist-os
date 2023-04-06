@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/chromium/web_engine/meta/shards/test/launch_context_provider.shard.cml",
         "//src/chromium/web_engine/meta/shards/web_engine_base.shard.cml",
         "//src/chromium/web_engine/meta/shards/web_engine_feature_keyboard.shard.cml",
         "//src/chromium/web_engine/meta/shards/web_engine_feature_network.shard.cml",

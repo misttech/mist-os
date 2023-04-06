@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 // This shard contains the minimum set of capabilities required to create a
-// `fuchsia.web.Context`(aka `web_instance`).
-// Include this shard when `fuchsia.web.ContextProvider` may be used.
+// `fuchsia.web.Context`(aka `web_instance`) via `fuchsia.web.ContextProvider`.
+//
+// Include this shard when `fuchsia.web.ContextProvider.Create` may be used.
 // Capabilities only required by ContextProvider are not included.
 //
 {

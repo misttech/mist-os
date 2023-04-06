@@ -59,7 +59,10 @@ fuchsia_component("virtual-keyboard-test-component") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/virtual-keyboard-test.cml"
-  deps = [ ":virtual-keyboard-test-bin" ]
+  deps = [
+    ":virtual-keyboard-test-bin",
+    "//src/chromium/web_engine/meta/shards/test:launch_context_provider",
+  ]
 }
 
 fuchsia_test_package("virtual-keyboard-test") {
