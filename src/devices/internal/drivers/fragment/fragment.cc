@@ -50,47 +50,49 @@ zx_status_t Fragment::Bind(void* ctx, zx_device_t* parent) {
   MakeUniqueName(name);
   auto dev = std::make_unique<Fragment>(parent, fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Failed to create directory endpoints: %s", endpoints.status_string());
-    return endpoints.status_value();
-  }
-  {
-    zx::result result = dev->outgoing_->AddUnmanagedProtocol(
-        [dev = dev.get()](zx::channel server) {
-          dev->rpc_channel_ = std::move(server);
-          dev->rpc_wait_.set_object(dev->rpc_channel_.get());
-          dev->rpc_wait_.set_trigger(ZX_CHANNEL_READABLE);
-          dev->rpc_wait_.set_handler([dev](async_dispatcher_t* dispatcher, async::Wait* wait,
-                                           zx_status_t status, const zx_packet_signal_t* signal) {
-            dev->ReadFidlFromChannel();
-            dev->rpc_wait_.Begin(dev->dispatcher_);
-          });
-          dev->rpc_wait_.Begin(dev->dispatcher_);
-        },
-        "proxy_channel");
-    if (result.status_value() != ZX_OK) {
-      zxlogf(ERROR, "Failed to add outgoing protocol: %s", result.status_string());
-      return result.status_value();
-    }
-  }
-
-  zx::result result = dev->outgoing_->Serve(std::move(endpoints->server));
-  if (result.status_value() != ZX_OK) {
-    zxlogf(ERROR, "Failed to service the outgoing directory %s", result.status_string());
-    return result.status_value();
+  zx::result client_end = fidl::CreateEndpoints(&dev->server_endpoint_);
+  if (client_end.is_error()) {
+    zxlogf(ERROR, "Failed to create directory endpoints: %s", client_end.status_string());
+    return client_end.status_value();
   }
 
   // The thing before the comma will become the process name, if a new process
   // is created
   auto status = dev->DdkAdd(ddk::DeviceAddArgs(name)
                                 .set_flags(DEVICE_ADD_NON_BINDABLE | DEVICE_ADD_MUST_ISOLATE)
-                                .set_outgoing_dir(endpoints->client.TakeChannel()));
+                                .set_outgoing_dir(client_end->TakeChannel()));
   if (status == ZX_OK) {
     // devmgr owns the memory now
     [[maybe_unused]] auto ptr = dev.release();
   }
   return status;
+}
+
+void Fragment::DdkInit(ddk::InitTxn init_txn) {
+  zx::result result = outgoing_->AddUnmanagedProtocol(
+      [this](zx::channel server) {
+        rpc_channel_ = std::move(server);
+        rpc_wait_.set_object(rpc_channel_.get());
+        rpc_wait_.set_trigger(ZX_CHANNEL_READABLE);
+        rpc_wait_.set_handler([this](async_dispatcher_t* dispatcher, async::Wait* wait,
+                                     zx_status_t status, const zx_packet_signal_t* signal) {
+          ReadFidlFromChannel();
+          rpc_wait_.Begin(dispatcher_);
+        });
+        rpc_wait_.Begin(dispatcher_);
+      },
+      "proxy_channel");
+  if (result.status_value() != ZX_OK) {
+    zxlogf(ERROR, "Failed to add outgoing protocol: %s", result.status_string());
+    return init_txn.Reply(result.status_value());
+  }
+
+  result = outgoing_->Serve(std::move(server_endpoint_));
+  if (result.status_value() != ZX_OK) {
+    zxlogf(ERROR, "Failed to service the outgoing directory %s", result.status_string());
+    return init_txn.Reply(result.status_value());
+  }
+  init_txn.Reply(ZX_OK);
 }
 
 zx_status_t Fragment::RpcCanvas(const uint8_t* req_buf, uint32_t req_size, uint8_t* resp_buf,

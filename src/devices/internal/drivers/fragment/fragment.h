@@ -59,7 +59,8 @@ class ProtocolClient {
 };
 
 class Fragment;
-using FragmentBase = ddk::Device<Fragment, ddk::GetProtocolable, ddk::Unbindable>;
+using FragmentBase =
+    ddk::Device<Fragment, ddk::GetProtocolable, ddk::Initializable, ddk::Unbindable>;
 
 class Fragment : public FragmentBase {
  public:
@@ -93,6 +94,7 @@ class Fragment : public FragmentBase {
 
   static zx_status_t Bind(void* ctx, zx_device_t* parent);
 
+  void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
   void DdkUnbind(ddk::UnbindTxn txn);
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out_protocol);
@@ -172,6 +174,7 @@ class Fragment : public FragmentBase {
   zx::channel rpc_channel_;
   async_dispatcher_t* dispatcher_;
   std::optional<component::OutgoingDirectory> outgoing_;
+  fidl::ServerEnd<fuchsia_io::Directory> server_endpoint_;
 };
 
 }  // namespace fragment
