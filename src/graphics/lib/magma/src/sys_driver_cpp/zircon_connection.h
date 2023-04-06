@@ -15,11 +15,11 @@
 #include <lib/zx/profile.h>
 #include <zircon/status.h>
 
+#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "magma_util/dlog.h"
 #include "magma_util/status.h"
 #include "msd/msd_defs.h"
 #include "msd_cc.h"
-#include "platform_object.h"
 #include "platform_thread.h"
 
 namespace magma {
@@ -43,9 +43,11 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   class Delegate {
    public:
     virtual ~Delegate() {}
-    virtual magma::Status ImportObject(zx::handle handle, PlatformObject::Type object_type,
+    virtual magma::Status ImportObject(zx::handle handle,
+                                       fuchsia_gpu_magma::wire::ObjectType object_type,
                                        uint64_t client_id) = 0;
-    virtual magma::Status ReleaseObject(uint64_t object_id, PlatformObject::Type object_type) = 0;
+    virtual magma::Status ReleaseObject(uint64_t object_id,
+                                        fuchsia_gpu_magma::wire::ObjectType object_type) = 0;
 
     virtual magma::Status CreateContext(uint32_t context_id) = 0;
     virtual magma::Status DestroyContext(uint32_t context_id) = 0;

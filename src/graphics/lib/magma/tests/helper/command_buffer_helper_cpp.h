@@ -224,7 +224,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
       wait_semaphores_.push_back(semaphore);
       success = connection_
                     ->ImportObject(zx::event(std::move(duplicate_handle)),
-                                   magma::PlatformObject::SEMAPHORE, semaphore->id())
+                                   fuchsia_gpu_magma::wire::ObjectType::kEvent, semaphore->id())
                     .ok();
       MAGMA_DASSERT(success);
       abi_wait_semaphore_ids()[i] = semaphore->id();
@@ -243,7 +243,7 @@ class CommandBufferHelper final : public msd::NotificationHandler {
       signal_semaphores_.push_back(semaphore);
       success = connection_
                     ->ImportObject(zx::event(std::move(duplicate_handle)),
-                                   magma::PlatformObject::SEMAPHORE, semaphore->id())
+                                   fuchsia_gpu_magma::wire::ObjectType::kEvent, semaphore->id())
                     .ok();
       MAGMA_DASSERT(success);
       abi_signal_semaphore_ids()[i] = semaphore->id();

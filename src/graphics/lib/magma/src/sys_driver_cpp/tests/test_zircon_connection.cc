@@ -11,6 +11,7 @@
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "platform_connection_client.h"
 #include "platform_handle.h"
 #include "platform_port.h"
@@ -486,36 +487,38 @@ class TestDelegate : public magma::ZirconConnection::Delegate {
  public:
   TestDelegate(std::shared_ptr<SharedData> shared_data) : shared_data_(shared_data) {}
 
-  magma::Status ImportObject(zx::handle handle, magma::PlatformObject::Type object_type,
+  magma::Status ImportObject(zx::handle handle, fuchsia_gpu_magma::wire::ObjectType object_type,
                              uint64_t object_id) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {
-      case magma::PlatformObject::SEMAPHORE: {
+      case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
         auto semaphore = magma::PlatformSemaphore::Import(zx::event(std::move(handle)));
         if (!semaphore)
           return MAGMA_STATUS_INVALID_ARGS;
         EXPECT_EQ(object_id, shared_data_->test_semaphore_id);
       } break;
-      case magma::PlatformObject::BUFFER: {
+      case fuchsia_gpu_magma::wire::ObjectType::kBuffer: {
         auto buffer = magma::PlatformBuffer::Import(zx::vmo(std::move(handle)));
         if (!buffer)
           return MAGMA_STATUS_INVALID_ARGS;
         EXPECT_EQ(object_id, shared_data_->test_buffer_id);
       } break;
+      default:
+        EXPECT_TRUE(false) << static_cast<uint32_t>(object_type);
     }
     shared_data_->test_complete = true;
     return MAGMA_STATUS_OK;
   }
 
   magma::Status ReleaseObject(uint64_t object_id,
-                              magma::PlatformObject::Type object_type) override {
+                              fuchsia_gpu_magma::wire::ObjectType object_type) override {
     std::unique_lock<std::mutex> lock(shared_data_->mutex);
     switch (object_type) {
-      case magma::PlatformObject::SEMAPHORE: {
+      case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
         EXPECT_EQ(object_id, shared_data_->test_semaphore_id);
         break;
       }
-      case magma::PlatformObject::BUFFER: {
+      case fuchsia_gpu_magma::wire::ObjectType::kBuffer: {
         EXPECT_EQ(object_id, shared_data_->test_buffer_id);
         break;
       }

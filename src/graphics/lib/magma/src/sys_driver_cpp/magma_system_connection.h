@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "magma_system_buffer.h"
 #include "magma_system_context.h"
 #include "magma_util/macros.h"
@@ -27,9 +28,10 @@ class MagmaSystemConnection : private MagmaSystemContext::Owner,
 
   ~MagmaSystemConnection() override;
 
-  magma::Status ImportObject(zx::handle handle, magma::PlatformObject::Type object_type,
+  magma::Status ImportObject(zx::handle handle, fuchsia_gpu_magma::wire::ObjectType object_type,
                              uint64_t client_id) override;
-  magma::Status ReleaseObject(uint64_t object_id, magma::PlatformObject::Type object_type) override;
+  magma::Status ReleaseObject(uint64_t object_id,
+                              fuchsia_gpu_magma::wire::ObjectType object_type) override;
   magma::Status CreateContext(uint32_t context_id) override;
   magma::Status DestroyContext(uint32_t context_id) override;
   magma::Status ExecuteCommandBufferWithResources(

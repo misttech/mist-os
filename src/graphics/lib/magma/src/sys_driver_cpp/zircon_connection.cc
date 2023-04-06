@@ -9,16 +9,17 @@
 
 #include <optional>
 
+#include "fidl/fuchsia.gpu.magma/cpp/wire_types.h"
 #include "platform_trace.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
 
 namespace {
-std::optional<magma::PlatformObject::Type> GetObjectType(fuchsia_gpu_magma::ObjectType fidl_type) {
+std::optional<fuchsia_gpu_magma::ObjectType> ValidateObjectType(
+    fuchsia_gpu_magma::ObjectType fidl_type) {
   switch (fidl_type) {
     case fuchsia_gpu_magma::ObjectType::kBuffer:
-      return magma::PlatformObject::Type::BUFFER;
     case fuchsia_gpu_magma::ObjectType::kEvent:
-      return magma::PlatformObject::Type::SEMAPHORE;
+      return {fidl_type};
     default:
       return std::nullopt;
   }
@@ -241,7 +242,7 @@ void ZirconConnection::ImportObject2(ImportObject2RequestView request,
                  static_cast<uint32_t>(request->object_type));
   DLOG("ZirconConnection: ImportObject2");
 
-  auto object_type = GetObjectType(request->object_type);
+  auto object_type = ValidateObjectType(request->object_type);
   if (!object_type) {
     SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
     return;
@@ -249,7 +250,7 @@ void ZirconConnection::ImportObject2(ImportObject2RequestView request,
 
   uint64_t size = 0;
 
-  if (object_type == magma::PlatformObject::BUFFER) {
+  if (object_type == fuchsia_gpu_magma::wire::ObjectType::kBuffer) {
     zx::unowned_vmo vmo(request->object.get());
     zx_status_t status = vmo->get_size(&size);
     if (status != ZX_OK) {
@@ -270,7 +271,7 @@ void ZirconConnection::ReleaseObject(ReleaseObjectRequestView request,
   DLOG("ZirconConnection: ReleaseObject");
   FlowControl();
 
-  auto object_type = GetObjectType(request->object_type);
+  auto object_type = ValidateObjectType(request->object_type);
   if (!object_type) {
     SetError(&completer, MAGMA_STATUS_INVALID_ARGS);
     return;

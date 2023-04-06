@@ -276,7 +276,7 @@ async_dispatcher_t* MagmaSystemConnection::GetAsyncDispatcher() {
 }
 
 magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
-                                                  magma::PlatformObject::Type object_type,
+                                                  fuchsia_gpu_magma::wire::ObjectType object_type,
                                                   uint64_t client_id) {
   if (!client_id)
     return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "client_id must be non zero");
@@ -286,10 +286,10 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
     return MAGMA_DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to lock device");
 
   switch (object_type) {
-    case magma::PlatformObject::BUFFER:
+    case fuchsia_gpu_magma::wire::ObjectType::kBuffer:
       return ImportBuffer(std::move(handle), client_id);
 
-    case magma::PlatformObject::SEMAPHORE: {
+    case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
       auto platform_sem = magma::PlatformSemaphore::Import(zx::event(std::move(handle)));
       if (!platform_sem)
         return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "failed to import platform semaphore");
@@ -316,13 +316,13 @@ magma::Status MagmaSystemConnection::ImportObject(zx::handle handle,
   return MAGMA_STATUS_OK;
 }
 
-magma::Status MagmaSystemConnection::ReleaseObject(uint64_t object_id,
-                                                   magma::PlatformObject::Type object_type) {
+magma::Status MagmaSystemConnection::ReleaseObject(
+    uint64_t object_id, fuchsia_gpu_magma::wire::ObjectType object_type) {
   switch (object_type) {
-    case magma::PlatformObject::BUFFER:
+    case fuchsia_gpu_magma::wire::ObjectType::kBuffer:
       return ReleaseBuffer(object_id);
 
-    case magma::PlatformObject::SEMAPHORE: {
+    case fuchsia_gpu_magma::wire::ObjectType::kEvent: {
       auto iter = semaphore_map_.find(object_id);
       if (iter == semaphore_map_.end())
         return MAGMA_DRET_MSG(MAGMA_STATUS_INVALID_ARGS,

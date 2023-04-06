@@ -150,8 +150,8 @@ TEST(MagmaSystemConnection, Semaphores) {
   zx::handle duplicate_handle1;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle1));
 
-  EXPECT_TRUE(connection.ImportObject(std::move(duplicate_handle1),
-                                      magma::PlatformObject::SEMAPHORE, semaphore->id()));
+  EXPECT_TRUE(connection.ImportObject(
+      std::move(duplicate_handle1), fuchsia_gpu_magma::wire::ObjectType::kEvent, semaphore->id()));
 
   auto system_semaphore = connection.LookupSemaphore(semaphore->id());
   EXPECT_NE(system_semaphore, nullptr);
@@ -161,21 +161,24 @@ TEST(MagmaSystemConnection, Semaphores) {
   zx::handle duplicate_handle2;
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle2));
 
-  EXPECT_TRUE(connection.ImportObject(std::move(duplicate_handle2),
-                                      magma::PlatformObject::SEMAPHORE, semaphore->id()));
+  EXPECT_TRUE(connection.ImportObject(
+      std::move(duplicate_handle2), fuchsia_gpu_magma::wire::ObjectType::kEvent, semaphore->id()));
 
   // freeing the allocated semaphore should decrease refcount to 1
-  EXPECT_TRUE(connection.ReleaseObject(semaphore->id(), magma::PlatformObject::SEMAPHORE));
+  EXPECT_TRUE(
+      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
   EXPECT_NE(connection.LookupSemaphore(semaphore->id()), nullptr);
 
   // freeing the allocated buffer should work
-  EXPECT_TRUE(connection.ReleaseObject(semaphore->id(), magma::PlatformObject::SEMAPHORE));
+  EXPECT_TRUE(
+      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
 
   // should no longer be able to get it from the map
   EXPECT_EQ(connection.LookupSemaphore(semaphore->id()), nullptr);
 
   // should not be able to double free it
-  EXPECT_FALSE(connection.ReleaseObject(semaphore->id(), magma::PlatformObject::SEMAPHORE));
+  EXPECT_FALSE(
+      connection.ReleaseObject(semaphore->id(), fuchsia_gpu_magma::wire::ObjectType::kEvent));
 }
 
 TEST(MagmaSystemConnection, BadSemaphoreImport) {
@@ -188,8 +191,8 @@ TEST(MagmaSystemConnection, BadSemaphoreImport) {
   MagmaSystemConnection connection(dev, std::move(msd_connection));
 
   constexpr uint32_t kBogusHandle = 0xabcd1234;
-  EXPECT_FALSE(
-      connection.ImportObject(zx::handle(kBogusHandle), magma::PlatformObject::SEMAPHORE, 0));
+  EXPECT_FALSE(connection.ImportObject(zx::handle(kBogusHandle),
+                                       fuchsia_gpu_magma::wire::ObjectType::kEvent, 0));
 
   auto buffer = magma::PlatformBuffer::Create(4096, "test");
   ASSERT_TRUE(buffer);
@@ -197,8 +200,8 @@ TEST(MagmaSystemConnection, BadSemaphoreImport) {
   zx::handle buffer_handle;
   ASSERT_TRUE(buffer->duplicate_handle(&buffer_handle));
 
-  EXPECT_FALSE(connection.ImportObject(std::move(buffer_handle), magma::PlatformObject::SEMAPHORE,
-                                       buffer->id()));
+  EXPECT_FALSE(connection.ImportObject(std::move(buffer_handle),
+                                       fuchsia_gpu_magma::wire::ObjectType::kEvent, buffer->id()));
 }
 
 TEST(MagmaSystemConnection, BufferSharing) {
