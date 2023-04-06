@@ -994,37 +994,41 @@ pub(crate) mod testutil {
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<IpSockRoute<I, Self::DeviceId>, IpSockRouteError> {
             let FakeIpSocketCtx { device_state, table, ip_device_id_ctx } = self;
-            let destination = table
-                .lookup(ip_device_id_ctx, device, *addr)
+
+            let (destination, ()) = table
+                .lookup_filter_map(ip_device_id_ctx, device, *addr, |_, d| match &local_ip {
+                    None => Some(()),
+                    Some(local_ip) => device_state
+                        .get(d)
+                        .and_then(|state| state.addrs.read().find(local_ip).map(|_| ())),
+                })
+                .next()
                 .ok_or(IpSockUnroutableError::NoRouteToRemoteAddr)?;
 
-            let Destination { device, next_hop: _ } = &destination;
-            local_ip
-                .map_or_else(
-                    || {
-                        device_state
-                            .get(&device)
-                            .unwrap()
-                            .addrs
-                            .read()
-                            .iter()
-                            .map(|e| e.addr())
-                            .next()
-                            .ok_or(IpSockRouteError::NoLocalAddrAvailable)
-                    },
-                    |local_ip| {
-                        device_state
-                            .get(&device)
-                            .unwrap()
-                            .addrs
-                            .read()
-                            .iter()
-                            .any(|e| e.addr() == local_ip)
-                            .then(|| local_ip)
-                            .ok_or(IpSockUnroutableError::LocalAddrNotAssigned.into())
-                    },
-                )
-                .map(|local_ip| IpSockRoute { local_ip, destination })
+            let Destination { device, next_hop } = destination;
+            let addrs = device_state.get(&device).unwrap().addrs.read();
+            let mut addrs = addrs.iter();
+            let local_ip = match local_ip {
+                None => {
+                    addrs.map(|e| e.addr()).next().ok_or(IpSockRouteError::NoLocalAddrAvailable)?
+                }
+                Some(local_ip) => {
+                    // We already constrained the set of devices so this
+                    // should be a given.
+                    assert!(
+                        addrs.any(|e| e.addr() == local_ip),
+                        "didn't find IP {:?} in {:?}",
+                        local_ip,
+                        addrs.collect::<Vec<_>>()
+                    );
+                    local_ip
+                }
+            };
+
+            Ok(IpSockRoute {
+                local_ip,
+                destination: Destination { next_hop, device: device.clone() },
+            })
         }
     }
 

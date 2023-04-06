@@ -3915,12 +3915,12 @@ mod tests {
                 )| {
                     assert_eq!(proto, &IpProto::Udp.into());
                     assert_eq!(dst_ip, &I::get_other_remote_ip_address(1),);
-                    device
+                    *device
                 },
             )
             .collect::<Vec<_>>();
         received_devices.sort();
-        assert_eq!(received_devices, [&MultipleDevicesId::A, &MultipleDevicesId::B]);
+        assert_eq!(received_devices, &MultipleDevicesId::all());
     }
 
     fn receive_packet_on<I: Ip + TestIpExt>(
@@ -4116,6 +4116,7 @@ mod tests {
             match id {
                 MultipleDevicesId::A => 0,
                 MultipleDevicesId::B => 1,
+                MultipleDevicesId::C => 2,
             }
         }
 
@@ -4145,8 +4146,7 @@ mod tests {
         for (device, listener) in bound_on_devices {
             assert_eq!(listen_data[&listener], vec![&[index_for_device(device)]]);
         }
-        let expected_listener_data: &[&[u8]] =
-            &[&[index_for_device(MultipleDevicesId::A)], &[index_for_device(MultipleDevicesId::B)]];
+        let expected_listener_data = &MultipleDevicesId::all().map(|d| vec![index_for_device(d)]);
         assert_eq!(&listen_data[&listener], expected_listener_data);
     }
 
@@ -5923,8 +5923,6 @@ where {
         assert_eq!(send_and_get_ttl(remote_ip::<I>()), Some(UNICAST_HOPS));
     }
 
-    /// Tests that incoming ICMP errors are properly delivered to a connection,
-    /// a listener, and a wildcard listener.
     #[test]
     fn test_icmp_error() {
         // Create a context with:

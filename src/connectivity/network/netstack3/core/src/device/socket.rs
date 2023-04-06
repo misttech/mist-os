@@ -630,7 +630,8 @@ mod tests {
             device_socket_lists,
             HashMap::from([
                 (&MultipleDevicesId::A, [].as_slice()),
-                (&MultipleDevicesId::B, &[index])
+                (&MultipleDevicesId::B, &[index]),
+                (&MultipleDevicesId::C, [].as_slice())
             ])
         );
     }

@@ -299,16 +299,38 @@ impl<I: Ip, D: Clone + Debug + PartialEq> ForwardingTable<I, D> {
         local_device: Option<&D>,
         address: I::Addr,
     ) -> Option<Destination<I::Addr, D>> {
-        let Self { table } = self;
+        self.lookup_filter_map(sync_ctx, local_device, address, |_: &mut SC, _: &D| Some(()))
+            .map(|(Destination { device, next_hop }, ())| Destination {
+                device: device.clone(),
+                next_hop,
+            })
+            .next()
+    }
 
+    pub(crate) fn lookup_filter_map<'a, SC: DeviceIdContext<AnyDevice, DeviceId = D>, R>(
+        &'a self,
+        sync_ctx: &'a mut SC,
+        local_device: Option<&'a D>,
+        address: I::Addr,
+        mut f: impl FnMut(&mut SC, &D) -> Option<R> + 'a,
+    ) -> impl Iterator<Item = (Destination<I::Addr, &D>, R)> + 'a {
+        let Self { table } = self;
         // Get all potential routes we could take to reach `address`.
-        table.iter().find_map(|ip::types::Entry { subnet, device, gateway, metric: _ }| {
-            (subnet.contains(&address)
-                && local_device.map_or(true, |d| d == device)
-                && sync_ctx.is_device_installed(device))
-            .then(|| {
+        table.iter().filter_map(move |entry| {
+            let ip::types::Entry { subnet, device, gateway, metric: _ } = entry;
+            if !subnet.contains(&address) {
+                return None;
+            }
+            if local_device.map_or(false, |local_device| local_device != device) {
+                return None;
+            }
+            if !sync_ctx.is_device_installed(device) {
+                return None;
+            }
+
+            f(sync_ctx, device).map(|r| {
                 let next_hop = gateway.map_or(NextHop::RemoteAsNeighbor, NextHop::Gateway);
-                Destination { next_hop, device: device.clone() }
+                (Destination { next_hop, device }, r)
             })
         })
     }
@@ -744,6 +766,94 @@ mod tests {
                 device: MORE_SPECIFIC_SUB_DEVICE.clone()
             },
             "matches the most specific route with the specified device"
+        );
+    }
+
+    #[ip_test]
+    fn test_lookup_filter_map<I: Ip + TestIpExt>() {
+        let mut sync_ctx = FakeCtx::<I>::default();
+        let mut table = ForwardingTable::<I, MultipleDevicesId>::default();
+
+        let (next_hop, more_specific_sub) = I::next_hop_addr_sub(1, 1);
+        let less_specific_sub = {
+            let (addr, sub) = I::next_hop_addr_sub(1, 2);
+            assert_eq!(next_hop, addr);
+            sub
+        };
+
+        // MultipleDevicesId::A always has a more specific route than B or C.
+        {
+            let metric = Metric::ExplicitMetric(RawMetric(0));
+            let more_specific_entry = ip::types::Entry {
+                subnet: more_specific_sub,
+                device: MultipleDevicesId::A,
+                gateway: None,
+                metric,
+            };
+            let _: &_ = table.add_entry(more_specific_entry).expect("was added");
+        }
+        // B and C have the same route but with different metrics.
+        for (device, metric) in [(MultipleDevicesId::B, 100), (MultipleDevicesId::C, 200)] {
+            let less_specific_entry = ip::types::Entry {
+                subnet: less_specific_sub,
+                device,
+                gateway: None,
+                metric: Metric::ExplicitMetric(RawMetric(metric)),
+            };
+            let _: &_ = table.add_entry(less_specific_entry).expect("was added");
+        }
+
+        fn lookup_with_devices<I: Ip>(
+            table: &ForwardingTable<I, MultipleDevicesId>,
+            next_hop: SpecifiedAddr<I::Addr>,
+            sync_ctx: &mut FakeSyncCtx<FakeForwardingContext<I>, (), MultipleDevicesId>,
+            devices: &[MultipleDevicesId],
+        ) -> Vec<Destination<I::Addr, MultipleDevicesId>> {
+            table
+                .lookup_filter_map(sync_ctx, None, *next_hop, |_, d| {
+                    devices.iter().contains(d).then_some(())
+                })
+                .map(|(Destination { next_hop, device }, ())| Destination {
+                    next_hop,
+                    device: device.clone(),
+                })
+                .collect::<Vec<_>>()
+        }
+
+        // Looking up the address without constraints should always give a route
+        // through device A.
+        assert_eq!(
+            table.lookup(&mut sync_ctx, None, *next_hop),
+            Some(Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::A })
+        );
+        // Without filtering, we should get A, then B, then C.
+        assert_eq!(
+            lookup_with_devices(&table, next_hop, &mut sync_ctx, &MultipleDevicesId::all()),
+            &[
+                Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::A },
+                Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::B },
+                Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::C },
+            ]
+        );
+
+        // If we filter out A, we get B and C.
+        assert_eq!(
+            lookup_with_devices(
+                &table,
+                next_hop,
+                &mut sync_ctx,
+                &[MultipleDevicesId::B, MultipleDevicesId::C]
+            ),
+            &[
+                Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::B },
+                Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::C }
+            ]
+        );
+
+        // If we only allow C, we won't get the other devices.
+        assert_eq!(
+            lookup_with_devices(&table, next_hop, &mut sync_ctx, &[MultipleDevicesId::C]),
+            &[Destination { next_hop: NextHop::RemoteAsNeighbor, device: MultipleDevicesId::C }]
         );
     }
 

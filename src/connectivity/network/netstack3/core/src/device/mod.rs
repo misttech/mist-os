@@ -2069,11 +2069,12 @@ pub(crate) mod testutil {
     pub(crate) enum MultipleDevicesId {
         A,
         B,
+        C,
     }
 
     impl MultipleDevicesId {
-        pub(crate) fn all() -> [Self; 2] {
-            [Self::A, Self::B]
+        pub(crate) fn all() -> [Self; 3] {
+            [Self::A, Self::B, Self::C]
         }
     }
 

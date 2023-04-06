@@ -26,14 +26,15 @@ use core::{
     num::{NonZeroU32, NonZeroU8},
     sync::atomic::{self, AtomicU16},
 };
+
+use derivative::Derivative;
+use explicit::ResultExt as _;
+use lock_order::lock::UnlockedAccess;
 use lock_order::{
     lock::{LockFor, RwLockFor},
     relation::LockBefore,
     Locked,
 };
-
-use derivative::Derivative;
-use lock_order::lock::UnlockedAccess;
 use log::{debug, trace};
 #[cfg(test)]
 use net_types::ip::IpVersion;
@@ -509,7 +510,8 @@ impl IpLayerIpExt for Ipv6 {
 // reference.
 pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> {
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IpForwardingDeviceContext;
+        + IpForwardingDeviceContext
+        + IpDeviceContext<I, C>;
 
     /// Calls the function with an immutable reference to IP routing table.
     fn with_ip_routing_table<
@@ -644,7 +646,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
 fn is_local_assigned_address<
     I: Ip + IpLayerIpExt,
     C: IpLayerNonSyncContext<I, SC::DeviceId>,
-    SC: IpLayerContext<I, C>,
+    SC: IpDeviceContext<I, C>,
 >(
     sync_ctx: &mut SC,
     device: &SC::DeviceId,
@@ -656,6 +658,30 @@ fn is_local_assigned_address<
     }
 }
 
+// Returns the local IP address to use for sending packets from the
+// given device to `addr`, restricting to `local_ip` if it is not
+// `None`.
+fn get_local_addr<
+    I: Ip + IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, SC::DeviceId>,
+    SC: IpDeviceContext<I, C>,
+>(
+    sync_ctx: &mut SC,
+    local_ip: Option<SpecifiedAddr<I::Addr>>,
+    device: &SC::DeviceId,
+    remote_addr: SpecifiedAddr<I::Addr>,
+) -> Result<SpecifiedAddr<I::Addr>, IpSockRouteError> {
+    if let Some(local_ip) = local_ip {
+        is_local_assigned_address(sync_ctx, device, local_ip)
+            .then_some(local_ip)
+            .ok_or(IpSockUnroutableError::LocalAddrNotAssigned.into())
+    } else {
+        sync_ctx
+            .get_local_addr_for_remote(device, remote_addr)
+            .ok_or(IpSockRouteError::NoLocalAddrAvailable)
+    }
+}
+
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
         C: IpDeviceNonSyncContext<I, SC::DeviceId> + IpLayerNonSyncContext<I, SC::DeviceId>,
@@ -664,26 +690,11 @@ impl<
 {
     fn lookup_route(
         &mut self,
-        ctx: &mut C,
+        _ctx: &mut C,
         device: Option<&SC::DeviceId>,
         local_ip: Option<SpecifiedAddr<I::Addr>>,
         addr: SpecifiedAddr<I::Addr>,
     ) -> Result<IpSockRoute<I, SC::DeviceId>, IpSockRouteError> {
-        // Returns the local IP address to use for sending packets from the
-        // given device to `addr`, restricting to `local_ip` if it is not
-        // `None`.
-        let get_local_addr = |sync_ctx: &mut Self, device: &SC::DeviceId| {
-            if let Some(local_ip) = local_ip {
-                is_local_assigned_address(sync_ctx, device, local_ip)
-                    .then_some(local_ip)
-                    .ok_or(IpSockUnroutableError::LocalAddrNotAssigned.into())
-            } else {
-                sync_ctx
-                    .get_local_addr_for_remote(device, addr)
-                    .ok_or(IpSockRouteError::NoLocalAddrAvailable)
-            }
-        };
-
         enum LocalDelivery<D> {
             WeakLoopback,
             StrongForDevice(D),
@@ -739,7 +750,9 @@ impl<
                             .ok_or(IpSockUnroutableError::LocalAddrNotAssigned)?,
                         None => addr,
                     },
-                    LocalDelivery::StrongForDevice(device) => get_local_addr(self, device)?,
+                    LocalDelivery::StrongForDevice(device) => {
+                        get_local_addr(self, local_ip, device, addr)?
+                    }
                 };
                 Ok(IpSockRoute {
                     local_ip,
@@ -749,12 +762,33 @@ impl<
                     },
                 })
             }
-            None => lookup_route_table(self, ctx, device, *addr)
-                .map(|destination| {
-                    let Destination { device, next_hop: _ } = &destination;
-                    Ok(IpSockRoute { local_ip: get_local_addr(self, device)?, destination })
+            None => self
+                .with_ip_routing_table(|sync_ctx, table| {
+                    let mut matching_with_addr =
+                        table.lookup_filter_map(sync_ctx, device, *addr, |sync_ctx, d| {
+                            Some(get_local_addr(sync_ctx, local_ip, d, addr))
+                        });
+
+                    let first_error = match matching_with_addr.next() {
+                        Some((Destination { device, next_hop }, Ok(addr))) => {
+                            return Ok((Destination { device: device.clone(), next_hop }, addr))
+                        }
+                        Some((_, Err(e))) => e,
+                        None => return Err(IpSockUnroutableError::NoRouteToRemoteAddr.into()),
+                    };
+
+                    matching_with_addr
+                        .filter_map(|(d, r)| {
+                            // Select successful routes. We ignore later errors
+                            // since we've already saved the first one.
+                            r.ok_checked::<IpSockRouteError>().map(|a| (d, a))
+                        })
+                        .next()
+                        .map_or(Err(first_error), |(Destination { device, next_hop }, addr)| {
+                            Ok((Destination { device: device.clone(), next_hop }, addr))
+                        })
                 })
-                .unwrap_or(Err(IpSockUnroutableError::NoRouteToRemoteAddr.into())),
+                .map(|(destination, local_ip)| IpSockRoute { local_ip, destination }),
         }
     }
 }
@@ -4694,6 +4728,68 @@ mod tests {
         I::get_other_ip_address(27)
     }
 
+    fn make_test_ctx<I: Ip + TestIpExt>() -> (Ctx<FakeNonSyncCtx>, Vec<DeviceId<FakeNonSyncCtx>>) {
+        let mut builder = FakeEventDispatcherBuilder::default();
+        for device in [Device::First, Device::Second] {
+            let ip: SpecifiedAddr<I::Addr> = device.ip_address();
+            let subnet =
+                AddrSubnet::from_witness(ip, <I::Addr as IpAddress>::BYTES * 8).unwrap().subnet();
+            let index = builder.add_device_with_ip(device.mac(), ip.get(), subnet);
+            assert_eq!(index, device.index());
+        }
+        let (mut ctx, device_ids) = builder.build();
+        let mut device_ids = device_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+        let Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
+        let loopback_id = crate::device::add_loopback_device(
+            sync_ctx,
+            Ipv6::MINIMUM_LINK_MTU,
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .unwrap()
+        .into();
+        crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &loopback_id);
+        crate::add_ip_addr_subnet(
+            sync_ctx,
+            non_sync_ctx,
+            &loopback_id,
+            AddrSubnet::from_witness(I::LOOPBACK_ADDRESS, I::LOOPBACK_SUBNET.prefix())
+                .unwrap()
+                .into(),
+        )
+        .unwrap();
+        assert_eq!(device_ids.len(), Device::Loopback.index());
+        device_ids.push(loopback_id);
+        (ctx, device_ids)
+    }
+
+    fn do_route_lookup<I: Ip + TestIpExt + IpDeviceStateIpExt>(
+        sync_ctx: &SyncCtx<FakeNonSyncCtx>,
+        non_sync_ctx: &mut FakeNonSyncCtx,
+        device_ids: Vec<DeviceId<FakeNonSyncCtx>>,
+        egress_device: Option<Device>,
+        local_ip: Option<SpecifiedAddr<I::Addr>>,
+        dest_ip: SpecifiedAddr<I::Addr>,
+    ) -> Result<IpSockRoute<I, Device>, IpSockRouteError>
+    where
+        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
+            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+    {
+        let egress_device = egress_device.map(|d| &device_ids[d.index()]);
+
+        IpSocketContext::<I, _>::lookup_route(
+            &mut Locked::new(sync_ctx),
+            non_sync_ctx,
+            egress_device,
+            local_ip,
+            dest_ip,
+        )
+        // Convert device IDs in any route so it's easier to compare.
+        .map(|IpSockRoute { local_ip, destination: Destination { next_hop, device } }| {
+            let device = Device::from_index(device_ids.iter().position(|d| d == &device).unwrap());
+            IpSockRoute { local_ip, destination: Destination { next_hop, device } }
+        })
+    }
+
     #[ip_test]
     #[test_case(None,
                 None,
@@ -4781,67 +4877,96 @@ mod tests {
     {
         set_logger_for_test();
 
-        let mut builder = FakeEventDispatcherBuilder::default();
-        for device in [Device::First, Device::Second] {
-            let ip: SpecifiedAddr<I::Addr> = device.ip_address();
-            let subnet =
-                AddrSubnet::from_witness(ip, <I::Addr as IpAddress>::BYTES * 8).unwrap().subnet();
-            let index = builder.add_device_with_ip(device.mac(), ip.get(), subnet);
-            assert_eq!(index, device.index());
-        }
-        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = builder.build();
-        let mut device_ids = device_ids.into_iter().map(Into::into).collect::<Vec<_>>();
+        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = make_test_ctx::<I>();
         let sync_ctx = &sync_ctx;
-        let loopback_id = crate::device::add_loopback_device(
-            sync_ctx,
-            Ipv6::MINIMUM_LINK_MTU,
-            DEFAULT_INTERFACE_METRIC,
-        )
-        .unwrap()
-        .into();
-        crate::device::testutil::enable_device(sync_ctx, &mut non_sync_ctx, &loopback_id);
-        crate::add_ip_addr_subnet(
-            sync_ctx,
-            &mut non_sync_ctx,
-            &loopback_id,
-            AddrSubnet::from_witness(I::LOOPBACK_ADDRESS, I::LOOPBACK_SUBNET.prefix())
-                .unwrap()
-                .into(),
-        )
-        .unwrap();
-        assert_eq!(device_ids.len(), Device::Loopback.index());
-        device_ids.push(loopback_id);
 
         // Add a route to the remote address only for Device::First.
         crate::add_route(
             sync_ctx,
             &mut non_sync_ctx,
             AddableEntryEither::without_gateway(
-                AddrSubnet::from_witness(remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8)
-                    .unwrap()
-                    .subnet()
-                    .into(),
+                Subnet::new(*remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8).unwrap().into(),
                 device_ids[Device::First.index()].clone(),
                 AddableMetric::ExplicitMetric(RawMetric(0)),
             ),
         )
         .unwrap();
 
-        let egress_device = egress_device.map(|d| &device_ids[d.index()]);
-
-        let result = IpSocketContext::<I, _>::lookup_route(
-            &mut Locked::new(sync_ctx),
+        let result = do_route_lookup(
+            sync_ctx,
             &mut non_sync_ctx,
+            device_ids,
             egress_device,
             local_ip,
             dest_ip,
-        )
-        // Convert device IDs in any route so it's easier to compare.
-        .map(|IpSockRoute { local_ip, destination: Destination { next_hop, device } }| {
-            let device = Device::from_index(device_ids.iter().position(|d| d == &device).unwrap());
-            IpSockRoute { local_ip, destination: Destination { next_hop, device } }
-        });
+        );
+        assert_eq!(result, expected_result);
+    }
 
+    #[ip_test]
+    #[test_case(None,
+                None,
+                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
+                }}); "no constraints")]
+    #[test_case(Some(Device::First.ip_address()),
+                None,
+                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
+                }}); "constrain local addr")]
+    #[test_case(Some(Device::Second.ip_address()), None,
+                Ok(IpSockRoute { local_ip: Device::Second.ip_address(), destination: Destination {
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Second
+                }});
+                "constrain local addr to second device")]
+    #[test_case(None,
+                Some(Device::First),
+                Ok(IpSockRoute { local_ip: Device::First.ip_address(), destination: Destination {
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::First
+                }}); "constrain device")]
+    #[test_case(None, Some(Device::Second),
+                Ok(IpSockRoute { local_ip: Device::Second.ip_address(), destination: Destination {
+                    next_hop: NextHop::RemoteAsNeighbor, device: Device::Second
+                }});
+                "constrain to second device")]
+    fn lookup_route_multiple_devices_with_route<I: Ip + TestIpExt + IpDeviceIpExt + IpLayerIpExt>(
+        local_ip: Option<SpecifiedAddr<I::Addr>>,
+        egress_device: Option<Device>,
+        expected_result: Result<IpSockRoute<I, Device>, IpSockRouteError>,
+    ) where
+        for<'a> Locked<&'a SyncCtx<FakeNonSyncCtx>, crate::lock_ordering::Unlocked>:
+            IpSocketContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
+    {
+        set_logger_for_test();
+
+        let (Ctx { sync_ctx, mut non_sync_ctx }, device_ids) = make_test_ctx::<I>();
+        let sync_ctx = &sync_ctx;
+
+        // Add a route to the remote address for both devices, with preference
+        // for the first.
+        for device in [Device::First, Device::Second] {
+            crate::add_route(
+                sync_ctx,
+                &mut non_sync_ctx,
+                AddableEntryEither::without_gateway(
+                    Subnet::new(*remote_ip::<I>(), <I::Addr as IpAddress>::BYTES * 8)
+                        .unwrap()
+                        .into(),
+                    device_ids[device.index()].clone(),
+                    AddableMetric::ExplicitMetric(RawMetric(device.index().try_into().unwrap())),
+                ),
+            )
+            .unwrap();
+        }
+
+        let result = do_route_lookup(
+            sync_ctx,
+            &mut non_sync_ctx,
+            device_ids,
+            egress_device,
+            local_ip,
+            remote_ip::<I>(),
+        );
         assert_eq!(result, expected_result);
     }
 
