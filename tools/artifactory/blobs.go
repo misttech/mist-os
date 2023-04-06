@@ -15,9 +15,13 @@ type blob struct {
 	Merkle string `json:"merkle"`
 }
 
+type deliveryBlobConfig struct {
+	Type int `json:"type"`
+}
+
 // BlobsUploads parses the blob manifest in the build and returns a list of
 // Uploads for all blobs.
-func BlobsUploads(blobManifestPath, srcDir, dstDir string) ([]Upload, error) {
+func BlobsUploads(blobManifestPath, deliveryBlobConfigPath, srcDir, dstDir string) ([]Upload, error) {
 	uploads := []Upload{}
 
 	data, err := os.ReadFile(blobManifestPath)
@@ -39,6 +43,30 @@ func BlobsUploads(blobManifestPath, srcDir, dstDir string) ([]Upload, error) {
 			Upload{
 				Source:      path.Join(srcDir, blob.Merkle),
 				Destination: path.Join(dstDir, blob.Merkle),
+				Deduplicate: true,
+			})
+	}
+
+	// Also upload delivery blobs if the config exists.
+	data, err = os.ReadFile(deliveryBlobConfigPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return uploads, nil
+		}
+		return nil, fmt.Errorf("failed to read delivery blob config: %w", err)
+	}
+
+	var config deliveryBlobConfig
+	err = json.Unmarshal(data, &config)
+	if err != nil {
+		return nil, fmt.Errorf("unable to unmarshal delivery blob config: %w", err)
+	}
+	blobType := fmt.Sprint(config.Type)
+	for _, blob := range blobs {
+		uploads = append(uploads,
+			Upload{
+				Source:      path.Join(srcDir, blobType, blob.Merkle),
+				Destination: path.Join(dstDir, blobType, blob.Merkle),
 				Deduplicate: true,
 			})
 	}

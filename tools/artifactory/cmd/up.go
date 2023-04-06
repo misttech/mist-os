@@ -91,6 +91,8 @@ Emits a GCS upload manifest for a build with the following structure:
 │   │   │   └── <assembly input archives>
 │   │   ├── blobs
 │   │   │   └── <blob names>
+│   │   │   └── <blob type>
+│   │   │   │   └── <blob names>
 │   │   ├── debug
 │   │   │   └── <debug binaries in zxdb format>
 │   │   ├── buildid
@@ -177,6 +179,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 	keyDir := path.Join(repo, keyDirName)
 	blobDir := path.Join(metadataDir, blobDirName)
 	blobManifestPath := path.Join(buildDir, blobManifestName)
+	deliveryBlobConfigPath := path.Join(buildDir, deliveryBlobConfigName)
 	targetDir := path.Join(metadataDir, targetDirName)
 	packageNamespaceDir := path.Join(cmd.namespace, packageDirName)
 	imageNamespaceDir := path.Join(cmd.namespace, imageDirName)
@@ -205,7 +208,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 			Compress:    true,
 		},
 		{
-			Source:      path.Join(buildDir, deliveryBlobConfigName),
+			Source:      deliveryBlobConfigPath,
 			Destination: path.Join(packageNamespaceDir, deliveryBlobConfigName),
 		},
 		{
@@ -223,7 +226,7 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 		},
 	}
 
-	blobs, err := artifactory.BlobsUploads(blobManifestPath, blobDir, blobDirName)
+	blobs, err := artifactory.BlobsUploads(blobManifestPath, deliveryBlobConfigPath, blobDir, blobDirName)
 	if err != nil {
 		return err
 	}
