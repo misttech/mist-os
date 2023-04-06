@@ -40,7 +40,6 @@ var ipExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outco
 
 var ipExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]outcome.Outcome{
 	{1, 1}:  Pass,
-	{1, 3}:  Pass,
 	{2, 3}:  Pass,
 	{2, 4}:  Pass,
 	{3, 4}:  Pass,
@@ -49,7 +48,6 @@ var ipExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{3, 8}:  Pass,
 	{4, 1}:  Pass,
 	{4, 2}:  Pass,
-	{4, 4}:  Pass,
 	{4, 5}:  Pass,
 	{5, 1}:  Pass,
 	{5, 6}:  Fail,
@@ -63,7 +61,6 @@ var ipExpectationsNS3 map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]ou
 	{6, 9}:  Inconclusive,
 	{6, 10}: Inconclusive,
 	{6, 12}: Inconclusive,
-	{7, 1}:  Pass,
 	{7, 3}:  Fail,
 	{7, 4}:  Pass,
 	{7, 5}:  Pass,
