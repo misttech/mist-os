@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_DEVICE_BT_HCI_H_
-#define SYSROOT_ZIRCON_DEVICE_BT_HCI_H_
+#ifndef ZIRCON_DEVICE_BT_HCI_H_
+#define ZIRCON_DEVICE_BT_HCI_H_
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -26,4 +26,4 @@ static inline uint8_t bt_hci_snoop_flags(bt_hci_snoop_type_t type, bool is_recei
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_DEVICE_BT_HCI_H_
+#endif  // ZIRCON_DEVICE_BT_HCI_H_

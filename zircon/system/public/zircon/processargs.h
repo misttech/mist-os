@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_PROCESSARGS_H_
-#define SYSROOT_ZIRCON_PROCESSARGS_H_
+#ifndef ZIRCON_PROCESSARGS_H_
+#define ZIRCON_PROCESSARGS_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -179,4 +179,4 @@ struct zx_proc_args {
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_PROCESSARGS_H_
+#endif  // ZIRCON_PROCESSARGS_H_

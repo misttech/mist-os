@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_H_
-#define SYSROOT_ZIRCON_SYSCALLS_H_
+#ifndef ZIRCON_SYSCALLS_H_
+#define ZIRCON_SYSCALLS_H_
 
 #include <zircon/compiler.h>
 #include <zircon/string_view.h>
@@ -35,4 +35,4 @@ __BEGIN_CDECLS
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_H_
+#endif  // ZIRCON_SYSCALLS_H_

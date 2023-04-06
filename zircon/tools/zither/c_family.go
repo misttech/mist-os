@@ -25,9 +25,9 @@ func HeaderGuard(summary FileSummary, backend string) string {
 	if backend == "c" || backend == "asm" {
 		switch summary.Library.String() {
 		case "zx":
-			path = "SYSROOT_ZIRCON_" + summary.Name() + "_H"
+			path = "ZIRCON_" + summary.Name() + "_H"
 		case "zbi":
-			path = "SYSROOT_ZIRCON_BOOT_" + summary.Name() + "_H"
+			path = "ZIRCON_BOOT_" + summary.Name() + "_H"
 		}
 	}
 	for _, c := range []string{".", string(filepath.Separator), "-"} {

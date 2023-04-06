@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_HW_GPT_H_
-#define SYSROOT_ZIRCON_HW_GPT_H_
+#ifndef ZIRCON_HW_GPT_H_
+#define ZIRCON_HW_GPT_H_
 
 #include <assert.h>
 #include <stdbool.h>
@@ -428,4 +428,4 @@ static_assert(GPT_ENTRY_SIZE == sizeof(gpt_entry_t), "Gpt entry size invalid");
 
 // clang-format on
 
-#endif  // SYSROOT_ZIRCON_HW_GPT_H_
+#endif  // ZIRCON_HW_GPT_H_

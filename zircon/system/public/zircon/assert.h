@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_ASSERT_
-#define SYSROOT_ZIRCON_ASSERT_
+#ifndef ZIRCON_ASSERT_H_
+#define ZIRCON_ASSERT_H_
 
 // For a description of which asserts are enabled at which debug levels, see the documentation for
 // GN build argument |assert_level|.
@@ -32,21 +32,21 @@ __END_CDECLS
 // Assert that |x| is true, else panic.
 //
 // ZX_ASSERT is always enabled and |x| will be evaluated regardless of any build arguments.
-#define ZX_ASSERT(x)                                                      \
-  do {                                                                    \
-    if (unlikely(!(x))) {                                                 \
+#define ZX_ASSERT(x)                                                    \
+  do {                                                                  \
+    if (unlikely(!(x))) {                                               \
       ZX_PANIC("ASSERT FAILED at (%s:%d): %s", __FILE__, __LINE__, #x); \
-    }                                                                     \
+    }                                                                   \
   } while (0)
 
 // Assert that |x| is true, else panic with the given message.
 //
 // ZX_ASSERT_MSG is always enabled and |x| will be evaluated regardless of any build arguments.
-#define ZX_ASSERT_MSG(x, msg, msgargs...)                                                     \
-  do {                                                                                        \
-    if (unlikely(!(x))) {                                                                     \
+#define ZX_ASSERT_MSG(x, msg, msgargs...)                                                \
+  do {                                                                                   \
+    if (unlikely(!(x))) {                                                                \
       ZX_PANIC("ASSERT FAILED at (%s:%d): %s\n" msg, __FILE__, __LINE__, #x, ##msgargs); \
-    }                                                                                         \
+    }                                                                                    \
   } while (0)
 
 // Conditionally implement ZX_DEBUG_ASSERT based on ZX_ASSERT_LEVEL.
@@ -64,23 +64,22 @@ __END_CDECLS
 //
 // Depending on build arguments, ZX_DEBUG_ASSERT may or may not be enabled. When disabled, |x| will
 // not be evaluated.
-#define ZX_DEBUG_ASSERT(x)                                                      \
-  do {                                                                          \
-    if (ZX_DEBUG_ASSERT_IMPLEMENTED && unlikely(!(x))) {                        \
+#define ZX_DEBUG_ASSERT(x)                                                    \
+  do {                                                                        \
+    if (ZX_DEBUG_ASSERT_IMPLEMENTED && unlikely(!(x))) {                      \
       ZX_PANIC("DEBUG ASSERT FAILED at (%s:%d): %s", __FILE__, __LINE__, #x); \
-    }                                                                           \
+    }                                                                         \
   } while (0)
 
 // Assert that |x| is true, else panic with the given message.
 //
 // Depending on build arguments, ZX_DEBUG_ASSERT_MSG may or may not be enabled. When disabled, |x|
 // will not be evaluated.
-#define ZX_DEBUG_ASSERT_MSG(x, msg, msgargs...)                                         \
-  do {                                                                                  \
-    if (ZX_DEBUG_ASSERT_IMPLEMENTED && unlikely(!(x))) {                                \
-      ZX_PANIC("DEBUG ASSERT FAILED at (%s:%d): %s\n" msg, __FILE__, __LINE__, #x, \
-               ##msgargs);                                                              \
-    }                                                                                   \
+#define ZX_DEBUG_ASSERT_MSG(x, msg, msgargs...)                                                \
+  do {                                                                                         \
+    if (ZX_DEBUG_ASSERT_IMPLEMENTED && unlikely(!(x))) {                                       \
+      ZX_PANIC("DEBUG ASSERT FAILED at (%s:%d): %s\n" msg, __FILE__, __LINE__, #x, ##msgargs); \
+    }                                                                                          \
   } while (0)
 
 // implement _COND versions of ZX_DEBUG_ASSERT which only emit the body if
@@ -98,4 +97,4 @@ __END_CDECLS
 #endif
 #endif  // #ifdef _KERNEL
 
-#endif  // SYSROOT_ZIRCON_ASSERT_
+#endif  // ZIRCON_ASSERT_H_

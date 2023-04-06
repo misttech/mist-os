@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_TIME_H_
-#define SYSROOT_ZIRCON_TIME_H_
+#ifndef ZIRCON_TIME_H_
+#define ZIRCON_TIME_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -217,4 +217,4 @@ __CONSTEXPR static inline struct timespec zx_timespec_from_time(zx_time_t time) 
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_TIME_H_
+#endif  // ZIRCON_TIME_H_

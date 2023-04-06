@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_SCHEDULER_H_
-#define SYSROOT_ZIRCON_SYSCALLS_SCHEDULER_H_
+#ifndef ZIRCON_SYSCALLS_SCHEDULER_H_
+#define ZIRCON_SYSCALLS_SCHEDULER_H_
 
 #include <zircon/compiler.h>
 #include <zircon/time.h>
@@ -33,4 +33,4 @@ typedef struct zx_sched_deadline_params {
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_SCHEDULER_H_
+#endif  // ZIRCON_SYSCALLS_SCHEDULER_H_

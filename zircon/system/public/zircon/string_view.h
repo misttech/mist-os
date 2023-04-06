@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_STRING_VIEW_H_
-#define SYSROOT_ZIRCON_STRING_VIEW_H_
+#ifndef ZIRCON_STRING_VIEW_H_
+#define ZIRCON_STRING_VIEW_H_
 
 #include <stddef.h>
 #if __cplusplus >= 201103L && __has_include(<type_traits>)
@@ -67,4 +67,4 @@ typedef struct zx_string_view {
 #endif
 } zx_string_view_t;
 
-#endif  // SYSROOT_ZIRCON_STRING_VIEW_H_
+#endif  // ZIRCON_STRING_VIEW_H_

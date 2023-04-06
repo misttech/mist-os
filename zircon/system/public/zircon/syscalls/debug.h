@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_DEBUG_H_
-#define SYSROOT_ZIRCON_SYSCALLS_DEBUG_H_
+#ifndef ZIRCON_SYSCALLS_DEBUG_H_
+#define ZIRCON_SYSCALLS_DEBUG_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -257,4 +257,4 @@ typedef uint32_t zx_thread_state_topic_t;
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_DEBUG_H_
+#endif  // ZIRCON_SYSCALLS_DEBUG_H_

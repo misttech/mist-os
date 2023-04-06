@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_DEVICE_AUDIO_H_
-#define SYSROOT_ZIRCON_DEVICE_AUDIO_H_
+#ifndef ZIRCON_DEVICE_AUDIO_H_
+#define ZIRCON_DEVICE_AUDIO_H_
 
 #include <sys/types.h>
 #include <zircon/compiler.h>
@@ -462,4 +462,4 @@ typedef struct audio_rb_position_notify {
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_DEVICE_AUDIO_H_
+#endif  // ZIRCON_DEVICE_AUDIO_H_

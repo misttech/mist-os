@@ -1,8 +1,8 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_HW_DEBUG_X86_H_
-#define SYSROOT_ZIRCON_HW_DEBUG_X86_H_
+#ifndef ZIRCON_HW_DEBUG_X86_H_
+#define ZIRCON_HW_DEBUG_X86_H_
 
 #include <stdint.h>
 
@@ -418,4 +418,4 @@ inline void __x86_internal_hw_debug_set_reg_value(uint64_t* reg, uint64_t value,
   *reg |= (value << shift) & mask;
 }
 
-#endif  // SYSROOT_ZIRCON_HW_DEBUG_X86_H_
+#endif  // ZIRCON_HW_DEBUG_X86_H_

@@ -6,8 +6,8 @@
 //   zx (//zircon/vdso/errors.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef SYSROOT_ZIRCON_ERRORS_H_
-#define SYSROOT_ZIRCON_ERRORS_H_
+#ifndef ZIRCON_ERRORS_H_
+#define ZIRCON_ERRORS_H_
 
 // Indicates an operation was successful.
 #define ZX_OK (0)
@@ -226,4 +226,4 @@
 // not be seen outside of the VDSO.
 #define ZX_ERR_INTERNAL_INTR_KILLED (-502)
 
-#endif  // SYSROOT_ZIRCON_ERRORS_H_
+#endif  // ZIRCON_ERRORS_H_

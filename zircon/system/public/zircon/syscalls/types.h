@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_TYPES_H_
-#define SYSROOT_ZIRCON_SYSCALLS_TYPES_H_
+#ifndef ZIRCON_SYSCALLS_TYPES_H_
+#define ZIRCON_SYSCALLS_TYPES_H_
 
 #include <zircon/compiler.h>
 
@@ -21,4 +21,4 @@ typedef struct zx_smc_result zx_smc_result_t;
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_TYPES_H_
+#endif  // ZIRCON_SYSCALLS_TYPES_H_

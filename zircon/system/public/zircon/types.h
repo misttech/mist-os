@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_TYPES_H_
-#define SYSROOT_ZIRCON_TYPES_H_
+#ifndef ZIRCON_TYPES_H_
+#define ZIRCON_TYPES_H_
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -574,4 +574,4 @@ typedef int zx_futex_storage_t;
 
 __END_CDECLS
 
-#endif // SYSROOT_ZIRCON_TYPES_H_
+#endif // ZIRCON_TYPES_H_

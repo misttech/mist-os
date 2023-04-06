@@ -31,13 +31,14 @@ FUCHSIA_ROOT = os.path.dirname(  # $root
     os.path.realpath(
     os.path.abspath(__file__)))))
 
-SYSROOT_PREFIXES = [
-    'ZIRCON_SYSTEM_PUBLIC',
-    'ZIRCON_THIRD_PARTY_ULIB_MUSL_INCLUDE',
-]
+SYSROOT_PREFIXES = ['ZIRCON_THIRD_PARTY_ULIB_MUSL_INCLUDE']
 sysroot_prefix = re.compile('^(' + '|'.join(SYSROOT_PREFIXES) + ')_')
 
-PUBLIC_PREFIXES = ['ZIRCON_SYSTEM_ULIB_.*_INCLUDE', 'SDK']
+PUBLIC_PREFIXES = [
+    'ZIRCON_SYSTEM_PUBLIC',
+    'ZIRCON_SYSTEM_ULIB_.*_INCLUDE',
+    'SDK',
+]
 public_prefix = re.compile('^(' + '|'.join(PUBLIC_PREFIXES) + ')_')
 
 all_header_guards = collections.defaultdict(list)

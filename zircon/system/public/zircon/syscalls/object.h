@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_OBJECT_H_
-#define SYSROOT_ZIRCON_SYSCALLS_OBJECT_H_
+#ifndef ZIRCON_SYSCALLS_OBJECT_H_
+#define ZIRCON_SYSCALLS_OBJECT_H_
 
 #include <zircon/types.h>
 
@@ -866,4 +866,4 @@ typedef struct zx_info_vcpu {
 
 __END_CDECLS
 
-#endif // SYSROOT_ZIRCON_SYSCALLS_OBJECT_H_
+#endif // ZIRCON_SYSCALLS_OBJECT_H_

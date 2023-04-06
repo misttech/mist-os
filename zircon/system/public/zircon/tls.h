@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_TLS_H_
-#define SYSROOT_ZIRCON_TLS_H_
+#ifndef ZIRCON_TLS_H_
+#define ZIRCON_TLS_H_
 
 // These constants are part of the C/C++ ABI known to compilers for
 // *-fuchsia targets.  These are offsets from the thread pointer.
@@ -26,4 +26,4 @@
 
 #endif
 
-#endif  // SYSROOT_ZIRCON_TLS_H_
+#endif  // ZIRCON_TLS_H_

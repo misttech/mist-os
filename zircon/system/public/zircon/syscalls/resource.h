@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_RESOURCE_H_
-#define SYSROOT_ZIRCON_SYSCALLS_RESOURCE_H_
+#ifndef ZIRCON_SYSCALLS_RESOURCE_H_
+#define ZIRCON_SYSCALLS_RESOURCE_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -43,4 +43,4 @@ typedef uint64_t zx_rsrc_system_base_t;
 #define ZX_RSRC_SYSTEM_ENERGY_INFO_BASE ((zx_rsrc_system_base_t)7u)
 #define ZX_RSRC_SYSTEM_COUNT ((zx_rsrc_system_base_t)8u)
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_RESOURCE_H_
+#endif  // ZIRCON_SYSCALLS_RESOURCE_H_

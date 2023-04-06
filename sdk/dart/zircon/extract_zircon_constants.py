@@ -54,8 +54,7 @@ def extract_defines(header, guard):
                 (match.groupdict()['symbol'], match.groupdict()['value']))
         else:
             # ignore the header guard
-            if line.startswith(f'#define {guard}') or \
-                line.startswith(f'#define SYSROOT_{guard}'):
+            if line.startswith(f'#define {guard}'):
                 continue
             # ignore function-like macros
             if not re.match(r'#define\s+[A-Za-z0-9_]+\(', line):

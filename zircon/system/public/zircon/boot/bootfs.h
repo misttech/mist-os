@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_BOOT_BOOTFS_H_
-#define SYSROOT_ZIRCON_BOOT_BOOTFS_H_
+#ifndef ZIRCON_BOOT_BOOTFS_H_
+#define ZIRCON_BOOT_BOOTFS_H_
 
 #include <stdint.h>
 
@@ -64,4 +64,4 @@ typedef struct {
 // zbi_bootfs_dirent_t.name_len must be > 1 and <= ZBI_BOOTFS_MAX_NAME_LEN.
 #define ZBI_BOOTFS_MAX_NAME_LEN (256)
 
-#endif  // SYSROOT_ZIRCON_BOOT_BOOTFS_H_
+#endif  // ZIRCON_BOOT_BOOTFS_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_SYSTEM_H_
-#define SYSROOT_ZIRCON_SYSCALLS_SYSTEM_H_
+#ifndef ZIRCON_SYSCALLS_SYSTEM_H_
+#define ZIRCON_SYSCALLS_SYSTEM_H_
 
 #include <zircon/types.h>
 
@@ -56,4 +56,4 @@ typedef struct zx_cpu_performance_info {
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_SYSTEM_H_
+#endif  // ZIRCON_SYSCALLS_SYSTEM_H_

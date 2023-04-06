@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_BOOT_IMAGE_H_
-#define SYSROOT_ZIRCON_BOOT_IMAGE_H_
+#ifndef ZIRCON_BOOT_IMAGE_H_
+#define ZIRCON_BOOT_IMAGE_H_
 
 #ifndef __ASSEMBLER__
 #include <stdint.h>
@@ -779,4 +779,4 @@ typedef struct {
 } zbi_debugdata_t;
 #endif
 
-#endif  // SYSROOT_ZIRCON_BOOT_IMAGE_H_
+#endif  // ZIRCON_BOOT_IMAGE_H_

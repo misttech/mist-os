@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_RIGHTS_H_
-#define SYSROOT_ZIRCON_RIGHTS_H_
+#ifndef ZIRCON_RIGHTS_H_
+#define ZIRCON_RIGHTS_H_
 
 #include <stdint.h>
 
@@ -122,4 +122,4 @@ typedef uint32_t zx_rights_t;
 
 #define ZX_DEFAULT_CLOCK_RIGHTS (ZX_RIGHTS_BASIC | ZX_RIGHTS_IO)
 
-#endif  // SYSROOT_ZIRCON_RIGHTS_H_
+#endif  // ZIRCON_RIGHTS_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_CLOCK_H_
-#define SYSROOT_ZIRCON_SYSCALLS_CLOCK_H_
+#ifndef ZIRCON_SYSCALLS_CLOCK_H_
+#define ZIRCON_SYSCALLS_CLOCK_H_
 
 #include <zircon/time.h>
 
@@ -113,4 +113,4 @@ typedef struct zx_clock_update_args_v2 {
   uint64_t error_bound;
 } zx_clock_update_args_v2_t;
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_CLOCK_H_
+#endif  // ZIRCON_SYSCALLS_CLOCK_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_DEVICE_INTEL_HDA_H_
-#define SYSROOT_ZIRCON_DEVICE_INTEL_HDA_H_
+#ifndef ZIRCON_DEVICE_INTEL_HDA_H_
+#define ZIRCON_DEVICE_INTEL_HDA_H_
 
 #include <zircon/compiler.h>
 #include <zircon/types.h>
@@ -126,4 +126,4 @@ typedef struct ihda_codec_set_stream_format_resp {
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_DEVICE_INTEL_HDA_H_
+#endif  // ZIRCON_DEVICE_INTEL_HDA_H_

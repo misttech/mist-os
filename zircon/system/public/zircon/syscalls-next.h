@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_SYSCALLS_NEXT_H_
-#define SYSROOT_ZIRCON_SYSCALLS_NEXT_H_
+#ifndef ZIRCON_SYSCALLS_NEXT_H_
+#define ZIRCON_SYSCALLS_NEXT_H_
 
 #ifndef _KERNEL
 
@@ -107,4 +107,4 @@ typedef struct zx_restricted_state {
 
 // ====== End of restricted mode support ====== //
 
-#endif  // SYSROOT_ZIRCON_SYSCALLS_NEXT_H_
+#endif  // ZIRCON_SYSCALLS_NEXT_H_

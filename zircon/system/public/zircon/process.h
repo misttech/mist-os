@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_PROCESS_H_
-#define SYSROOT_ZIRCON_PROCESS_H_
+#ifndef ZIRCON_PROCESS_H_
+#define ZIRCON_PROCESS_H_
 
 #include <stdint.h>
 #include <zircon/analyzer.h>
@@ -33,4 +33,4 @@ zx_handle_t zx_job_default(void);
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_PROCESS_H_
+#endif  // ZIRCON_PROCESS_H_

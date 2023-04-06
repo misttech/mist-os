@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_AVAILABILITY_H_
-#define SYSROOT_ZIRCON_AVAILABILITY_H_
+#ifndef ZIRCON_AVAILABILITY_H_
+#define ZIRCON_AVAILABILITY_H_
 
 // Emulate a "HEAD" API level since it is not supported directly by clang.
 // Fuchsia API levels are unsigned 64-bit integers, but clang stores API levels as 32-bit,
@@ -75,4 +75,4 @@
 
 #endif  // __Fuchsia_API_level__
 
-#endif  // SYSROOT_ZIRCON_AVAILABILITY_H_
+#endif  // ZIRCON_AVAILABILITY_H_

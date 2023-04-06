@@ -6,8 +6,8 @@
 //   zbi (//sdk/fidl/zbi/driver-config.fidl)
 // by zither, a Fuchsia platform tool.
 
-#ifndef SYSROOT_ZIRCON_BOOT_DRIVER_CONFIG_H_
-#define SYSROOT_ZIRCON_BOOT_DRIVER_CONFIG_H_
+#ifndef ZIRCON_BOOT_DRIVER_CONFIG_H_
+#define ZIRCON_BOOT_DRIVER_CONFIG_H_
 
 #include <stdint.h>
 
@@ -217,4 +217,4 @@ typedef struct {
 }
 #endif
 
-#endif  // SYSROOT_ZIRCON_BOOT_DRIVER_CONFIG_H_
+#endif  // ZIRCON_BOOT_DRIVER_CONFIG_H_

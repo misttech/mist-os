@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SYSROOT_ZIRCON_HW_PCI_H_
-#define SYSROOT_ZIRCON_HW_PCI_H_
+#ifndef ZIRCON_HW_PCI_H_
+#define ZIRCON_HW_PCI_H_
 
 #include <stdint.h>
 #include <zircon/compiler.h>
@@ -47,4 +47,4 @@ typedef struct zx_pci_bdf {
 
 __END_CDECLS
 
-#endif  // SYSROOT_ZIRCON_HW_PCI_H_
+#endif  // ZIRCON_HW_PCI_H_
