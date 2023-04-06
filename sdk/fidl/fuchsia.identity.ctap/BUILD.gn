@@ -11,5 +11,6 @@ fidl("fuchsia.identity.ctap") {
     "ctap.fidl",
     "get_assertion.fidl",
     "make_credential.fidl",
+    "overview.fidl",
   ]
 }
