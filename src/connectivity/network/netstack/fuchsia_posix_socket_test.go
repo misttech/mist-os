@@ -180,6 +180,12 @@ func TestDatagramSocketWithBlockingEndpoint(t *testing.T) {
 				}
 			} else {
 				linkEp.SetBlocking(false)
+				// Wait until the write loop becomes unblocked and begins writing again before
+				// closing the socket; otherwise the notifications of the endpoint being
+				// writable and the socket closing can race, and the write loop will exit before
+				// enqueueing the remaining packets in the zircon socket.
+				<-linkEp.WaitFor(1)
+
 				if err := validateClose(); err != nil {
 					t.Fatal(err)
 				}
