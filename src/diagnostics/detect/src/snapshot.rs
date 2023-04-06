@@ -126,11 +126,9 @@ impl CrashReportHandlerBuilder {
             config_proxy.upsert_with_ack(&CRASH_PROGRAM_NAME.to_string(), product_config).await?;
         }
         // Connect to the CrashReporter service if a proxy wasn't specified
-        let proxy = if self.proxy.is_some() {
-            self.proxy.unwrap()
-        } else {
-            connect_proxy::<fidl_feedback::CrashReporterMarker>(&CRASH_REPORTER_SVC.to_string())?
-        };
+        let proxy = self.proxy.unwrap_or(connect_proxy::<fidl_feedback::CrashReporterMarker>(
+            &CRASH_REPORTER_SVC.to_string(),
+        )?);
 
         // Set up the crash report sender that runs asynchronously
         let (channel, receiver) = mpsc::channel(self.max_pending_crash_reports);

@@ -11,7 +11,6 @@ use {
         constants, utils, BlockIndex, BlockType, Container, Error as FormatError,
         ReadableBlockContainer, {ArrayFormat, Block, LinkNodeDisposition, PropertyFormat},
     },
-    num_traits::ToPrimitive,
     parking_lot::{Mutex, MutexGuard},
     std::{
         collections::HashMap,
@@ -685,7 +684,7 @@ impl InnerState {
     /// Free a *_VALUE block at the given |index|.
     fn free_value(&mut self, index: BlockIndex) -> Result<(), Error> {
         let block = self.heap.get_block(index)?;
-        self.delete_value(block).unwrap();
+        self.delete_value(block)?;
         Ok(())
     }
 
@@ -736,31 +735,33 @@ impl InnerState {
         block: &mut Block<Container>,
         value: &str,
     ) -> Result<(), Error> {
-        let head_extent = match self.inline_string_reference(block, value.as_bytes()) {
-            Ok(Some(written)) => self.write_extents(&value.as_bytes()[written..])?,
-            Ok(None) => BlockIndex::EMPTY,
+        let value_bytes = value.as_bytes();
+        let (head_extent, bytes_written) = match self.inline_string_reference(block, value_bytes) {
+            Ok(inlined) if (inlined as usize) < value.len() => {
+                let (head, in_extents) = self.write_extents(&value_bytes[inlined as usize..])?;
+                (head, inlined + in_extents)
+            }
+            Ok(inlined) => (BlockIndex::EMPTY, inlined),
             Err(e) => return Err(e),
         };
 
         block.set_extent_next_index(head_extent)?;
-        block.set_total_length(value.as_bytes().len().to_u32().unwrap())?;
+        block.set_total_length(bytes_written)?;
         Ok(())
     }
 
     /// Given a string, write the portion that can be inlined to the given block.
-    /// If the data overflows, return the number of bytes written.
+    /// Return the number of bytes written.
     fn inline_string_reference(
         &mut self,
         block: &mut Block<Container>,
         value: &[u8],
-    ) -> Result<Option<usize>, Error> {
+    ) -> Result<u32, Error> {
         // only returns an error if you call with wrong block type
-        let bytes_written = block.write_string_reference_inline(value)?;
-        if bytes_written < value.len() {
-            Ok(Some(bytes_written))
-        } else {
-            Ok(None)
-        }
+        // Safety: we convert from usize to u32 here, because we know that there are fewer
+        // than u32::MAX bytes written inline in even the largest string reference block.
+        // This allows safe promotion to usize anywhere necessary later.
+        Ok(block.write_string_reference_inline(value)? as u32)
     }
 
     /// Decrement the reference count on the block and free it if the count is 0.
@@ -901,7 +902,7 @@ impl InnerState {
         slots: usize,
         parent_index: BlockIndex,
     ) -> Result<Block<Container>, Error> {
-        // array_element_size will never fail for BlockType::StringReference.
+        // Safety: array_element_size will never fail for BlockType::StringReference.
         let block_size = slots as usize * BlockType::StringReference.array_element_size().unwrap()
             + constants::MIN_ORDER_SIZE;
         if block_size > constants::MAX_ORDER_SIZE {
@@ -969,7 +970,8 @@ impl InnerState {
                         continue;
                     }
 
-                    block.array_set_string_slot(i, BlockIndex::EMPTY).unwrap();
+                    // Safety: can only fail if `i` out of bounds, which is checked above
+                    block.array_set_string_slot(i, BlockIndex::EMPTY)?;
                     let to_free = self.heap.get_block(index)?;
                     self.release_string_reference(to_free)?;
                 }
@@ -1002,6 +1004,7 @@ impl InnerState {
         let result = self.heap.get_block(parent_index).and_then(|mut parent_block| {
             match parent_block.block_type() {
                 BlockType::NodeValue | BlockType::Tombstone => {
+                    // Safety: NodeValues and Tombstones always have child_count
                     parent_block.set_child_count(parent_block.child_count().unwrap() + 1)?;
                     Ok(())
                 }
@@ -1023,18 +1026,18 @@ impl InnerState {
         // Decrement parent child count.
         let parent_index = block.parent_index()?;
         if parent_index != BlockIndex::ROOT {
-            let mut parent = self.heap.get_block(parent_index).unwrap();
-            let child_count = parent.child_count().unwrap() - 1;
+            let mut parent = self.heap.get_block(parent_index)?;
+            let child_count = parent.child_count()? - 1;
             if parent.block_type() == BlockType::Tombstone && child_count == 0 {
                 self.heap.free_block(parent).expect("Failed to free block");
             } else {
-                parent.set_child_count(child_count).unwrap();
+                parent.set_child_count(child_count)?;
             }
         }
 
         // Free the name block.
         let name_index = block.name_index()?;
-        let name = self.heap.get_block(name_index).unwrap();
+        let name = self.heap.get_block(name_index)?;
         match name.block_type() {
             BlockType::StringReference => {
                 self.release_string_reference(name)?;
@@ -1058,8 +1061,8 @@ impl InnerState {
         value: &[u8],
     ) -> Result<(), Error> {
         self.free_extents(block.property_extent_index()?)?;
-        let extent_index = self.write_extents(value)?;
-        block.set_total_length(value.len().to_u32().unwrap())?;
+        let (extent_index, written) = self.write_extents(value)?;
+        block.set_total_length(written)?;
         block.set_property_extent_index(extent_index)?;
         Ok(())
     }
@@ -1067,20 +1070,20 @@ impl InnerState {
     fn free_extents(&mut self, head_extent_index: BlockIndex) -> Result<(), Error> {
         let mut index = head_extent_index;
         while index != BlockIndex::ROOT {
-            let block = self.heap.get_block(index).unwrap();
+            let block = self.heap.get_block(index)?;
             index = block.next_extent()?;
             self.heap.free_block(block)?;
         }
         Ok(())
     }
 
-    fn write_extents(&mut self, value: &[u8]) -> Result<BlockIndex, Error> {
+    fn write_extents(&mut self, value: &[u8]) -> Result<(BlockIndex, u32), Error> {
         if value.len() == 0 {
             // Invalid index
-            return Ok(BlockIndex::ROOT);
+            return Ok((BlockIndex::ROOT, 0));
         }
         let mut offset = 0;
-        let total_size = value.len().to_usize().unwrap();
+        let total_size = value.len();
         let mut extent_block =
             self.heap.allocate_block(utils::block_size_for_payload(total_size - offset))?;
         let head_extent_index = extent_block.index();
@@ -1089,13 +1092,30 @@ impl InnerState {
             let bytes_written = extent_block.extent_set_contents(&value[offset..])?;
             offset += bytes_written;
             if offset < total_size {
-                let block =
-                    self.heap.allocate_block(utils::block_size_for_payload(total_size - offset))?;
+                let Ok(block) =
+                    self.heap.allocate_block(
+                        utils::block_size_for_payload(total_size - offset)
+                    ) else {
+                        // If we fail to allocate, just take what was written already and bail.
+                        // Safety: See the below safety comment. In general, if the VMO could be
+                        // larger than u32::MAX bytes, but the max size block could not be,
+                        // this would still safely truncate the data and be an accurate count of
+                        // how many bytes were actually written, because the heap has not
+                        // allocated and we have written exactly `offset` bytes.
+                        return Ok((head_extent_index, offset as u32));
+                    };
                 extent_block.set_extent_next_index(block.index())?;
                 extent_block = block;
             }
         }
-        Ok(head_extent_index)
+
+        // TODO(fxbug.dev/124958): we can remove cast
+        // Safety: each max sized block has fewer than u32::MAX bytes, so an individual
+        // block cannot have more than u32::MAX bytes written. The max VMO is also smaller
+        // than u32::MAX bytes, so the sum of the bytes of all the blocks in the VMO
+        // is smaller than u32::MAX. That means that the total length written to extents
+        // is smaller than u32::MAX, and demotion from usize is always safe.
+        Ok((head_extent_index, offset as u32))
     }
 }
 
@@ -1889,6 +1909,22 @@ mod tests {
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();
         let blocks: Vec<ScannedBlock<'_>> = snapshot.scan().collect();
         assert!(blocks[1..].iter().all(|b| b.block_type() == BlockType::Free));
+    }
+
+    #[fuchsia::test]
+    fn test_write_extent_overflow() {
+        const SIZE: usize = constants::MAX_ORDER_SIZE * 2;
+        const EXPECTED_WRITTEN: usize = constants::MAX_ORDER_SIZE - constants::HEADER_SIZE_BYTES;
+        const TRIED_TO_WRITE: usize = SIZE + 1;
+        let core_state = get_state(SIZE);
+        let (_, written) = core_state
+            .try_lock()
+            .unwrap()
+            .inner_lock
+            .write_extents(&[4u8; TRIED_TO_WRITE])
+            .unwrap();
+        assert_eq!(written as usize, EXPECTED_WRITTEN);
+        assert!(EXPECTED_WRITTEN < TRIED_TO_WRITE);
     }
 
     #[fuchsia::test]

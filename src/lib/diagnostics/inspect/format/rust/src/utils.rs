@@ -4,13 +4,13 @@
 
 use crate::constants;
 use crate::BlockType;
-use num_traits::ToPrimitive;
 use std::cmp::{max, min};
 
 /// Returns the smallest order such that (MIN_ORDER_SHIFT << order) >= size.
 /// Size must be non zero.
 pub fn fit_order(size: usize) -> usize {
-    (std::mem::size_of::<usize>() * 8 - (size - 1).leading_zeros().to_usize().unwrap())
+    // Safety: `leading_zeros` returns a u32, so this is safe promotion
+    (std::mem::size_of::<usize>() * 8 - (size - 1).leading_zeros() as usize)
         .checked_sub(constants::MIN_ORDER_SHIFT)
         .unwrap_or(0)
 }

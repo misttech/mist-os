@@ -66,14 +66,14 @@ fn expand(
         partial.children.into_iter().map(|child| expand(child, snapshot_children)).collect();
     let mut hierarchy = DiagnosticsHierarchy::new(partial.name, partial.properties, children);
     for link_value in partial.links {
-        let result = snapshot_children.remove(&link_value.content);
-        if result.is_none() {
+        let Some(result) = snapshot_children.remove(&link_value.content) else {
             hierarchy.add_missing(MissingValueReason::LinkNotFound, link_value.name);
             continue;
-        }
+        };
+
         // TODO(miguelfrde): remove recursion or limit depth.
         let result: Result<DiagnosticsHierarchy, ReaderError> =
-            result.unwrap().and_then(|snapshot_tree| snapshot_tree.try_into());
+            result.and_then(|snapshot_tree| snapshot_tree.try_into());
         match result {
             Err(ReaderError::TreeTimedOut) => {
                 hierarchy.add_missing(MissingValueReason::Timeout, link_value.name);
@@ -168,6 +168,7 @@ mod tests {
     use {
         super::*,
         crate::{assert_data_tree, assert_json_diff, reader, Inspector, InspectorConfig},
+        inspect_format::constants,
     };
 
     #[fuchsia::test]
@@ -240,6 +241,26 @@ mod tests {
         });
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn read_too_big_string() {
+        // magic size is the amount of data that can be written. Basically it is the size of the
+        // VMO minus all of the header and bookkeeping data stored in the VMO
+        let magic_size_found_by_experiment = 259076;
+        let inspector =
+            Inspector::new(InspectorConfig::default().size(constants::DEFAULT_VMO_SIZE_BYTES));
+        let string_head = "X".repeat(magic_size_found_by_experiment);
+        let string_tail =
+            "Y".repeat((constants::DEFAULT_VMO_SIZE_BYTES * 2) - magic_size_found_by_experiment);
+        let full_string = format!("{string_head}{string_tail}");
+
+        inspector.root().record_int(full_string, 5);
+        let hierarchy = reader::read(&inspector).await.unwrap();
+        // somewhat redundant to check both things, but checking the size makes fencepost errors
+        // obvious, while checking the contents make real problems obvious
+        assert_eq!(hierarchy.properties[0].key().len(), string_head.len());
+        assert_eq!(hierarchy.properties[0].key(), &string_head);
     }
 
     #[fuchsia::test]

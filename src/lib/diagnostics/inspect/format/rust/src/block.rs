@@ -202,6 +202,9 @@ impl<T: ReadBytes> Block<T> {
         let mut bytes = vec![0u8; entry_type_size];
         self.container
             .read_at((self.index + 1).offset() + slot_index * entry_type_size, &mut bytes);
+        // Safety: this is converting a Vec of `entry_type_size` into an array literal.
+        // As long as `entry_type_size` is correct, this is safe. The sizes are statically
+        // declared.
         Ok(BlockIndex::new(u32::from_le_bytes(bytes.try_into().unwrap())))
     }
 
@@ -342,6 +345,7 @@ impl<T: ReadBytes> Block<T> {
     /// Returns the type of a block. Panics on an invalid value.
     pub fn block_type(&self) -> BlockType {
         let block_type = self.header().block_type();
+        // Safety: BlockType is repr(u8). We never write anything but BlockTypes here.
         BlockType::from_u8(block_type).unwrap()
     }
 
@@ -502,6 +506,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
         header.set_header_version(constants::HEADER_VERSION_NUMBER);
         self.write(header, Payload(0));
+        // Safety: a valid `size` is smaller than a u32
         self.set_header_vmo_size(size.try_into().unwrap())?;
         Ok(())
     }
@@ -925,6 +930,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq> Block<T> {
         }
         let mut header = self.header();
         header.set_block_type(BlockType::Name as u8);
+        // Safety: name length must fit in 12 bytes.
         header.set_name_length(u16::from_usize(bytes.len()).unwrap());
         self.write_header(header);
         self.write_payload_from_bytes(bytes);

@@ -315,8 +315,7 @@ impl<'a> ScanResult<'a> {
         // Build a valid hierarchy by attaching completed nodes to their parent.
         // Once the parent is complete, it's added to the stack and we recurse
         // until the root is found (parent index = 0).
-        while complete_nodes.len() > 0 {
-            let scanned_node = complete_nodes.pop().unwrap();
+        while let Some(scanned_node) = complete_nodes.pop() {
             if uninitialized_nodes.contains(&scanned_node.parent_index) {
                 // Skip children of initialized nodes. These nodes were implicitly unlinked due to
                 // tombstoning.
@@ -334,6 +333,8 @@ impl<'a> ScanResult<'a> {
                 .ok_or(ReaderError::ParentIndexNotFound(scanned_node.parent_index))?
                 .is_complete()
             {
+                // Safety: if pending_nodes did not contain scanned_node.parent_index,
+                // we would've returned above with ParentIndexNotFound
                 let parent_node = pending_nodes.remove(&scanned_node.parent_index).unwrap();
                 if scanned_node.parent_index == BlockIndex::ROOT {
                     return Ok(parent_node.partial_hierarchy);
@@ -430,6 +431,7 @@ impl<'a> ScanResult<'a> {
         let name = self.get_name(name_index).ok_or(ReaderError::ParseName(name_index))?;
         let parent_index = block.parent_index()?;
         let array_slots = block.array_slots()?;
+        // Safety: So long as the array is valid, array_capacity will return a valid value.
         if utils::array_capacity(block.order(), block.array_entry_type()?).unwrap() < array_slots {
             return Err(ReaderError::AttemptedToReadTooManyArraySlots(block.index()));
         }
@@ -437,30 +439,42 @@ impl<'a> ScanResult<'a> {
         let parsed_property = match block.array_entry_type().map_err(ReaderError::VmoFormat)? {
             BlockType::IntValue => {
                 let values = value_indexes
+                    // Safety: in release mode, this can only error for index-out-of-bounds.
+                    // We check above that indexes are in-bounds.
                     .map(|i| block.array_get_int_slot(i).unwrap())
                     .collect::<Vec<i64>>();
                 Property::IntArray(
                     name,
+                    // Safety: if the block is an array, it must have an array format.
+                    // We have already verified it is an array.
                     ArrayContent::new(values, block.array_format().unwrap())
                         .map_err(ReaderError::Hierarchy)?,
                 )
             }
             BlockType::UintValue => {
                 let values = value_indexes
+                    // Safety: in release mode, this can only error for index-out-of-bounds.
+                    // We check above that indexes are in-bounds.
                     .map(|i| block.array_get_uint_slot(i).unwrap())
                     .collect::<Vec<u64>>();
                 Property::UintArray(
                     name,
+                    // Safety: if the block is an array, it must have an array format.
+                    // We have already verified it is an array.
                     ArrayContent::new(values, block.array_format().unwrap())
                         .map_err(ReaderError::Hierarchy)?,
                 )
             }
             BlockType::DoubleValue => {
                 let values = value_indexes
+                    // Safety: in release mode, this can only error for index-out-of-bounds.
+                    // We check above that indexes are in-bounds.
                     .map(|i| block.array_get_double_slot(i).unwrap())
                     .collect::<Vec<f64>>();
                 Property::DoubleArray(
                     name,
+                    // Safety: if the block is an array, it must have an array format.
+                    // We have already verified it is an array.
                     ArrayContent::new(values, block.array_format().unwrap())
                         .map_err(ReaderError::Hierarchy)?,
                 )
@@ -468,6 +482,8 @@ impl<'a> ScanResult<'a> {
             BlockType::StringReference => {
                 let values = value_indexes
                     .map(|i| {
+                        // Safety: in release mode, this can only error for index-out-of-bounds.
+                        // We check above that indexes are in-bounds.
                         let string_idx = block.array_get_string_index_slot(i).unwrap();
                         // default initialize unset values -- 0 index is never a string, it is always
                         // the header block
@@ -475,8 +491,11 @@ impl<'a> ScanResult<'a> {
                             return String::new();
                         }
 
-                        let block = self.snapshot.get_block(string_idx).unwrap();
-                        self.load_string_reference(block).unwrap()
+                        self.snapshot
+                            .get_block(string_idx)
+                            .map(|b| self.load_string_reference(b))
+                            .flatten()
+                            .unwrap_or(String::new())
                     })
                     .collect::<Vec<String>>();
                 Property::StringList(name, values)

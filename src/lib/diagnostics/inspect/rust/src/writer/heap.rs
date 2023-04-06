@@ -10,7 +10,6 @@ use crate::writer::Error;
 use inspect_format::{
     constants, utils, Block, BlockIndex, BlockType, PtrEq, ReadBytes, WriteBytes,
 };
-use num_traits::ToPrimitive;
 use std::{cmp::min, convert::TryInto};
 
 /// The inspect heap.
@@ -84,7 +83,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
             }
         };
         let next_into = self.free_head_per_order[next_order as usize];
-        let mut block = self.get_block(next_into).unwrap();
+        let mut block = self.get_block(next_into)?;
         while block.order() > min_fit_order {
             self.split_block(&mut block)?;
         }
@@ -101,7 +100,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
             return Err(Error::BlockAlreadyFree(block.index()));
         }
         let mut buddy_index = self.buddy(block.index(), block.order());
-        let mut buddy_block = self.get_block(buddy_index).unwrap();
+        let mut buddy_block = self.get_block(buddy_index)?;
         let mut block_to_free = block;
         while buddy_block.block_type() == BlockType::Free
             && block_to_free.order() < constants::NUM_ORDERS - 1
@@ -113,7 +112,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
             }
             block_to_free.set_order(block_to_free.order() + 1)?;
             buddy_index = self.buddy(block_to_free.index(), block_to_free.order());
-            buddy_block = self.get_block(buddy_index).unwrap();
+            buddy_block = self.get_block(buddy_index)?;
         }
         block_to_free.become_free(self.free_head_per_order[block_to_free.order() as usize]);
         self.free_head_per_order[block_to_free.order() as usize] = block_to_free.index();
@@ -142,6 +141,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
     }
 
     pub fn set_header_block(&mut self, header: &mut Block<T>) -> Result<(), Error> {
+        // Safety: the current size can't be larger than a max u32 value
         header.set_header_vmo_size(self.current_size_bytes.try_into().unwrap())?;
         self.header = Some(header.clone());
         Ok(())
@@ -175,13 +175,15 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
         self.free_head_per_order[(constants::NUM_ORDERS - 1) as usize] = last_index;
         self.current_size_bytes = new_size;
         if let Some(header) = self.header.as_mut() {
-            header.set_header_vmo_size(self.current_size_bytes.try_into().unwrap())?;
+            // Safety: the current size can't be larger than a max u32 value
+            header.set_header_vmo_size(self.current_size_bytes as u32)?;
         }
         Ok(())
     }
 
     fn is_free_block(&self, index: BlockIndex, expected_order: u8) -> bool {
-        if index.to_usize().unwrap() >= self.current_size_bytes / constants::MIN_ORDER_SIZE {
+        // Safety: promoting from u32 to usize
+        if *index as usize >= self.current_size_bytes / constants::MIN_ORDER_SIZE {
             return false;
         }
         match self.get_block(index) {
@@ -202,7 +204,7 @@ impl<T: ReadBytes + WriteBytes + PtrEq + Clone> Heap<T> {
             return Ok(true);
         }
         while self.is_free_block(next_index, order) {
-            let mut curr_block = self.get_block(next_index).unwrap();
+            let mut curr_block = self.get_block(next_index)?;
             next_index = curr_block.free_next_index()?;
             if next_index == index {
                 curr_block.set_free_next_index(block.free_next_index()?)?;

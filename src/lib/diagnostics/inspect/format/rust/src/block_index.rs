@@ -20,6 +20,7 @@ impl BlockIndex {
 
     /// Get index in the VMO for a given |offset|.
     pub fn from_offset(offset: usize) -> BlockIndex {
+        // Safety: `offset` can't be larger than the largest `BlockIndex`
         Self::new(u32::try_from(offset / constants::MIN_ORDER_SIZE).unwrap())
     }
 
@@ -52,14 +53,16 @@ impl Deref for BlockIndex {
 // Panics if a u32 is larger than a usize
 impl From<BlockIndex> for usize {
     fn from(idx: BlockIndex) -> usize {
-        usize::try_from(*idx).unwrap()
+        // usize on Fuchsia is 64 bits
+        *idx as usize
     }
 }
 
 // Panics if a u32 is larger than a usize
 impl From<&BlockIndex> for usize {
     fn from(idx: &BlockIndex) -> usize {
-        usize::try_from(**idx).unwrap()
+        // usize on Fuchsia is 64 bits
+        **idx as usize
     }
 }
 
