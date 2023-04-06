@@ -8,8 +8,7 @@
 #include <lib/zx/channel.h>
 #include <magma_intel_gen_defs.h>
 
-#include <shared_mutex>
-#include <thread>
+#include <future>
 
 #include <gtest/gtest.h>
 
@@ -144,57 +143,31 @@ class TestConnection : public magma::TestDeviceBase {
   uint64_t gpu_addr_ = 0;
 };
 
-constexpr uint32_t kMaxCount = 100;
-constexpr uint32_t kRestartCount = kMaxCount / 10;
-
-static std::atomic_uint complete_count;
-// This lock ensures the looper threads don't continue making new connections while we're attempting
-// to unbind, as open connections keep the driver from being released.
-static std::shared_mutex connection_create_mutex;
-
-static void looper_thread_entry() {
-  std::unique_ptr<TestConnection> test(new TestConnection());
-  while (complete_count < kMaxCount) {
-    magma_status_t status = test->Test();
-    if (status == MAGMA_STATUS_OK) {
-      complete_count++;
-    } else {
-      EXPECT_EQ(status, MAGMA_STATUS_CONNECTION_LOST);
-      test.reset();
-      std::shared_lock lock(connection_create_mutex);
-      test.reset(new TestConnection());
-    }
-  }
-}
-
-static void test_shutdown(uint32_t iters) {
-  for (uint32_t i = 0; i < iters; i++) {
-    complete_count = 0;
-
-    std::thread looper(looper_thread_entry);
-    std::thread looper2(looper_thread_entry);
-
-    uint32_t count = kRestartCount;
-    while (complete_count < kMaxCount) {
-      if (complete_count > count) {
-        // Force looper thread connections to drain. Also prevent loopers from trying to create new
-        // connections while the device is torn down, just so it's easier to test that device
-        // creation is working.
-        std::unique_lock lock(connection_create_mutex);
-
-        magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_INTEL);
-        count += kRestartCount;
+TEST(Shutdown, Test) {
+  constexpr uint32_t kMaxCount = 10;
+  for (uint32_t i = 0; i < kMaxCount; i++) {
+    std::future wait_future = std::async([]() {
+      TestConnection test;
+      magma_status_t status = MAGMA_STATUS_OK;
+      // Keep testing the driver until we see that it has gone away (because of the restart).
+      while (status == MAGMA_STATUS_OK) {
+        status = test.Test();
       }
-      std::this_thread::yield();
-    }
+      EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST, status);
+    });
+    std::future restart_future = std::async(
+        []() { magma::TestDeviceBase::RebindParentDeviceFromId(MAGMA_VENDOR_ID_INTEL); });
+    restart_future.wait();
+    wait_future.wait();
 
-    looper.join();
-    looper2.join();
+    // Perform one more test to be sure the rebind was successful.
+    TestConnection test;
+    EXPECT_EQ(MAGMA_STATUS_OK, test.Test());
+
+    if (HasFailure()) {
+      return;
+    }
   }
 }
 
 }  // namespace
-
-TEST(Shutdown, Test) { test_shutdown(1); }
-
-TEST(Shutdown, DISABLED_Stress) { test_shutdown(1000); }
