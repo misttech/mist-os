@@ -48,28 +48,6 @@ constexpr const char kProduct[] = "CDC Ethernet";
 constexpr const char kSerial[] = "ebfd5ad49d2a";
 constexpr size_t kEthernetMtu = 1500;
 
-zx_status_t GetTopologicalPath(int fd, std::string* out) {
-  size_t path_len;
-  fdio_cpp::UnownedFdioCaller connection(fd);
-  auto resp = fidl::WireCall(
-                  ::fidl::UnownedClientEnd<fuchsia_device::Controller>(connection.borrow_channel()))
-                  ->GetTopologicalPath();
-  zx_status_t status = resp.status();
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (resp.value().is_error()) {
-    return resp.value().error_value();
-  }
-  const auto& r = *resp->value();
-  path_len = r.path.size();
-  if (path_len > PATH_MAX) {
-    return ZX_ERR_INTERNAL;
-  }
-  *out = std::string(r.path.data(), r.path.size());
-  return ZX_OK;
-}
-
 struct DevicePaths {
   std::optional<std::string> path;
   std::string subdir;
@@ -83,16 +61,21 @@ zx_status_t WaitForDevice(int dirfd, int event, const char* name, void* cookie) 
   if (event != WATCH_EVENT_ADD_FILE) {
     return ZX_OK;
   }
-  fbl::unique_fd fd;
-  if (zx_status_t status = fdio_open_fd_at(dirfd, name, 0, fd.reset_and_get_address());
-      status != ZX_OK) {
-    return status;
+  fdio_cpp::UnownedFdioCaller caller(dirfd);
+  zx::result client_end =
+      component::ConnectAt<fuchsia_device::Controller>(caller.directory(), name);
+  if (client_end.is_error()) {
+    return client_end.error_value();
   }
-  std::string topological_path;
-  zx_status_t status = GetTopologicalPath(fd.get(), &topological_path);
-  if (status != ZX_OK) {
-    return status;
+  const fidl::WireResult result = fidl::WireCall(client_end.value())->GetTopologicalPath();
+  if (!result.ok()) {
+    return result.status();
   }
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    return response.error_value();
+  }
+  std::string_view topological_path = response->path.get();
   DevicePaths* paths = reinterpret_cast<DevicePaths*>(cookie);
   if (topological_path.find(paths->query) != std::string::npos) {
     paths->path = paths->subdir + std::string{name};
@@ -334,10 +317,15 @@ class UsbCdcEcmTest : public zxtest::Test {
       ASSERT_STATUS(fdio_watch_directory(fd.get(), WaitForDevice, ZX_TIME_INFINITE, &paths),
                     ZX_ERR_STOP);
     };
-    DevicePaths host_device_paths{.subdir = "class/network/", .query = "/usb-bus/"};
+    DevicePaths host_device_paths{
+        .subdir = "class/network/",
+        .query = "/usb-bus/",
+    };
     // Attach to function-001, because it implements usb-cdc-ecm.
-    DevicePaths peripheral_device_paths{.subdir = "class/network/",
-                                        .query = "/usb-peripheral/function-001"};
+    DevicePaths peripheral_device_paths{
+        .subdir = "class/network/",
+        .query = "/usb-peripheral/function-001",
+    };
 
     wait_for_device(host_device_paths);
     wait_for_device(peripheral_device_paths);
