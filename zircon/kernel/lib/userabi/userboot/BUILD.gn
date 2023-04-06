@@ -35,6 +35,10 @@ if (current_toolchain == default_toolchain) {
       with_shared = false
       is_pic_default = true
 
+      # Though a loadable_module() target is used, really this is an executable
+      # that can be compiled with -fPIE instead of -fPIC.
+      remove_shared_configs = [ "//build/config:shared_library_config" ]
+
       toolchain_args = {
         if (optimize == "none" || optimize == "debug") {
           # userboot doesn't stay sufficiently pure without optimization.
@@ -71,6 +75,13 @@ if (toolchain_environment == "userboot") {
       rebase_path("//zircon/kernel/include/hidden.h", root_build_dir),
     ]
     defines = [ "HIDDEN" ]
+
+    if (current_cpu == "riscv64") {
+      # The compiler will sometimes choose to move constants from true .rodata
+      # into .sdata for the locality at the expense of becoming writable. That
+      # can't be tolerated in userboot, where no writable segment is allowed.
+      cflags += [ "-msmall-data-limit=0" ]
+    }
   }
 
   group("userboot_config_deps") {

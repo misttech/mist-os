@@ -87,17 +87,21 @@ class VDsoMutator {
     uintptr_t info, value, size;
   };
 
-#if ARCH_X86
+#if defined(__x86_64__)
   // Fill with the single-byte HLT instruction, so any place
   // user-mode jumps into this code, it gets a trap.
   using Insn = uint8_t;
   static constexpr Insn kTrapFill = 0xf4;  // hlt
   static constexpr Insn kSyscallInsn[] = {/*syscall*/ 0x0f, 0x05, /*nop*/ 0x90};
   static constexpr Insn kVmcallInsn[] = {0x0f, 0x01, 0xc1};
-#elif ARCH_ARM64
+#elif defined(__aarch64__)
   // Fixed-size instructions.  Use 'brk #1' (what __builtin_trap() emits).
   using Insn = uint32_t;
   static constexpr Insn kTrapFill = 0xd4200020;
+#elif defined(__riscv)
+  // Instructions are 16 or 32 bits.  All zeros is the 16-bit `unimp` instruction.
+  using Insn = uint16_t;
+  static constexpr Insn kTrapFill = 0;
 #else
 #error what architecture?
 #endif
