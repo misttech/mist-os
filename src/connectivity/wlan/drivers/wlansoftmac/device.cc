@@ -66,7 +66,8 @@ wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
     },
 };
 
-#define DEV(c) static_cast<Device*>(c)
+static constexpr inline Device* DEV(void* ctx) { return static_cast<Device*>(ctx); }
+
 static zx_protocol_device_t eth_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .unbind = [](void* ctx) { DEV(ctx)->EthUnbind(); },
@@ -88,7 +89,6 @@ static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
     .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data, size_t data_size)
         -> zx_status_t { return DEV(ctx)->EthernetImplSetParam(param, value, data, data_size); },
 };
-#undef DEV
 
 WlanSoftmacHandle::WlanSoftmacHandle(DeviceInterface* device)
     : device_(device), inner_handle_(nullptr) {
@@ -102,12 +102,15 @@ WlanSoftmacHandle::~WlanSoftmacHandle() {
   }
 }
 
+static constexpr inline DeviceInterface* DEVICE(void* c) {
+  return static_cast<DeviceInterface*>(c);
+}
+
 zx_status_t WlanSoftmacHandle::Init() {
   if (inner_handle_ != nullptr) {
     return ZX_ERR_BAD_STATE;
   }
 
-#define DEVICE(c) static_cast<DeviceInterface*>(c)
   rust_device_interface_t wlansoftmac_rust_ops = {
       .device = static_cast<void*>(this->device_),
       .start = [](void* device, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
@@ -192,7 +195,6 @@ zx_status_t WlanSoftmacHandle::Init() {
         return DEVICE(device)->ClearAssoc(*addr);
       },
   };
-#undef DEVICE
 
   inner_handle_ = start_sta(wlansoftmac_rust_ops, rust_buffer_provider);
   return ZX_OK;

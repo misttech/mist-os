@@ -312,7 +312,7 @@ typedef struct zx_protocol_device {
   // should be copied.
   //
   // This hook will only be executed on the devhost's main thread.
-  void (*message)(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
+  void (*message)(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn);
 
   //@ ## service_connect
   // Connect a runtime client to this device.

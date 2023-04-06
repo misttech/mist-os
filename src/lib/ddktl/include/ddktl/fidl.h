@@ -11,7 +11,7 @@
 namespace ddk {
 
 device_fidl_txn_t IntoDeviceFIDLTransaction(fidl::Transaction* txn);
-fidl::Transaction* FromDeviceFIDLTransaction(device_fidl_txn_t* txn);
+fidl::Transaction* FromDeviceFIDLTransaction(device_fidl_txn_t& txn);
 
 }  // namespace ddk
 

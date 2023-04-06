@@ -479,7 +479,7 @@ struct zx_device
   // Methods from the devfs_fidl::DeviceInterface class.
   void LogError(const char* error) override;
   bool IsUnbound() override;
-  bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t* txn) override;
+  bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) override;
   void ConnectToDeviceFidl(ConnectToDeviceFidlRequestView request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override;
   void Bind(BindRequestView request, BindCompleter::Sync& completer) override;

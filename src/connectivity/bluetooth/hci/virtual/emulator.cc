@@ -81,7 +81,7 @@ EmulatorDevice::EmulatorDevice(zx_device_t* device)
       emulator_dev_(nullptr),
       binding_(this) {}
 
-#define DEV(c) static_cast<EmulatorDevice*>(c)
+static inline constexpr EmulatorDevice* DEV(void* ctx) { return static_cast<EmulatorDevice*>(ctx); }
 
 static zx_protocol_device_t bt_emulator_device_ops = {
     .version = DEVICE_OPS_VERSION,
@@ -91,11 +91,10 @@ static zx_protocol_device_t bt_emulator_device_ops = {
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
     .message =
-        [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+        [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "EmulatorMessage\n");
-          EmulatorDevice* thiz = static_cast<EmulatorDevice*>(ctx);
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Emulator>(
-              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
+              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
 };
@@ -110,11 +109,10 @@ static zx_protocol_device_t bt_hci_device_ops = {
       return DEV(ctx)->GetProtocol(proto_id, out_proto);
     },
     .message =
-        [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+        [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "HciMessage\n");
-          EmulatorDevice* thiz = static_cast<EmulatorDevice*>(ctx);
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
-              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
+              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
 };
@@ -139,8 +137,6 @@ static bt_hci_protocol_ops_t hci_protocol_ops = {
       return DEV(ctx)->OpenChan(Channel::SNOOP, chan);
     },
 };
-
-#undef DEV
 
 zx_status_t EmulatorDevice::Bind(std::string_view name) {
   logf(TRACE, "bind\n");

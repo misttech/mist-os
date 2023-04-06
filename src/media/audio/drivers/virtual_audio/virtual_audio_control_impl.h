@@ -19,7 +19,7 @@ class VirtualAudioControlImpl : public fidl::WireServer<fuchsia_virtualaudio::Co
   static zx_status_t DdkBind(void* ctx, zx_device_t* parent_bus);
   static void DdkRelease(void* ctx);
   static void DdkUnbind(void* ctx);
-  static void DdkMessage(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn);
+  static void DdkMessage(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn);
 
  private:
   VirtualAudioControlImpl() = default;

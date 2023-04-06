@@ -25,10 +25,10 @@ namespace audio::intel_hda::codecs {
 zx_protocol_device_t IntelHDADaiBase::DAI_DEVICE_THUNKS = []() {
   zx_protocol_device_t sdt = {};
   sdt.version = DEVICE_OPS_VERSION;
-  sdt.message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+  sdt.message = [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
     IntelHDADaiBase* thiz = static_cast<IntelHDADaiBase*>(ctx);
     fidl::WireDispatch<fuchsia_hardware_audio::DaiConnector>(
-        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
         ddk::FromDeviceFIDLTransaction(txn));
   };
   return sdt;

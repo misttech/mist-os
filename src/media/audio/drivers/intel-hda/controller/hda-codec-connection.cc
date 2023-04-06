@@ -34,15 +34,13 @@ HdaCodecConnection::ProbeCommandListEntry HdaCodecConnection::PROBE_COMMANDS[] =
     {.verb = GET_PARAM(CodecParam::REVISION_ID), .parse = &HdaCodecConnection::ParseRevisionId},
 };
 
-#define DEV (static_cast<HdaCodecConnection*>(ctx))
-
 zx_protocol_device_t HdaCodecConnection::CODEC_DEVICE_THUNKS = []() {
   zx_protocol_device_t ops = {};
   ops.version = DEVICE_OPS_VERSION;
-  ops.message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
+  ops.message = [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
     HdaCodecConnection* thiz = static_cast<HdaCodecConnection*>(ctx);
     fidl::WireDispatch<fuchsia_hardware_intel_hda::CodecDevice>(
-        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
         ddk::FromDeviceFIDLTransaction(txn));
   };
   return ops;
@@ -51,10 +49,9 @@ zx_protocol_device_t HdaCodecConnection::CODEC_DEVICE_THUNKS = []() {
 ihda_codec_protocol_ops_t HdaCodecConnection::CODEC_PROTO_THUNKS = {
     .get_driver_channel = [](void* ctx, zx_handle_t* channel_out) -> zx_status_t {
       ZX_DEBUG_ASSERT(ctx);
-      return DEV->CodecGetDispatcherChannel(channel_out);
+      return static_cast<HdaCodecConnection*>(ctx)->CodecGetDispatcherChannel(channel_out);
     },
 };
-#undef DEV
 
 HdaCodecConnection::HdaCodecConnection(IntelHDAController& controller, uint8_t codec_id)
     : controller_(controller), codec_id_(codec_id), loop_(&kAsyncLoopConfigNeverAttachToThread) {

@@ -16,9 +16,9 @@ device_fidl_txn_t IntoDeviceFIDLTransaction(fidl::Transaction* txn) {
   };
 }
 
-fidl::Transaction* FromDeviceFIDLTransaction(device_fidl_txn_t* txn) {
+fidl::Transaction* FromDeviceFIDLTransaction(device_fidl_txn_t& txn) {
   // Invalidate the source transaction.
-  uintptr_t raw = std::exchange(txn->driver_host_context, 0);
+  uintptr_t raw = std::exchange(txn.driver_host_context, 0);
   ZX_ASSERT_MSG(raw != 0, "Reused a device_fidl_txn_t!");
   return reinterpret_cast<fidl::Transaction*>(raw);
 }

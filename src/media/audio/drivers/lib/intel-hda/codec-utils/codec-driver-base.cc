@@ -32,7 +32,10 @@ IntelHDACodecDriverBase::IntelHDACodecDriverBase() : loop_(&kAsyncLoopConfigNeve
   loop_.StartThread("intel-hda-codec-driver-loop");
 }
 
-#define DEV(_ctx) static_cast<IntelHDACodecDriverBase*>(_ctx)
+static inline constexpr IntelHDACodecDriverBase* DEV(void* ctx) {
+  return static_cast<IntelHDACodecDriverBase*>(ctx);
+}
+
 zx_protocol_device_t IntelHDACodecDriverBase::CODEC_DEVICE_THUNKS = []() {
   zx_protocol_device_t ops = {};
   ops.version = DEVICE_OPS_VERSION;
@@ -45,7 +48,6 @@ zx_protocol_device_t IntelHDACodecDriverBase::CODEC_DEVICE_THUNKS = []() {
   };
   return ops;
 }();
-#undef DEV
 
 zx::result<> IntelHDACodecDriverBase::Bind(zx_device_t* codec_dev, const char* name) {
   ZX_ASSERT(codec_dev != nullptr);

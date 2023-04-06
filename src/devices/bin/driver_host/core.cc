@@ -72,7 +72,7 @@ void DriverHostContext::DeviceDestroy(zx_device_t* dev) {
           -> zx_status_t { device_invalid_fatal(ctx); },
       .rxrpc = +[](void* ctx, zx_handle_t) -> zx_status_t { device_invalid_fatal(ctx); },
       .message =
-          +[](void* ctx, fidl_incoming_msg_t*, device_fidl_txn_t*) { device_invalid_fatal(ctx); },
+          +[](void* ctx, fidl_incoming_msg_t, device_fidl_txn_t) { device_invalid_fatal(ctx); },
       .service_connect =
           +[](void* ctx, const char*, fdf_handle_t) -> zx_status_t { device_invalid_fatal(ctx); },
   });

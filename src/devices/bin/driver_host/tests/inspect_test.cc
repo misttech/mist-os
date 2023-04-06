@@ -184,8 +184,7 @@ TEST_F(DeviceInspectTestCase, CallStats) {
   fbl::RefPtr<zx_device> device;
   ASSERT_OK(zx_device::Create(&(driver_host()), "test-device", driver(), &device));
   device->set_ops({
-      .message = [](void* ctx, fidl_incoming_msg_t* msg,
-                    device_fidl_txn_t* txn) { ASSERT_NULL(txn); },
+      .message = [](void*, fidl_incoming_msg_t, device_fidl_txn_t) {},
   });
   device->vnode.reset();
 
@@ -200,7 +199,7 @@ TEST_F(DeviceInspectTestCase, CallStats) {
       ->MessageOp(
           fidl::IncomingHeaderAndMessage::Create(reinterpret_cast<uint8_t*>(&header),
                                                  sizeof(header), handles, handle_metadata, 0),
-          nullptr);
+          {});
 
   {
     // Test InspectCallStats::Update() method

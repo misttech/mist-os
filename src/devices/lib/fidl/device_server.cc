@@ -200,8 +200,7 @@ void DeviceServer::MessageDispatcher::dispatch_message(
 
   // Use shadowing lambda captures to ensure consumed values aren't used.
   [&, txn = Transaction(txn)]() mutable {
-    device_fidl_txn_t ddk_txn = ddk::IntoDeviceFIDLTransaction(&txn);
-    if (!parent_.controller_.MessageOp(std::move(msg), &ddk_txn)) {
+    if (!parent_.controller_.MessageOp(std::move(msg), ddk::IntoDeviceFIDLTransaction(&txn))) {
       // The device doesn't implement zx_protocol_device::message.
       static_cast<fidl::Transaction*>(&txn)->InternalError(fidl::UnbindInfo::UnknownOrdinal(),
                                                            fidl::ErrorOrigin::kReceive);

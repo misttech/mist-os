@@ -35,7 +35,6 @@
 #define ETHERNET_INITIAL_TRANSMIT_DELAY 0
 #define ETHERNET_INITIAL_RECV_DELAY 0
 
-namespace telephony_transport = fuchsia_hardware_telephony_transport;
 namespace telephony_snoop = fuchsia_telephony_snoop;
 
 // TODO (jiamingw): investigate whether it can be replaced by eth::Operation
@@ -411,7 +410,8 @@ void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
   return;
 }
 
-#define DEV(c) static_cast<Device*>(c)
+static inline constexpr Device* DEV(void* ctx) { return static_cast<Device*>(ctx); }
+
 static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
     .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
       return DEV(ctx)->EthernetImplQuery(options, info);
@@ -427,7 +427,6 @@ static ethernet_impl_protocol_ops_t ethernet_impl_ops = {
     .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data, size_t data_size)
         -> zx_status_t { return DEV(ctx)->EthernetImplSetParam(param, value, data, data_size); },
 };
-#undef DEV
 
 static zx_protocol_device_t eth_qmi_ops = {
     .version = DEVICE_OPS_VERSION,
@@ -502,11 +501,9 @@ void Device::SnoopQmiMsgSend(uint8_t* msg_arr, uint32_t msg_arr_len,
 }
 
 static void qmi_interrupt_cb(void* ctx, usb_request_t* req) {
-  Device* device = static_cast<Device*>(ctx);
-
   zx_port_packet_t packet = {};
   packet.key = INTERRUPT_MSG;
-  zx_port_queue(device->GetQmiChannelPort(), &packet);
+  zx_port_queue(DEV(ctx)->GetQmiChannelPort(), &packet);
 }
 
 int Device::EventLoop(void) {
@@ -581,10 +578,7 @@ int Device::EventLoop(void) {
   }  // while(true)
 }
 
-static int qmi_transport_thread(void* ctx) {
-  Device* device_ptr = static_cast<Device*>(ctx);
-  return device_ptr->EventLoop();
-}
+static int qmi_transport_thread(void* ctx) { return DEV(ctx)->EventLoop(); }
 
 void Device::GenInboundEthFrameHdr(EthFrameHdr* eth_frame_hdr) {
   // Dest mac addr.
@@ -635,8 +629,7 @@ void Device::UsbRecv(usb_request_t* request) {
 }
 
 static void usb_read_complete(void* ctx, usb_request_t* request) {
-  Device* device_ptr = static_cast<Device*>(ctx);
-  device_ptr->UsbReadCompleteHandler(request);
+  DEV(ctx)->UsbReadCompleteHandler(request);
 }
 
 void Device::UsbReadCompleteHandler(usb_request_t* request) {
@@ -728,8 +721,7 @@ void Device::UsbWriteCompleteHandler(usb_request_t* request) {
 }
 
 static void usb_write_complete(void* ctx, usb_request_t* request) {
-  Device* device_ptr = static_cast<Device*>(ctx);
-  device_ptr->UsbWriteCompleteHandler(request);
+  DEV(ctx)->UsbWriteCompleteHandler(request);
 }
 
 Device::Device(zx_device_t* parent) : DeviceType(parent) { usb_device_ = parent; }

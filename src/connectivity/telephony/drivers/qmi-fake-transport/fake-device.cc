@@ -14,7 +14,6 @@
 
 #include <ddktl/fidl.h>
 
-namespace fidl_qmi_transport = fuchsia_hardware_telephony_transport;
 namespace fidl_tel_snoop = fuchsia_telephony_snoop;
 
 namespace qmi_fake {
@@ -32,7 +31,8 @@ constexpr uint32_t kTelCtrlPlanePktMax = 2048;
 
 QmiDevice::QmiDevice(zx_device_t* device) : Device(device) {}
 
-#define DEV(c) static_cast<QmiDevice*>(c)
+static inline constexpr QmiDevice* DEV(void* ctx) { return static_cast<QmiDevice*>(ctx); }
+
 static zx_protocol_device_t qmi_fake_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
@@ -40,10 +40,9 @@ static zx_protocol_device_t qmi_fake_device_ops = {
     },
     .unbind = [](void* ctx) { DEV(ctx)->Unbind(); },
     .release = [](void* ctx) { DEV(ctx)->Release(); },
-    .message = [](void* ctx, fidl_incoming_msg_t* msg,
-                  device_fidl_txn_t* txn) { return DEV(ctx)->DdkMessage(msg, txn); },
+    .message = [](void* ctx, fidl_incoming_msg_t msg,
+                  device_fidl_txn_t txn) { return DEV(ctx)->DdkMessage(msg, txn); },
 };
-#undef DEV
 
 static void sent_fake_qmi_msg(zx::channel& channel, uint8_t* resp, uint32_t resp_size) {
   zx_status_t status;

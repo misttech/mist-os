@@ -718,10 +718,9 @@ zx_status_t Device::GetMetadataSize(uint32_t type, size_t* out_size) {
   return device_server_.GetMetadataSize(type, out_size);
 }
 
-bool Device::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t* txn) {
+bool Device::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) {
   if (HasOp(ops_, &zx_protocol_device_t::message)) {
-    fidl_incoming_msg_t fidl_msg = std::move(msg).ReleaseToEncodedCMessage();
-    ops_->message(compat_symbol_.context, &fidl_msg, txn);
+    ops_->message(compat_symbol_.context, std::move(msg).ReleaseToEncodedCMessage(), txn);
     return true;
   }
   return false;

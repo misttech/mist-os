@@ -16,7 +16,7 @@ class TestInterface : public devfs_fidl::DeviceInterface {
  public:
   void LogError(const char* error) override { printf("%s\n", error); }
   bool IsUnbound() override { return false; }
-  bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t* txn) override {
+  bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn) override {
     return false;
   }
 
