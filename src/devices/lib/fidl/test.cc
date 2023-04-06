@@ -89,7 +89,7 @@ TEST_P(MultiplexTest, CheckUnimplemented) {
           if (include_node) {
             ASSERT_OK(result.status());
           } else {
-            ASSERT_STATUS(result.status(), ZX_ERR_NOT_SUPPORTED);
+            ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
           }
         });
     ASSERT_OK(loop.RunUntilIdle());
@@ -111,7 +111,7 @@ TEST_P(MultiplexTest, CheckUnimplemented) {
           if (include_controller) {
             ASSERT_OK(result.status());
           } else {
-            ASSERT_STATUS(result.status(), ZX_ERR_NOT_SUPPORTED);
+            ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
           }
         });
     ASSERT_OK(loop.RunUntilIdle());

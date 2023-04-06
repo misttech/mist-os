@@ -36,4 +36,11 @@ test("test") {
 fuchsia_unittest_package("tests") {
   package_name = "devfs-fidl-test"
   deps = [ ":test" ]
+
+  # MultiplexTest.CheckUnimplemented intentionally triggers error logs.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

@@ -203,7 +203,8 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     device_fidl_txn_t ddk_txn = ddk::IntoDeviceFIDLTransaction(&txn);
     if (!parent_.controller_.MessageOp(std::move(msg), &ddk_txn)) {
       // The device doesn't implement zx_protocol_device::message.
-      static_cast<fidl::Transaction*>(&txn)->Close(ZX_ERR_NOT_SUPPORTED);
+      static_cast<fidl::Transaction*>(&txn)->InternalError(fidl::UnbindInfo::UnknownOrdinal(),
+                                                           fidl::ErrorOrigin::kReceive);
     }
     std::optional internal_error = txn.internal_error();
     if (!internal_error.has_value()) {
