@@ -360,7 +360,7 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
       .property_list = std::move(property_list),
       .driver_path = fidl::StringView::FromExternal(child->zx_driver()->libname()),
       .device_add_config = add_device_config,
-      .has_init = child->ops()->init != nullptr,
+      .has_init = child->ops().init != nullptr,
       .dfv2_device_symbol = reinterpret_cast<uint64_t>(child->get_dfv2_symbol()),
   };
 
@@ -371,7 +371,7 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
   if (status == ZX_OK) {
     if (response->is_ok()) {
       device_id = response->value()->local_device_id;
-      if (child->ops()->init) {
+      if (child->ops().init) {
         // Mark child as invisible until the init function is replied.
         child->set_flag(DEV_FLAG_INVISIBLE);
       }
@@ -502,15 +502,15 @@ zx_status_t DriverHostContext::FindDriver(std::string_view libname, zx::vmo vmo,
     new_driver->set_status(ZX_ERR_IO);
     return new_driver->status();
   }
-  auto ops = &dr->ops;
-  if (!(*ops)) {
+  const zx_driver_ops_t* ops = dr->ops;
+  if (!ops) {
     LOGF(ERROR, "Driver '%s' has nullptr ops", c_libname);
     new_driver->set_status(ZX_ERR_INVALID_ARGS);
     return new_driver->status();
   }
-  if ((*ops)->version != DRIVER_OPS_VERSION) {
+  if (ops->version != DRIVER_OPS_VERSION) {
     LOGF(ERROR, "Driver '%s' has bad driver ops version %#lx, expecting %#lx", c_libname,
-         (*ops)->version, DRIVER_OPS_VERSION);
+         ops->version, DRIVER_OPS_VERSION);
     new_driver->set_status(ZX_ERR_INVALID_ARGS);
     return new_driver->status();
   }
@@ -799,7 +799,6 @@ StatusOrConn DriverHostControllerConnection::CreateStubDevice(CreateDeviceReques
     return zx::error(status);
   }
   dev->set_protocol_id(stub.protocol_id);
-  dev->set_ops(&kDeviceDefaultOps);
   dev->set_local_id(request->local_device_id);
 
   auto coordinator = fidl::WireSharedClient(std::move(request->coordinator),

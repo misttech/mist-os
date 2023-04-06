@@ -134,7 +134,7 @@ struct zx_device
     async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks", get_trace_label("init", &trace_label));
-      Dispatch(ops_->init);
+      Dispatch(ops_.init);
       completion.Signal();
     });
 
@@ -147,7 +147,7 @@ struct zx_device
     async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks", get_trace_label("unbind", &trace_label));
-      Dispatch(ops_->unbind);
+      Dispatch(ops_.unbind);
       completion.Signal();
     });
 
@@ -155,11 +155,15 @@ struct zx_device
   }
 
   zx_status_t ServiceConnectOp(const char* service_name, fdf_handle_t channel) {
+    if (!ops_.service_connect) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
     libsync::Completion completion;
     zx_status_t status;
 
     async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
-      status = Dispatch(ops_->service_connect, ZX_OK, service_name, channel);
+      status = ops_.service_connect(ctx(), service_name, channel);
       completion.Signal();
     });
 
@@ -173,7 +177,7 @@ struct zx_device
     async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks", get_trace_label("release", &trace_label));
-      Dispatch(ops_->release);
+      Dispatch(ops_.release);
       completion.Signal();
     });
 
@@ -186,7 +190,7 @@ struct zx_device
   void ReleaseSyncOp() {
     TraceLabelBuffer trace_label;
     TRACE_DURATION("driver_host:driver-hooks", get_trace_label("release-sync", &trace_label));
-    Dispatch(ops_->release);
+    Dispatch(ops_.release);
   }
 
   void SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t suspend_reason) {
@@ -195,7 +199,7 @@ struct zx_device
     async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks", get_trace_label("suspend", &trace_label));
-      Dispatch(ops_->suspend, requested_state, enable_wake, suspend_reason);
+      Dispatch(ops_.suspend, requested_state, enable_wake, suspend_reason);
       completion.Signal();
     });
 
@@ -203,6 +207,10 @@ struct zx_device
   }
 
   zx_status_t SetPerformanceStateOp(uint32_t requested_state, uint32_t* out_state) {
+    if (!ops_.set_performance_state) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
     libsync::Completion completion;
     zx_status_t status;
 
@@ -210,8 +218,7 @@ struct zx_device
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks",
                      get_trace_label("set_performance_state", &trace_label));
-      status =
-          Dispatch(ops_->set_performance_state, ZX_ERR_NOT_SUPPORTED, requested_state, out_state);
+      status = ops_.set_performance_state(ctx(), requested_state, out_state);
       completion.Signal();
     });
 
@@ -220,6 +227,10 @@ struct zx_device
   }
 
   zx_status_t ConfigureAutoSuspendOp(bool enable, uint8_t requested_state) {
+    if (!ops_.configure_auto_suspend) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
     libsync::Completion completion;
     zx_status_t status;
 
@@ -227,8 +238,7 @@ struct zx_device
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks",
                      get_trace_label("conf_auto_suspend", &trace_label));
-      status =
-          Dispatch(ops_->configure_auto_suspend, ZX_ERR_NOT_SUPPORTED, enable, requested_state);
+      status = ops_.configure_auto_suspend(ctx(), enable, requested_state);
       completion.Signal();
     });
 
@@ -242,7 +252,7 @@ struct zx_device
     async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks", get_trace_label("resume", &trace_label));
-      Dispatch(ops_->resume, requested_state);
+      Dispatch(ops_.resume, requested_state);
       completion.Signal();
     });
 
@@ -256,7 +266,7 @@ struct zx_device
       TraceLabelBuffer trace_label;
       TRACE_DURATION("driver_host:driver-hooks",
                      get_trace_label("child_pre_release", &trace_label));
-      Dispatch(ops_->child_pre_release, child_ctx);
+      Dispatch(ops_.child_pre_release, child_ctx);
       completion.Signal();
     });
 
@@ -283,8 +293,8 @@ struct zx_device
 
   uintptr_t magic = DEV_MAGIC;
 
-  const zx_protocol_device_t* ops() const { return ops_; }
-  void set_ops(const zx_protocol_device_t* ops) {
+  const zx_protocol_device_t& ops() const { return ops_; }
+  void set_ops(zx_protocol_device_t ops) {
     ops_ = ops;
     inspect_->set_ops(ops);
   }
@@ -494,11 +504,6 @@ struct zx_device
   // Templates that dispatch the protocol operations if they were set.
   // If they were not set, the second paramater is returned to the caller
   // (usually ZX_ERR_NOT_SUPPORTED)
-  template <typename RetType, typename... ArgTypes>
-  RetType Dispatch(RetType (*op)(void* ctx, ArgTypes...), RetType fallback, ArgTypes... args) {
-    return op ? (*op)(ctx(), args...) : fallback;
-  }
-
   template <typename... ArgTypes>
   void Dispatch(void (*op)(void* ctx, ArgTypes...), ArgTypes... args) {
     if (op) {
@@ -532,7 +537,7 @@ struct zx_device
 
   uint32_t flags_ = 0;
 
-  const zx_protocol_device_t* ops_ = nullptr;
+  zx_protocol_device_t ops_ = {};
 
   compat::device_t dfv2_symbol_ = compat::kDefaultDevice;
 

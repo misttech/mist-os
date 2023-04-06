@@ -26,22 +26,12 @@ TEST(DeviceApiTest, OpsNotImplemented) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx, "test", *std::move(driver), &dev));
 
-  zx_protocol_device_t ops = {};
-  dev->set_ops(&ops);
   dev->vnode.reset();
 
   EXPECT_EQ(device_get_protocol(dev.get(), 0, nullptr), ZX_ERR_NOT_SUPPORTED);
 }
 
 uint64_t test_ctx = 0xabcdef;
-
-zx_status_t test_get_protocol(void* ctx, uint32_t proto_id, void* out) {
-  EXPECT_EQ(ctx, &test_ctx);
-  EXPECT_EQ(proto_id, 42);
-  uint8_t* data = static_cast<uint8_t*>(out);
-  *data = 0xab;
-  return ZX_OK;
-}
 
 TEST(DeviceApiTest, GetProtocol) {
   DriverHostContext ctx(&kAsyncLoopConfigNoAttachToCurrentThread);
@@ -54,9 +44,16 @@ TEST(DeviceApiTest, GetProtocol) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx, "test", *std::move(driver), &dev));
 
-  zx_protocol_device_t ops = {};
-  ops.get_protocol = test_get_protocol;
-  dev->set_ops(&ops);
+  dev->set_ops({
+      .get_protocol =
+          [](void* ctx, uint32_t proto_id, void* out) {
+            EXPECT_EQ(ctx, &test_ctx);
+            EXPECT_EQ(proto_id, 42);
+            uint8_t* data = static_cast<uint8_t*>(out);
+            *data = 0xab;
+            return ZX_OK;
+          },
+  });
   dev->set_ctx(&test_ctx);
   dev->vnode.reset();
 

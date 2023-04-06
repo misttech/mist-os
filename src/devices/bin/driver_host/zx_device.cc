@@ -390,7 +390,7 @@ void zx_device::LogError(const char* error) {
 bool zx_device::IsUnbound() { return flags_ & DEV_FLAG_UNBINDING; }
 
 bool zx_device::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t* txn) {
-  if (!ops_->message) {
+  if (!ops_.message) {
     return false;
   }
 
@@ -401,7 +401,7 @@ bool zx_device::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t*
     TRACE_DURATION("driver_host:driver-hooks", get_trace_label("message", &trace_label));
     inspect_->MessageOpStats().Update();
     fidl_incoming_msg_t fidl_msg = std::move(msg).ReleaseToEncodedCMessage();
-    ops_->message(ctx(), &fidl_msg, txn);
+    ops_.message(ctx(), &fidl_msg, txn);
     completion.Signal();
   });
 

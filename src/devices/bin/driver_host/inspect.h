@@ -29,7 +29,9 @@ class InspectCallStats {
 
   class InspectCallStatsUpdate {
    public:
-    InspectCallStatsUpdate(InspectCallStats& stats) : stats_(stats) { stats_.count().Add(1); }
+    explicit InspectCallStatsUpdate(InspectCallStats& stats) : stats_(stats) {
+      stats_.count().Add(1);
+    }
     ~InspectCallStatsUpdate() {
       stats_.time_taken_ns().Insert((zx::clock::get_monotonic() - start_).get());
     }
@@ -180,9 +182,11 @@ class DriverInspect {
 
   InspectNodeCollection& devices() { return devices_; }
 
-  void set_name(std::string name) { driver_node_.CreateString("name", name, &static_values_); }
+  void set_name(const std::string& name) {
+    driver_node_.CreateString("name", name, &static_values_);
+  }
 
-  void set_ops(const zx_driver_ops_t* ops);
+  void set_ops(const zx_driver_ops_t& ops);
 
   void set_status(zx_status_t status);
 
@@ -232,7 +236,7 @@ class DeviceInspect {
 
   void set_flags(uint32_t flags);
 
-  void set_ops(const zx_protocol_device_t* ops);
+  void set_ops(const zx_protocol_device_t& ops);
 
   void set_protocol_id(uint32_t protocol_id);
   void set_fidl_offers(cpp20::span<const char*> fidl_offers);

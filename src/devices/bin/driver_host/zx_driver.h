@@ -67,7 +67,7 @@ struct zx_driver : fbl::DoublyLinkedListable<fbl::RefPtr<zx_driver>>, fbl::RefCo
 
   void set_driver_rec(zx_driver_rec_t* driver_rec) { driver_rec_ = driver_rec; }
 
-  void set_ops(const zx_driver_ops_t* ops) {
+  void set_ops(zx_driver_ops_t ops) {
     ops_ = ops;
     inspect_.set_ops(ops);
   }
@@ -90,13 +90,13 @@ struct zx_driver : fbl::DoublyLinkedListable<fbl::RefPtr<zx_driver>>, fbl::RefCo
   // Interface to |ops|. These names contain Op in order to not
   // collide with e.g. RefPtr names.
 
-  bool has_init_op() const { return ops_->init != nullptr; }
+  bool has_init_op() const { return ops_.init != nullptr; }
 
-  bool has_bind_op() const { return ops_->bind != nullptr; }
+  bool has_bind_op() const { return ops_.bind != nullptr; }
 
-  bool has_create_op() const { return ops_->create != nullptr; }
+  bool has_create_op() const { return ops_.create != nullptr; }
 
-  bool has_run_unit_tests_op() const { return ops_->run_unit_tests != nullptr; }
+  bool has_run_unit_tests_op() const { return ops_.run_unit_tests != nullptr; }
 
   zx_status_t InitOp(const fbl::RefPtr<Driver>& driver);
 
@@ -120,7 +120,7 @@ struct zx_driver : fbl::DoublyLinkedListable<fbl::RefPtr<zx_driver>>, fbl::RefCo
 
   const char* name_ = nullptr;
   zx_driver_rec_t* driver_rec_ = nullptr;
-  const zx_driver_ops_t* ops_ = nullptr;
+  zx_driver_ops_t ops_ = {};
   void* ctx_ = nullptr;
 
   driver_logger::Logger logger_;

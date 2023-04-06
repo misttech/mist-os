@@ -14,8 +14,6 @@
 
 void InitializeFidlProxyDevice(const fbl::RefPtr<zx_device>& dev,
                                fidl::ClientEnd<fuchsia_io::Directory> incoming_dir) {
-  static const zx_protocol_device_t empty_device_ops = {};
-
   fbl::RefPtr<FidlProxyDevice> fidl_proxy_device =
       fbl::MakeRefCounted<FidlProxyDevice>(std::move(incoming_dir));
 
@@ -23,7 +21,6 @@ void InitializeFidlProxyDevice(const fbl::RefPtr<zx_device>& dev,
 
   // FIDL proxies aren't real devices, so they don't have a context object or any device operations.
   dev->set_ctx(nullptr);
-  dev->set_ops(&empty_device_ops);
 }
 
 fbl::RefPtr<zx_driver> GetFidlProxyDriver(DriverHostContext* ctx) {

@@ -157,25 +157,25 @@ DriverInspect::~DriverInspect() {
   drivers_.count.Subtract(1);
 }
 
-void DriverInspect::set_ops(const zx_driver_ops_t* ops) {
+void DriverInspect::set_ops(const zx_driver_ops_t& ops) {
   fbl::StringBuffer<128> ops_list;
 
-  if (ops->bind) {
+  if (ops.bind) {
     ops_list.Append("bind ");
   }
-  if (ops->create) {
+  if (ops.create) {
     ops_list.Append("create ");
   }
-  if (ops->init) {
+  if (ops.init) {
     ops_list.Append("init ");
   }
-  if (ops->release) {
+  if (ops.release) {
     ops_list.Append("release ");
   }
-  if (ops->run_unit_tests) {
+  if (ops.run_unit_tests) {
     ops_list.Append("run_unit_tests ");
   }
-  if (ops->version) {
+  if (ops.version) {
     ops_list.Append("version ");
   }
   driver_node_.CreateString("ops", {ops_list.data(), ops_list.length()}, &static_values_);
@@ -241,51 +241,48 @@ void DeviceInspect::set_flags(uint32_t flags) {
   flags_.Set({flags_str.data(), flags_str.length()});
 }
 
-void DeviceInspect::set_ops(const zx_protocol_device_t* ops) {
+void DeviceInspect::set_ops(const zx_protocol_device_t& ops) {
   if (!ops_) {
     ops_ = device_node_.CreateString("ops", "");
   }
-  if (!ops) {
-    return;
-  }
   fbl::StringBuffer<256> ops_str;
-  if (ops->get_protocol) {
+  if (ops.get_protocol) {
     ops_str.Append("get_protocol ");
   }
-  if (ops->init) {
+  if (ops.init) {
     ops_str.Append("init ");
   }
-  if (ops->unbind) {
+  if (ops.unbind) {
     ops_str.Append("unbind ");
   }
-  if (ops->release) {
+  if (ops.release) {
     ops_str.Append("release ");
   }
-  if (ops->suspend) {
+  if (ops.suspend) {
     ops_str.Append("suspend ");
   }
-  if (ops->resume) {
+  if (ops.resume) {
     ops_str.Append("resume ");
   }
-  if (ops->set_performance_state) {
+  if (ops.set_performance_state) {
     ops_str.Append("set_performance_state ");
   }
-  if (ops->configure_auto_suspend) {
+  if (ops.configure_auto_suspend) {
     ops_str.Append("configure_auto_suspend ");
   }
-  if (ops->rxrpc) {
+  if (ops.rxrpc) {
     ops_str.Append("rxrpc ");
   }
-  if (ops->message) {
+  if (ops.message) {
     ops_str.Append("message ");
   }
-  if (ops->child_pre_release) {
+  if (ops.child_pre_release) {
     ops_str.Append("child_pre_release");
   }
-  if (ops->open_protocol_session_multibindable) {
+  if (ops.open_protocol_session_multibindable) {
     ops_str.Append("open_protocol_session_multibindable");
   }
-  if (ops->close_protocol_session_multibindable) {
+  if (ops.close_protocol_session_multibindable) {
     ops_str.Append("close_protocol_session_multibindable");
   }
   ops_.Set({ops_str.data(), ops_str.length()});

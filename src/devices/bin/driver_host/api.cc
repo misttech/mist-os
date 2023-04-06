@@ -291,8 +291,8 @@ struct GenericProtocol {
 __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_id, void* out) {
   DEBUG_ASSERT_VALID_DEVICE(dev);
   auto proto = static_cast<GenericProtocol*>(out);
-  if (dev->ops()->get_protocol) {
-    return dev->ops()->get_protocol(dev->ctx(), proto_id, out);
+  if (dev->ops().get_protocol) {
+    return dev->ops().get_protocol(dev->ctx(), proto_id, out);
   }
   if ((proto_id == dev->protocol_id()) && (dev->protocol_ops() != nullptr)) {
     proto->ops = dev->protocol_ops();
@@ -305,8 +305,8 @@ __EXPORT zx_status_t device_get_protocol(const zx_device_t* dev, uint32_t proto_
 __EXPORT zx_status_t device_open_protocol_session_multibindable(const zx_device_t* dev,
                                                                 uint32_t proto_id, void* out) {
   DEBUG_ASSERT_VALID_DEVICE(dev);
-  if (dev->ops()->open_protocol_session_multibindable) {
-    return dev->ops()->open_protocol_session_multibindable(dev->ctx(), proto_id, out);
+  if (dev->ops().open_protocol_session_multibindable) {
+    return dev->ops().open_protocol_session_multibindable(dev->ctx(), proto_id, out);
   }
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -314,8 +314,8 @@ __EXPORT zx_status_t device_open_protocol_session_multibindable(const zx_device_
 __EXPORT zx_status_t device_close_protocol_session_multibindable(const zx_device_t* dev,
                                                                  void* proto) {
   DEBUG_ASSERT_VALID_DEVICE(dev);
-  if (dev->ops()->close_protocol_session_multibindable) {
-    return dev->ops()->close_protocol_session_multibindable(dev->ctx(), proto);
+  if (dev->ops().close_protocol_session_multibindable) {
+    return dev->ops().close_protocol_session_multibindable(dev->ctx(), proto);
   }
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -323,10 +323,7 @@ __EXPORT zx_status_t device_close_protocol_session_multibindable(const zx_device
 __EXPORT zx_status_t device_service_connect(zx_device_t* dev, const char* service_name,
                                             fdf_handle_t channel) {
   DEBUG_ASSERT_VALID_DEVICE(dev);
-  if (dev->ops()->service_connect) {
-    return dev->ServiceConnectOp(service_name, channel);
-  }
-  return ZX_ERR_NOT_SUPPORTED;
+  return dev->ServiceConnectOp(service_name, channel);
 }
 
 __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,

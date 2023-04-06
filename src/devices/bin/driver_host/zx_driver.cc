@@ -13,7 +13,7 @@ zx_status_t zx_driver::InitOp(const fbl::RefPtr<Driver>& driver) {
   zx_status_t status;
 
   async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
-    status = ops_->init(&ctx_);
+    status = ops_.init(&ctx_);
     completion.Signal();
   });
 
@@ -33,7 +33,7 @@ zx_status_t zx_driver::BindOp(internal::BindContext* bind_context,
 
   async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
     internal::set_bind_context(bind_context);
-    status = ops_->bind(ctx_, device.get());
+    status = ops_.bind(ctx_, device.get());
     internal::set_bind_context(nullptr);
     completion.Signal();
   });
@@ -51,7 +51,7 @@ zx_status_t zx_driver::CreateOp(internal::CreationContext* creation_context,
 
   async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
     internal::set_creation_context(creation_context);
-    status = ops_->create(ctx_, parent.get(), name, rpc_channel);
+    status = ops_.create(ctx_, parent.get(), name, rpc_channel);
     internal::set_creation_context(nullptr);
     completion.Signal();
   });
@@ -64,7 +64,7 @@ void zx_driver::ReleaseOp(const fbl::RefPtr<Driver>& driver) const {
   libsync::Completion completion;
   async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
     // TODO(kulakowski/teisenbe) Consider poisoning the ops_ table on release.
-    ops_->release(ctx_);
+    ops_.release(ctx_);
     completion.Signal();
   });
   completion.Wait();
@@ -76,7 +76,7 @@ bool zx_driver::RunUnitTestsOp(const fbl::RefPtr<zx_device_t>& parent,
   bool result;
 
   async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
-    result = ops_->run_unit_tests(ctx_, parent.get(), test_output.release());
+    result = ops_.run_unit_tests(ctx_, parent.get(), test_output.release());
     completion.Signal();
   });
 

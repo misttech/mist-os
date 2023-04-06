@@ -90,13 +90,6 @@ fbl::RefPtr<zx_driver> GetCompositeDriver(DriverHostContext* ctx) {
 
 zx_status_t InitializeCompositeDevice(const fbl::RefPtr<zx_device>& dev,
                                       CompositeFragments&& fragments) {
-  static const zx_protocol_device_t composite_device_ops = []() {
-    zx_protocol_device_t ops = {};
-    ops.unbind = [](void* ctx) { static_cast<CompositeDeviceInstance*>(ctx)->Unbind(); };
-    ops.release = [](void* ctx) { static_cast<CompositeDeviceInstance*>(ctx)->Release(); };
-    return ops;
-  }();
-
   auto composite = fbl::MakeRefCounted<CompositeDevice>(dev);
 
   std::unique_ptr<CompositeDeviceInstance> new_device;
@@ -110,7 +103,10 @@ zx_status_t InitializeCompositeDevice(const fbl::RefPtr<zx_device>& dev,
   }
 
   dev->set_composite(composite, false);
-  dev->set_ops(&composite_device_ops);
+  dev->set_ops({
+      .unbind = [](void* ctx) { static_cast<CompositeDeviceInstance*>(ctx)->Unbind(); },
+      .release = [](void* ctx) { static_cast<CompositeDeviceInstance*>(ctx)->Release(); },
+  });
   dev->set_ctx(new_device.release());
   // Flag that when this is cleaned up, we should run its release hook.
   dev->set_flag(DEV_FLAG_ADDED);

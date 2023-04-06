@@ -53,69 +53,29 @@ void set_creation_context(CreationContext* ctx) {
 
 }  // namespace internal
 
-static void default_unbind(void* ctx) {}
-static void default_suspend(void* ctx, uint8_t requested_state, bool enable_wake,
-                            uint8_t suspend_reason) {}
-static void default_resume(void* ctx, uint32_t requested_state) {}
-static void default_release(void* ctx) {}
-
-static zx_status_t default_set_performance_state(void* ctx, uint32_t requested_state,
-                                                 uint32_t* out_state) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-static zx_status_t default_rxrpc(void* ctx, zx_handle_t channel) { return ZX_ERR_NOT_SUPPORTED; }
-
-static void default_child_pre_release(void* ctx, void* child_ctx) {}
-
-static zx_status_t default_service_connect(void* ctx, const char* service_name,
-                                           fdf_handle_t channel) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-const zx_protocol_device_t internal::kDeviceDefaultOps = []() {
-  zx_protocol_device_t ops = {};
-  ops.unbind = default_unbind;
-  ops.release = default_release;
-  ops.suspend = default_suspend;
-  ops.resume = default_resume;
-  ops.rxrpc = default_rxrpc;
-  ops.set_performance_state = default_set_performance_state;
-  ops.child_pre_release = default_child_pre_release;
-  ops.service_connect = default_service_connect;
-  return ops;
-}();
-
 [[noreturn]] static void device_invalid_fatal(void* ctx) {
   LOGF(FATAL, "Device used after destruction");
   __builtin_trap();
 }
 
-static zx_protocol_device_t device_invalid_ops = []() {
-  zx_protocol_device_t ops = {};
-  ops.unbind = +[](void* ctx) { device_invalid_fatal(ctx); };
-  ops.suspend = +[](void* ctx, uint8_t requested_state, bool enable_wake, uint8_t suspend_reason) {
-    device_invalid_fatal(ctx);
-  };
-  ops.resume = +[](void* ctx, uint32_t) { device_invalid_fatal(ctx); };
-  ops.release = +[](void* ctx) { device_invalid_fatal(ctx); };
-  ops.rxrpc = +[](void* ctx, zx_handle_t) -> zx_status_t { device_invalid_fatal(ctx); };
-  ops.message =
-      +[](void* ctx, fidl_incoming_msg_t*, device_fidl_txn_t*) { device_invalid_fatal(ctx); };
-  ops.set_performance_state =
-      +[](void* ctx, uint32_t requested_state, uint32_t* out_state) -> zx_status_t {
-    device_invalid_fatal(ctx);
-  };
-  ops.service_connect =
-      +[](void* ctx, const char*, fdf_handle_t) -> zx_status_t { device_invalid_fatal(ctx); };
-  return ops;
-}();
-
 void DriverHostContext::DeviceDestroy(zx_device_t* dev) {
   inspect_.DeviceDestroyStats().Update();
 
   // ensure any ops will be fatal
-  dev->set_ops(&device_invalid_ops);
-
+  dev->set_ops({
+      .unbind = +[](void* ctx) { device_invalid_fatal(ctx); },
+      .release = +[](void* ctx) { device_invalid_fatal(ctx); },
+      .suspend = +[](void* ctx, uint8_t requested_state, bool enable_wake,
+                     uint8_t suspend_reason) { device_invalid_fatal(ctx); },
+      .resume = +[](void* ctx, uint32_t) { device_invalid_fatal(ctx); },
+      .set_performance_state = +[](void* ctx, uint32_t requested_state, uint32_t* out_state)
+          -> zx_status_t { device_invalid_fatal(ctx); },
+      .rxrpc = +[](void* ctx, zx_handle_t) -> zx_status_t { device_invalid_fatal(ctx); },
+      .message =
+          +[](void* ctx, fidl_incoming_msg_t*, device_fidl_txn_t*) { device_invalid_fatal(ctx); },
+      .service_connect =
+          +[](void* ctx, const char*, fdf_handle_t) -> zx_status_t { device_invalid_fatal(ctx); },
+  });
   dev->magic = 0xdeaddeaddeaddead;
 
   // ensure all pointers are invalid
@@ -229,10 +189,6 @@ zx_status_t DriverHostContext::DeviceValidate(const fbl::RefPtr<zx_device_t>& de
     LOGD(ERROR, *dev, "Invalid signature for device %p: %#lx", dev.get(), dev->magic);
     return ZX_ERR_BAD_STATE;
   }
-  if (dev->ops() == nullptr) {
-    LOGD(ERROR, *dev, "Invalid ops for device %p", dev.get());
-    return ZX_ERR_INVALID_ARGS;
-  }
   if ((dev->protocol_id() == ZX_PROTOCOL_ROOT)) {
     LOGD(ERROR, *dev, "Invalid protocol for device %p: %#x", dev.get(), dev->protocol_id());
     // These protocols is only allowed for the special
@@ -302,7 +258,9 @@ zx_status_t DriverHostContext::DeviceCreate(fbl::RefPtr<Driver> drv, const char*
     dev->magic = 0;
   }
 
-  dev->set_ops(ops);
+  if (ops) {
+    dev->set_ops(*ops);
+  }
 
   // TODO(teisenbe): Why do we default to dev.get() here?  Why not just
   // nullptr
@@ -414,7 +372,7 @@ zx_status_t DriverHostContext::DeviceInit(const fbl::RefPtr<zx_device_t>& dev) {
     return ZX_ERR_BAD_STATE;
   }
   // Call dev's init op.
-  if (dev->ops()->init) {
+  if (dev->ops().init) {
     dev->set_flag(DEV_FLAG_INITIALIZING);
     api_lock_.Release();
     dev->InitOp();
@@ -501,7 +459,7 @@ zx_status_t DriverHostContext::DeviceUnbind(const fbl::RefPtr<zx_device_t>& dev)
   if (!(dev->flags() & DEV_FLAG_UNBINDING)) {
     dev->set_flag(DEV_FLAG_UNBINDING);
     // Call dev's unbind op.
-    if (dev->ops()->unbind) {
+    if (dev->ops().unbind) {
       VLOGD(1, *dev, "Device %p is being unbound", dev.get());
       api_lock_.Release();
       dev->UnbindOp();
@@ -559,12 +517,12 @@ void DriverHostContext::DeviceResumeReply(const fbl::RefPtr<zx_device_t>& dev, z
 
 void DriverHostContext::DeviceSystemSuspend(const fbl::RefPtr<zx_device>& dev, uint32_t flags) {
   if (dev->auto_suspend_configured()) {
-    dev->ops()->configure_auto_suspend(dev->ctx(), false, DEV_POWER_STATE_D0);
+    dev->ops().configure_auto_suspend(dev->ctx(), false, DEV_POWER_STATE_D0);
     LOGF(INFO, "System suspend overriding auto suspend for device %p '%s'", dev.get(), dev->name());
   }
   zx_status_t status = ZX_ERR_NOT_SUPPORTED;
   // If new suspend hook is implemented, prefer that.
-  if (dev->ops()->suspend) {
+  if (dev->ops().suspend) {
     fuchsia_device::wire::SystemPowerStateInfo new_state_info;
     uint8_t suspend_reason = DEVICE_SUSPEND_REASON_SELECTIVE_SUSPEND;
 
@@ -593,14 +551,14 @@ void DriverHostContext::DeviceSystemSuspend(const fbl::RefPtr<zx_device>& dev, u
 void DriverHostContext::DeviceSystemResume(const fbl::RefPtr<zx_device>& dev,
                                            uint32_t target_system_state) {
   if (dev->auto_suspend_configured()) {
-    dev->ops()->configure_auto_suspend(dev->ctx(), false, DEV_POWER_STATE_D0);
+    dev->ops().configure_auto_suspend(dev->ctx(), false, DEV_POWER_STATE_D0);
     LOGF(INFO, "System resume overriding auto suspend for device %p '%s'", dev.get(), dev->name());
   }
 
   zx_status_t status = ZX_ERR_NOT_SUPPORTED;
 
   // If new resume hook is implemented, prefer that.
-  if (dev->ops()->resume) {
+  if (dev->ops().resume) {
     enum_lock_acquire();
     {
       api_lock_.Release();
@@ -610,7 +568,7 @@ void DriverHostContext::DeviceSystemResume(const fbl::RefPtr<zx_device>& dev,
       uint32_t performance_state = sys_power_states.at(target_system_state - 1).performance_state;
 
       uint32_t requested_perf_state = internal::get_perf_state(dev, performance_state);
-      dev->ops()->resume(dev->ctx(), requested_perf_state);
+      dev->ops().resume(dev->ctx(), requested_perf_state);
       api_lock_.Acquire();
     }
     enum_lock_release();
@@ -631,8 +589,8 @@ zx_status_t DriverHostContext::DeviceSetPerformanceState(const fbl::RefPtr<zx_de
   if (!(dev->IsPerformanceStateSupported(requested_state))) {
     return ZX_ERR_INVALID_ARGS;
   }
-  if (dev->ops()->set_performance_state) {
-    zx_status_t status = dev->ops()->set_performance_state(dev->ctx(), requested_state, out_state);
+  if (dev->ops().set_performance_state) {
+    zx_status_t status = dev->ops().set_performance_state(dev->ctx(), requested_state, out_state);
     if (!(dev->IsPerformanceStateSupported(*out_state))) {
       LOGD(FATAL, *dev,
            "Device %p 'set_performance_state' hook returned an unsupported performance state",

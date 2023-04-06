@@ -176,8 +176,6 @@ TEST_F(CoreTest, ConnectFidlReturnsError) {
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
   auto remove = fit::defer([&dev]() { Remove(dev); });
 
-  zx_protocol_device_t ops = {};
-  dev->set_ops(&ops);
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
   zx::result endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
@@ -189,14 +187,12 @@ TEST_F(CoreTest, ConnectFidlReturnsError) {
 
 TEST_F(CoreTest, LastDeviceUnbindStopsAsyncLoop) {
   EXPECT_EQ(0, driver_obj_->device_count());
-  zx_protocol_device_t ops = {};
   {
     fbl::RefPtr<zx_device> dev;
     ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
 
     EXPECT_EQ(1, driver_obj_->device_count());
     ASSERT_FALSE(driver_obj_->IsDispatcherShutdown());
-    dev->set_ops(&ops);
     // Mark the device as "added" so that we try and call the release op on the device (and shut
     // down its dispatcher).
     dev->set_flag(DEV_FLAG_ADDED);
@@ -221,9 +217,6 @@ TEST_F(CoreTest, RebindNoChildren) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
   auto remove = fit::defer([&dev]() { Remove(dev); });
-
-  zx_protocol_device_t ops = {};
-  dev->set_ops(&ops);
 
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
@@ -292,20 +285,19 @@ TEST_F(CoreTest, RebindHasOneChild) {
   uint32_t unbind_count = 0;
   coordinator_.SyncCall(&FakeCoordinator::set_unbind_children_value, true);
 
-  zx_protocol_device_t ops = {};
-  ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
-
   fbl::RefPtr<zx_device> parent;
   ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
   auto remove = fit::defer([&parent]() { Remove(parent); });
   ASSERT_NO_FATAL_FAILURE(Connect(parent));
-  parent->set_ops(&ops);
+  parent->set_ops({
+      .unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; },
+  });
   parent->set_ctx(&unbind_count);
   {
     fbl::RefPtr<zx_device> child;
     ASSERT_OK(zx_device::Create(&ctx_, "child", driver_obj_, &child));
     ASSERT_NO_FATAL_FAILURE(Connect(child));
-    child->set_ops(&ops);
+    child->set_ops(parent->ops());
     child->set_ctx(&unbind_count);
     parent->add_child(child.get());
     child->set_parent(parent);
@@ -326,22 +318,21 @@ TEST_F(CoreTest, RebindHasMultipleChildren) {
   uint32_t unbind_count = 0;
   coordinator_.SyncCall(&FakeCoordinator::set_unbind_children_value, true);
 
-  zx_protocol_device_t ops = {};
-  ops.unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; };
-
   fbl::RefPtr<zx_device> parent;
   ASSERT_OK(zx_device::Create(&ctx_, "parent", driver_obj_, &parent));
   auto remove = fit::defer([&parent]() { Remove(parent); });
 
   ASSERT_NO_FATAL_FAILURE(Connect(parent));
-  parent->set_ops(&ops);
+  parent->set_ops({
+      .unbind = [](void* ctx) { *static_cast<uint32_t*>(ctx) += 1; },
+  });
   parent->set_ctx(&unbind_count);
   {
     std::array<fbl::RefPtr<zx_device>, 5> children;
     for (auto& child : children) {
       ASSERT_OK(zx_device::Create(&ctx_, "child", driver_obj_, &child));
       ASSERT_NO_FATAL_FAILURE(Connect(child));
-      child->set_ops(&ops);
+      child->set_ops(parent->ops());
       child->set_ctx(&unbind_count);
       parent->add_child(child.get());
       child->set_parent(parent);
@@ -368,9 +359,6 @@ TEST_F(CoreTest, AddCompositeNodeSpec) {
   fbl::RefPtr<zx_device> dev;
   ASSERT_OK(zx_device::Create(&ctx_, "test", driver_obj_, &dev));
   auto remove = fit::defer([&dev]() { Remove(dev); });
-
-  zx_protocol_device_t ops = {};
-  dev->set_ops(&ops);
 
   ASSERT_NO_FATAL_FAILURE(Connect(dev));
 
