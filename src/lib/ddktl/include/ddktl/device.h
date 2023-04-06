@@ -195,11 +195,10 @@ class MessageableInternal : public fidl::WireServer<Protocol>, public base_mixin
 
  private:
   static zx_status_t Message(void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
-    ddk::Transaction transaction(txn);
     fidl::WireDispatch<Protocol>(static_cast<D*>(ctx),
                                  fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
-                                 &transaction);
-    return transaction.Status();
+                                 ddk::FromDeviceFIDLTransaction(txn));
+    return ZX_OK;
   }
 };
 

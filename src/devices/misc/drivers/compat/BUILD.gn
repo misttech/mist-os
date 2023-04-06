@@ -35,7 +35,6 @@ source_set("lib") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/compat/cpp:symbols",
     "//src/devices/bin/driver_host:composite_node_spec_util",
-    "//src/devices/lib/fidl",
     "//src/devices/lib/fidl:devfs_fidl",
   ]
   public_deps = [

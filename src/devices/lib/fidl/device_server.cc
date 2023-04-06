@@ -5,11 +5,13 @@
 #include "src/devices/lib/fidl/device_server.h"
 
 #include <lib/async/cpp/task.h>
+#include <lib/ddk/device.h>
+#include <lib/fidl/cpp/wire/status.h>
 #include <lib/syslog/global.h>
 
 #include <string_view>
 
-#include "src/devices/lib/fidl/transaction.h"
+#include <ddktl/fidl.h>
 
 namespace devfs_fidl {
 
@@ -133,6 +135,37 @@ fidl::DispatchResult TryDispatch(fidl::WireServer<FidlProtocol>* impl,
   return fidl::internal::WireServerDispatcher<FidlProtocol>::TryDispatch(impl, msg, nullptr, txn);
 }
 
+class Transaction final : public fidl::Transaction {
+ public:
+  explicit Transaction(fidl::Transaction* inner) : inner_(inner) {}
+  ~Transaction() final = default;
+
+  const std::optional<std::tuple<fidl::UnbindInfo, fidl::ErrorOrigin>>& internal_error() const {
+    return internal_error_;
+  }
+
+ private:
+  std::unique_ptr<fidl::Transaction> TakeOwnership() final { return inner_->TakeOwnership(); }
+
+  zx_status_t Reply(fidl::OutgoingMessage* message, fidl::WriteOptions write_options) final {
+    return inner_->Reply(message, std::move(write_options));
+  }
+
+  void Close(zx_status_t epitaph) final { return inner_->Close(epitaph); }
+
+  void InternalError(fidl::UnbindInfo error, fidl::ErrorOrigin origin) final {
+    internal_error_.emplace(error, origin);
+    return inner_->InternalError(error, origin);
+  }
+
+  void EnableNextDispatch() final { return inner_->EnableNextDispatch(); }
+
+  bool DidOrGoingToUnbind() final { return inner_->DidOrGoingToUnbind(); }
+
+  fidl::Transaction* const inner_;
+  std::optional<std::tuple<fidl::UnbindInfo, fidl::ErrorOrigin>> internal_error_;
+};
+
 }  // namespace
 
 void DeviceServer::MessageDispatcher::dispatch_message(
@@ -156,21 +189,39 @@ void DeviceServer::MessageDispatcher::dispatch_message(
     }
   }
 
-  fidl_incoming_msg_t c_msg = std::move(msg).ReleaseToEncodedCMessage();
-  auto ddk_txn = MakeDdkInternalTransaction(txn);
-  zx_status_t status = parent_.controller_.MessageOp(&c_msg, ddk_txn.Txn());
-  if (status != ZX_OK && status != ZX_ERR_ASYNC) {
-    if (status == ZX_ERR_NOT_SUPPORTED) {
-      constexpr char kNotSupportedErrorMessage[] =
-          "Failed to send message to device: ZX_ERR_NOT_SUPPORTED\n"
-          "It is possible that this message relied on deprecated FIDL multiplexing.\n"
-          "For more information see https://fuchsia.dev/fuchsia-src/contribute/open_projects/drivers/fidl_multiplexing";
-      parent_.controller_.LogError(kNotSupportedErrorMessage);
-    }
-
-    // Close the connection on any error
-    txn->Close(status);
+  if (!msg.ok()) {
+    // Mimic fidl::internal::TryDispatch.
+    txn->InternalError(fidl::UnbindInfo{msg}, fidl::ErrorOrigin::kReceive);
+    return;
   }
+
+  uint64_t ordinal = msg.header()->ordinal;
+
+  // Use shadowing lambda captures to ensure consumed values aren't used.
+  [&, msg = std::move(msg).ReleaseToEncodedCMessage(), txn = Transaction(txn)]() mutable {
+    device_fidl_txn_t ddk_txn = ddk::IntoDeviceFIDLTransaction(&txn);
+    if (zx_status_t status = parent_.controller_.MessageOp(&msg, &ddk_txn); status != ZX_OK) {
+      // Close the connection on any error.
+      static_cast<fidl::Transaction*>(&txn)->Close(status);
+    }
+    std::optional internal_error = txn.internal_error();
+    if (!internal_error.has_value()) {
+      return;
+    }
+    auto& [error, origin] = internal_error.value();
+    if (error.reason() == fidl::Reason::kUnexpectedMessage) {
+      std::string message;
+      message.append("Failed to send message with ordinal=");
+      message.append(std::to_string(ordinal));
+      message.append(" to device: ");
+      message.append(error.FormatDescription());
+      message.append(
+          "\n"
+          "It is possible that this message relied on deprecated FIDL multiplexing.\n"
+          "For more information see https://fuchsia.dev/fuchsia-src/contribute/open_projects/drivers/fidl_multiplexing");
+      parent_.controller_.LogError(message.c_str());
+    }
+  }();
 }
 
 }  // namespace devfs_fidl

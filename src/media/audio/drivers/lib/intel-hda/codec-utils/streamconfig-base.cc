@@ -31,10 +31,10 @@ zx_protocol_device_t IntelHDAStreamConfigBase::STREAM_DEVICE_THUNKS = []() {
   sdt.version = DEVICE_OPS_VERSION;
   sdt.message = [](void* ctx, fidl_incoming_msg_t* msg, device_fidl_txn_t* txn) {
     IntelHDAStreamConfigBase* thiz = static_cast<IntelHDAStreamConfigBase*>(ctx);
-    ddk::Transaction transaction(txn);
     fidl::WireDispatch<fuchsia_hardware_audio::StreamConfigConnector>(
-        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg), &transaction);
-    return transaction.Status();
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
+        ddk::FromDeviceFIDLTransaction(txn));
+    return ZX_OK;
   };
   sdt.release = [](void* ctx) { reinterpret_cast<IntelHDAStreamConfigBase*>(ctx)->Deactivate(); };
   return sdt;

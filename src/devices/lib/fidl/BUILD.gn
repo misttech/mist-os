@@ -5,23 +5,13 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-source_set("fidl") {
-  sources = [
-    "transaction.cc",
-    "transaction.h",
-  ]
-  public_deps = [
-    "//sdk/lib/fidl/cpp/wire",
-    "//src/lib/ddktl",
-  ]
-}
-
 source_set("devfs_fidl") {
   sources = [
     "device_server.cc",
     "device_server.h",
   ]
-  deps = [ ":fidl" ]
+
+  deps = [ "//src/lib/ddktl" ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp_wire",

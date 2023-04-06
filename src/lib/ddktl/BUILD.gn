@@ -15,6 +15,7 @@ config("include") {
 
 source_set("ddktl") {
   sources = [
+    "fidl.cc",
     "include/ddktl/composite-node-spec.h",
     "include/ddktl/device-internal.h",
     "include/ddktl/device.h",

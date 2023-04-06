@@ -23,7 +23,6 @@
     driver_log_severity_enabled_internal;
     driver_logvf_internal;
     driver_logf_internal;
-    device_fidl_transaction_take_ownership;
     device_get_fragment_count;
     device_get_fragments;
     device_get_fragment_protocol;
