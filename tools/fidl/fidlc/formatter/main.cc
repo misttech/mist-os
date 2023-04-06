@@ -13,6 +13,7 @@
 #include <string>
 #include <vector>
 
+#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/formatter.h"
 #include "tools/fidl/fidlc/include/fidl/lexer.h"
 #include "tools/fidl/fidlc/include/fidl/source_manager.h"
@@ -53,11 +54,12 @@ void Usage(std::string_view argv0) {
 bool Format(const fidl::SourceFile& source_file, fidl::Reporter* reporter, std::string& output) {
   fidl::Lexer lexer(source_file, reporter);
   fidl::ExperimentalFlags experimental_flags;
-  // TODO(fxbug.dev/88366): unknown interaction flag hardcoded on in the
-  // formatter so formatter works with unknown interaction modifiers without
-  // adding flags.
+  // The formatter is run directly by fx format-code, not as part of the build,
+  // so we can't rely on having accurate experimental flags. Instead, we just
+  // set all the flags which could block parsing if disabled.
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractions);
   experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kUnknownInteractionsNewDefaults);
+  experimental_flags.EnableFlag(fidl::ExperimentalFlags::Flag::kZxCTypes);
 
   auto formatter = fidl::fmt::NewFormatter(100, reporter);
   auto result = formatter.Format(source_file, experimental_flags);

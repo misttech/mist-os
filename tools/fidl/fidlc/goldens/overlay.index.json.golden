@@ -24,8 +24,8 @@
         "is_virtual": false,
         "file": "../../tools/fidl/fidlc/testdata/overlay.test.fidl",
         "data": "OverlayStruct",
-        "start_offset": 462,
-        "end_offset": 475
+        "start_offset": 461,
+        "end_offset": 474
       },
       "members": [
         {
@@ -34,8 +34,8 @@
             "is_virtual": false,
             "file": "../../tools/fidl/fidlc/testdata/overlay.test.fidl",
             "data": "the_overlay",
-            "start_offset": 491,
-            "end_offset": 502
+            "start_offset": 490,
+            "end_offset": 501
           },
           "type": {
             "kind": "identifier",
@@ -45,8 +45,8 @@
               "is_virtual": false,
               "file": "../../tools/fidl/fidlc/testdata/overlay.test.fidl",
               "data": "Overlay",
-              "start_offset": 503,
-              "end_offset": 510
+              "start_offset": 502,
+              "end_offset": 509
             }
           }
         }

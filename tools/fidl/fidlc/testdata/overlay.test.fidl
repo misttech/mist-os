@@ -19,7 +19,6 @@ type Overlay = strict overlay {
     3: VectorStringAlsoNeedsConstructor vector<string>;
 };
 
-
 type ReverseOrdinalOverlay = strict overlay {
     2: second uint32;
     1: first uint32;
@@ -36,5 +35,3 @@ type OverlayWithAttributes = strict overlay {
     @baz
     2: y float64;
 };
-
-
