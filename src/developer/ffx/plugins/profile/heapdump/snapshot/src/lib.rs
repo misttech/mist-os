@@ -5,23 +5,23 @@
 use {
     anyhow::Result,
     ffx_core::ffx_plugin,
-    ffx_profile_heapdump_common::{build_process_selector, check_collector_error, export_to_pprof},
+    ffx_profile_heapdump_common::{
+        build_process_selector, check_collector_error, connect_to_collector, export_to_pprof,
+    },
     ffx_profile_heapdump_snapshot_args::SnapshotCommand,
     ffx_writer::Writer,
-    fidl_fuchsia_memory_heapdump_client as fheapdump_client,
+    fidl_fuchsia_developer_remotecontrol::RemoteControlProxy,
 };
 
-#[ffx_plugin(
-    "ffx_profile_heapdump",
-    fheapdump_client::CollectorProxy = "core/heapdump-collector:expose:fuchsia.memory.heapdump.client.Collector"
-)]
+#[ffx_plugin("ffx_profile_heapdump")]
 pub async fn snapshot(
-    collector: fheapdump_client::CollectorProxy,
+    remote_control: RemoteControlProxy,
     cmd: SnapshotCommand,
     _writer: Writer,
 ) -> Result<()> {
     let mut process_selector = build_process_selector(cmd.by_name, cmd.by_koid)?;
 
+    let collector = connect_to_collector(&remote_control, cmd.collector).await?;
     let result = collector.take_live_snapshot(&mut process_selector).await?;
     let receiver_stream = check_collector_error(result)?.into_stream()?;
 

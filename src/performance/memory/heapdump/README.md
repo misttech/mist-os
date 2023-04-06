@@ -11,8 +11,8 @@ point in time and export them in a pprof-compatible protobuf format.
   invocation.
 * Add `//src/performance/memory/heapdump/instrumentation` to the `deps` of the
   `executable` target that you want to profile.
-* Route the `fuchsia.memory.heapdump.process.Registry` capability from collector
-  to your component.
+* Add `//src/performance/memory/heapdump/instrumentation/local_collector.shard.cml`
+  to the `include` list in your component's manifest.
 * Add `#include <heapdump/bind_with_fdio.h>` and call
   `heapdump_bind_with_fdio()` at the beginning of `main` in your program.
 * Run your program as usual.

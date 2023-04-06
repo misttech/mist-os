@@ -8,6 +8,9 @@ use fidl_fuchsia_memory_heapdump_client as fheapdump_client;
 mod pprof;
 pub use crate::pprof::export_to_pprof;
 
+mod realm_query;
+pub use realm_query::connect_to_collector;
+
 /// Builds a ProcessSelector value from command-line arguments.
 pub fn build_process_selector(
     by_name: Option<String>,

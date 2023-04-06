@@ -6,7 +6,12 @@
         {
             name: "heapdump-collector",
             url: "fuchsia-pkg://fuchsia.com/heapdump-collector#meta/heapdump-collector.cm",
-            environment: "#core-env",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.memory.heapdump.process.Registry",
+            from: "#heapdump-collector",
         },
     ],
 }
