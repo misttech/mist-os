@@ -1387,6 +1387,10 @@ group("default") {
     deps += [ "//build/images:default-images" ]
     deps += [ "//:drivers-check" ]
   }
+
+  if (use_bazel_images_only) {
+    assert_no_deps = [ "//build/images/fuchsia" ]
+  }
 }
 
 ###

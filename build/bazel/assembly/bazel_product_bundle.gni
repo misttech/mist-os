@@ -96,7 +96,11 @@ template("bazel_product_bundle") {
         ninja = "pave.sh"
       },
     ]
-    directory_timestamp_outputs = [ "product_bundle/product_bundle.json" ]
+    directory_timestamp_outputs = [
+      "product_bundle/product_bundle.json",
+      "product_bundle/system_a/fuchsia.zbi",
+      "product_bundle/system_a/fvm.blk",
+    ]
 
     # Populate metadata when Bazel image is not used will pollute GN assembly.
     if (use_bazel_images_only) {
