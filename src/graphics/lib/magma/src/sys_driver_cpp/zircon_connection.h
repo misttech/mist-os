@@ -108,8 +108,8 @@ class ZirconConnection : public fidl::WireServer<fuchsia_gpu_magma::Primary>,
   async::Loop* async_loop() { return &async_loop_; }
 
   static void RunLoop(std::shared_ptr<magma::ZirconConnection> connection, void* device_handle) {
-    magma::PlatformThreadHelper::SetCurrentThreadName("ConnectionThread " +
-                                                      std::to_string(connection->client_id_));
+    pthread_setname_np(pthread_self(),
+                       ("ConnectionThread " + std::to_string(connection->client_id_)).c_str());
 
     // Apply the thread role before entering the handler loop.
     magma::PlatformThreadHelper::SetRole(device_handle, "fuchsia.graphics.magma.connection");
