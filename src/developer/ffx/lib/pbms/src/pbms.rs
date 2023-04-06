@@ -55,7 +55,7 @@ where
     info.save(&output_dir.join("info"))?;
     tracing::debug!("Wrote 'info' file to {:?}", output_dir);
 
-    fetch_bundle_uri(&repo, output_dir, auth_flow, progress, ui, client)
+    fetch_from_url(&repo, output_dir, auth_flow, progress, ui, client)
         .await
         .context("fetching product bundle by URL")?;
     Ok(())
@@ -366,7 +366,7 @@ where
 {
     tracing::debug!("fetch_by_format");
     match format {
-        "files" | "tgz" => fetch_bundle_uri(uri, &local_dir, auth_flow, progress, ui, client).await,
+        "files" | "tgz" => fetch_from_url(uri, &local_dir, auth_flow, progress, ui, client).await,
         _ =>
         // The schema currently defines only "files" or "tgz" (see RFC-100).
         // This error could be a typo in the product bundle or a new image
@@ -386,7 +386,7 @@ where
 /// Bundle, "bundle_uri".
 ///
 /// Currently: "pattern": "^(?:http|https|gs|file):\/\/"
-pub(crate) async fn fetch_bundle_uri<F, I>(
+pub(crate) async fn fetch_from_url<F, I>(
     product_url: &url::Url,
     local_dir: &Path,
     auth_flow: &AuthFlowChoice,
@@ -398,7 +398,7 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
-    tracing::debug!("fetch_bundle_uri {:?}", product_url);
+    tracing::debug!("fetch_from_url {:?}", product_url);
     if product_url.scheme() == GS_SCHEME {
         fetch_from_gcs(product_url.as_str(), local_dir, auth_flow, progress, ui, client)
             .await
@@ -621,11 +621,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     #[should_panic(expected = "Unexpected URI scheme")]
-    async fn test_fetch_bundle_uri() {
+    async fn test_fetch_from_url() {
         let url = url::Url::parse("fake://foo").expect("url");
         let ui = structured_ui::MockUi::new();
         let client = Client::initial().expect("creating client");
-        fetch_bundle_uri(
+        fetch_from_url(
             &url,
             &Path::new("unused"),
             &AuthFlowChoice::Default,

@@ -84,10 +84,7 @@ async fn pb_get_impl<I: structured_ui::Interface + Sync>(
     }
     ui.present(&structured_ui::Presentation::Progress(progress))?;
 
-    tracing::debug!(
-        "Total fx product-bundle get runtime {} seconds.",
-        start.elapsed().as_secs_f32()
-    );
+    tracing::debug!("Total ffx product get runtime {} seconds.", start.elapsed().as_secs_f32());
     tracing::debug!("End");
     Ok(())
 }

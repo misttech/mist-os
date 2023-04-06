@@ -6,7 +6,7 @@
 //! manifest.
 
 use crate::{
-    pbms::{fetch_bundle_uri, make_remote_url, GS_SCHEME},
+    pbms::{fetch_from_url, make_remote_url, GS_SCHEME},
     AuthFlowChoice,
 };
 use ::gcs::client::{
@@ -299,7 +299,7 @@ where
     let blobs_dir = metadata_dir.join("blobs");
 
     // Download the repository private keys.
-    fetch_bundle_uri(
+    fetch_from_url(
         &repo_keys_uri.join("targets.json")?,
         keys_dir.as_std_path(),
         auth_flow,
@@ -308,9 +308,9 @@ where
         client,
     )
     .await
-    .context("fetch_bundle_uri targets.json")?;
+    .context("fetch_from_url targets.json")?;
 
-    fetch_bundle_uri(
+    fetch_from_url(
         &repo_keys_uri.join("snapshot.json")?,
         keys_dir.as_std_path(),
         auth_flow,
@@ -319,9 +319,9 @@ where
         client,
     )
     .await
-    .context("fetch_bundle_uri snapshot.json")?;
+    .context("fetch_from_url snapshot.json")?;
 
-    fetch_bundle_uri(
+    fetch_from_url(
         &repo_keys_uri.join("timestamp.json")?,
         keys_dir.as_std_path(),
         auth_flow,
@@ -330,7 +330,7 @@ where
         client,
     )
     .await
-    .context("fetch_bundle_uri timestamp.json")?;
+    .context("fetch_from_url timestamp.json")?;
 
     let trusted_targets = fuchsia_repo::resolve::resolve_repository_metadata_with_start_time(
         &repo_client,
@@ -429,7 +429,7 @@ where
     F: Fn(DirectoryProgress<'_>, FileProgress<'_>) -> ProgressResult,
     I: structured_ui::Interface + Sync,
 {
-    fetch_bundle_uri(&repo_uri, &local_dir, auth_flow, progress, ui, client)
+    fetch_from_url(&repo_uri, &local_dir, auth_flow, progress, ui, client)
         .await
         .with_context(|| format!("downloading repo URI {}", repo_uri))
 }

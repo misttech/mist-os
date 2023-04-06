@@ -20,13 +20,14 @@
 //! a product bundle is also the name of the product bundle metadata entry.
 
 use crate::{
+    gcs::string_from_gcs,
     pbms::{
         fetch_product_metadata, get_product_data_from_gcs, local_path_helper, path_from_file_url,
         pb_dir_name, pb_names_from_path, pbm_repo_list, CONFIG_STORAGE_PATH, GS_SCHEME,
     },
     repo_info::RepoInfo,
 };
-use ::gcs::client::{Client, ProgressResponse};
+use ::gcs::client::{Client, FileProgress, ProgressResponse, ProgressResult};
 use anyhow::{bail, Context, Result};
 use camino::Utf8Path;
 use errors::ffx_bail;
@@ -535,6 +536,45 @@ pub async fn make_way_for_output(local_dir: &Path, force: bool) -> Result<()> {
         .with_context(|| format!("creating directory {:?}", local_dir))?;
     tracing::debug!("local_dir dir ready.");
     Ok(())
+}
+
+/// Download data from any of the supported schemes listed in RFC-100, Product
+/// Bundle, "bundle_uri" to a string.
+///
+/// Currently: "pattern": "^(?:http|https|gs|file):\/\/"
+///
+/// Note: If the contents are large or more than a single file is expected,
+/// consider using fetch_from_url to write to a file instead.
+pub async fn string_from_url<F, I>(
+    product_url: &url::Url,
+    auth_flow: &AuthFlowChoice,
+    progress: &F,
+    ui: &I,
+    client: &Client,
+) -> Result<String>
+where
+    F: Fn(FileProgress<'_>) -> ProgressResult,
+    I: structured_ui::Interface + Sync,
+{
+    tracing::debug!("string_from_url {:?}", product_url);
+    Ok(match product_url.scheme() {
+        "http" | "https" => unimplemented!(),
+        GS_SCHEME => string_from_gcs(product_url.as_str(), auth_flow, progress, ui, client)
+            .await
+            .context("Downloading from GCS as string.")?,
+        "file" => {
+            if let Some(file_path) = &path_from_file_url(product_url) {
+                std::fs::read_to_string(file_path)
+                    .with_context(|| format!("string_from_url reading {:?}", file_path))?
+            } else {
+                bail!(
+                    "Invalid URL (e.g.: 'file://foo', with two initial slashes is invalid): {}",
+                    product_url
+                )
+            }
+        }
+        _ => bail!("Unexpected URI scheme in ({:?})", product_url),
+    })
 }
 
 #[cfg(test)]
