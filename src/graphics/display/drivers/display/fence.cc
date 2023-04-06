@@ -6,8 +6,10 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/trace/event.h>
+#include <lib/fit/thread_checker.h>
 #include <zircon/assert.h>
 
+#include <thread>
 #include <utility>
 
 #include "src/graphics/display/drivers/display/client.h"
@@ -15,8 +17,10 @@
 namespace display {
 
 bool Fence::CreateRef() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
   fbl::AllocChecker ac;
-  cur_ref_ = fbl::AdoptRef(new (&ac) FenceReference(fbl::RefPtr<Fence>(this)));
+  cur_ref_ =
+      fbl::AdoptRef(new (&ac) FenceReference(fbl::RefPtr<Fence>(this), std::this_thread::get_id()));
   if (ac.check()) {
     ref_count_++;
   }
@@ -24,15 +28,20 @@ bool Fence::CreateRef() {
   return ac.check();
 }
 
-void Fence::ClearRef() { cur_ref_ = nullptr; }
+void Fence::ClearRef() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  cur_ref_ = nullptr;
+}
 
 fbl::RefPtr<FenceReference> Fence::GetReference() { return cur_ref_; }
 
-void Fence::Signal() { event_.signal(0, ZX_EVENT_SIGNALED); }
+void Fence::Signal() const { event_.signal(0, ZX_EVENT_SIGNALED); }
 
 bool Fence::OnRefDead() { return --ref_count_ == 0; }
 
 zx_status_t Fence::OnRefArmed(fbl::RefPtr<FenceReference>&& ref) {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+
   if (armed_refs_.is_empty()) {
     ready_wait_.set_object(event_.get());
     ready_wait_.set_trigger(ZX_EVENT_SIGNALED);
@@ -48,6 +57,8 @@ zx_status_t Fence::OnRefArmed(fbl::RefPtr<FenceReference>&& ref) {
 }
 
 void Fence::OnRefDisarmed(FenceReference* ref) {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+
   armed_refs_.erase(*ref);
   if (armed_refs_.is_empty()) {
     ready_wait_.Cancel();
@@ -56,6 +67,8 @@ void Fence::OnRefDisarmed(FenceReference* ref) {
 
 void Fence::OnReady(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
                     const zx_packet_signal_t* signal) {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+
   ZX_DEBUG_ASSERT(status == ZX_OK && (signal->observed & ZX_EVENT_SIGNALED));
   TRACE_DURATION("gfx", "Display::Fence::OnReady");
   TRACE_FLOW_END("gfx", "event_signal", koid_);
@@ -83,39 +96,49 @@ Fence::Fence(FenceCallback* cb, async_dispatcher_t* dispatcher, uint64_t fence_i
 }
 
 Fence::~Fence() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
   ZX_DEBUG_ASSERT(armed_refs_.is_empty());
   ZX_DEBUG_ASSERT(ref_count_ == 0);
 }
 
 zx_status_t FenceReference::StartReadyWait() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
   return fence_->OnRefArmed(fbl::RefPtr<FenceReference>(this));
 }
 
-void FenceReference::ResetReadyWait() { fence_->OnRefDisarmed(this); }
+void FenceReference::ResetReadyWait() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  fence_->OnRefDisarmed(this);
+}
 
 void FenceReference::SetImmediateRelease(fbl::RefPtr<FenceReference>&& fence) {
   release_fence_ = std::move(fence);
 }
 
 void FenceReference::OnReady() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
   if (release_fence_) {
     release_fence_->Signal();
     release_fence_ = nullptr;
   }
 }
 
-void FenceReference::Signal() { fence_->Signal(); }
+void FenceReference::Signal() const { fence_->Signal(); }
 
-FenceReference::FenceReference(fbl::RefPtr<Fence> fence) : fence_(std::move(fence)) {}
+FenceReference::FenceReference(fbl::RefPtr<Fence> fence, std::thread::id fence_thread_id)
+    : fence_(std::move(fence)), thread_checker_(fence_thread_id) {}
 
-FenceReference::~FenceReference() { fence_->cb_->OnRefForFenceDead(fence_.get()); }
+FenceReference::~FenceReference() {
+  FIT_DCHECK_IS_THREAD_VALID(thread_checker_);
+  fence_->cb_->OnRefForFenceDead(fence_.get());
+}
 
 FenceCollection::FenceCollection(async_dispatcher_t* dispatcher,
                                  fit::function<void(FenceReference*)>&& fired_cb)
     : dispatcher_(dispatcher), fired_cb_(std::move(fired_cb)) {}
 
 void FenceCollection::Clear() {
-  // Use a temporary list to prevent double locking when resetting
+  // Use a temporary list to prevent double locking when resetting.
   fbl::SinglyLinkedList<fbl::RefPtr<Fence>> fences;
   {
     fbl::AutoLock lock(&mtx_);

@@ -11,6 +11,7 @@
 
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
+#include <lib/fit/thread_checker.h>
 #include <lib/zx/event.h>
 #include <threads.h>
 
@@ -35,6 +36,10 @@ class FenceCallback {
 // Class which wraps an event into a fence. A single Fence can have multiple FenceReference
 // objects, which allows an event to be treated as a semaphore independently of it being
 // imported/released (i.e. can be released while still in use).
+//
+// Fence is not thread-safe (but thread-compatible). For the sake of simplicity,
+// in order to avoid data races, we require `Fence`s and its `FenceReference`s
+// be created and destroyed on the same thread where the Fence is created.
 class Fence : public fbl::RefCounted<Fence>,
               public IdMappable<fbl::RefPtr<Fence>>,
               public fbl::SinglyLinkedListable<fbl::RefPtr<Fence>> {
@@ -58,7 +63,7 @@ class Fence : public fbl::RefCounted<Fence>,
   zx_handle_t event() const { return event_.get(); }
 
  private:
-  void Signal();
+  void Signal() const;
   void OnRefDied();
   zx_status_t OnRefArmed(fbl::RefPtr<FenceReference>&& ref);
   void OnRefDisarmed(FenceReference* ref);
@@ -80,18 +85,27 @@ class Fence : public fbl::RefCounted<Fence>,
   int ref_count_ = 0;
   zx_koid_t koid_ = 0;
 
+  FIT_DECLARE_THREAD_CHECKER(thread_checker_)
+
   friend FenceReference;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(Fence);
 };
 
+// Each FenceReference represents a pending / active wait or signaling of the
+// Fence it refers to, regardless of the Fence it refers to being imported
+// or released by the Client.
+//
+// FenceReference is not thread-safe (but thread-compatible). For the sake of
+// simplicity, we require `FenceReference`s be created and destroyed on the same
+// thread where the Fence is created.
 class FenceReference : public fbl::RefCounted<FenceReference>,
                        public fbl::DoublyLinkedListable<fbl::RefPtr<FenceReference>> {
  public:
-  explicit FenceReference(fbl::RefPtr<Fence> fence);
+  explicit FenceReference(fbl::RefPtr<Fence> fence, std::thread::id fence_thread_id);
   ~FenceReference();
 
-  void Signal();
+  void Signal() const;
 
   zx_status_t StartReadyWait();
   void ResetReadyWait();
@@ -104,6 +118,8 @@ class FenceReference : public fbl::RefCounted<FenceReference>,
   fbl::RefPtr<Fence> fence_;
 
   fbl::RefPtr<FenceReference> release_fence_;
+
+  const fit::thread_checker thread_checker_;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(FenceReference);
 };

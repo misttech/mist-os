@@ -4,8 +4,10 @@
 
 #include "src/graphics/display/drivers/display/image.h"
 
+#include <lib/async-loop/loop.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/async/default.h>
 #include <lib/fit/defer.h>
 #include <zircon/pixelformat.h>
@@ -58,6 +60,8 @@ TEST_F(ImageTest, MultipleAcquiresAllowed) {
 }
 
 TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+
   zx::vmo vmo;
   ASSERT_OK(zx::vmo::create(1024 * 600 * 4, 0u, &vmo));
   image_t info = {};
@@ -75,8 +79,8 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
   ASSERT_OK(zx::event::create(0, &signal_event));
   zx::event signal_event_dup;
   signal_event.duplicate(ZX_RIGHT_SAME_RIGHTS, &signal_event_dup);
-  auto signal_fence = fbl::AdoptRef(
-      new Fence(this, controller()->loop().dispatcher(), 1, std::move(signal_event_dup)));
+  auto signal_fence =
+      fbl::AdoptRef(new Fence(this, loop.dispatcher(), 1, std::move(signal_event_dup)));
   signal_fence->CreateRef();
   auto signal_cleanup = fit::defer([signal_fence]() { signal_fence->ClearRef(); });
 
@@ -109,10 +113,18 @@ TEST_F(ImageTest, RetiredImagesAreAlwaysUsable) {
           image->OnRetire();
           delete task;
         });
-    EXPECT_OK(lifecycle_task->Post(controller()->loop().dispatcher()));
-    signal_event.wait_async(signal_port, 0xfeed, ZX_EVENT_SIGNALED, 0);
-    zx_port_packet_t packet;
-    EXPECT_OK(signal_port.wait(zx::time::infinite(), &packet));
+    EXPECT_OK(lifecycle_task->Post(loop.dispatcher()));
+
+    async::WaitOnce signal_event_wait(signal_event.get(), ZX_EVENT_SIGNALED, /*options=*/0);
+    bool signal_event_signaled = false;
+    signal_event_wait.Begin(
+        loop.dispatcher(),
+        [&signal_event_signaled](async_dispatcher_t* dispatcher, async::WaitOnce* wait,
+                                 zx_status_t status, const zx_packet_signal_t* signal) {
+          signal_event_signaled = true;
+        });
+    loop.RunUntilIdle();
+    EXPECT_TRUE(signal_event_signaled);
   } while (--attempts > 0);
   EXPECT_EQ(0, failures);
   EXPECT_EQ(kNumIterations, retire_count);
