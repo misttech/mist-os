@@ -1,8 +1,8 @@
 # Copyright 2018 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
 import("//build/packages/package_metadata.gni")
+import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 
 # Generates package metadata from a prebuilt FAR archive.
 #
@@ -25,11 +25,15 @@ import("//build/packages/package_metadata.gni")
 #   deps (optional)
 #   testonly (optional)
 #   visibility (optional)
+#   metadata (optional)
 #     Usual GN meanings.
 #
 template("prebuilt_package") {
-  if (!defined(invoker.package_name)) {
-    invoker.package_name = target_name
+  assert(defined(invoker.archive))
+
+  package_name = target_name
+  if (defined(invoker.package_name)) {
+    package_name = invoker.package_name
   }
 
   repository = "fuchsia.com"
@@ -37,80 +41,21 @@ template("prebuilt_package") {
     repository = invoker.repository
   }
 
-  pkg_out_dir = "$target_out_dir/$target_name"
-
-  _out_blobs_json = "$pkg_out_dir/blobs.json"
-  _out_blobs_manifest = "$pkg_out_dir/blobs.manifest"
-  _out_package_manifest_json = "$pkg_out_dir/package_manifest.json"
-  _out_meta_merkle = "$pkg_out_dir/meta.far.merkle"
-
-  define_package_metadata_target = "${target_name}_metadata"
-  define_package_metadata(define_package_metadata_target) {
-    _pkg_version_key = "${invoker.package_name}/0"
-    _blobs_json = rebase_path(_out_blobs_json, root_build_dir)
-    _meta_merkle = rebase_path(_out_meta_merkle, root_build_dir)
-
-    blob_manifest = _out_blobs_manifest
-    meta_far_merkle_index_entry = "$_pkg_version_key=$_meta_merkle"
-    package_name = invoker.package_name
-    package_output_manifest = _out_package_manifest_json
-    snapshot_entry = "$_pkg_version_key=$_blobs_json"
+  main_target_deps = []
+  if (defined(invoker.deps)) {
+    main_target_deps += invoker.deps
   }
 
-  main_target_name = target_name
-  manifest_target_name = "${target_name}.manifest"
-  group(manifest_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
-    public_deps = [ ":$main_target_name" ]
-  }
-
-  action(target_name) {
+  package_tool_package_archive_extract(target_name) {
     forward_variables_from(invoker,
                            [
-                             "metadata",
                              "testonly",
                              "visibility",
+                             "metadata",
                            ])
-
     archive = invoker.archive
-
-    if (defined(visibility)) {
-      visibility += [ ":$manifest_target_name" ]
-    }
-
-    script = "//build/packages/prebuilt_package.py"
-
-    package_tool = "$host_out_dir/package-tool"
-
-    args = [
-      "--package-tool",
-      rebase_path(package_tool, root_build_dir),
-      "--name",
-      invoker.package_name,
-      "--archive",
-      rebase_path(archive, root_build_dir),
-      "--workdir",
-      rebase_path(pkg_out_dir, root_build_dir),
-      "--repository",
-      repository,
-    ]
-
-    inputs = [
-      archive,
-      package_tool,
-    ]
-
-    outputs = [ _out_package_manifest_json ]
-
-    deps = [
-      ":$define_package_metadata_target",
-      "//src/sys/pkg/bin/package-tool($host_toolchain)",
-    ]
-    if (defined(invoker.deps)) {
-      deps += invoker.deps
-    }
-
-    # The contents of these folders is dynamic, and managed entirely by this action.
-    hermetic_action_ignored_prefixes = [ "${pkg_out_dir}/blobs" ]
+    package_name = package_name
+    repository = repository
+    deps = main_target_deps
   }
 }
