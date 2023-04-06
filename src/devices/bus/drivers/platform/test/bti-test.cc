@@ -11,6 +11,8 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
 #include <lib/driver_test_realm/realm_builder/cpp/lib.h>
+#include <lib/fdio/cpp/caller.h>
+#include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
@@ -27,7 +29,8 @@ using device_watcher::RecursiveWaitForFile;
 
 using namespace component_testing;
 
-constexpr char kDevicePath[] = "sys/platform/11:01:1a/test-bti";
+constexpr char kParentPath[] = "sys/platform/11:01:1a";
+constexpr char kDeviceName[] = "test-bti";
 
 TEST(PbusBtiTest, BtiIsSameAfterCrash) {
   auto realm_builder = component_testing::RealmBuilder::Create();
@@ -50,19 +53,26 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
   ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 
-  // Connect to dev.
-  fbl::unique_fd dev_fd;
+  // Connect to the parent directory.
+  fbl::unique_fd parent_dir;
   {
-    fidl::InterfaceHandle<fuchsia::io::Directory> dev;
-    ASSERT_OK(realm.component().Connect("dev-topological", dev.NewRequest().TakeChannel()));
-    ASSERT_OK(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()));
+    zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(endpoints);
+    ASSERT_OK(realm.component().Connect("dev-topological", endpoints->server.TakeChannel()));
+    fbl::unique_fd dev_fd;
+    ASSERT_OK(
+        fdio_fd_create(endpoints->client.TakeChannel().release(), dev_fd.reset_and_get_address()));
+    ASSERT_OK(RecursiveWaitForFile(dev_fd.get(), kParentPath));
+    ASSERT_OK(fdio_open_fd_at(dev_fd.get(), kParentPath,
+                              static_cast<uint32_t>(fuchsia_io::wire::OpenFlags::kDirectory),
+                              parent_dir.reset_and_get_address()));
   }
 
   uint64_t koid1;
   {
     fidl::WireSyncClient<fuchsia_hardware_btitest::BtiDevice> client;
     {
-      zx::result channel = RecursiveWaitForFile(dev_fd.get(), kDevicePath);
+      zx::result channel = RecursiveWaitForFile(parent_dir.get(), kDeviceName);
       ASSERT_OK(channel);
       client.Bind(fidl::ClientEnd<fuchsia_hardware_btitest::BtiDevice>(std::move(channel.value())));
     }
@@ -72,11 +82,15 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
       koid1 = result.value().koid;
     }
 
-    {
-      const fidl::OneWayStatus result = client->Crash();
-      ASSERT_OK(result.status());
-    }
+    zx::result dir_watcher =
+        device_watcher::DirWatcher::Create(fdio_cpp::UnownedFdioCaller(parent_dir).directory());
+    ASSERT_OK(dir_watcher);
 
+    ASSERT_OK(client->Crash());
+    // We have to wait for both the entry to be removed in devfs and for the channel to be
+    // closed. The channel closes before the device is removed from devfs so only waiting for
+    // one could result in a race.
+    ASSERT_OK(dir_watcher->WaitForRemoval(kDeviceName, zx::duration::infinite()));
     ASSERT_OK(client.client_end().channel().wait_one(ZX_CHANNEL_PEER_CLOSED, zx::time::infinite(),
                                                      nullptr));
   }
@@ -86,7 +100,7 @@ TEST(PbusBtiTest, BtiIsSameAfterCrash) {
   {
     fidl::WireSyncClient<fuchsia_hardware_btitest::BtiDevice> client;
     {
-      zx::result channel = RecursiveWaitForFile(dev_fd.get(), kDevicePath);
+      zx::result channel = RecursiveWaitForFile(parent_dir.get(), kDeviceName);
       ASSERT_OK(channel);
       client.Bind(fidl::ClientEnd<fuchsia_hardware_btitest::BtiDevice>(std::move(channel.value())));
     }

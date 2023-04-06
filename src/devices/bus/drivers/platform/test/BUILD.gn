@@ -16,14 +16,14 @@ test("platform-bus") {
     "//sdk/lib/fdio",
     "//src/devices/testing/devmgr-integration-test-shim",
     "//src/lib/ddk",
-
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # TODO(fxb/38132): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
 }
 
 driver_bind_rules("test-board-bind") {
@@ -64,12 +64,12 @@ fuchsia_driver("test-board-driver") {
     "//src/devices/lib/fidl-metadata",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
-
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(fxb/38132): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
 }
 
 fuchsia_driver_component("test-board") {
@@ -394,10 +394,10 @@ foreach(driver, simple_drivers) {
       "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
       "//src/devices/lib/driver",
       "//src/lib/ddk",
-
-      # TODO(fxb/38132): Migrate to the new bind rules and delete the below
-      "//src/lib/ddk:ddk-deprecated-binding-headers",
     ]
+
+    # TODO(fxb/38132): Migrate to the new bind rules and delete this dep.
+    deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
   }
 
   fuchsia_driver_component("test-$driver") {
@@ -458,12 +458,12 @@ fuchsia_driver("test-bti-board-driver") {
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
-
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
   ]
+
+  # TODO(fxb/38132): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
 }
 
 fuchsia_driver_component("test-bti-board") {
@@ -514,13 +514,14 @@ test("platform-bus-bti") {
     "//src/lib/ddk",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
-
-    # TODO(fxb/38132): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
     "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fdio-caller",
     "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
+
+  # TODO(fxb/38132): Migrate to the new bind rules and delete this dep.
+  deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
 }
 
 fuchsia_unittest_package("platform-bus-bti-test") {
