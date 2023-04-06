@@ -1,5 +1,4 @@
 include /src/fidl/OWNERS
 
-per-file gen_fidldocs.py,gen_fidldocs_test.py=mangini@google.com,theosiu@google.com
 
 # COMPONENT: Build
