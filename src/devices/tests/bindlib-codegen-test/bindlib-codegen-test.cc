@@ -5,14 +5,18 @@
 #include <fidl/fuchsia.device.test/cpp/wire.h>
 #include <fidl/fuchsia.device/cpp/wire.h>
 #include <fuchsia/driver/development/cpp/fidl.h>
+#include <fuchsia/driver/test/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/driver.h>
 #include <lib/device-watcher/cpp/device-watcher.h>
+#include <lib/driver_test_realm/realm_builder/cpp/lib.h>
 #include <lib/fdio/directory.h>
 #include <lib/sys/cpp/component_context.h>
 
 #include <bind/bindlib/codegen/testlib/cpp/bind.h>
 #include <bind/bindlibparent/codegen/testlib/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
 namespace lib = bind_bindlib_codegen_testlib;
@@ -23,16 +27,46 @@ const std::string kChildDevicePath = "/dev/sys/test/parent";
 class BindLibToFidlCodeGenTest : public testing::Test {
  protected:
   void SetUp() override {
+    // Create and build the realm.
+    realm_builder_ = component_testing::RealmBuilder::Create();
+    driver_test_realm::Setup(*realm_builder_);
+    realm_ = realm_builder_->Build(loop_.dispatcher());
+
+    // Start DriverTestRealm.
+    fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
+    ASSERT_EQ(ZX_OK, realm_->component().Connect(driver_test_realm.NewRequest()));
+
+    auto args = fuchsia::driver::test::RealmArgs();
+    args.set_use_driver_framework_v2(false);
+
+    fuchsia::driver::test::Realm_Start_Result realm_result;
+    ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
+    ASSERT_FALSE(realm_result.is_err());
+
+    // Connect to dev.
+    fidl::InterfaceHandle<fuchsia::io::Node> dev;
+    zx_status_t status =
+        realm_->component().Connect("dev-topological", dev.NewRequest().TakeChannel());
+    ASSERT_EQ(status, ZX_OK);
+
+    // Turn it into a file descriptor.
+    fbl::unique_fd dev_fd;
+    ASSERT_EQ(fdio_fd_create(dev.TakeChannel().release(), dev_fd.reset_and_get_address()), ZX_OK);
+
     // Wait for the child device to bind and appear. The child device should bind with its string
     // properties.
-    zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/test/parent/child");
+    zx::result channel =
+        device_watcher::RecursiveWaitForFile(dev_fd.get(), "sys/test/parent/child");
     ASSERT_EQ(channel.status_value(), ZX_OK);
 
     // Connect to the DriverDevelopment service.
-    auto context = sys::ComponentContext::Create();
-    context->svc()->Connect(driver_dev_.NewRequest());
+    status = realm_->component().Connect(driver_dev_.NewRequest());
+    ASSERT_EQ(status, ZX_OK);
   }
 
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  std::optional<component_testing::RealmBuilder> realm_builder_;
+  std::optional<component_testing::RealmRoot> realm_;
   fuchsia::driver::development::DriverDevelopmentSyncPtr driver_dev_;
 };
 
