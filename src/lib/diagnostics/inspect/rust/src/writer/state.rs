@@ -1928,6 +1928,41 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn overflow_property() {
+        const SIZE: usize = constants::MAX_ORDER_SIZE * 2;
+        const EXPECTED_WRITTEN: usize = constants::MAX_ORDER_SIZE - constants::HEADER_SIZE_BYTES;
+
+        let core_state = get_state(SIZE);
+        let mut state = core_state.try_lock().expect("lock state");
+
+        let data = "X".repeat(SIZE * 2);
+        let block = state
+            .create_property("test".into(), data.as_bytes(), PropertyFormat::String, 0.into())
+            .unwrap();
+        assert_eq!(block.block_type(), BlockType::BufferValue);
+        assert_eq!(*block.index(), 2);
+        assert_eq!(*block.parent_index().unwrap(), 0);
+        assert_eq!(*block.name_index().unwrap(), 3);
+        assert_eq!(block.total_length().unwrap(), EXPECTED_WRITTEN);
+        assert_eq!(*block.property_extent_index().unwrap(), 128);
+        assert_eq!(block.property_format().unwrap(), PropertyFormat::String);
+
+        let name_block = state.heap().get_block(block.name_index().unwrap()).unwrap();
+        assert_eq!(name_block.block_type(), BlockType::StringReference);
+        assert_eq!(name_block.total_length().unwrap(), 4);
+        assert_eq!(state.load_string(name_block.index()).unwrap(), "test");
+
+        let extent_block = state.heap().get_block(128.into()).unwrap();
+        assert_eq!(extent_block.block_type(), BlockType::Extent);
+        assert_eq!(extent_block.order(), 7);
+        assert_eq!(*extent_block.next_extent().unwrap(), *BlockIndex::EMPTY);
+        assert_eq!(
+            extent_block.extent_contents().unwrap(),
+            data.chars().take(EXPECTED_WRITTEN).map(|c| c as u8).collect::<Vec<u8>>()
+        );
+    }
+
+    #[fuchsia::test]
     fn test_multi_extent_property() {
         let core_state = get_state(10000);
         let block = {
