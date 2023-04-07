@@ -68,6 +68,33 @@ cipd install fuchsia/sdk/core/linux-amd64 latest -root ${IDK_DIR}
 cipd install fuchsia/sdk/core/mac-amd64 latest -root ${IDK_DIR}
 ```
 
+#### Generating RISC-V Libraries and Sysroot for the Fuchsia IDK
+
+To build RISC-V LLVM runtime libraries for Fuchsia, you need to generate
+RISC-V libraries and sysroot for Fuchsia IDK.
+
+Since the script is going to change the content of
+`${IDK_DIR}/pkg/sysroot/meta.json`, we need to make this file writable:
+
+```bash
+chmod 644 "${IDK_DIR}/pkg/sysroot/meta.json"
+```
+
+The next step is to run the script to generate the RISC-V libraries and sysroot:
+
+
+```bash
+python3 ${FUCHSIA_DIR}/scripts/clang/generate_sysroot.py --sdk-dir=${IDK_DIR} \
+  --arch=riscv64 \
+  --ifs-path=${FUCHSIA_DIR}/prebuilt/third_party/clang/${platform}/bin/llvm-ifs
+```
+
+For Linux x64 platform, the `${platform}` should be `linux-x64` and on Mac x64
+platform, the `${platform}` should be `mac-x64`.
+
+Note: This is just temporary until IDK contains the RISC-V libraries and
+sysroot, at which point this step will not be needed.
+
 ### Sysroot for Linux
 
 To include compiler runtimes and C++ library for Linux, download the sysroot.
