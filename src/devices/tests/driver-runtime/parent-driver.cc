@@ -85,7 +85,9 @@ zx_status_t Device::OnRuntimeConnect(fdf::Channel channel) {
 void Device::HandleRuntimeRequest(fdf_dispatcher_t* dispatcher, fdf::ChannelRead* channel_read,
                                   zx_status_t status) {
   if (status != ZX_OK) {
-    zxlogf(ERROR, "HandleRuntimeRequest got err: %d", status);
+    if (status != ZX_ERR_PEER_CLOSED) {
+      zxlogf(ERROR, "HandleRuntimeRequest got err: %d", status);
+    }
     return;
   }
 

@@ -15,5 +15,14 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
+    capabilities: [
+        { service: "fuchsia.device.runtime.test.Service" },
+    ],
     use: [],
+    expose: [
+        {
+            service: "fuchsia.device.runtime.test.Service",
+            from: "self",
+        },
+    ],
 }
