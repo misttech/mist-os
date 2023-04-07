@@ -914,6 +914,38 @@ int AmlogicDisplay::HpdThread() {
   return status;
 }
 
+zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
+  if (zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(parent_, "gpio", &hpd_gpio_);
+      status != ZX_OK) {
+    DISP_ERROR("Could not obtain GPIO protocol %d\n", status);
+    return status;
+  }
+
+  if (zx_status_t status = hpd_gpio_.ConfigIn(GPIO_PULL_DOWN); status != ZX_OK) {
+    DISP_ERROR("Hotplug detection GPIO input config failed: %s\n", zx_status_get_string(status));
+    return status;
+  }
+
+  if (zx_status_t status = hpd_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH, &hpd_irq_);
+      status != ZX_OK) {
+    DISP_ERROR("Hotplug detection GPIO: cannot get interrupt: %s\n", zx_status_get_string(status));
+    return status;
+  }
+
+  auto hotplug_detection_thread = [](void* arg) {
+    return static_cast<AmlogicDisplay*>(arg)->HpdThread();
+  };
+  if (int status =
+          thrd_create_with_name(&hpd_thread_, hotplug_detection_thread, this, "hpd_thread");
+      status != thrd_success) {
+    zx_status_t zx_status = thrd_status_to_zx_status(status);
+    DISP_ERROR("Could not create hotplug detection thread: %s\n", zx_status_get_string(zx_status));
+    return zx_status;
+  }
+
+  return ZX_OK;
+}
+
 // TODO(payamm): make sure unbind/release are called if we return error
 zx_status_t AmlogicDisplay::Bind() {
   root_node_ = inspector_.GetRoot().CreateChild("amlogic-display");
@@ -1033,27 +1065,8 @@ zx_status_t AmlogicDisplay::Bind() {
   }
 
   if (vout_->supports_hpd()) {
-    if (zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(parent_, "gpio", &hpd_gpio_);
-        status != ZX_OK) {
-      DISP_ERROR("Could not obtain GPIO protocol %d\n", status);
-      return status;
-    }
-
-    if (zx_status_t status = hpd_gpio_.ConfigIn(GPIO_PULL_DOWN); status != ZX_OK) {
-      DISP_ERROR("gpio_config_in failed for gpio %d\n", status);
-      return status;
-    }
-
-    if (zx_status_t status = hpd_gpio_.GetInterrupt(ZX_INTERRUPT_MODE_LEVEL_HIGH, &hpd_irq_);
-        status != ZX_OK) {
-      DISP_ERROR("gpio_get_interrupt failed for gpio %d\n", status);
-      return status;
-    }
-
-    auto hpd_thread = [](void* arg) { return static_cast<AmlogicDisplay*>(arg)->HpdThread(); };
-    if (int status = thrd_create_with_name(&hpd_thread_, hpd_thread, this, "hpd_thread");
-        status != 0) {
-      DISP_ERROR("Could not create hpd_thread %d\n", status);
+    if (zx_status_t status = SetupHotplugDisplayDetection(); status != ZX_OK) {
+      DISP_ERROR("Cannot set up hotplug display: %s\n", zx_status_get_string(status));
       return status;
     }
   }

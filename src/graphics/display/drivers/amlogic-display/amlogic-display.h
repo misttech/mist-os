@@ -139,6 +139,10 @@ class AmlogicDisplay
   int HpdThread();
   void PopulatePanelType() TA_REQ(display_lock_);
 
+  // Sets up the hotlpug display detection hardware interrupts and starts the
+  // interrupt handler thread.
+  zx_status_t SetupHotplugDisplayDetection();
+
   // This function enables the display hardware. This function is disruptive and causes
   // unexpected pixels to be visible on the screen.
   zx_status_t DisplayInit() TA_REQ(display_lock_);
