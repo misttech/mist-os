@@ -18,6 +18,10 @@ type DeclType = flexible enum {
 
     /// The capability comes from an `expose` declaration in the component's manifest.
     EXPOSE = 2;
+
+    /// A capability that could be either a `use` or `expose` declaration. Used
+    /// in inputs only, for fuzzy matching.
+    ANY = 3;
 };
 
 /// Routing result for a particular capability.
@@ -47,8 +51,9 @@ type ServiceInstance = table {
     /// The name of the service instance in this service directory.
     1: instance_name string:MAX;
 
-    /// The name of the child component that serves the service instance.
-    2: child_name fuchsia.component.child_name;
+    /// The name of the child component that serves the service instance,
+    /// including the collection name.
+    2: child_name string:MAX;
 
     /// The name of the service instance as exposed by the child.
     3: child_instance_name string:MAX;
@@ -57,7 +62,8 @@ type ServiceInstance = table {
 /// A capability in a target component to route to the source.
 @available(added=12)
 type RouteTarget = struct {
-    /// The name of the capability (this is not the path).
+    /// The capability name to match (this is not the path). Supports fuzzy
+    /// matching by substring.
     name fuchsia.component.name;
     /// Whether the capability is a `use`d by the component or `expose`d
     /// from it.
@@ -75,8 +81,6 @@ type RouteValidatorError = flexible enum {
     INSTANCE_NOT_FOUND = 3;
     /// The component instance was not resolved.
     INSTANCE_NOT_RESOLVED = 4;
-    /// The capability declaration was not found.
-    CAPABILITY_NOT_FOUND = 5;
 };
 
 @discoverable
@@ -96,6 +100,10 @@ protocol RouteValidator {
 
     /// Routes a component's used or exposed capabilities, and returns
     /// information about them.
+    ///
+    /// If `targets` is empty, returns results for all the component's used and
+    /// exposed capabilities. Otherwise, returns only results for capabilities
+    /// specified in `targets`.
     ///
     /// This method only supports routing namespace capabilities (protocols,
     /// directories, services, and storage).

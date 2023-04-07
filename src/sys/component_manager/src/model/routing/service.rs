@@ -671,6 +671,11 @@ impl CollectionServiceDirectory {
         self.inner.lock().await.entries.clone()
     }
 
+    /// Returns the name of the collection the instances are aggregated over
+    pub fn collection(&self) -> &str {
+        &self.route.collection_name
+    }
+
     /// Adds directory entries from services exposed by a child in the aggregated collection.
     pub async fn add_entries_from_child(&self, child_name: &str) -> Result<(), ModelError> {
         let parent =
