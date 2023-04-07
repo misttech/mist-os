@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -31,6 +32,10 @@ var (
 	// legacy_test is the generic test name given when trf is running a v1 test suite.
 	// trf treats all v1 test as legacy_test and does not format the stdout correctly.
 	trfLegacyTest = regexp.MustCompile(`\[RUNNING\]\tlegacy_test`)
+	// ex: "[expectation-comparer] INFO: ChrootTest.Success success is expected."
+	// ex: "[expectation-comparer] INFO: ChrootTest.ProcMemSelfMapsNoEscapeProcOpen skip is expected."
+	// ex: "[expectation-comparer] INFO: ChrootTest.ProcMemSelfFdsNoEscapeProcOpen failure is expected, so it will be reported to the test runner as having passed."
+	trfTestExpectationPattern = regexp.MustCompile(`(.*)INFO: (?P<test_name>.*?) (?P<expectation>.*?) is expected(.*)$`)
 )
 
 // Parse tests run by the Test Runner Framework (TRF)
@@ -38,6 +43,7 @@ func parseTrfTest(lines [][]byte) []runtests.TestCaseResult {
 	var res []runtests.TestCaseResult
 	testCases := make(map[string]runtests.TestCaseResult)
 	errorMessages := make(map[string]*strings.Builder)
+	expectations := make(map[string]string)
 
 	currentTestName := ""
 	foundStderr := false
@@ -81,12 +87,23 @@ func parseTrfTest(lines [][]byte) []runtests.TestCaseResult {
 			}
 			continue
 		}
+		if m := trfTestExpectationPattern.FindStringSubmatch(line); m != nil {
+			expectations[m[2]] = m[3]
+		}
 	}
 
 	for testName, testCase := range testCases {
 		if msg, ok := errorMessages[testName]; ok {
 			if testCase.Status == runtests.TestFailure {
 				testCase.FailReason = msg.String()
+			}
+		}
+		if expectation, ok := expectations[testName]; ok {
+			testCase.Tags = []build.TestTag{
+				{
+					Key:   "expectation",
+					Value: expectation,
+				},
 			}
 		}
 		res = append(res, testCase)

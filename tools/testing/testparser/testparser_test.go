@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/testing/conformance/parseoutput"
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 )
 
@@ -157,6 +158,102 @@ One or more test runs failed.
 			Format:      "FTF",
 		},
 	}
+	testCaseCmp(t, stdout, want)
+}
+
+func TestParseTrfTestWithExpectations(t *testing.T) {
+	stdout := `
+Running test 'fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm'
+[RUNNING]	ChrootTest.ProcMemSelfMapsNoEscapeProcOpen
+[SKIPPED]	ChrootTest.ProcMemSelfMapsNoEscapeProcOpen
+[RUNNING]	ChrootTest.Success
+[RUNNING]	ChrootTest.ProcMemSelfFdsNoEscapeProcOpen
+[stdout - fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm]
+Note: Google Test filter = ChrootTest.Success:ChrootTest.ProcMemSelfFdsNoEscapeProcOpen:
+[==========] Running 2 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 2 tests from ChrootTest
+[ RUN      ] ChrootTest.Success
+[       OK ] ChrootTest.Success (4 ms)
+[ RUN      ] ChrootTest.ProcMemSelfFdsNoEscapeProcOpen
+third_party/gvisor/test/syscalls/linux/chroot.cc:306: Failure
+Value of: InForkedProcess(rest)
+Expected: is OK and has a value that is equal to 0
+	Actual: No Error (of type N12cloud_gvisor7testing12PosixErrorOrIiEE), has a value 256
+
+[  FAILED  ] ChrootTest.ProcMemSelfFdsNoEscapeProcOpen (17 ms)
+[----------] 2 tests from ChrootTest (21 ms total)
+
+[----------] Global test environment tear-down
+[==========] 2 tests from 1 test suite ran. (21 ms total)
+[  PASSED  ] 1 tests.
+[  FAILED  ] 1 tests, listed below:
+[  FAILED  ] ChrootTest.ProcMemSelfFdsNoEscapeProcOpen
+
+	1 FAILED TESTS
+[stderr - fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm]
+Check failed: strcmp(buf, "/foo") == 0
+libc: Fatal signal 6 (SIGABRT), code -1 (SI_QUEUE) in tid 9 (chroot_test), pid 9 (<unknown>)
+[PASSED]	ChrootTest.Success
+[PASSED]	ChrootTest.ProcMemSelfFdsNoEscapeProcOpen
+[01447.596892][runners:chroot_test.cm_Z3b2DH8][starnix] INFO: start_component: fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm
+arguments: Some([])
+manifest: Some(Dictionary { entries: Some([DictionaryEntry { key: "binary", value: Some(Str("data/tests/chroot_test")) }, DictionaryEntry { key: "environ", value: Some(StrVec(["TEST_TMPDIR=/data/tmp", "TEST_ON_GVISOR=1", "TEST_SRCDIR={pkg_path}/data/tests", "BENCHMARK_FORMAT=json", "BENCHMARK_OUT=/test_data/benchmark.json"])) }, DictionaryEntry { key: "user", value: Some(Str("fuchsia:x:0:0")) }, DictionaryEntry { key: "apex_hack", value: Some(StrVec(["com.android.runtime"])) }, DictionaryEntry { key: "features", value: Some(StrVec(["binder", "test_data"])) }, DictionaryEntry { key: "init", value: Some(StrVec([])) }, DictionaryEntry { key: "init_user", value: Some(Str("root:x:0:0")) }, DictionaryEntry { key: "kernel_cmdline", value: Some(Str("androidboot.hardware=starnix")) }, DictionaryEntry { key: "mounts", value: Some(StrVec(["/:ext4:data/system.img", "/vendor:ext4:data/testcases.img", "/data:remotefs:data", "/dev:devtmpfs", "/dev/shm:tmpfs", "/data/tmp:tmpfs", "/dev/shm:tmpfs", "/dev/pts:devpts", "/proc:proc", "/sys:sysfs", "/sys/fs/selinux:selinuxfs"])) }, DictionaryEntry { key: "name", value: Some(Str("gvisor_test")) }, DictionaryEntry { key: "startup_file_path", value: Some(Str("")) }, DictionaryEntry { key: "test_type", value: Some(Str("gunit")) }, DictionaryEntry { key: "args", value: Some(StrVec(["--gunit_list_tests", "--gunit_output=json:/test_data/test_result-b2be0d31-81ff-40c4-bdb9-0cfc9e93649d.json"])) }]), __non_exhaustive: () })
+
+[01447.598078][runners:chroot_test.cm_Z3b2DH8][starnix] INFO: start_component environment: ["TEST_TMPDIR=/data/tmp", "TEST_ON_GVISOR=1", "TEST_SRCDIR=/container/component/f169czoi4l/pkg/data/tests", "BENCHMARK_FORMAT=json", "BENCHMARK_OUT=/test_data/benchmark.json"]
+
+[01447.641356][runners:chroot_test.cm_Z3b2DH8][stdio,starnix] INFO: ChrootTest.
+	Success
+	ProcMemSelfFdsNoEscapeProcOpen
+	ProcMemSelfMapsNoEscapeProcOpen
+[01447.649121][expectation-comparer] INFO: ChrootTest.ProcMemSelfMapsNoEscapeProcOpen skip is expected.
+[01447.780791][expectation-comparer] INFO: ChrootTest.Success success is expected.
+[01447.782299][expectation-comparer] INFO: ChrootTest.ProcMemSelfFdsNoEscapeProcOpen failure is expected, so it will be reported to the test runner as having passed.
+
+2 out of 2 attempted tests passed, 1 tests skipped...
+fuchsia-pkg://fuchsia.com/starnix_gvisor_tests?hash=c7c79a3408c5c0c89f61beb738f2dd71ca1c724f8d9c9d4a72e52631c8cbaacb#meta/chroot_test.cm completed with result: PASSED
+
+PASS: 1 FAIL: 0 00:01 √  fuchsia-pkg://fuchsia.com/starnix_gvisor_tests#meta/chroot_test.cm
+	`
+	want := []runtests.TestCaseResult{
+		{
+			DisplayName: "ChrootTest.Success",
+			CaseName:    "ChrootTest.Success",
+			Status:      runtests.TestSuccess,
+			Format:      "FTF",
+			Tags: []build.TestTag{
+				{
+					Key:   "expectation",
+					Value: "success",
+				},
+			},
+		},
+		{
+			DisplayName: "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
+			CaseName:    "ChrootTest.ProcMemSelfFdsNoEscapeProcOpen",
+			Status:      runtests.TestSuccess,
+			Format:      "FTF",
+			Tags: []build.TestTag{
+				{
+					Key:   "expectation",
+					Value: "failure",
+				},
+			},
+		},
+		{
+			DisplayName: "ChrootTest.ProcMemSelfMapsNoEscapeProcOpen",
+			CaseName:    "ChrootTest.ProcMemSelfMapsNoEscapeProcOpen",
+			Status:      runtests.TestSkipped,
+			Format:      "FTF",
+			Tags: []build.TestTag{
+				{
+					Key:   "expectation",
+					Value: "skip",
+				},
+			},
+		},
+	}
+
 	testCaseCmp(t, stdout, want)
 }
 
