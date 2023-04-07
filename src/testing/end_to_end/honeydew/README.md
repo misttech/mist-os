@@ -137,65 +137,9 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
   for the development and testing of HoneyDew
 * Follow [instructions on how to submit contributions to the Fuchsia project]
   for the Gerrit developer work flow
-* If you are using [vscode IDE] then I recommend installing
-  [python extension], [pylint extension], [mypy extension], [isort extension]
-  and update [user/workspace settings in vscode] to below:
-    ```json
-    "editor.rulers": [
-        80
-    ],
-    "editor.formatOnSave": true,
-    "editor.detectIndentation": false,
-    "editor.tabSize": 4,
-    "files.insertFinalNewline": true,
-    "files.trimTrailingWhitespace": true,
-
-    // To lint Python files using pylint
-    "python.linting.pylintEnabled": true,
-    "python.linting.pylintPath": "pylint",
-    "python.linting.pylintArgs": [
-        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pylintrc"
-    ],
-    "pylint.args": [
-        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pylintrc"
-    ]
-
-    // To lint Python files using mypy
-    "python.linting.mypyEnabled": true,
-    "python.linting.mypyPath": "mypy",
-    "python.linting.mypyArgs": [
-        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/mypy.ini"
-    ]
-    "mypy.args" = [
-        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/mypy.ini"
-    ]
-
-    // Whether to lint Python files when saved.
-    "python.linting.lintOnSave": true,
-
-    // To format Python files using yapf
-    "python.formatting.provider": "yapf",
-    "python.formatting.yapfPath": "yapf",
-
-    // List of paths to libraries and the like that need to be imported by auto complete engine. E.g. when using Google App SDK, the paths are not in system path, hence need to be added into this list.
-    "python.autoComplete.extraPaths": [
-        "${env:FUCHSIA_DIR}/src/testing/end_to_end",
-        "${env:FUCHSIA_DIR}/fuchsia/third_party/mobly/",
-        "${env:FUCHSIA_DIR}/fuchsia/third_party/parameterized/",
-    ],
-    "python.analysis.extraPaths": [
-        "${env:FUCHSIA_DIR}/fuchsia/src/testing/end_to_end",
-        "${env:FUCHSIA_DIR}/fuchsia/third_party/mobly/",
-        "${env:FUCHSIA_DIR}/fuchsia/third_party/parameterized/",
-    ],
-    // Index installed third party libraries and user files for language features such as auto-import, add import, workspace symbols and etc.
-    "python.analysis.indexing": true,
-    "python.analysis.inlayHints.functionReturnTypes": true,
-    "python.analysis.inlayHints.variableTypes": true,
-    "python.analysis.typeCheckingMode": "basic",
-    "python.analysis.autoImportCompletions": true,
-    "python.analysis.completeFunctionParens": true,
-    ```
+* If you are using [vscode IDE] then I recommend installing these
+  [vscode extensions] from [vscode extension marketplace] and using these
+  [vscode settings]
 * If contribution involves adding a new class method or new class itself, you
   may have to update the [interfaces] definitions
 * Ensure there is both [unit tests] and [functional tests] coverage for
@@ -213,30 +157,30 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 * Ensure code is [pylint], [mypy] and [pytype] compatible
   * Install `pylint`, `mypy` and `pytype` inside virtual environment or at system level
   * For `pylint`, you can either enable it in your IDE or
-    run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+    run `pylint --rcfile=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pylintrc $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
   * For `mypy`, you can either enable it in your IDE or
-    run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
-  * For `pytype`, you can run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+    run `mypy --config-file=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/mypy.ini $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
+  * For `pytype`, you can run `pytype --config=$FUCHSIA_DIR/src/testing/end_to_end/honeydew/linter/pytype.toml $FUCHSIA_DIR/src/testing/end_to_end/honeydew/`
 * At least one of the [HoneyDew OWNERS] should be added as a reviewer
   * Please run any impacted functional tests locally and share the test output
     with the CL reviewers
   * Please share `pylint`, `mypy` and `pytype` output with the CL reviewers
 
-[HoneyDew OWNERS]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/OWNERS
+[HoneyDew OWNERS]: ../OWNERS
 
-[interfaces]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/interfaces/
+[interfaces]: interfaces/
 
-[unit tests]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/unit_tests/
+[unit tests]: tests/unit_tests/
 
-[unit tests README]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/unit_tests/README.md
+[unit tests README]: tests/unit_tests/README.md
 
-[top level HoneyDew unit tests BUILD]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/unit_tests/BUILD.gn
+[top level HoneyDew unit tests BUILD]: tests/unit_tests/BUILD.gn
 
-[functional tests]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/functional_tests/
+[functional tests]: tests/functional_tests/
 
-[functional tests README]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/functional_tests/README.md
+[functional tests README]: tests/functional_tests/README.md
 
-[top level HoneyDew functional tests BUILD]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/testing/end_to_end/honeydew/tests/functional_tests/BUILD.gn
+[top level HoneyDew functional tests BUILD]: tests/functional_tests/BUILD.gn
 
 [instructions on how to submit contributions to the Fuchsia project]: https://fuchsia.dev/fuchsia-src/development/source_code/contribute_changes
 
@@ -250,12 +194,8 @@ Here are some of the pointers that you can use while contributing to HoneyDew:
 
 [vscode IDE]: https://code.visualstudio.com/docs/python/python-tutorial
 
-[python extension]: https://marketplace.visualstudio.com/items?itemName=ms-python.python
+[vscode extension marketplace]: https://code.visualstudio.com/docs/editor/extension-marketplace
 
-[pylint extension]: https://marketplace.visualstudio.com/items?itemName=ms-python.pylint
+[vscode extensions]: vscode/extensions.json
 
-[mypy extension]: https://marketplace.visualstudio.com/items?itemName=ms-python.mypy-type-checker
-
-[isort extension]: https://marketplace.visualstudio.com/items?itemName=ms-python.isort
-
-[user/workspace settings in vscode]: https://code.visualstudio.com/docs/getstarted/settings
+[vscode settings]: vscode/settings.json

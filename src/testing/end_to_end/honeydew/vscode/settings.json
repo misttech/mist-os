@@ -1,0 +1,53 @@
+{
+    "python.linting.lintOnSave": true,
+    "python.linting.pylintEnabled": true,
+    "python.linting.pylintPath": "pylint",
+    "python.linting.pylintArgs": [
+        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pylintrc"
+    ],
+    "pylint.args": [
+        "--rcfile=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/pylintrc"
+    ],
+    "python.linting.mypyEnabled": true,
+    "python.linting.mypyPath": "mypy",
+    "python.linting.mypyArgs": [
+        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/mypy.ini"
+    ],
+    "mypy.args": [
+        "--config-file=${env:FUCHSIA_DIR}/src/testing/end_to_end/honeydew/mypy.ini"
+    ],
+    "python.formatting.provider": "yapf",
+    "python.formatting.yapfPath": "yapf",
+    "editor.rulers": [
+        80
+    ],
+    "editor.formatOnSave": true,
+    "editor.formatOnSaveMode": "file",
+    "editor.detectIndentation": false,
+    "editor.tabSize": 4,
+    "files.insertFinalNewline": true,
+    "files.trimTrailingWhitespace": true,
+    "update.mode": "none",
+    "[python]": {
+        "editor.codeActionsOnSave": {
+            "source.organizeImports": true
+        },
+        "editor.formatOnType": true
+    },
+    "python.autoComplete.extraPaths": [
+        "${env:FUCHSIA_DIR}/src/testing/end_to_end",
+        "${env:FUCHSIA_DIR}/fuchsia/third_party/mobly/",
+        "${env:FUCHSIA_DIR}/fuchsia/third_party/parameterized/"
+    ],
+    "python.analysis.extraPaths": [
+        "${env:FUCHSIA_DIR}/fuchsia/src/testing/end_to_end",
+        "${env:FUCHSIA_DIR}/fuchsia/third_party/mobly/",
+        "${env:FUCHSIA_DIR}/fuchsia/third_party/parameterized/"
+    ],
+    "python.analysis.indexing": true,
+    "python.analysis.inlayHints.functionReturnTypes": true,
+    "python.analysis.inlayHints.variableTypes": true,
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.completeFunctionParens": true
+}

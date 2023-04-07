@@ -1,0 +1,9 @@
+{
+    "recommendations": [
+        "ms-python.python",
+        "ms-python.pylint",
+        "ms-python.mypy-type-checker",
+        "ms-python.isort",
+        "streetsidesoftware.code-spell-checker",
+    ]
+}
