@@ -46,10 +46,11 @@ pub async fn start_component(
 ) -> Result<(), Error> {
     let url = start_info.resolved_url.clone().unwrap_or_else(|| "<unknown>".to_string());
     log_info!(
-        "start_component: {}\narguments: {:?}\nmanifest: {:?}",
+        "start_component: {}\narguments: {:?}\nmanifest: {:?}\nns: {:?}",
         url,
         start_info.numbered_handles,
         start_info.program,
+        start_info.ns,
     );
 
     let component_path = generate_component_path(&container)?;
