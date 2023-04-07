@@ -138,9 +138,14 @@ void AmlogicDisplay::DisplayControllerImplSetDisplayControllerInterface(
     const display_controller_interface_protocol_t* intf) {
   fbl::AutoLock lock(&display_lock_);
   dc_intf_ = ddk::DisplayControllerInterfaceProtocolClient(intf);
-  added_display_args_t args;
-  vout_->PopulateAddedDisplayArgs(&args, display_id_);
-  dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, nullptr, 0, nullptr);
+
+  if (display_attached_) {
+    added_display_info_t info{.is_standard_srgb_out = false};  // Random default
+    added_display_args_t args;
+    vout_->PopulateAddedDisplayArgs(&args, display_id_);
+    dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
+    vout_->OnDisplaysChanged(info);
+  }
 }
 
 // part of ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL ops
@@ -525,19 +530,6 @@ zx_status_t AmlogicDisplay::DdkGetProtocol(uint32_t proto_id, void* out_protocol
   }
 }
 
-zx_status_t AmlogicDisplay::SetupDisplayInterface() {
-  fbl::AutoLock lock(&display_lock_);
-
-  added_display_info_t info{.is_standard_srgb_out = false};  // Random default
-  if (dc_intf_.is_valid()) {
-    added_display_args_t args;
-    vout_->PopulateAddedDisplayArgs(&args, display_id_);
-    dc_intf_.OnDisplaysChanged(&args, 1, nullptr, 0, &info, 1, nullptr);
-  }
-
-  return vout_->OnDisplaysChanged(info);
-}
-
 zx_status_t AmlogicDisplay::DisplayControllerImplGetSysmemConnection(zx::channel connection) {
   zx_status_t status = sysmem_.Connect(std::move(connection));
   if (status != ZX_OK) {
@@ -647,6 +639,7 @@ zx_status_t AmlogicDisplay::DisplayControllerImplSetBufferCollectionConstraints(
 
 zx_status_t AmlogicDisplay::DisplayControllerImplSetDisplayPower(uint64_t display_id,
                                                                  bool power_on) {
+  fbl::AutoLock lock(&display_lock_);
   if (display_id != display_id_ || !display_attached_) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -961,8 +954,6 @@ zx_status_t AmlogicDisplay::Bind() {
         }
         DISP_INFO("Provided Display Info: %d x %d with panel type %d\n", display_info.width,
                   display_info.height, display_info.panel_type);
-        display_attached_ = true;
-
         {
           fbl::AutoLock lock(&display_lock_);
           if (zx_status_t status = vout_->InitDsi(parent_, display_info.panel_type,
@@ -971,6 +962,7 @@ zx_status_t AmlogicDisplay::Bind() {
             DISP_ERROR("Could not initialize DSI Vout device! %d\n", status);
             return status;
           }
+          display_attached_ = true;
         }
 
         root_node_.CreateUint("input_panel_type", display_info.panel_type, &inspector_);
@@ -1009,12 +1001,6 @@ zx_status_t AmlogicDisplay::Bind() {
 
   if (zx_status_t status = pdev_.GetBti(0, &bti_); status != ZX_OK) {
     DISP_ERROR("Could not get BTI handle %d\n", status);
-    return status;
-  }
-
-  // Setup Display Interface
-  if (zx_status_t status = SetupDisplayInterface(); status != ZX_OK) {
-    DISP_ERROR("Amlogic display setup failed! %d\n", status);
     return status;
   }
 

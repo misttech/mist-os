@@ -134,7 +134,6 @@ class AmlogicDisplay
   }
 
  private:
-  zx_status_t SetupDisplayInterface();
   int VSyncThread();
   int CaptureThread();
   int HpdThread();
@@ -217,7 +216,7 @@ class AmlogicDisplay
   inspect::Node osd_node_;
 
   uint64_t display_id_ = PANEL_DISPLAY_ID;
-  bool display_attached_ = false;
+  bool display_attached_ TA_GUARDED(display_lock_) = false;
 
   // Hot Plug Detection
   ddk::GpioProtocolClient hpd_gpio_{};
