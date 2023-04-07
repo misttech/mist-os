@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/config_data_for_assembly.gni")
 import("//build/components.gni")
 import("//build/config.gni")
 import("//src/sys/core/build/core_shard.gni")
@@ -43,7 +44,6 @@ executable("bin") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("for_transition") {
-  public_deps = [ ":sshd-host" ]
 }
 
 fuchsia_package_with_single_component("sshd-host") {
@@ -62,8 +62,9 @@ fuchsia_package_with_single_component("sshd-host") {
   ]
 }
 
-core_shard("core_shard") {
-  shard_file = "meta/sshd-host.core_shard.cml"
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
+group("core_shard") {
 }
 
 # Enabling a soft-transition, remove when complete

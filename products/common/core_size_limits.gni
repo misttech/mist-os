@@ -129,7 +129,10 @@ size_checker_input = {
     },
     {
       component = "Connectivity/Overnet"
-      src = [ "packages/cache/overnetstack" ]
+      src = [
+        "packages/base/overnetstack",
+        "packages/cache/overnetstack",
+      ]
       limit = 1236271  # 1.179 MiB
       creep_limit = 81920  # 80.0 KiB
     },

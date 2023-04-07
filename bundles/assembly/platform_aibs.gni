@@ -77,7 +77,9 @@ user_platform_aib_names = [
 # The names of all userdebug-allowed platform Assembly Input Bundles
 #LINT.IfChange
 _userdebug_aib_names = [
-  # TODO
+  # Needed by both eng and userdebug products, but contains things disallowed in
+  # user.
+  "core_realm_development_access",
 ]
 
 # LINT.ThenChange(platform_aib_names.bzl)

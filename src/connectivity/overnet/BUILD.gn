@@ -7,13 +7,13 @@ group("overnet") {
   deps = [
     "examples",
     "lib",
-    "overnetstack",
     "tools",
   ]
 }
 
+# Enabling a soft-transition, remove when complete
+# TODO(122864) Remove transitional labels
 group("runtime") {
-  deps = [ "overnetstack" ]
 }
 
 group("tests") {

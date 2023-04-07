@@ -38,7 +38,7 @@ USER_PLATFORM_AIB_NAMES = [
 ]
 
 USERDEBUG_PLATFORM_AIB_NAMES = USER_PLATFORM_AIB_NAMES + [
-    # TODO
+    "core_realm_development_access",
 ]
 
 # The names of all of the platform's Assembly Input Bundles.

@@ -103,7 +103,6 @@ if (is_fuchsia) {
 
     # Enable ffx support.
     "//src/connectivity/network/mdns/bundles:services",  # group for transition
-    "//src/developer/ffx:runtime",  # group for transition
 
     # Enable SSH (for engineering builds):
     "//src/developer/sshd-host:for_transition",

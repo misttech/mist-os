@@ -33,7 +33,6 @@ group("tools") {
     "network/bundles:tools",
     "network/mdns/bundles:utils",
     "network/net-cli",
-    "overnet/overnetstack",
     "overnet/tools",
     "wlan:tools",
   ]

@@ -38,16 +38,14 @@ template("assemble_network_conformance_system") {
     allow_eng_platform_bundle_use = true
 
     base_packages = [
-      "//src/developer/sshd-host",
-      "//src/developer/sshd-host:config",
-      "//src/sys/process-resolver",
+      "//src/developer/sshd-host:for_transition",
+      "//src/developer/sshd-host:config-for_transition",
       "//src/connectivity/network",
       "//src/connectivity/network/mdns/bundles:config",
       "//src/connectivity/network/mdns/bundles:services",
       "//src/connectivity/network/netcfg:config-default",
       "//src/connectivity/network/net-cli",
       "//src/connectivity/network/testing/network-test-realm/service:network-test-realm",
-      "//src/developer/ffx:runtime",
       "//src/security/policy:appmgr_policy_eng",
       "//src/security/bin/root_ssl_certificates",
       "//src/sys/appmgr:appmgr_scheme_config",

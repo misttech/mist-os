@@ -221,7 +221,21 @@ assembly_input_bundle("core_realm") {
         # TODO:  These shards should be folded into the `core.cml` file itself
         # as they are never omitted from that file.
         core = rebase_path(
-                [ "//src/developer/build_info/meta/build_info.core_shard.cml" ],
+                [
+                  "//src/developer/build_info/meta/build_info.core_shard.cml",
+
+                  # The process_resolver core shard should only be present in
+                  # the `core_realm_development_access` AIB, but it's required
+                  # here until optional exposes are available, as the
+                  # `fuchsia.process.Resolver` capability is routed to the
+                  # `/bootstrap/console-launcher` component which is currently
+                  # present on all build-types (but is not needed on user, as
+                  # there is no reachable console there).
+                  # Note that the `process-resolver` component itself is not
+                  # present except when the `core_realm_development_access` is
+                  # added to the system.
+                  "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
+                ],
                 root_build_dir)
       }
     },
@@ -326,6 +340,50 @@ assembly_input_bundle("core_realm_user_and_userdebug") {
                 ],
                 root_build_dir)
       }
+    },
+  ]
+}
+
+# This is the AIB that adds the services necessary for developers to access a
+# target running Fuchsia from their development host using tools like `ffx`.
+#
+# This is included with all eng and userdebug build-type systems.
+#
+assembly_input_bundle("core_realm_development_access") {
+  base_packages = [
+    # SSH is necessary for remote access for development
+    "//src/developer/sshd-host",
+
+    # Process resolver enables cli commands to be resolved to components.
+    # TODO(http://fxbug.dev/125120):  This component is compiled differently
+    # based on the `auto_update_packages` GN build argument.
+    "//src/sys/process-resolver",
+
+    # ffx's remote-control (remote access) components:
+    "//src/developer/remote-control:remote-control-package",
+    "//src/developer/remote-control:pkg-diagnostics-bridge",
+    "//src/connectivity/overnet/overnetstack",
+  ]
+  config_data_labels = [ "//src/developer/remote-control:maps" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = {
+        # All paths must be rebased since this is passed directly to the AIB
+        # config.
+        core = rebase_path(
+                [ "//src/developer/sshd-host/meta/sshd-host.core_shard.cml" ],
+                root_build_dir)
+      }
+    },
+  ]
+  shell_commands = [
+    {
+      package = "remote-control"
+      components = [
+        "remote_control_runner",
+        "remote_control_bin",
+      ]
     },
   ]
 }
@@ -437,7 +495,6 @@ assembly_input_bundle("common_minimal") {
         # config.
         core = rebase_path(
                 [
-                  "//src/sys/process-resolver/meta/process_resolver.core_shard.cml",
                   "//src/diagnostics/kcounter/meta/diagnostics-kcounter.core_shard.cml",
                   "//src/diagnostics/log-stats/meta/log-stats.core_shard.cml",
                   "//src/diagnostics/realm/meta/diagnostics.core_shard.cml",

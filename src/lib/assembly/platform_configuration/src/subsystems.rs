@@ -84,9 +84,17 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                 vec!["bootstrap"]
             }
             (FeatureSupportLevel::Utility, BuildType::Eng) => {
-                vec!["bootstrap", "core_realm", "core_realm_eng"]
+                vec!["bootstrap", "core_realm", "core_realm_development_access", "core_realm_eng"]
             }
-            (FeatureSupportLevel::Utility, _) => {
+            (FeatureSupportLevel::Utility, BuildType::UserDebug) => {
+                vec![
+                    "bootstrap",
+                    "core_realm",
+                    "core_realm_development_access",
+                    "core_realm_user_and_userdebug",
+                ]
+            }
+            (FeatureSupportLevel::Utility, BuildType::User) => {
                 vec!["bootstrap", "core_realm", "core_realm_user_and_userdebug"]
             }
             (FeatureSupportLevel::Minimal, BuildType::Eng) => {
@@ -94,6 +102,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                     "bootstrap",
                     "core_realm",
                     "core_realm_eng",
+                    "core_realm_development_access",
                     "common_minimal",
                     "common_minimal_eng",
                     "common_minimal_userdebug",
@@ -103,6 +112,7 @@ impl DefineSubsystemConfiguration<()> for CommonBundles {
                 vec![
                     "bootstrap",
                     "core_realm",
+                    "core_realm_development_access",
                     "core_realm_user_and_userdebug",
                     "common_minimal",
                     "common_minimal_userdebug",

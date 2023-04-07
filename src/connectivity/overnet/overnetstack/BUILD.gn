@@ -61,6 +61,10 @@ fuchsia_component("component") {
 }
 
 fuchsia_package("overnetstack") {
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+  ]
   deps = [ ":component" ]
 }
 

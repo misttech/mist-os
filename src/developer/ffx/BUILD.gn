@@ -169,9 +169,6 @@ group("runtime") {
   deps = [
     # The tool
     ":host",
-
-    # Target-side dependencies
-    "//src/developer/remote-control:runtime",
   ]
 }
 
