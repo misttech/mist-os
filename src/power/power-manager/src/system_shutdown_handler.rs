@@ -17,12 +17,12 @@ use fuchsia_inspect::{self as inspect, Property};
 use fuchsia_zircon::{self as zx, Status as zx_status};
 use futures::prelude::*;
 use futures::TryStreamExt;
-use log::*;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use tracing::*;
 
 /// Node: SystemShutdownHandler
 ///

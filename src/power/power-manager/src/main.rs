@@ -40,11 +40,10 @@ mod test;
 use crate::power_manager::PowerManager;
 use anyhow::Error;
 use fuchsia_trace_provider;
-use log;
 
 #[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    log::info!("started");
+    tracing::info!("started");
 
     // Setup tracing
     fuchsia_trace_provider::trace_provider_create_with_fdio();
@@ -54,6 +53,6 @@ async fn main() -> Result<(), Error> {
 
     // This future should never complete
     let result = pm.run().await;
-    log::error!("Unexpected exit with result: {:?}", result);
+    tracing::error!("Unexpected exit with result: {:?}", result);
     result
 }

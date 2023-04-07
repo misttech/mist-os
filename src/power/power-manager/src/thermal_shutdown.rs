@@ -19,11 +19,11 @@ use futures::{
     stream::FuturesUnordered,
     StreamExt,
 };
-use log::*;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::collections::HashMap;
 use std::rc::Rc;
+use tracing::*;
 
 /// Node: ThermalShutdown
 ///

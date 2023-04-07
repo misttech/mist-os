@@ -19,7 +19,6 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::prelude::*;
 use futures::TryStreamExt;
-use log::*;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::cell::RefCell;
@@ -28,6 +27,7 @@ use std::iter::FromIterator as _;
 use std::path::Path;
 use std::rc::Rc;
 use thermal_config::{ClientConfig, ThermalConfig};
+use tracing::*;
 
 /// Node: ThermalStateHandler
 ///

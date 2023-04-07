@@ -7,7 +7,7 @@
 macro_rules! log_if_err {
     ($result:expr, $log_prefix:expr) => {
         if let Err(e) = $result.as_ref() {
-            log::error!("{}: {}", $log_prefix, e);
+            tracing::error!("{}: {}", $log_prefix, e);
         }
     };
 }
@@ -18,13 +18,13 @@ macro_rules! log_if_err {
 macro_rules! log_if_false_and_debug_assert {
     ($cond:expr, $msg:expr) => {
         if !($cond) {
-            log::error!($msg);
+            tracing::error!($msg);
             debug_assert!($cond, $msg);
         }
     };
     ($cond:expr, $fmt:expr, $($arg:tt)+) => {
         if !($cond) {
-            log::error!($fmt, $($arg)+);
+            tracing::error!($fmt, $($arg)+);
             debug_assert!($cond, $fmt, $($arg)+);
         }
     };

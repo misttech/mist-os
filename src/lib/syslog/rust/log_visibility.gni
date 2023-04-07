@@ -58,6 +58,5 @@ third_party_rust_crate_log_visibility = [
   "//src/devices/bin/driver_tools:*",
   "//src/devices/bin/driver-index:*",
   "//src/lib/syslog/rust:*",
-  "//src/power/power-manager:*",
   "//src/sys/pkg/lib/fidl-fuchsia-update-installer-ext:*",
 ]

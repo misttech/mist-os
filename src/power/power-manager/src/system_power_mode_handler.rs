@@ -19,7 +19,6 @@ use fuchsia_component::server::{ServiceFs, ServiceFsDir, ServiceObjLocal};
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
 use futures::prelude::*;
 use futures::TryStreamExt;
-use log::*;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::cell::RefCell;
@@ -29,6 +28,7 @@ use std::rc::Rc;
 use system_power_mode_config::{
     ClientConfig, ClientConfigExt, ClientType, SystemMode, SystemPowerModeConfig,
 };
+use tracing::*;
 
 /// Node: SystemPowerModeHandler
 ///

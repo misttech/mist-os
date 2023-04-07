@@ -16,9 +16,9 @@ use {
     fuchsia_component::server::{ServiceFs, ServiceObjLocal},
     fuchsia_inspect::{self as inspect, Property},
     futures::prelude::*,
-    log::*,
     serde_json as json,
     std::{cell::RefCell, collections::HashMap, rc::Rc},
+    tracing::*,
 };
 
 /// Node: SystemProfileHandler

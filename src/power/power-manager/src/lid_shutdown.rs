@@ -21,10 +21,10 @@ use futures::{
     future::{FutureExt, LocalBoxFuture},
     StreamExt, TryStreamExt,
 };
-use log::*;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::{cell::RefCell, collections::HashMap, path::PathBuf, rc::Rc};
+use tracing::*;
 
 /// Node: LidShutdown
 ///

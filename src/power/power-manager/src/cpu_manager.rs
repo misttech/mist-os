@@ -206,7 +206,7 @@ impl CpuCluster {
                 panic!("Wrong response type for SetPerformanceState: {:?}", r);
             }
             Err(e) => {
-                log::error!("SetPerformanceState failed: {:?}", e);
+                tracing::error!("SetPerformanceState failed: {:?}", e);
 
                 // If the update failed, query the value, so at least the current state is known. If
                 // that fails, too, record a range of possible values based on the previous and
@@ -216,7 +216,7 @@ impl CpuCluster {
                         self.current_pstate.set(RangedValue::Known(i as usize));
                     }
                     result => {
-                        log::error!("Unexpected result from GetPerformanceState: {:?}", result);
+                        tracing::error!("Unexpected result from GetPerformanceState: {:?}", result);
                         let range = Range {
                             lower: std::cmp::min(self.current_pstate.get().lower(), index),
                             upper: std::cmp::max(self.current_pstate.get().upper(), index),
@@ -666,7 +666,7 @@ impl CpuManager {
         let (cpu_loads, load_query_error) = match self.get_cpu_loads().await {
             Ok(loads) => (loads, None),
             Err(e) => {
-                log::error!(
+                tracing::error!(
                     "Error querying CPU loads: {}\nWill throttle assuming maximal load.",
                     e
                 );

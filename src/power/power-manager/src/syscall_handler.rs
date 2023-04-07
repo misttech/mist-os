@@ -108,7 +108,7 @@ impl SyscallHandler {
                 self.name(),
                 &error_string
             );
-            log::error!("{}", &verbose_string);
+            tracing::error!("{}", &verbose_string);
             return Err(format_err!("{}", &verbose_string).into());
         }
 

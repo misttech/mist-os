@@ -156,17 +156,17 @@ impl ActivityHandler {
                     }
 
                     // Stream gave an unexpected error
-                    Some(Err(e)) => log::error!("Error polling listener_stream: {}", e),
+                    Some(Err(e)) => tracing::error!("Error polling listener_stream: {}", e),
 
                     // Stream closed unexpectedly. Attempt to reconnect once. If reconnection fails,
                     // exit the loop because something is wrong (or the Activity service is not
                     // available on this build variant).
                     None => {
-                        log::error!("Listener stream closed. Reconnecting...");
+                        tracing::error!("Listener stream closed. Reconnecting...");
                         match Self::connect_activity_service(&self.activity_proxy) {
                             Ok(stream) => listener_stream = stream,
                             Err(e) => {
-                                log::error!("{}", e);
+                                tracing::error!("{}", e);
                                 break;
                             }
                         }
@@ -174,7 +174,7 @@ impl ActivityHandler {
                 }
             }
 
-            log::error!("ActivityHandler is disabled");
+            tracing::error!("ActivityHandler is disabled");
             self.inspect.set_handler_enabled(false);
         }
         .boxed_local())

@@ -18,11 +18,11 @@ use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use futures::prelude::*;
 use futures::TryStreamExt;
-use log::*;
 use serde_json as json;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
+use tracing::*;
 
 /// Node: ShutdownWatcher
 ///

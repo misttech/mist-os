@@ -9,9 +9,9 @@ use fidl_fuchsia_power_manager_debug as fdebug;
 use fuchsia_async as fasync;
 use fuchsia_component::server::{ServiceFsDir, ServiceObjLocal};
 use futures::{TryFutureExt, TryStreamExt};
-use log::*;
 use std::collections::HashMap;
 use std::rc::Rc;
+use tracing::*;
 
 /// Publishes a service to expose debug control of the Power Manager.
 ///
