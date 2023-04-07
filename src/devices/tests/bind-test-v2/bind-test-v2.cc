@@ -31,7 +31,9 @@ class BindCompilerV2Test : public gtest::TestLoopFixture {
     fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
     ASSERT_EQ(realm_->component().Connect(driver_test_realm.NewRequest()), ZX_OK);
     fuchsia::driver::test::Realm_Start_Result realm_result;
-    ASSERT_EQ(driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result), ZX_OK);
+    fuchsia::driver::test::RealmArgs args;
+    args.set_use_driver_framework_v2(false);
+    ASSERT_EQ(driver_test_realm->Start(std::move(args), &realm_result), ZX_OK);
     ASSERT_FALSE(realm_result.is_err());
 
     fidl::InterfaceHandle<fuchsia::io::Node> dev;
