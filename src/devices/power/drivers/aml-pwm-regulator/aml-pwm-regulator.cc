@@ -4,9 +4,10 @@
 
 #include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator.h"
 
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/fdf/dispatcher.h>
+
+#include "src/devices/power/drivers/aml-pwm-regulator/aml-pwm-regulator-bind.h"
 
 namespace aml_pwm_regulator {
 

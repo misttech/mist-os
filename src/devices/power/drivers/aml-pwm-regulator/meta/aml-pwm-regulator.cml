@@ -15,14 +15,5 @@
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
-    capabilities: [
-        { service: "fuchsia.hardware.vreg.Service" },
-    ],
     use: [],
-    expose: [
-        {
-            service: "fuchsia.hardware.vreg.Service",
-            from: "self",
-        },
-    ],
 }
