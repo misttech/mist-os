@@ -10,7 +10,6 @@ use {
     fidl_fuchsia_hwinfo,
     fidl_fuchsia_intl::{LocaleId, RegulatoryDomain},
     fidl_fuchsia_io as fio,
-    fuchsia_syslog::{self, fx_log_err, fx_log_warn},
     serde::{Deserialize, Serialize},
     std::{fs::File, io},
 };
@@ -69,7 +68,7 @@ impl DeviceInfo {
         device_info.serial_number = match read_factory_file(SERIAL_TXT, proxy_handle).await {
             Ok(content) => Some(content),
             Err(err) => {
-                fx_log_err!("Failed to read factory file {}: {}", SERIAL_TXT.to_string(), err);
+                tracing::error!("Failed to read factory file {}: {}", SERIAL_TXT.to_string(), err);
                 None
             }
         };
@@ -130,9 +129,9 @@ impl BoardInfo {
 
     pub fn load() -> Self {
         let mut board_info = BoardInfo::read_config(BOARD_CONFIG_JSON_FILE).unwrap_or_else(|err| {
-            fx_log_err!("Failed to read board_config.json due to {}", err);
+            tracing::error!("Failed to read board_config.json due to {}", err);
             BoardInfo::read_config(DEFAULT_BOARD_CONFIG_JSON_FILE).unwrap_or_else(|err| {
-                fx_log_err!("Failed to read default_board_config.json due to {}", err);
+                tracing::error!("Failed to read default_board_config.json due to {}", err);
                 BoardInfo { name: None, revision: None, cpu_architecture: None }
             })
         });
@@ -270,10 +269,10 @@ impl ProductInfo {
                     self.audio_amplifier = Some(value.to_owned());
                 }
                 _ => {
-                    fx_log_warn!("hw.txt dictionary values {} - {}", key, value.to_owned());
+                    tracing::warn!("hw.txt dictionary values {} - {}", key, value.to_owned());
                 }
             }
-            fx_log_warn!("hw.txt line: {}={}", key, filtered_value);
+            tracing::warn!("hw.txt line: {}={}", key, filtered_value);
         }
         Ok(())
     }
@@ -294,16 +293,16 @@ impl ProductInfo {
     pub async fn load(proxy_handle: &MiscFactoryStoreProviderProxy) -> Self {
         let mut product_info = ProductInfo::new();
         if let Err(err) = product_info.load_from_config_data(PRODUCT_CONFIG_JSON_FILE) {
-            fx_log_err!("Failed to load product_config.json due to {}", err);
+            tracing::error!("Failed to load product_config.json due to {}", err);
             if let Err(err) = product_info.load_from_config_data(DEFAULT_PRODUCT_CONFIG_JSON_FILE) {
-                fx_log_err!("Failed to load default_product_config.json due to {}", err);
+                tracing::error!("Failed to load default_product_config.json due to {}", err);
             }
         }
         if let Err(err) = product_info.load_from_hw_file(HW_TXT, proxy_handle).await {
-            fx_log_err!("Failed to load hw.txt due to {}", err);
+            tracing::error!("Failed to load hw.txt due to {}", err);
         }
         if let Err(err) = product_info.load_from_locale_list(LOCALE_LIST_FILE, proxy_handle).await {
-            fx_log_err!("Failed to load locale_list.txt due to {}", err);
+            tracing::error!("Failed to load locale_list.txt due to {}", err);
         }
         product_info
     }

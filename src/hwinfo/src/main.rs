@@ -10,10 +10,8 @@ use {
     config::{BoardInfo, DeviceInfo, ProductInfo},
     fidl_fuchsia_factory::MiscFactoryStoreProviderMarker,
     fidl_fuchsia_hwinfo::{BoardRequestStream, DeviceRequestStream, ProductRequestStream},
-    fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_component::server::ServiceFs,
-    fuchsia_syslog::{self, fx_log_info},
     futures::prelude::*,
     hwinfo_server::{
         spawn_board_info_server, spawn_device_info_server, spawn_product_info_server,
@@ -28,10 +26,9 @@ enum IncomingServices {
     BoardInfo(BoardRequestStream),
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["hwinfo"])]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init_with_tags(&["hwinfo"])?;
-    fx_log_info!("Initiating Hwinfo Server...");
+    tracing::info!("Initiating Hwinfo Server...");
     let proxy = connect_to_protocol::<MiscFactoryStoreProviderMarker>()
         .expect("Failed to connect to MiscFactoryStoreProvider service");
     // Loading Device Info
