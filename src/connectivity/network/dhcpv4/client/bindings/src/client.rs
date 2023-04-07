@@ -97,7 +97,7 @@ impl dhcp_client_core::Clock for Clock {
 /// Encapsulates all DHCP client state.
 struct Client {
     config: dhcp_client_core::ClientConfig,
-    core: dhcp_client_core::State,
+    core: dhcp_client_core::State<fuchsia_async::Time>,
     rng: rand::rngs::StdRng,
     stop_receiver: mpsc::UnboundedReceiver<()>,
 }

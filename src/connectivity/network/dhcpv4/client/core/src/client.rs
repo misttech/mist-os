@@ -30,29 +30,29 @@ pub enum ExitReason {
 }
 
 /// All possible core state machine states.
-pub enum State {
+pub enum State<I> {
     Init(Init),
-    Selecting(Selecting),
-    Requesting(Requesting),
+    Selecting(Selecting<I>),
+    Requesting(Requesting<I>),
 }
 
 /// The next step to take after running the core state machine for one step.
-pub enum Step {
-    NextState(State),
+pub enum Step<I> {
+    NextState(State<I>),
     Exit(ExitReason),
 }
 
-impl State {
-    pub async fn run(
+impl<I: deps::Instant> State<I> {
+    pub async fn run<C: deps::Clock<Instant = I>>(
         &self,
         config: &ClientConfig,
         packet_socket_provider: &impl deps::PacketSocketProvider,
         rng: &mut impl deps::RngProvider,
-        clock: &impl deps::Clock,
+        clock: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
-    ) -> Result<Step, Error> {
+    ) -> Result<Step<I>, Error> {
         match self {
-            State::Init(init) => Ok(Step::NextState(State::Selecting(init.do_init(rng)))),
+            State::Init(init) => Ok(Step::NextState(State::Selecting(init.do_init(rng, clock)))),
             State::Selecting(selecting) => match selecting
                 .do_selecting(config, packet_socket_provider, rng, clock, stop_receiver)
                 .await?
@@ -69,7 +69,7 @@ impl State {
     }
 }
 
-impl Default for State {
+impl<I> Default for State<I> {
     fn default() -> Self {
         State::Init(Init::default())
     }
@@ -121,12 +121,23 @@ struct TransactionId(
 pub struct Init {}
 
 impl Init {
-    /// Generates a random transaction ID, and transitions to Selecting.
-    pub fn do_init(&self, rng: &mut impl deps::RngProvider) -> Selecting {
+    /// Generates a random transaction ID, records the starting time, and
+    /// transitions to Selecting.
+    pub fn do_init<C: deps::Clock>(
+        &self,
+        rng: &mut impl deps::RngProvider,
+        clock: &C,
+    ) -> Selecting<C::Instant> {
         let discover_options = DiscoverOptions {
             xid: TransactionId(NonZeroU32::new(rng.get_rng().gen_range(1..=u32::MAX)).unwrap()),
         };
-        Selecting { discover_options }
+        Selecting {
+            discover_options,
+            // Per RFC 2131 section 4.4.1, "The client records its own local time
+            // for later use in computing the lease expiration" when it starts
+            // sending DHCPDISCOVERs.
+            start_time: clock.now(),
+        }
     }
 }
 
@@ -238,37 +249,40 @@ fn build_discover(
 }
 
 #[derive(Debug)]
-pub enum SelectingOutcome {
+pub enum SelectingOutcome<I> {
     GracefulShutdown,
-    Requesting(Requesting),
+    Requesting(Requesting<I>),
 }
 
 /// The Selecting state as depicted in the state-transition diagram in [RFC 2131].
 ///
 /// [RFC 2131]: https://www.rfc-editor.org/rfc/inline-errata/rfc2131.html#section-4.4
-pub struct Selecting {
+pub struct Selecting<I> {
     discover_options: DiscoverOptions,
+    // The time at which the DHCP transaction was initiated (used as the offset
+    // from which lease expiration times are computed).
+    start_time: I,
 }
 
-impl Selecting {
+impl<I: deps::Instant> Selecting<I> {
     /// Executes the Selecting state.
     ///
     /// Transmits (and retransmits, if necessary) DHCPDISCOVER messages, and
     /// receives DHCPOFFER messages, on a packet socket. Tries to select a
     /// DHCPOFFER. If successful, transitions to Requesting.
-    pub async fn do_selecting(
+    pub async fn do_selecting<C: deps::Clock<Instant = I>>(
         &self,
         client_config: &ClientConfig,
         packet_socket_provider: &impl deps::PacketSocketProvider,
         rng: &mut impl deps::RngProvider,
-        time: &impl deps::Clock,
+        time: &C,
         stop_receiver: &mut mpsc::UnboundedReceiver<()>,
-    ) -> Result<SelectingOutcome, Error> {
+    ) -> Result<SelectingOutcome<I>, Error> {
         // TODO(https://fxbug.dev/124724): avoid dropping/recreating the packet
         // socket unnecessarily by taking an `&impl
         // deps::Socket<net_types::ethernet::Mac>` here instead.
         let socket = packet_socket_provider.get_packet_socket().await.map_err(Error::Socket)?;
-        let Selecting { discover_options } = self;
+        let Selecting { discover_options, start_time } = self;
         let message = build_discover(client_config, discover_options);
 
         let message = crate::parse::serialize_dhcp_message_to_ip_packet(
@@ -329,6 +343,7 @@ impl Selecting {
                 Ok(SelectingOutcome::Requesting(Requesting {
                     discover_options: discover_options.clone(),
                     fields_from_offer_to_use_in_request,
+                    start_time: *start_time,
                 }))
             }
         }
@@ -381,16 +396,17 @@ fn validate_message(
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Requesting {
+pub struct Requesting<I> {
     discover_options: DiscoverOptions,
     fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest,
+    start_time: I,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::deps::testutil::{
-        run_until_next_timers_fire, FakeRngProvider, FakeSocket, FakeSocketProvider,
+        advance, run_until_next_timers_fire, FakeRngProvider, FakeSocket, FakeSocketProvider,
         FakeTimeController,
     };
     use crate::deps::{Clock as _, DatagramInfo, Socket as _};
@@ -441,11 +457,21 @@ mod test {
     #[test]
     fn do_init_uses_rng() {
         let mut rng = FakeRngProvider::new(0);
-        let Selecting { discover_options: DiscoverOptions { xid: xid_a } } =
-            Init {}.do_init(&mut rng);
-        let Selecting { discover_options: DiscoverOptions { xid: xid_b } } =
-            Init {}.do_init(&mut rng);
+        let time = FakeTimeController::new();
+        let arbitrary_start_time = std::time::Duration::from_secs(42);
+        advance(&time, arbitrary_start_time);
+
+        let Selecting {
+            discover_options: DiscoverOptions { xid: xid_a },
+            start_time: start_time_a,
+        } = Init {}.do_init(&mut rng, &time);
+        let Selecting {
+            discover_options: DiscoverOptions { xid: xid_b },
+            start_time: start_time_b,
+        } = Init {}.do_init(&mut rng, &time);
         assert_ne!(xid_a, xid_b);
+        assert_eq!(start_time_a, arbitrary_start_time);
+        assert_eq!(start_time_b, arbitrary_start_time);
     }
 
     #[test]
@@ -457,6 +483,7 @@ mod test {
 
         let selecting = Selecting {
             discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            start_time: std::time::Duration::from_secs(0),
         };
         let mut rng = FakeRngProvider::new(0);
 
@@ -521,6 +548,7 @@ mod test {
 
         let selecting = Selecting {
             discover_options: DiscoverOptions { xid: TransactionId(nonzero_ext::nonzero!(1u32)) },
+            start_time: std::time::Duration::from_secs(0),
         };
         let mut rng = FakeRngProvider::new(0);
 
@@ -669,13 +697,17 @@ mod test {
         initialize_logging();
 
         let mut rng = FakeRngProvider::new(0);
-        let selecting = Init {}.do_init(&mut rng);
+        let time = FakeTimeController::new();
+
+        let arbitrary_start_time = std::time::Duration::from_secs(42);
+        advance(&time, arbitrary_start_time);
+
+        let selecting = Init {}.do_init(&mut rng, &time);
         let TransactionId(xid) = selecting.discover_options.xid;
 
         let (server_end, client_end) = FakeSocket::<net_types::ethernet::Mac>::new_pair();
         let test_socket_provider = FakeSocketProvider::new(client_end);
 
-        let time = FakeTimeController::new();
         let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
 
         let client_config = test_client_config();
@@ -843,7 +875,8 @@ mod test {
                     ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
                         .try_into()
                         .expect("should be specified"),
-                }
+                },
+                start_time: arbitrary_start_time,
             }
         );
     }
