@@ -200,7 +200,9 @@ impl<R> TestEnvBuilder<R> {
                 self.packages
                     .iter()
                     .fold(
-                        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH).add_package(&update),
+                        RepositoryBuilder::from_template_dir(EMPTY_REPO_PATH)
+                            .add_package(&update)
+                            .delivery_blob_type(1),
                         |repo, package| repo.add_package(package),
                     )
                     .build()

@@ -85,6 +85,7 @@ fuchsia_test_package("isolated-swd-tests") {
     "//src/storage/bin/blobfs",
     "//src/storage/blobfs:decompressor-sandbox",
     "//src/storage/testing:storage_driver_test_realm",
+    "//src/storage/tools/blobfs-compression",
     "//src/sys/pkg/bin/fake-system-update-committer",
     "//src/sys/pkg/bin/pm:pm_bin",
     "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
