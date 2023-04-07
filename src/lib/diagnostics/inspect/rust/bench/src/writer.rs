@@ -427,7 +427,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         );
     });
     bench = bench.with_function("Heap/extend", |b| {
-        b.iter_with_large_setup(
+        b.iter_batched_ref(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
                 let mut heap = Heap::new(container).unwrap();
@@ -436,7 +436,8 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
                 }
                 heap
             },
-            |mut heap| heap.allocate_block(2048).unwrap(),
+            |heap| heap.allocate_block(2048).unwrap(),
+            criterion::BatchSize::LargeInput,
         );
     });
     bench = bench.with_function("Heap/free", |b| {
