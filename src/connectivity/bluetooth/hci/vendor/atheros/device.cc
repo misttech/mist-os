@@ -23,7 +23,6 @@
 namespace btatheros {
 
 using ::bt::BufferView;
-using ::bt::PacketView;
 
 // hard coded for Qualcomm Atheros chipset 0CF3:E300
 static constexpr size_t GET_TARGET_VERSION = 0x09;
@@ -35,7 +34,9 @@ static constexpr size_t SYSCFG_UPDATED = 0x40;
 static constexpr size_t RAMPATCH_HDR = 28;
 static constexpr size_t NVM_HDR = 4;
 
-static zx_protocol_device_t dev_proto = {
+namespace {
+
+constexpr zx_protocol_device_t dev_proto = {
     .version = DEVICE_OPS_VERSION,
     .get_protocol = [](void* ctx, uint32_t proto_id, void* protocol) -> zx_status_t {
       return static_cast<Device*>(ctx)->DdkGetProtocol(proto_id, protocol);
@@ -52,6 +53,15 @@ static zx_protocol_device_t dev_proto = {
         },
 };
 
+void interrupt_complete(void* ctx, usb_request_t* req) {
+  if (ctx != nullptr) {
+    sync_completion_t* completion = static_cast<sync_completion_t*>(ctx);
+    sync_completion_signal(completion);
+  }
+}
+
+}  // namespace
+
 Device::Device(zx_device_t* device, bt_hci_protocol_t* hci, usb_protocol_t* usb)
     : parent_(device), hci_(*hci), usb_(*usb), firmware_loaded_(false) {}
 
@@ -65,13 +75,6 @@ zx_status_t Device::Bind() {
   };
 
   return device_add(parent_, &args, &zxdev_);
-}
-
-static void interrupt_complete(void* ctx, usb_request_t* req) {
-  if (ctx != nullptr) {
-    sync_completion_t* completion = (sync_completion_t*)ctx;
-    sync_completion_signal(completion);
-  }
 }
 
 zx_status_t Device::LoadNVM(const qca_version& version) {
@@ -97,7 +100,7 @@ zx_status_t Device::LoadNVM(const qca_version& version) {
   size_t sent = 0;
 
   result = usb_control_out(&usb_, USB_TYPE_VENDOR, DFU_DOWNLOAD, 0, 0, ZX_TIME_INFINITE,
-                           (uint8_t*)file.view(0, size).data(), size);
+                           const_cast<uint8_t*>(file.view(0, size).data()), size);
   if (result != ZX_OK) {
     return result;
   }
@@ -162,7 +165,7 @@ zx_status_t Device::LoadRAM(const qca_version& version) {
   BufferView file(reinterpret_cast<void*>(fw_addr), fw_size);
 
   result = usb_control_out(&usb_, USB_TYPE_VENDOR, DFU_DOWNLOAD, 0, 0, ZX_TIME_INFINITE,
-                           (uint8_t*)file.view(0, size).data(), size);
+                           const_cast<uint8_t*>(file.view(0, size).data()), size);
   usb_request_t* req;
   result = usb_request_alloc(&req, size, bulk_out_addr_, parent_req_size_);
   if (result != ZX_OK) {

@@ -19,7 +19,6 @@
 
 namespace fdh = fuchsia_driver_host;
 namespace fio = fuchsia_io;
-namespace frunner = fuchsia_component_runner;
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -226,7 +225,7 @@ uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& prog
 
   uint32_t opts = 0;
   if (default_dispatcher_opts.is_ok()) {
-    for (auto opt : *default_dispatcher_opts) {
+    for (const auto& opt : *default_dispatcher_opts) {
       if (opt == "allow_sync_calls") {
         opts |= FDF_DISPATCHER_OPTION_ALLOW_SYNC_CALLS;
       } else {
@@ -237,7 +236,8 @@ uint32_t ExtractDefaultDispatcherOpts(const fuchsia_data::wire::Dictionary& prog
   return opts;
 }
 
-zx::result<fdf::Dispatcher> CreateDispatcher(fbl::RefPtr<Driver> driver, uint32_t dispatcher_opts) {
+zx::result<fdf::Dispatcher> CreateDispatcher(const fbl::RefPtr<Driver>& driver,
+                                             uint32_t dispatcher_opts) {
   auto name = GetManifest(driver->url());
   // The dispatcher must be shutdown before the dispatcher is destroyed.
   // Usually we will wait for the callback from |fdf_env::DriverShutdown| before destroying
@@ -252,7 +252,8 @@ zx::result<fdf::Dispatcher> CreateDispatcher(fbl::RefPtr<Driver> driver, uint32_
   // Currently we only support synchronized dispatchers for the default dispatcher.
   return fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
       driver.get(), fdf::SynchronizedDispatcher::Options{.value = dispatcher_opts},
-      fbl::StringPrintf("%.*s-default-%p", (int)name.size(), name.data(), driver.get()),
+      fbl::StringPrintf("%.*s-default-%p", static_cast<int>(name.size()), name.data(),
+                        driver.get()),
       [driver_ref = driver](fdf_dispatcher_t* dispatcher) {});
 }
 

@@ -22,7 +22,6 @@ namespace ftest = fuchsia::bluetooth::test;
 
 using bt::DeviceAddress;
 using bt::testing::FakeController;
-using bt::testing::FakePeer;
 
 namespace bt_hci_virtual {
 namespace {
@@ -72,18 +71,9 @@ fuchsia::bluetooth::AddressType LeOwnAddressTypeToFidl(
   return fuchsia::bluetooth::AddressType::PUBLIC;
 }
 
-}  // namespace
+constexpr EmulatorDevice* DEV(void* ctx) { return static_cast<EmulatorDevice*>(ctx); }
 
-EmulatorDevice::EmulatorDevice(zx_device_t* device)
-    : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
-      parent_(device),
-      hci_dev_(nullptr),
-      emulator_dev_(nullptr),
-      binding_(this) {}
-
-static inline constexpr EmulatorDevice* DEV(void* ctx) { return static_cast<EmulatorDevice*>(ctx); }
-
-static zx_protocol_device_t bt_emulator_device_ops = {
+constexpr zx_protocol_device_t bt_emulator_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
       return DEV(ctx)->GetProtocol(proto_id, out_proto);
@@ -103,7 +93,7 @@ static zx_protocol_device_t bt_emulator_device_ops = {
 // device is strictly tied to the bt-emulator device (i.e. it can never out-live
 // bt-emulator). We handle its destruction in the bt_emulator_device_ops
 // messages.
-static zx_protocol_device_t bt_hci_device_ops = {
+constexpr zx_protocol_device_t bt_hci_device_ops = {
     .version = DEVICE_OPS_VERSION,
     .get_protocol = [](void* ctx, uint32_t proto_id, void* out_proto) -> zx_status_t {
       return DEV(ctx)->GetProtocol(proto_id, out_proto);
@@ -117,7 +107,7 @@ static zx_protocol_device_t bt_hci_device_ops = {
         },
 };
 
-static bt_hci_protocol_ops_t hci_protocol_ops = {
+constexpr bt_hci_protocol_ops_t hci_protocol_ops = {
     .open_command_channel = [](void* ctx, zx_handle_t chan) -> zx_status_t {
       return DEV(ctx)->OpenChan(Channel::COMMAND, chan);
     },
@@ -137,6 +127,15 @@ static bt_hci_protocol_ops_t hci_protocol_ops = {
       return DEV(ctx)->OpenChan(Channel::SNOOP, chan);
     },
 };
+
+}  // namespace
+
+EmulatorDevice::EmulatorDevice(zx_device_t* device)
+    : loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      parent_(device),
+      hci_dev_(nullptr),
+      emulator_dev_(nullptr),
+      binding_(this) {}
 
 zx_status_t EmulatorDevice::Bind(std::string_view name) {
   logf(TRACE, "bind\n");
@@ -252,10 +251,10 @@ zx_status_t EmulatorDevice::GetProtocol(uint32_t proto_id, void* out_proto) {
   return ZX_OK;
 }
 
-zx_status_t EmulatorDevice::OpenChan(Channel chan_type, zx_handle_t in_h) {
+zx_status_t EmulatorDevice::OpenChan(Channel chan_type, zx_handle_t chan) {
   logf(TRACE, "open HCI channel\n");
 
-  zx::channel in(in_h);
+  zx::channel in(chan);
 
   if (chan_type == Channel::COMMAND) {
     async::PostTask(loop_.dispatcher(),

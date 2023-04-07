@@ -42,7 +42,7 @@ class WireWeakAsyncClientImpl<TestProtocol> : public fidl::internal::ClientImplB
   void SomeWireMethod() {
     fidl_testing::GoodMessage msg;
     fidl::Status result = _client_base()->MakeSyncCallWith(
-        [&](std::shared_ptr<fidl::internal::AnyTransport> transport) {
+        [&](const std::shared_ptr<fidl::internal::AnyTransport>& transport) {
           // The input to this call has no handles.
           ZX_ASSERT(msg.message().handle_actual() == 0);
           auto copied_bytes = msg.message().CopyBytes();

@@ -32,8 +32,6 @@ class GoodMessage {
     return fidl::OutgoingMessage::FromEncodedCMessage(&c_msg);
   }
 
-  const fidl_type_t* type() const { return nullptr; }
-
  private:
   FIDL_ALIGNDECL fidl_message_header_t content_ = {};
 };

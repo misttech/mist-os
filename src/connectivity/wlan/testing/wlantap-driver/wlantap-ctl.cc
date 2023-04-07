@@ -30,7 +30,7 @@ namespace wlan_tap = fuchsia_wlan_tap::wire;
 constexpr size_t kWlantapPhyConfigBufferSize =
     fidl::MaxSizeInChannel<wlan_tap::WlantapPhyConfig, fidl::MessageDirection::kSending>();
 
-static fidl::Arena<kWlantapPhyConfigBufferSize> phy_config_arena;
+fidl::Arena<kWlantapPhyConfigBufferSize> phy_config_arena;
 
 class WlantapDriver {
  private:
@@ -39,23 +39,18 @@ class WlantapDriver {
 };
 
 struct WlantapCtl : fidl::WireServer<fuchsia_wlan_tap::WlantapCtl> {
-  WlantapCtl(WlantapDriver* driver) : driver_(driver) {}
+  explicit WlantapCtl(WlantapDriver* driver) : driver_(driver) {}
 
   static void DdkRelease(void* ctx) { delete static_cast<WlantapCtl*>(ctx); }
 
   void CreatePhy(CreatePhyRequestView request, CreatePhyCompleter::Sync& completer) override {
-    zx_status_t status;
     phy_config_arena.Reset();
 
     auto natural_config = fidl::ToNatural(request->config);
     auto wire_config = fidl::ToWire(phy_config_arena, std::move(natural_config));
     auto phy_config = std::make_shared<wlan_tap::WlantapPhyConfig>(wire_config);
 
-    if ((status = wlan::CreatePhy(device_, request->proxy.TakeChannel(), phy_config)) != ZX_OK) {
-      completer.Reply(status);
-    } else {
-      completer.Reply(ZX_OK);
-    }
+    completer.Reply(wlan::CreatePhy(device_, request->proxy.TakeChannel(), phy_config));
   }
 
   static void DdkMessage(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
@@ -95,7 +90,7 @@ zx_status_t wlantapctl_bind(void* ctx, zx_device_t* parent) {
     return status;
   }
   // Transfer ownership to devmgr
-  wlantapctl.release();
+  [[maybe_unused]] WlantapCtl* ptr = wlantapctl.release();
   return ZX_OK;
 }
 

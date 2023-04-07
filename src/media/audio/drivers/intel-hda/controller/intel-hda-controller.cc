@@ -26,8 +26,7 @@
 #include "src/media/audio/drivers/intel-hda/controller/intel_hda-bind.h"
 #include "utils.h"
 
-namespace audio {
-namespace intel_hda {
+namespace audio::intel_hda {
 
 // static member variable declaration
 
@@ -59,11 +58,11 @@ ihda_codec_protocol_ops_t IntelHDAController::CODEC_PROTO_THUNKS = {
         },
 };
 
-IntelHDAController::IntelHDAController(acpi::Client acpi)
+IntelHDAController::IntelHDAController(acpi::Client client)
     : state_(State::STARTING),
       id_(device_id_gen_.fetch_add(1u)),
       loop_(&kAsyncLoopConfigNeverAttachToThread),
-      acpi_(std::move(acpi)) {
+      acpi_(std::move(client)) {
   snprintf(log_prefix_, sizeof(log_prefix_), "IHDA Controller (unknown BDF)");
   loop_->StartThread("intel-hda-controller-loop");
 }
@@ -161,7 +160,7 @@ void IntelHDAController::ReturnStreamLocked(fbl::RefPtr<IntelHDAStream>&& ptr) {
 uint8_t IntelHDAController::AllocateStreamTagLocked(bool input) {
   uint16_t& tag_pool = input ? free_input_tags_ : free_output_tags_;
 
-  for (uint8_t ret = 1; ret < (sizeof(tag_pool) << 3); ++ret) {
+  for (size_t ret = 1; ret < (sizeof(tag_pool) << 3); ++ret) {
     if (tag_pool & (1u << ret)) {
       tag_pool = static_cast<uint16_t>(tag_pool & ~(1u << ret));
       return ret;
@@ -418,7 +417,6 @@ static constexpr zx_driver_ops_t driver_ops = []() {
   return ops;
 }();
 
-}  // namespace intel_hda
-}  // namespace audio
+}  // namespace audio::intel_hda
 
 ZIRCON_DRIVER(intel_hda, audio::intel_hda::driver_ops, "zircon", "0.1");

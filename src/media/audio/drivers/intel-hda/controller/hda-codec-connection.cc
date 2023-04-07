@@ -19,8 +19,7 @@
 #include "intel-hda-stream.h"
 #include "utils.h"
 
-namespace audio {
-namespace intel_hda {
+namespace audio::intel_hda {
 
 #define SET_DEVICE_PROP(_prop, _value)                                                             \
   do {                                                                                             \
@@ -85,8 +84,8 @@ fbl::RefPtr<HdaCodecConnection> HdaCodecConnection::Create(IntelHDAController& c
 zx_status_t HdaCodecConnection::Startup() {
   ZX_DEBUG_ASSERT(state_ == State::PROBING);
 
-  for (size_t i = 0; i < std::size(PROBE_COMMANDS); ++i) {
-    CodecCommand cmd(id(), 0u, PROBE_COMMANDS[i].verb);
+  for (const auto& probe_cmd : PROBE_COMMANDS) {
+    CodecCommand cmd(id(), 0u, probe_cmd.verb);
     auto job = CodecCmdJobAllocator::New(cmd);
 
     if (job == nullptr) {
@@ -105,7 +104,8 @@ zx_status_t HdaCodecConnection::Startup() {
 }
 
 void HdaCodecConnection::SendCORBResponse(const fbl::RefPtr<Channel>& channel,
-                                          const CodecResponse& resp, uint32_t transaction_id) {
+                                          const CodecResponse& resp,
+                                          uint32_t transaction_id) const {
   ZX_DEBUG_ASSERT(channel != nullptr);
   ihda_codec_send_corb_cmd_resp_t payload;
 
@@ -162,7 +162,7 @@ void HdaCodecConnection::ProcessUnsolicitedResponse(const CodecResponse& resp) {
     SendCORBResponse(codec_driver_channel, resp);
 }
 
-void HdaCodecConnection::ProcessWakeupEvt() {
+void HdaCodecConnection::ProcessWakeupEvt() const {
   // TODO(johngro) : handle wakeup events.  Wakeup events are delivered for
   // two reasons.
   //
@@ -449,7 +449,8 @@ void HdaCodecConnection::ProcessCodecDeactivate() {
   }
 }
 
-zx_status_t HdaCodecConnection::ProcessGetIDs(Channel* channel, const ihda_proto::GetIDsReq& req) {
+zx_status_t HdaCodecConnection::ProcessGetIDs(Channel* channel,
+                                              const ihda_proto::GetIDsReq& req) const {
   ZX_DEBUG_ASSERT(channel != nullptr);
 
   ihda_proto::GetIDsResp resp;
@@ -674,5 +675,4 @@ void HdaCodecConnection::GetDispatcherChannelSignalled(async_dispatcher_t* dispa
   }
 }
 
-}  // namespace intel_hda
-}  // namespace audio
+}  // namespace audio::intel_hda

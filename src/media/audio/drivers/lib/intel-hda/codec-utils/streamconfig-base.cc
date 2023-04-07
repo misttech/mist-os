@@ -125,7 +125,7 @@ void IntelHDAStreamConfigBase::GetSupportedFormats(
   fbl::Vector<FidlCompatibleFormats> fidl_compatible_formats;
   for (auto& i : supported_formats_) {
     auto formats = audio::utils::GetAllFormats(i.sample_formats);
-    ZX_ASSERT(formats.size() >= 1);
+    ZX_ASSERT(!formats.empty());
     for (auto& j : formats) {
       fbl::Vector<uint32_t> rates;
       // Ignore flags if min and max are equal.
@@ -166,14 +166,14 @@ void IntelHDAStreamConfigBase::GetSupportedFormats(
     fidl::VectorView<audio_fidl::wire::ChannelSet> channel_sets(allocator,
                                                                 src.number_of_channels.size());
 
-    for (uint8_t j = 0; j < src.number_of_channels.size(); ++j) {
+    for (size_t j = 0; j < src.number_of_channels.size(); ++j) {
       fidl::VectorView<audio_fidl::wire::ChannelAttributes> all_attributes(
           allocator, src.number_of_channels[j]);
       channel_sets[j].Allocate(allocator);
-      channel_sets[j].set_attributes(allocator, std::move(all_attributes));
+      channel_sets[j].set_attributes(allocator, all_attributes);
     }
     formats.Allocate(allocator);
-    formats.set_channel_sets(allocator, std::move(channel_sets));
+    formats.set_channel_sets(allocator, channel_sets);
     formats.set_sample_formats(allocator,
                                ::fidl::VectorView<audio_fidl::wire::SampleFormat>::FromExternal(
                                    src.sample_formats.data(), src.sample_formats.size()));
@@ -186,10 +186,10 @@ void IntelHDAStreamConfigBase::GetSupportedFormats(
         allocator, ::fidl::VectorView<uint8_t>::FromExternal(src.valid_bits_per_sample.data(),
                                                              src.valid_bits_per_sample.size()));
     fidl_formats[i].Allocate(allocator);
-    fidl_formats[i].set_pcm_supported_formats(allocator, std::move(formats));
+    fidl_formats[i].set_pcm_supported_formats(allocator, formats);
   }
 
-  completer.Reply(std::move(fidl_formats));
+  completer.Reply(fidl_formats);
 }
 
 void IntelHDAStreamConfigBase::CreateRingBuffer(
@@ -226,7 +226,7 @@ void IntelHDAStreamConfigBase::CreateRingBuffer(
     return;
   }
 
-  res = IntelHDAStreamBase::CreateRingBufferLocked(std::move(format), std::move(ring_buffer));
+  res = IntelHDAStreamBase::CreateRingBufferLocked(format, std::move(ring_buffer));
   if (res != ZX_OK) {
     completer.Close(res);
   }
@@ -251,7 +251,7 @@ void IntelHDAStreamConfigBase::WatchGainState(
     }
     gain_state.set_gain_db(cur_gain_state_.cur_gain);
     channel->last_reported_gain_state_ = cur_gain_state_;
-    channel->gain_completer_->Reply(std::move(gain_state));
+    channel->gain_completer_->Reply(gain_state);
     channel->gain_completer_.reset();
   }
 }
@@ -307,7 +307,7 @@ void IntelHDAStreamConfigBase::SetGain(audio_fidl::wire::GainState target_state,
   }
   for (auto& channel : stream_channels_) {
     if (channel.gain_completer_) {
-      channel.gain_completer_->Reply(std::move(target_state));
+      channel.gain_completer_->Reply(target_state);
       channel.gain_completer_.reset();
     }
   }
@@ -331,7 +331,7 @@ void IntelHDAStreamConfigBase::WatchPlugState(
     plug_state.set_plugged(plugged).set_plug_state_time(allocator, plug.plug_state_time);
     channel->last_reported_plugged_state_ =
         plugged ? StreamChannel::Plugged::kPlugged : StreamChannel::Plugged::kUnplugged;
-    channel->plug_completer_->Reply(std::move(plug_state));
+    channel->plug_completer_->Reply(plug_state);
     channel->plug_completer_.reset();
   }
 }
@@ -342,7 +342,7 @@ void IntelHDAStreamConfigBase::NotifyPlugStateLocked(bool plugged, int64_t plug_
       fidl::Arena allocator;
       audio_fidl::wire::PlugState plug_state(allocator);
       plug_state.set_plugged(plugged).set_plug_state_time(allocator, plug_time);
-      channel.plug_completer_->Reply(std::move(plug_state));
+      channel.plug_completer_->Reply(plug_state);
       channel.plug_completer_.reset();
     }
   }
@@ -397,7 +397,7 @@ void IntelHDAStreamConfigBase::GetProperties(
   } else if (plug.flags & AUDIO_PDNF_HARDWIRED) {
     response.set_plug_detect_capabilities(audio_fidl::wire::PlugDetectCapabilities::kHardwired);
   }
-  completer.Reply(std::move(response));
+  completer.Reply(response);
 }
 
 void IntelHDAStreamConfigBase::OnGetGainLocked(audio_proto::GainState* out_resp) {

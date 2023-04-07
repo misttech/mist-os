@@ -29,8 +29,7 @@
 #include "debug-logging.h"
 #include "intel-hda-stream.h"
 
-namespace audio {
-namespace intel_hda {
+namespace audio::intel_hda {
 
 class IntelHDAController;
 struct CodecResponse;
@@ -53,7 +52,7 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
   zx_status_t Startup();
   void ProcessSolicitedResponse(const CodecResponse& resp, std::unique_ptr<CodecCmdJob>&& job);
   void ProcessUnsolicitedResponse(const CodecResponse& resp);
-  void ProcessWakeupEvt();
+  void ProcessWakeupEvt() const;
 
   // TODO (johngro) : figure out shutdown... Currently, this expected to
   // execute synchronously, which does not allow codec drivers any opportunity
@@ -99,7 +98,7 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
                                      zx_status_t status, const zx_packet_signal_t* signal);
 
   void SendCORBResponse(const fbl::RefPtr<Channel>& channel, const CodecResponse& resp,
-                        uint32_t transaction_id = IHDA_INVALID_TRANSACTION_ID);
+                        uint32_t transaction_id = IHDA_INVALID_TRANSACTION_ID) const;
 
   // Parsers for device probing
   zx_status_t ParseVidDid(const CodecResponse& resp);
@@ -113,7 +112,7 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
   zx_status_t ProcessUserRequest(Channel* channel);
   zx_status_t ProcessCodecRequest(Channel* channel);
   void ProcessCodecDeactivate();
-  zx_status_t ProcessGetIDs(Channel* channel, const ihda_proto::GetIDsReq& req);
+  zx_status_t ProcessGetIDs(Channel* channel, const ihda_proto::GetIDsReq& req) const;
   zx_status_t ProcessSendCORBCmd(Channel* channel, const ihda_proto::SendCORBCmdReq& req);
   zx_status_t ProcessRequestStream(Channel* channel, const ihda_proto::RequestStreamReq& req);
   zx_status_t ProcessReleaseStream(Channel* channel, const ihda_proto::ReleaseStreamReq& req);
@@ -158,7 +157,6 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
   async::Loop loop_;
 };
 
-}  // namespace intel_hda
-}  // namespace audio
+}  // namespace audio::intel_hda
 
 #endif  // SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_CONTROLLER_HDA_CODEC_CONNECTION_H_

@@ -21,11 +21,11 @@
 namespace tel_fake {
 
 // port info
-typedef enum {
+using DevicePacketEnum = enum {
   kChannelMsg = 1,
   kInterruptMsg,
   kTerminateMsg,
-} DevicePacketEnum;
+};
 
 // TODO (jiamingw): change the name of FIDL protocol in next CL.
 class Device : fidl::WireServer<fuchsia_hardware_telephony_transport::Qmi> {
@@ -43,7 +43,7 @@ class Device : fidl::WireServer<fuchsia_hardware_telephony_transport::Qmi> {
   void Unbind();
   void Release();
 
-  zx_status_t GetProtocol(uint32_t proto_id, void* out_proto);
+  static zx_status_t GetProtocol(uint32_t proto_id, void* out_proto);
   zx_status_t SetChannelToDevice(zx::channel transport);
   zx_status_t SetNetworkStatusToDevice(bool connected);
   zx_status_t SetSnoopChannelToDevice(

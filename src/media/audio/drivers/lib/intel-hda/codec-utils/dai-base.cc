@@ -126,7 +126,7 @@ void IntelHDADaiBase::GetDaiFormats(DaiChannel::GetDaiFormatsCompleter::Sync& co
   all_formats[0] = formats;
 
   fuchsia_hardware_audio::wire::DaiGetDaiFormatsResponse response;
-  response.dai_formats = std::move(all_formats);
+  response.dai_formats = all_formats;
   completer.Reply(::fit::ok(&response));
 }
 
@@ -155,7 +155,7 @@ void IntelHDADaiBase::GetRingBufferFormats(
   fbl::Vector<FidlCompatibleFormats> fidl_compatible_formats;
   for (auto& i : supported_formats_) {
     auto formats = audio::utils::GetAllFormats(i.sample_formats);
-    ZX_ASSERT(formats.size() >= 1);
+    ZX_ASSERT(!formats.empty());
     for (auto& j : formats) {
       fbl::Vector<uint32_t> rates;
       // Ignore flags if min and max are equal.
@@ -196,14 +196,14 @@ void IntelHDADaiBase::GetRingBufferFormats(
     fidl::VectorView<fuchsia_hardware_audio::wire::ChannelSet> channel_sets(
         allocator, src.number_of_channels.size());
 
-    for (uint8_t j = 0; j < src.number_of_channels.size(); ++j) {
+    for (size_t j = 0; j < src.number_of_channels.size(); ++j) {
       fidl::VectorView<fuchsia_hardware_audio::wire::ChannelAttributes> all_attributes(
           allocator, src.number_of_channels[j]);
       channel_sets[j].Allocate(allocator);
-      channel_sets[j].set_attributes(allocator, std::move(all_attributes));
+      channel_sets[j].set_attributes(allocator, all_attributes);
     }
     formats.Allocate(allocator);
-    formats.set_channel_sets(allocator, std::move(channel_sets));
+    formats.set_channel_sets(allocator, channel_sets);
     formats.set_sample_formats(
         allocator, ::fidl::VectorView<fuchsia_hardware_audio::wire::SampleFormat>::FromExternal(
                        src.sample_formats.data(), src.sample_formats.size()));
@@ -216,11 +216,11 @@ void IntelHDADaiBase::GetRingBufferFormats(
         allocator, ::fidl::VectorView<uint8_t>::FromExternal(src.valid_bits_per_sample.data(),
                                                              src.valid_bits_per_sample.size()));
     fidl_formats[i].Allocate(allocator);
-    fidl_formats[i].set_pcm_supported_formats(allocator, std::move(formats));
+    fidl_formats[i].set_pcm_supported_formats(allocator, formats);
   }
 
   fuchsia_hardware_audio::wire::DaiGetRingBufferFormatsResponse response;
-  response.ring_buffer_formats = std::move(fidl_formats);
+  response.ring_buffer_formats = fidl_formats;
   completer.Reply(::fit::ok(&response));
 }
 
@@ -260,8 +260,7 @@ void IntelHDADaiBase::CreateRingBuffer(
     return;
   }
 
-  res = IntelHDAStreamBase::CreateRingBufferLocked(std::move(ring_buffer_format),
-                                                   std::move(ring_buffer));
+  res = IntelHDAStreamBase::CreateRingBufferLocked(ring_buffer_format, std::move(ring_buffer));
   if (res != ZX_OK) {
     completer.Close(res);
   }
@@ -290,7 +289,7 @@ void IntelHDADaiBase::GetProperties(
                                                      resp_manufacturer.strlen);
   response.set_manufacturer(fidl::ObjectView<fidl::StringView>::FromExternal(&manufacturer));
 
-  completer.Reply(std::move(response));
+  completer.Reply(response);
 }
 
 void IntelHDADaiBase::OnGetStringLocked(const audio_proto::GetStringReq& req,

@@ -119,18 +119,20 @@ TEST(ClientBindingTestCase, ParallelAsyncTxns) {
   // of the channel.
   std::vector<std::unique_ptr<TestResponseContext>> contexts;
   std::thread threads[10];
-  for (int i = 0; i < 10; ++i) {
-    contexts.emplace_back(std::make_unique<TestResponseContext>(&spy));
-    threads[i] = std::thread([context = contexts[i].get(), remote = &remote.channel(), &spy] {
-      spy.PrepareAsyncTxn(context);
-      EXPECT_TRUE(spy.IsPending(context->Txid()));
-      fidl_message_header_t hdr;
-      fidl::InitTxnHeader(&hdr, context->Txid(), 0, fidl::MessageDynamicFlags::kStrictMethod);
-      ASSERT_OK(remote->write(0, &hdr, sizeof(fidl_message_header_t), nullptr, 0));
-    });
+  for (auto& thread : threads) {
+    thread = std::thread(
+        [context = contexts.emplace_back(std::make_unique<TestResponseContext>(&spy)).get(),
+         remote = &remote.channel(), &spy] {
+          spy.PrepareAsyncTxn(context);
+          EXPECT_TRUE(spy.IsPending(context->Txid()));
+          fidl_message_header_t hdr;
+          fidl::InitTxnHeader(&hdr, context->Txid(), 0, fidl::MessageDynamicFlags::kStrictMethod);
+          ASSERT_OK(remote->write(0, &hdr, sizeof(fidl_message_header_t), nullptr, 0));
+        });
   }
-  for (int i = 0; i < 10; ++i)
-    threads[i].join();
+  for (auto& thread : threads) {
+    thread.join();
+  }
 
   // Trigger unbound handler.
   remote.reset();
@@ -216,7 +218,7 @@ TEST(ClientBindingTestCase, Events) {
 
   class EventHandler : public fidl::WireAsyncEventHandler<TestProtocol> {
    public:
-    EventHandler(sync_completion_t& unbound) : unbound_(unbound) {}
+    explicit EventHandler(sync_completion_t& unbound) : unbound_(unbound) {}
 
     void on_fidl_error(::fidl::UnbindInfo info) override {
       EXPECT_EQ(fidl::Reason::kPeerClosedWhileReading, info.reason());
@@ -233,15 +235,16 @@ TEST(ClientBindingTestCase, Events) {
 
   // In parallel, send 10 event messages from the remote end of the channel.
   std::thread threads[10];
-  for (int i = 0; i < 10; ++i) {
-    threads[i] = std::thread([remote = &remote.channel()] {
+  for (auto& thread : threads) {
+    thread = std::thread([remote = &remote.channel()] {
       fidl_message_header_t hdr;
       fidl::InitTxnHeader(&hdr, 0, 0, fidl::MessageDynamicFlags::kStrictMethod);
       ASSERT_OK(remote->write(0, &hdr, sizeof(fidl_message_header_t), nullptr, 0));
     });
   }
-  for (int i = 0; i < 10; ++i)
-    threads[i].join();
+  for (auto& thread : threads) {
+    thread.join();
+  }
 
   // Trigger unbound handler.
   remote.reset();

@@ -38,8 +38,7 @@
 #include "src/devices/lib/acpi/client.h"
 #include "utils.h"
 
-namespace audio {
-namespace intel_hda {
+namespace audio::intel_hda {
 
 class IntelHDAController : public fbl::RefCounted<IntelHDAController>,
                            public fidl::WireServer<fuchsia_hardware_intel_hda::ControllerDevice> {
@@ -241,7 +240,6 @@ class IntelHDAController : public fbl::RefCounted<IntelHDAController>,
   acpi::Client acpi_;
 };
 
-}  // namespace intel_hda
-}  // namespace audio
+}  // namespace audio::intel_hda
 
 #endif  // SRC_MEDIA_AUDIO_DRIVERS_INTEL_HDA_CONTROLLER_INTEL_HDA_CONTROLLER_H_
