@@ -91,11 +91,6 @@ func newCachedPkgRepo(ctx context.Context, repoPath, repoURL, blobURL string) (*
 	if err != nil {
 		return nil, err
 	}
-	// Create the /blobs subdirectory if it doesn't already exist.
-	blobsSubdir := filepath.Join(repoPath, "blobs")
-	if err := os.MkdirAll(blobsSubdir, os.ModePerm); err != nil {
-		return nil, err
-	}
 	return &cachedPkgRepo{
 		loggerCtx:  ctx,
 		fileServer: http.FileServer(http.Dir(repoPath)),
@@ -193,6 +188,10 @@ func (c *cachedPkgRepo) fetchFromGCS(w http.ResponseWriter, r *http.Request, loc
 	// At this point, we know that the download succeeded, so move the
 	// temporary file holding the blob into the cache.
 	tf.Close()
+	if err := os.MkdirAll(filepath.Base(localPath), os.ModePerm); err != nil {
+		c.logf("failed to create parent dir for blob %s: %s", localPath, err)
+		return
+	}
 	if err := os.Rename(tf.Name(), localPath); err != nil {
 		// This is not a fatal error, as future requests will just re-download
 		// the blob.
