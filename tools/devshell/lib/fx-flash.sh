@@ -11,8 +11,9 @@ function fx-flash {
   local serial="$1"
   local device="$2"
   local flash_manifest="$3"
-  local skip_verify="$4"
-  local no_bootloader_reboot="$5"
+  local product_bundle="$4"
+  local skip_verify="$5"
+  local no_bootloader_reboot="$6"
 
 
   if [[ $num_gb_devices > 1 ]]; then
@@ -84,8 +85,13 @@ function fx-flash {
      ffx_args+=("-c" "target.default=")
   fi
 
-  if [[ ! -f "${flash_manifest}" ]]; then
+  if [[ -n "${flash_manifest}" && ! -f "${flash_manifest}" ]]; then
     fx-error "Flash manifest: '${flash_manifest}' not found"
+    return 1
+  fi
+
+  if [[ -n "${product_bundle}" && ! -d "${product_bundle}" ]]; then
+    fx-error "Product bundle: '${product_bundle}' not found"
     return 1
   fi
 
@@ -97,6 +103,15 @@ function fx-flash {
     ffx_flash_args+=("--no-bootloader-reboot")
   fi
 
-  fx-info "Running fx ffx ${ffx_args[@]} target flash ${flash_manifest} ${ffx_flash_args[@]}"
-  fx-command-run host-tool --check-firewall ffx "${ffx_args[@]}" target flash "${flash_manifest}" "${ffx_flash_args[@]}"
+  if [[ ! -z "${flash_manifest}" ]]; then
+    flash_manifest_args=("${flash_manifest}")
+  elif [[ ! -z "${product_bundle}" ]]; then
+    flash_manifest_args=(--product-bundle "${product_bundle}")
+  else
+    ffx-error "No flash manifest or product bundle provided!"
+    return 1
+  fi
+
+  fx-info "Running fx ffx ${ffx_args[@]} target flash ${flash_manifest_args[@]} ${ffx_flash_args[@]}"
+  fx-command-run host-tool --check-firewall ffx "${ffx_args[@]}" target flash "${flash_manifest_args[@]}" "${ffx_flash_args[@]}"
 }

@@ -130,5 +130,6 @@ if "${flash}"; then
   fi
   cd "${artifact_dir}"
   manifest_path="${artifact_dir}/${flash_manifest}"
-  fx-flash "${serial}" "${device}" "${manifest_path}" "${skip_verify}" "${no_bootloader_reboot}"
+  product_bundle=
+  fx-flash "${serial}" "${device}" "${manifest_path}" "${product_bundle}" "${skip_verify}" "${no_bootloader_reboot}"
 fi
