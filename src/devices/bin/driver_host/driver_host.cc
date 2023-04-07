@@ -364,9 +364,11 @@ zx_status_t DriverHostContext::DriverManagerAdd(const fbl::RefPtr<zx_device_t>& 
       .dfv2_device_symbol = reinterpret_cast<uint64_t>(child->get_dfv2_symbol()),
   };
 
+  api_lock_.Release();
   auto response = coordinator_client.sync()->AddDevice(
       std::move(add_device_args), std::move(coordinator_endpoints->server),
       std::move(controller_endpoints->client), std::move(inspect), std::move(outgoing_dir));
+  api_lock_.Acquire();
   zx_status_t status = response.status();
   if (status == ZX_OK) {
     if (response->is_ok()) {
@@ -552,9 +554,11 @@ zx_status_t DriverHostContext::ConnectFidlProtocol(const fbl::RefPtr<zx_device_t
                                                    std::string_view service_name,
                                                    std::string_view protocol_name,
                                                    zx::channel request) {
+  api_lock_.Release();
   fidl::WireResult result = dev->coordinator_client.sync()->ConnectFidlProtocol(
       fidl::StringView::FromExternal(fragment_name), fidl::StringView::FromExternal(service_name),
       fidl::StringView::FromExternal(protocol_name), std::move(request));
+  api_lock_.Acquire();
   if (!result.ok()) {
     return result.status();
   }
@@ -918,7 +922,9 @@ zx::result<bool> DriverHostContext::ScheduleUnbindChildren(const fbl::RefPtr<zx_
   const auto& client = dev->coordinator_client;
   ZX_ASSERT(client);
   VLOGD(1, *dev, "schedule-unbind-children");
+  api_lock_.Release();
   auto resp = client.sync()->ScheduleUnbindChildren();
+  api_lock_.Acquire();
   zx_status_t call_status = resp->is_error() ? resp->error_value() : ZX_OK;
   log_rpc_result(dev, "schedule-unbind-children", resp.status(), call_status);
   if (resp.status() != ZX_OK) {
@@ -973,7 +979,9 @@ zx_status_t DriverHostContext::DeviceBind(const fbl::RefPtr<zx_device_t>& dev,
   }
   VLOGD(1, *dev, "bind-device");
   auto driver_path = ::fidl::StringView::FromExternal(drv_libname);
+  api_lock_.Release();
   auto response = client.sync()->BindDevice(std::move(driver_path));
+  api_lock_.Acquire();
   zx_status_t status = response.status();
   zx_status_t call_status = ZX_OK;
   if (status == ZX_OK && response->is_error()) {
@@ -1002,7 +1010,9 @@ zx_status_t DriverHostContext::LoadFirmware(const zx_driver_t* drv,
   VLOGD(1, *dev, "load-firmware");
   auto drv_libname = ::fidl::StringView::FromExternal(drv->libname());
   auto str_path = ::fidl::StringView::FromExternal(path);
+  api_lock_.Release();
   auto response = client.sync()->LoadFirmware(std::move(drv_libname), std::move(str_path));
+  api_lock_.Acquire();
   zx_status_t status = response.status();
   zx_status_t call_status = ZX_OK;
   auto result = std::move(response.Unwrap());
@@ -1035,7 +1045,9 @@ zx_status_t DriverHostContext::GetMetadata(const fbl::RefPtr<zx_device_t>& dev, 
     return ZX_ERR_IO_REFUSED;
   }
   VLOGD(1, *dev, "get-metadata");
+  api_lock_.Release();
   auto result = client.sync()->GetMetadata(type);
+  api_lock_.Acquire();
   zx_status_t status = result.status();
   zx_status_t call_status = ZX_OK;
   if (status == ZX_OK) {
@@ -1062,7 +1074,9 @@ zx_status_t DriverHostContext::GetMetadataSize(const fbl::RefPtr<zx_device_t>& d
     return ZX_ERR_IO_REFUSED;
   }
   VLOGD(1, *dev, "get-metadata-size");
+  api_lock_.Release();
   auto response = client.sync()->GetMetadataSize(type);
+  api_lock_.Acquire();
   zx_status_t status = response.status();
   zx_status_t call_status = ZX_OK;
   if (status == ZX_OK) {
@@ -1085,9 +1099,11 @@ zx_status_t DriverHostContext::AddMetadata(const fbl::RefPtr<zx_device_t>& dev, 
     return ZX_ERR_IO_REFUSED;
   }
   VLOGD(1, *dev, "add-metadata");
+  api_lock_.Release();
   auto response = client.sync()->AddMetadata(
       type, ::fidl::VectorView<uint8_t>::FromExternal(
                 reinterpret_cast<uint8_t*>(const_cast<void*>(data)), length));
+  api_lock_.Acquire();
   zx_status_t status = response.status();
   zx_status_t call_status = ZX_OK;
   if (status == ZX_OK && response->is_error()) {
@@ -1181,8 +1197,10 @@ zx_status_t DriverHostContext::DeviceAddComposite(const fbl::RefPtr<zx_device_t>
           ::fidl::VectorView<fuchsia_device_manager::wire::DeviceMetadata>::FromExternal(metadata)};
 
   static_assert(sizeof(comp_desc->props[0]) == sizeof(uint64_t));
+  api_lock_.Release();
   auto response = client.sync()->AddCompositeDevice(::fidl::StringView::FromExternal(name),
                                                     std::move(comp_dev));
+  api_lock_.Acquire();
   zx_status_t status = response.status();
   zx_status_t call_status = ZX_OK;
   if (status == ZX_OK && response->is_error()) {
@@ -1232,8 +1250,10 @@ zx_status_t DriverHostContext::DeviceAddCompositeNodeSpec(const fbl::RefPtr<zx_d
 
   fdm::wire::CompositeNodeSpecDescriptor desc = {.parents = parents, .metadata = metadata};
 
+  api_lock_.Release();
   auto response =
       client.sync()->AddCompositeNodeSpec(fidl::StringView(allocator, name), std::move(desc));
+  api_lock_.Acquire();
   auto status = response.status();
   auto call_status = status == ZX_OK && response->is_error() ? response->error_value() : ZX_OK;
 

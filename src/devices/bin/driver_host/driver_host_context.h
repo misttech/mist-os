@@ -84,7 +84,8 @@ class DriverHostContext {
   zx::result<bool> ScheduleUnbindChildren(const fbl::RefPtr<zx_device_t>& dev) TA_REQ(api_lock_);
 
   zx_status_t LoadFirmware(const zx_driver_t* drv, const fbl::RefPtr<zx_device_t>& dev,
-                           const char* path, zx_handle_t* vmo_handle, size_t* size);
+                           const char* path, zx_handle_t* vmo_handle, size_t* size)
+      TA_REQ(api_lock_);
   zx_status_t GetTopoPath(const fbl::RefPtr<zx_device_t>& dev, char* path, size_t max,
                           size_t* actual);
   zx_status_t GetMetadata(const fbl::RefPtr<zx_device_t>& dev, uint32_t type, void* buf,
@@ -107,7 +108,8 @@ class DriverHostContext {
 
   zx_status_t ConnectFidlProtocol(const fbl::RefPtr<zx_device_t>& dev,
                                   std::string_view fragment_name, std::string_view service_name,
-                                  std::string_view protocol_name, zx::channel request);
+                                  std::string_view protocol_name, zx::channel request)
+      TA_REQ(api_lock_);
 
   void AddDriver(fbl::RefPtr<dfv2::Driver> driver);
   void RemoveDriver(dfv2::Driver& driver);
