@@ -177,7 +177,7 @@ zx_status_t resource_parse_irq(ACPI_RESOURCE* res, resource_irq_t* out) {
         return ZX_ERR_OUT_OF_RANGE;
       }
       for (uint8_t i = 0; (i < irq->InterruptCount) && (i < std::size(out->pins)); i++) {
-        out->pins[i] = irq->Interrupts[i];
+        out->pins[i] = irq->u.Interrupts[i];
       }
       break;
     }
@@ -192,7 +192,7 @@ zx_status_t resource_parse_irq(ACPI_RESOURCE* res, resource_irq_t* out) {
         return ZX_ERR_OUT_OF_RANGE;
       }
       for (uint8_t i = 0; (i < irq->InterruptCount) && (i < std::size(out->pins)); i++) {
-        out->pins[i] = irq->Interrupts[i];
+        out->pins[i] = irq->u.Interrupts[i];
       }
       break;
     }

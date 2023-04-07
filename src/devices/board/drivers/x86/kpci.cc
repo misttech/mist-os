@@ -77,11 +77,11 @@ static ACPI_STATUS handle_prt(ACPI_HANDLE object, zx_pci_init_arg_t* arg, uint8_
     uint32_t global_irq = ZX_PCI_NO_IRQ_MAPPING;
     bool level_triggered = true;
     bool active_high = false;
-    if (entry->Source[0]) {
+    if (entry->u.Source[0]) {
       // If the Source is not just a NULL byte, then it refers to a
       // PCI Interrupt Link Device
       ACPI_HANDLE ild;
-      status = AcpiGetHandle(object, entry->Source, &ild);
+      status = AcpiGetHandle(object, entry->u.Source, &ild);
       if (status != AE_OK) {
         goto cleanup;
       }
@@ -105,10 +105,10 @@ static ACPI_STATUS handle_prt(ACPI_HANDLE object, zx_pci_init_arg_t* arg, uint8_
             // happen?
             PANIC_UNIMPLEMENTED;
           }
-          if (irq->Interrupts[0] != 0) {
+          if (irq->u.Interrupts[0] != 0) {
             active_high = (irq->Polarity == ACPI_ACTIVE_HIGH);
             level_triggered = (irq->Triggering == ACPI_LEVEL_SENSITIVE);
-            global_irq = irq->Interrupts[0];
+            global_irq = irq->u.Interrupts[0];
           }
         } else {
           // TODO: Handle non extended IRQs

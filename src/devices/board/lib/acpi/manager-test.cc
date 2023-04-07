@@ -483,7 +483,10 @@ TEST_F(AcpiManagerTest, TestInterruptsMakeFragments) {
                       .Shareable = 0,
                       .WakeCapable = 0,
                       .InterruptCount = 1,
-                      .Interrupts = {2},
+                      .u =
+                          {
+                              .Interrupt = 2,
+                          },
                   },
           },
   };

@@ -53,11 +53,6 @@ typedef struct sync_mutex sync_mutex_t;
 #define ACPI_MUTEX sync_mutex_t *
 #define ACPI_SEMAPHORE acpi_semaphore_t *
 
-// Borrowed from aclinuxex.h
-
-// Include the gcc header since we're compiling on gcc
-#include <acpica/platform/acgcc.h>
-
 __BEGIN_CDECLS
 bool _acpica_acquire_global_lock(void *FacsPtr);
 bool _acpica_release_global_lock(void *FacsPtr);

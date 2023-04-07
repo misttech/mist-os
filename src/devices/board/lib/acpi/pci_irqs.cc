@@ -88,9 +88,9 @@ acpi_legacy_irq PrtEntryToIrq(ACPI_HANDLE object, ACPI_PCI_ROUTING_TABLE* entry)
   acpi_legacy_irq new_irq = {.vector = entry->SourceIndex, .options = ZX_INTERRUPT_MODE_LEVEL_LOW};
   // If the PRT contains a Source entry than we can attempt to find an Extended
   // IRQ Resource describing it.
-  if (entry->Source[0]) {
-    if (auto result = FindExtendedIrqResource(object, entry->Source); result.is_ok()) {
-      new_irq.vector = result->Interrupts[0];
+  if (entry->u.Source[0]) {
+    if (auto result = FindExtendedIrqResource(object, entry->u.Source); result.is_ok()) {
+      new_irq.vector = result->u.Interrupts[0];
       if (result->Triggering == ACPI_LEVEL_SENSITIVE) {
         if (result->Polarity == ACPI_ACTIVE_HIGH) {
           new_irq.options = ZX_INTERRUPT_MODE_LEVEL_HIGH;
@@ -174,7 +174,7 @@ ACPI_STATUS ReadPciRoutingTable(ACPI_HANDLE object, AcpiPciroot::Context* contex
            "_PRT Entry RootPort %02x.%1x: .Address = 0x%05llx, .Pin = %u, .SourceIndex = %u, "
            ".Source = \"%s\"",
            (port) ? port->dev_id : 0, (port) ? port->func_id : 0, entry.Address, entry.Pin,
-           entry.SourceIndex, entry.Source);
+           entry.SourceIndex, entry.u.Source);
 
     // Per ACPI Spec 6.2.13, all _PRT entries must have a function address of
     // 0xFFFF representing all functions in the device. In effect, this means we

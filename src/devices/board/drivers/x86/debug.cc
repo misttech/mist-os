@@ -127,7 +127,7 @@ ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
         INDENT_PRINTF("sharable: %d\n", irq->Shareable);
         INDENT_PRINTF("wake_cap: %d\n", irq->WakeCapable);
         for (unsigned int i = 0; i < irq->InterruptCount; ++i) {
-          INDENT_PRINTF("irq #%d: %d\n", i, irq->Interrupts[i]);
+          INDENT_PRINTF("irq #%d: %d\n", i, irq->u.Interrupts[i]);
         }
         break;
       }
@@ -152,7 +152,7 @@ ACPI_STATUS acpi_print_resources(ACPI_HANDLE object, unsigned int level,
         INDENT_PRINTF("sharable: %d\n", irq->Shareable);
         INDENT_PRINTF("wake_cap: %d\n", irq->WakeCapable);
         for (unsigned int i = 0; i < irq->InterruptCount; ++i) {
-          INDENT_PRINTF("irq #%d: %d\n", i, irq->Interrupts[i]);
+          INDENT_PRINTF("irq #%d: %d\n", i, irq->u.Interrupts[i]);
         }
         break;
       }
@@ -219,13 +219,13 @@ ACPI_STATUS acpi_print_prt(unsigned int level, ACPI_HANDLE object) {
     INDENT_PRINTF("Dev ID: %#04x\n", (uint16_t)(entry->Address >> 16));
     level -= 1;
 
-    if (entry->Source[0]) {
+    if (entry->u.Source[0]) {
       // If the Source is not just a NULL byte, then it refers to a
       // PCI Interrupt Link Device
-      INDENT_PRINTF("Source: %s\n", entry->Source);
+      INDENT_PRINTF("Source: %s\n", entry->u.Source);
       INDENT_PRINTF("Source Index: %u\n", entry->SourceIndex);
       ACPI_HANDLE ild;
-      status = AcpiGetHandle(object, entry->Source, &ild);
+      status = AcpiGetHandle(object, entry->u.Source, &ild);
       if (status != AE_OK) {
         INDENT_PRINTF("Could not lookup Interrupt Link Device\n");
         continue;
