@@ -55,20 +55,6 @@ class ClosureQueue {
   void StopAndClear();
   bool is_stopped();
 
-  // The DDK has some sync calls such as DdkSuspend().  By allowing the DDK's
-  // main dispatcher thread to pump the queue, the code that calls Enqueue() can
-  // be simpler.
-  //
-  // The calling thread must be the dispatcher_thread.
-  //
-  // This method will wait for at least one task to be in the queue, and then
-  // run exactly one task (here on the dispatcher_thread that's calling this
-  // method), then will return to the caller.
-  //
-  // TODO(dustingreen): If DdkSuspend() and similar become async, consider
-  // removing this method.
-  void RunOneHere();
-
   thrd_t dispatcher_thread();
 
  private:

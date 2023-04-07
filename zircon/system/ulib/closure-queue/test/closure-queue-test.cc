@@ -42,13 +42,6 @@ TEST_F(ClosureQueueTest, StopAndClearDoesNotRunMoreTasks) {
   EXPECT_FALSE(closure_ran);
 }
 
-TEST_F(ClosureQueueTest, RunOneHere) {
-  bool closure_ran = false;
-  queue_.Enqueue([&closure_ran] { closure_ran = true; });
-  queue_.RunOneHere();
-  EXPECT_TRUE(closure_ran);
-}
-
 TEST_F(ClosureQueueTest, SetDispatcher) {
   ClosureQueue queue;
   queue.SetDispatcher(loop_.dispatcher(), thrd_current());
