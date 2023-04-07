@@ -734,11 +734,15 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
     ApplyLayerImage(layer, {glm::vec2(0), glm::vec2(render_target.width, render_target.height)},
                     render_target, event_data.wait_id, event_data.signal_id);
 
+    // We are being opportunistic and skipping the costly CheckConfig() call at this stage, because
+    // we know that gpu composited layers work and there is no fallback case beyond this. See
+    // fxb/84271 for more details.
+#ifndef NDEBUG
     if (!CheckConfig()) {
       FX_LOGS(ERROR) << "Both display hardware composition and GPU rendering have failed.";
-      // TODO(fxbug.dev/59646): Figure out how we really want to handle this case here.
       return false;
     }
+#endif
   }
 
   // See ReleaseFenceManager comments for details.
