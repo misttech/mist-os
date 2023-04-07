@@ -1086,7 +1086,8 @@ pub fn sys_setpriority(
     // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
     // be lying anymore by the time you read this.)
     let priority = 20 - priority;
-    task.write().priority = priority.clamp(1, 40) as u8;
+    let max_priority = std::cmp::min(40, task.thread_group.get_rlimit(Resource::NICE));
+    task.write().priority = priority.clamp(1, max_priority as i32) as u8;
     Ok(())
 }
 
