@@ -28,7 +28,10 @@ fn node_benchmarks(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Node/drop", move |b| {
         let inspector = Inspector::default();
         let root = inspector.root();
-        b.iter_with_large_setup(|| root.create_child(NAME), |child| drop(child));
+        b.iter_with_large_setup(
+            || root.create_child(NAME),
+            |child| criterion::black_box(drop(child)),
+        );
     });
     bench
 }
@@ -71,15 +74,16 @@ macro_rules! bench_numeric_property_fn {
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name>](NAME, 0 as $type),
-                        |p| drop(p));
+                        |p| criterion::black_box(drop(p)));
                 });
                 bench = bench.with_function(
                     concat!("Node/record_", stringify!($name), "_property"),
                     move |b| {
                         let inspector = Inspector::default();
-                        b.iter_with_large_setup(
+                        b.iter_batched_ref(
                             || inspector.root().create_child(NAME),
-                            |child| child.[<record_ $name>](NAME, 0 as $type));
+                            |child| child.[<record_ $name>](NAME, 0 as $type),
+                            criterion::BatchSize::SmallInput);
                     }
                 );
                 bench
@@ -159,7 +163,7 @@ macro_rules! bench_property_fn {
                     let root = inspector.root();
                     b.iter_with_large_setup(
                         || root.[<create_ $name>](NAME, &initial_val),
-                        |p| drop(p));
+                        |p| criterion::black_box(drop(p)));
                 });
                 let initial_val = initial_value.clone();
                 bench = bench.with_function(
@@ -238,7 +242,7 @@ macro_rules! bench_numeric_array_property_fn {
                         let root = inspector.root();
                         b.iter_with_large_setup(
                             || root.[<create_ $name _array>](NAME, array_size),
-                            |p| drop(p));
+                            |p| criterion::black_box(drop(p)));
                     }
                 );
                 bench
@@ -280,7 +284,10 @@ fn string_array_property_benchmarks(
     bench = bench.with_function(format!("StringArrayProperty/drop/{}", array_size), move |b| {
         let inspector = Inspector::default();
         let root = inspector.root();
-        b.iter_with_large_setup(|| root.create_string_array(NAME, array_size), |p| drop(p));
+        b.iter_with_large_setup(
+            || root.create_string_array(NAME, array_size),
+            |p| criterion::black_box(drop(p)),
+        );
     });
     bench
 }
@@ -396,7 +403,7 @@ macro_rules! bench_histogram_property_fn {
                     b.iter_with_large_setup(
                         || root.[<create_ $name _ $histogram_type _histogram>](
                             NAME, params.clone()),
-                        |p| drop(p));
+                        |p| criterion::black_box(drop(p)));
                 });
 
                 bench
@@ -414,16 +421,17 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         });
     });
     bench = bench.with_function("Heap/allocate_512k", |b| {
-        b.iter_with_large_setup(
+        b.iter_batched_ref(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
                 Heap::new(container).unwrap()
             },
-            |mut heap| {
+            |heap| {
                 for _ in 0..512 {
                     heap.allocate_block(2048).unwrap();
                 }
             },
+            criterion::BatchSize::SmallInput,
         );
     });
     bench = bench.with_function("Heap/extend", |b| {
@@ -441,7 +449,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         );
     });
     bench = bench.with_function("Heap/free", |b| {
-        b.iter_with_large_setup(
+        b.iter_batched(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
                 let mut heap = Heap::new(container).unwrap();
@@ -456,6 +464,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
                     heap.free_block(block).unwrap();
                 }
             },
+            criterion::BatchSize::LargeInput,
         );
     });
     bench = bench.with_function("Heap/drop", |b| {
@@ -464,7 +473,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
                 Heap::new(container).unwrap()
             },
-            |heap| drop(heap),
+            |heap| criterion::black_box(drop(heap)),
         );
     });
 
