@@ -8219,6 +8219,15 @@ to migrate from minfs to fxfs.
 
 From //src/storage/fshost/generated_fshost_config.gni:42
 
+### use_driver_framework_v2_default
+
+If this is true, then DriverManager will load DFv2 drivers when unspecified by
+fuchsia.driver.test/RealmArgs.use_driver_framework_v2.
+
+**Current value (from the default):** `false`
+
+From //sdk/lib/driver_test_realm/driver_test_realm.gni:8
+
 ### use_elf_kernel
 
 Build an ELF kernel rather than a ZBI image kernel.
