@@ -78,6 +78,13 @@ int main(int argc, char** argv) {
   gigaboot::RebootMode reboot_mode =
       gigaboot::GetRebootMode().value_or(gigaboot::RebootMode::kNormal);
 
+  // Reset previous reboot mode immediately to prevent it from being sticky.
+  if (reboot_mode != gigaboot::RebootMode::kNormal &&
+      !SetRebootMode(gigaboot::RebootMode::kNormal)) {
+    printf("Failed to reset reboot mode\n");
+    return 1;
+  }
+
   bool enter_fastboot = reboot_mode == gigaboot::RebootMode::kBootloader;
   if (enter_fastboot) {
     printf("Your BIOS instructs Gigaboot to directly enter fastboot and skip normal boot.\n");
