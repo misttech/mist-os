@@ -128,6 +128,11 @@ impl ExpectationsComparer {
             (fidl_fuchsia_test::Status::Failed, fidl_fuchsia_test::Status::Passed)
         ) {
             tracing::info!("{name} failure is expected, so it will be reported to the test runner as having passed.")
+        } else if matches!(
+            (original_status, status),
+            (fidl_fuchsia_test::Status::Passed, fidl_fuchsia_test::Status::Passed)
+        ) {
+            tracing::info!("{name} success is expected.")
         }
 
         case_listener_proxy
@@ -159,6 +164,8 @@ impl ExpectationsComparer {
         for (invocation, _) in skipped {
             let (case_listener_proxy, case_listener_server_end) =
                 fidl::endpoints::create_proxy().context("error creating case listener proxy")?;
+            let name = invocation.name.as_ref().expect("fuchsia.test/Invocation had no name");
+            tracing::info!("{name} skip is expected.");
             listener_proxy
                 .on_test_case_started(
                     invocation,
