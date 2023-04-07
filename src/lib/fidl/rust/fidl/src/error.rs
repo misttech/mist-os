@@ -130,24 +130,6 @@ pub enum Error {
     #[error("A FIDL message contained incorrectly encoded UTF8.")]
     Utf8Error,
 
-    /// Exceeded the maximum length of a vector.
-    #[error("Vector was too long. Expected at most {max_length} elements, got {actual_length}.")]
-    VectorTooLong {
-        /// Maximum length, i.e. the `N` in `vector<T>:N`.
-        max_length: usize,
-        /// Actual length of the vector (number of elements).
-        actual_length: usize,
-    },
-
-    /// Exceeded the maximum length of a string.
-    #[error("String was too long. Expected at most {max_bytes} bytes, got {actual_bytes}.")]
-    StringTooLong {
-        /// Maximum length in bytes, i.e. the `N` in `string:N`.
-        max_bytes: usize,
-        /// Actual length of the string in bytes.
-        actual_bytes: usize,
-    },
-
     /// A message was received for an ordinal value that the service does not
     /// understand, and either the method is not flexible or this protocol does
     /// not allow flexible methods of this type.  This generally results from an

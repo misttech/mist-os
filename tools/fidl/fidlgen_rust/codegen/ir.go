@@ -806,13 +806,10 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = fmt.Sprintf("&mut [%s; %d]", el.Param, *val.ElementCount)
 		}
 	case fidlgen.VectorType:
+		// TODO(fxbug.dev/37304): Use val.ElementCount for vector bound.
 		el := c.compileType(*val.ElementType)
 		t.ElementType = &el
-		if val.ElementCount == nil {
-			t.Fidl = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.Fidl)
-		} else {
-			t.Fidl = fmt.Sprintf("fidl::encoding::Vector<%s, %d>", el.Fidl, *val.ElementCount)
-		}
+		t.Fidl = fmt.Sprintf("fidl::encoding::UnboundedVector<%s>", el.Fidl)
 		t.Owned = fmt.Sprintf("Vec<%s>", el.Owned)
 		if val.ElementType.Kind == fidlgen.PrimitiveType {
 			t.Param = fmt.Sprintf("&[%s]", el.Owned)
@@ -820,11 +817,8 @@ func (c *compiler) compileType(val fidlgen.Type) Type {
 			t.Param = fmt.Sprintf("&mut dyn ExactSizeIterator<Item = %s>", el.Param)
 		}
 	case fidlgen.StringType:
-		if val.ElementCount == nil {
-			t.Fidl = "fidl::encoding::UnboundedString"
-		} else {
-			t.Fidl = fmt.Sprintf("fidl::encoding::BoundedString<%d>", *val.ElementCount)
-		}
+		// TODO(fxbug.dev/37304): Use val.ElementCount for string bound.
+		t.Fidl = "fidl::encoding::UnboundedString"
 		t.Owned = "String"
 		t.Param = "&str"
 	case fidlgen.HandleType:

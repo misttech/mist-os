@@ -176,7 +176,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn update_with_long_region_code_fails() {
+    fn ignore_update_with_long_region_code() {
         let mut context = TestContext::new(make_default_stub_iface_manager());
         let regulatory_fut = context.regulatory_manager.run(context.regulatory_sender);
         pin_mut!(regulatory_fut);
@@ -187,8 +187,20 @@ mod tests {
             context.executor.run_until_stalled(region_request_fut),
             Poll::Ready(Some(Ok(RegulatoryRegionWatcherRequest::GetRegionUpdate{responder}))) => responder
         );
-        assert_variant!(responder.send(Some("USA")), Err(fidl::Error::StringTooLong { .. }));
+        responder.send(Some("USA")).expect("failed to send response");
         assert_variant!(context.executor.run_until_stalled(&mut regulatory_fut), Poll::Pending);
+
+        assert_variant!(
+            &context.executor.run_until_stalled(&mut context.regulatory_receiver),
+            Poll::Pending
+        );
+
+        // Verify that there is a new region update request.
+        let region_request_fut = &mut context.regulatory_region_requests.next();
+        assert_variant!(
+            context.executor.run_until_stalled(region_request_fut),
+            Poll::Ready(Some(_)),
+        );
     }
 
     #[fuchsia::test]

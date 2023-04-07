@@ -17,6 +17,8 @@ success("Length2String") {
 }
 
 encode_failure("StringExceedsLimit") {
+    // TODO(fxbug.dev/37304) Enforce size bounds in rust
+    bindings_denylist = [rust],
     value = Length2StringWrapper{
         length_2_string: "abc", // exceeds the string length
     },

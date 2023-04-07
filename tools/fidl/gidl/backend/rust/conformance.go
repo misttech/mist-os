@@ -238,7 +238,7 @@ func encodingContext(wireFormat ir.WireFormat) string {
 
 // Rust errors are defined in src/lib/fidl/rust/fidl/src/error.rs.
 var rustErrorCodeNames = map[ir.ErrorCode]string{
-	ir.CountExceedsLimit:                  "VectorTooLong",
+	ir.CountExceedsLimit:                  "OutOfRange",
 	ir.EnvelopeBytesExceedMessageLength:   "InvalidNumBytesInEnvelope",
 	ir.EnvelopeHandlesExceedMessageLength: "InvalidNumHandlesInEnvelope",
 	ir.ExceededMaxOutOfLineDepth:          "MaxRecursionDepth",
@@ -263,7 +263,7 @@ var rustErrorCodeNames = map[ir.ErrorCode]string{
 	ir.StrictUnionUnknownField:            "UnknownUnionTag",
 	ir.StringCountExceeds32BitLimit:       "OutOfRange",
 	ir.StringNotUtf8:                      "Utf8Error",
-	ir.StringTooLong:                      "StringTooLong",
+	ir.StringTooLong:                      "OutOfRange",
 	ir.TableCountExceeds32BitLimit:        "OutOfRange",
 	ir.TooFewBytes:                        "OutOfRange",
 	ir.TooFewBytesInPrimaryObject:         "OutOfRange",

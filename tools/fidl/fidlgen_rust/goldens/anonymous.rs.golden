@@ -549,11 +549,11 @@ fidl_table! {
     name: FunctionApplication,
     members: [
         func {
-            ty: fidl::encoding::BoundedString<100>,
+            ty: fidl::encoding::UnboundedString,
             ordinal: 1,
         },
         args {
-            ty: fidl::encoding::Vector<fidl::encoding::OptionalUnion<Expression>, 5>,
+            ty: fidl::encoding::UnboundedVector<fidl::encoding::OptionalUnion<Expression>>,
             ordinal: 3,
         },
         flags {
@@ -583,7 +583,7 @@ fidl_table! {
     name: TableMember,
     members: [
         table_data {
-            ty: fidl::encoding::Vector<TableData, 10>,
+            ty: fidl::encoding::UnboundedVector<TableData>,
             ordinal: 2,
         },
     ],

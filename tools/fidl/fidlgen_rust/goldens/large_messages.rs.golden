@@ -107,7 +107,7 @@ fidl_union! {
     name: SemiBoundedBelievedToBeSmall,
     members: [
         Bytes {
-            ty: fidl::encoding::Vector<u8, 65488>,
+            ty: fidl::encoding::UnboundedVector<u8>,
             ordinal: 1,
         },
     ],
@@ -173,7 +173,7 @@ fidl_union! {
     name: SemiBoundedMaybeLarge,
     members: [
         Bytes {
-            ty: fidl::encoding::Vector<u8, 65489>,
+            ty: fidl::encoding::UnboundedVector<u8>,
             ordinal: 1,
         },
     ],
@@ -191,7 +191,7 @@ fidl_struct! {
     name: BoundedKnownToBeSmall,
     members: [
         bytes {
-            ty: fidl::encoding::Vector<u8, 65504>,
+            ty: fidl::encoding::UnboundedVector<u8>,
             index: 0,
             typevar: T0,
             offset_v1: 0,
@@ -219,7 +219,7 @@ fidl_struct! {
     name: BoundedMaybeLarge,
     members: [
         bytes {
-            ty: fidl::encoding::Vector<u8, 65505>,
+            ty: fidl::encoding::UnboundedVector<u8>,
             index: 0,
             typevar: T0,
             offset_v1: 0,
@@ -257,7 +257,7 @@ fidl_struct! {
             offset_v2: 0,
         },
         bytes {
-            ty: fidl::encoding::Vector<u8, 1000>,
+            ty: fidl::encoding::UnboundedVector<u8>,
             index: 1,
             typevar: T1,
             offset_v1: 8,

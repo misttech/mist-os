@@ -1524,30 +1524,6 @@ HandleDef{
 
 
 
-#[test]
-fn test_golden_string_with_max_size2_v1_encode_failure() {
-    let value = &test_conformance::GoldenStringWithMaxSize2 { s: String::from("abc") };
-    let bytes = &mut Vec::new();
-    let handles = &mut Vec::new();
-    bytes.resize(65536, 0xcd); // fill with junk data
-    match Encoder::encode_with_context::<test_conformance::GoldenStringWithMaxSize2>(_V1_CONTEXT, bytes, handles, value) {
-        Err(err) => assert_matches!(err, Error::StringTooLong { .. }),
-        Ok(_) => panic!("unexpected successful encoding"),
-    }
-}
-
-#[test]
-fn test_golden_string_with_max_size2_v2_encode_failure() {
-    let value = &test_conformance::GoldenStringWithMaxSize2 { s: String::from("abc") };
-    let bytes = &mut Vec::new();
-    let handles = &mut Vec::new();
-    bytes.resize(65536, 0xcd); // fill with junk data
-    match Encoder::encode_with_context::<test_conformance::GoldenStringWithMaxSize2>(_V2_CONTEXT, bytes, handles, value) {
-        Err(err) => assert_matches!(err, Error::StringTooLong { .. }),
-        Ok(_) => panic!("unexpected successful encoding"),
-    }
-}
-
 
 
 #[test]
