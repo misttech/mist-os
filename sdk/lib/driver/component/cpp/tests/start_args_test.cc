@@ -3,8 +3,13 @@
 // found in the LICENSE file.
 
 #include <lib/driver/component/cpp/start_args.h>
+#include <lib/zx/eventpair.h>
+
+#include <array>
 
 #include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -168,4 +173,57 @@ TEST(StartArgsTest, NsValue) {
 
   auto pkg = fdf::NsValue(ns_entries, "/pkg");
   EXPECT_EQ(ZX_ERR_NOT_FOUND, pkg.error_value());
+}
+
+TEST(StartArgsTest, AdoptEncodedFidlMessage) {
+  std::array<uint8_t, 16> bytes;
+  bytes.fill(1);
+
+  zx::eventpair ep1, ep2;
+  ASSERT_OK(zx::eventpair::create(0, &ep1, &ep2));
+  zx_handle_t handles[] = {
+      ep1.get(),
+  };
+
+  EncodedFidlMessage msg{
+      .bytes = bytes.data(),
+      .handles = handles,
+      .num_bytes = static_cast<uint32_t>(bytes.size()),
+      .num_handles = static_cast<uint32_t>(std::size(handles)),
+  };
+
+  // Handles should be closed when the message goes out of scope.
+  { fdf::AdoptEncodedFidlMessage adopted{msg}; }
+
+  zx_signals_t observed = ZX_SIGNAL_NONE;
+  ASSERT_OK(ep2.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &observed));
+  EXPECT_EQ(observed, ZX_EVENTPAIR_PEER_CLOSED);
+  [[maybe_unused]] zx_handle_t h = ep1.release();
+}
+
+TEST(StartArgsTest, AdoptEncodedFidlMessageToFidl) {
+  std::array<uint8_t, 16> bytes;
+  bytes.fill(1);
+
+  zx::eventpair ep1, ep2;
+  ASSERT_OK(zx::eventpair::create(0, &ep1, &ep2));
+  zx_handle_t handles[] = {
+      ep1.get(),
+  };
+
+  EncodedFidlMessage msg{
+      .bytes = bytes.data(),
+      .handles = handles,
+      .num_bytes = static_cast<uint32_t>(bytes.size()),
+      .num_handles = static_cast<uint32_t>(std::size(handles)),
+  };
+
+  fdf::AdoptEncodedFidlMessage adopted{msg};
+  // Handles should be closed when the message goes out of scope.
+  { fidl::EncodedMessage encoded = adopted.TakeMessage(); }
+
+  zx_signals_t observed = ZX_SIGNAL_NONE;
+  ASSERT_OK(ep2.wait_one(ZX_EVENTPAIR_PEER_CLOSED, zx::time::infinite_past(), &observed));
+  EXPECT_EQ(observed, ZX_EVENTPAIR_PEER_CLOSED);
+  [[maybe_unused]] zx_handle_t h = ep1.release();
 }

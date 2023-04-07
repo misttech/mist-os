@@ -8,12 +8,25 @@
 #include <lib/fdf/dispatcher.h>
 #include <zircon/fidl.h>
 
+// Lightweight reference to an encoded FIDL message.
+//
+// You may use |fdf::AdoptEncodedFidlMessage| to take ownership of the handles
+// in the message.
+//
+// It is intended as a stable ABI.
+struct EncodedFidlMessage {
+  uint8_t* bytes;
+  zx_handle_t* handles;
+  uint32_t num_bytes;
+  uint32_t num_handles;
+};
+
 struct EncodedDriverStartArgs {
   // |msg| is an encoded `fuchsia.driver.framework/DriverStartArgs` table. The
   // ownership of handles in |msg| are transferred to the driver. The driver may
   // mutate the bytes referenced by |msg|, but those are only alive until the
   // |DriverLifecycle::v1::start| method returns.
-  fidl_incoming_msg_t* msg;
+  EncodedFidlMessage msg;
 
   // |wire_format_metadata| describes the the revision of the FIDL wire format
   // used to encode |msg|. This is required in order to be able to correctly decode the

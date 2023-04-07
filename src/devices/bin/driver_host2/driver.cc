@@ -207,9 +207,15 @@ zx::result<> Driver::Start(fuchsia_driver_framework::DriverStartArgs start_args,
   // After calling |lifecycle_->start|, we assume it has taken ownership of
   // the handles from |start_args|, and can therefore relinquish ownership.
   fidl_incoming_msg_t c_msg = std::move(converted_message.message()).ReleaseToEncodedCMessage();
+  EncodedFidlMessage msg{
+      .bytes = static_cast<uint8_t*>(c_msg.bytes),
+      .handles = c_msg.handles,
+      .num_bytes = c_msg.num_bytes,
+      .num_handles = c_msg.num_handles,
+  };
   void* opaque = nullptr;
   zx_status_t status =
-      lifecycle_->v1.start({&c_msg, wire_format_metadata}, initial_dispatcher, &opaque);
+      lifecycle_->v1.start({msg, wire_format_metadata}, initial_dispatcher, &opaque);
   if (status != ZX_OK) {
     return zx::error(status);
   }

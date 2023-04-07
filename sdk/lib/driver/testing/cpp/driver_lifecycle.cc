@@ -53,11 +53,17 @@ zx::result<OpaqueDriverPtr> StartDriver(fdf::DriverStartArgs start_args,
   // After calling |record_->start|, we assume it has taken ownership of
   // the handles from |start_args|, and can therefore relinquish ownership.
   fidl_incoming_msg_t c_msg = std::move(converted_message.message()).ReleaseToEncodedCMessage();
+  EncodedFidlMessage msg{
+      .bytes = static_cast<uint8_t*>(c_msg.bytes),
+      .handles = c_msg.handles,
+      .num_bytes = c_msg.num_bytes,
+      .num_handles = c_msg.num_handles,
+  };
   OpaqueDriverPtr opaque = nullptr;
 
   zx_status_t status = ZX_ERR_INTERNAL;
   zx::result result = fdf::RunOnDispatcherSync(driver_dispatcher.dispatcher(), [&]() {
-    status = driver_lifecycle_symbol.v1.start({&c_msg, wire_format_metadata},
+    status = driver_lifecycle_symbol.v1.start({msg, wire_format_metadata},
                                               driver_dispatcher.driver_dispatcher().get(), &opaque);
   });
 

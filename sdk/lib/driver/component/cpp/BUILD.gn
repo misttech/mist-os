@@ -86,10 +86,12 @@ executable("cpp_test") {
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
+    "//src/lib/testing/predicates",
     "//third_party/rapidjson",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/syslog",
+    "//zircon/system/ulib/zx",
   ]
 
   # TODO(fxbug.dev/94768): This target uses mutable tables which are deprecated,

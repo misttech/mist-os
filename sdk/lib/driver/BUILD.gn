@@ -9,5 +9,6 @@ group("tests") {
     "compat:tests",
     "component:tests",
     "devfs:tests",
+    "symbols:tests",
   ]
 }

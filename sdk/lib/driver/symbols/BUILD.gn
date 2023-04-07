@@ -12,3 +12,8 @@ sdk_source_set("symbols") {
   public_deps = [ "//sdk/lib/driver/runtime:driver_runtime" ]
   public_configs = [ "//sdk/config" ]
 }
+
+group("tests") {
+  testonly = true
+  deps = [ "tests" ]
+}
