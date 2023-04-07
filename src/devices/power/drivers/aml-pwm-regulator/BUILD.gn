@@ -9,10 +9,10 @@ import("//build/test.gni")
 
 driver_bind_rules("aml-pwm-regulator-bind") {
   rules = "aml-pwm-regulator.bind"
-  header_output = "aml-pwm-regulator-bind.h"
   tests = "bind-tests.json"
+  disable_fragment_gen = true
   deps = [
-    "//src/devices/bind/fuchsia.amlogic.platform.t931",
+    "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.pwm",
   ]
 }
