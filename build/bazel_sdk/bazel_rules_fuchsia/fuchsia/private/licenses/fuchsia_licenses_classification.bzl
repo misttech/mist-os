@@ -22,7 +22,7 @@ def _fuchsia_licenses_classification_impl(ctx):
     if ctx.attr.fail_on_disallowed_conditions:
         arguments.append("--fail_on_disallowed_conditions=True")
     if ctx.file.failure_message_preamble:
-        inputs.extend(ctx.file.failure_message_preamble)
+        inputs.append(ctx.file.failure_message_preamble)
         arguments.append("--failure_message_preamble=%s" % ctx.file.failure_message_preamble.path)
     if ctx.files.policy_override_rules:
         inputs.extend(ctx.files.policy_override_rules)

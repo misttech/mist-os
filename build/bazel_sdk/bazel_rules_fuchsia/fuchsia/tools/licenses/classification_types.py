@@ -474,8 +474,6 @@ class LicensesClassifications:
             default_condition: str) -> "LicensesClassifications":
         json_output = json.load(open(identify_license_output_path, 'r'))
 
-        print(json.dumps(json_output, indent="    "))
-
         # Expected results from https://github.com/google/licenseclassifier/tree/main/tools/identify_license
         # have the following json layout:
         # [
