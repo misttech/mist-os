@@ -12,6 +12,7 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as frunner,
     fidl_fuchsia_test::{self as ftest},
     futures::TryStreamExt,
+    tracing::debug,
 };
 
 /// Handles a single `ftest::SuiteRequestStream`.
@@ -25,6 +26,7 @@ pub async fn handle_suite_requests(
     mut start_info: frunner::ComponentStartInfo,
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
+    debug!(?start_info, "got suite request stream");
     let test_type = test_type(start_info.program.as_ref().unwrap());
     // The kernel start info is largely the same as that of the test component. The main difference
     // is that the kernel_start_info does not contain the outgoing directory of the test component.
@@ -35,11 +37,14 @@ pub async fn handle_suite_requests(
     // execution of the test.
     let (starnix_kernel, realm, kernel_name) =
         instantiate_kernel_in_realm(kernels_dir, kernel_start_info).await?;
+    debug!(%kernel_name, "instantiated starnix test kernel");
 
     while let Some(event) = stream.try_next().await? {
         let mut test_start_info = clone_start_info(&mut start_info)?;
+        debug!("got suite request");
         match event {
             ftest::SuiteRequest::GetTests { iterator, .. } => {
+                debug!("enumerating test cases");
                 let stream = iterator.into_stream()?;
 
                 if test_type.is_gtest_like() {
@@ -57,10 +62,12 @@ pub async fn handle_suite_requests(
                 }
             }
             ftest::SuiteRequest::Run { tests, options, listener, .. } => {
+                debug!(?tests, "running tests");
                 let run_listener_proxy =
                     listener.into_proxy().context("Can't convert run listener channel to proxy")?;
 
                 if tests.is_empty() {
+                    debug!("no tests listed, returning");
                     run_listener_proxy.on_finished()?;
                     break;
                 }
@@ -72,6 +79,7 @@ pub async fn handle_suite_requests(
                     replace_program_args(test_args, &mut program);
                 }
                 test_start_info.program = Some(program);
+                debug!(?test_start_info, "running tests with info");
 
                 match test_type {
                     _ if test_type.is_gtest_like() => {
@@ -146,10 +154,12 @@ async fn run_test_case(
     run_listener_proxy: &ftest::RunListenerProxy,
     starnix_kernel: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
+    debug!("running generic fallback test suite");
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>()?;
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
+    debug!("notifying client test case started");
     run_listener_proxy.on_test_case_started(
         test,
         ftest::StdHandles {
@@ -160,9 +170,11 @@ async fn run_test_case(
         case_listener,
     )?;
 
+    debug!("starting test component");
     let component_controller = start_test_component(start_info, starnix_kernel)?;
 
     let result = read_result(component_controller.take_event_stream()).await;
+    debug!(?result, "notifying client test case finished");
     case_listener_proxy.finished(result)?;
 
     Ok(())

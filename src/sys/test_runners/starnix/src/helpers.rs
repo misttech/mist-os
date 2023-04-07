@@ -18,6 +18,7 @@ use {
     gtest_runner_lib::parser::read_file,
     kernel_config::generate_kernel_config,
     runner::component::ComponentNamespace,
+    tracing::debug,
 };
 
 pub async fn run_starnix_benchmark(
@@ -32,6 +33,7 @@ pub async fn run_starnix_benchmark(
     let (numbered_handles, stdout_client, stderr_client) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
 
+    debug!("notifying client test case started");
     run_listener_proxy.on_test_case_started(
         test,
         ftest::StdHandles {
@@ -42,6 +44,7 @@ pub async fn run_starnix_benchmark(
         case_listener,
     )?;
 
+    debug!("getting test suite label");
     let program = start_info.program.as_ref().context("No program")?;
     let test_suite = match runner::get_value(program, "test_suite_label") {
         Some(fdata::DictionaryValue::Str(value)) => value.to_owned(),
@@ -200,6 +203,7 @@ pub fn start_test_component(
     let (component_controller, component_controller_server_end) =
         create_proxy::<frunner::ComponentControllerMarker>()?;
 
+    debug!(?start_info, "asking kernel to start component");
     starnix_kernel.start(start_info, component_controller_server_end)?;
 
     Ok(component_controller)

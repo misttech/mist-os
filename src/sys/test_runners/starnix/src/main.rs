@@ -15,10 +15,12 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use tracing::debug;
 use vfs::directory::{entry::DirectoryEntry, helper::DirectlyMutable};
 
 #[fuchsia::main(logging_tags=["starnix_test_runner"])]
 async fn main() -> Result<(), Error> {
+    debug!("starnix test runner started");
     const SVC_DIRECTORY: &str = "svc";
 
     let outgoing_dir_handle =
