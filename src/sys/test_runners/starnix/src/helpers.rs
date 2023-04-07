@@ -127,49 +127,58 @@ pub fn clone_start_info(
     })
 }
 
-/// Instantiates a starnix kernel in the realm of the given namespace.
-///
-/// # Parameters
-///   - `kernels_dir`: The top-level directory where kernel configurations are stored.
-///   - `start_info`: The component start info used to create the configuration for the
-///                   starnix_kernel that will run the test.
-///
-/// Returns a proxy to the instantiated runner as well as to the realm in which the runner is
-/// instantiated.
-pub async fn instantiate_kernel_in_realm(
-    kernels_dir: &vfs::directory::immutable::Simple,
-    mut start_info: frunner::ComponentStartInfo,
-) -> Result<(frunner::ComponentRunnerProxy, fcomponent::RealmProxy, String), Error> {
-    const KERNELS_DIR_NAME: &str = "kernels";
+pub struct TestKernel {
+    pub kernel_runner: frunner::ComponentRunnerProxy,
+    pub realm: fcomponent::RealmProxy,
+    pub name: String,
+}
 
-    let runner_url = "starnix_kernel#meta/starnix_kernel.cm";
+impl TestKernel {
+    /// Instantiates a starnix kernel in the realm of the given namespace.
+    ///
+    /// # Parameters
+    ///   - `kernels_dir`: The top-level directory where kernel configurations are stored.
+    ///   - `start_info`: The component start info used to create the configuration for the
+    ///                   starnix_kernel that will run the test.
+    ///
+    /// Returns a proxy to the instantiated runner as well as to the realm in which the runner is
+    /// instantiated.
+    pub async fn instantiate_in_realm(
+        kernels_dir: &vfs::directory::immutable::Simple,
+        mut start_info: frunner::ComponentStartInfo,
+    ) -> Result<Self, Error> {
+        const KERNELS_DIR_NAME: &str = "kernels";
 
-    // Grab the realm from the component's namespace.
-    let realm =
-        get_realm(start_info.ns.as_mut().ok_or(anyhow!("Couldn't get realm from namespace"))?)?;
+        let runner_url = "starnix_kernel#meta/starnix_kernel.cm";
 
-    let kernel_start_info = generate_kernel_config(kernels_dir, KERNELS_DIR_NAME, start_info)?;
+        // Grab the realm from the component's namespace.
+        let realm =
+            get_realm(start_info.ns.as_mut().ok_or(anyhow!("Couldn't get realm from namespace"))?)?;
 
-    realm
-        .create_child(
-            &mut fdecl::CollectionRef { name: RUNNERS_COLLECTION.into() },
-            fdecl::Child {
-                name: Some(kernel_start_info.name.clone()),
-                url: Some(runner_url.to_string()),
-                startup: Some(fdecl::StartupMode::Lazy),
-                ..fdecl::Child::EMPTY
-            },
-            kernel_start_info.args,
-        )
-        .await?
-        .map_err(|e| anyhow::anyhow!("failed to create runner child: {:?}", e))?;
-    let runner_outgoing =
-        open_exposed_directory(&realm, &kernel_start_info.name, RUNNERS_COLLECTION).await?;
-    let starnix_kernel = fclient::connect_to_protocol_at_dir_root::<frunner::ComponentRunnerMarker>(
-        &runner_outgoing,
-    )?;
+        let kernel_start_info = generate_kernel_config(kernels_dir, KERNELS_DIR_NAME, start_info)?;
 
-    Ok((starnix_kernel, realm, kernel_start_info.name))
+        realm
+            .create_child(
+                &mut fdecl::CollectionRef { name: RUNNERS_COLLECTION.into() },
+                fdecl::Child {
+                    name: Some(kernel_start_info.name.clone()),
+                    url: Some(runner_url.to_string()),
+                    startup: Some(fdecl::StartupMode::Lazy),
+                    ..fdecl::Child::EMPTY
+                },
+                kernel_start_info.args,
+            )
+            .await?
+            .map_err(|e| anyhow::anyhow!("failed to create runner child: {:?}", e))?;
+        let runner_outgoing =
+            open_exposed_directory(&realm, &kernel_start_info.name, RUNNERS_COLLECTION).await?;
+
+        let kernel_runner = fclient::connect_to_protocol_at_dir_root::<
+            frunner::ComponentRunnerMarker,
+        >(&runner_outgoing)?;
+
+        Ok(Self { kernel_runner, realm, name: kernel_start_info.name })
+    }
 }
 
 /// Returns numbered handles with their respective stdout and stderr clients.

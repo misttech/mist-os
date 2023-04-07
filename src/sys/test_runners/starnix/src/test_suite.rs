@@ -35,8 +35,8 @@ pub async fn handle_suite_requests(
     // Instantiates a starnix_kernel instance in the test component's realm. Running the kernel
     // in the test realm allows coverage data to be collected for the runner itself, during the
     // execution of the test.
-    let (starnix_kernel, realm, kernel_name) =
-        instantiate_kernel_in_realm(kernels_dir, kernel_start_info).await?;
+    let TestKernel { kernel_runner: starnix_kernel, realm, name: kernel_name } =
+        TestKernel::instantiate_in_realm(kernels_dir, kernel_start_info).await?;
     debug!(%kernel_name, "instantiated starnix test kernel");
 
     while let Some(event) = stream.try_next().await? {
