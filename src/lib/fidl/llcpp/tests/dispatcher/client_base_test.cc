@@ -40,7 +40,7 @@ class GoodMessage {
                 .num_bytes = sizeof(content_),
             },
     };
-    return fidl::OutgoingMessage::FromEncodedCMessage(&c_msg);
+    return fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
   }
 
   FIDL_ALIGNDECL fidl_message_header_t content_ = {};

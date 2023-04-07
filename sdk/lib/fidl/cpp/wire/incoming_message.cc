@@ -24,11 +24,11 @@ EncodedMessage EncodedMessage::Create(cpp20::span<uint8_t> bytes, zx_handle_t* h
                         reinterpret_cast<fidl_handle_metadata_t*>(handle_metadata), handle_actual);
 }
 
-EncodedMessage EncodedMessage::FromEncodedCMessage(const fidl_incoming_msg_t* c_msg) {
+EncodedMessage EncodedMessage::FromEncodedCMessage(const fidl_incoming_msg_t& c_msg) {
   return EncodedMessage(
       &internal::ChannelTransport::VTable,
-      cpp20::span<uint8_t>{reinterpret_cast<uint8_t*>(c_msg->bytes), c_msg->num_bytes},
-      c_msg->handles, c_msg->handle_metadata, c_msg->num_handles);
+      cpp20::span<uint8_t>{reinterpret_cast<uint8_t*>(c_msg.bytes), c_msg.num_bytes}, c_msg.handles,
+      c_msg.handle_metadata, c_msg.num_handles);
 }
 
 fidl_incoming_msg_t EncodedMessage::ReleaseToEncodedCMessage() && {
@@ -62,11 +62,11 @@ EncodedMessage::EncodedMessage(const internal::TransportVTable* transport_vtable
 }
 
 IncomingHeaderAndMessage IncomingHeaderAndMessage::FromEncodedCMessage(
-    const fidl_incoming_msg_t* c_msg) {
-  ZX_DEBUG_ASSERT(c_msg->num_bytes >= sizeof(fidl_message_header_t));
+    const fidl_incoming_msg_t& c_msg) {
+  ZX_DEBUG_ASSERT(c_msg.num_bytes >= sizeof(fidl_message_header_t));
   return IncomingHeaderAndMessage(&internal::ChannelTransport::VTable,
-                                  reinterpret_cast<uint8_t*>(c_msg->bytes), c_msg->num_bytes,
-                                  c_msg->handles, c_msg->handle_metadata, c_msg->num_handles);
+                                  reinterpret_cast<uint8_t*>(c_msg.bytes), c_msg.num_bytes,
+                                  c_msg.handles, c_msg.handle_metadata, c_msg.num_handles);
 }
 
 IncomingHeaderAndMessage::~IncomingHeaderAndMessage() = default;

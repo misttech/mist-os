@@ -32,7 +32,7 @@ zx_protocol_device_t IntelHDAStreamConfigBase::STREAM_DEVICE_THUNKS = []() {
   sdt.message = [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
     IntelHDAStreamConfigBase* thiz = static_cast<IntelHDAStreamConfigBase*>(ctx);
     fidl::WireDispatch<fuchsia_hardware_audio::StreamConfigConnector>(
-        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
         ddk::FromDeviceFIDLTransaction(txn));
   };
   sdt.release = [](void* ctx) { reinterpret_cast<IntelHDAStreamConfigBase*>(ctx)->Deactivate(); };

@@ -92,8 +92,8 @@ TEST(OutgoingMessage, ConstructFromCIovecMessage) {
               .num_handles = 1,
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg);
-  ASSERT_EQ(FIDL_OUTGOING_MSG_TYPE_IOVEC, MessageChecker::GetCMessage(msg)->type);
+  auto msg = fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
+  ASSERT_EQ(FIDL_OUTGOING_MSG_TYPE_IOVEC, MessageChecker::GetCMessage(msg).type);
   ASSERT_EQ(&iovec, msg.iovecs());
   ASSERT_EQ(1u, msg.iovec_actual());
   ASSERT_EQ(&handle, msg.handles());
@@ -120,8 +120,8 @@ TEST(OutgoingMessage, ConstructFromCByteMessage) {
               .num_handles = 1,
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg);
-  ASSERT_EQ(FIDL_OUTGOING_MSG_TYPE_IOVEC, MessageChecker::GetCMessage(msg)->type);
+  auto msg = fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
+  ASSERT_EQ(FIDL_OUTGOING_MSG_TYPE_IOVEC, MessageChecker::GetCMessage(msg).type);
 
   ASSERT_NE(nullptr, msg.iovecs());
   ASSERT_EQ(1u, msg.iovec_actual());
@@ -157,7 +157,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMatch) {
               .num_iovecs = std::size(iovecs_a),
           },
   };
-  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_a);
+  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_a);
 
   uint8_t bytes_b1[]{1, 2};
   uint8_t bytes_b2[]{3};
@@ -187,7 +187,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMatch) {
               .num_iovecs = std::size(iovecs_b),
           },
   };
-  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_b);
+  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_b);
 
   EXPECT_TRUE(msg_a.BytesMatch(msg_b));
   EXPECT_TRUE(msg_b.BytesMatch(msg_a));
@@ -210,7 +210,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMatchIgnoreHandles) {
               .num_iovecs = std::size(iovecs),
           },
   };
-  auto msg_without_handles = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_without_handles);
+  auto msg_without_handles = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_without_handles);
 
   // Bytes should match even if one has handles and the other doesn't.
   zx_handle_t handle;
@@ -227,7 +227,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMatchIgnoreHandles) {
               .num_handles = 1,
           },
   };
-  auto msg_with_handles = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_with_handles);
+  auto msg_with_handles = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_with_handles);
 
   EXPECT_TRUE(msg_without_handles.BytesMatch(msg_with_handles));
   EXPECT_TRUE(msg_with_handles.BytesMatch(msg_without_handles));
@@ -252,7 +252,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMismatchByteLength) {
               .num_iovecs = std::size(iovecs_a),
           },
   };
-  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_a);
+  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_a);
 
   // 3 bytes.
   zx_channel_iovec_t iovecs_b[] = {
@@ -270,7 +270,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMismatchByteLength) {
               .num_iovecs = std::size(iovecs_b),
           },
   };
-  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_b);
+  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_b);
 
   EXPECT_FALSE(msg_a.BytesMatch(msg_b));
   EXPECT_FALSE(msg_b.BytesMatch(msg_a));
@@ -296,7 +296,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMismatchIovecLength) {
               .num_iovecs = std::size(iovecs_a),
           },
   };
-  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_a);
+  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_a);
 
   // 2 iovecs.
   zx_channel_iovec_t iovecs_b[] = {
@@ -319,7 +319,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMismatchIovecLength) {
               .num_iovecs = std::size(iovecs_b),
           },
   };
-  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_b);
+  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_b);
 
   EXPECT_FALSE(msg_a.BytesMatch(msg_b));
   EXPECT_FALSE(msg_b.BytesMatch(msg_a));
@@ -348,7 +348,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMismatch) {
               .num_iovecs = std::size(iovecs_a),
           },
   };
-  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_a);
+  auto msg_a = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_a);
 
   uint8_t bytes_b1[]{1, 2};
   uint8_t bytes_b2[]{5};
@@ -378,7 +378,7 @@ TEST(OutgoingMessage, OutgoingMessageBytesMismatch) {
               .num_iovecs = std::size(iovecs_b),
           },
   };
-  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg_b);
+  auto msg_b = fidl::OutgoingMessage::FromEncodedCMessage(c_msg_b);
 
   EXPECT_FALSE(msg_a.BytesMatch(msg_b));
   EXPECT_FALSE(msg_b.BytesMatch(msg_a));
@@ -413,7 +413,7 @@ TEST(OutgoingMessage, OutgoingMessageCopiedBytes) {
               .num_iovecs = std::size(iovecs),
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCMessage(&c_msg);
+  auto msg = fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
 
   uint8_t expected_bytes[] = {1, 2, 3, 4};
   EXPECT_EQ(4u, msg.CountBytes());

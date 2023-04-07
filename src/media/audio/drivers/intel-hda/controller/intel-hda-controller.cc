@@ -44,7 +44,7 @@ zx_protocol_device_t IntelHDAController::CONTROLLER_DEVICE_THUNKS = []() {
   ops.message = [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
     IntelHDAController* thiz = static_cast<IntelHDAController*>(ctx);
     fidl::WireDispatch<fuchsia_hardware_intel_hda::ControllerDevice>(
-        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+        thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
         ddk::FromDeviceFIDLTransaction(txn));
   };
   return ops;

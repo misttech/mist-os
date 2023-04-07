@@ -70,7 +70,7 @@ zx_status_t test_driver_start(EncodedDriverStartArgs encoded_start_args,
   auto wire_format_metadata =
       fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
   auto decoded = fidl::StandaloneInplaceDecode<fdf::wire::DriverStartArgs>(
-      fidl::EncodedMessage::FromEncodedCMessage(encoded_start_args.msg), wire_format_metadata);
+      fidl::EncodedMessage::FromEncodedCMessage(*encoded_start_args.msg), wire_format_metadata);
   if (!decoded.is_ok()) {
     return decoded.error_value().status();
   }

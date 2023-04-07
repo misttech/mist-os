@@ -33,7 +33,7 @@ void backlight_message(void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn
     ptr = static_cast<display_ref_t*>(ctx)->display_device;
   }
   fidl::WireDispatch<fuchsia_hardware_backlight::Device>(
-      ptr, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+      ptr, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
       ddk::FromDeviceFIDLTransaction(txn));
 }
 

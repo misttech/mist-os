@@ -154,7 +154,7 @@ class DecodedMessage<FidlType, Transport,
   static_assert(!IsFidlTransactionalMessage<FidlType>::value);
 
  public:
-  DecodedMessage(uint8_t* bytes, uint32_t byte_actual, zx_handle_t* handles = nullptr,
+  DecodedMessage(const uint8_t* bytes, uint32_t byte_actual, const zx_handle_t* handles = nullptr,
                  typename Transport::HandleMetadata* handle_metadata = nullptr,
                  uint32_t handle_actual = 0)
       : DecodedMessage(::fidl::internal::WireFormatVersion::kV2, bytes, byte_actual, handles,
@@ -180,18 +180,18 @@ class DecodedMessage<FidlType, Transport,
     value_ = std::move(result.value());
   }
 
-  explicit DecodedMessage(const fidl_incoming_msg_t* c_msg)
-      : DecodedMessage(static_cast<uint8_t*>(c_msg->bytes), c_msg->num_bytes, c_msg->handles,
-                       reinterpret_cast<fidl_channel_handle_metadata_t*>(c_msg->handle_metadata),
-                       c_msg->num_handles) {}
+  explicit DecodedMessage(const fidl_incoming_msg_t& c_msg)
+      : DecodedMessage(static_cast<uint8_t*>(c_msg.bytes), c_msg.num_bytes, c_msg.handles,
+                       reinterpret_cast<fidl_channel_handle_metadata_t*>(c_msg.handle_metadata),
+                       c_msg.num_handles) {}
 
   // Internal constructor for specifying a specific wire format version.
   DecodedMessage(::fidl::internal::WireFormatVersion wire_format_version,
-                 const fidl_incoming_msg_t* c_msg)
-      : DecodedMessage(wire_format_version, static_cast<uint8_t*>(c_msg->bytes), c_msg->num_bytes,
-                       c_msg->handles,
-                       reinterpret_cast<fidl_channel_handle_metadata_t*>(c_msg->handle_metadata),
-                       c_msg->num_handles) {}
+                 const fidl_incoming_msg_t& c_msg)
+      : DecodedMessage(wire_format_version, static_cast<uint8_t*>(c_msg.bytes), c_msg.num_bytes,
+                       c_msg.handles,
+                       reinterpret_cast<fidl_channel_handle_metadata_t*>(c_msg.handle_metadata),
+                       c_msg.num_handles) {}
 
   ~DecodedMessage() = default;
 

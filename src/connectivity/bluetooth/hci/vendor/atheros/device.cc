@@ -48,7 +48,7 @@ constexpr zx_protocol_device_t dev_proto = {
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           Device* thiz = static_cast<Device*>(ctx);
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
-              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+              thiz, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
 };

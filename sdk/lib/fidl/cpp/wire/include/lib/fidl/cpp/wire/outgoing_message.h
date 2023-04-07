@@ -65,12 +65,12 @@ class OutgoingMessage : public ::fidl::Status {
   // use other constructors of |OutgoingMessage|.
   //
   // The bytes must represent a transactional message.
-  static OutgoingMessage FromEncodedCMessage(const fidl_outgoing_msg_t* c_msg);
+  static OutgoingMessage FromEncodedCMessage(const fidl_outgoing_msg_t& c_msg);
 
   // Creates an object which can manage an encoded FIDL value.
   // This is identical to |FromEncodedCMessage| but the |OutgoingMessage|
   // is non-transactional instead of transactional.
-  static OutgoingMessage FromEncodedCValue(const fidl_outgoing_msg_t* c_msg);
+  static OutgoingMessage FromEncodedCValue(const fidl_outgoing_msg_t& c_msg);
 
   struct InternalIovecConstructorArgs {
     const internal::TransportVTable* transport_vtable;
@@ -217,7 +217,7 @@ class OutgoingMessage : public ::fidl::Status {
   bool is_transactional() const { return is_transactional_; }
 
  private:
-  OutgoingMessage(fidl_outgoing_msg_t msg, uint32_t handle_capacity)
+  OutgoingMessage(const fidl_outgoing_msg_t& msg, uint32_t handle_capacity)
       : ::fidl::Status(::fidl::Status::Ok()), message_(msg), handle_capacity_(handle_capacity) {}
 
   void EncodeImpl(fidl::internal::WireFormatVersion wire_format_version, void* data,
@@ -232,7 +232,7 @@ class OutgoingMessage : public ::fidl::Status {
 
   explicit OutgoingMessage(InternalIovecConstructorArgs args);
   explicit OutgoingMessage(InternalByteBackedConstructorArgs args);
-  explicit OutgoingMessage(const fidl_outgoing_msg_t* msg, bool is_transactional);
+  explicit OutgoingMessage(const fidl_outgoing_msg_t& msg, bool is_transactional);
 
   fidl::IncomingHeaderAndMessage CallImpl(internal::AnyUnownedTransport transport,
                                           internal::MessageStorageViewBase& storage,
@@ -256,7 +256,7 @@ class OutgoingMessage : public ::fidl::Status {
   uint32_t backing_buffer_capacity_ = 0;
   uint8_t* backing_buffer_ = nullptr;
 
-  // If OutgoingMessage is constructed with a fidl_outgoing_msg_t* that contains bytes
+  // If OutgoingMessage is constructed with a fidl_outgoing_msg_t that contains bytes
   // rather than iovec, it is converted to a single-element iovec pointing to the bytes.
   zx_channel_iovec_t converted_byte_message_iovec_ = {};
   bool is_transactional_ = false;

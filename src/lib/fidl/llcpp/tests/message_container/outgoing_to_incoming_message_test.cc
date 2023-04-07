@@ -31,7 +31,7 @@ TEST(OutgoingToEncodedMessage, IovecMessage) {
               .num_iovecs = std::size(iovecs),
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(&c_msg);
+  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_OK, result.status());
   ASSERT_EQ(std::size(bytes1) + std::size(bytes2), result.message().bytes().size());
@@ -54,7 +54,7 @@ TEST(OutgoingToEncodedMessage, LargeMessage) {
               .num_bytes = kLargeMessageSize,
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(&c_msg);
+  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_OK, result.status());
   EXPECT_EQ(bytes, std::vector(result.message().bytes().begin(), result.message().bytes().end()));
@@ -87,7 +87,7 @@ TEST(OutgoingToEncodedMessage, Handles) {
               .num_handles = 1,
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(&c_msg);
+  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_OK, result.status());
   fidl::EncodedMessage& output = result.message();
@@ -126,7 +126,7 @@ TEST(OutgoingToEncodedMessage, HandlesWrongType) {
               .num_handles = 1,
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(&c_msg);
+  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, result.status());
   ASSERT_EQ(fidl::Reason::kEncodeError, result.error().reason());
@@ -157,7 +157,7 @@ TEST(OutgoingToEncodedMessage, HandlesWrongRights) {
               .num_handles = 1,
           },
   };
-  auto msg = fidl::OutgoingMessage::FromEncodedCValue(&c_msg);
+  auto msg = fidl::OutgoingMessage::FromEncodedCValue(c_msg);
   auto result = fidl::OutgoingToEncodedMessage(msg);
   ASSERT_EQ(ZX_ERR_INVALID_ARGS, result.status());
   ASSERT_EQ(fidl::Reason::kEncodeError, result.error().reason());

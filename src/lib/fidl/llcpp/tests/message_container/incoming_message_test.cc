@@ -74,7 +74,7 @@ TEST_F(IncomingMessageWithHandlesTest, AdoptHandlesFromC) {
       .num_bytes = static_cast<uint32_t>(std::size(bytes_)),
       .num_handles = static_cast<uint32_t>(std::size(handles_)),
   };
-  auto incoming = fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&c_msg);
+  auto incoming = fidl::IncomingHeaderAndMessage::FromEncodedCMessage(c_msg);
   EXPECT_EQ(ZX_OK, incoming.status());
 }
 
@@ -116,7 +116,7 @@ TEST_F(IncomingMessageWithHandlesTest, ReleaseHandles) {
   }
 
   // Adopt the handles again to close them.
-  auto incoming = fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&c_msg);
+  auto incoming = fidl::IncomingHeaderAndMessage::FromEncodedCMessage(c_msg);
 }
 
 TEST_F(IncomingMessageWithHandlesTest, MoveConstructorHandleOwnership) {

@@ -73,7 +73,7 @@ class EncodedMessage {
   // The bytes must represent a regular FIDL message instead of a transactional
   // message. To adopt a transactional message, see
   // |IncomingHeaderAndMessage::FromEncodedCMessage|.
-  static EncodedMessage FromEncodedCMessage(const fidl_incoming_msg_t* c_msg);
+  static EncodedMessage FromEncodedCMessage(const fidl_incoming_msg_t& c_msg);
 
   // Convert the incoming message to its C API counterpart, releasing the
   // ownership of handles to the caller in the process. This consumes the
@@ -224,7 +224,7 @@ class IncomingHeaderAndMessage : public ::fidl::Status {
   // The handles in |c_msg| are owned by the returned |IncomingHeaderAndMessage| object.
   //
   // The bytes must represent a transactional message.
-  static IncomingHeaderAndMessage FromEncodedCMessage(const fidl_incoming_msg_t* c_msg);
+  static IncomingHeaderAndMessage FromEncodedCMessage(const fidl_incoming_msg_t& c_msg);
 
   // Creates an empty incoming message representing an error (e.g. failed to read from
   // a channel).

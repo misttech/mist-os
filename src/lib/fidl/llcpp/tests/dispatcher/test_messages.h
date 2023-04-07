@@ -29,7 +29,7 @@ class GoodMessage {
                 .num_bytes = sizeof(content_),
             },
     };
-    return fidl::OutgoingMessage::FromEncodedCMessage(&c_msg);
+    return fidl::OutgoingMessage::FromEncodedCMessage(c_msg);
   }
 
  private:

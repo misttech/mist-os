@@ -13,7 +13,9 @@ namespace fidl_testing {
 // tests that depend on the private states of message objects.
 class MessageChecker {
  public:
-  static fidl_outgoing_msg_t* GetCMessage(::fidl::OutgoingMessage& msg) { return &msg.message_; }
+  static const fidl_outgoing_msg_t& GetCMessage(::fidl::OutgoingMessage& msg) {
+    return msg.message_;
+  }
 };
 
 }  // namespace fidl_testing

@@ -13,28 +13,27 @@
 
 namespace fidl {
 
-OutgoingMessage OutgoingMessage::FromEncodedCMessage(const fidl_outgoing_msg_t* c_msg) {
+OutgoingMessage OutgoingMessage::FromEncodedCMessage(const fidl_outgoing_msg_t& c_msg) {
   return OutgoingMessage(c_msg, true);
 }
 
-OutgoingMessage OutgoingMessage::FromEncodedCValue(const fidl_outgoing_msg_t* c_msg) {
+OutgoingMessage OutgoingMessage::FromEncodedCValue(const fidl_outgoing_msg_t& c_msg) {
   return OutgoingMessage(c_msg, false);
 }
 
-OutgoingMessage::OutgoingMessage(const fidl_outgoing_msg_t* c_msg, bool is_transactional)
+OutgoingMessage::OutgoingMessage(const fidl_outgoing_msg_t& c_msg, bool is_transactional)
     : fidl::Status(fidl::Status::Ok()) {
-  ZX_ASSERT(c_msg);
   transport_vtable_ = &internal::ChannelTransport::VTable;
-  switch (c_msg->type) {
+  switch (c_msg.type) {
     case FIDL_OUTGOING_MSG_TYPE_IOVEC: {
-      message_ = *c_msg;
-      iovec_capacity_ = c_msg->iovec.num_iovecs;
-      handle_capacity_ = c_msg->iovec.num_handles;
+      message_ = c_msg;
+      iovec_capacity_ = c_msg.iovec.num_iovecs;
+      handle_capacity_ = c_msg.iovec.num_handles;
       break;
     }
     case FIDL_OUTGOING_MSG_TYPE_BYTE: {
-      backing_buffer_ = reinterpret_cast<uint8_t*>(c_msg->byte.bytes);
-      backing_buffer_capacity_ = c_msg->byte.num_bytes;
+      backing_buffer_ = reinterpret_cast<uint8_t*>(c_msg.byte.bytes);
+      backing_buffer_capacity_ = c_msg.byte.num_bytes;
       converted_byte_message_iovec_ = {
           .buffer = backing_buffer_,
           .capacity = backing_buffer_capacity_,
@@ -46,13 +45,13 @@ OutgoingMessage::OutgoingMessage(const fidl_outgoing_msg_t* c_msg, bool is_trans
               {
                   .iovecs = &converted_byte_message_iovec_,
                   .num_iovecs = 1,
-                  .handles = c_msg->byte.handles,
-                  .handle_metadata = c_msg->byte.handle_metadata,
-                  .num_handles = c_msg->byte.num_handles,
+                  .handles = c_msg.byte.handles,
+                  .handle_metadata = c_msg.byte.handle_metadata,
+                  .num_handles = c_msg.byte.num_handles,
               },
       };
       iovec_capacity_ = 1;
-      handle_capacity_ = c_msg->byte.num_handles;
+      handle_capacity_ = c_msg.byte.num_handles;
       break;
     }
     default:

@@ -57,7 +57,7 @@ struct WlantapCtl : fidl::WireServer<fuchsia_wlan_tap::WlantapCtl> {
     auto self = static_cast<WlantapCtl*>(ctx);
 
     fidl::WireDispatch<fuchsia_wlan_tap::WlantapCtl>(
-        self, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+        self, fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
         ddk::FromDeviceFIDLTransaction(txn));
   }
 

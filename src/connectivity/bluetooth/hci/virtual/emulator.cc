@@ -84,7 +84,7 @@ constexpr zx_protocol_device_t bt_emulator_device_ops = {
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "EmulatorMessage\n");
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Emulator>(
-              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
 };
@@ -102,7 +102,7 @@ constexpr zx_protocol_device_t bt_hci_device_ops = {
         [](void* ctx, fidl_incoming_msg_t msg, device_fidl_txn_t txn) {
           logf(TRACE, "HciMessage\n");
           fidl::WireDispatch<fuchsia_hardware_bluetooth::Hci>(
-              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(&msg),
+              DEV(ctx), fidl::IncomingHeaderAndMessage::FromEncodedCMessage(msg),
               ddk::FromDeviceFIDLTransaction(txn));
         },
 };
