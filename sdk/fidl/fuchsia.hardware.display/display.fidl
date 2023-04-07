@@ -15,11 +15,6 @@ type Mode = struct {
     flags uint32;
 };
 
-// === Mode flags ===
-
-// Flag for interlaced display modes.
-const MODE_INTERLACED int32 = 0x1;
-
 // Info contains the information about a particular attached display.
 type Info = struct {
     id uint64;
