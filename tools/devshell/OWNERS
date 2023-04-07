@@ -23,6 +23,8 @@ per-file             list-products,ninjatrace2json,set-build-dir,use      = file
 # per-file-COMPONENT list-products,ninjatrace2json,set-build-dir,use      = Build>Workflow
 per-file             list-packages,get-src-dir                            = file: /build/OWNERS
 # per-file-COMPONENT list-packages,get-src-dir                            = Build>Workflow
+per-file             get-flash-source                                     = file: /build/OWNERS
+# per-file-COMPONENT get-flash-source                                     = Build>Workdlow
 
 per-file             repro = olivernewman@google.com
 # per-file-COMPONENT repro = Build>Workflow
