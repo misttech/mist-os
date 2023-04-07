@@ -756,9 +756,6 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::RenderFrame");
   std::scoped_lock lock(lock_);
 
-  // Config should be reset before doing anything new.
-  DiscardConfig();
-
   // Determine whether we need to fall back to GPU composition. Avoid calling CheckConfig() if we
   // don't need to, because this requires a round-trip to the display controller.
   // Note: SetRenderDatasOnDisplay() failing indicates hardware failure to do display composition.
@@ -766,7 +763,12 @@ void DisplayCompositor::RenderFrame(const uint64_t frame_number, const zx::time 
       !enable_display_composition_ || !SetRenderDatasOnDisplay(render_data_list) || !CheckConfig();
 
   if (fallback_to_gpu_composition) {
-    DiscardConfig();
+    // Discard only if we have attempted to SetRenderDatasOnDisplay() and have an unapplied config.
+    // DiscardConfig call is costly and we should avoid calling when it isnt necessary.
+    if (enable_display_composition_) {
+      DiscardConfig();
+    }
+
     if (!PerformGpuComposition(frame_number, presentation_time, render_data_list,
                                std::move(release_fences), std::move(callback))) {
       return;

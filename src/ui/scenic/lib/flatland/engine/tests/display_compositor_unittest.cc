@@ -995,15 +995,6 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   display_compositor_->SetColorConversionValues({1, 0, 0, 0, 1, 0, 0, 0, 1}, {0.1f, 0.2f, 0.3f},
                                                 {-0.3f, -0.2f, -0.1f});
 
-  // We start the frame by clearing the config.
-  EXPECT_CALL(*mock_display_controller_, CheckConfig(true, _))
-      .WillOnce(testing::Invoke([&](bool, MockDisplayController::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
-        std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-        callback(result, ops);
-      }));
-
   // Setup the EXPECT_CALLs for gmock.
   uint64_t layer_id = 1;
   EXPECT_CALL(*mock_display_controller_, CreateLayer(_))
@@ -1182,15 +1173,6 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
   display_compositor_->SetColorConversionValues({1, 0, 0, 0, 1, 0, 0, 0, 1}, {0.1f, 0.2f, 0.3f},
                                                 {-0.3f, -0.2f, -0.1f});
 
-  // We start the frame by clearing the config.
-  EXPECT_CALL(*mock_display_controller_, CheckConfig(true, _))
-      .WillOnce(testing::Invoke([&](bool, MockDisplayController::CheckConfigCallback callback) {
-        fuchsia::hardware::display::ConfigResult result =
-            fuchsia::hardware::display::ConfigResult::OK;
-        std::vector<fuchsia::hardware::display::ClientCompositionOp> ops;
-        callback(result, ops);
-      }));
-
   // Setup the EXPECT_CALLs for gmock.
   // Note that a couple of layers are created upfront for the display.
   uint64_t layer_id = 1;
@@ -1248,7 +1230,9 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       GenerateDisplayListForTest({{display_id, {display_info, parent_root_handle}}}), {},
       [](const scheduling::Timestamps&) {});
 
-  EXPECT_CALL(*mock_display_controller_, DestroyLayer(layers[0]));
+  for (uint64_t i = 1; i < layer_id; ++i) {
+    EXPECT_CALL(*mock_display_controller_, DestroyLayer(i));
+  }
 
   EXPECT_CALL(*mock_display_controller_, CheckConfig(_, _))
       .WillOnce(testing::Invoke([&](bool, MockDisplayController::CheckConfigCallback callback) {
