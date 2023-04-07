@@ -5,6 +5,7 @@
 import("//build/compiled_action.gni")
 import("//build/info/info.gni")
 import("//build/python/python_action.gni")
+import("//build/sdk/product_bundle_transfer_manifest.gni")
 import("//build/security/verifier/scrutiny_verifiers.gni")
 import("//sdk/config.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
@@ -99,12 +100,10 @@ template("product_bundle") {
     hermetic_inputs_depfile =
         "${target_out_dir}/${target_name}_hermetic_inputs.d"
     outdir = "$target_out_dir/$target_name"
+    target_out_dir = target_out_dir
     product_bundle_manifest = "${outdir}/product_bundle.json"
     vd_dir = "${outdir}/virtual_devices"
     transfer_manifest = "$target_out_dir/transfer.json"
-    all_blobs_json = "$target_out_dir/all_blobs.json"
-    images_json = "$target_out_dir/images.json"
-    targets_json = "$target_out_dir/targets.json"
     tuf_keys = "//src/sys/pkg/repositories/devhost/keys"
   }
 
@@ -326,48 +325,19 @@ template("product_bundle") {
     }
   }
 
-  compiled_action(labels.transfer_manifest) {
+  product_bundle_transfer_manifest(labels.transfer_manifest) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
+    product_bundle_target = ":${labels.product_bundle}"
+    output_dir = files.target_out_dir
+    product_bundle_dir = files.outdir
 
-    tool = "//tools/pbtool"
-
-    # Constructing the transfer manifest requires walking the TUF metadata and
-    # reading meta.fars from the blobs directory. Determining exactly which
-    # files are read is quite difficult, therefore we ignore some entire
-    # directories.
-    hermetic_action_ignored_prefixes = [
-      "${files.outdir}/blobs",
-      "${files.outdir}/repository",
-    ]
-
-    deps = [ ":${labels.product_bundle}" ]
-    inputs = [ files.product_bundle_manifest ]
-    outputs = [
-      files.all_blobs_json,
-      files.images_json,
-      files.targets_json,
-      files.transfer_manifest,
-    ]
-
-    args = [
-      "generate-transfer-manifest",
-      "--product-bundle",
-      rebase_path(files.outdir, root_build_dir),
-      "--out-dir",
-      rebase_path(target_out_dir, root_build_dir),
-    ]
-
-    if (virtual_devices != []) {
-      inputs += [ "${files.vd_dir}/manifest.json" ]
-    }
-    foreach(virtual_device, virtual_devices) {
-      vd_filename = get_path_info(virtual_device, "file")
-      inputs += [ "${files.vd_dir}/${vd_filename}" ]
-    }
+    # The definition of metadata.product_bundles.transfer_manifest_path
+    # below depends on the following assertion.
+    assert("${output_dir}/transfer.json" == files.transfer_manifest)
   }
 
   if (!skip_scrutiny) {
@@ -434,8 +404,7 @@ template("product_bundle") {
           product_version = product_version
           transfer_manifest_path =
               rebase_path(files.transfer_manifest, root_build_dir)
-          transfer_manifest_url =
-              "file://" + rebase_path(files.transfer_manifest, root_build_dir)
+          transfer_manifest_url = "file://" + transfer_manifest_path
         },
       ]
     }

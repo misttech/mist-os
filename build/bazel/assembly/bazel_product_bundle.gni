@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_action.gni")
 import("//build/images/args.gni")
+import("//build/sdk/product_bundle_transfer_manifest.gni")
 import("//bundles/assembly/platform_aibs.gni")
 import("//src/sys/pkg/bin/package-tool/package-tool.gni")
 
@@ -169,6 +170,16 @@ template("bazel_product_bundle") {
             bootserver_pave = []
           },
         ]
+
+        product_bundles = [
+          {
+            label = get_label_info(":$target_name", "label_with_toolchain")
+            path = rebase_path("$target_gen_dir/product_bundle", root_build_dir)
+            transfer_manifest_path =
+                rebase_path("$target_gen_dir/transfer.json", root_build_dir)
+            transfer_manifest_url = "file://" + transfer_manifest_path
+          },
+        ]
       }
     }
   }
@@ -187,6 +198,19 @@ template("bazel_product_bundle") {
     deps = [ ":${_bazel_action_target}" ]
   }
 
+  _transfer_manifest_target = "${target_name}_transfer_manifest"
+
+  product_bundle_transfer_manifest(_transfer_manifest_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    product_bundle_target = ":${_bazel_action_target}"
+    product_bundle_dir = target_gen_dir + "/product_bundle"
+    output_dir = target_gen_dir
+  }
+
   # A convenience group for easy `fx build` invocation.
   group(target_name) {
     forward_variables_from(invoker,
@@ -197,6 +221,7 @@ template("bazel_product_bundle") {
     deps = [
       ":${_bazel_action_target}",
       ":${_package_manifests_list_target}",
+      ":${_transfer_manifest_target}",
     ]
   }
 }

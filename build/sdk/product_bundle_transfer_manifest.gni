@@ -1,0 +1,76 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/compiled_action.gni")
+
+# Generate the transfer manifest of a given product bundle.
+# This actually outputs four different files:
+#
+#    all_blobs.json
+#    targets.json
+#    images.json
+#    transfer.json
+#
+# Arguments:
+#    product_bundle_target: (required)
+#       Target generating the product bundle.
+#       Type: GN label string.
+#
+#    product_bundir_dir: (required)
+#       Input product bundle directory.
+#       Type: GN path string.
+#
+#    output_dir: (optional)
+#       Output path location, defaults to target_out_dir
+#       Type: GN path string.
+#
+#   testonly, visibility
+#       Usual GN meaning.
+#
+template("product_bundle_transfer_manifest") {
+  _product_bundle_dir = invoker.product_bundle_dir
+  _product_bundle_target = invoker.product_bundle_target
+
+  _out_dir = target_out_dir
+  if (defined(invoker.output_dir)) {
+    _out_dir = invoker.output_dir
+  }
+
+  compiled_action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+
+    tool = "//tools/pbtool"
+
+    # Constructing the transfer manifest requires walking the TUF metadata and
+    # reading meta.fars from the blobs directory. Determining exactly which
+    # files are read is quite difficult, therefore we ignore some entire
+    # directories.
+    hermetic_action_ignored_prefixes = [
+      "${_product_bundle_dir}/blobs",
+      "${_product_bundle_dir}/repository",
+      "${_product_bundle_dir}/virtual_devices",
+    ]
+
+    deps = [ _product_bundle_target ]
+    inputs = [ "${_product_bundle_dir}/product_bundle.json" ]
+    outputs = [
+      "${_out_dir}/all_blobs.json",
+      "${_out_dir}/images.json",
+      "${_out_dir}/targets.json",
+      "${_out_dir}/transfer.json",
+    ]
+
+    args = [
+      "generate-transfer-manifest",
+      "--product-bundle",
+      rebase_path(_product_bundle_dir, root_build_dir),
+      "--out-dir",
+      rebase_path(_out_dir, root_build_dir),
+    ]
+  }
+}
