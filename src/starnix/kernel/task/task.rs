@@ -132,19 +132,23 @@ pub enum SchedulerPolicy {
 }
 
 impl SchedulerPolicy {
-    pub fn from_raw(policy: u32, params: sched_param) -> Result<Self, Errno> {
+    pub fn from_raw(policy: u32, params: sched_param, rlimit: u64) -> Result<Self, Errno> {
         let valid_priorities =
             min_priority_for_sched_policy(policy)?..=max_priority_for_sched_policy(policy)?;
         if !valid_priorities.contains(&params.sched_priority) {
             return error!(EINVAL);
         }
-        // ok to cast i32->u32, above range excludes negatives
-        match (policy, params.sched_priority as u32) {
+        // ok to cast i32->u64, above range excludes negatives
+        match (policy, params.sched_priority as u64) {
             (SCHED_NORMAL, 0) => Ok(Self::Normal),
             (SCHED_BATCH, 0) => Ok(Self::Batch),
             (SCHED_IDLE, 0) => Ok(Self::Idle),
-            (SCHED_FIFO, priority) => Ok(Self::Fifo { priority }),
-            (SCHED_RR, priority) => Ok(Self::RoundRobin { priority }),
+            (SCHED_FIFO, priority) => {
+                Ok(Self::Fifo { priority: std::cmp::min(priority, rlimit) as u32 })
+            }
+            (SCHED_RR, priority) => {
+                Ok(Self::RoundRobin { priority: std::cmp::min(priority, rlimit) as u32 })
+            }
             _ => error!(EINVAL),
         }
     }

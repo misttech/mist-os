@@ -459,13 +459,8 @@ pub fn sys_sched_getscheduler(current_task: &CurrentTask, pid: pid_t) -> Result<
         return error!(EINVAL);
     }
 
-    let target = if pid == 0 {
-        current_task.task.clone()
-    } else {
-        current_task.task.get_task(pid).ok_or(errno!(ESRCH))?
-    };
-
-    let current_policy = target.read().scheduler_policy;
+    let target_task = get_task_or_current(current_task, pid)?;
+    let current_policy = target_task.read().scheduler_policy;
     Ok(current_policy.raw_policy())
 }
 
@@ -479,16 +474,13 @@ pub fn sys_sched_setscheduler(
         return error!(EINVAL);
     }
 
-    let target = if pid == 0 {
-        current_task.task.clone()
-    } else {
-        current_task.task.get_task(pid).ok_or(errno!(ESRCH))?
-    };
+    let target_task = get_task_or_current(current_task, pid)?;
+    let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
 
     let param: sched_param = current_task.mm.read_object(param.into())?;
-    let policy = SchedulerPolicy::from_raw(policy, param)?;
+    let policy = SchedulerPolicy::from_raw(policy, param, rlimit)?;
     // TODO(https://fxbug.dev/123174) make zircon aware of this update
-    target.write().scheduler_policy = policy;
+    target_task.write().scheduler_policy = policy;
 
     Ok(())
 }
@@ -534,12 +526,8 @@ pub fn sys_sched_getparam(
         return error!(EINVAL);
     }
 
-    let target = if pid == 0 {
-        current_task.task.clone()
-    } else {
-        current_task.task.get_task(pid).ok_or(errno!(ESRCH))?
-    };
-    let param_value = target.read().scheduler_policy.raw_params();
+    let target_task = get_task_or_current(current_task, pid)?;
+    let param_value = target_task.read().scheduler_policy.raw_params();
     current_task.mm.write_object(param.into(), &param_value)?;
     Ok(())
 }
@@ -1065,8 +1053,8 @@ pub fn sys_getpriority(current_task: &CurrentTask, which: u32, who: i32) -> Resu
         _ => return error!(EINVAL),
     }
     // TODO(tbodt): check permissions
-    let task = get_task_or_current(current_task, who)?;
-    let state = task.read();
+    let target_task = get_task_or_current(current_task, who)?;
+    let state = target_task.read();
     Ok(state.priority)
 }
 
@@ -1081,13 +1069,13 @@ pub fn sys_setpriority(
         _ => return error!(EINVAL),
     }
     // TODO(tbodt): check permissions
-    let task = get_task_or_current(current_task, who)?;
+    let target_task = get_task_or_current(current_task, who)?;
     // The priority passed into setpriority is actually in the -19...20 range and is not
     // transformed into the 1...40 range. The man page is lying. (I sent a patch, so it might not
     // be lying anymore by the time you read this.)
     let priority = 20 - priority;
-    let max_priority = std::cmp::min(40, task.thread_group.get_rlimit(Resource::NICE));
-    task.write().priority = priority.clamp(1, max_priority as i32) as u8;
+    let max_priority = std::cmp::min(40, target_task.thread_group.get_rlimit(Resource::NICE));
+    target_task.write().priority = priority.clamp(1, max_priority as i32) as u8;
     Ok(())
 }
 
