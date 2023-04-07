@@ -25,8 +25,11 @@ TEST_F(BanjoProxyTest, ChildBinds) {
   // Start DriverTestRealm.
   fidl::SynchronousInterfacePtr<fuchsia::driver::test::Realm> driver_test_realm;
   ASSERT_EQ(ZX_OK, realm.component().Connect(driver_test_realm.NewRequest()));
+  fuchsia::driver::test::RealmArgs args;
+  // Explicitly mark this as a DFv1 test as this uses banjo proxying which is deprecated.
+  args.set_use_driver_framework_v2(false);
   fuchsia::driver::test::Realm_Start_Result realm_result;
-  ASSERT_EQ(ZX_OK, driver_test_realm->Start(fuchsia::driver::test::RealmArgs(), &realm_result));
+  ASSERT_EQ(ZX_OK, driver_test_realm->Start(std::move(args), &realm_result));
   ASSERT_FALSE(realm_result.is_err());
 
   // Connect to dev.
