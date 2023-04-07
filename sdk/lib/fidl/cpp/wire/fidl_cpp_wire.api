@@ -11,7 +11,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/connect_service.h": "bdcddf6d1cc3bd54508b381a530a3532",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/decoded_value.h": "c429c5bee0cb6c04170fb7c80b7ce048",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/envelope.h": "dd182e1ba484a861570df80ee3188792",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/extract_resource_on_destruction.h": "6c224ef7d609cb1e07d0ad4894aec54e",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/extract_resource_on_destruction.h": "3140a844ac437694842ead57b63a4733",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/incoming_message.h": "8dda73269886993965f8e07c189f7f73",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/arrow.h": "4dfc87d35dd820b80460f4f66ff7d0b5",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/client_continuation.h": "ccea0cfdb8edfa53755611ea750b7b47",
@@ -32,7 +32,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/transport.h": "fa9d35cb9588f1241ab6e9e0c6de66bc",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/transport_channel.h": "befe09f77584082fd7a3f09dff67bcd8",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/transport_err.h": "d4010128b391d07bbfd8a7ac54c76449",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/message.h": "1435ca9b10b0feace5465657ec619ded",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/message.h": "a09299546903710984453e97db73db41",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/message_storage.h": "0069b96d5a8d53ce94cf924d5eee6e63",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/object_view.h": "63e1aa32ca56e07c4d5a2ceefa204fe3",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/optional.h": "dc0074fa8d150918608a42dd5e84c4c0",
@@ -53,5 +53,5 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_encoder.h": "8eca2dd7afd27f592c81064134c9a3af",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_messaging.h": "a94d10e8975fdf7bbfe858f3ba9228ed",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_messaging_declarations.h": "63e5c70248ec1a447692e661756be5b1",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_types.h": "ade0fc08880304dcc459bde71eee8d60"
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/wire_types.h": "3061242281a11eb319184ee573488beb"
 }

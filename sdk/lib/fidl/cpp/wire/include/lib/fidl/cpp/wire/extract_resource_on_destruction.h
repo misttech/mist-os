@@ -8,6 +8,7 @@
 #include <lib/sync/completion.h>
 #include <lib/zx/channel.h>
 #include <zircon/assert.h>
+#include <zircon/status.h>
 
 #include <memory>
 #include <optional>
@@ -88,7 +89,8 @@ void DestroyAndExtract(std::shared_ptr<Container>&& object,
   object.reset();
 
   zx_status_t status = sync_completion_wait(&on_destruction, ZX_TIME_INFINITE);
-  ZX_ASSERT_MSG(status == ZX_OK, "Error waiting for object destruction.\n");
+  ZX_ASSERT_MSG(status == ZX_OK, "Error waiting for object destruction: %s",
+                zx_status_get_string(status));
 
   callback(std::move(result.value()));
 }

@@ -105,9 +105,7 @@ template <typename Transport>
 class UnownedEncodedMessageBase {
  public:
   zx_status_t status() const { return message_.status(); }
-#ifdef __Fuchsia__
   const char* status_string() const { return message_.status_string(); }
-#endif
   bool ok() const { return message_.status() == ZX_OK; }
   std::string FormatDescription() const { return message_.FormatDescription(); }
   const char* lossy_description() const { return message_.lossy_description(); }
