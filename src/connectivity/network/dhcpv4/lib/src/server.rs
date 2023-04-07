@@ -616,106 +616,45 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
     }
 
     fn build_offer(&self, disc: Message, offered_ip: Ipv4Addr) -> Result<Message, ServerError> {
-        let mut options = Vec::new();
-        options.push(DhcpOption::DhcpMessageType(MessageType::DHCPOFFER));
-        options.push(DhcpOption::ServerIdentifier(self.get_server_ip(&disc)?));
-        let lease_length = match disc.options.iter().find_map(|opt| match opt {
-            DhcpOption::IpAddressLeaseTime(seconds) => Some(*seconds),
-            _ => None,
-        }) {
-            Some(seconds) => std::cmp::min(seconds, self.params.lease_length.max_seconds),
-            None => self.params.lease_length.default_seconds,
-        };
-        options.push(DhcpOption::IpAddressLeaseTime(lease_length));
-        let v = self
-            .options_repo
-            .get(&OptionCode::RenewalTimeValue)
-            .map(|v| match v {
-                DhcpOption::RenewalTimeValue(v) => *v,
-                v => panic!(
-                    "options repo contains code-value mismatch: key={:?} value={:?}",
-                    &OptionCode::RenewalTimeValue,
-                    v
+        let server_ip = self.get_server_ip(&disc)?;
+        build_offer(
+            disc,
+            OfferOptions {
+                offered_ip,
+                server_ip,
+                lease_length_config: self.params.lease_length.clone(),
+                renewal_time_value: self.options_repo.get(&OptionCode::RenewalTimeValue).map(|v| {
+                    match v {
+                        DhcpOption::RenewalTimeValue(v) => *v,
+                        v => panic!(
+                            "options repo contains code-value mismatch: key={:?} value={:?}",
+                            &OptionCode::RenewalTimeValue,
+                            v
+                        ),
+                    }
+                }),
+                rebinding_time_value: self.options_repo.get(&OptionCode::RebindingTimeValue).map(
+                    |v| match v {
+                        DhcpOption::RebindingTimeValue(v) => *v,
+                        v => panic!(
+                            "options repo contains code-value mismatch: key={:?} value={:?}",
+                            &OptionCode::RenewalTimeValue,
+                            v
+                        ),
+                    },
                 ),
-            })
-            .unwrap_or_else(|| lease_length / 2);
-        options.push(DhcpOption::RenewalTimeValue(v));
-        let v = self
-            .options_repo
-            .get(&OptionCode::RebindingTimeValue)
-            .map(|v| match v {
-                DhcpOption::RebindingTimeValue(v) => *v,
-                v => panic!(
-                    "options repo contains code-value mismatch: key={:?} value={:?}",
-                    &OptionCode::RenewalTimeValue,
-                    v
-                ),
-            })
-            .unwrap_or_else(|| (lease_length / 4) * 3 + (lease_length % 4) * 3 / 4);
-        options.push(DhcpOption::RebindingTimeValue(v));
-        options.extend_from_slice(&self.get_requested_options(&disc.options));
-        let offer = Message {
-            op: OpCode::BOOTREPLY,
-            secs: 0,
-            yiaddr: offered_ip,
-            ciaddr: Ipv4Addr::UNSPECIFIED,
-            siaddr: Ipv4Addr::UNSPECIFIED,
-            sname: String::new(),
-            file: String::new(),
-            options,
-            ..disc
-        };
-        Ok(offer)
+                subnet_mask: self.params.managed_addrs.mask.into(),
+            },
+            &self.options_repo,
+        )
     }
 
     fn get_requested_options(&self, client_opts: &[DhcpOption]) -> Vec<DhcpOption> {
-        // TODO(https://fxbug.dev/104860): We should consider always supplying the
-        // SubnetMask for all DHCPDISCOVER and DHCPREQUEST requests. ISC
-        // does this, and we may desire to for increased compatibility with
-        // non-compliant clients.
-        //
-        // See: https://github.com/isc-projects/dhcp/commit/e9c5964
-
-        let prl = client_opts.iter().find_map(|opt| match opt {
-            DhcpOption::ParameterRequestList(v) => Some(v),
-            _ => None,
-        });
-        prl.map_or(Vec::new(), |requested_opts| {
-            let mut offered_opts: Vec<DhcpOption> = requested_opts
-                .iter()
-                .filter_map(|code| match self.options_repo.get(code) {
-                    Some(opt) => Some(opt.clone()),
-                    None => match code {
-                        OptionCode::SubnetMask => {
-                            Some(DhcpOption::SubnetMask(self.params.managed_addrs.mask.into()))
-                        }
-                        _ => None,
-                    },
-                })
-                .collect();
-
-            //  Enforce ordering SUBNET_MASK by moving it before ROUTER.
-            //  See: https://datatracker.ietf.org/doc/html/rfc2132#section-3.3
-            //
-            //      If both the subnet mask and the router option are specified
-            //      in a DHCP reply, the subnet mask option MUST be first.
-            let mut router_position = None;
-            for (i, option) in offered_opts.iter().enumerate() {
-                match option {
-                    DhcpOption::Router(_) => router_position = Some(i),
-                    DhcpOption::SubnetMask(_) => {
-                        if let Some(router_index) = router_position {
-                            offered_opts[router_index..(i + 1)].rotate_right(1)
-                        }
-                        // Once we find the subnet mask, we can bail on the for loop.
-                        break;
-                    }
-                    _ => continue,
-                }
-            }
-
-            offered_opts
-        })
+        get_requested_options(
+            client_opts,
+            &self.options_repo,
+            self.params.managed_addrs.mask.into(),
+        )
     }
 
     fn build_ack(&self, req: Message, requested_ip: Ipv4Addr) -> Result<Message, ServerError> {
@@ -845,6 +784,125 @@ impl<DS: DataStore, TS: SystemTimeSource> Server<DS, TS> {
             Ok(())
         }
     }
+}
+
+/// Helper for constructing a repo of `DhcpOption`s.
+pub fn options_repo<const N: usize>(options: [DhcpOption; N]) -> HashMap<OptionCode, DhcpOption> {
+    options.into_iter().map(|option| (option.code(), option)).collect()
+}
+
+/// Parameters needed in order to build a DHCPOFFER.
+pub struct OfferOptions {
+    pub offered_ip: Ipv4Addr,
+    pub server_ip: Ipv4Addr,
+    pub lease_length_config: crate::configuration::LeaseLength,
+    pub renewal_time_value: Option<u32>,
+    pub rebinding_time_value: Option<u32>,
+    pub subnet_mask: Ipv4Addr,
+}
+
+/// Builds a DHCPOFFER in response to the given DHCPDISCOVER using the provided
+/// `offer_options` and `options_repo`.
+pub fn build_offer(
+    disc: Message,
+    offer_options: OfferOptions,
+    options_repo: &HashMap<OptionCode, DhcpOption>,
+) -> Result<Message, ServerError> {
+    let OfferOptions {
+        offered_ip,
+        server_ip,
+        lease_length_config:
+            crate::configuration::LeaseLength {
+                default_seconds: default_lease_length_seconds,
+                max_seconds: max_lease_length_seconds,
+            },
+        renewal_time_value,
+        rebinding_time_value,
+        subnet_mask,
+    } = offer_options;
+    let mut options = Vec::new();
+    options.push(DhcpOption::DhcpMessageType(MessageType::DHCPOFFER));
+    options.push(DhcpOption::ServerIdentifier(server_ip));
+    let lease_length = match disc.options.iter().find_map(|opt| match opt {
+        DhcpOption::IpAddressLeaseTime(seconds) => Some(*seconds),
+        _ => None,
+    }) {
+        Some(seconds) => std::cmp::min(seconds, max_lease_length_seconds),
+        None => default_lease_length_seconds,
+    };
+    options.push(DhcpOption::IpAddressLeaseTime(lease_length));
+    let v = renewal_time_value.unwrap_or_else(|| lease_length / 2);
+    options.push(DhcpOption::RenewalTimeValue(v));
+    let v =
+        rebinding_time_value.unwrap_or_else(|| (lease_length / 4) * 3 + (lease_length % 4) * 3 / 4);
+    options.push(DhcpOption::RebindingTimeValue(v));
+    options.extend_from_slice(&get_requested_options(&disc.options, &options_repo, subnet_mask));
+    let offer = Message {
+        op: OpCode::BOOTREPLY,
+        secs: 0,
+        yiaddr: offered_ip,
+        ciaddr: Ipv4Addr::UNSPECIFIED,
+        siaddr: Ipv4Addr::UNSPECIFIED,
+        sname: String::new(),
+        file: String::new(),
+        options,
+        ..disc
+    };
+    Ok(offer)
+}
+
+/// Given the DHCP options set by the client, retrieves the values of the DHCP
+/// options requested by the client.
+pub fn get_requested_options(
+    client_opts: &[DhcpOption],
+    options_repo: &HashMap<OptionCode, DhcpOption>,
+    subnet_mask: Ipv4Addr,
+) -> Vec<DhcpOption> {
+    // TODO(https://fxbug.dev/104860): We should consider always supplying the
+    // SubnetMask for all DHCPDISCOVER and DHCPREQUEST requests. ISC
+    // does this, and we may desire to for increased compatibility with
+    // non-compliant clients.
+    //
+    // See: https://github.com/isc-projects/dhcp/commit/e9c5964
+
+    let prl = client_opts.iter().find_map(|opt| match opt {
+        DhcpOption::ParameterRequestList(v) => Some(v),
+        _ => None,
+    });
+    prl.map_or(Vec::new(), |requested_opts| {
+        let mut offered_opts: Vec<DhcpOption> = requested_opts
+            .iter()
+            .filter_map(|code| match options_repo.get(code) {
+                Some(opt) => Some(opt.clone()),
+                None => match code {
+                    OptionCode::SubnetMask => Some(DhcpOption::SubnetMask(subnet_mask)),
+                    _ => None,
+                },
+            })
+            .collect();
+
+        //  Enforce ordering SUBNET_MASK by moving it before ROUTER.
+        //  See: https://datatracker.ietf.org/doc/html/rfc2132#section-3.3
+        //
+        //      If both the subnet mask and the router option are specified
+        //      in a DHCP reply, the subnet mask option MUST be first.
+        let mut router_position = None;
+        for (i, option) in offered_opts.iter().enumerate() {
+            match option {
+                DhcpOption::Router(_) => router_position = Some(i),
+                DhcpOption::SubnetMask(_) => {
+                    if let Some(router_index) = router_position {
+                        offered_opts[router_index..(i + 1)].rotate_right(1)
+                    }
+                    // Once we find the subnet mask, we can bail on the for loop.
+                    break;
+                }
+                _ => continue,
+            }
+        }
+
+        offered_opts
+    })
 }
 
 // TODO(https://fxbug.dev/74998): Find an alternative to panicking.
@@ -1463,9 +1521,10 @@ pub mod tests {
             OptionCode, ProtocolError,
         },
         server::{
-            get_client_state, validate_discover, AddressPool, AddressPoolError, ClientIdentifier,
-            ClientState, DataStore, LeaseRecord, NakReason, ResponseTarget, ServerAction,
-            ServerDispatcher, ServerError, ServerParameters, SystemTimeSource,
+            build_offer, get_client_state, options_repo, validate_discover, AddressPool,
+            AddressPoolError, ClientIdentifier, ClientState, DataStore, LeaseRecord, NakReason,
+            OfferOptions, ResponseTarget, ServerAction, ServerDispatcher, ServerError,
+            ServerParameters, SystemTimeSource,
         },
     };
     use anyhow::Error;
@@ -4244,6 +4303,69 @@ pub mod tests {
             Some(t2),
             "offer options did not contain expected rebinding time: {:?}",
             offer.options
+        );
+    }
+
+    #[test_case(None; "no requested lease length")]
+    #[test_case(Some(150); "requested lease length under maximum")]
+    #[test_case(Some(1000); "requested lease length above maximum")]
+    fn standalone_build_offer(requested_lease_length: Option<u32>) {
+        let discover = new_test_discover_with_options(
+            requested_lease_length.map(DhcpOption::IpAddressLeaseTime).into_iter(),
+        );
+        let offered_ip = random_ipv4_generator();
+        let subnet_mask = std_ip_v4!("255.255.255.0");
+        let server_ip = random_ipv4_generator();
+        const DEFAULT_LEASE_LENGTH_SECONDS: u32 = 100;
+        const MAX_LEASE_LENGTH_SECONDS: u32 = 200;
+        let lease_length_config = LeaseLength {
+            default_seconds: DEFAULT_LEASE_LENGTH_SECONDS,
+            max_seconds: MAX_LEASE_LENGTH_SECONDS,
+        };
+        let expected_lease_length = match requested_lease_length {
+            None => DEFAULT_LEASE_LENGTH_SECONDS,
+            Some(x) => x.min(MAX_LEASE_LENGTH_SECONDS),
+        };
+
+        let chaddr = discover.chaddr;
+        let xid = discover.xid;
+        let bdcast_flag = discover.bdcast_flag;
+
+        assert_eq!(
+            build_offer(
+                discover,
+                OfferOptions {
+                    offered_ip,
+                    server_ip,
+                    lease_length_config,
+                    renewal_time_value: None,
+                    rebinding_time_value: None,
+                    subnet_mask,
+                },
+                &options_repo([]),
+            )
+            .expect("build_offer should succeed"),
+            Message {
+                op: OpCode::BOOTREPLY,
+                xid,
+                secs: 0,
+                bdcast_flag,
+                ciaddr: Ipv4Addr::UNSPECIFIED,
+                yiaddr: offered_ip,
+                siaddr: Ipv4Addr::UNSPECIFIED,
+                giaddr: Ipv4Addr::UNSPECIFIED,
+                chaddr,
+                sname: String::new(),
+                file: String::new(),
+                options: vec![
+                    DhcpOption::DhcpMessageType(MessageType::DHCPOFFER),
+                    DhcpOption::ServerIdentifier(server_ip),
+                    DhcpOption::IpAddressLeaseTime(expected_lease_length),
+                    DhcpOption::RenewalTimeValue(expected_lease_length / 2),
+                    DhcpOption::RebindingTimeValue(expected_lease_length * 3 / 4),
+                    DhcpOption::SubnetMask(subnet_mask),
+                ],
+            }
         );
     }
 }
