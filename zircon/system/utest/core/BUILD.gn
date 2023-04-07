@@ -60,6 +60,8 @@ core_tests_with_custom_manifests =
       "channel",
       "memory-mapping",
       "port",
+      "process-shared",  # requires ZX_POL_NEW_PROCESS,
+                         # ZX_POL_AMBIENT_MARK_VMO_EXEC, and the next vDSO
 
       # Some tests require ZX_POL_AMBIENT_MARK_VMO_EXEC.
       "vmo",

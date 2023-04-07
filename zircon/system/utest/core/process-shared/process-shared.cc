@@ -2,11 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/test/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fit/defer.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/zx/job.h>
 #include <lib/zx/process.h>
 #include <lib/zx/thread.h>
@@ -15,34 +11,9 @@
 #include <zircon/syscalls.h>
 
 #include <mini-process/mini-process.h>
+#include <zxtest/zxtest.h>
 
-#include "src/lib/test-suite/test_suite.h"
-
-#define ASSERT_OK(e)                                                        \
-  do {                                                                      \
-    if (e != ZX_OK) {                                                       \
-      fprintf(stderr, "test assert failed at %s:%d\n", __FILE__, __LINE__); \
-      return fuchsia::test::Status::FAILED;                                 \
-    }                                                                       \
-  } while (0)
-
-#define ASSERT_EQ(e1, e2)                                                   \
-  do {                                                                      \
-    if (e1 != e2) {                                                         \
-      fprintf(stderr, "test assert failed at %s:%d\n", __FILE__, __LINE__); \
-      return fuchsia::test::Status::FAILED;                                 \
-    }                                                                       \
-  } while (0)
-
-#define ASSERT_NE(e1, e2)                                                   \
-  do {                                                                      \
-    if (e1 == e2) {                                                         \
-      fprintf(stderr, "test assert failed at %s:%d\n", __FILE__, __LINE__); \
-      return fuchsia::test::Status::FAILED;                                 \
-    }                                                                       \
-  } while (0)
-
-fuchsia::test::Status shared_map_in_prototype() {
+TEST(ProcessShared, MapInPrototype) {
   zx::process prototype_process;
   zx::vmar shared_vmar;
   constexpr const char kPrototypeName[] = "prototype_process";
@@ -52,11 +23,9 @@ fuchsia::test::Status shared_map_in_prototype() {
   zx::process process;
   zx::vmar restricted_vmar;
   constexpr const char kProcessName[] = "process";
-  if (zx_process_create_shared(prototype_process.get(), 0, kProcessName, sizeof(kProcessName),
-                               process.reset_and_get_address(),
-                               restricted_vmar.reset_and_get_address()) != ZX_OK) {
-    return fuchsia::test::Status::FAILED;
-  }
+  ASSERT_OK(zx_process_create_shared(prototype_process.get(), 0, kProcessName, sizeof(kProcessName),
+                                     process.reset_and_get_address(),
+                                     restricted_vmar.reset_and_get_address()));
 
   // Map a vmo into the shared vmar using the prototype handle.
   zx_handle_t vmo;
@@ -80,11 +49,9 @@ fuchsia::test::Status shared_map_in_prototype() {
   read_data = {'d', 'e', 'f'};
   ASSERT_EQ(process.read_memory(addr, read_data.data(), read_data.size(), &actual), ZX_OK);
   ASSERT_EQ(read_data, shared_data);
-
-  return fuchsia::test::Status::PASSED;
 }
 
-fuchsia::test::Status restricted_vmar_not_shared() {
+TEST(ProcessShared, RestrictedVmarNotShared) {
   zx::process prototype_process;
   zx::vmar shared_vmar;
   constexpr const char kPrototypeName[] = "prototype_process";
@@ -117,11 +84,9 @@ fuchsia::test::Status restricted_vmar_not_shared() {
     // the prototype.
     ASSERT_NE(read_data, restricted_data);
   }
-
-  return fuchsia::test::Status::PASSED;
 }
 
-fuchsia::test::Status shared_process_invalid_prototype() {
+TEST(ProcessShared, InvalidPrototype) {
   zx::process prototype_process;
   zx::vmar prototype_vmar;
   constexpr const char kPrototypeName[] = "prototype_process";
@@ -135,11 +100,9 @@ fuchsia::test::Status shared_process_invalid_prototype() {
                                      process.reset_and_get_address(),
                                      restricted_vmar.reset_and_get_address()),
             ZX_ERR_INVALID_ARGS);
-
-  return fuchsia::test::Status::PASSED;
 }
 
-fuchsia::test::Status info_process_vmos() {
+TEST(ProcessShared, InfoProcessVmos) {
   // Build a shareable process.
   static constexpr char kSharedProcessName[] = "object-info-shar-proc";
   zx::process shared_process;
@@ -217,14 +180,12 @@ fuchsia::test::Status info_process_vmos() {
                                      &available_smallbuf));
   ASSERT_EQ(smallbuf_size, actual_smallbuf);
   ASSERT_EQ(available_private, available_smallbuf);
-
-  return fuchsia::test::Status::PASSED;
 }
 
 // Verify mappings in shared processes are properly accounted for in zx_info_task_stats_t.
 //
 // See also fxbug.dev/123525.
-fuchsia::test::Status info_task_stats() {
+TEST(ProcessShared, InfoTaskStats) {
   // We're going to create 3 processes, proc1, proc2, and proc3, with a total of 4 VMARs.  proc1 and
   // proc2 will share a region (vmar_shared) and each have their own private region (vmar1 and
   // vmar2).  proc3 will have one (unshared) region (vmar3).
@@ -275,7 +236,7 @@ fuchsia::test::Status info_task_stats() {
   }
 
   // Make sure all the task stats start as 0.
-  auto assertProcStatsAreZero = [](zx::process& proc) -> fuchsia::test::Status {
+  auto assertProcStatsAreZero = [](zx::process& proc) {
     zx_info_task_stats_t stats{};
     size_t actual{};
     size_t avail{};
@@ -284,13 +245,10 @@ fuchsia::test::Status info_task_stats() {
     ASSERT_EQ(0, stats.mem_private_bytes);
     ASSERT_EQ(0, stats.mem_shared_bytes);
     ASSERT_EQ(0, stats.mem_scaled_shared_bytes);
-    return fuchsia::test::Status::PASSED;
   };
   zx::process* procs[] = {&proc1, &proc2, &proc3};
   for (zx::process* p : procs) {
-    if (assertProcStatsAreZero(*p) != fuchsia::test::Status::PASSED) {
-      return fuchsia::test::Status::FAILED;
-    }
+    ASSERT_NO_FAILURES(assertProcStatsAreZero(*p));
   }
 
   // Now we'll start mapping the VMOs and verify the stats as we go.
@@ -308,12 +266,8 @@ fuchsia::test::Status info_task_stats() {
   ASSERT_EQ(2 * kSize, stats.mem_private_bytes);
   ASSERT_EQ(0, stats.mem_shared_bytes);
   ASSERT_EQ(0, stats.mem_scaled_shared_bytes);
-  if (assertProcStatsAreZero(proc2) != fuchsia::test::Status::PASSED) {
-    return fuchsia::test::Status::FAILED;
-  }
-  if (assertProcStatsAreZero(proc3) != fuchsia::test::Status::PASSED) {
-    return fuchsia::test::Status::FAILED;
-  }
+  ASSERT_NO_FAILURES(assertProcStatsAreZero(proc2));
+  ASSERT_NO_FAILURES(assertProcStatsAreZero(proc3));
 
   // vmar_shared will get m[2] and m[3].
   ASSERT_OK(vmar_shared.map(ZX_VM_PERM_READ | ZX_VM_MAP_RANGE, 0u, m[2], 0, kSize, &vaddr));
@@ -395,27 +349,4 @@ fuchsia::test::Status info_task_stats() {
   ASSERT_EQ(1 * kSize, stats.mem_private_bytes);
   ASSERT_EQ(2 * kSize, stats.mem_shared_bytes);
   ASSERT_EQ((kSize / 2) + (kSize / 2), stats.mem_scaled_shared_bytes);
-
-  return fuchsia::test::Status::PASSED;
-}
-
-int main(int argc, const char** argv) {
-  printf("test");
-  std::vector<example::TestInput> inputs = {
-      {.name = "ShareableProcess.GetInfoVmos", .status = info_process_vmos()},
-      {.name = "ShareableProcess.GetInfoTaskStats", .status = info_task_stats()},
-      {.name = "ProcessTest.SharedMapInPrototype", .status = shared_map_in_prototype()},
-      {.name = "ProcessTest.RestrictedVmarNotShared", .status = restricted_vmar_not_shared()},
-      {.name = "ProcessTest.SharedProcessInvalidPrototype",
-       .status = shared_process_invalid_prototype()},
-  };
-
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-
-  example::TestSuite suite(&loop, std::move(inputs));
-  context->outgoing()->AddPublicService(suite.GetHandler());
-
-  loop.Run();
-  return 0;
 }
