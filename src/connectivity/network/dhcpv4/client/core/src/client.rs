@@ -4,11 +4,12 @@
 
 //! Implements the DHCP client state machine.
 
-use todo_unused::todo_unused;
-
-use crate::deps::{self, Instant as _};
+use crate::deps::{self, DatagramInfo, Instant as _};
+use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes};
-use futures::{channel::mpsc, pin_mut, select, FutureExt as _, StreamExt as _};
+use futures::{
+    channel::mpsc, pin_mut, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _,
+};
 use rand::Rng as _;
 use std::{net::Ipv4Addr, num::NonZeroU32};
 
@@ -32,6 +33,7 @@ pub enum ExitReason {
 pub enum State {
     Init(Init),
     Selecting(Selecting),
+    Requesting(Requesting),
 }
 
 /// The next step to take after running the core state machine for one step.
@@ -56,7 +58,13 @@ impl State {
                 .await?
             {
                 SelectingOutcome::GracefulShutdown => Ok(Step::Exit(ExitReason::GracefulShutdown)),
+                SelectingOutcome::Requesting(requesting) => {
+                    Ok(Step::NextState(State::Requesting(requesting)))
+                }
             },
+            State::Requesting(_requesting) => {
+                todo!("TODO(https://fxbug.dev/123609): implement requesting state");
+            }
         }
     }
 }
@@ -133,6 +141,8 @@ async fn send_with_retransmits<T: Clone + Send>(
         if let Some(wait_duration) = wait_duration {
             time.wait_until(time.now().add(wait_duration)).await;
         }
+        // TODO(https://fxbug.dev/124593): better indicate recoverable
+        // vs. non-recoverable error types.
         socket.send_to(message, dest.clone()).await.map_err(Error::Socket)?;
     }
     Ok(())
@@ -164,8 +174,23 @@ fn default_retransmit_schedule(
 
 // This is assumed to be an appropriate buffer size due to Ethernet's common MTU
 // of 1500 bytes.
-#[todo_unused("https://fxbug.dev/81593")]
 const BUFFER_SIZE: usize = 1500;
+
+fn recv_stream<'a, T, U: Send>(
+    socket: &'a impl deps::Socket<U>,
+    recv_buf: &'a mut [u8],
+    parser: impl Fn(&[u8], U) -> T + 'a,
+) -> impl Stream<Item = Result<T, Error>> + 'a {
+    futures::stream::try_unfold((recv_buf, parser), move |(recv_buf, parser)| async move {
+        // TODO(https://fxbug.dev/124593): better indicate recoverable
+        // vs. non-recoverable error types.
+        let DatagramInfo { length, address } =
+            socket.recv_from(recv_buf).await.map_err(Error::Socket)?;
+        let raw_msg = &recv_buf[..length];
+        let parsed = parser(raw_msg, address);
+        Ok(Some((parsed, (recv_buf, parser))))
+    })
+}
 
 fn build_discover(
     ClientConfig {
@@ -215,7 +240,7 @@ fn build_discover(
 #[derive(Debug)]
 pub enum SelectingOutcome {
     GracefulShutdown,
-    // TODO(https://fxbug.dev/123520): Implement receiving offers.
+    Requesting(Requesting),
 }
 
 /// The Selecting state as depicted in the state-transition diagram in [RFC 2131].
@@ -263,19 +288,102 @@ impl Selecting {
         )
         .fuse();
 
-        pin_mut!(send_fut);
+        let mut recv_buf = [0u8; BUFFER_SIZE];
+        let offer_fields_stream = recv_stream(&socket, &mut recv_buf, |packet, src_addr| {
+            // We don't care about the src addr of incoming offers, because we
+            // identify DHCP servers via the Server Identifier option.
+            let _: net_types::ethernet::Mac = src_addr;
+            let message = crate::parse::parse_dhcp_message_from_ip_packet(packet, CLIENT_PORT)
+                .context("error while parsing DHCP message from IP packet")?;
+            validate_message(discover_options, client_config, &message)
+                .context("invalid DHCP message")?;
+            crate::parse::fields_to_retain_from_selecting(message)
+                .context("error while retrieving fields to use in DHCPREQUEST from DHCP message")
+        })
+        .try_filter_map(|parse_result| {
+            futures::future::ok(match parse_result {
+                Ok(fields) => Some(fields),
+                Err(error) => {
+                    tracing::warn!("discarding incoming packet: {}", error);
+                    None
+                }
+            })
+        })
+        .fuse();
 
-        // TODO(https://fxbug.dev/123520): Interrupt this when receiving offers.
+        pin_mut!(send_fut, offer_fields_stream);
+
         select! {
-            send_result = send_fut => {
-                send_result?;
+            send_discovers_result = send_fut => {
+                send_discovers_result?;
                 unreachable!("should never stop retransmitting DHCPDISCOVER unless we hit an error");
             },
             () = stop_receiver.select_next_some() => {
                 Ok(SelectingOutcome::GracefulShutdown)
             },
+            fields_to_use_in_request_result = offer_fields_stream.select_next_some() => {
+                let fields_from_offer_to_use_in_request = fields_to_use_in_request_result?;
+
+                // Currently, we take the naive approach of accepting the first
+                // DHCPOFFER we see without doing any special selection logic.
+                Ok(SelectingOutcome::Requesting(Requesting {
+                    discover_options: discover_options.clone(),
+                    fields_from_offer_to_use_in_request,
+                }))
+            }
         }
     }
+}
+
+#[derive(thiserror::Error, Debug, PartialEq)]
+enum ValidateMessageError {
+    #[error("xid {actual} doesn't match expected xid {expected}")]
+    WrongXid { expected: u32, actual: u32 },
+    #[error("chaddr {actual} doesn't match expected chaddr {expected}")]
+    WrongChaddr { expected: net_types::ethernet::Mac, actual: net_types::ethernet::Mac },
+}
+
+fn validate_message(
+    DiscoverOptions { xid: TransactionId(my_xid) }: &DiscoverOptions,
+    ClientConfig {
+        client_hardware_address: my_chaddr,
+        client_identifier: _,
+        parameter_request_list: _,
+        preferred_lease_time_secs: _,
+        requested_ip_address: _,
+    }: &ClientConfig,
+    dhcp_protocol::Message {
+        op: _,
+        xid: msg_xid,
+        secs: _,
+        bdcast_flag: _,
+        ciaddr: _,
+        yiaddr: _,
+        siaddr: _,
+        giaddr: _,
+        chaddr: msg_chaddr,
+        sname: _,
+        file: _,
+        options: _,
+    }: &dhcp_protocol::Message,
+) -> Result<(), ValidateMessageError> {
+    if *msg_xid != u32::from(*my_xid) {
+        return Err(ValidateMessageError::WrongXid { expected: my_xid.get(), actual: *msg_xid });
+    }
+
+    if msg_chaddr != my_chaddr {
+        return Err(ValidateMessageError::WrongChaddr {
+            expected: *my_chaddr,
+            actual: *msg_chaddr,
+        });
+    }
+    Ok(())
+}
+
+#[derive(Debug, PartialEq)]
+pub struct Requesting {
+    discover_options: DiscoverOptions,
+    fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest,
 }
 
 #[cfg(test)]
@@ -289,6 +397,9 @@ mod test {
     use assert_matches::assert_matches;
     use fuchsia_async as fasync;
     use futures::channel::mpsc;
+    use futures::join;
+    use net_declare::{net_mac, std_ip_v4};
+    use test_case::test_case;
 
     fn initialize_logging() {
         let subscriber = tracing_subscriber::fmt()
@@ -301,13 +412,21 @@ mod test {
         let _: Result<_, _> = tracing::subscriber::set_global_default(subscriber);
     }
 
-    const TEST_MAC_ADDRESS: net_types::ethernet::Mac = net_declare::net_mac!("01:02:03:04:05:06");
+    const TEST_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("01:01:01:01:01:01");
+    const TEST_SERVER_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("02:02:02:02:02:02");
+    const OTHER_MAC_ADDRESS: net_types::ethernet::Mac = net_mac!("03:03:03:03:03:03");
 
     const TEST_PARAMETER_REQUEST_LIST: [dhcp_protocol::OptionCode; 3] = [
         dhcp_protocol::OptionCode::SubnetMask,
         dhcp_protocol::OptionCode::Router,
         dhcp_protocol::OptionCode::DomainNameServer,
     ];
+
+    const SERVER_IP: Ipv4Addr = std_ip_v4!("192.168.1.1");
+    const YIADDR: Ipv4Addr = std_ip_v4!("198.168.1.5");
+    const OTHER_ADDR: Ipv4Addr = std_ip_v4!("198.168.1.6");
+    const DEFAULT_LEASE_LENGTH_SECONDS: u32 = 100;
+    const MAX_LEASE_LENGTH_SECONDS: u32 = 200;
 
     fn test_client_config() -> ClientConfig {
         ClientConfig {
@@ -431,7 +550,9 @@ mod test {
             loop {
                 let mut recv_buf = [0u8; BUFFER_SIZE];
                 let DatagramInfo { length, address } =
-                    server_end.recv_from(&mut recv_buf).await.unwrap();
+                    server_end.recv_from(&mut recv_buf)
+                        .await
+                        .expect("recv_from on test socket should succeed");
 
                 assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
 
@@ -439,7 +560,7 @@ mod test {
                     &recv_buf[..length],
                     nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT),
                 )
-                .unwrap();
+                .expect("received packet should parse as DHCP message");
 
                 assert_eq!(
                     msg,
@@ -496,5 +617,234 @@ mod test {
             assert!(duration_range.contains(&(received_time - previous_time)));
             previous_time = received_time;
         }
+    }
+
+    const XID: NonZeroU32 = nonzero_ext::nonzero!(1u32);
+    #[test_case(u32::from(XID), TEST_MAC_ADDRESS => Ok(()) ; "accepts good reply")]
+    #[test_case(u32::from(XID), TEST_SERVER_MAC_ADDRESS => Err(
+        ValidateMessageError::WrongChaddr {
+            expected: TEST_MAC_ADDRESS,
+            actual: TEST_SERVER_MAC_ADDRESS,
+        }) ; "rejects wrong chaddr")]
+    #[test_case(u32::from(XID).wrapping_add(1), TEST_MAC_ADDRESS => Err(
+        ValidateMessageError::WrongXid {
+            expected: u32::from(XID),
+            actual: u32::from(XID).wrapping_add(1),
+        }) ; "rejects wrong xid")]
+    fn test_validate_message(
+        message_xid: u32,
+        message_chaddr: net_types::ethernet::Mac,
+    ) -> Result<(), ValidateMessageError> {
+        let discover_options = DiscoverOptions { xid: TransactionId(XID) };
+        let client_config = ClientConfig {
+            client_hardware_address: TEST_MAC_ADDRESS,
+            client_identifier: None,
+            parameter_request_list: Some(TEST_PARAMETER_REQUEST_LIST.into()),
+            preferred_lease_time_secs: None,
+            requested_ip_address: None,
+        };
+
+        let reply = dhcp_protocol::Message {
+            op: dhcp_protocol::OpCode::BOOTREPLY,
+            xid: message_xid,
+            secs: 0,
+            bdcast_flag: false,
+            ciaddr: Ipv4Addr::UNSPECIFIED,
+            yiaddr: Ipv4Addr::UNSPECIFIED,
+            siaddr: Ipv4Addr::UNSPECIFIED,
+            giaddr: Ipv4Addr::UNSPECIFIED,
+            chaddr: message_chaddr,
+            sname: String::new(),
+            file: String::new(),
+            options: Vec::new(),
+        };
+
+        validate_message(&discover_options, &client_config, &reply)
+    }
+
+    #[allow(clippy::unused_unit)]
+    #[test_case(false ; "with no garbage traffic on link")]
+    #[test_case(true ; "ignoring garbage replies to discover")]
+    fn do_selecting_good_offer(reply_to_discover_with_garbage: bool) {
+        initialize_logging();
+
+        let mut rng = FakeRngProvider::new(0);
+        let selecting = Init {}.do_init(&mut rng);
+        let TransactionId(xid) = selecting.discover_options.xid;
+
+        let (server_end, client_end) = FakeSocket::<net_types::ethernet::Mac>::new_pair();
+        let test_socket_provider = FakeSocketProvider::new(client_end);
+
+        let time = FakeTimeController::new();
+        let (_stop_sender, mut stop_receiver) = mpsc::unbounded();
+
+        let client_config = test_client_config();
+
+        let selecting_fut = selecting
+            .do_selecting(
+                &client_config,
+                &test_socket_provider,
+                &mut rng,
+                &time,
+                &mut stop_receiver,
+            )
+            .fuse();
+
+        let server_fut = async {
+            let mut recv_buf = [0u8; BUFFER_SIZE];
+
+            if reply_to_discover_with_garbage {
+                let DatagramInfo { length: _, address: dst_addr } = server_end
+                    .recv_from(&mut recv_buf)
+                    .await
+                    .expect("recv_from on test socket should succeed");
+                assert_eq!(dst_addr, net_types::ethernet::Mac::BROADCAST);
+
+                server_end
+                    .send_to(b"hello", OTHER_MAC_ADDRESS)
+                    .await
+                    .expect("send_to with garbage data should succeed");
+            }
+
+            let DatagramInfo { length, address } = server_end
+                .recv_from(&mut recv_buf)
+                .await
+                .expect("recv_from on test socket should succeed");
+            assert_eq!(address, net_types::ethernet::Mac::BROADCAST);
+
+            // `dhcp_protocol::Message` intentionally doesn't implement `Clone`,
+            // so we re-parse instead for testing purposes.
+            let parse_msg = || {
+                crate::parse::parse_dhcp_message_from_ip_packet(
+                    &recv_buf[..length],
+                    nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT),
+                )
+                .expect("received packet on test socket should parse as DHCP message")
+            };
+
+            let msg = parse_msg();
+            assert_eq!(
+                parse_msg(),
+                dhcp_protocol::Message {
+                    op: dhcp_protocol::OpCode::BOOTREQUEST,
+                    xid: msg.xid,
+                    secs: 0,
+                    bdcast_flag: false,
+                    ciaddr: Ipv4Addr::UNSPECIFIED,
+                    yiaddr: Ipv4Addr::UNSPECIFIED,
+                    siaddr: Ipv4Addr::UNSPECIFIED,
+                    giaddr: Ipv4Addr::UNSPECIFIED,
+                    chaddr: TEST_MAC_ADDRESS,
+                    sname: String::new(),
+                    file: String::new(),
+                    options: vec![
+                        dhcp_protocol::DhcpOption::ParameterRequestList(
+                            TEST_PARAMETER_REQUEST_LIST.into()
+                        ),
+                        dhcp_protocol::DhcpOption::DhcpMessageType(
+                            dhcp_protocol::MessageType::DHCPDISCOVER
+                        ),
+                    ],
+                }
+            );
+
+            let build_reply = || {
+                dhcpv4::server::build_offer(
+                    parse_msg(),
+                    dhcpv4::server::OfferOptions {
+                        offered_ip: YIADDR,
+                        server_ip: SERVER_IP,
+                        lease_length_config: dhcpv4::configuration::LeaseLength {
+                            default_seconds: DEFAULT_LEASE_LENGTH_SECONDS,
+                            max_seconds: MAX_LEASE_LENGTH_SECONDS,
+                        },
+                        // The following fields don't matter for this test, as the
+                        // client will read them from the DHCPACK rather than
+                        // remembering them from the DHCPOFFER.
+                        renewal_time_value: Some(20),
+                        rebinding_time_value: Some(30),
+                        subnet_mask: std_ip_v4!("255.255.255.0"),
+                    },
+                    &dhcpv4::server::options_repo([]),
+                )
+                .expect("dhcp server crate error building offer")
+            };
+
+            let bad_reply = dhcp_protocol::Message {
+                xid: (u32::from(xid).wrapping_add(1)),
+                // Provide a different yiaddr in order to distinguish whether
+                // the client correctly discarded this one, since we check which
+                // `yiaddr` the client uses as its requested IP address later.
+                yiaddr: OTHER_ADDR,
+                ..build_reply()
+            };
+
+            let good_reply = build_reply();
+
+            let send_reply = |reply: dhcp_protocol::Message| async {
+                let dst_ip = reply.yiaddr;
+                server_end
+                    .send_to(
+                        crate::parse::serialize_dhcp_message_to_ip_packet(
+                            reply,
+                            SERVER_IP,
+                            SERVER_PORT,
+                            dst_ip,
+                            CLIENT_PORT,
+                        )
+                        .as_ref(),
+                        // Note that this is the address the client under test
+                        // observes in `recv_from`.
+                        TEST_SERVER_MAC_ADDRESS,
+                    )
+                    .await
+                    .expect("send_to on test socket should succeed");
+            };
+
+            // The DHCP client should ignore the reply with an incorrect xid.
+            send_reply(bad_reply).await;
+            send_reply(good_reply).await;
+        }
+        .fuse();
+
+        pin_mut!(selecting_fut, server_fut);
+
+        let main_future = async move {
+            let (selecting_result, ()) = join!(selecting_fut, server_fut);
+            selecting_result
+        }
+        .fuse();
+        pin_mut!(main_future);
+        let mut executor = fasync::TestExecutor::new();
+        let selecting_result = loop {
+            match run_until_next_timers_fire(&mut executor, &time, &mut main_future) {
+                std::task::Poll::Ready(result) => break result,
+                std::task::Poll::Pending => (),
+            }
+        };
+
+        let requesting = assert_matches!(
+            selecting_result,
+            Ok(SelectingOutcome::Requesting(requesting)) => requesting,
+            "should have successfully transitioned to Requesting"
+        );
+
+        assert_eq!(
+            requesting,
+            Requesting {
+                discover_options: DiscoverOptions { xid: requesting.discover_options.xid },
+                fields_from_offer_to_use_in_request: crate::parse::FieldsFromOfferToUseInRequest {
+                    server_identifier: net_types::ip::Ipv4Addr::from(SERVER_IP)
+                        .try_into()
+                        .expect("should be specified"),
+                    ip_address_lease_time_secs: Some(nonzero_ext::nonzero!(
+                        DEFAULT_LEASE_LENGTH_SECONDS
+                    )),
+                    ip_address_to_request: net_types::ip::Ipv4Addr::from(YIADDR)
+                        .try_into()
+                        .expect("should be specified"),
+                }
+            }
+        );
     }
 }

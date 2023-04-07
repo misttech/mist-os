@@ -467,7 +467,9 @@ impl TryFrom<u8> for OpCode {
 /// RFC 1533. Note that not all options defined in the RFC are represented
 /// here; options which are not in this type are not currently supported. Supported
 /// options appear in this type in the order in which they are defined in the RFC.
-#[derive(Copy, Clone, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize)]
+#[derive(
+    Copy, Clone, Debug, Deserialize, Eq, FromPrimitive, Hash, PartialEq, Serialize, PartialOrd, Ord,
+)]
 #[repr(u8)]
 pub enum OptionCode {
     Pad = 0,

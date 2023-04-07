@@ -7,7 +7,7 @@ mod deps;
 mod parse;
 
 pub use client::{
-    ClientConfig, Error, ExitReason, Init, Selecting, SelectingOutcome, State, Step, CLIENT_PORT,
-    SERVER_PORT,
+    ClientConfig, Error, ExitReason, Init, Requesting, Selecting, SelectingOutcome, State, Step,
+    CLIENT_PORT, SERVER_PORT,
 };
 pub use deps::{Clock, DatagramInfo, Instant, PacketSocketProvider, Socket, SocketError};
