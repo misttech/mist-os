@@ -24,27 +24,8 @@ pub trait RealmProxy {
     ) -> Result<(), OperationError>;
 }
 
-// A [RealmProxy] that mediates access to the services in a [RealmInstance].
-pub struct RealmInstanceProxy {
-    instance: RealmInstance,
-}
-
-impl RealmInstanceProxy {
-    // from_instance creates a new RealmInstanceProxy.
-    //
-    // Protocol connections are forward to the given [instance].
-    //
-    // # Example usage
-    //
-    // ```
-    // let builder = RealmBuilder::new().await?;
-    // let realm = build_test_realm(&mut builder);
-    // RealmInstanceProxy::from_instance(realm);
-    // ```
-    pub fn from_instance(instance: RealmInstance) -> Self {
-        Self { instance: instance }
-    }
-}
+// A default [RealmProxy] implementation that mediates access to a specific [RealmInstance].
+struct RealmInstanceProxy(RealmInstance);
 
 impl RealmProxy for RealmInstanceProxy {
     fn connect_to_named_protocol(
@@ -52,10 +33,8 @@ impl RealmProxy for RealmInstanceProxy {
         protocol: &str,
         server_end: zx::Channel,
     ) -> Result<(), OperationError> {
-        let res = self
-            .instance
-            .root
-            .connect_request_to_named_protocol_at_exposed_dir(protocol, server_end);
+        let res =
+            self.0.root.connect_request_to_named_protocol_at_exposed_dir(protocol, server_end);
 
         if let Some(err) = res.err() {
             error!("{:?}", err);
@@ -66,7 +45,7 @@ impl RealmProxy for RealmInstanceProxy {
     }
 }
 
-// handle_request_stream uses [realm_proxy] to handle all requests from [stream].
+// serve_with_proxy uses [proxy] to handle all requests from [stream].
 //
 // This function is useful when implementing a custom test harness that serves
 // other protocols in addition to the RealmProxy protocol.
@@ -74,25 +53,25 @@ impl RealmProxy for RealmInstanceProxy {
 // # Example Usage
 //
 // ```
-// enum IncomingService {
-//     RealmProxy(RealmProxy_RequestStream),
-// }
-//
-// #[fuchsia::main(logging_tags = ["proxy"])]
+// #[fuchsia::main(logging = true)]
 // async fn main() -> Result<(), Error> {
-//     let mut fs = ServiceFs::new();
-//     fs.dir("svc").add_fidl_service(IncomingService::RealmProxy);
-//     fs.take_and_serve_directory_handle()?;
-//     fs.for_each_concurrent(None, |IncomingService::RealmProxy(stream)| async {
-//         let realm_proxy = RealmInstanceProxy::from_builder(setup_realm);
-//         handle_request_stream(realm_proxy, stream).await.unwrap();
-//     })
-//     .await;
-//     Ok(())
+//   let mut fs = ServiceFs::new();
+//
+//   fs.dir("svc").add_fidl_service(|stream| {
+//     fasync::Task::spawn(async move {
+//       let realm = build_realm().await.unwrap();
+//       let realm_proxy = MyCustomRealmProxy(realm);
+//       realm_proxy::service::serve_with_proxy(realm_proxy, stream).await.unwrap();
+//     }).detach();
+//   });
+//
+//   fs.take_and_serve_directory_handle()?;
+//   fs.collect::<()>().await;
+//   Ok(())
 // }
 // ```
-pub async fn handle_request_stream<P: RealmProxy>(
-    mut realm_proxy: P,
+pub async fn serve_with_proxy<P: RealmProxy>(
+    mut proxy: P,
     mut stream: RealmProxy_RequestStream,
 ) -> Result<(), Error> {
     while let Some(Ok(request)) = stream.next().await {
@@ -101,11 +80,37 @@ pub async fn handle_request_stream<P: RealmProxy>(
             RealmProxy_Request::ConnectToNamedProtocol {
                 protocol, server_end, responder, ..
             } => {
-                let mut res = realm_proxy.connect_to_named_protocol(protocol.as_str(), server_end);
+                let mut res = proxy.connect_to_named_protocol(protocol.as_str(), server_end);
                 responder.send(&mut res)?;
             }
         }
     }
 
     Ok(())
+}
+
+// serve proxies all requests in [stream] to [realm].
+//
+// # Example Usage
+//
+// ```
+// #[fuchsia::main(logging = true)]
+// async fn main() -> Result<(), Error> {
+//   let mut fs = ServiceFs::new();
+//
+//   fs.dir("svc").add_fidl_service(|stream| {
+//     fasync::Task::spawn(async move {
+//       let realm = build_realm().await.unwrap();
+//       realm_proxy::service::serve(realm, stream).await.unwrap();
+//     }).detach();
+//   });
+//
+//   fs.take_and_serve_directory_handle()?;
+//   fs.collect::<()>().await;
+//   Ok(())
+// }
+// ```
+pub async fn serve(realm: RealmInstance, stream: RealmProxy_RequestStream) -> Result<(), Error> {
+    let proxy = RealmInstanceProxy(realm);
+    serve_with_proxy(proxy, stream).await
 }

@@ -11,7 +11,7 @@ use {
     fuchsia_pkg_testing::{Package, PackageBuilder, SystemImageBuilder},
     fuchsia_zircon as zx,
     futures::{StreamExt, TryFutureExt},
-    realm_proxy::service::handle_request_stream,
+    realm_proxy::service::serve_with_proxy,
     tracing::{error, info},
 };
 
@@ -50,7 +50,7 @@ async fn main() -> Result<(), Error> {
 
     fs.for_each_concurrent(None, move |IncomingService::RealmProxy(stream)| {
         let realm_proxy = PkgdirTestRealmProxy::new(Clone::clone(&client));
-        handle_request_stream(realm_proxy, stream)
+        serve_with_proxy(realm_proxy, stream)
             .unwrap_or_else(|e| error!("handling realm_proxy request stream{:?}", e))
     })
     .await;

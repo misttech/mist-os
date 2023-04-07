@@ -8,7 +8,6 @@ use {
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route},
     futures::{StreamExt, TryFutureExt},
-    realm_proxy::service::{handle_request_stream, RealmInstanceProxy},
     tracing::{error, info},
 };
 
@@ -47,10 +46,7 @@ async fn main() -> Result<(), Error> {
 
 async fn run_server(config: ConfigValues, stream: RealmProxy_RequestStream) -> Result<(), Error> {
     let realm = build_realm(config).await?;
-    let proxy = RealmInstanceProxy::from_instance(realm);
-    handle_request_stream(proxy, stream).await?;
-
-    Ok(())
+    realm_proxy::service::serve(realm, stream).await
 }
 
 pub async fn build_realm(config: ConfigValues) -> Result<RealmInstance, Error> {
