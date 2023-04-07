@@ -351,13 +351,10 @@ impl fmt::Display for Config {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{environment::ExecutableKind, nested::RecursiveMap, EnvironmentContext};
+    use crate::nested::RecursiveMap;
     use regex::Regex;
     use serde_json::json;
-    use std::{
-        collections::HashMap,
-        io::{BufReader, BufWriter},
-    };
+    use std::io::{BufReader, BufWriter};
 
     const ERROR: &'static [u8] = b"0";
 
@@ -743,7 +740,7 @@ mod test {
         Ok(())
     }
 
-    fn test_map(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
+    fn test_map(value: Value) -> Option<Value> {
         value
             .as_str()
             .map(|s| match s {
@@ -755,13 +752,6 @@ mod test {
 
     #[test]
     fn test_mapping() -> Result<()> {
-        let ctx = EnvironmentContext::isolated(
-            ExecutableKind::Test,
-            "/tmp".into(),
-            HashMap::default(),
-            ConfigMap::default(),
-            None,
-        );
         let test = Config {
             user: Some(ConfigFile::from_buf(None, BufReader::new(MAPPED))),
             build: None,
@@ -771,8 +761,7 @@ mod test {
         };
         let test_mapping = "TEST_MAP".to_string();
         let test_passed = "passed".to_string();
-        let mapped_value =
-            test.get("name", SelectMode::First).as_ref().recursive_map(&ctx, &test_map);
+        let mapped_value = test.get("name", SelectMode::First).as_ref().recursive_map(&test_map);
         assert_eq!(mapped_value, Some(Value::String(test_passed)));
         let identity_value = test.get("name", SelectMode::First);
         assert_eq!(identity_value, Some(Value::String(test_mapping)));
@@ -823,13 +812,6 @@ mod test {
 
     #[test]
     fn test_nested_get_should_map_values_in_sub_tree() -> Result<()> {
-        let ctx = EnvironmentContext::isolated(
-            ExecutableKind::Test,
-            "/tmp".into(),
-            HashMap::default(),
-            ConfigMap::default(),
-            None,
-        );
         let test = Config {
             user: None,
             build: None,
@@ -837,8 +819,7 @@ mod test {
             default: serde_json::from_slice(NESTED)?,
             runtime: serde_json::from_slice(DEEP)?,
         };
-        let value =
-            test.get("name.nested", SelectMode::First).as_ref().recursive_map(&ctx, &test_map);
+        let value = test.get("name.nested", SelectMode::First).as_ref().recursive_map(&test_map);
         assert_eq!(value, Some(serde_json::from_str("{\"deep\": {\"name\": \"passed\"}}")?));
         Ok(())
     }

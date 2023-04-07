@@ -2,14 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::EnvironmentContext;
 use serde_json::Value;
 use std::path::PathBuf;
 
 /// Filters for config values that map to files that are reachable. Returns None
 /// for strings that don't correspond to files discoverable by [`PathBuf::exists`],
 /// but maps to the same value for anything else.
-pub(crate) fn file_check(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
+pub(crate) fn file_check(value: Value) -> Option<Value> {
     match &value {
         Value::String(s) if PathBuf::from(s).exists() => Some(value),
         Value::String(_) => None, // filter out strings that don't correspond to existing files.
@@ -22,24 +21,16 @@ pub(crate) fn file_check(_ctx: &EnvironmentContext, value: Value) -> Option<Valu
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{environment::ExecutableKind, ConfigMap};
     use anyhow::{bail, Result};
     use serde_json::json;
     use tempfile::NamedTempFile;
 
     #[test]
     fn test_file_mapper() -> Result<()> {
-        let ctx = EnvironmentContext::isolated(
-            ExecutableKind::Test,
-            "/tmp".into(),
-            Default::default(),
-            ConfigMap::default(),
-            None,
-        );
         let file = NamedTempFile::new()?;
         if let Some(path) = file.path().to_str() {
             let test = Value::String(path.to_string());
-            assert_eq!(file_check(&ctx, test), Some(Value::String(path.to_string())));
+            assert_eq!(file_check(test), Some(Value::String(path.to_string())));
             Ok(())
         } else {
             bail!("Unable to get temp file path");
@@ -48,15 +39,8 @@ mod test {
 
     #[test]
     fn test_file_mapper_returns_none() -> Result<()> {
-        let ctx = EnvironmentContext::isolated(
-            ExecutableKind::Test,
-            "/tmp".into(),
-            Default::default(),
-            ConfigMap::default(),
-            None,
-        );
         let test = json!("/fake_path/should_not_exist");
-        assert_eq!(file_check(&ctx, test), None);
+        assert_eq!(file_check(test), None);
         Ok(())
     }
 }

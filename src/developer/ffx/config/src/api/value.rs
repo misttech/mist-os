@@ -9,7 +9,6 @@ use crate::{
     },
     mapping::{filter, flatten},
     nested::RecursiveMap,
-    EnvironmentContext,
 };
 use anyhow::anyhow;
 use serde_json::Value;
@@ -29,28 +28,20 @@ pub struct ConfigValue(pub(crate) Option<Value>);
 // See RecursiveMap for why the value version is the main implementation.
 impl RecursiveMap for ConfigValue {
     type Output = ConfigValue;
-    fn recursive_map<T: Fn(&EnvironmentContext, Value) -> Option<Value>>(
-        self,
-        ctx: &EnvironmentContext,
-        mapper: &T,
-    ) -> ConfigValue {
-        ConfigValue(self.0.recursive_map(ctx, mapper))
+    fn recursive_map<T: Fn(Value) -> Option<Value>>(self, mapper: &T) -> ConfigValue {
+        ConfigValue(self.0.recursive_map(mapper))
     }
 }
 impl RecursiveMap for &ConfigValue {
     type Output = ConfigValue;
-    fn recursive_map<T: Fn(&EnvironmentContext, Value) -> Option<Value>>(
-        self,
-        ctx: &EnvironmentContext,
-        mapper: &T,
-    ) -> ConfigValue {
-        ConfigValue(self.0.clone()).recursive_map(ctx, mapper)
+    fn recursive_map<T: Fn(Value) -> Option<Value>>(self, mapper: &T) -> ConfigValue {
+        ConfigValue(self.0.clone()).recursive_map(mapper)
     }
 }
 
 pub trait ValueStrategy {
-    fn handle_arrays(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
-        flatten(ctx, value)
+    fn handle_arrays(value: Value) -> Option<Value> {
+        flatten(value)
     }
 
     fn validate_query(query: &ConfigQuery<'_>) -> std::result::Result<(), ConfigError> {
@@ -74,7 +65,7 @@ impl From<Option<Value>> for ConfigValue {
 }
 
 impl ValueStrategy for Value {
-    fn handle_arrays(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
+    fn handle_arrays(value: Value) -> Option<Value> {
         Some(value)
     }
 
@@ -92,7 +83,7 @@ impl TryFrom<ConfigValue> for Value {
 }
 
 impl ValueStrategy for Option<Value> {
-    fn handle_arrays(_ctx: &EnvironmentContext, value: Value) -> Option<Value> {
+    fn handle_arrays(value: Value) -> Option<Value> {
         Some(value)
     }
 
@@ -254,8 +245,8 @@ impl TryFrom<ConfigValue> for Option<PathBuf> {
 }
 
 impl<T: TryFrom<ConfigValue>> ValueStrategy for Vec<T> {
-    fn handle_arrays(ctx: &EnvironmentContext, value: Value) -> Option<Value> {
-        filter(ctx, value)
+    fn handle_arrays(value: Value) -> Option<Value> {
+        filter(value)
     }
 
     fn validate_query(_query: &ConfigQuery<'_>) -> std::result::Result<(), ConfigError> {

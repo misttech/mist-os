@@ -118,7 +118,7 @@ impl<'a> ConfigQuery<'a> {
         self.get_config(ctx.load().await.map_err(|e| e.into())?)
             .await
             .map_err(|e| e.into())?
-            .recursive_map(&ctx, &validate_type::<T>)
+            .recursive_map(&validate_type::<T>)
             .try_into()
     }
 
@@ -136,15 +136,15 @@ impl<'a> ConfigQuery<'a> {
         self.get_config(ctx.load().await.map_err(|e| e.into())?)
             .await
             .map_err(|e| e.into())?
-            .recursive_map(&ctx, &runtime)
-            .recursive_map(&ctx, &cache)
-            .recursive_map(&ctx, &data)
-            .recursive_map(&ctx, &config)
-            .recursive_map(&ctx, &home)
-            .recursive_map(&ctx, &build)
-            .recursive_map(&ctx, &env_var)
-            .recursive_map(&ctx, &T::handle_arrays)
-            .recursive_map(&ctx, &validate_type::<T>)
+            .recursive_map(&|val| runtime(&ctx, val))
+            .recursive_map(&|val| cache(&ctx, val))
+            .recursive_map(&|val| data(&ctx, val))
+            .recursive_map(&|val| config(&ctx, val))
+            .recursive_map(&|val| home(&ctx, val))
+            .recursive_map(&|val| build(&ctx, val))
+            .recursive_map(&|val| env_var(&ctx, val))
+            .recursive_map(&T::handle_arrays)
+            .recursive_map(&validate_type::<T>)
             .try_into()
     }
 
@@ -161,15 +161,15 @@ impl<'a> ConfigQuery<'a> {
         self.get_config(ctx.load().await.map_err(|e| e.into())?)
             .await
             .map_err(|e| e.into())?
-            .recursive_map(&ctx, &runtime)
-            .recursive_map(&ctx, &cache)
-            .recursive_map(&ctx, &data)
-            .recursive_map(&ctx, &config)
-            .recursive_map(&ctx, &home)
-            .recursive_map(&ctx, &build)
-            .recursive_map(&ctx, &env_var)
-            .recursive_map(&ctx, &T::handle_arrays)
-            .recursive_map(&ctx, &file_check)
+            .recursive_map(&|val| runtime(&ctx, val))
+            .recursive_map(&|val| cache(&ctx, val))
+            .recursive_map(&|val| data(&ctx, val))
+            .recursive_map(&|val| config(&ctx, val))
+            .recursive_map(&|val| home(&ctx, val))
+            .recursive_map(&|val| build(&ctx, val))
+            .recursive_map(&|val| env_var(&ctx, val))
+            .recursive_map(&T::handle_arrays)
+            .recursive_map(&file_check)
             .try_into()
     }
 

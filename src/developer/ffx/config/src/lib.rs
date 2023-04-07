@@ -267,12 +267,9 @@ mod test {
     use super::*;
     // This is to get the FfxConfigBacked derive to compile, as it
     // creates a token stream referencing `ffx_config` on the inside.
-    use crate::{self as ffx_config, environment::ExecutableKind};
+    use crate::{self as ffx_config};
     use serde_json::{json, Value};
-    use std::{
-        collections::{HashMap, HashSet},
-        path::PathBuf,
-    };
+    use std::{collections::HashSet, path::PathBuf};
 
     #[test]
     fn test_config_levels_make_sense_from_first() {
@@ -298,40 +295,33 @@ mod test {
 
     #[test]
     fn test_validating_types() {
-        let ctx = EnvironmentContext::isolated(
-            ExecutableKind::Test,
-            "/tmp".into(),
-            HashMap::default(),
-            ConfigMap::default(),
-            None,
-        );
-        assert!(validate_type::<String>(&ctx, json!("test")).is_some());
-        assert!(validate_type::<String>(&ctx, json!(1)).is_none());
-        assert!(validate_type::<String>(&ctx, json!(false)).is_none());
-        assert!(validate_type::<String>(&ctx, json!(true)).is_none());
-        assert!(validate_type::<String>(&ctx, json!({"test": "whatever"})).is_none());
-        assert!(validate_type::<String>(&ctx, json!(["test", "test2"])).is_none());
-        assert!(validate_type::<bool>(&ctx, json!(true)).is_some());
-        assert!(validate_type::<bool>(&ctx, json!(false)).is_some());
-        assert!(validate_type::<bool>(&ctx, json!("true")).is_some());
-        assert!(validate_type::<bool>(&ctx, json!("false")).is_some());
-        assert!(validate_type::<bool>(&ctx, json!(1)).is_none());
-        assert!(validate_type::<bool>(&ctx, json!("test")).is_none());
-        assert!(validate_type::<bool>(&ctx, json!({"test": "whatever"})).is_none());
-        assert!(validate_type::<bool>(&ctx, json!(["test", "test2"])).is_none());
-        assert!(validate_type::<u64>(&ctx, json!(2)).is_some());
-        assert!(validate_type::<u64>(&ctx, json!(100)).is_some());
-        assert!(validate_type::<u64>(&ctx, json!("100")).is_some());
-        assert!(validate_type::<u64>(&ctx, json!("0")).is_some());
-        assert!(validate_type::<u64>(&ctx, json!(true)).is_none());
-        assert!(validate_type::<u64>(&ctx, json!("test")).is_none());
-        assert!(validate_type::<u64>(&ctx, json!({"test": "whatever"})).is_none());
-        assert!(validate_type::<u64>(&ctx, json!(["test", "test2"])).is_none());
-        assert!(validate_type::<PathBuf>(&ctx, json!("/")).is_some());
-        assert!(validate_type::<PathBuf>(&ctx, json!("test")).is_some());
-        assert!(validate_type::<PathBuf>(&ctx, json!(true)).is_none());
-        assert!(validate_type::<PathBuf>(&ctx, json!({"test": "whatever"})).is_none());
-        assert!(validate_type::<PathBuf>(&ctx, json!(["test", "test2"])).is_none());
+        assert!(validate_type::<String>(json!("test")).is_some());
+        assert!(validate_type::<String>(json!(1)).is_none());
+        assert!(validate_type::<String>(json!(false)).is_none());
+        assert!(validate_type::<String>(json!(true)).is_none());
+        assert!(validate_type::<String>(json!({"test": "whatever"})).is_none());
+        assert!(validate_type::<String>(json!(["test", "test2"])).is_none());
+        assert!(validate_type::<bool>(json!(true)).is_some());
+        assert!(validate_type::<bool>(json!(false)).is_some());
+        assert!(validate_type::<bool>(json!("true")).is_some());
+        assert!(validate_type::<bool>(json!("false")).is_some());
+        assert!(validate_type::<bool>(json!(1)).is_none());
+        assert!(validate_type::<bool>(json!("test")).is_none());
+        assert!(validate_type::<bool>(json!({"test": "whatever"})).is_none());
+        assert!(validate_type::<bool>(json!(["test", "test2"])).is_none());
+        assert!(validate_type::<u64>(json!(2)).is_some());
+        assert!(validate_type::<u64>(json!(100)).is_some());
+        assert!(validate_type::<u64>(json!("100")).is_some());
+        assert!(validate_type::<u64>(json!("0")).is_some());
+        assert!(validate_type::<u64>(json!(true)).is_none());
+        assert!(validate_type::<u64>(json!("test")).is_none());
+        assert!(validate_type::<u64>(json!({"test": "whatever"})).is_none());
+        assert!(validate_type::<u64>(json!(["test", "test2"])).is_none());
+        assert!(validate_type::<PathBuf>(json!("/")).is_some());
+        assert!(validate_type::<PathBuf>(json!("test")).is_some());
+        assert!(validate_type::<PathBuf>(json!(true)).is_none());
+        assert!(validate_type::<PathBuf>(json!({"test": "whatever"})).is_none());
+        assert!(validate_type::<PathBuf>(json!(["test", "test2"])).is_none());
     }
 
     #[test]
