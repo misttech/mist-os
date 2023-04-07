@@ -183,6 +183,8 @@ class Device : public std::enable_shared_from_this<Device>,
     return parent_ && system_power_state_ == fuchsia_device_manager::SystemPowerState::kFullyOn;
   }
 
+  bool HasChildNamed(std::string_view name) const;
+
   // This arena backs `properties_`.
   // This should be declared before any objects it backs so it is destructed last.
   fidl::Arena<512> arena_;

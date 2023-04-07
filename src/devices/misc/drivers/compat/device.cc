@@ -302,6 +302,9 @@ const char* Device::Name() const { return name_.data(); }
 bool Device::HasChildren() const { return !children_.empty(); }
 
 zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
+  if (HasChildNamed(zx_args->name)) {
+    return ZX_ERR_BAD_STATE;
+  }
   device_t compat_device = {
       .proto_ops =
           {
@@ -681,6 +684,11 @@ void Device::InsertOrUpdateProperty(fuchsia_driver_framework::wire::NodeProperty
 }
 
 std::string Device::OutgoingName() { return name_ + "-" + std::to_string(device_id_); }
+
+bool Device::HasChildNamed(std::string_view name) const {
+  return std::any_of(children_.begin(), children_.end(),
+                     [name](const auto& child) { return name == child->Name(); });
+}
 
 zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
   if (HasOp(ops_, &zx_protocol_device_t::get_protocol)) {

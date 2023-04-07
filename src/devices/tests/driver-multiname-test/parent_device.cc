@@ -28,7 +28,8 @@ static zx_driver_ops_t parent_device_driver_ops = {
     .bind =
         [](void* ctx, zx_device_t* dev) {
           std::unique_ptr device = std::make_unique<ParentDevice>(dev);
-          zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("parent_device"));
+          zx_status_t status = device->DdkAdd(
+              ddk::DeviceAddArgs("parent_device").set_flags(DEVICE_ADD_NON_BINDABLE));
           if (status == ZX_OK) {
             [[maybe_unused]] ParentDevice* ptr = device.release();
           }
