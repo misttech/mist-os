@@ -306,6 +306,8 @@ func fuchsiaLogChecks() []FailureModeCheck {
 			&stringInLogCheck{String: "SUMMARY: UndefinedBehaviorSanitizer", Type: lt, AttributeToTest: true, ExceptBlocks: []*logBlock{
 				{startString: "[===UBSAN EXCEPT BLOCK START===]", endString: "[===UBSAN EXCEPT BLOCK END===]"},
 			}},
+			// At the time of writing, HWASAN had no in-tree tests that trigger and expect a hwasan failure, so no ExceptBlocks
+			&stringInLogCheck{String: "ERROR: HWAddressSanitizer", Type: lt, AttributeToTest: true},
 			// Match specific OOPS types before finally matching the generic type.
 			&stringInLogCheck{String: "lockup_detector: no heartbeat from", Type: lt, AttributeToTest: true, ExceptBlocks: oopsExceptBlocks},
 			&stringInLogCheck{String: "ZIRCON KERNEL OOPS", Type: lt, AttributeToTest: true, ExceptBlocks: oopsExceptBlocks},
