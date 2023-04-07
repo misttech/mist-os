@@ -546,7 +546,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
 
     // Set driver_manager config based on request.
     realm_builder_.InitMutableConfigFromPackage("driver_manager");
-    const bool is_dfv2 = request.args().use_driver_framework_v2().value_or(false);
+    const bool is_dfv2 =
+        request.args().use_driver_framework_v2().value_or(USE_DRIVER_FRAMEWORK_V2_DEFAULT);
     realm_builder_.SetConfigValue("driver_manager", "use_driver_framework_v2",
                                   ConfigValue::Bool(is_dfv2));
 
