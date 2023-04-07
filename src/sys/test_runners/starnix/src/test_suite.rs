@@ -26,18 +26,18 @@ pub async fn handle_suite_requests(
     mut stream: ftest::SuiteRequestStream,
 ) -> Result<(), Error> {
     let test_type = test_type(start_info.program.as_ref().unwrap());
+    // The kernel start info is largely the same as that of the test component. The main difference
+    // is that the kernel_start_info does not contain the outgoing directory of the test component.
+    let kernel_start_info = clone_start_info(&mut start_info)?;
+
+    // Instantiates a starnix_kernel instance in the test component's realm. Running the kernel
+    // in the test realm allows coverage data to be collected for the runner itself, during the
+    // execution of the test.
+    let (starnix_kernel, realm, kernel_name) =
+        instantiate_kernel_in_realm(kernels_dir, kernel_start_info).await?;
+
     while let Some(event) = stream.try_next().await? {
         let mut test_start_info = clone_start_info(&mut start_info)?;
-        // The kernel start info is largely the same as that of the test component. The main difference
-        // is that the kernel_start_info does not contain the outgoing directory of the test component.
-        let kernel_start_info = clone_start_info(&mut start_info)?;
-
-        // Instantiates a starnix_kernel instance in the test component's realm. Running the kernel
-        // in the test realm allows coverage data to be collected for the runner itself, during the
-        // execution of the test.
-        let (starnix_kernel, realm, kernel_name) =
-            instantiate_kernel_in_realm(kernels_dir, kernel_start_info).await?;
-
         match event {
             ftest::SuiteRequest::GetTests { iterator, .. } => {
                 let stream = iterator.into_stream()?;
@@ -116,15 +116,15 @@ pub async fn handle_suite_requests(
                 run_listener_proxy.on_finished()?;
             }
         }
-
-        realm
-            .destroy_child(&mut fdecl::ChildRef {
-                name: kernel_name,
-                collection: Some(RUNNERS_COLLECTION.into()),
-            })
-            .await?
-            .map_err(|e| anyhow::anyhow!("failed to destory runner child: {:?}", e))?;
     }
+
+    realm
+        .destroy_child(&mut fdecl::ChildRef {
+            name: kernel_name,
+            collection: Some(RUNNERS_COLLECTION.into()),
+        })
+        .await?
+        .map_err(|e| anyhow::anyhow!("failed to destory runner child: {:?}", e))?;
 
     Ok(())
 }
