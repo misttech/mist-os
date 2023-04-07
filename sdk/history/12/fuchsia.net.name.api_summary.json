@@ -155,6 +155,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.net.name/LookupIpOptions.canonical_name_lookup",
+        "ordinal": "4",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.net.name/LookupIpOptions.ipv4_lookup",
         "ordinal": "1",
         "type": "bool"
@@ -180,6 +186,12 @@
         "name": "fuchsia.net.name/LookupResult.addresses",
         "ordinal": "1",
         "type": "vector<fuchsia.net/IpAddress>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.net.name/LookupResult.canonical_name",
+        "ordinal": "2",
+        "type": "string:255"
     },
     {
         "kind": "table",

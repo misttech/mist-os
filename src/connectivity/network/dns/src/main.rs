@@ -107,7 +107,7 @@ impl QueryStats {
 
         let current_window = past_queries.back_mut().and_then(|window| {
             let QueryWindow { start, .. } = window;
-            (end_time - *start < STAT_WINDOW_DURATION).then(|| window)
+            (end_time - *start < STAT_WINDOW_DURATION).then_some(window)
         });
 
         match current_window {
@@ -785,11 +785,17 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
             let stats = stats.clone();
             let routes = routes.clone();
             async move {
-                let fname::LookupIpOptions { ipv4_lookup, ipv6_lookup, sort_addresses, .. } =
-                    options;
+                let fname::LookupIpOptions {
+                    ipv4_lookup,
+                    ipv6_lookup,
+                    sort_addresses,
+                    canonical_name_lookup,
+                    ..
+                } = options;
                 let ipv4_lookup = ipv4_lookup.unwrap_or(false);
                 let ipv6_lookup = ipv6_lookup.unwrap_or(false);
                 let sort_addresses = sort_addresses.unwrap_or(false);
+                let canonical_name_lookup = canonical_name_lookup.unwrap_or(false);
                 let mut lookup_result = (|| async {
                     let hostname = hostname.as_str();
                     // The [`IntoName`] implementation for &str does not
@@ -818,56 +824,57 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     };
                     let resolver = resolver.read();
                     let start_time = fasync::Time::now();
-                    let (ret1, ret2) = futures::future::join(
+                    let (ret1, ret2, ret3) = futures::future::join3(
                         futures::future::OptionFuture::from(
                             ipv4_lookup.then(|| resolver.lookup(hostname, RecordType::A)),
                         ),
                         futures::future::OptionFuture::from(
                             ipv6_lookup.then(|| resolver.lookup(hostname, RecordType::AAAA)),
                         ),
+                        futures::future::OptionFuture::from(
+                            canonical_name_lookup
+                                .then(|| resolver.lookup(hostname, RecordType::CNAME)),
+                        ),
                     )
                     .await;
-                    let result = [ret1, ret2];
+                    let result = [ret1, ret2, ret3];
                     if result.iter().all(Option::is_none) {
                         return Err(fname::LookupError::InvalidArgs);
                     }
-                    let (addrs, error) = result.into_iter()
-                        .filter_map(std::convert::identity)
-                        .fold((Vec::new(), None), |(mut addrs, mut error), result| {
-                            let () = match result {
-                                Err(err) => match error.as_ref() {
-                                    Some(_err) => {}
-                                    None => {
-                                        error = Some(err);
-                                    }
-                                },
-                                Ok(lookup) => lookup.iter().for_each(|rdata| match rdata {
-                                    RData::A(addr) if ipv4_lookup => {
-                                        addrs.push(net_ext::IpAddress(IpAddr::V4(*addr)).into())
-                                    }
-                                    RData::AAAA(addr) if ipv6_lookup => {
-                                        addrs.push(net_ext::IpAddress(IpAddr::V6(*addr)).into())
-                                    }
-                                    rdata => {
-                                        let record_type = rdata.to_record_type();
-                                        match record_type {
+                    let (addrs, cnames, error) =
+                        result.into_iter().filter_map(std::convert::identity).fold(
+                            (Vec::new(), Vec::new(), None),
+                            |(mut addrs, mut cnames, mut error), result| {
+                                let () = match result {
+                                    Err(err) => match error.as_ref() {
+                                        Some(_err) => {}
+                                        None => {
+                                            error = Some(err);
+                                        }
+                                    },
+                                    Ok(lookup) => lookup.iter().for_each(|rdata| match rdata {
+                                        RData::A(addr) if ipv4_lookup => addrs
+                                            .push(net_ext::IpAddress(IpAddr::V4(*addr)).into()),
+                                        RData::AAAA(addr) if ipv6_lookup => addrs
+                                            .push(net_ext::IpAddress(IpAddr::V6(*addr)).into()),
+                                        RData::CNAME(name) => {
                                             // CNAME records are known to be present with other
                                             // query types; avoid logging in that case.
-                                            RecordType::CNAME => (),
-                                            record_type => {
-                                                error!(
-                                                    "Lookup(_, {:?}) yielded unexpected record type: {}",
-                                                    options,
-                                                    record_type
-                                                )
+                                            if canonical_name_lookup {
+                                                cnames.push(name.to_utf8())
                                             }
                                         }
-                                    }
-                                }),
-                            };
-                            (addrs, error)
+                                        rdata => {
+                                            error!(
+                                                "Lookup(_, {:?}) yielded unexpected record type: {}",
+                                                options, rdata.to_record_type(),
+                                            )
+                                        }
+                                    }),
+                                };
+                            (addrs, cnames, error)
                         });
-                    let count = match NonZeroUsize::try_from(addrs.len()) {
+                    let count = match NonZeroUsize::try_from(addrs.len() + cnames.len()) {
                         Ok(count) => Ok(count),
                         Err(std::num::TryFromIntError { .. }) => {
                             match error {
@@ -903,7 +910,32 @@ fn create_ip_lookup_fut<T: ResolverLookup>(
                     } else {
                         Ok(addrs)
                     }?;
-                    Ok(fname::LookupResult { addresses: Some(addrs), ..fname::LookupResult::EMPTY })
+                    // Per RFC 1034 section 3.6.2:
+                    //
+                    //   If a CNAME RR is present at a node, no other data should be present; this
+                    //   ensures that the data for a canonical name and its aliases cannot be
+                    //   different.  This rule also insures that a cached CNAME can be used without
+                    //   checking with an authoritative server for other RR types.
+                    if cnames.len() > 1 {
+                        let cnames =
+                            cnames.iter().fold(HashMap::<&str, usize>::new(), |mut acc, cname| {
+                                *acc.entry(cname).or_default() += 1;
+                                acc
+                            });
+                        warn!(
+                            "Lookup({}, {:?}): multiple CNAMEs: {:?}",
+                            hostname, options, cnames
+                        )
+                    }
+                    let cname = {
+                        let mut cnames = cnames;
+                        cnames.pop()
+                    };
+                    Ok(fname::LookupResult {
+                        addresses: Some(addrs),
+                        canonical_name: cname,
+                        ..fname::LookupResult::EMPTY
+                    })
                 })()
                 .await;
                 responder.send(&mut lookup_result).unwrap_or_else(|e| match e {
@@ -1161,6 +1193,7 @@ mod tests {
     use itertools::Itertools as _;
     use net_declare::{fidl_ip, std_ip, std_ip_v4, std_ip_v6};
     use net_types::ip::Ip as _;
+    use test_case::test_case;
     use trust_dns_proto::{
         op::Query,
         rr::{Name, RData, Record},
@@ -1182,6 +1215,8 @@ mod tests {
     const REMOTE_IPV4_HOST: &str = "www.foo.com";
     // host which has IPv6 address only.
     const REMOTE_IPV6_HOST: &str = "www.bar.com";
+    const REMOTE_IPV4_HOST_ALIAS: &str = "www.alsofoo.com";
+    const REMOTE_IPV6_HOST_ALIAS: &str = "www.alsobar.com";
     // host used in reverse_lookup when multiple hostnames are returned.
     const REMOTE_IPV6_HOST_EXTRA: &str = "www.bar2.com";
     // host which has IPv4 and IPv6 address if reset name servers.
@@ -1324,10 +1359,19 @@ mod tests {
             let rdatas = match record_type {
                 RecordType::A => [REMOTE_IPV4_HOST, REMOTE_IPV4_IPV6_HOST]
                     .contains(&host_name.as_str())
-                    .then(|| RData::A(IPV4_HOST)),
+                    .then_some(RData::A(IPV4_HOST)),
                 RecordType::AAAA => [REMOTE_IPV6_HOST, REMOTE_IPV4_IPV6_HOST]
                     .contains(&host_name.as_str())
-                    .then(|| RData::AAAA(IPV6_HOST)),
+                    .then_some(RData::AAAA(IPV6_HOST)),
+                RecordType::CNAME => match host_name.as_str() {
+                    REMOTE_IPV4_HOST_ALIAS => Some(REMOTE_IPV4_HOST),
+                    REMOTE_IPV6_HOST_ALIAS => Some(REMOTE_IPV6_HOST),
+                    _ => None,
+                }
+                .map(Name::from_str)
+                .transpose()
+                .unwrap()
+                .map(RData::CNAME),
                 record_type => {
                     panic!("unexpected record type {:?}", record_type)
                 }
@@ -1619,6 +1663,31 @@ mod tests {
                         addresses: Some(vec![map_ip(IPV6_HOST)]),
                         ..fname::LookupResult::EMPTY
                     }),
+                );
+            })
+            .await;
+    }
+
+    #[test_case(REMOTE_IPV4_HOST_ALIAS, REMOTE_IPV4_HOST; "ipv4")]
+    #[test_case(REMOTE_IPV6_HOST_ALIAS, REMOTE_IPV6_HOST; "ipv6")]
+    #[fasync::run_singlethreaded(test)]
+    async fn test_lookupip_remotehost_canonical_name(hostname: &str, expected: &str) {
+        TestEnvironment::new()
+            .run_lookup(|proxy| async move {
+                assert_matches!(
+                    proxy
+                        .lookup_ip(
+                            hostname,
+                            fname::LookupIpOptions {
+                                canonical_name_lookup: Some(true),
+                                ..fname::LookupIpOptions::EMPTY
+                            }
+                        )
+                        .await,
+                    Ok(Ok(fname::LookupResult {
+                        canonical_name: Some(cname),
+                        ..
+                    })) => assert_eq!(cname, expected)
                 );
             })
             .await;

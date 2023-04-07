@@ -49,9 +49,11 @@ protocol Lookup {
             ///
             /// If not set, interpreted as false.
             3: sort_addresses bool;
-
-            // TODO(https://fxbug.dev/21414): add a field here and in `LookupResult`
-            // to support returning the canonical name.
+            /// Include the canonical name.
+            ///
+            /// If not set, interpreted as false.
+            @available(added=12)
+            4: canonical_name_lookup bool;
         };
     }) -> (struct {
         result @generated_name("LookupResult") table {
@@ -60,6 +62,11 @@ protocol Lookup {
             /// If sorting was requested, `addresses` is sorted in order of
             /// preference, most preferred destination address first.
             1: addresses vector<fuchsia.net.IpAddress>:MAX;
+            /// The canonical name of the requested hostname.
+            ///
+            /// Provided only if requested.
+            @available(added=12)
+            2: canonical_name fuchsia.net.Hostname;
         };
     }) error LookupError;
     /// Look up a hostname by IP address.
