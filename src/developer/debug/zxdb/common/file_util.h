@@ -44,6 +44,8 @@ std::string NormalizePath(const std::string& path);
 std::time_t GetFileModificationTime(const std::string& path);
 
 // Check if a path starts with another path. Return false if either one is relative.
+// The input may not be normalized, e.g.,
+//   PathStartsWith("/path/to/build/dir/../../source.cc", "/path/to/build/dir") => true
 bool PathStartsWith(const std::filesystem::path& path, const std::filesystem::path& base);
 
 // Compute the relative path from base. Both inputs must be absolute.

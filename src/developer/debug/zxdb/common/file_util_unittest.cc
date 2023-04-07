@@ -60,7 +60,7 @@ TEST(FileUtil, NormalizePath) {
   EXPECT_EQ("../foo", NormalizePath("../foo"));
   EXPECT_EQ("..", NormalizePath(".."));
   EXPECT_EQ(".", NormalizePath("./././."));
-  EXPECT_EQ("../../..", NormalizePath("../../.."));
+  EXPECT_EQ("../../..", NormalizePath("./../../.."));
 
   // The implementation of this is std::filesystem which isn't consistent here about whether
   // trailing slashes are preserved. It would be nice if the "../" case preserved the trailing
@@ -87,9 +87,12 @@ TEST(FileUtil, PathStartsWith) {
 
   EXPECT_TRUE(PathStartsWith("abc", "abc"));
   EXPECT_TRUE(PathStartsWith("abc/def", "abc"));
+  EXPECT_TRUE(PathStartsWith("abc/def", "abc/"));
 
   EXPECT_TRUE(PathStartsWith(".", "."));
   EXPECT_TRUE(PathStartsWith("./abc", "."));
+  EXPECT_TRUE(PathStartsWith("./abc", "./"));
+  EXPECT_TRUE(PathStartsWith("./abc", "abc"));
 
   EXPECT_FALSE(PathStartsWith("/abc", "/a"));
   EXPECT_FALSE(PathStartsWith("/", ""));

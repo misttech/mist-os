@@ -60,6 +60,10 @@ bool PathStartsWith(const std::filesystem::path& path, const std::filesystem::pa
     return false;
   auto path_it = path.begin();
   for (const auto& ancestor : base) {
+    if (ancestor.empty() || ancestor == ".")
+      continue;
+    while (path_it->empty() || *path_it == ".")
+      path_it++;
     if (path_it == path.end())
       return false;
     if (ancestor != *path_it)
