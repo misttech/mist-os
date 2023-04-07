@@ -3169,14 +3169,14 @@ mod tests {
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &device,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 buffer,
             ),
             IpVersion::V6 => receive_ip_packet::<_, _, Ipv6>(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &device,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 buffer,
             ),
         }
@@ -3495,7 +3495,7 @@ mod tests {
     fn test_should_send_icmpv4_error() {
         let src_ip = FAKE_CONFIG_V4.local_ip;
         let dst_ip = FAKE_CONFIG_V4.remote_ip;
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
         let multicast_ip_1 = SpecifiedAddr::new(Ipv4Addr::new([224, 0, 0, 1])).unwrap();
         let multicast_ip_2 = SpecifiedAddr::new(Ipv4Addr::new([224, 0, 0, 2])).unwrap();
 
@@ -3616,7 +3616,7 @@ mod tests {
     fn test_should_send_icmpv6_error() {
         let src_ip = FAKE_CONFIG_V6.local_ip;
         let dst_ip = FAKE_CONFIG_V6.remote_ip;
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
         let multicast_ip_1 =
             SpecifiedAddr::new(Ipv6Addr::new([0xff00, 0, 0, 0, 0, 0, 0, 1])).unwrap();
         let multicast_ip_2 =
@@ -4906,7 +4906,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 FAKE_CONFIG_V4.remote_ip,
                 FAKE_CONFIG_V4.local_ip,
                 IpProto::Udp.into(),
@@ -4924,7 +4924,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 FAKE_CONFIG_V4.remote_ip,
                 FAKE_CONFIG_V4.local_ip,
                 Icmpv4ParameterProblemCode::PointerIndicatesError,
@@ -4941,7 +4941,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 FAKE_CONFIG_V4.remote_ip,
                 FAKE_CONFIG_V4.local_ip,
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable,
@@ -4957,7 +4957,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
                 FAKE_CONFIG_V6.local_ip,
                 IpProto::Udp.into(),
@@ -4972,7 +4972,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
                 FAKE_CONFIG_V6.local_ip,
                 IpProto::Udp.into(),
@@ -4990,7 +4990,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 UnicastAddr::new(*FAKE_CONFIG_V6.remote_ip).expect("unicast source address"),
                 FAKE_CONFIG_V6.local_ip,
                 Icmpv6ParameterProblemCode::ErroneousHeaderField,
@@ -5006,7 +5006,7 @@ mod tests {
                 sync_ctx,
                 non_sync_ctx,
                 &FakeDeviceId,
-                FrameDestination::Unicast,
+                FrameDestination::Individual { local: true },
                 UnicastAddr::from_witness(FAKE_CONFIG_V6.remote_ip).unwrap(),
                 FAKE_CONFIG_V6.local_ip,
                 Icmpv6DestUnreachableCode::NoRoute,

@@ -1013,7 +1013,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             icmpv6_packet_buf,
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 0);
@@ -1027,7 +1027,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             icmpv6_packet_buf,
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "ndp::rx_router_advertisement"), 1);

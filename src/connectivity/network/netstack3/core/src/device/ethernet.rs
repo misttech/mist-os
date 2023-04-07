@@ -16,8 +16,7 @@ use log::trace;
 use net_types::{
     ethernet::Mac,
     ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    BroadcastAddress, MulticastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, UnicastAddress,
-    Witness,
+    BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Nested, Serializer};
 use packet_formats::{
@@ -66,19 +65,6 @@ use crate::{
     sync::{Mutex, RwLock},
     BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
 };
-
-impl From<Mac> for FrameDestination {
-    fn from(mac: Mac) -> FrameDestination {
-        if mac.is_broadcast() {
-            FrameDestination::Broadcast
-        } else if mac.is_multicast() {
-            FrameDestination::Multicast
-        } else {
-            debug_assert!(mac.is_unicast());
-            FrameDestination::Unicast
-        }
-    }
-}
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
 
@@ -619,22 +605,28 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetTxDequeue>>
     }
 }
 
-/// Should a packet with destination MAC address, `dst`, be accepted by this
-/// device?
-///
-/// Returns `true` if this device is in promiscuous mode or the frame is
-/// destined for this device.
-fn should_deliver(
+/// Returns the type of frame if it should be delivered, otherwise `None`.
+fn deliver_as(
     static_state: &StaticEthernetDeviceState,
     dynamic_state: &DynamicEthernetDeviceState,
     dst_mac: &Mac,
-) -> bool {
-    dynamic_state.promiscuous_mode
-        || (static_state.mac.get() == *dst_mac)
-        || dst_mac.is_broadcast()
-        || (MulticastAddr::new(*dst_mac)
-            .map(|a| dynamic_state.link_multicast_groups.contains(&a))
-            .unwrap_or(false))
+) -> Option<FrameDestination> {
+    if dynamic_state.promiscuous_mode {
+        return Some(FrameDestination::from_dest(*dst_mac, static_state.mac.get()));
+    }
+    UnicastAddr::new(*dst_mac)
+        .and_then(|u| {
+            (static_state.mac == u).then_some(FrameDestination::Individual { local: true })
+        })
+        .or_else(|| dst_mac.is_broadcast().then_some(FrameDestination::Broadcast))
+        .or_else(|| {
+            MulticastAddr::new(*dst_mac).and_then(|a| {
+                dynamic_state
+                    .link_multicast_groups
+                    .contains(&a)
+                    .then_some(FrameDestination::Multicast)
+            })
+        })
 }
 
 /// A timer ID for Ethernet devices.
@@ -771,18 +763,24 @@ pub(super) fn receive_frame<
         return;
     };
 
-    let (_, dst) = (frame.src_mac(), frame.dst_mac());
+    let dst = frame.dst_mac();
 
-    let should_deliver = sync_ctx
+    let frame_dest = sync_ctx
         .with_ethernet_device_state(device_id, |static_state, dynamic_state| {
-            should_deliver(static_state, dynamic_state, &dst)
+            deliver_as(static_state, dynamic_state, &dst)
         });
-    if !should_deliver {
-        trace!("ethernet::receive_frame: destination mac {:?} not for device {:?}", dst, device_id);
-        return;
-    }
 
-    let frame_dst = FrameDestination::from(dst);
+    let frame_dst = match frame_dest {
+        None => {
+            trace!(
+                "ethernet::receive_frame: destination mac {:?} not for device {:?}",
+                dst,
+                device_id
+            );
+            return;
+        }
+        Some(frame_dest) => frame_dest,
+    };
 
     match frame.ethertype() {
         Some(EtherType::Arp) => {
@@ -1115,6 +1113,7 @@ mod tests {
     use alloc::{collections::hash_map::HashMap, vec, vec::Vec};
 
     use ip_test_macro::ip_test;
+    use net_declare::net_mac;
     use net_types::ip::{AddrSubnet, Ip, IpAddr, IpVersion};
     use packet::Buf;
     use packet_formats::{
@@ -1591,7 +1590,7 @@ mod tests {
         let src_ip = I::get_other_ip_address(3);
         let src_mac = UnicastAddr::new(Mac::new([10, 11, 12, 13, 14, 15])).unwrap();
         let config = I::FAKE_CONFIG;
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
         let mut rng = new_rng(70812476915813);
         let mut body: Vec<u8> = core::iter::repeat_with(|| rng.gen()).take(100).collect();
         let buf = Buf::new(&mut body[..], ..)
@@ -1697,7 +1696,12 @@ mod tests {
     }
 
     #[ip_test]
-    fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>() {
+    #[test_case(UnicastAddr::new(net_mac!("12:13:14:15:16:17")).unwrap(), true; "unicast")]
+    #[test_case(MulticastAddr::new(net_mac!("13:14:15:16:17:18")).unwrap(), false; "multicast")]
+    fn test_promiscuous_mode<I: Ip + TestIpExt + IpExt>(
+        other_mac: impl Witness<Mac>,
+        is_other_host: bool,
+    ) {
         // Test that frames not destined for a device will still be accepted
         // when the device is put into promiscuous mode. In all cases, frames
         // that are destined for a device must always be accepted.
@@ -1708,7 +1712,6 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         let eth_device = &device_ids[0];
         let device = eth_device.clone().into();
-        let other_mac = Mac::new([13, 14, 15, 16, 17, 18]);
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(I::PacketBuilder::new(
@@ -1727,17 +1730,22 @@ mod tests {
             .unwrap()
             .unwrap_b();
 
+        let dispatch_receive_ip_packet_other_host_name =
+            &alloc::format!("{}_other_host", dispatch_receive_ip_packet_name::<I>());
+
         // Accept packet destined for this device if promiscuous mode is off.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, false)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 1);
+        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
         // Accept packet destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
+        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
         let buf = Buf::new(Vec::new(), ..)
             .encapsulate(I::PacketBuilder::new(
@@ -1748,7 +1756,7 @@ mod tests {
             ))
             .encapsulate(EthernetFrameBuilder::new(
                 config.remote_mac.get(),
-                other_mac,
+                other_mac.get(),
                 I::ETHER_TYPE,
             ))
             .serialize_vec_outer()
@@ -1762,12 +1770,17 @@ mod tests {
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 2);
+        assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name), 0);
 
         // Accept packet not destined for this device if promiscuous mode is on.
         crate::device::set_promiscuous_mode(&mut sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting promiscuous mode");
         crate::device::receive_frame(&mut sync_ctx, &mut non_sync_ctx, &eth_device, buf.clone());
         assert_eq!(get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_name::<I>()), 3);
+        assert_eq!(
+            get_counter_val(&non_sync_ctx, dispatch_receive_ip_packet_other_host_name),
+            usize::from(is_other_host)
+        );
     }
 
     #[ip_test]
@@ -1875,7 +1888,7 @@ mod tests {
             sync_ctx,
             non_sync_ctx,
             device,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf,
         );
         assert_eq!(

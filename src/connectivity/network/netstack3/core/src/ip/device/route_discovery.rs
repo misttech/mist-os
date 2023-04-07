@@ -683,7 +683,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(0, false, as_secs(ONE_SECOND).into()),
         );
         assert_eq!(take_route_discovery_events(&mut non_sync_ctx), HashSet::from([]));
@@ -695,7 +695,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(as_secs(ONE_SECOND), true, 0),
         );
         let gateway_route =
@@ -720,7 +720,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(as_secs(TWO_SECONDS), true, as_secs(ONE_SECOND).into()),
         );
         let on_link_route = Ipv6DiscoveredRoute { subnet, gateway: None };
@@ -743,7 +743,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(0, true, as_secs(TWO_SECONDS).into()),
         );
         assert_eq!(
@@ -765,7 +765,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(0, false, 0),
         );
         assert_eq!(take_route_discovery_events(&mut non_sync_ctx), HashSet::from([]));
@@ -779,7 +779,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(0, true, 0),
         );
         assert_eq!(
@@ -834,7 +834,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         let weak_device_id = device_id.downgrade();
@@ -865,7 +865,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         non_sync_ctx.timer_ctx().assert_timers_installed([
@@ -887,7 +887,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         non_sync_ctx.timer_ctx().assert_timers_installed([(
@@ -902,7 +902,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf(router_lifetime_secs, true, prefix_lifetime_secs),
         );
         assert_eq!(
@@ -950,7 +950,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device_id,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             router_advertisement_buf(
                 src_ip,
                 as_secs(TWO_SECONDS),

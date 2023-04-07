@@ -1351,6 +1351,15 @@ fn dispatch_receive_ipv4_packet<
 ) {
     ctx.increment_debug_counter("dispatch_receive_ipv4_packet");
 
+    match frame_dst {
+        FrameDestination::Individual { local: false } => {
+            ctx.increment_debug_counter("dispatch_receive_ipv4_packet_other_host")
+        }
+        FrameDestination::Individual { local: true }
+        | FrameDestination::Multicast
+        | FrameDestination::Broadcast => (),
+    };
+
     let (mut body, err) =
         match sync_ctx.dispatch_receive_ip_packet(ctx, device, src_ip, dst_ip, proto, body) {
             Ok(()) => return,
@@ -1430,6 +1439,15 @@ fn dispatch_receive_ipv6_packet<
     // header rather than all of the IPv6 headers.
 
     ctx.increment_debug_counter("dispatch_receive_ipv6_packet");
+
+    match frame_dst {
+        FrameDestination::Individual { local: false } => {
+            ctx.increment_debug_counter("dispatch_receive_ipv6_packet_other_host")
+        }
+        FrameDestination::Individual { local: true }
+        | FrameDestination::Multicast
+        | FrameDestination::Broadcast => (),
+    };
 
     let (mut body, err) =
         match sync_ctx.dispatch_receive_ip_packet(ctx, device, src_ip, dst_ip, proto, body) {
@@ -1638,8 +1656,8 @@ pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B
 
 /// Receive an IPv4 packet from a device.
 ///
-/// `frame_dst` specifies whether this packet was received in a broadcast or
-/// unicast link-layer frame.
+/// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
+/// for options.
 pub(crate) fn receive_ipv4_packet<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
     B: BufferMut,
@@ -1852,8 +1870,8 @@ pub(crate) fn receive_ipv4_packet<
 
 /// Receive an IPv6 packet from a device.
 ///
-/// `frame_dst` specifies whether this packet was received in a broadcast or
-/// unicast link-layer frame.
+/// `frame_dst` specifies how this packet was received; see [`FrameDestination`]
+/// for options.
 pub(crate) fn receive_ipv6_packet<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
     B: BufferMut,
@@ -3181,7 +3199,13 @@ mod tests {
         body.extend(fragment_offset * 8..fragment_offset * 8 + 8);
         let buffer =
             Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap().into_inner();
-        receive_ip_packet::<_, _, Ipv4>(sync_ctx, ctx, device, FrameDestination::Unicast, buffer);
+        receive_ip_packet::<_, _, Ipv4>(
+            sync_ctx,
+            ctx,
+            device,
+            FrameDestination::Individual { local: true },
+            buffer,
+        );
     }
 
     /// Generate and 'receive' an IPv6 fragment packet.
@@ -3215,7 +3239,13 @@ mod tests {
         let payload_len = u16::try_from(bytes.len() - 40).unwrap();
         bytes[4..6].copy_from_slice(&payload_len.to_be_bytes());
         let buffer = Buf::new(bytes, ..);
-        receive_ip_packet::<_, _, Ipv6>(sync_ctx, ctx, device, FrameDestination::Unicast, buffer);
+        receive_ip_packet::<_, _, Ipv6>(
+            sync_ctx,
+            ctx,
+            device,
+            FrameDestination::Individual { local: true },
+            buffer,
+        );
     }
 
     #[test]
@@ -3251,7 +3281,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf,
         );
 
@@ -3302,7 +3332,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf,
         );
         assert_eq!(non_sync_ctx.frames_sent().len(), 1);
@@ -3322,7 +3352,7 @@ mod tests {
         let device: DeviceId<_> = device_ids[0].clone().into();
         let mut expected_icmps = 0;
         let mut bytes = [0; 64];
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         // Test parsing an IPv6 packet where we MUST send an ICMP parameter
         // problem due to an unrecognized extension header option.
@@ -3715,7 +3745,7 @@ mod tests {
         let device: DeviceId<_> = device_ids[0].clone().into();
         set_forwarding_enabled::<_, Ipv6>(sync_ctx, &mut non_sync_ctx, &device, true)
             .expect("error setting routing enabled");
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         // Construct an IPv6 packet that is too big for our MTU (MTU = 1280;
         // body itself is 5000). Note, the final packet will be larger because
@@ -3849,7 +3879,7 @@ mod tests {
             FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         // Update PMTU from None.
 
@@ -3957,7 +3987,7 @@ mod tests {
             FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         // Update PMTU from None but with an MTU too low.
 
@@ -4009,7 +4039,7 @@ mod tests {
             FakeEventDispatcherBuilder::from_config(fake_config.clone()).build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         // Update from None.
 
@@ -4163,7 +4193,7 @@ mod tests {
             FakeEventDispatcherBuilder::from_config(ip_config.clone()).build();
         let mut sync_ctx = &sync_ctx;
         let device: DeviceId<_> = device_ids[0].clone().into();
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         let ic_config = Ipv4::FAKE_CONFIG;
         let icmp_builder = IcmpPacketBuilder::<Ipv4, &[u8], _>::new(
@@ -4208,7 +4238,7 @@ mod tests {
         let mut sync_ctx = &sync_ctx;
         // First possible device id.
         let device: DeviceId<_> = device_ids[0].clone().into();
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         let ic_config = Ipv6::FAKE_CONFIG;
         let icmp_builder = IcmpPacketBuilder::<Ipv6, &[u8], _>::new(
@@ -4350,7 +4380,7 @@ mod tests {
         )
         .unwrap();
 
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
 
         let ip: Ipv6Addr = config.local_mac.to_ipv6_link_local().addr().get();
 
@@ -4461,7 +4491,7 @@ mod tests {
             &mut sync_ctx,
             &mut non_sync_ctx,
             &device,
-            FrameDestination::Unicast,
+            FrameDestination::Individual { local: true },
             buf.clone(),
         );
         assert_eq!(get_counter_val(&non_sync_ctx, "receive_ipv6_packet: non-unicast source"), 1);

@@ -234,7 +234,7 @@ mod tests {
             IpProto::Tcp.into(),
         );
         let device_id: DeviceId<_> = device_ids[0].clone().into();
-        let frame_dst = FrameDestination::Unicast;
+        let frame_dst = FrameDestination::Individual { local: true };
         let mut buffer =
             Buf::new(vec![1, 2, 3, 4, 5], ..).encapsulate(builder).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();

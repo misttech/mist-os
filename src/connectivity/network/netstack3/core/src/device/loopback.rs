@@ -387,6 +387,8 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
             Ok(e) => e,
         };
 
+        let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
+
         // TODO(https://fxbug.dev/106735): dispatch to packet sockets.
 
         let ethertype = match frame.ethertype() {
@@ -402,14 +404,14 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
                 self,
                 ctx,
                 &device_id.clone().into(),
-                FrameDestination::Unicast,
+                frame_dest,
                 buf,
             ),
             EtherType::Ipv6 => crate::ip::receive_ipv6_packet(
                 self,
                 ctx,
                 &device_id.clone().into(),
-                FrameDestination::Unicast,
+                frame_dest,
                 buf,
             ),
             ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {

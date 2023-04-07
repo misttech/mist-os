@@ -33,7 +33,7 @@ use net_types::{
     ip::{
         AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
     },
-    MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
+    BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{Buf, BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
@@ -1356,9 +1356,12 @@ impl<C: DeviceLayerEventDispatcher> IdMapCollectionKey for DeviceId<C> {
 /// section 2.4.e, which govern when to avoid sending an ICMP error message for
 /// ICMP and ICMPv6 respectively.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub(crate) enum FrameDestination {
+pub enum FrameDestination {
     /// A unicast address - one which is neither multicast nor broadcast.
-    Unicast,
+    Individual {
+        /// Whether the frame's destination address belongs to the receiver.
+        local: bool,
+    },
     /// A multicast address; if the addressing scheme supports overlap between
     /// multicast and broadcast, then broadcast addresses should use the
     /// `Broadcast` variant.
@@ -1378,6 +1381,25 @@ impl FrameDestination {
     /// Is this `FrameDestination::Broadcast`?
     pub(crate) fn is_broadcast(self) -> bool {
         self == FrameDestination::Broadcast
+    }
+
+    pub(crate) fn from_dest(destination: Mac, local_mac: Mac) -> Self {
+        BroadcastAddr::new(destination)
+            .map(Into::into)
+            .or_else(|| MulticastAddr::new(destination).map(Into::into))
+            .unwrap_or_else(|| FrameDestination::Individual { local: destination == local_mac })
+    }
+}
+
+impl From<BroadcastAddr<Mac>> for FrameDestination {
+    fn from(_value: BroadcastAddr<Mac>) -> Self {
+        Self::Broadcast
+    }
+}
+
+impl From<MulticastAddr<Mac>> for FrameDestination {
+    fn from(_value: MulticastAddr<Mac>) -> Self {
+        Self::Multicast
     }
 }
 
@@ -2118,6 +2140,34 @@ mod tests {
             assert_eq!(tracker, OriginTracker::new());
         }
         assert_eq!(tracker.clone(), tracker);
+    }
+
+    #[test]
+    fn frame_destination_from_dest() {
+        const LOCAL_ADDR: Mac = net_mac!("88:88:88:88:88:88");
+
+        assert_eq!(
+            FrameDestination::from_dest(
+                UnicastAddr::new(net_mac!("00:11:22:33:44:55")).unwrap().get(),
+                LOCAL_ADDR
+            ),
+            FrameDestination::Individual { local: false }
+        );
+        assert_eq!(
+            FrameDestination::from_dest(LOCAL_ADDR, LOCAL_ADDR),
+            FrameDestination::Individual { local: true }
+        );
+        assert_eq!(
+            FrameDestination::from_dest(Mac::BROADCAST, LOCAL_ADDR),
+            FrameDestination::Broadcast,
+        );
+        assert_eq!(
+            FrameDestination::from_dest(
+                MulticastAddr::new(net_mac!("11:11:11:11:11:11")).unwrap().get(),
+                LOCAL_ADDR
+            ),
+            FrameDestination::Multicast
+        );
     }
 
     #[test]
