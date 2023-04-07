@@ -199,6 +199,7 @@ zx_status_t s905d2_pll_ena(aml_pll_dev_t* pll_dev) {
     wait_count--;
   }
 
+  zxlogf(ERROR, "Clk enable timedout");
   return ZX_ERR_TIMED_OUT;
 }
 

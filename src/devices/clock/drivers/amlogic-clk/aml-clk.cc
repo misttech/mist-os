@@ -842,6 +842,7 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
 
 zx_status_t AmlClock::ClkTogglePll(uint32_t clk, const bool enable) {
   if (clk >= pll_count_) {
+    zxlogf(ERROR, "Invalid clk: %d, pll count %zu", clk, pll_count_);
     return ZX_ERR_INVALID_ARGS;
   }
 
