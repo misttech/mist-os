@@ -11,7 +11,7 @@
 #include "command_buffer.h"
 #include "engine_command_streamer.h"
 #include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_intel_pci_device.h"
 
 class MsdIntelContext;
@@ -41,12 +41,10 @@ class MsdIntelConnection {
 
   void DestroyContext(std::shared_ptr<MsdIntelContext> context);
 
-  void SetNotificationCallback(msd_connection_notification_callback_t callback, void* token) {
-    notifications_.Set(callback, token);
-  }
+  void SetNotificationCallback(msd::NotificationHandler* handler) { notifications_.Set(handler); }
 
   // Called by the device thread when command buffers complete.
-  void SendNotification(const std::vector<uint64_t>& buffer_ids) {
+  void SendNotification(std::vector<uint64_t>& buffer_ids) {
     notifications_.SendBufferIds(buffer_ids);
   }
 
@@ -69,6 +67,10 @@ class MsdIntelConnection {
 
   void ReleaseBuffer(magma::PlatformBuffer* buffer);
 
+  // A value chosen for historical reasons, just want to prevent sending channel messages
+  // that are too large.
+  static constexpr size_t kMaxUint64PerChannelSend = 510;
+
  private:
   MsdIntelConnection(Owner* owner, std::shared_ptr<PerProcessGtt> ppgtt, msd_client_id_t client_id)
       : owner_(owner), ppgtt_(std::move(ppgtt)), client_id_(client_id) {}
@@ -82,8 +84,6 @@ class MsdIntelConnection {
           std::vector<std::shared_ptr<magma::PlatformSemaphore>>& semaphores, uint32_t timeout_ms)>
           wait_callback);
 
-  static const uint32_t kMagic = 0x636f6e6e;  // "conn" (Connection)
-
   Owner* owner_;
   std::shared_ptr<PerProcessGtt> ppgtt_;
   msd_client_id_t client_id_;
@@ -92,65 +92,56 @@ class MsdIntelConnection {
 
   class Notifications {
    public:
-    void SendBufferIds(const std::vector<uint64_t>& buffer_ids) {
+    void SendBufferIds(std::vector<uint64_t>& buffer_ids) {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (callback_ && token_) {
-        msd_notification_t notification = {.type = MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND};
-        const uint32_t max = MSD_CHANNEL_SEND_MAX_SIZE / sizeof(uint64_t);
+      if (!handler_)
+        return;
 
-        uint32_t dst_index = 0;
-        for (uint32_t src_index = 0; src_index < buffer_ids.size();) {
-          reinterpret_cast<uint64_t*>(notification.u.channel_send.data)[dst_index++] =
-              buffer_ids[src_index++];
-          if (dst_index == max || src_index == buffer_ids.size()) {
-            notification.u.channel_send.size = dst_index * sizeof(uint64_t);
-            dst_index = 0;
-            callback_(token_, &notification);
-          }
-        }
+      for (size_t src_index = 0; src_index < buffer_ids.size();) {
+        size_t count = std::min(buffer_ids.size() - src_index, kMaxUint64PerChannelSend);
+
+        auto start = reinterpret_cast<uint8_t*>(&buffer_ids[src_index]);
+        auto end = reinterpret_cast<uint8_t*>(&buffer_ids[src_index + count]);
+
+        handler_->NotificationChannelSend(cpp20::span(start, end));
+
+        src_index += count;
       }
     }
 
     void SendContextKilled() {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (callback_ && token_) {
-        msd_notification_t notification = {.type = MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED};
-        callback_(token_, &notification);
-      }
+      if (!handler_)
+        return;
+
+      handler_->ContextKilled();
     }
 
     void AddHandleWait(msd_connection_handle_wait_complete_t completer,
                        msd_connection_handle_wait_start_t starter, void* wait_context,
                        magma_handle_t handle) {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (callback_ && token_) {
-        msd_notification_t notification = {.type = MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT};
-        notification.u.handle_wait = {.starter = starter,
-                                      .completer = completer,
-                                      .wait_context = wait_context,
-                                      .handle = handle};
-        callback_(token_, &notification);
-      }
+      if (!handler_)
+        return;
+
+      handler_->HandleWait(starter, completer, wait_context, zx::unowned_handle(handle));
     }
 
     void CancelHandleWait(void* cancel_token) {
       std::lock_guard<std::mutex> lock(mutex_);
-      if (callback_ && token_) {
-        msd_notification_t notification = {.type = MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT_CANCEL};
-        notification.u.handle_wait_cancel = {.cancel_token = cancel_token};
-        callback_(token_, &notification);
-      }
+      if (!handler_)
+        return;
+
+      handler_->HandleWaitCancel(cancel_token);
     }
 
-    void Set(msd_connection_notification_callback_t callback, void* token) {
+    void Set(msd::NotificationHandler* handler) {
       std::lock_guard<std::mutex> lock(mutex_);
-      callback_ = callback;
-      token_ = token;
+      handler_ = handler;
     }
 
    private:
-    msd_connection_notification_callback_t callback_ = nullptr;
-    void* token_ = nullptr;
+    msd::NotificationHandler* handler_ = nullptr;
     std::mutex mutex_;
   };
 
@@ -159,23 +150,23 @@ class MsdIntelConnection {
   friend class TestMsdIntelConnection;
 };
 
-class MsdIntelAbiConnection : public msd_connection_t {
+class MsdIntelAbiConnection : public msd::Connection {
  public:
-  MsdIntelAbiConnection(std::shared_ptr<MsdIntelConnection> ptr) : ptr_(std::move(ptr)) {
-    magic_ = kMagic;
-  }
+  explicit MsdIntelAbiConnection(std::shared_ptr<MsdIntelConnection> ptr) : ptr_(std::move(ptr)) {}
 
-  static MsdIntelAbiConnection* cast(msd_connection_t* connection) {
-    DASSERT(connection);
-    DASSERT(connection->magic_ == kMagic);
-    return static_cast<MsdIntelAbiConnection*>(connection);
-  }
+  // msd::Connection impl
+  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
+                           uint64_t flags) override;
+  void ReleaseBuffer(msd::Buffer& buffer) override;
+
+  void SetNotificationCallback(msd::NotificationHandler* handler) override;
+
+  std::unique_ptr<msd::Context> CreateContext() override;
 
   std::shared_ptr<MsdIntelConnection> ptr() { return ptr_; }
 
  private:
   std::shared_ptr<MsdIntelConnection> ptr_;
-  static const uint32_t kMagic = 0x636f6e6e;  // "conn" (Connection)
 };
 
 #endif  // MSD_INTEL_CONNECTION_H

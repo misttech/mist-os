@@ -116,8 +116,6 @@ std::unique_ptr<MsdIntelDevice> MsdIntelDevice::Create(void* device_handle,
   return device;
 }
 
-MsdIntelDevice::MsdIntelDevice() { magic_ = kMagic; }
-
 MsdIntelDevice::~MsdIntelDevice() { Destroy(); }
 
 std::pair<magma_intel_gen_topology*, uint8_t*> MsdIntelDevice::GetTopology() {
@@ -150,8 +148,8 @@ void MsdIntelDevice::Destroy() {
   interrupt_manager_.reset();
 }
 
-std::unique_ptr<MsdIntelConnection> MsdIntelDevice::Open(msd_client_id_t client_id) {
-  return MsdIntelConnection::Create(this, client_id);
+std::unique_ptr<msd::Connection> MsdIntelDevice::Open(msd_client_id_t client_id) {
+  return std::make_unique<MsdIntelAbiConnection>(MsdIntelConnection::Create(this, client_id));
 }
 
 bool MsdIntelDevice::Init(void* device_handle) {
@@ -1170,24 +1168,15 @@ magma::Status MsdIntelDevice::ProcessTimestampRequest(
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-msd_connection_t* msd_device_open(msd_device_t* dev, msd_client_id_t client_id) {
-  auto connection = MsdIntelDevice::cast(dev)->Open(client_id);
-  if (!connection)
-    return DRETP(nullptr, "MsdIntelDevice::Open failed");
-  return new MsdIntelAbiConnection(std::move(connection));
-}
-
-void msd_device_destroy(msd_device_t* dev) { delete MsdIntelDevice::cast(dev); }
-
-magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
-                                magma_handle_t* result_buffer_out, uint64_t* result_out) {
+magma_status_t MsdIntelDevice::Query(uint64_t id, zx::vmo* result_buffer_out,
+                                     uint64_t* result_out) {
   switch (id) {
     case MAGMA_QUERY_VENDOR_ID:
       *result_out = MAGMA_VENDOR_ID_INTEL;
       break;
 
     case MAGMA_QUERY_DEVICE_ID:
-      *result_out = MsdIntelDevice::cast(device)->device_id();
+      *result_out = device_id();
       break;
 
     case MAGMA_QUERY_VENDOR_VERSION:
@@ -1199,8 +1188,8 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
       break;
 
     case kMagmaIntelGenQuerySubsliceAndEuTotal:
-      *result_out = MsdIntelDevice::cast(device)->subslice_total();
-      *result_out = (*result_out << 32) | MsdIntelDevice::cast(device)->eu_total();
+      *result_out = subslice_total();
+      *result_out = (*result_out << 32) | eu_total();
       break;
 
     case kMagmaIntelGenQueryGttSize:
@@ -1212,7 +1201,7 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
       break;
 
     case kMagmaIntelGenQueryTimestampFrequency:
-      *result_out = MsdIntelDevice::cast(device)->timestamp_frequency();
+      *result_out = timestamp_frequency();
       break;
 
     case kMagmaIntelGenQueryTimestamp: {
@@ -1220,14 +1209,17 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
       if (!buffer)
         return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to create timestamp buffer");
 
-      if (!buffer->duplicate_handle(result_buffer_out))
+      zx::handle handle;
+      if (!buffer->duplicate_handle(&handle))
         return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to dupe timestamp buffer");
 
-      return MsdIntelDevice::cast(device)->QueryTimestamp(std::move(buffer)).get();
+      *result_buffer_out = zx::vmo(std::move(handle));
+
+      return QueryTimestamp(std::move(buffer)).get();
     }
 
     case kMagmaIntelGenQueryTopology: {
-      auto [topology, mask_data] = MsdIntelDevice::cast(device)->GetTopology();
+      auto [topology, mask_data] = GetTopology();
       if (!topology)
         return DRET_MSG(MAGMA_STATUS_UNIMPLEMENTED, "topology not present");
 
@@ -1248,14 +1240,17 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
         buffer->UnmapCpu();
       }
 
-      if (!buffer->duplicate_handle(result_buffer_out))
+      zx::handle handle;
+      if (!buffer->duplicate_handle(&handle))
         return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to dupe topology buffer");
+
+      *result_buffer_out = zx::vmo(std::move(handle));
 
       return MAGMA_STATUS_OK;
     }
 
     case kMagmaIntelGenQueryHasContextIsolation: {
-      *result_out = MsdIntelDevice::cast(device)->engines_have_context_isolation();
+      *result_out = engines_have_context_isolation();
       break;
     }
 
@@ -1264,7 +1259,7 @@ magma_status_t msd_device_query(msd_device_t* device, uint64_t id,
   }
 
   if (result_buffer_out)
-    *result_buffer_out = magma::PlatformHandle::kInvalidHandle;
+    *result_buffer_out = zx::vmo();
 
   return MAGMA_STATUS_OK;
 }
@@ -1283,36 +1278,34 @@ void MsdIntelDevice::CheckEngines() {
   }
 }
 
-void msd_device_dump_status(msd_device_t* device, uint32_t dump_type) {
-  MsdIntelDevice::cast(device)->DumpStatusToLog();
-}
+void MsdIntelDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
 
-magma_status_t msd_device_get_icd_list(struct msd_device_t* abi_device, uint64_t count,
-                                       msd_icd_info_t* icd_info_out, uint64_t* actual_count_out) {
+magma_status_t MsdIntelDevice::GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
   constexpr uint32_t kMediaIcdCount = 1;
   constexpr uint32_t kTotalIcdCount = std::size(kSuffixes) + kMediaIcdCount;
 
-  if (icd_info_out && count < kTotalIcdCount) {
-    return MAGMA_STATUS_INVALID_ARGS;
+  std::vector<msd_icd_info_t> icd_info;
+  icd_info.resize(kTotalIcdCount);
+
+  for (uint32_t i = 0; i < std::size(kSuffixes); i++) {
+    strncpy(icd_info[i].component_url,
+            fbl::StringPrintf("fuchsia-pkg://fuchsia.com/libvulkan_intel_gen%s#meta/vulkan.cm",
+                              kSuffixes[i])
+                .c_str(),
+            sizeof(icd_info[i].component_url) - 1);
+    icd_info[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
   }
-  *actual_count_out = kTotalIcdCount;
-  if (icd_info_out) {
-    for (uint32_t i = 0; i < std::size(kSuffixes); i++) {
-      strncpy(icd_info_out[i].component_url,
-              fbl::StringPrintf("fuchsia-pkg://fuchsia.com/libvulkan_intel_gen%s#meta/vulkan.cm",
-                                kSuffixes[i])
-                  .c_str(),
-              sizeof(icd_info_out[i].component_url) - 1);
-      icd_info_out[i].support_flags = ICD_SUPPORT_FLAG_VULKAN;
-    }
-    {
-      size_t media_index = std::size(kSuffixes);
-      strncpy(icd_info_out[media_index].component_url,
-              "fuchsia-pkg://fuchsia.com/codec_runner_intel_gen#meta/codec_runner_intel_gen.cm",
-              sizeof(icd_info_out[media_index].component_url) - 1);
-      icd_info_out[media_index].support_flags = ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY;
-    }
+
+  {
+    size_t media_index = std::size(kSuffixes);
+    strncpy(icd_info[media_index].component_url,
+            "fuchsia-pkg://fuchsia.com/codec_runner_intel_gen#meta/codec_runner_intel_gen.cm",
+            sizeof(icd_info[media_index].component_url) - 1);
+    icd_info[media_index].support_flags = ICD_SUPPORT_FLAG_MEDIA_CODEC_FACTORY;
   }
+
+  icd_info.swap(*icd_info_out);
+
   return MAGMA_STATUS_OK;
 }

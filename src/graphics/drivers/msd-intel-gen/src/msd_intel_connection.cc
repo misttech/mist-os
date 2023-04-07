@@ -10,16 +10,6 @@
 #include "platform_trace.h"
 #include "ppgtt.h"
 
-void msd_connection_close(msd_connection_t* connection) {
-  delete MsdIntelAbiConnection::cast(connection);
-}
-
-msd_context_t* msd_connection_create_context(msd_connection_t* abi_connection) {
-  auto connection = MsdIntelAbiConnection::cast(abi_connection)->ptr();
-
-  return new MsdIntelAbiContext(MsdIntelConnection::CreateContext(connection));
-}
-
 // static
 std::shared_ptr<MsdIntelContext> MsdIntelConnection::CreateContext(
     std::shared_ptr<MsdIntelConnection> connection) {
@@ -38,28 +28,6 @@ void MsdIntelConnection::DestroyContext(std::shared_ptr<MsdIntelContext> context
   context_list_.erase(iter);
 
   return owner_->DestroyContext(std::move(context));
-}
-
-void msd_connection_set_notification_callback(struct msd_connection_t* connection,
-                                              msd_connection_notification_callback_t callback,
-                                              void* token) {
-  MsdIntelAbiConnection::cast(connection)->ptr()->SetNotificationCallback(callback, token);
-}
-
-magma_status_t msd_connection_map_buffer(msd_connection_t* abi_connection, msd_buffer_t* abi_buffer,
-                                         uint64_t gpu_addr, uint64_t offset, uint64_t length,
-                                         uint64_t flags) {
-  if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
-    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
-
-  uint64_t page_offset = offset / magma::page_size();
-  uint64_t page_count = length / magma::page_size();
-
-  auto connection = MsdIntelAbiConnection::cast(abi_connection)->ptr();
-  auto buffer = MsdIntelAbiBuffer::cast(abi_buffer)->ptr();
-
-  magma::Status status = connection->MapBufferGpu(buffer, gpu_addr, page_offset, page_count);
-  return status.get();
 }
 
 magma::Status MsdIntelConnection::MapBufferGpu(std::shared_ptr<MsdIntelBuffer> buffer,
@@ -109,17 +77,6 @@ magma::Status MsdIntelConnection::MapBufferGpu(std::shared_ptr<MsdIntelBuffer> b
   DLOG("MapBufferGpu %lu addr 0x%lx", mapping->BufferId(), gpu_addr);
 
   return MAGMA_STATUS_OK;
-}
-
-magma_status_t msd_connection_unmap_buffer(msd_connection_t* abi_connection,
-                                           msd_buffer_t* abi_buffer, uint64_t gpu_va) {
-  return MAGMA_STATUS_UNIMPLEMENTED;
-}
-
-void msd_connection_release_buffer(msd_connection_t* connection, msd_buffer_t* buffer) {
-  MsdIntelAbiConnection::cast(connection)
-      ->ptr()
-      ->ReleaseBuffer(MsdIntelAbiBuffer::cast(buffer)->ptr()->platform_buffer());
 }
 
 void MsdIntelConnection::ReleaseBuffer(magma::PlatformBuffer* buffer) {
@@ -267,4 +224,30 @@ std::unique_ptr<MsdIntelConnection> MsdIntelConnection::Create(Owner* owner,
                                                                msd_client_id_t client_id) {
   return std::unique_ptr<MsdIntelConnection>(
       new MsdIntelConnection(owner, PerProcessGtt::Create(owner), client_id));
+}
+
+magma_status_t MsdIntelAbiConnection::MapBuffer(msd::Buffer& msd_buffer, uint64_t gpu_addr,
+                                                uint64_t offset, uint64_t length, uint64_t flags) {
+  if (!magma::is_page_aligned(offset) || !magma::is_page_aligned(length))
+    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Offset or length not page aligned");
+
+  uint64_t page_offset = offset / magma::page_size();
+  uint64_t page_count = length / magma::page_size();
+
+  auto buffer = static_cast<MsdIntelAbiBuffer*>(&msd_buffer)->ptr();
+
+  magma::Status status = ptr()->MapBufferGpu(buffer, gpu_addr, page_offset, page_count);
+  return status.get();
+}
+
+void MsdIntelAbiConnection::ReleaseBuffer(msd::Buffer& buffer) {
+  ptr()->ReleaseBuffer(static_cast<MsdIntelAbiBuffer*>(&buffer)->ptr()->platform_buffer());
+}
+
+void MsdIntelAbiConnection::SetNotificationCallback(msd::NotificationHandler* handler) {
+  ptr()->SetNotificationCallback(handler);
+}
+
+std::unique_ptr<msd::Context> MsdIntelAbiConnection::CreateContext() {
+  return std::make_unique<MsdIntelAbiContext>(MsdIntelConnection::CreateContext(ptr()));
 }

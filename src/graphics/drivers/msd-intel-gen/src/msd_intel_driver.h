@@ -7,31 +7,20 @@
 
 #include <memory>
 
-#include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 
-class MsdIntelDriver : public msd_driver_t {
+class MsdIntelDriver : public msd::Driver {
  public:
-  virtual ~MsdIntelDriver() {}
-
-  static std::unique_ptr<MsdIntelDriver> Create();
-  static void Destroy(MsdIntelDriver* drv);
-
-  static MsdIntelDriver* cast(msd_driver_t* drv) {
-    DASSERT(drv);
-    DASSERT(drv->magic_ == kMagic);
-    return static_cast<MsdIntelDriver*>(drv);
-  }
-
-  void configure(uint32_t flags) { configure_flags_ = flags; }
+  // msd::Driver implementation.
+  void Configure(uint32_t flags) override { configure_flags_ = flags; }
+  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_handle) override;
+  std::unique_ptr<msd::Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) override;
+  magma_status_t ImportSemaphore(zx::event handle, uint64_t client_id,
+                                 std::unique_ptr<msd::Semaphore>* out) override;
 
   uint32_t configure_flags() { return configure_flags_; }
 
  private:
-  MsdIntelDriver();
-
-  static const uint32_t kMagic = 0x64726976;  //"driv"
-
   uint32_t configure_flags_ = 0;
 };
 

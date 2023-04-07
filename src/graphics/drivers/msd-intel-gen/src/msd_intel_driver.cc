@@ -6,35 +6,43 @@
 
 #include "magma_util/dlog.h"
 #include "magma_util/short_macros.h"
+#include "msd_intel_buffer.h"
 #include "msd_intel_device.h"
+#include "msd_intel_semaphore.h"
 
-MsdIntelDriver::MsdIntelDriver() { magic_ = kMagic; }
-
-std::unique_ptr<MsdIntelDriver> MsdIntelDriver::Create() {
-  return std::unique_ptr<MsdIntelDriver>(new MsdIntelDriver());
-}
-
-void MsdIntelDriver::Destroy(MsdIntelDriver* drv) { delete drv; }
-
-//////////////////////////////////////////////////////////////////////////////
-
-msd_driver_t* msd_driver_create(void) { return MsdIntelDriver::Create().release(); }
-
-void msd_driver_configure(struct msd_driver_t* drv, uint32_t flags) {
-  MsdIntelDriver::cast(drv)->configure(flags);
-}
-
-void msd_driver_destroy(msd_driver_t* drv) { MsdIntelDriver::Destroy(MsdIntelDriver::cast(drv)); }
-
-msd_device_t* msd_driver_create_device(msd_driver_t* drv, void* device_handle) {
-  bool start_device_thread =
-      (MsdIntelDriver::cast(drv)->configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
+std::unique_ptr<msd::Device> MsdIntelDriver::CreateDevice(msd::DeviceHandle* device_handle) {
+  bool start_device_thread = (configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
 
   std::unique_ptr<MsdIntelDevice> device =
       MsdIntelDevice::Create(device_handle, start_device_thread);
+
   if (!device)
     return DRETP(nullptr, "failed to create device");
 
-  // Transfer ownership
-  return device.release();
+  return device;
 }
+
+std::unique_ptr<msd::Buffer> MsdIntelDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+  auto buffer = MsdIntelBuffer::Import(std::move(vmo), client_id);
+  if (!buffer)
+    return DRETP(nullptr, "MsdIntelBuffer::Import failed");
+
+  return std::make_unique<MsdIntelAbiBuffer>(std::move(buffer));
+}
+
+magma_status_t MsdIntelDriver::ImportSemaphore(zx::event event, uint64_t client_id,
+                                               std::unique_ptr<msd::Semaphore>* semaphore_out) {
+  auto semaphore = magma::PlatformSemaphore::Import(std::move(event));
+  if (!semaphore)
+    return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import event handle");
+
+  semaphore->set_local_id(client_id);
+
+  *semaphore_out = std::make_unique<MsdIntelAbiSemaphore>(
+      std::shared_ptr<magma::PlatformSemaphore>(std::move(semaphore)));
+
+  return MAGMA_STATUS_OK;
+}
+
+// static
+std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdIntelDriver>(); }

@@ -5,7 +5,7 @@
 #include <magma_intel_gen_defs.h>
 
 #include <gtest/gtest.h>
-#include <helper/command_buffer_helper.h>
+#include <helper/command_buffer_helper_cpp.h>
 #include <helper/platform_pci_device_helper.h>
 #include <mock/fake_address_space.h>
 #include <mock/mock_bus_mapper.h>
@@ -29,10 +29,10 @@ class TestHwCommandBuffer : public ::testing::Test {
     MockBusMapper bus_mapper_;
   };
 
-  MsdIntelDevice* device() { return MsdIntelDevice::cast(helper_->dev()->msd_dev()); }
+  MsdIntelDevice* device() { return static_cast<MsdIntelDevice*>(helper_->dev()->msd_dev()); }
 
   std::shared_ptr<AddressSpace> exec_address_space() {
-    auto context = MsdIntelAbiContext::cast(helper_->ctx())->ptr();
+    auto context = static_cast<MsdIntelAbiContext*>(helper_->ctx())->ptr();
     return context->exec_address_space();
   }
 
@@ -47,7 +47,7 @@ class TestHwCommandBuffer : public ::testing::Test {
       std::vector<MagmaSystemBuffer*>& resources = helper_->resources();
       for (auto& resource : resources) {
         std::shared_ptr<GpuMapping> mapping = addr_space->MapBufferGpu(
-            addr_space, MsdIntelAbiBuffer::cast(resource->msd_buf())->ptr());
+            addr_space, static_cast<MsdIntelAbiBuffer*>(resource->msd_buf())->ptr());
         ASSERT_TRUE(mapping);
         EXPECT_TRUE(addr_space->AddMapping(mapping));
       }
@@ -91,7 +91,7 @@ class TestHwCommandBuffer : public ::testing::Test {
       gpu_addr_t gpu_addr = 0;
       std::vector<MagmaSystemBuffer*>& resources = helper_->resources();
       for (auto& resource : resources) {
-        auto buffer = MsdIntelAbiBuffer::cast(resource->msd_buf())->ptr();
+        auto buffer = static_cast<MsdIntelAbiBuffer*>(resource->msd_buf())->ptr();
         std::shared_ptr<GpuMapping> mapping;
         EXPECT_TRUE(AddressSpace::MapBufferGpu(exec_address_space(), buffer, gpu_addr, 0,
                                                buffer->platform_buffer()->size() / PAGE_SIZE,
@@ -102,7 +102,7 @@ class TestHwCommandBuffer : public ::testing::Test {
       }
     }
 
-    auto device = MsdIntelDevice::cast(helper_->dev()->msd_dev());
+    auto device = static_cast<MsdIntelDevice*>(helper_->dev()->msd_dev());
 
     ASSERT_TRUE(cmd_buf_->PrepareForExecution());
 
@@ -147,7 +147,7 @@ class TestHwCommandBuffer : public ::testing::Test {
     {
       std::vector<MagmaSystemBuffer*>& resources = helper_->resources();
       for (auto& resource : resources) {
-        auto buffer = MsdIntelAbiBuffer::cast(resource->msd_buf())->ptr();
+        auto buffer = static_cast<MsdIntelAbiBuffer*>(resource->msd_buf())->ptr();
         std::shared_ptr<GpuMapping> mapping;
         EXPECT_TRUE(AddressSpace::MapBufferGpu(exec_address_space(), buffer, gpu_addr, 0,
                                                buffer->platform_buffer()->size() / PAGE_SIZE,
@@ -204,16 +204,12 @@ class TestHwCommandBuffer : public ::testing::Test {
  private:
   void CreateCommandBuffer() {
     cmd_buf_ = CommandBuffer::Create(
-        MsdIntelAbiContext::cast(helper_->ctx())->ptr(), helper_->abi_cmd_buf(),
+        static_cast<MsdIntelAbiContext*>(helper_->ctx())->ptr(), helper_->abi_cmd_buf(),
         helper_->abi_resources(), helper_->msd_resources().data(), helper_->msd_wait_semaphores(),
         helper_->msd_signal_semaphores());
   }
 
-  void SetUp() override {
-    auto platform_device = TestPlatformPciDevice::GetInstance();
-    ASSERT_TRUE(platform_device);
-    helper_ = CommandBufferHelper::Create(platform_device);
-  }
+  void SetUp() override { helper_ = CommandBufferHelper::Create(); }
 
   std::unique_ptr<MagmaSystemBuffer> buffer_;
   std::unique_ptr<CommandBuffer> cmd_buf_;

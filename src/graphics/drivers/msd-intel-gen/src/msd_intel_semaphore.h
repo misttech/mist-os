@@ -5,28 +5,18 @@
 #ifndef MSD_INTEL_SEMAPHORE_H
 #define MSD_INTEL_SEMAPHORE_H
 
-#include "magma_util/short_macros.h"
-#include "msd_defs.h"
+#include "msd_cc.h"
 #include "platform_semaphore.h"
 
-class MsdIntelAbiSemaphore : public msd_semaphore_t {
+class MsdIntelAbiSemaphore : public msd::Semaphore {
  public:
-  MsdIntelAbiSemaphore(std::shared_ptr<magma::PlatformSemaphore> ptr) : ptr_(std::move(ptr)) {
-    magic_ = kMagic;
-  }
-
-  static MsdIntelAbiSemaphore* cast(msd_semaphore_t* semaphore) {
-    DASSERT(semaphore);
-    DASSERT(semaphore->magic_ == kMagic);
-    return static_cast<MsdIntelAbiSemaphore*>(semaphore);
-  }
+  explicit MsdIntelAbiSemaphore(std::shared_ptr<magma::PlatformSemaphore> ptr)
+      : ptr_(std::move(ptr)) {}
 
   std::shared_ptr<magma::PlatformSemaphore> ptr() { return ptr_; }
 
  private:
   std::shared_ptr<magma::PlatformSemaphore> ptr_;
-
-  static constexpr uint32_t kMagic = 0x73656d61;  // "sema"
 };
 
 #endif  // MSD_INTEL_SEMAPHORE_H

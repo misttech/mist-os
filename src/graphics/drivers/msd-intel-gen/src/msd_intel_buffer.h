@@ -12,7 +12,7 @@
 #include <vector>
 
 #include "magma_util/short_macros.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "platform_buffer.h"
 #include "platform_event.h"
 #include "types.h"
@@ -21,7 +21,7 @@ class AddressSpace;
 
 class MsdIntelBuffer {
  public:
-  static std::unique_ptr<MsdIntelBuffer> Import(uint32_t handle, uint64_t client_id);
+  static std::unique_ptr<MsdIntelBuffer> Import(zx::vmo handle, uint64_t client_id);
   static std::unique_ptr<MsdIntelBuffer> Create(uint64_t size, const char* name);
 
   magma::PlatformBuffer* platform_buffer() {
@@ -35,20 +35,14 @@ class MsdIntelBuffer {
   std::unique_ptr<magma::PlatformBuffer> platform_buf_;
 };
 
-class MsdIntelAbiBuffer : public msd_buffer_t {
+class MsdIntelAbiBuffer : public msd::Buffer {
  public:
-  MsdIntelAbiBuffer(std::shared_ptr<MsdIntelBuffer> ptr) : ptr_(std::move(ptr)) { magic_ = kMagic; }
+  explicit MsdIntelAbiBuffer(std::shared_ptr<MsdIntelBuffer> ptr) : ptr_(std::move(ptr)) {}
 
-  static MsdIntelAbiBuffer* cast(msd_buffer_t* buf) {
-    DASSERT(buf);
-    DASSERT(buf->magic_ == kMagic);
-    return static_cast<MsdIntelAbiBuffer*>(buf);
-  }
   std::shared_ptr<MsdIntelBuffer> ptr() { return ptr_; }
 
  private:
   std::shared_ptr<MsdIntelBuffer> ptr_;
-  static const uint32_t kMagic = 0x62756666;  // "buff"
 };
 
 #endif  // MSD_INTEL_BUFFER_H

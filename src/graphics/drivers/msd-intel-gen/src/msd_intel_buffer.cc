@@ -4,17 +4,13 @@
 
 #include "msd_intel_buffer.h"
 
-#include "address_space.h"
-#include "gpu_mapping.h"
-#include "msd.h"
-
 MsdIntelBuffer::MsdIntelBuffer(std::unique_ptr<magma::PlatformBuffer> platform_buf)
     : platform_buf_(std::move(platform_buf)) {}
 
-std::unique_ptr<MsdIntelBuffer> MsdIntelBuffer::Import(uint32_t handle, uint64_t client_id) {
-  auto platform_buf = magma::PlatformBuffer::Import(handle);
+std::unique_ptr<MsdIntelBuffer> MsdIntelBuffer::Import(zx::vmo handle, uint64_t client_id) {
+  auto platform_buf = magma::PlatformBuffer::Import(std::move(handle));
   if (!platform_buf)
-    return DRETP(nullptr, "MsdIntelBuffer::Create: Could not create platform buffer from token");
+    return DRETP(nullptr, "PlaformBuffer::Import failed");
 
   platform_buf->set_local_id(client_id);
 
@@ -24,18 +20,7 @@ std::unique_ptr<MsdIntelBuffer> MsdIntelBuffer::Import(uint32_t handle, uint64_t
 std::unique_ptr<MsdIntelBuffer> MsdIntelBuffer::Create(uint64_t size, const char* name) {
   auto platform_buf = magma::PlatformBuffer::Create(size, name);
   if (!platform_buf)
-    return DRETP(nullptr, "MsdIntelBuffer::Create: Could not create platform buffer from size");
+    return DRETP(nullptr, "PlatformBuffer::Create failed");
 
   return std::unique_ptr<MsdIntelBuffer>(new MsdIntelBuffer(std::move(platform_buf)));
 }
-
-//////////////////////////////////////////////////////////////////////////////
-
-msd_buffer_t* msd_buffer_import(uint32_t handle, uint64_t client_id) {
-  auto buffer = MsdIntelBuffer::Import(handle, client_id);
-  if (!buffer)
-    return DRETP(nullptr, "MsdIntelBuffer::Create failed");
-  return new MsdIntelAbiBuffer(std::move(buffer));
-}
-
-void msd_buffer_destroy(msd_buffer_t* buf) { delete MsdIntelAbiBuffer::cast(buf); }

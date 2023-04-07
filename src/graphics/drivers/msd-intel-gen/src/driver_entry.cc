@@ -29,8 +29,8 @@
 #include "platform_trace_provider_with_fdio.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/magma_performance_counter_device.h"
 #include "src/graphics/lib/magma/src/magma_util/platform/zircon/zircon_platform_status.h"
-#include "src/graphics/lib/magma/src/sys_driver/magma_device_impl.h"
-#include "sys_driver/magma_driver.h"
+#include "src/graphics/lib/magma/src/sys_driver_cpp/magma_device_impl.h"
+#include "sys_driver_cpp/magma_driver.h"
 
 #if MAGMA_TEST_DRIVER
 #include "test_bind.h"  //nogncheck
@@ -54,7 +54,8 @@ class IntelDevice : public DdkDeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_
   int MagmaStart() FIT_REQUIRES(magma_mutex()) {
     DLOG("magma_start");
 
-    set_magma_system_device(magma_driver()->CreateDevice(&gpu_core_protocol_));
+    set_magma_system_device(
+        magma_driver()->CreateDevice(reinterpret_cast<msd::DeviceHandle*>(&gpu_core_protocol_)));
     if (!magma_system_device())
       return DRET_MSG(ZX_ERR_NO_RESOURCES, "Failed to create device");
 

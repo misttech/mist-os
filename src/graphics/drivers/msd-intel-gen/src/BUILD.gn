@@ -50,7 +50,6 @@ source_set("src") {
     "msd_intel_pci_device_shim.cc",
     "msd_intel_register_io.cc",
     "msd_intel_register_io.h",
-    "msd_intel_semaphore.cc",
     "pagetable.h",
     "ppgtt.cc",
     "ppgtt.h",
@@ -71,7 +70,7 @@ source_set("src") {
   ]
 
   deps = [
-    "$magma_build_root/include:msd",
+    "$magma_build_root/include:msd_cc",
     "$magma_build_root/src/magma_util:address_space",
     "$magma_build_root/src/magma_util:allocator",
     "$magma_build_root/src/magma_util:macros",

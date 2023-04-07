@@ -6,7 +6,6 @@
 
 #include "address_space.h"
 #include "command_buffer.h"
-#include "magma_intel_gen_defs.h"
 #include "msd_intel_connection.h"
 #include "platform_logger.h"
 #include "platform_thread.h"
@@ -338,31 +337,19 @@ void MsdIntelContext::Kill() {
 
 //////////////////////////////////////////////////////////////////////////////
 
-void msd_context_destroy(msd_context_t* ctx) {
-  auto abi_context = MsdIntelAbiContext::cast(ctx);
+MsdIntelAbiContext::~MsdIntelAbiContext() {
   // get a copy of the shared ptr
-  auto client_context = abi_context->ptr();
-  // delete the abi container
-  delete abi_context;
+  auto client_context = ptr();
   // can safely unmap contexts only from the device thread; for that we go through the connection
-  auto connection = client_context->connection().lock();
+  auto connection = ptr()->connection().lock();
   DASSERT(connection);
   connection->DestroyContext(std::move(client_context));
 }
 
-magma_status_t msd_context_execute_immediate_commands(msd_context_t* ctx, uint64_t commands_size,
-                                                      void* commands, uint64_t semaphore_count,
-                                                      msd_semaphore_t** msd_semaphores) {
-  return MAGMA_STATUS_CONTEXT_KILLED;
-}
-
-magma_status_t msd_context_execute_command_buffer_with_resources(
-    msd_context_t* ctx, magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources,
-    msd_buffer_t** buffers, msd_semaphore_t** wait_semaphores,
-    msd_semaphore_t** signal_semaphores) {
-  auto context = MsdIntelAbiContext::cast(ctx)->ptr();
-
-  auto command_buffer = CommandBuffer::Create(context, cmd_buf, exec_resources, buffers,
+magma_status_t MsdIntelAbiContext::ExecuteCommandBufferWithResources(
+    magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
+    msd::Semaphore** wait_semaphores, msd::Semaphore** signal_semaphores) {
+  auto command_buffer = CommandBuffer::Create(ptr(), cmd_buf, exec_resources, buffers,
                                               wait_semaphores, signal_semaphores);
   if (!command_buffer)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "Failed to create command buffer");
@@ -372,6 +359,6 @@ magma_status_t msd_context_execute_command_buffer_with_resources(
     return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "Failed to prepare command buffer for execution");
   TRACE_DURATION_END("magma", "PrepareForExecution");
 
-  magma::Status status = context->SubmitCommandBuffer(std::move(command_buffer));
+  magma::Status status = ptr()->SubmitCommandBuffer(std::move(command_buffer));
   return status.get();
 }

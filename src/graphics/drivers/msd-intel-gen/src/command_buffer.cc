@@ -15,9 +15,9 @@
 std::unique_ptr<CommandBuffer> CommandBuffer::Create(std::weak_ptr<MsdIntelContext> context,
                                                      magma_command_buffer* cmd_buf,
                                                      magma_exec_resource* exec_resources,
-                                                     msd_buffer_t** msd_buffers,
-                                                     msd_semaphore_t** msd_wait_semaphores,
-                                                     msd_semaphore_t** msd_signal_semaphores) {
+                                                     msd::Buffer** msd_buffers,
+                                                     msd::Semaphore** msd_wait_semaphores,
+                                                     msd::Semaphore** msd_signal_semaphores) {
   if (cmd_buf->resource_count == 0)
     return DRETP(nullptr, "Command buffer requires at least 1 resource");
 
@@ -33,20 +33,21 @@ std::unique_ptr<CommandBuffer> CommandBuffer::Create(std::weak_ptr<MsdIntelConte
   std::vector<ExecResource> resources;
   resources.reserve(cmd_buf->resource_count);
   for (uint32_t i = 0; i < cmd_buf->resource_count; i++) {
-    resources.emplace_back(ExecResource{MsdIntelAbiBuffer::cast(msd_buffers[i])->ptr(),
+    resources.emplace_back(ExecResource{static_cast<MsdIntelAbiBuffer*>(msd_buffers[i])->ptr(),
                                         exec_resources[i].offset, exec_resources[i].length});
   }
 
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> wait_semaphores;
   wait_semaphores.reserve(cmd_buf->wait_semaphore_count);
   for (uint32_t i = 0; i < cmd_buf->wait_semaphore_count; i++) {
-    wait_semaphores.emplace_back(MsdIntelAbiSemaphore::cast(msd_wait_semaphores[i])->ptr());
+    wait_semaphores.emplace_back(static_cast<MsdIntelAbiSemaphore*>(msd_wait_semaphores[i])->ptr());
   }
 
   std::vector<std::shared_ptr<magma::PlatformSemaphore>> signal_semaphores;
   signal_semaphores.reserve(cmd_buf->signal_semaphore_count);
   for (uint32_t i = 0; i < cmd_buf->signal_semaphore_count; i++) {
-    signal_semaphores.emplace_back(MsdIntelAbiSemaphore::cast(msd_signal_semaphores[i])->ptr());
+    signal_semaphores.emplace_back(
+        static_cast<MsdIntelAbiSemaphore*>(msd_signal_semaphores[i])->ptr());
   }
 
   auto command_buffer = std::unique_ptr<CommandBuffer>(

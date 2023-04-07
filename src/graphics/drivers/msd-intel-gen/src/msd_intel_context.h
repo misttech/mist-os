@@ -12,7 +12,7 @@
 
 #include "command_buffer.h"
 #include "magma_util/status.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_intel_buffer.h"
 #include "platform_logger.h"
 #include "ppgtt.h"
@@ -173,22 +173,22 @@ class MsdIntelContext {
   friend class TestContext;
 };
 
-class MsdIntelAbiContext : public msd_context_t {
+class MsdIntelAbiContext : public msd::Context {
  public:
-  explicit MsdIntelAbiContext(std::shared_ptr<MsdIntelContext> ptr) : ptr_(std::move(ptr)) {
-    magic_ = kMagic;
-  }
+  explicit MsdIntelAbiContext(std::shared_ptr<MsdIntelContext> ptr) : ptr_(std::move(ptr)) {}
 
-  static MsdIntelAbiContext* cast(msd_context_t* context) {
-    DASSERT(context);
-    DASSERT(context->magic_ == kMagic);
-    return static_cast<MsdIntelAbiContext*>(context);
-  }
+  ~MsdIntelAbiContext() override;
+
   std::shared_ptr<MsdIntelContext> ptr() { return ptr_; }
+
+  magma_status_t ExecuteCommandBufferWithResources(magma_command_buffer* command_buffer,
+                                                   magma_exec_resource* exec_resources,
+                                                   msd::Buffer** buffers,
+                                                   msd::Semaphore** wait_semaphores,
+                                                   msd::Semaphore** signal_semaphores) override;
 
  private:
   std::shared_ptr<MsdIntelContext> ptr_;
-  static const uint32_t kMagic = 0x63747874;  // "ctxt"
 };
 
 #endif  // MSD_INTEL_CONTEXT_H

@@ -151,7 +151,25 @@ struct Param {
   magma_status_t completer_status = MAGMA_STATUS_OK;
 };
 
-class MsdIntelContextSubmit : public testing::TestWithParam<Param> {
+struct TestNotification {
+  enum class Type {
+    kHandleWait = 1,
+    kHandleWaitCancel = 2,
+  };
+  Type type;
+  struct {
+    msd_connection_handle_wait_start_t starter;
+    msd_connection_handle_wait_complete_t completer;
+    void* wait_context;
+    magma_handle_t handle;
+  } handle_wait;
+  struct {
+    void* cancel_token;
+  } handle_wait_cancel;
+};
+
+class MsdIntelContextSubmit : public testing::TestWithParam<Param>,
+                              public msd::NotificationHandler {
  public:
   class ConnectionOwner : public MsdIntelConnection::Owner {
    public:
@@ -177,20 +195,43 @@ class MsdIntelContextSubmit : public testing::TestWithParam<Param> {
     std::unique_ptr<AddressSpaceOwner> address_space_owner_;
   };
 
-  static void NotificationCallback(void* token, msd_notification_t* notification) {
-    auto test = reinterpret_cast<MsdIntelContextSubmit*>(token);
+  void NotificationChannelSend(cpp20::span<uint8_t> data) override {}
+  void ContextKilled() override {}
+  void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override {}
 
+  void HandleWait(msd_connection_handle_wait_start_t starter,
+                  msd_connection_handle_wait_complete_t completer, void* wait_context,
+                  zx::unowned_handle handle) override {
     // Process handle wait starter callbacks immediately so that a context shutdown
     // early will send handle wait cancellations.
-    if (notification->type == MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT) {
-      notification->u.handle_wait.starter(notification->u.handle_wait.wait_context,
-                                          &test->cancel_token);
-    }
+    starter(wait_context, &cancel_token);
 
-    test->notifications_.push_back(*notification);
+    TestNotification test_notification = {
+        .type = TestNotification::Type::kHandleWait,
+        .handle_wait =
+            {
+                .starter = starter,
+                .completer = completer,
+                .wait_context = wait_context,
+                .handle = handle->get(),
+            },
+    };
+
+    notifications_.push_back(test_notification);
   }
 
-  std::vector<msd_notification_t> notifications_;
+  void HandleWaitCancel(void* cancel_token) override {
+    TestNotification test_notification = {.type = TestNotification::Type::kHandleWaitCancel,
+                                          .handle_wait_cancel = {
+                                              .cancel_token = cancel_token,
+                                          }};
+
+    notifications_.push_back(test_notification);
+  }
+
+  async_dispatcher_t* GetAsyncDispatcher() override { return nullptr; }
+
+  std::vector<TestNotification> notifications_;
   int cancel_token;
 
   void SubmitCommandBuffer(bool shutdown_early = false);
@@ -218,7 +259,7 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
       std::shared_ptr<MsdIntelConnection>(MsdIntelConnection::Create(owner.get(), 0u));
   auto address_space = std::make_shared<AllocatingAddressSpace>(owner.get(), 0, PAGE_SIZE);
 
-  connection->SetNotificationCallback(NotificationCallback, this);
+  connection->SetNotificationCallback(this);
 
   auto context = std::make_shared<MsdIntelContext>(address_space, connection);
 
@@ -275,19 +316,19 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
   uint32_t cancel_count = 0;
 
   while (notifications_.size()) {
-    std::vector<msd_notification_t> processing_notifications;
+    std::vector<TestNotification> processing_notifications;
     notifications_.swap(processing_notifications);
 
     for (auto& notification : processing_notifications) {
-      if (notification.type == MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT_CANCEL) {
-        EXPECT_EQ(notification.u.handle_wait_cancel.cancel_token, &cancel_token);
+      if (notification.type == TestNotification::Type::kHandleWaitCancel) {
+        EXPECT_EQ(notification.handle_wait_cancel.cancel_token, &cancel_token);
         cancel_count++;
       } else {
-        ASSERT_EQ(notification.type, MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT);
+        ASSERT_EQ(notification.type, TestNotification::Type::kHandleWait);
 
         magma_handle_t handle_copy;
-        ASSERT_TRUE(magma::PlatformHandle::duplicate_handle(notification.u.handle_wait.handle,
-                                                            &handle_copy));
+        ASSERT_TRUE(
+            magma::PlatformHandle::duplicate_handle(notification.handle_wait.handle, &handle_copy));
 
         auto semaphore = magma::PlatformSemaphore::Import(handle_copy);
         ASSERT_TRUE(semaphore);
@@ -295,8 +336,8 @@ void MsdIntelContextSubmit::SubmitCommandBuffer(bool shutdown_early) {
 
         semaphores.push_back(std::move(semaphore));
 
-        notification.u.handle_wait.completer(notification.u.handle_wait.wait_context,
-                                             p.completer_status, notification.u.handle_wait.handle);
+        notification.handle_wait.completer(notification.handle_wait.wait_context,
+                                           p.completer_status, notification.handle_wait.handle);
       }
     }
   }

@@ -10,17 +10,25 @@
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 
-class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection::Owner {
+namespace {
+struct HandleWaitNotification {
+  msd_connection_handle_wait_start_t starter;
+  msd_connection_handle_wait_complete_t completer;
+  void* wait_context;
+  magma_handle_t handle;
+};
+}  // namespace
+
+class TestMsdIntelConnection : public ::testing::Test,
+                               public MsdIntelConnection::Owner,
+                               public msd::NotificationHandler {
  public:
   ~TestMsdIntelConnection() {
     // Call back completions just to prevent memory leaks
     for (auto& n : notifications_) {
-      if (n.type == MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT) {
-        static int cancel_token;
-        n.u.handle_wait.starter(n.u.handle_wait.wait_context, &cancel_token);
-        n.u.handle_wait.completer(n.u.handle_wait.wait_context, MAGMA_STATUS_OK,
-                                  n.u.handle_wait.handle);
-      }
+      static int cancel_token;
+      n.starter(n.wait_context, &cancel_token);
+      n.completer(n.wait_context, MAGMA_STATUS_OK, n.handle);
     }
   }
 
@@ -33,56 +41,86 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
 
   magma::PlatformBusMapper* GetBusMapper() override { return &mock_bus_mapper_; }
 
-  void Notification() {
-    auto connection = MsdIntelConnection::Create(this, 0);
-    ASSERT_TRUE(connection);
+  // msd::NotificationHandler impl
+  void NotificationChannelSend(cpp20::span<uint8_t> data) override {
+    channel_send_count_ += 1;
+    callback_count_ += 1;
 
-    connection->SetNotificationCallback(NotificationCallbackStatic, this);
+    // Checks below are specific to BufferCompletions test
+    if (test_buffer_ids_.empty())
+      return;
 
-    // +2 so we force multiple notification messages
-    for (uint32_t i = 0; i < MSD_CHANNEL_SEND_MAX_SIZE / sizeof(uint64_t) + 2; i++) {
-      test_buffer_ids_.push_back(i);
-    }
-    connection->SendNotification(test_buffer_ids_);
-  }
-
-  static void NotificationCallbackStatic(void* token, msd_notification_t* notification) {
-    reinterpret_cast<TestMsdIntelConnection*>(token)->NotificationCallback(notification);
-  }
-
-  void NotificationCallback(msd_notification_t* notification) {
-    EXPECT_EQ(MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND, notification->type);
-    constexpr uint32_t kMaxUint64PerSend = MSD_CHANNEL_SEND_MAX_SIZE / sizeof(uint64_t);
-
-    uint32_t count = callback_counts_[notification->type];
-    callback_counts_[notification->type] += 1;
-
-    switch (count) {
-      case 0:
-        EXPECT_EQ(kMaxUint64PerSend, notification->u.channel_send.size / sizeof(uint64_t));
-        for (uint32_t i = 0; i < notification->u.channel_send.size / sizeof(uint64_t); i++) {
-          EXPECT_EQ(test_buffer_ids_[i],
-                    reinterpret_cast<uint64_t*>(notification->u.channel_send.data)[i]);
-        }
-        break;
+    switch (channel_send_count_) {
       case 1:
-        EXPECT_EQ(test_buffer_ids_.size() - kMaxUint64PerSend,
-                  notification->u.channel_send.size / sizeof(uint64_t));
-        for (uint32_t i = 0; i < notification->u.channel_send.size / sizeof(uint64_t); i++) {
-          EXPECT_EQ(test_buffer_ids_[kMaxUint64PerSend + i],
-                    reinterpret_cast<uint64_t*>(notification->u.channel_send.data)[i]);
+        EXPECT_EQ(MsdIntelConnection::kMaxUint64PerChannelSend, data.size() / sizeof(uint64_t));
+
+        for (uint32_t i = 0; i < data.size() / sizeof(uint64_t); i++) {
+          EXPECT_EQ(test_buffer_ids_[i], reinterpret_cast<uint64_t*>(&data[0])[i]);
         }
         break;
+
+      case 2:
+        EXPECT_EQ(test_buffer_ids_.size() - MsdIntelConnection::kMaxUint64PerChannelSend,
+                  data.size() / sizeof(uint64_t));
+
+        for (uint32_t i = 0; i < data.size() / sizeof(uint64_t); i++) {
+          EXPECT_EQ(test_buffer_ids_[MsdIntelConnection::kMaxUint64PerChannelSend + i],
+                    reinterpret_cast<uint64_t*>(&data[0])[i]);
+        }
+        break;
+
       default:
         EXPECT_TRUE(false);
     }
+  }
+
+  void ContextKilled() override {
+    context_killed_count_ += 1;
+    callback_count_ += 1;
+  }
+
+  void PerformanceCounterReadCompleted(const msd::PerfCounterResult& result) override {
+    callback_count_ += 1;
+  }
+
+  void HandleWait(msd_connection_handle_wait_start_t starter,
+                  msd_connection_handle_wait_complete_t completer, void* wait_context,
+                  zx::unowned_handle handle) override {
+    handle_wait_count_ += 1;
+    callback_count_ += 1;
+
+    HandleWaitNotification notification = {
+        .starter = starter,
+        .completer = completer,
+        .wait_context = wait_context,
+        .handle = handle->get(),
+    };
+    notifications_.push_back(notification);
+  }
+
+  void HandleWaitCancel(void* cancel_token) override { callback_count_ += 1; }
+
+  async_dispatcher_t* GetAsyncDispatcher() override { return nullptr; }
+
+  void BufferCompletions() {
+    auto connection = MsdIntelConnection::Create(this, 0);
+    ASSERT_TRUE(connection);
+
+    connection->SetNotificationCallback(this);
+
+    // +2 so we force multiple notification callbacks
+    for (uint32_t i = 0; i < MsdIntelConnection::kMaxUint64PerChannelSend + 2; i++) {
+      test_buffer_ids_.push_back(i);
+    }
+
+    connection->SendNotification(test_buffer_ids_);
   }
 
   void ReleaseBuffer() {
     auto connection = MsdIntelConnection::Create(this, 0);
     ASSERT_TRUE(connection);
 
-    connection->SetNotificationCallback(CallbackCounter, this);
+    connection->SetNotificationCallback(this);
 
     std::shared_ptr<MsdIntelBuffer> buffer = MsdIntelBuffer::Create(PAGE_SIZE, "test");
     std::shared_ptr<GpuMapping> mapping;
@@ -101,9 +139,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
     mapping.reset();
     connection->ReleaseBuffer(buffer->platform_buffer());
 
-    for (auto iter : callback_counts_) {
-      EXPECT_EQ(0u, iter.second);
-    }
+    EXPECT_EQ(0u, callback_count_);
 
     EXPECT_EQ(2u, batch_count);
   }
@@ -120,7 +156,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
     size_t expected_flush_batches = context->GetTargetCommandStreamers().size();
     EXPECT_GE(expected_flush_batches, 1u);
 
-    connection->SetNotificationCallback(CallbackCounter, this);
+    connection->SetNotificationCallback(this);
 
     std::shared_ptr<MsdIntelBuffer> buffer = MsdIntelBuffer::Create(PAGE_SIZE, "test");
     std::shared_ptr<GpuMapping> mapping;
@@ -164,9 +200,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
 
     connection->ReleaseBuffer(buffer->platform_buffer(), wait_callback);
 
-    for (auto iter : callback_counts_) {
-      EXPECT_EQ(0u, iter.second);
-    }
+    EXPECT_EQ(0u, callback_count_);
 
     EXPECT_FALSE(connection->sent_context_killed());
 
@@ -179,7 +213,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
     auto connection = std::shared_ptr<MsdIntelConnection>(MsdIntelConnection::Create(this, 0));
     ASSERT_TRUE(connection);
 
-    connection->SetNotificationCallback(CallbackCounter, this);
+    connection->SetNotificationCallback(this);
 
     std::vector<std::shared_ptr<MsdIntelContext>> contexts;
     contexts.push_back(MsdIntelConnection::CreateContext(connection));
@@ -224,9 +258,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
 
     EXPECT_EQ(wait_callback_count, contexts.size());
 
-    for (auto iter : callback_counts_) {
-      EXPECT_EQ(0u, iter.second);
-    }
+    EXPECT_EQ(0u, callback_count_);
 
     EXPECT_FALSE(connection->sent_context_killed());
 
@@ -241,7 +273,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
     auto connection = std::shared_ptr<MsdIntelConnection>(MsdIntelConnection::Create(this, 0));
     ASSERT_TRUE(connection);
 
-    connection->SetNotificationCallback(CallbackCounter, this);
+    connection->SetNotificationCallback(this);
 
     auto context = MsdIntelConnection::CreateContext(connection);
     context->SetTargetCommandStreamer(RENDER_COMMAND_STREAMER);
@@ -302,22 +334,9 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
 
     EXPECT_EQ(wait_callback_count, 1u);
 
-    for (auto iter : callback_counts_) {
-      uint32_t count = iter.second;
-      switch (iter.first) {
-        case MSD_CONNECTION_NOTIFICATION_HANDLE_WAIT:
-          EXPECT_EQ(1u, count);
-          break;
-        case MSD_CONNECTION_NOTIFICATION_CONTEXT_KILLED:
-          EXPECT_EQ(command_buffer_stuck ? 1u : 0u, count);
-          break;
-        case MSD_CONNECTION_NOTIFICATION_CHANNEL_SEND:
-          EXPECT_EQ(command_buffer_stuck ? 0u : 1u, count);
-          break;
-        default:
-          EXPECT_EQ(0u, count) << "type " << iter.first;
-      }
-    }
+    EXPECT_EQ(1u, handle_wait_count_);
+    EXPECT_EQ(command_buffer_stuck ? 1u : 0u, context_killed_count_);
+    EXPECT_EQ(command_buffer_stuck ? 0u : 1u, channel_send_count_);
 
     if (command_buffer_stuck) {
       EXPECT_TRUE(connection->sent_context_killed());
@@ -332,7 +351,7 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
     // Ensure wait semaphore is reset
     EXPECT_FALSE(wait_semaphore->WaitNoReset(0));
 
-    connection->SetNotificationCallback(nullptr, nullptr);
+    connection->SetNotificationCallback(nullptr);
 
     connection->DestroyContext(context);
   }
@@ -387,24 +406,19 @@ class TestMsdIntelConnection : public ::testing::Test, public MsdIntelConnection
     }
   }
 
-  static void CallbackCounter(void* token, msd_notification_t* notification) {
-    auto test = reinterpret_cast<TestMsdIntelConnection*>(token);
-    test->callback_counts_[notification->type] += 1;
-    // Track notifications for cleanup purposes
-    test->notifications_.push_back(*notification);
-  }
-
  private:
   MockBusMapper mock_bus_mapper_;
   std::vector<uint64_t> test_buffer_ids_;
-  // Map of notification types to counts
-  std::map<uint64_t, uint32_t> callback_counts_;
+  uint64_t callback_count_ = 0;
+  uint64_t channel_send_count_ = 0;
+  uint64_t context_killed_count_ = 0;
+  uint64_t handle_wait_count_ = 0;
   std::function<void(std::unique_ptr<MappedBatch> batch)> submit_batch_handler_;
   // Notifications to be cleaned up to avoid leaks
-  std::vector<msd_notification_t> notifications_;
+  std::vector<HandleWaitNotification> notifications_;
 };
 
-TEST_F(TestMsdIntelConnection, Notification) { Notification(); }
+TEST_F(TestMsdIntelConnection, BufferCompletions) { BufferCompletions(); }
 
 TEST_F(TestMsdIntelConnection, ReleaseBuffer) { ReleaseBuffer(); }
 

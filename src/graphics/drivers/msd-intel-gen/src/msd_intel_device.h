@@ -17,7 +17,7 @@
 #include "interrupt_manager.h"
 #include "magma_util/short_macros.h"
 #include "magma_util/thread.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_intel_connection.h"
 #include "msd_intel_context.h"
 #include "msd_intel_pci_device.h"
@@ -30,7 +30,7 @@
 
 struct magma_intel_gen_topology;
 
-class MsdIntelDevice : public msd_device_t,
+class MsdIntelDevice : public msd::Device,
                        public MsdIntelRegisterIo::Owner,
                        public EngineCommandStreamer::Owner,
                        public Gtt::Owner,
@@ -54,9 +54,11 @@ class MsdIntelDevice : public msd_device_t,
 
   virtual ~MsdIntelDevice();
 
-  // This takes ownership of the connection so that ownership can be
-  // transferred across the MSD ABI by the caller
-  std::unique_ptr<MsdIntelConnection> Open(msd_client_id_t client_id);
+  // msd::Device impl.
+  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t GetIcdList(std::vector<msd_icd_info_t>* icd_info_out) override;
+  void DumpStatus(uint32_t dump_flags) override;
+  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override;
 
   uint32_t device_id() override { return device_id_; }  // provided for EngineCommandStreamer
   uint32_t revision() { return revision_; }
@@ -65,12 +67,6 @@ class MsdIntelDevice : public msd_device_t,
   std::pair<magma_intel_gen_topology*, uint8_t*> GetTopology();
   bool engines_have_context_isolation() { return engines_have_context_isolation_; }
   uint64_t timestamp_frequency() const { return timestamp_freq_; }
-
-  static MsdIntelDevice* cast(msd_device_t* dev) {
-    DASSERT(dev);
-    DASSERT(dev->magic_ == kMagic);
-    return static_cast<MsdIntelDevice*>(dev);
-  }
 
   // Initialize the device using the given platform |device_handle|.
   bool Init(void* device_handle);
@@ -102,8 +98,6 @@ class MsdIntelDevice : public msd_device_t,
   magma::Status QueryTimestamp(std::unique_ptr<magma::PlatformBuffer> buffer);
 
  private:
-  MsdIntelDevice();
-
 #define CHECK_THREAD_IS_CURRENT(x) \
   if (x)                           \
   DASSERT(magma::ThreadIdCheck::IsCurrent(*x))
@@ -224,13 +218,11 @@ class MsdIntelDevice : public msd_device_t,
 
   std::shared_ptr<magma::PlatformBuffer> scratch_buffer() { return scratch_buffer_; }
 
-  static const uint32_t kMagic = 0x64657669;  //"devi"
-
   uint32_t device_id_{};
   uint32_t revision_{};
   uint32_t subslice_total_{};
   uint32_t eu_total_{};
-  std::unique_ptr<Topology> topology_;
+  std::shared_ptr<Topology> topology_;
   bool engines_have_context_isolation_ = false;
   uint64_t timestamp_freq_{};
 

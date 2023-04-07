@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "mapped_batch.h"
-#include "msd.h"
+#include "msd_cc.h"
 #include "msd_intel_buffer.h"
 #include "platform_semaphore.h"
 
@@ -26,9 +26,9 @@ class CommandBuffer : public MappedBatch {
   static std::unique_ptr<CommandBuffer> Create(std::weak_ptr<MsdIntelContext> context,
                                                magma_command_buffer* cmd_buf,
                                                magma_exec_resource* exec_resources,
-                                               msd_buffer_t** msd_buffers,
-                                               msd_semaphore_t** msd_wait_semaphores,
-                                               msd_semaphore_t** msd_signal_semaphores);
+                                               msd::Buffer** msd_buffers,
+                                               msd::Semaphore** msd_wait_semaphores,
+                                               msd::Semaphore** msd_signal_semaphores);
 
   ~CommandBuffer();
 
