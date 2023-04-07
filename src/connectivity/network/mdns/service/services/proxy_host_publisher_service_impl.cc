@@ -45,11 +45,12 @@ void ProxyHostPublisherServiceImpl::PublishProxyHost(
       addresses.begin(), addresses.end(), std::back_inserter(inet_addresses),
       [](const fuchsia::net::IpAddress& fidl_address) { return inet::IpAddress(fidl_address); });
 
-  auto host_publisher = new HostPublisher(std::move(callback), mdns(), host_name, inet_addresses,
+  auto host_publisher = new HostPublisher(callback.share(), mdns(), host_name, inet_addresses,
                                           media, ip_versions, std::move(request));
 
   if (!mdns().PublishHost(host_name, std::move(inet_addresses), media, ip_versions, perform_probe,
                           host_publisher)) {
+    delete host_publisher;
     callback(fpromise::error(fuchsia::net::mdns::PublishProxyHostError::ALREADY_PUBLISHED_LOCALLY));
     return;
   }

@@ -5,12 +5,24 @@
 #include <iostream>
 
 #include "src/connectivity/network/mdns/service/common/formatters.h"
+#include "src/connectivity/network/mdns/service/common/type_converters.h"
 #include "src/connectivity/network/mdns/service/encoding/dns_formatting.h"
 #include "src/connectivity/network/mdns/service/mdns.h"
+#include "src/connectivity/network/mdns/service/services/proxy_host_publisher_service_impl.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
-namespace mdns {
-namespace test {
+namespace fidl {
+
+template <>
+struct TypeConverter<fuchsia::net::IpAddress, inet::IpAddress> {
+  static fuchsia::net::IpAddress Convert(const inet::IpAddress& value) {
+    return static_cast<fuchsia::net::IpAddress>(value);
+  }
+};
+
+}  // namespace fidl
+
+namespace mdns::test {
 
 constexpr char kHostName[] = "fuchsia-1234-5678-9abc";
 constexpr char kLocalHostFullName[] = "fuchsia-1234-5678-9abc.local.";
@@ -873,5 +885,58 @@ TEST_F(MdnsUnitTests, RespondAlt) {
   RunLoopUntilIdle();
 }
 
-}  // namespace test
-}  // namespace mdns
+// Tests that |ProxyHostPublisher.PublishProxyHost| can be called more than once for a given
+// service instance. This is a regression test for fxb/124634.
+TEST_F(MdnsUnitTests, PublishProxyHostAlreadyPublishedLocally) {
+  // Start.
+  SetHasInterfaces(true);
+  Start(false, {kServiceName});
+
+  RunLoopUntilIdle();
+  ExpectSendMessageNotCalled();
+
+  // Create a |ProxyHostPublisherServiceImpl| attached to the |Mdns| instance under test.
+  fuchsia::net::mdns::ProxyHostPublisherPtr service_ptr;
+  ProxyHostPublisherServiceImpl service_impl(under_test(), service_ptr.NewRequest(), []() {});
+  RunLoopUntilIdle();
+
+  // Publish a proxy host.
+  fuchsia::net::mdns::ServiceInstancePublisherPtr publisher1_ptr;
+  bool callback1_called = false;
+  service_impl.PublishProxyHost(
+      kProxyHostName, fidl::To<std::vector<fuchsia::net::IpAddress>>(kAddresses), {},
+      publisher1_ptr.NewRequest(),
+      [&callback1_called](fuchsia::net::mdns::ProxyHostPublisher_PublishProxyHost_Result result) {
+        EXPECT_TRUE(result.is_response());
+        callback1_called = true;
+      });
+  RunLoopUntilIdle();
+  // We don't expect the callback, because the probe has not completed.
+  EXPECT_FALSE(callback1_called);
+
+  // Publish a proxy host of the same name. This call caused a crash before fxb/124634 was fixed.
+  fuchsia::net::mdns::ServiceInstancePublisherPtr publisher2_ptr;
+  bool callback2_called = false;
+  service_impl.PublishProxyHost(
+      kProxyHostName, fidl::To<std::vector<fuchsia::net::IpAddress>>(kAddresses), {},
+      publisher2_ptr.NewRequest(),
+      [&callback2_called](fuchsia::net::mdns::ProxyHostPublisher_PublishProxyHost_Result result) {
+        EXPECT_TRUE(result.is_err());
+        EXPECT_EQ(fuchsia::net::mdns::PublishProxyHostError::ALREADY_PUBLISHED_LOCALLY,
+                  result.err());
+        callback2_called = true;
+      });
+  RunLoopUntilIdle();
+  EXPECT_TRUE(callback2_called);
+
+  // Clean up.
+  RunLoopUntil([&callback1_called]() { return callback1_called; });
+
+  publisher1_ptr = nullptr;
+  RunLoopUntilIdle();
+
+  under_test().Stop();
+  RunLoopUntilIdle();
+}
+
+}  // namespace mdns::test
