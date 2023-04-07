@@ -14,7 +14,7 @@ use zerocopy::ByteSlice;
 
 use crate::{
     canonicalize_range, take_back, take_back_mut, take_front, take_front_mut,
-    AsFragmentedByteSlice, BufferMut, BufferView, BufferViewMut, ContiguousBuffer,
+    AsFragmentedByteSlice, Buffer, BufferMut, BufferView, BufferViewMut, ContiguousBuffer,
     ContiguousBufferImpl, ContiguousBufferMut, ContiguousBufferMutImpl, EmptyBuf, FragmentedBuffer,
     FragmentedBufferMut, FragmentedBytes, FragmentedBytesMut, GrowBuffer, GrowBufferMut,
     ParsablePacket, ParseBuffer, ParseBufferMut, ReusableBuffer, SerializeBuffer, ShrinkBuffer,
@@ -267,6 +267,19 @@ where
     }
 }
 
+impl<A, B> Buffer for Either<A, B>
+where
+    A: Buffer,
+    B: Buffer,
+{
+    fn parse_with_view<'a, ParseArgs, P: ParsablePacket<&'a [u8], ParseArgs>>(
+        &'a mut self,
+        args: ParseArgs,
+    ) -> Result<(P, &'a [u8]), P::Error> {
+        call_method_on_either!(self, parse_with_view, args)
+    }
+}
+
 impl<A: AsRef<[u8]>, B: AsRef<[u8]>> AsRef<[u8]> for Either<A, B> {
     fn as_ref(&self) -> &[u8] {
         call_method_on_either!(self, as_ref)
@@ -418,6 +431,18 @@ impl<B: AsRef<[u8]>> AsRef<[u8]> for Buf<B> {
 impl<B: AsMut<[u8]>> AsMut<[u8]> for Buf<B> {
     fn as_mut(&mut self) -> &mut [u8] {
         &mut self.buf.as_mut()[self.body.clone()]
+    }
+}
+
+impl<B: AsRef<[u8]>> Buffer for Buf<B> {
+    fn parse_with_view<'a, ParseArgs, P: ParsablePacket<&'a [u8], ParseArgs>>(
+        &'a mut self,
+        args: ParseArgs,
+    ) -> Result<(P, &'a [u8]), P::Error> {
+        let Self { body, ref buf } = self;
+        let body_before = body.clone();
+        let view = BufView { buf: &buf.as_ref()[body.clone()], body };
+        P::parse(view, args).map(|r| (r, &buf.as_ref()[body_before]))
     }
 }
 

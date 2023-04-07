@@ -138,6 +138,7 @@ pub(crate) struct BindingsNonSyncCtxImpl {
     rng: OsRng,
     timers: timers::TimerDispatcher<TimerId<BindingsNonSyncCtxImpl>>,
     devices: Devices<DeviceId<BindingsNonSyncCtxImpl>>,
+    packet_sockets: crate::bindings::socket::packet::Sockets,
     icmp_echo_sockets: IcmpEchoSockets,
     udp_sockets: UdpSockets,
     tcp_v4_listeners: IdMap<crate::bindings::socket::stream::ListenerState>,

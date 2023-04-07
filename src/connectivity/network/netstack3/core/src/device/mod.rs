@@ -1145,6 +1145,20 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
     }
 }
 
+impl<C: socket::NonSyncContext<DeviceId<C>> + DeviceLayerEventDispatcher>
+    socket::NonSyncContext<EthernetDeviceId<C::Instant, C::EthernetDeviceState>> for C
+{
+    fn receive_frame(
+        &mut self,
+        socket: socket::SocketId,
+        device: &EthernetDeviceId<C::Instant, C::EthernetDeviceState>,
+        frame: socket::Frame<&[u8]>,
+        whole_frame: &[u8],
+    ) {
+        self.receive_frame(socket, &device.clone().into(), frame, whole_frame)
+    }
+}
+
 impl_timer_context!(
     C: DeviceLayerEventDispatcher,
     DeviceLayerTimerId<C>,

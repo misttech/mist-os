@@ -229,7 +229,7 @@ pub trait NonSyncContext:
     + IcmpContext<Ipv6>
     + transport::tcp::socket::NonSyncContext
     + device::DeviceLayerEventDispatcher
-    + device::socket::NonSyncContext
+    + device::socket::NonSyncContext<DeviceId<Self>>
     + 'static
 {
 }
@@ -250,7 +250,7 @@ impl<
             + IcmpContext<Ipv6>
             + transport::tcp::socket::NonSyncContext
             + device::DeviceLayerEventDispatcher
-            + device::socket::NonSyncContext
+            + device::socket::NonSyncContext<DeviceId<Self>>
             + 'static,
     > NonSyncContext for C
 {

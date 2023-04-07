@@ -831,6 +831,17 @@ impl<B: BufferMut> BufferIcmpContext<Ipv6, B> for FakeNonSyncCtx {
     }
 }
 
+impl crate::device::socket::NonSyncContext<DeviceId<Self>> for FakeNonSyncCtx {
+    fn receive_frame(
+        &mut self,
+        _socket: crate::device::socket::SocketId,
+        _device: &DeviceId<Self>,
+        _frame: crate::device::socket::Frame<&[u8]>,
+        _raw_frame: &[u8],
+    ) {
+    }
+}
+
 impl DeviceLayerEventDispatcher for FakeNonSyncCtx {
     type LoopbackDeviceState = ();
     type EthernetDeviceState = ();

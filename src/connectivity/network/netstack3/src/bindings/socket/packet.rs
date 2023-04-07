@@ -5,8 +5,10 @@
 use std::{
     num::NonZeroU16,
     ops::{ControlFlow, DerefMut},
+    sync::Arc,
 };
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_posix_socket_packet as fppacket;
 
@@ -15,23 +17,83 @@ use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::TryStreamExt as _;
 use log::error;
+use net_types::ethernet::Mac;
 use netstack3_core::{
+    data_structures::id_map::{EntryKey as _, IdMap},
     device::{
-        socket::{Protocol, SocketId, SocketInfo, TargetDevice},
-        DeviceId, WeakDeviceId,
+        socket::{Frame, NonSyncContext, Protocol, SocketId, SocketInfo, TargetDevice},
+        DeviceId, FrameDestination, WeakDeviceId,
     },
+    sync::Mutex,
     Ctx, SyncCtx,
 };
 
 use crate::bindings::{
     devices::BindingId,
     socket::{
+        queue::{BodyLen, MessageQueue},
         worker::{self, CloseResponder, SocketWorker},
         IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING,
     },
-    util::{DeviceNotFoundError, IntoFidl, TryIntoCoreWithContext as _, TryIntoFidlWithContext},
+    util::{
+        ConversionContext as _, DeviceNotFoundError, IntoFidl, TryIntoCoreWithContext as _,
+        TryIntoFidlWithContext,
+    },
     BindingsNonSyncCtxImpl, NetstackContext,
 };
+
+#[derive(Default)]
+pub(crate) struct Sockets {
+    /// State for all sockets, indexed by their [`SocketId`]
+    sockets: IdMap<SocketState>,
+}
+
+/// State held in the non-sync context for a single socket.
+#[derive(Debug)]
+struct SocketState {
+    /// The received messages for the socket.
+    ///
+    /// This is shared with the worker that handles requests for the socket.
+    queue: Arc<Mutex<MessageQueue<Message>>>,
+    kind: fppacket::Kind,
+}
+
+impl NonSyncContext<DeviceId<Self>> for BindingsNonSyncCtxImpl {
+    fn receive_frame(
+        &mut self,
+        socket: SocketId,
+        device: &DeviceId<Self>,
+        frame: Frame<&[u8]>,
+        raw: &[u8],
+    ) {
+        let Sockets { sockets } = &self.packet_sockets;
+        let SocketState { queue, kind } =
+            sockets.get(socket.get_key_index()).expect("invalid socket ID");
+
+        let Frame::Ethernet { frame_dst, src_mac, dst_mac, protocol, body } = frame;
+        let packet_type = match frame_dst {
+            FrameDestination::Broadcast => fppacket::PacketType::Broadcast,
+            FrameDestination::Multicast => fppacket::PacketType::Multicast,
+            FrameDestination::Individual { local } => local
+                .then_some(fppacket::PacketType::Host)
+                .unwrap_or(fppacket::PacketType::OtherHost),
+        };
+        let message = match kind {
+            fppacket::Kind::Network => body,
+            fppacket::Kind::Link => raw,
+        };
+
+        let data = MessageData {
+            dst_mac,
+            src_mac,
+            packet_type,
+            protocol: protocol.unwrap_or(0),
+            interface_type: iface_type(device),
+            interface_id: self.get_binding_id(device.clone()).get(),
+        };
+        queue.lock().receive(IntoMessage(data, message))
+    }
+}
 
 pub(crate) async fn serve(
     ctx: NetstackContext,
@@ -48,8 +110,8 @@ pub(crate) async fn serve(
                         });
                     fasync::Task::spawn(SocketWorker::serve_stream_with(
                         ctx.clone(),
-                        move |sync_ctx, _: &mut BindingsNonSyncCtxImpl, properties| {
-                            BindingData::new(sync_ctx, kind, properties)
+                        move |sync_ctx, non_sync_ctx, properties| {
+                            BindingData::new(sync_ctx, non_sync_ctx, kind, properties)
                         },
                         SocketWorkerProperties {},
                         request_stream,
@@ -65,15 +127,57 @@ pub(crate) async fn serve(
 
 #[derive(Debug)]
 struct BindingData {
+    /// The event to hand off for [`fppacket::SocketRequest::Describe`].
     peer_event: zx::EventPair,
-    // TODO(https://fxbug.dev/106735): use this for signaling.
-    _local_event: zx::EventPair,
+    /// Shared queue of messages received for the socket.
+    ///
+    /// This is the "read" end of the queue; the non-sync context holds a
+    /// reference to the same queue for delivering incoming messages.
+    message_queue: Arc<Mutex<MessageQueue<Message>>>,
     state: State,
+}
+
+struct IntoMessage<'a>(MessageData, &'a [u8]);
+
+impl BodyLen for IntoMessage<'_> {
+    fn body_len(&self) -> usize {
+        let Self(_data, body) = self;
+        body.len()
+    }
+}
+
+impl From<IntoMessage<'_>> for Message {
+    fn from(IntoMessage(data, body): IntoMessage<'_>) -> Self {
+        Self { data, body: body.into() }
+    }
+}
+
+#[derive(Debug)]
+struct Message {
+    data: MessageData,
+    body: Vec<u8>,
+}
+
+#[derive(Debug)]
+struct MessageData {
+    src_mac: Mac,
+    dst_mac: Mac,
+    protocol: u16,
+    interface_type: fppacket::HardwareType,
+    interface_id: u64,
+    packet_type: fppacket::PacketType,
+}
+
+impl BodyLen for Message {
+    fn body_len(&self) -> usize {
+        self.body.len()
+    }
 }
 
 impl BindingData {
     fn new(
         sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
         kind: fppacket::Kind,
         SocketWorkerProperties {}: SocketWorkerProperties,
     ) -> Self {
@@ -83,11 +187,16 @@ impl BindingData {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        BindingData {
-            _local_event: local_event,
-            peer_event,
-            state: State { id: netstack3_core::device::socket::create(sync_ctx), kind },
-        }
+        let message_queue = Arc::new(Mutex::new(MessageQueue::new(local_event)));
+        let id = netstack3_core::device::socket::create(sync_ctx);
+
+        let Sockets { sockets } = &mut non_sync_ctx.packet_sockets;
+        assert_matches!(
+            sockets.insert(id.get_key_index(), SocketState { queue: message_queue.clone(), kind }),
+            None
+        );
+
+        BindingData { message_queue, peer_event, state: State { id, kind } }
     }
 }
 
@@ -119,10 +228,12 @@ impl worker::SocketWorkerHandler for BindingData {
     fn close(
         self,
         sync_ctx: &mut SyncCtx<BindingsNonSyncCtxImpl>,
-        _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
+        non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
-        let Self { peer_event: _, state, _local_event: _ } = self;
+        let Self { peer_event: _, state, message_queue: _ } = self;
         let State { id, kind: _ } = state;
+        let Sockets { sockets } = &mut non_sync_ctx.packet_sockets;
+        assert_matches!(sockets.remove(id.get_key_index()), Some(_));
         netstack3_core::device::socket::remove(sync_ctx, id)
     }
 }
@@ -134,7 +245,7 @@ struct RequestHandler<'a> {
 
 impl<'a> RequestHandler<'a> {
     fn describe(self) -> fppacket::SocketDescribeResponse {
-        let Self { ctx: _, data: BindingData { peer_event, state: _, _local_event: _ } } = self;
+        let Self { ctx: _, data: BindingData { peer_event, state: _, message_queue: _ } } = self;
         let peer = peer_event
             .duplicate_handle(
                 // The client only needs to be able to receive signals so don't
@@ -163,7 +274,7 @@ impl<'a> RequestHandler<'a> {
                 })
             })
             .transpose()?;
-        let Self { ctx, data: BindingData { peer_event: _, _local_event: _, state } } = self;
+        let Self { ctx, data: BindingData { peer_event: _, message_queue: _, state } } = self;
         let mut guard = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
         let device = match interface {
@@ -199,7 +310,7 @@ impl<'a> RequestHandler<'a> {
     > {
         let Self {
             ctx,
-            data: BindingData { peer_event: _, _local_event, state: State { id, kind } },
+            data: BindingData { peer_event: _, message_queue: _, state: State { id, kind } },
         } = self;
         let mut guard = ctx.lock().await;
         let Ctx { sync_ctx, non_sync_ctx } = guard.deref_mut();
@@ -221,6 +332,16 @@ impl<'a> RequestHandler<'a> {
         });
 
         Ok((*kind, protocol, interface))
+    }
+
+    async fn receive(self) -> Result<Message, fposix::Errno> {
+        let Self {
+            ctx: _,
+            data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
+        } = self;
+
+        let mut queue = message_queue.lock();
+        queue.pop().ok_or(fposix::EWOULDBLOCK)
     }
 
     async fn handle_request(
@@ -322,12 +443,16 @@ impl<'a> RequestHandler<'a> {
                 responder_send!(responder, &mut self.get_info().await);
             }
             fppacket::SocketRequest::RecvMsg {
-                want_packet_info: _,
-                data_len: _,
-                want_control: _,
-                flags: _,
+                want_packet_info,
+                data_len,
+                want_control,
+                flags,
                 responder,
-            } => responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp)),
+            } => {
+                let params = RecvMsgParams { want_packet_info, data_len, want_control, flags };
+                let response = self.receive().await;
+                responder_send!(responder, &mut response.map(|r| params.apply_to(r)))
+            }
             fppacket::SocketRequest::SendMsg {
                 packet_info: _,
                 data: _,
@@ -342,6 +467,13 @@ impl<'a> RequestHandler<'a> {
     }
 }
 
+fn iface_type(device: &DeviceId<BindingsNonSyncCtxImpl>) -> fppacket::HardwareType {
+    match device {
+        DeviceId::Ethernet(_) => fppacket::HardwareType::Ethernet,
+        DeviceId::Loopback(_) => fppacket::HardwareType::Loopback,
+    }
+}
+
 impl TryIntoFidlWithContext<fppacket::InterfaceProperties>
     for WeakDeviceId<BindingsNonSyncCtxImpl>
 {
@@ -351,19 +483,63 @@ impl TryIntoFidlWithContext<fppacket::InterfaceProperties>
         ctx: &C,
     ) -> Result<fppacket::InterfaceProperties, Self::Error> {
         let device = self.upgrade().ok_or(DeviceNotFoundError)?;
-        let (iface_type, addr) = match &device {
-            DeviceId::Ethernet(e) => (
-                fppacket::HardwareType::Ethernet,
-                fppacket::HardwareAddress::Eui48(e.external_state().mac.into_fidl()),
-            ),
-            DeviceId::Loopback(_) => (
-                fppacket::HardwareType::Loopback,
+        let iface_type = iface_type(&device);
+        let addr = match &device {
+            DeviceId::Ethernet(e) => {
+                fppacket::HardwareAddress::Eui48(e.external_state().mac.into_fidl())
+            }
+            DeviceId::Loopback(_) => {
                 // Pretend that the loopback interface has an all-zeroes MAC
                 // address to match Linux behavior.
-                fppacket::HardwareAddress::Eui48(fidl_fuchsia_net::MacAddress { octets: [0; 6] }),
-            ),
+                fppacket::HardwareAddress::Eui48(fidl_fuchsia_net::MacAddress { octets: [0; 6] })
+            }
         };
         let id = ctx.get_binding_id(device).get();
         Ok(fppacket::InterfaceProperties { addr, id, type_: iface_type })
+    }
+}
+
+struct RecvMsgParams {
+    want_packet_info: bool,
+    data_len: u32,
+    want_control: bool,
+    flags: fidl_fuchsia_posix_socket::RecvMsgFlags,
+}
+
+impl RecvMsgParams {
+    fn apply_to(
+        self,
+        response: Message,
+    ) -> (Option<Box<fppacket::RecvPacketInfo>>, Vec<u8>, fppacket::RecvControlData, u32) {
+        let Self { want_packet_info, data_len, want_control, flags } = self;
+        let data_len = data_len.try_into().unwrap_or(usize::MAX);
+
+        let Message { data, mut body } = response;
+        let MessageData { src_mac, dst_mac, packet_type, interface_id, interface_type, protocol } =
+            data;
+
+        let truncated = body.len().saturating_sub(data_len);
+        body.truncate(data_len);
+
+        let packet_info = if want_packet_info {
+            let info = fppacket::RecvPacketInfo {
+                packet_type,
+                interface_type,
+                packet_info: fppacket::PacketInfo {
+                    protocol,
+                    interface_id,
+                    addr: fppacket::HardwareAddress::Eui48(src_mac.into_fidl()),
+                },
+            };
+            Some(Box::new(info))
+        } else {
+            None
+        };
+
+        // TODO(https://fxbug.dev/106735): Return control data and flags.
+        let _ = (want_control, flags, dst_mac);
+        let control = fppacket::RecvControlData::EMPTY;
+
+        (packet_info, body, control, truncated.try_into().unwrap_or(u32::MAX))
     }
 }

@@ -15,7 +15,7 @@ use lock_order::{
 };
 use log::trace;
 use net_types::{ethernet::Mac, ip::IpAddress, SpecifiedAddr};
-use packet::{Buf, BufferMut, ParseBuffer, Serializer};
+use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
@@ -379,17 +379,24 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
         (): Self::Meta,
         mut buf: Buf<Vec<u8>>,
     ) {
-        let frame = match buf.parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
-            Err(e) => {
-                trace!("dropping invalid ethernet frame over loopback: {:?}", e);
-                return;
-            }
-            Ok(e) => e,
-        };
+        let (frame, whole_body) =
+            match buf.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
+                Err(e) => {
+                    trace!("dropping invalid ethernet frame over loopback: {:?}", e);
+                    return;
+                }
+                Ok(e) => e,
+            };
 
         let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
 
-        // TODO(https://fxbug.dev/106735): dispatch to packet sockets.
+        crate::device::socket::BufferSocketHandler::<LoopbackDevice, _>::handle_received_frame(
+            self,
+            ctx,
+            device_id,
+            crate::device::socket::Frame::from_ethernet(&frame, frame_dest),
+            whole_body,
+        );
 
         let ethertype = match frame.ethertype() {
             Some(e) => e,
@@ -534,6 +541,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use lock_order::{Locked, Unlocked};
     use net_types::ip::{AddrSubnet, Ip, Ipv4, Ipv6};
+    use packet::ParseBuffer;
 
     use crate::{
         context::testutil::FakeInstant,

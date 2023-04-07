@@ -52,7 +52,7 @@ use crate::{
             },
             DequeueState, TransmitQueueFrameError,
         },
-        socket::DeviceSockets,
+        socket::{BufferSocketHandler, DeviceSockets},
         state::IpLinkDeviceState,
         with_ethernet_state, with_ethernet_state_and_sync_ctx, Device, DeviceIdContext,
         DeviceLayerEventDispatcher, DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu,
@@ -734,10 +734,12 @@ where
 
 /// Receive an Ethernet frame from the network.
 pub(super) fn receive_frame<
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>
+        + crate::device::socket::NonSyncContext<SC::DeviceId>,
     B: BufferMut,
     SC: BufferEthernetIpLinkDeviceDynamicStateContext<C, B>
-        + ArpPacketHandler<B, EthernetLinkDevice, C>,
+        + ArpPacketHandler<B, EthernetLinkDevice, C>
+        + BufferSocketHandler<EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -753,8 +755,8 @@ pub(super) fn receive_frame<
     // Ethernet frame. If this becomes insufficient in the future, we may want
     // to consider making this behavior configurable (at compile time, at
     // runtime on a global basis, or at runtime on a per-device basis).
-    let frame = if let Ok(frame) =
-        buffer.parse_with::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
+    let (ethernet, whole_frame) = if let Ok(frame) =
+        buffer.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck)
     {
         frame
     } else {
@@ -763,7 +765,7 @@ pub(super) fn receive_frame<
         return;
     };
 
-    let dst = frame.dst_mac();
+    let dst = ethernet.dst_mac();
 
     let frame_dest = sync_ctx
         .with_ethernet_device_state(device_id, |static_state, dynamic_state| {
@@ -782,7 +784,14 @@ pub(super) fn receive_frame<
         Some(frame_dest) => frame_dest,
     };
 
-    match frame.ethertype() {
+    sync_ctx.handle_received_frame(
+        ctx,
+        device_id,
+        crate::device::socket::Frame::from_ethernet(&ethernet, frame_dst),
+        whole_frame,
+    );
+
+    match ethernet.ethertype() {
         Some(EtherType::Arp) => {
             let types = if let Ok(types) = peek_arp_types(buffer.as_ref()) {
                 types

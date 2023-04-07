@@ -979,19 +979,27 @@ impl<B> ReusableBuffer for B where B: TargetBuffer + ShrinkBuffer {}
 
 /// A byte buffer used for parsing that can grow back to its original size.
 ///
-/// `Buffer` is a shorthand for `GrowBuffer + ParseBuffer`. A `Buffer` can be
-/// used for parsing (via [`ParseBuffer`]) and then grow back to its original
-/// size (via [`GrowBuffer`]).
-pub trait Buffer: GrowBuffer + ParseBuffer {}
-impl<B> Buffer for B where B: GrowBuffer + ParseBuffer {}
+/// `Buffer` owns its backing memory and so implies `GrowBuffer + ParseBuffer`.
+/// A `Buffer` can be used for parsing (via [`ParseBuffer`]) and then grow back
+/// to its original size (via [`GrowBuffer`]). Since it owns the backing memory,
+/// it also provides the ability to provide both a parsed and un-parsed view
+/// into a packet via [`Buffer::parse_with_view`].
+pub trait Buffer: GrowBuffer + ParseBuffer {
+    /// Like [`ParseBuffer::parse_with`] but additionally provides an
+    /// un-structured view into the parsed data on successful parsing.
+    fn parse_with_view<'a, ParseArgs, P: ParsablePacket<&'a [u8], ParseArgs>>(
+        &'a mut self,
+        args: ParseArgs,
+    ) -> Result<(P, &'a [u8]), P::Error>;
+}
 
 /// A byte buffer used for parsing and serialization.
 ///
 /// `BufferMut` is a shorthand for `TargetBuffer + ParseBufferMut`. A
 /// `BufferMut` can be used for parsing (via [`ParseBufferMut`]) and
 /// serialization (via [`TargetBuffer`]).
-pub trait BufferMut: TargetBuffer + ParseBufferMut {}
-impl<B> BufferMut for B where B: TargetBuffer + ParseBufferMut {}
+pub trait BufferMut: TargetBuffer + ParseBufferMut + Buffer {}
+impl<B> BufferMut for B where B: TargetBuffer + ParseBufferMut + Buffer {}
 
 /// An empty buffer.
 ///
@@ -1118,6 +1126,15 @@ impl<'a> BufferView<&'a mut [u8]> for EmptyBuf {
     }
 }
 impl<'a> BufferViewMut<&'a mut [u8]> for EmptyBuf {}
+impl Buffer for EmptyBuf {
+    fn parse_with_view<'a, ParseArgs, P: ParsablePacket<&'a [u8], ParseArgs>>(
+        &'a mut self,
+        args: ParseArgs,
+    ) -> Result<(P, &'a [u8]), P::Error> {
+        self.parse_with(args).map(|r| (r, [].as_slice()))
+    }
+}
+
 impl FragmentedBuffer for Never {
     fn len(&self) -> usize {
         match *self {}
