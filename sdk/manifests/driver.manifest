@@ -13,11 +13,11 @@ sdk://fidl/fuchsia.data
 sdk://fidl/fuchsia.device.fs
 sdk://fidl/fuchsia.diagnostics
 sdk://fidl/fuchsia.diagnostics.types
-sdk://fidl/fuchsia.driver.compat
 sdk://fidl/fuchsia.driver.framework
 sdk://fidl/fuchsia.hardware.acpi
 sdk://fidl/fuchsia.hardware.i2c
 sdk://fidl/fuchsia.hardware.pci
+sdk://fidl/fuchsia.hardware.wlan.associnfo
 sdk://fidl/fuchsia.input
 sdk://fidl/fuchsia.input.report
 sdk://fidl/fuchsia.inspect
@@ -33,14 +33,12 @@ sdk://fidl/fuchsia.wlan.ieee80211
 sdk://fidl/fuchsia.wlan.internal
 sdk://fidl/fuchsia.wlan.phyimpl
 sdk://fidl/fuchsia.wlan.softmac
-sdk://fidl/fuchsia.hardware.wlan.associnfo
 sdk://fidl/zx
 sdk://pkg/async
 sdk://pkg/async-cpp
 sdk://pkg/async-default
 sdk://pkg/component_incoming_cpp
 sdk://pkg/component_outgoing_cpp
-sdk://pkg/driver_compat
 sdk://pkg/driver_component_cpp
 sdk://pkg/driver_devfs_cpp
 sdk://pkg/driver_incoming_cpp

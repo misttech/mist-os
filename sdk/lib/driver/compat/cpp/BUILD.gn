@@ -7,7 +7,7 @@ import("//build/cpp/sdk_source_set.gni")
 import("//build/test.gni")
 
 sdk_source_set("cpp") {
-  category = "experimental"
+  category = "internal"
   sdk_name = "driver_compat"
   include_base = "//sdk"
   sources = [

@@ -601,7 +601,6 @@ sdk_molecule("driver_fidl") {
   visibility = [ ":*" ]
   deps = [
     "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs_sdk($fidl_toolchain)",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.acpi:fuchsia.hardware.acpi_sdk($fidl_toolchain)",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_sdk($fidl_toolchain)",
@@ -632,7 +631,6 @@ sdk("driver") {
     ":driver_host_tools",
     "//sdk/lib/component/incoming/cpp:cpp_sdk",
     "//sdk/lib/component/outgoing/cpp:cpp_sdk",
-    "//sdk/lib/driver/compat/cpp:cpp_sdk",
     "//sdk/lib/driver/component:driver_component",
     "//sdk/lib/driver/component/cpp:cpp_sdk",
     "//sdk/lib/driver/devfs/cpp:cpp_sdk",
