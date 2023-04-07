@@ -15,7 +15,6 @@
                 // TODO(https://fxbug.dev/106735): Support packet sockets.
                 "AllPacketSocketTests/PacketSocketTest.RebindProtocol/*",
                 "AllInetTests/CookedPacketTest.Send/*",
-                "AllInetTests/RawPacketTest.SetSocketRecvBuf*",
                 "AllInetTests/RawPacketTest.SetSocketSendBuf*",
                 "AllInetTests/RawPacketTest.GetSocketError*",
                 "AllInetTests/RawPacketTest.Send/*",

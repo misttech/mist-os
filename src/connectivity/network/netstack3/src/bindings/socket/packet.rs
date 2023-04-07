@@ -344,6 +344,26 @@ impl<'a> RequestHandler<'a> {
         queue.pop().ok_or(fposix::EWOULDBLOCK)
     }
 
+    async fn set_receive_buffer(self, size: u64) {
+        let Self {
+            ctx: _,
+            data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
+        } = self;
+
+        let mut queue = message_queue.lock();
+        queue.set_max_available_messages_size(size.try_into().unwrap_or(usize::MAX))
+    }
+
+    async fn receive_buffer(self) -> u64 {
+        let Self {
+            ctx: _,
+            data: BindingData { peer_event: _, message_queue, state: State { id: _, kind: _ } },
+        } = self;
+
+        let queue = message_queue.lock();
+        queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
+    }
+
     async fn handle_request(
         self,
         request: fppacket::SocketRequest,
@@ -382,11 +402,11 @@ impl<'a> RequestHandler<'a> {
             fppacket::SocketRequest::GetSendBuffer { responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
             }
-            fppacket::SocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+            fppacket::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
+                responder_send!(responder, &mut Ok(self.set_receive_buffer(value_bytes).await));
             }
             fppacket::SocketRequest::GetReceiveBuffer { responder } => {
-                responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
+                responder_send!(responder, &mut Ok(self.receive_buffer().await));
             }
             fppacket::SocketRequest::SetKeepAlive { value: _, responder } => {
                 responder_send!(responder, &mut Err(fposix::Errno::Eopnotsupp))
