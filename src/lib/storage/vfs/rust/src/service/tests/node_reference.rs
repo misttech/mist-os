@@ -220,7 +220,7 @@ fn reopen_not_supported() {
         |node_proxy| async move {
             let (client_end, server_end) = create_proxy::<fio::NodeMarker>().unwrap();
 
-            node_proxy.reopen(None, server_end).unwrap();
+            node_proxy.reopen(fio::RightsRequest::EMPTY, server_end).unwrap();
 
             let mut event_stream = client_end.take_event_stream();
             assert_matches!(

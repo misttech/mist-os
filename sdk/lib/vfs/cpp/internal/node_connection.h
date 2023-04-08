@@ -43,8 +43,8 @@ class NodeConnection final : public Connection, public fuchsia::io::Node {
                      GetAttributesCallback callback) override {
     callback(fuchsia::io::Node2_GetAttributes_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
-  void Reopen(std::unique_ptr<::fuchsia::io::RightsRequest> rights_request,
-              ::fidl::InterfaceRequest<::fuchsia::io::Node> object_request) override {
+  void Reopen(fuchsia::io::RightsRequest rights_request,
+              fidl::InterfaceRequest<fuchsia::io::Node> object_request) override {
     object_request.Close(ZX_ERR_NOT_SUPPORTED);
   }
   void UpdateAttributes(fuchsia::io::MutableNodeAttributes MutableNodeAttributes,

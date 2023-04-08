@@ -19,7 +19,6 @@ fidl("fuchsia.io") {
     "node.fidl",
     "node2.fidl",
     "rights-abilities.fidl",
-    "rights-request.fidl",
     "symlink.fidl",
   ]
 
