@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zircon-internal/align.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -473,73 +474,74 @@ zx_status_t capture_start() {
   return ZX_OK;
 }
 
-bool amlogic_capture_compare(void* capture_buf, void* actual_buf, size_t size, uint32_t height,
-                             uint32_t width) {
-  auto image_buf = std::make_unique<uint8_t[]>(size);
-  std::memcpy(image_buf.get(), actual_buf, size);
+bool AmlogicCompareCapturedImage(cpp20::span<const uint8_t> captured_image,
+                                 cpp20::span<const uint8_t> input_image,
+                                 zx_pixel_format_t input_image_pixel_format, int height,
+                                 int width) {
+  assert(input_image_pixel_format == ZX_PIXEL_FORMAT_ABGR_8888 ||
+         input_image_pixel_format == ZX_PIXEL_FORMAT_BGR_888x ||
+         input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
+         input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888);
 
-  auto* imageptr = static_cast<uint8_t*>(image_buf.get());
-  auto* captureptr = static_cast<uint8_t*>(capture_buf);
+  auto expected_image = std::vector<uint8_t>(input_image.begin(), input_image.end());
 
-  // first fix endianess
-  auto* tmpptr = reinterpret_cast<uint32_t*>(image_buf.get());
-  for (size_t i = 0; i < size / 4; i++) {
-    tmpptr[i] = be32toh(tmpptr[i]);
-  }
-
-  uint32_t capture_stride = ZX_ALIGN(width * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888), 64);
-  uint32_t buffer_stride = ZX_ALIGN(width * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_x888), 64);
-  uint32_t buffer_width_bytes = width * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_x888);
-  uint32_t capture_width_bytes = width * ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
-  size_t buf_idx = 0;
-  if (std::string_view(board_name.data(), board_name.size()).find("astro") !=
-      std::string_view::npos) {
-    // For Astro only:
-    // Ignore last column. Has junk (hardware bug)
-    // Ignoring last column, means there is a shift by one pixel.
-    // Therefore, image_buffer should start from pixel 1 (i.e. 4th byte since x888) and
-    // capture_buffer should end at width - 3 (i.e. 888)
-    capture_width_bytes -= ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888);
-    buf_idx = ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_x888);
-  }
-  size_t cap_idx = 0;
-  // Ignore first line. It <sometimes> contains junk (hardware bug).
-  bool success = true;
-  for (size_t h = 1; h < height; h++) {
-    for (; cap_idx < capture_width_bytes && buf_idx < buffer_width_bytes;) {
-      // skip the alpha channel
-      if (((buf_idx) % 4) == 0) {
-        buf_idx++;
-        continue;
-      }
-      if (imageptr[h * buffer_stride + buf_idx] == captureptr[h * capture_stride + cap_idx]) {
-        buf_idx++;
-        cap_idx++;
-        continue;
-      }
-      if (imageptr[h * buffer_stride + buf_idx] != 0 &&
-          (imageptr[h * buffer_stride + buf_idx] == captureptr[h * capture_stride + cap_idx] + 1 ||
-           imageptr[h * buffer_stride + buf_idx] == captureptr[h * capture_stride + cap_idx] - 1)) {
-        buf_idx++;
-        cap_idx++;
-        continue;
-      }
-      success = false;
-      printf("h:%zu, buf[%zu] = 0x%x, cap[%zu] = 0x%x\n", h, h * buffer_stride + buf_idx,
-             imageptr[h * buffer_stride + buf_idx], h * capture_stride + cap_idx,
-             captureptr[h * capture_stride + cap_idx]);
-      break;
-    }
-    if (!success) {
-      break;
+  // Amlogic captured images are always in packed (least-significant) B8G8R8
+  // (most-siginificant) format. To avoid out-of-order data access, we convert
+  // the endianness of the input image, if they are in (least-significant)
+  // R8G8B8A8 (most-significant) order.
+  if (input_image_pixel_format == ZX_PIXEL_FORMAT_ARGB_8888 ||
+      input_image_pixel_format == ZX_PIXEL_FORMAT_RGB_x888) {
+    for (size_t i = 0; i + 3 < expected_image.size(); i += 4) {
+      std::swap(expected_image[i], expected_image[i + 3]);
+      std::swap(expected_image[i + 1], expected_image[i + 2]);
     }
   }
-  return success;
+
+  // Actually the pixel format of captured image is not RGB888 but BGR888;
+  // though it is not defined as a zx_pixel_format_t. Since we only need the
+  // bytes-per-pixel here to calculate the stride, in this case it's okay to
+  // use ZX_PIXEL_FORMAT_RGB_888.
+  const int capture_stride =
+      ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_RGB_888)), 64);
+  const int expected_stride =
+      ZX_ALIGN(width * static_cast<int>(ZX_PIXEL_FORMAT_BYTES(ZX_PIXEL_FORMAT_BGR_888x)), 64);
+
+  // Ignore the first row. It sometimes contains junk (hardware bug).
+  int start_row = 1;
+  int end_row = height;
+
+  int start_column = 0;
+  // Ignore the last column for Astro only. It contains junk bytes (hardware bug).
+  const bool board_is_astro =
+      std::string_view(board_name.data(), board_name.size()).find("astro") !=
+      std::string_view::npos;
+  int end_column = board_is_astro ? (width - 1) : width;
+
+  for (int row = start_row; row < end_row; row++) {
+    for (int column = start_column; column < end_column; column++) {
+      for (int channel = 0; channel < 3; channel++) {
+        // On expected image, the first byte is alpha channel, so we ignore it.
+        int expected_byte_index = row * expected_stride + column * 4 + 1 + channel;
+        int captured_byte_index = row * capture_stride + column * 3 + channel;
+
+        constexpr int kColorDifferenceThreshold = 2;
+        if (abs(expected_image[expected_byte_index] - captured_image[captured_byte_index]) >
+            kColorDifferenceThreshold) {
+          printf("Pixel different: (row=%d, col=%d, channel=%d) expected 0x%02x captured 0x%02x\n",
+                 row, column, channel, expected_image[expected_byte_index],
+                 captured_image[captured_byte_index]);
+          return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
-bool capture_compare(void* input_image_buf, uint32_t height, uint32_t width) {
-  if (input_image_buf == nullptr) {
-    printf("%s: null buf\n", __func__);
+bool CompareCapturedImage(cpp20::span<const uint8_t> input_image,
+                          zx_pixel_format_t input_image_pixel_format, int height, int width) {
+  if (input_image.data() == nullptr) {
+    printf("%s: input image is null\n", __func__);
     return false;
   }
 
@@ -560,11 +562,12 @@ bool capture_compare(void* input_image_buf, uint32_t height, uint32_t width) {
   zx_cache_flush(ptr, capture_vmo_size, ZX_CACHE_FLUSH_INVALIDATE);
 
   if (platform == AMLOGIC_PLATFORM) {
-    return amlogic_capture_compare(mapped_capture_vmo.start(), input_image_buf, capture_vmo_size,
-                                   height, width);
+    return AmlogicCompareCapturedImage(
+        cpp20::span(reinterpret_cast<const uint8_t*>(mapped_capture_vmo.start()), capture_vmo_size),
+        input_image, input_image_pixel_format, height, width);
   }
 
-  return !memcmp(input_image_buf, mapped_capture_vmo.start(), capture_vmo_size);
+  return !memcmp(input_image.data(), mapped_capture_vmo.start(), capture_vmo_size);
 }
 
 void capture_release() {
@@ -1143,8 +1146,12 @@ int main(int argc, const char* argv[]) {
         break;
       }
       if (verify_capture &&
-          !capture_compare(layers[0]->GetCurrentImageBuf(), displays[0].mode().vertical_resolution,
-                           displays[0].mode().horizontal_resolution)) {
+          !CompareCapturedImage(
+              cpp20::span(reinterpret_cast<const uint8_t*>(layers[0]->GetCurrentImageBuf()),
+                          layers[0]->GetCurrentImageSize()),
+              /*input_image_pixel_format=*/displays[0].format(),
+              /*height=*/displays[0].mode().vertical_resolution,
+              /*width=*/displays[0].mode().horizontal_resolution)) {
         capture_result = false;
         break;
       }
