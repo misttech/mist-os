@@ -117,6 +117,7 @@ const device_bind_prop_t kI2cProperties[] = {
 };
 
 static const gpio_pin_t gpio_expander_pins[] = {
+    DECL_GPIO_PIN(VIM3_LCD_RESET),
     DECL_GPIO_PIN(VIM3_SD_MODE),
 };
 
