@@ -3,10 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/chromium/web_engine/meta/shards/web_engine_base.shard.cml",
-        "//src/chromium/web_engine/meta/shards/web_engine_feature_network.shard.cml",
-        "//src/chromium/web_engine/meta/shards/web_engine_feature_vulkan.shard.cml",
-        "//src/chromium/web_engine/meta/shards/web_engine_view.shard.cml",
         "inspect/client.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "sys/testing/elf_test_runner.shard.cml",
@@ -14,6 +10,7 @@
         // system-test is needed to access fuchsia.sysmem.Allocator
         // and fuchsia.vulkan.loader.Loader.
         "sys/testing/system-test.shard.cml",
+        "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/web_runner_pixel_test_bin",
@@ -23,13 +20,14 @@
             protocol: [
                 "fuchsia.kernel.RootJobForInspect",
                 "fuchsia.kernel.Stats",
-                "fuchsia.logger.LogSink",
                 "fuchsia.media.ProfileProvider",
                 "fuchsia.posix.socket.Provider",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
+
+                // Explicitly offer as there is no `vulkan/offer.shard.cml`.
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],

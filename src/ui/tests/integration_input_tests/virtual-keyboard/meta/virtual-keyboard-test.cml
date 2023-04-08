@@ -7,6 +7,7 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "sys/testing/system-test.shard.cml",
+        "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/virtual-keyboard-test",
@@ -17,7 +18,6 @@
             // Keep it minimal, describe only what's actually needed.
             // TODO(fxbug.dev/81446): Remove this list.
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.scheduler.ProfileProvider",
 
@@ -25,6 +25,8 @@
                 // successful transition to CFv2.
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
+
+                // Explicitly offer as there is no `vulkan/offer.shard.cml`.
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],

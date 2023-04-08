@@ -7,7 +7,6 @@
         "//src/sys/test_runners/gtest/default.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
     program: {
         binary: "bin/text-input-test",
@@ -30,6 +29,8 @@
                 // successful transition to CFv2.
                 "fuchsia.sys.Environment",
                 "fuchsia.sysmem.Allocator",
+
+                // Explicitly offer as there is no `vulkan/offer.shard.cml`.
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.vulkan.loader.Loader",
             ],
