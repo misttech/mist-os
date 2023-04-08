@@ -10,32 +10,50 @@
 #include <hwreg/bitfields.h>
 #include <hwreg/mmio.h>
 
-#define VPU_RDMA_AHB_START_ADDR_MAN (0x1100 << 2)
-#define VPU_RDMA_AHB_END_ADDR_MAN (0x1101 << 2)
-#define VPU_RDMA_AHB_START_ADDR_1 (0x1102 << 2)
-#define VPU_RDMA_AHB_END_ADDR_1 (0x1103 << 2)
-#define VPU_RDMA_AHB_START_ADDR_2 (0x1104 << 2)
-#define VPU_RDMA_AHB_END_ADDR_2 (0x1105 << 2)
-#define VPU_RDMA_AHB_START_ADDR_3 (0x1106 << 2)
-#define VPU_RDMA_AHB_END_ADDR_3 (0x1107 << 2)
-#define VPU_RDMA_AHB_START_ADDR_4 (0x1108 << 2)
-#define VPU_RDMA_AHB_END_ADDR_4 (0x1109 << 2)
-#define VPU_RDMA_AHB_START_ADDR_5 (0x110a << 2)
-#define VPU_RDMA_AHB_END_ADDR_5 (0x110b << 2)
-#define VPU_RDMA_AHB_START_ADDR_6 (0x110c << 2)
-#define VPU_RDMA_AHB_END_ADDR_6 (0x110d << 2)
-#define VPU_RDMA_AHB_START_ADDR_7 (0x110e << 2)
-#define VPU_RDMA_AHB_END_ADDR_7 (0x110f << 2)
+// The register definitions here are from AMLogic S912 Datasheet revision 0.1.
+// The information was cross-checked against AMLogic's VLSI GXL RDMA
+// Specification, Version 1.0, dated September 26, 2018.
+
+// The RDMA (Register Direct Memory Access) is briefly described in the S912
+// Datasheet section 27.3 "Video Output" > "RDMA".
+//
+// The A311D datasheet Section 10.2.1 "Video Output" > "Overview" mentions that
+// the VPU includes an RDMA submodule, but does not list the registers. Our
+// experiments and passing tests indicate that the RDMA functionality we use is
+// unchanged.
+
+// Register addresses from the S912 datasheet section 27.3 "RDMA", Table
+// IV.29.3 "Register List of RDMA". The table specifies absolute addresses, but
+// the addresses are relative to the VPU's MMIO block. S912 datasheet section
+// 16 "Memory Map" indicates that the S912's VPU's MMIO block starts at
+// 0xd0100000.
+#define VPU_RDMA_AHB_START_ADDR_MAN 0x4400
+#define VPU_RDMA_AHB_END_ADDR_MAN 0x4404
+#define VPU_RDMA_AHB_START_ADDR_1 0x4408
+#define VPU_RDMA_AHB_END_ADDR_1 0x440c
+#define VPU_RDMA_AHB_START_ADDR_2 0x4410
+#define VPU_RDMA_AHB_END_ADDR_2 0x4414
+#define VPU_RDMA_AHB_START_ADDR_3 0x4418
+#define VPU_RDMA_AHB_END_ADDR_3 0x441c
+#define VPU_RDMA_AHB_START_ADDR_4 0x4420
+#define VPU_RDMA_AHB_END_ADDR_4 0x4424
+#define VPU_RDMA_AHB_START_ADDR_5 0x4428
+#define VPU_RDMA_AHB_END_ADDR_5 0x442c
+#define VPU_RDMA_AHB_START_ADDR_6 0x4430
+#define VPU_RDMA_AHB_END_ADDR_6 0x4434
+#define VPU_RDMA_AHB_START_ADDR_7 0x4438
+#define VPU_RDMA_AHB_END_ADDR_7 0x443c
+#define VPU_RDMA_ACCESS_AUTO 0x4440
+#define VPU_RDMA_ACCESS_AUTO2 0x4444
+#define VPU_RDMA_ACCESS_AUTO3 0x4448
+#define VPU_RDMA_ACCESS_MAN 0x444c
+#define VPU_RDMA_CTRL 0x4450
+#define VPU_RDMA_STATUS 0x4454
+#define VPU_RDMA_STATUS2 0x4458
+#define VPU_RDMA_STATUS3 0x445c
+
 #define VPU_RDMA_AHB_START_ADDR(x) (VPU_RDMA_AHB_START_ADDR_MAN + ((x) << 3))
 #define VPU_RDMA_AHB_END_ADDR(x) (VPU_RDMA_AHB_END_ADDR_MAN + ((x) << 3))
-#define VPU_RDMA_ACCESS_AUTO (0x1110 << 2)
-#define VPU_RDMA_ACCESS_AUTO2 (0x1111 << 2)
-#define VPU_RDMA_ACCESS_AUTO3 (0x1112 << 2)
-#define VPU_RDMA_ACCESS_MAN (0x1113 << 2)
-#define VPU_RDMA_CTRL (0x1114 << 2)
-#define VPU_RDMA_STATUS (0x1115 << 2)
-#define VPU_RDMA_STATUS2 (0x1116 << 2)
-#define VPU_RDMA_STATUS3 (0x1117 << 2)
 
 // VPU_RDMA_ACCESS_AUTO Bit Definition
 #define RDMA_ACCESS_AUTO_INT_EN(channel) (1 << ((channel) << 3))
