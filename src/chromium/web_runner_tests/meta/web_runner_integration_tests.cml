@@ -15,12 +15,12 @@
     },
     children: [
         {
-            name: "property_provider",
-            url: "fuchsia-pkg://fuchsia.com/intl_property_manager#meta/intl_property_manager.cm",
-        },
-        {
             name: "build_info",
             url: "#meta/fake_build_info.cm",
+        },
+        {
+            name: "property_provider",
+            url: "fuchsia-pkg://fuchsia.com/intl_property_manager#meta/intl_property_manager.cm",
         },
         {
             name: "netstack",
@@ -32,10 +32,9 @@
         },
     ],
     use: [
+        // The following blocks contain protocols that must be provided when
+        // creating a `fuchsia.web.Context` that can render Frames in Scenic.
         {
-            // These must be provided when creating a `fuchsia.web.Context` that
-            // can render Frames in Scenic. "fuchsia.logger.LogSink" is provided
-            // via include above, and "fuchsia.ui.*" are provided below.
             protocol: [
                 "fuchsia.accessibility.semantics.SemanticsManager",
 
@@ -45,24 +44,21 @@
                 "fuchsia.hwinfo.Product",
 
                 // "fuchsia.intl.PropertyProvider", is provided below.
-                "fuchsia.kernel.VmexResource",
-                "fuchsia.media.ProfileProvider",
+                "fuchsia.kernel.VmexResource", // Assuming JavaScript desired.
+
+                // "fuchsia.logger/LogSink", is included by the shard above.
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.process.Launcher",
                 "fuchsia.sysmem.Allocator",
             ],
         },
         {
-            // Required for `ContextFeatureFlags::NETWORK`.
-            // Get these directly from the hermetic netstack component.
-            protocol: [
-                "fuchsia.net.interfaces.State",
-                "fuchsia.net.name.Lookup",
-
-                // This is also needed to launch a web server.
-                "fuchsia.posix.socket.Provider",
-            ],
-            from: "#netstack",
+            protocol: "fuchsia.buildinfo.Provider",
+            from: "#build_info",
+        },
+        {
+            protocol: "fuchsia.intl.PropertyProvider",
+            from: "#property_provider",
         },
         {
             protocol: [
@@ -73,43 +69,30 @@
             from: "#ui",
         },
         {
-            protocol: "fuchsia.intl.PropertyProvider",
-            from: "#property_provider",
-        },
-        {
-            protocol: "fuchsia.buildinfo.Provider",
-            from: "#build_info",
-        },
-        {
             protocol: [
-                // Included to suppress "proper `use` declaration "warnings.
+                // TODO(crbug.com/1224707): Migrate to `fuchsia.scheduler`.
+                "fuchsia.media.ProfileProvider",
+
+                // Included to suppress "proper `use` declaration" warnings.
                 "fuchsia.tracing.perfetto.ProducerConnector",
             ],
             availability: "optional",
         },
+
+        // Required for `ContextFeatureFlags::NETWORK`.
+        // Get these directly from the hermetic netstack component.
+        {
+            protocol: [
+                "fuchsia.net.interfaces.State",
+                "fuchsia.net.name.Lookup",
+
+                // This is also needed to launch a web server.
+                "fuchsia.posix.socket.Provider",
+            ],
+            from: "#netstack",
+        },
     ],
     offer: [
-        {
-            protocol: [
-                "fuchsia.scheduler.ProfileProvider",
-                "fuchsia.sys.Environment",
-                "fuchsia.sys.Loader",
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.tracing.provider.Registry",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-            from: "parent",
-            to: "#realm_builder",
-        },
-        {
-            // Optionally used by ContextProvider. Offer them to suppress log messages.
-            protocol: [
-                "fuchsia.feedback.ComponentDataRegister",
-                "fuchsia.feedback.CrashReportingProductRegister",
-            ],
-            from: "parent",
-            to: "#realm_builder",
-        },
         {
             directory: "config-data",
             from: "parent",
@@ -125,6 +108,25 @@
             availability: "required",
         },
         {
+            // Used by ContextProvider.
+            protocol: [
+                "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.feedback.CrashReportingProductRegister",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
+            protocol: [
+                // TODO(crbug.com/1280703): Remove "fuchsia.sys.*" after
+                // successful transition to CFv2.
+                "fuchsia.sys.Environment",
+                "fuchsia.sys.Loader",
+            ],
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
             protocol: [
                 "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysmem.Allocator",
@@ -132,14 +134,8 @@
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",
-            to: "#ui",
-        },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
             to: [
-                "#build_info",
-                "#property_provider",
+                "#realm_builder",
                 "#ui",
             ],
         },
