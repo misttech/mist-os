@@ -736,7 +736,7 @@ mod tests {
         fidl_test_inspect_validate::Value,
         fuchsia_inspect::reader::snapshot::BackingBuffer,
         inspect_format::{
-            constants, Block, BlockHeader, BlockIndex, BlockType, Payload as BlockPayload,
+            constants, Block, BlockIndex, BlockType, HeaderFields, PayloadFields, ReadBytes,
         },
     };
 
@@ -805,12 +805,12 @@ mod tests {
         buffer[location] = previous;
     }
 
-    fn put_header(header: &BlockHeader, buffer: &mut [u8], index: usize) {
-        copy_into(&header.value().to_le_bytes(), buffer, index * 16);
+    fn put_header<T: ReadBytes>(header: &Block<&mut T>, buffer: &mut [u8], index: usize) {
+        copy_into(&HeaderFields::value(&header).to_le_bytes(), buffer, index * 16);
     }
 
-    fn put_payload(payload: &BlockPayload, buffer: &mut [u8], index: usize) {
-        copy_into(&payload.value().to_le_bytes(), buffer, index * 16 + 8);
+    fn put_payload<T: ReadBytes>(payload: &Block<&mut T>, buffer: &mut [u8], index: usize) {
+        copy_into(&PayloadFields::value(&payload).to_le_bytes(), buffer, index * 16 + 8);
     }
 
     #[fuchsia::test]
@@ -821,31 +821,33 @@ mod tests {
         const NUMBER_EXTENT: BlockIndex = BlockIndex::new(5);
 
         // VMO Header block (index 0)
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Header.to_u8().unwrap());
-        header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
-        header.set_header_version(constants::HEADER_VERSION_NUMBER);
+        let mut container = [0u8; 16];
+        let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+        HeaderFields::set_order(&mut header, 0);
+        HeaderFields::set_block_type(&mut header, BlockType::Header.to_u8().unwrap());
+        HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
+        HeaderFields::set_header_version(&mut header, constants::HEADER_VERSION_NUMBER);
         put_header(&header, &mut buffer, (*BlockIndex::HEADER).try_into().unwrap());
 
         // create a Node named number
-        header.set_order(0);
-        header.set_block_type(BlockType::NodeValue.to_u8().unwrap());
-        header.set_value_name_index(*NUMBER_NAME);
-        header.set_value_parent_index(*BlockIndex::HEADER);
+        HeaderFields::set_order(&mut header, 0);
+        HeaderFields::set_block_type(&mut header, BlockType::NodeValue.to_u8().unwrap());
+        HeaderFields::set_value_name_index(&mut header, *NUMBER_NAME);
+        HeaderFields::set_value_parent_index(&mut header, *BlockIndex::HEADER);
         put_header(&header, &mut buffer, (*NODE).try_into().unwrap());
 
         // create a STRING_REFERENCE with value "number" that is the above Node's name.
-        header.set_order(0);
-        header.set_block_type(BlockType::StringReference.to_u8().unwrap());
-        header.set_extent_next_index(*NUMBER_EXTENT);
+        HeaderFields::set_order(&mut header, 0);
+        HeaderFields::set_block_type(&mut header, BlockType::StringReference.to_u8().unwrap());
+        HeaderFields::set_extent_next_index(&mut header, *NUMBER_EXTENT);
         put_header(&header, &mut buffer, (*NUMBER_NAME).try_into().unwrap());
         copy_into(&[6, 0, 0, 0], &mut buffer, (*NUMBER_NAME * 16 + 8).try_into().unwrap());
         copy_into(b"numb", &mut buffer, (*NUMBER_NAME * 16 + 12).try_into().unwrap());
-        let mut number_extent = BlockHeader(0);
-        number_extent.set_order(0);
-        number_extent.set_block_type(BlockType::Extent.to_u8().unwrap());
-        number_extent.set_extent_next_index(0);
+        let mut container = [0u8; 16];
+        let mut number_extent = Block::new(&mut container, BlockIndex::EMPTY);
+        HeaderFields::set_order(&mut number_extent, 0);
+        HeaderFields::set_block_type(&mut number_extent, BlockType::Extent.to_u8().unwrap());
+        HeaderFields::set_extent_next_index(&mut number_extent, 0);
         put_header(&number_extent, &mut buffer, (*NUMBER_EXTENT).try_into().unwrap());
         copy_into(b"er", &mut buffer, (*NUMBER_EXTENT * 16 + 8).try_into().unwrap());
 
@@ -857,26 +859,36 @@ mod tests {
         let mut buffer = [0u8; 4096];
         // VMO Header block (index 0)
         const HEADER: usize = 0;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Header.to_u8().unwrap());
-        header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
-        header.set_header_version(constants::HEADER_VERSION_NUMBER);
-        put_header(&header, &mut buffer, HEADER);
+        {
+            let mut container = [0u8; 16];
+            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::Header.to_u8().unwrap());
+            HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
+            HeaderFields::set_header_version(&mut header, constants::HEADER_VERSION_NUMBER);
+            put_header(&header, &mut buffer, HEADER);
+        }
         const ROOT: usize = 1;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::NodeValue.to_u8().unwrap());
-        header.set_value_name_index(2);
-        header.set_value_parent_index(0);
-        put_header(&header, &mut buffer, ROOT);
+        {
+            let mut container = [0u8; 16];
+            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::NodeValue.to_u8().unwrap());
+            HeaderFields::set_value_name_index(&mut header, 2);
+            HeaderFields::set_value_parent_index(&mut header, 0);
+            put_header(&header, &mut buffer, ROOT);
+        }
+
         // Root's Name block
         const ROOT_NAME: usize = 2;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Name.to_u8().unwrap());
-        header.set_name_length(4);
-        put_header(&header, &mut buffer, ROOT_NAME);
+        {
+            let mut container = [0u8; 16];
+            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::Name.to_u8().unwrap());
+            HeaderFields::set_name_length(&mut header, 4);
+            put_header(&header, &mut buffer, ROOT_NAME);
+        }
         copy_into(b"node", &mut buffer, ROOT_NAME * 16 + 8);
         try_byte(&mut buffer, (16, 0), 0, Some("root ->\n> node ->"));
         // Mess up HEADER_MAGIC_NUMBER - it should fail to load.
@@ -892,19 +904,23 @@ mod tests {
 
         // Let's give it a property.
         const NUMBER: usize = 4;
-        let mut number_header = BlockHeader(0);
-        number_header.set_order(0);
-        number_header.set_block_type(BlockType::IntValue.to_u8().unwrap());
-        number_header.set_value_name_index(3);
-        number_header.set_value_parent_index(1);
+        let mut container = [0u8; 16];
+        let mut number_header = Block::new(&mut container, BlockIndex::EMPTY);
+        HeaderFields::set_order(&mut number_header, 0);
+        HeaderFields::set_block_type(&mut number_header, BlockType::IntValue.to_u8().unwrap());
+        HeaderFields::set_value_name_index(&mut number_header, 3);
+        HeaderFields::set_value_parent_index(&mut number_header, 1);
         put_header(&number_header, &mut buffer, NUMBER);
         const NUMBER_NAME: usize = 3;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Name.to_u8().unwrap());
-        header.set_name_length(6);
-        put_header(&header, &mut buffer, NUMBER_NAME);
-        copy_into(b"number", &mut buffer, NUMBER_NAME * 16 + 8);
+        {
+            let mut container = [0u8; 16];
+            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::Name.to_u8().unwrap());
+            HeaderFields::set_name_length(&mut header, 6);
+            put_header(&header, &mut buffer, NUMBER_NAME);
+            copy_into(b"number", &mut buffer, NUMBER_NAME * 16 + 8);
+        }
 
         try_byte(&mut buffer, (HEADER, 8), 2, Some("root ->\n> node ->\n> > number: Int(0)"));
         try_byte(&mut buffer, (NUMBER, 1), 5, Some("root ->\n> node ->\n> > number: Uint(0)"));
@@ -914,8 +930,8 @@ mod tests {
         try_byte(&mut buffer, (NUMBER, 1), 0xb0, None);
         // 15 is an illegal block type.
         try_byte(&mut buffer, (NUMBER, 1), 0xf, None);
-        number_header.set_order(2);
-        number_header.set_block_type(BlockType::ArrayValue.to_u8().unwrap());
+        HeaderFields::set_order(&mut number_header, 2);
+        HeaderFields::set_block_type(&mut number_header, BlockType::ArrayValue.to_u8().unwrap());
         put_header(&number_header, &mut buffer, NUMBER);
         // Array block again has illegal Array Entry Type of 0.
         try_byte(&mut buffer, (128, 0), 0, None);
@@ -1173,34 +1189,44 @@ mod tests {
         let mut buffer = [0u8; 4096];
         // VMO Header block (index 0)
         const HEADER: usize = 0;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Header.to_u8().unwrap());
-        header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
-        header.set_header_version(constants::HEADER_VERSION_NUMBER);
-        put_header(&header, &mut buffer, HEADER);
+        {
+            let mut container = [0u8; 16];
+            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::Header.to_u8().unwrap());
+            HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
+            HeaderFields::set_header_version(&mut header, constants::HEADER_VERSION_NUMBER);
+            put_header(&header, &mut buffer, HEADER);
+        }
         const VALUE: usize = 1;
-        let mut value_header = BlockHeader(0);
-        value_header.set_order(0);
-        value_header.set_block_type(BlockType::NodeValue.to_u8().unwrap());
-        value_header.set_value_name_index(2);
-        value_header.set_value_parent_index(0);
+        let mut container = [0u8; 16];
+        let mut value_header = Block::new(&mut container, BlockIndex::EMPTY);
+        HeaderFields::set_order(&mut value_header, 0);
+        HeaderFields::set_block_type(&mut value_header, BlockType::NodeValue.to_u8().unwrap());
+        HeaderFields::set_value_name_index(&mut value_header, 2);
+        HeaderFields::set_value_parent_index(&mut value_header, 0);
         put_header(&value_header, &mut buffer, VALUE);
         // Root's Name block
         const VALUE_NAME: usize = 2;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Name.to_u8().unwrap());
-        header.set_name_length(5);
-        put_header(&header, &mut buffer, VALUE_NAME);
+        {
+            let mut buf = [0; 16];
+            let mut header = Block::new(&mut buf, 0.into());
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::Name.to_u8().unwrap());
+            HeaderFields::set_name_length(&mut header, 5);
+            put_header(&header, &mut buffer, VALUE_NAME);
+        }
         copy_into(b"value", &mut buffer, VALUE_NAME * 16 + 8);
         // Extent block (not linked into tree)
         const EXTENT: usize = 3;
-        let mut header = BlockHeader(0);
-        header.set_order(0);
-        header.set_block_type(BlockType::Extent.to_u8().unwrap());
-        header.set_extent_next_index(0);
-        put_header(&header, &mut buffer, EXTENT);
+        {
+            let mut container = [0u8; 16];
+            let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+            HeaderFields::set_order(&mut header, 0);
+            HeaderFields::set_block_type(&mut header, BlockType::Extent.to_u8().unwrap());
+            HeaderFields::set_extent_next_index(&mut header, 0);
+            put_header(&header, &mut buffer, EXTENT);
+        }
         // Let's make sure it scans.
         try_byte(&mut buffer, (16, 0), 0, Some("root ->\n> value ->"));
         // Put garbage in a random FREE block body - should fail.
@@ -1212,16 +1238,25 @@ mod tests {
         try_byte(&mut buffer, (VALUE_NAME, 7), 42, None);
         // Put garbage in EXTENT header - should fail.
         try_byte(&mut buffer, (EXTENT, 6), 42, None);
-        value_header.set_block_type(BlockType::ArrayValue.to_u8().unwrap());
+        HeaderFields::set_block_type(&mut value_header, BlockType::ArrayValue.to_u8().unwrap());
         put_header(&value_header, &mut buffer, VALUE);
-        let mut array_subheader = BlockPayload(0);
-        array_subheader.set_array_entry_type(BlockType::IntValue.to_u8().unwrap());
-        array_subheader.set_array_flags(ArrayFormat::Default.to_u8().unwrap());
-        put_payload(&array_subheader, &mut buffer, VALUE);
+        {
+            let mut container = [0u8; 16];
+            let mut array_subheader = Block::new(&mut container, BlockIndex::EMPTY);
+            PayloadFields::set_array_entry_type(
+                &mut array_subheader,
+                BlockType::IntValue.to_u8().unwrap(),
+            );
+            PayloadFields::set_array_flags(
+                &mut array_subheader,
+                ArrayFormat::Default.to_u8().unwrap(),
+            );
+            put_payload(&array_subheader, &mut buffer, VALUE);
+        }
         try_byte(&mut buffer, (16, 0), 0, Some("root ->\n> value: IntArray([], Default)"));
         // Put garbage in reserved part of Array spec, should fail.
         try_byte(&mut buffer, (VALUE, 12), 42, None);
-        value_header.set_block_type(BlockType::IntValue.to_u8().unwrap());
+        HeaderFields::set_block_type(&mut value_header, BlockType::IntValue.to_u8().unwrap());
         put_header(&value_header, &mut buffer, VALUE);
         // Now the array spec is just a (large) value; it should succeed.
         try_byte(&mut buffer, (VALUE, 12), 42, Some("root ->\n> value: Int(180388626436)"));

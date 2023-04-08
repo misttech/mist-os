@@ -307,6 +307,14 @@ impl State {
         let state_lock = self.try_lock().unwrap();
         callback(&state_lock.get_block(index))
     }
+
+    pub(crate) fn get_block_mut<F>(&self, index: BlockIndex, callback: F)
+    where
+        F: FnOnce(&mut Block<&mut Container>) -> (),
+    {
+        let mut state_lock = self.try_lock().unwrap();
+        callback(&mut state_lock.get_block_mut(index))
+    }
 }
 
 /// Statistics about the current inspect state.

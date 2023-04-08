@@ -14,10 +14,10 @@ rustc_library("lib") {
 
   deps = [
     "//src/lib/diagnostics/hierarchy/rust",
-    "//third_party/rust_crates:bitfield",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
+    "//third_party/rust_crates:paste",
     "//third_party/rust_crates:thiserror",
   ]
 

@@ -575,13 +575,13 @@ mod tests {
     use {
         super::*,
         crate::{
-            assert_data_tree, assert_json_diff, types::private::InspectTypeInternal, ArrayProperty,
-            ExponentialHistogramParams, HistogramProperty, Inspector, LinearHistogramParams,
-            StringReference,
+            assert_data_tree, assert_json_diff, types::private::InspectTypeInternal,
+            writer::testing_utils::GetBlockExt, ArrayProperty, ExponentialHistogramParams,
+            HistogramProperty, Inspector, LinearHistogramParams, StringReference,
         },
         anyhow::Error,
         futures::prelude::*,
-        inspect_format::{constants, Payload, ReadBytes},
+        inspect_format::{constants, PayloadFields, ReadBytes},
     };
 
     #[fuchsia::test]
@@ -900,16 +900,15 @@ mod tests {
 
         let vmo = inspector.vmo().await.unwrap();
         let vmo_size = vmo.len();
+
+        // Mess up with the block slots by setting them to a too big number.
+        array.get_block_mut(|array_block| {
+            PayloadFields::set_array_slots_count(array_block, 255);
+        });
+
         let mut buf = vec![0u8; vmo_size as usize];
         ReadBytes::read(&vmo, &mut buf[..]);
 
-        // Mess up with the block slots by setting them to a too big number.
-        let offset = array.block_index().unwrap().offset() + 8;
-        let mut payload =
-            Payload(u64::from_le_bytes(*<&[u8; 8]>::try_from(&buf[offset..offset + 8])?));
-        payload.set_array_slots_count(255);
-
-        buf[offset..offset + 8].clone_from_slice(&payload.value().to_le_bytes());
         assert!(PartialNodeHierarchy::try_from(Snapshot::build(&buf)).is_err());
 
         Ok(())

@@ -272,7 +272,7 @@ fn buddy(index: BlockIndex, order: u8) -> BlockIndex {
 mod tests {
     use super::*;
     use crate::reader::snapshot::{BackingBuffer, BlockIterator};
-    use inspect_format::{BlockHeader, BlockIndex, Container, Payload, WritableBlockContainer};
+    use inspect_format::{block_testing, BlockIndex, Container, WritableBlockContainer};
 
     #[derive(Debug)]
     struct BlockDebug {
@@ -648,8 +648,11 @@ mod tests {
         assert_eq!(*heap.allocate_block(utils::order_to_size(1)).unwrap(), 4);
 
         // Write garbage to the second half of the order 1 block in index 2.
-        Block::new(&mut heap.container, 3.into())
-            .write(BlockHeader(0xffffffff), Payload(0xffffffff));
+        {
+            let mut block = Block::new(&mut heap.container, 3.into());
+            block_testing::override_header(&mut block, 0xffffffff);
+            block_testing::override_payload(&mut block, 0xffffffff);
+        }
 
         // Free order 1 block in index 2.
         assert!(heap.free_block(b1).is_ok());

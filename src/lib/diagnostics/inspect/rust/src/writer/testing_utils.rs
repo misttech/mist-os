@@ -22,6 +22,15 @@ pub trait GetBlockExt: crate::private::InspectTypeInternal {
         let state = self.state().expect("state is set");
         state.get_block(block_index, callback)
     }
+
+    fn get_block_mut<F>(&self, callback: F)
+    where
+        F: FnOnce(&mut Block<&mut Container>) -> (),
+    {
+        let block_index = self.block_index().expect("block index is set");
+        let state = self.state().expect("state is set");
+        state.get_block_mut(block_index, callback)
+    }
 }
 
 impl<T> GetBlockExt for T where T: crate::private::InspectTypeInternal {}

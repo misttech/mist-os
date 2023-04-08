@@ -198,7 +198,10 @@ mod tests {
         super::*,
         crate::{data, puppet, results::Results},
         anyhow::{bail, format_err},
-        inspect_format::{constants, ArrayFormat, BlockHeader, BlockType, Payload, PropertyFormat},
+        inspect_format::{
+            constants, ArrayFormat, Block, BlockIndex, BlockType, HeaderFields, PayloadFields,
+            PropertyFormat,
+        },
     };
 
     #[fuchsia::test]
@@ -258,18 +261,18 @@ mod tests {
     }
 
     macro_rules! put_header {
-        ($header:ident, $index:expr, $buffer:expr) => {
-            copy_into(&$header.value().to_le_bytes(), $buffer, $index, 0);
+        ($block:ident, $index:expr, $buffer:expr) => {
+            copy_into(&HeaderFields::value(&$block).to_le_bytes(), $buffer, $index, 0);
         };
     }
     macro_rules! put_payload {
-        ($header:ident, $index:expr, $buffer:expr) => {
-            copy_into(&$header.value().to_le_bytes(), $buffer, $index, 8);
+        ($block:ident, $index:expr, $buffer:expr) => {
+            copy_into(&PayloadFields::value(&$block).to_le_bytes(), $buffer, $index, 8);
         };
     }
     macro_rules! set_type {
-        ($header:ident, $block_type:ident) => {
-            $header.set_block_type(BlockType::$block_type as u8)
+        ($block:ident, $block_type:ident) => {
+            HeaderFields::set_block_type(&mut $block, BlockType::$block_type as u8)
         };
     }
 
@@ -281,15 +284,17 @@ mod tests {
     fn init_vmo_contents(mut buffer: &mut [u8]) {
         const HEADER_INDEX: usize = 0;
 
-        let mut header = BlockHeader(0);
-        header.set_order(constants::HEADER_ORDER as u8);
+        let mut container = [0u8; 16];
+        let mut header = Block::new(&mut container, BlockIndex::EMPTY);
+        HeaderFields::set_order(&mut header, constants::HEADER_ORDER as u8);
         set_type!(header, Header);
-        header.set_header_magic(constants::HEADER_MAGIC_NUMBER);
-        header.set_header_version(constants::HEADER_VERSION_NUMBER);
+        HeaderFields::set_header_magic(&mut header, constants::HEADER_MAGIC_NUMBER);
+        HeaderFields::set_header_version(&mut header, constants::HEADER_VERSION_NUMBER);
         put_header!(header, HEADER_INDEX, &mut buffer);
-        let mut name_header = BlockHeader(0);
+        let mut container = [0u8; 16];
+        let mut name_header = Block::new(&mut container, BlockIndex::EMPTY);
         set_type!(name_header, Name);
-        name_header.set_name_length(4);
+        HeaderFields::set_name_length(&mut name_header, 4);
         put_header!(name_header, NAME_INDEX as usize, &mut buffer);
     }
 
@@ -307,9 +312,10 @@ mod tests {
     fn reserved_metrics() -> Result<(), Error> {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
-        let mut reserved_header = BlockHeader(0);
+        let mut container = [0u8; 16];
+        let mut reserved_header = Block::new(&mut container, BlockIndex::EMPTY);
         set_type!(reserved_header, Reserved);
-        reserved_header.set_order(1);
+        HeaderFields::set_order(&mut reserved_header, 1);
         put_header!(reserved_header, 2, &mut buffer);
         test_metrics(&buffer, 14, 256, "RESERVED", 1, 16, 0, 32, 0)?;
         Ok(())
@@ -319,13 +325,14 @@ mod tests {
     fn node_metrics() -> Result<(), Error> {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
-        let mut node_header = BlockHeader(0);
+        let mut container = [0u8; 16];
+        let mut node_header = Block::new(&mut container, BlockIndex::EMPTY);
         set_type!(node_header, NodeValue);
-        node_header.set_value_parent_index(1);
+        HeaderFields::set_value_parent_index(&mut node_header, 1);
         put_header!(node_header, 2, &mut buffer);
         test_metrics(&buffer, 15, 256, "NODE_VALUE(UNUSED)", 1, 16, 0, 16, 0)?;
-        node_header.set_value_name_index(NAME_INDEX);
-        node_header.set_value_parent_index(0);
+        HeaderFields::set_value_name_index(&mut node_header, NAME_INDEX);
+        HeaderFields::set_value_parent_index(&mut node_header, 0);
         put_header!(node_header, 2, &mut buffer);
         test_metrics(&buffer, 15, 256, "NODE_VALUE", 1, 16, 0, 16, 0)?;
         test_metrics(&buffer, 15, 256, "NAME", 1, 8, 4, 16, 25)?;
@@ -342,11 +349,12 @@ mod tests {
         init_vmo_contents(&mut buffer);
         macro_rules! test_number {
             ($number_type:ident, $parent:expr, $block_string:expr, $data_size:expr, $data_percent:expr) => {
-                let mut value_header = BlockHeader(0);
-                set_type!(value_header, $number_type);
-                value_header.set_value_name_index(NAME_INDEX);
-                value_header.set_value_parent_index($parent);
-                put_header!(value_header, 2, &mut buffer);
+                let mut container = [0u8; 16];
+                let mut value = Block::new(&mut container, BlockIndex::EMPTY);
+                set_type!(value, $number_type);
+                HeaderFields::set_value_name_index(&mut value, NAME_INDEX);
+                HeaderFields::set_value_parent_index(&mut value, $parent);
+                put_header!(value, 2, &mut buffer);
                 test_metrics(&buffer, 15, 256, $block_string, 1, 8, $data_size, 16, $data_percent)?;
             };
         }
@@ -363,30 +371,31 @@ mod tests {
     fn property_metrics() -> Result<(), Error> {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
-        let mut value_header = BlockHeader(0);
-        set_type!(value_header, BufferValue);
-        value_header.set_value_name_index(NAME_INDEX);
-        value_header.set_value_parent_index(0);
-        put_header!(value_header, 2, &mut buffer);
-        let mut property_payload = Payload(0);
-        property_payload.set_total_length(12);
-        property_payload.set_property_extent_index(4);
-        property_payload.set_property_flags(PropertyFormat::String as u8);
-        put_payload!(property_payload, 2, &mut buffer);
-        let mut extent_header = BlockHeader(0);
-        set_type!(extent_header, Extent);
-        extent_header.set_extent_next_index(5);
-        put_header!(extent_header, 4, &mut buffer);
-        extent_header.set_extent_next_index(0);
-        put_header!(extent_header, 5, &mut buffer);
+        let mut container = [0u8; 16];
+        let mut value = Block::new(&mut container, BlockIndex::EMPTY);
+        set_type!(value, BufferValue);
+        HeaderFields::set_value_name_index(&mut value, NAME_INDEX);
+        HeaderFields::set_value_parent_index(&mut value, 0);
+        put_header!(value, 2, &mut buffer);
+        PayloadFields::set_property_total_length(&mut value, 12);
+        PayloadFields::set_property_extent_index(&mut value, 4);
+        PayloadFields::set_property_flags(&mut value, PropertyFormat::String as u8);
+        put_payload!(value, 2, &mut buffer);
+        let mut container = [0u8; 16];
+        let mut extent = Block::new(&mut container, BlockIndex::EMPTY);
+        set_type!(extent, Extent);
+        HeaderFields::set_extent_next_index(&mut extent, 5);
+        put_header!(extent, 4, &mut buffer);
+        HeaderFields::set_extent_next_index(&mut extent, 0);
+        put_header!(extent, 5, &mut buffer);
         test_metrics(&buffer, 15, 256, "EXTENT", 2, 16, 12, 32, 37)?;
         test_metrics(&buffer, 15, 256, "STRING", 1, 16, 0, 16, 0)?;
-        property_payload.set_property_flags(PropertyFormat::Bytes as u8);
-        put_payload!(property_payload, 2, &mut buffer);
+        PayloadFields::set_property_flags(&mut value, PropertyFormat::Bytes as u8);
+        put_payload!(value, 2, &mut buffer);
         test_metrics(&buffer, 15, 256, "EXTENT", 2, 16, 12, 32, 37)?;
         test_metrics(&buffer, 15, 256, "BYTES", 1, 16, 0, 16, 0)?;
-        value_header.set_value_parent_index(7);
-        put_header!(value_header, 2, &mut buffer);
+        HeaderFields::set_value_parent_index(&mut value, 7);
+        put_header!(value, 2, &mut buffer);
         test_metrics(&buffer, 15, 256, "EXTENT(UNUSED)", 2, 16, 0, 32, 0)?;
         test_metrics(&buffer, 15, 256, "BYTES(UNUSED)", 1, 16, 0, 16, 0)?;
         Ok(())
@@ -396,38 +405,38 @@ mod tests {
     fn array_metrics() -> Result<(), Error> {
         let mut buffer = [0u8; 256];
         init_vmo_contents(&mut buffer);
-        let mut value_header = BlockHeader(0);
-        set_type!(value_header, ArrayValue);
-        value_header.set_order(3);
-        value_header.set_value_name_index(NAME_INDEX);
-        value_header.set_value_parent_index(0);
-        put_header!(value_header, 4, &mut buffer);
-        let mut property_payload = Payload(0);
-        property_payload.set_array_entry_type(BlockType::IntValue as u8);
-        property_payload.set_array_flags(ArrayFormat::Default as u8);
-        property_payload.set_array_slots_count(4);
-        put_payload!(property_payload, 4, &mut buffer);
+        let mut container = [0u8; 16];
+        let mut value = Block::new(&mut container, BlockIndex::EMPTY);
+        set_type!(value, ArrayValue);
+        HeaderFields::set_order(&mut value, 3);
+        HeaderFields::set_value_name_index(&mut value, NAME_INDEX);
+        HeaderFields::set_value_parent_index(&mut value, 0);
+        put_header!(value, 4, &mut buffer);
+        PayloadFields::set_array_entry_type(&mut value, BlockType::IntValue as u8);
+        PayloadFields::set_array_flags(&mut value, ArrayFormat::Default as u8);
+        PayloadFields::set_array_slots_count(&mut value, 4);
+        put_payload!(value, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, "ARRAY(Default, INT_VALUE)", 1, 16, 32, 128, 25)?;
-        property_payload.set_array_flags(ArrayFormat::LinearHistogram as u8);
-        property_payload.set_array_slots_count(8);
-        put_payload!(property_payload, 4, &mut buffer);
+        PayloadFields::set_array_flags(&mut value, ArrayFormat::LinearHistogram as u8);
+        PayloadFields::set_array_slots_count(&mut value, 8);
+        put_payload!(value, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, "ARRAY(LinearHistogram, INT_VALUE)", 1, 16, 64, 128, 50)?;
-        property_payload.set_array_flags(ArrayFormat::ExponentialHistogram as u8);
+        PayloadFields::set_array_flags(&mut value, ArrayFormat::ExponentialHistogram as u8);
         // avoid line-wrapping the parameter list of test_metrics()
         let name = "ARRAY(ExponentialHistogram, INT_VALUE)";
-        put_payload!(property_payload, 4, &mut buffer);
+        put_payload!(value, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 64, 128, 50)?;
-        property_payload.set_array_entry_type(BlockType::UintValue as u8);
+        PayloadFields::set_array_entry_type(&mut value, BlockType::UintValue as u8);
         let name = "ARRAY(ExponentialHistogram, UINT_VALUE)";
-        put_payload!(property_payload, 4, &mut buffer);
+        put_payload!(value, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 64, 128, 50)?;
-        property_payload.set_array_entry_type(BlockType::DoubleValue as u8);
+        PayloadFields::set_array_entry_type(&mut value, BlockType::DoubleValue as u8);
         let name = "ARRAY(ExponentialHistogram, DOUBLE_VALUE)";
-        put_payload!(property_payload, 4, &mut buffer);
+        put_payload!(value, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 64, 128, 50)?;
-        value_header.set_value_parent_index(1);
+        HeaderFields::set_value_parent_index(&mut value, 1);
         let name = "ARRAY(ExponentialHistogram, DOUBLE_VALUE)(UNUSED)";
-        put_header!(value_header, 4, &mut buffer);
+        put_header!(value, 4, &mut buffer);
         test_metrics(&buffer, 8, 256, name, 1, 16, 0, 128, 0)?;
         Ok(())
     }

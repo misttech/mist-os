@@ -8,18 +8,86 @@
 //!
 //! [inspect-vmo]: https://fuchsia.dev/fuchsia-src/reference/diagnostics/inspect/vmo-format
 
-use bitfield::bitfield;
+use crate::{
+    block::Block,
+    container::{ReadBytes, WriteBytes},
+};
+use paste;
+use std::ops::{Deref, DerefMut};
 
-bitfield! {
+macro_rules! bitfield_fields {
+    ($offset_fn:ident,) => {};
+
+    ($offset_fn:ident,
+     $(#[$attr:meta])* $type:ty,
+     $name:ident: $msb:expr, $lsb:expr;
+     $($rest:tt)*
+    ) => {
+        paste::item! {
+            $(#[$attr])*
+            #[inline]
+            pub fn $name<T: Deref<Target=Q>, Q: ReadBytes>(b: &Block<T>) -> $type {
+                if let Some(value) = b.container.get_u64(b.$offset_fn()) {
+                    static MASK : u64 = (1 << ($msb - $lsb + 1)) - 1;
+                    // This cast is fine. We only deal with u8, u16, u32, u64 here.
+                    return ((value >> ($lsb % 64)) & MASK ) as $type;
+                }
+                0
+            }
+
+            $(#[$attr])*
+            #[inline]
+            pub fn [<set_ $name>]<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes>(
+                   b: &mut Block<T>, value: $type) {
+                let offset = b.$offset_fn();
+                b.container.with_u64_mut(offset, |num_ref: &mut u64| {
+                    static MASK : u64 = (1u64 << ($msb - $lsb + 1)) - 1;
+                    *num_ref = (*num_ref & !MASK.checked_shl($lsb).unwrap_or(0)) |
+                               (value as u64).checked_shl($lsb).unwrap_or(0);
+                })
+            }
+        }
+        bitfield_fields!{$offset_fn, $($rest)*}
+    };
+}
+
+macro_rules! block_bitfield {
+    ($(#[$attr:meta])* struct $name:ident, $offset_fn:ident; $($rest:tt)*) => {
+        $(#[$attr])*
+        pub struct $name;
+
+        impl $name {
+            bitfield_fields!{$offset_fn, $($rest)*}
+
+            /// Get the raw 64 bits of the header section of the block.
+            pub fn value<T: Deref<Target=Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
+                b.container.get_u64(b.$offset_fn()).unwrap_or(0)
+            }
+
+            /// Set the raw 64 bits of the header section of the block.
+            #[inline]
+            pub fn set_value<T: Deref<Target=Q> + DerefMut<Target=Q>, Q: WriteBytes + ReadBytes>(
+                b: &mut Block<T>, value: u64
+            ) {
+                let offset = b.$offset_fn();
+                b.container.with_u64_mut(offset, |num_ref: &mut u64| {
+                    *num_ref = value;
+                });
+            }
+        }
+    };
+}
+
+block_bitfield! {
     /// Bitfields for writing and reading segments of the header and payload of
     /// inspect VMO blocks.
     /// Represents the header structure of an inspect VMO Block. Not to confuse with
     /// the `HEADER` block.
-    pub struct BlockHeader(u64);
+    struct HeaderFields, header_offset;
 
     /// The size of a block given as a bit shift from the minimum size.
     /// `size_in_bytes = 16 << order`. Separates blocks into classes by their (power of two) size.
-    pub u8, order, set_order: 3, 0;
+    u8, order: 3, 0;
 
     /// The type of the block. Determines how the rest of the bytes are interpreted.
     /// - 0: Free
@@ -37,116 +105,173 @@ bitfield! {
     /// - 12: Link value
     /// - 13: Bool value
     /// - 14: String Reference
-    pub u8, block_type, set_block_type: 15, 8;
+    u8, block_type: 15, 8;
 
     /// Only for a `HEADER` block. The version number. Currently 1.
-    pub u32, header_version, set_header_version: 31, 16;
+    u32, header_version: 31, 16;
 
     /// Only for a `HEADER` block. The magic number "INSP".
-    pub u32, header_magic, set_header_magic: 63, 32;
+    u32, header_magic: 63, 32;
 
     /// Only for `*_VALUE` blocks. The index of the `NAME` block of associated with this value.
-    pub u32, value_name_index, set_value_name_index: 63, 40;
+    u32, value_name_index: 63, 40;
 
     /// Only for `*_VALUE` blocks. The index of the parent of this value.
-    pub u32, value_parent_index, set_value_parent_index: 39, 16;
+    u32, value_parent_index: 39, 16;
+
+    // Only for RESERVED blocks
+    u64, reserved_empty: 63, 16;
+
+    // Only for TOMBSTONE blocks
+    u64, tombstone_empty: 63, 16;
 
     /// Only for `FREE` blocks. The index of the next free block.
-    pub u32, free_next_index, set_free_next_index: 39, 16;
+    u8, free_reserved: 7, 4;
+    u32, free_next_index: 39, 16;
+    u32, free_empty: 63, 40;
 
     /// Only for `NAME` blocks. The length of the string.
-    pub u16, name_length, set_name_length: 27, 16;
+    u16, name_length: 27, 16;
 
     /// Only for `EXTENT` or `STRING_REFERENCE` blocks.
     /// The index of the next `EXTENT` block.
-    pub u32, extent_next_index, set_extent_next_index: 39, 16;
+    u32, extent_next_index: 39, 16;
 
     /// Only for `STRING_REFERENCE` blocks.
     /// The number of active references to the string, including itself.
-    pub u32, string_reference_count, set_string_reference_count: 63, 40;
-
-    /// The raw 64 bits of the header section of the block.
-    pub value, _: 63, 0;
+    u32, string_reference_count: 63, 40;
 }
 
-bitfield! {
+block_bitfield! {
     /// Represents the payload of inspect VMO Blocks (except for `EXTENT` and `NAME`).
-    pub struct Payload(u64);
-
-    /// The raw 64 bits of the payload section of the block.
-    pub value, _: 63, 0;
+    struct PayloadFields, payload_offset;
 
     /// Only for `BUFFER` or `STRING_REFERENCE` blocks. The total size of the buffer.
-    pub u32, total_length, set_total_length: 31, 0;
+    u32, property_total_length:  31, 0;
 
     /// Only for `BUFFER` blocks. The index of the first `EXTENT` block of this buffer.
-    pub u32, property_extent_index, set_property_extent_index: 59, 32;
+    u32, property_extent_index: 59, 32;
 
     /// Only for `BUFFER` blocks. The buffer flags of this block indicating its display format.
     /// 0: utf-8 string
     /// 1: binary array
-    pub u8, property_flags, set_property_flags: 63, 60;
-
-    /// Only for `INT/UINT/DOUBLE_VALUE` blocks. The numeric value of the block, this number has to
-    /// be casted to its type for `INT` and `DOUBLE` blocks.
-    pub numeric_value, set_numeric_value: 63, 0;
-
-    /// Only for the `HEADER` block. The generation count of the header, used for implementing
-    /// locking.
-    pub header_generation_count, set_header_generation_count: 63, 0;
+    u8, property_flags: 63, 60;
 
     /// Only for `ARRAY_VALUE` blocks. The type of each entry in the array (int, uint, double).
     /// 0: Int
     /// 1: Uint
     /// 2: Double
-    pub u8, array_entry_type, set_array_entry_type: 3, 0;
+    u8, array_entry_type: 3, 0;
 
     /// Only for `ARRAY_VALUE` blocks. The display format of the block (default, linear histogram,
     /// exponential histogram)
     /// 0: Regular array
     /// 1: Linear histogram
     /// 2: Exponential histogram
-    pub u8, array_flags, set_array_flags: 7, 4;
+    u8, array_flags: 7, 4;
 
     /// Only for `ARRAY_VALUE` blocks. The nmber of entries in the array.
-    pub u8, array_slots_count, set_array_slots_count: 15, 8;
+    u8, array_slots_count: 15, 8;
 
     /// Only for `LINK_VALUE` blocks. Index of the content of this link (as a `NAME` node)
-    pub u32, content_index, set_content_index: 19, 0;
+    u32, content_index: 19, 0;
 
     /// Only for `LINK_VALUE`. Instructs readers whether to use child or inline disposition.
     /// 0: child
     /// 1: inline
-    pub u8, disposition_flags, set_disposition_flags: 63, 60;
+    u8, disposition_flags: 63, 60;
+}
+
+impl PayloadFields {
+    /// Only for `INT/UINT/DOUBLE_VALUE` blocks. The numeric value of the block, this number has to
+    /// be casted to its type for `INT` and `DOUBLE` blocks.
+    #[inline]
+    pub fn numeric_value<T: Deref<Target = Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
+        Self::value(b)
+    }
+
+    /// Only for `INT/UINT/DOUBLE_VALUE` blocks. The numeric value of the block, this number has to
+    /// be casted to its type for `INT` and `DOUBLE` blocks.
+    #[inline]
+    pub fn set_numeric_value<
+        T: Deref<Target = Q> + DerefMut<Target = Q>,
+        Q: WriteBytes + ReadBytes,
+    >(
+        b: &mut Block<T>,
+        value: u64,
+    ) {
+        Self::set_value(b, value);
+    }
+
+    /// Only for the `HEADER` block. The generation count of the header, used for implementing
+    /// locking.
+    #[inline]
+    pub fn header_generation_count<T: Deref<Target = Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
+        Self::value(b)
+    }
+
+    /// Only for the `HEADER` block. The generation count of the header, used for implementing
+    /// locking.
+    #[inline]
+    pub fn set_header_generation_count<
+        T: Deref<Target = Q> + DerefMut<Target = Q>,
+        Q: WriteBytes + ReadBytes,
+    >(
+        b: &mut Block<T>,
+        value: u64,
+    ) {
+        Self::set_value(b, value);
+    }
+
+    /// Only for NODE blocks
+    #[inline]
+    pub fn child_count<T: Deref<Target = Q>, Q: ReadBytes>(b: &Block<T>) -> u64 {
+        Self::value(b)
+    }
+
+    /// Only for NODE blocks
+    #[inline]
+    pub fn set_child_count<
+        T: Deref<Target = Q> + DerefMut<Target = Q>,
+        Q: WriteBytes + ReadBytes,
+    >(
+        b: &mut Block<T>,
+        value: u64,
+    ) {
+        Self::set_value(b, value);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::BlockIndex;
 
     #[fuchsia::test]
     fn test_header() {
-        let mut header = BlockHeader(0);
+        let mut container = [0u8; 16];
+        let mut block = Block::new(&mut container, BlockIndex::EMPTY);
         let magic = 0x494e5350;
-        header.set_order(13);
-        header.set_block_type(3);
-        header.set_header_version(1);
-        header.set_header_magic(magic);
-        assert_eq!(header.order(), 13);
-        assert_eq!(header.header_version(), 1);
-        assert_eq!(header.header_magic(), magic);
-        assert_eq!(header.value(), 0x494e53500001030d);
+        HeaderFields::set_order(&mut block, 13);
+        HeaderFields::set_block_type(&mut block, 3);
+        HeaderFields::set_header_version(&mut block, 1);
+        HeaderFields::set_header_magic(&mut block, magic);
+        assert_eq!(HeaderFields::order(&block), 13);
+        assert_eq!(HeaderFields::header_version(&block), 1);
+        assert_eq!(HeaderFields::header_magic(&block), magic);
+        assert_eq!(HeaderFields::value(&block), 0x494e53500001030d);
     }
 
     #[fuchsia::test]
     fn test_payload() {
-        let mut payload = Payload(0);
-        payload.set_total_length(0xab);
-        payload.set_property_extent_index(0x1234);
-        payload.set_property_flags(3);
-        assert_eq!(payload.total_length(), 0xab);
-        assert_eq!(payload.property_extent_index(), 0x1234);
-        assert_eq!(payload.property_flags(), 3);
-        assert_eq!(payload.value(), 0x30001234000000ab);
+        let mut container = [0u8; 16];
+        let mut block = Block::new(&mut container, BlockIndex::EMPTY);
+        PayloadFields::set_property_total_length(&mut block, 0xab);
+        PayloadFields::set_property_extent_index(&mut block, 0x1234);
+        PayloadFields::set_property_flags(&mut block, 3);
+        assert_eq!(PayloadFields::property_total_length(&block), 0xab);
+        assert_eq!(PayloadFields::property_extent_index(&block), 0x1234);
+        assert_eq!(PayloadFields::property_flags(&block), 3);
+        assert_eq!(PayloadFields::value(&block), 0x30001234000000ab);
     }
 }

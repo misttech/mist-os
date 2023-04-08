@@ -26,6 +26,40 @@ pub trait ReadBytes {
     fn read(&self, dst: &mut [u8]) {
         self.read_at(0, dst);
     }
+
+    #[inline]
+    fn get_u64(&self, offset: usize) -> Option<u64> {
+        if offset + 8 > self.len() {
+            return None;
+        }
+        let mut dst = [0u8; 8];
+        self.read_at(offset, &mut dst);
+        Some(u64::from_le_bytes(dst))
+    }
+}
+
+/// Trait implemented by container to which bytes can be written.
+// TODO(miguelfrde): in a follow-up allow WriteBytes to not depend on ReadBytes.
+pub trait WriteBytes: ReadBytes {
+    /// Writes the given `bytes` at the given `offset` in the container.
+    fn write_at(&mut self, offset: usize, bytes: &[u8]) -> usize;
+
+    /// Writes the given `bytes` at offset 0 in the container.
+    #[inline]
+    fn write(&mut self, src: &[u8]) -> usize {
+        self.write_at(0, src)
+    }
+
+    #[inline]
+    fn with_u64_mut<F>(&mut self, offset: usize, cb: F)
+    where
+        F: FnOnce(&mut u64) -> (),
+    {
+        if let Some(mut value) = self.get_u64(offset) {
+            cb(&mut value);
+            self.write_at(offset, &value.to_le_bytes());
+        }
+    }
 }
 
 /// Trait implemented by an Inspect container that can be written to.
@@ -39,14 +73,16 @@ pub trait WritableBlockContainer: ReadableBlockContainer + WriteBytes {
     >;
 }
 
-pub trait WriteBytes {
-    /// Writes the given `bytes` at the given `offset` in the container.
-    fn write_at(&mut self, offset: usize, bytes: &[u8]) -> usize;
-
-    /// Writes the given `bytes` at offset 0 in the container.
+impl ReadBytes for Vec<u8> {
     #[inline]
-    fn write(&mut self, src: &[u8]) -> usize {
-        self.write_at(0, src)
+    fn read_at(&self, offset: usize, dst: &mut [u8]) {
+        self.as_slice().read_at(offset, dst)
+    }
+
+    /// The number of bytes in the buffer.
+    #[inline]
+    fn len(&self) -> usize {
+        self.as_slice().len()
     }
 }
 
@@ -58,7 +94,7 @@ impl ReadBytes for [u8] {
         }
         let upper_bound = std::cmp::min(self.len(), dst.len() + offset);
         let bytes_read = upper_bound - offset;
-        dst[..bytes_read].clone_from_slice(&self[offset..upper_bound]);
+        dst[..bytes_read].copy_from_slice(&self[offset..upper_bound]);
     }
 
     /// The number of bytes in the buffer.
@@ -81,15 +117,16 @@ impl<const N: usize> ReadBytes for [u8; N] {
     }
 }
 
-impl ReadBytes for Vec<u8> {
+/// Trait implemented by an Inspect container that can be written to.
+impl<const N: usize> WriteBytes for [u8; N] {
     #[inline]
-    fn read_at(&self, offset: usize, dst: &mut [u8]) {
-        self.as_slice().read_at(offset, dst)
-    }
-
-    /// The number of bytes in the buffer.
-    #[inline]
-    fn len(&self) -> usize {
-        self.as_slice().len()
+    fn write_at(&mut self, offset: usize, bytes: &[u8]) -> usize {
+        if offset >= self.len() {
+            return 0;
+        }
+        let upper_bound = std::cmp::min(self.len(), bytes.len() + offset);
+        let bytes_written = upper_bound - offset;
+        self[offset..upper_bound].copy_from_slice(&bytes[..bytes_written]);
+        bytes_written
     }
 }
