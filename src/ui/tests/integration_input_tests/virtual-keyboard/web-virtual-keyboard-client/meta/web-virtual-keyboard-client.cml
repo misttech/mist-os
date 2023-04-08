@@ -27,6 +27,12 @@
                 "test.virtualkeyboard.InputPositionListener",
             ],
         },
+        {
+            protocol: [
+                // Provided to this Component by the test.
+                "fuchsia.web.ContextProvider",
+            ],
+        },
     ],
     expose: [
         {

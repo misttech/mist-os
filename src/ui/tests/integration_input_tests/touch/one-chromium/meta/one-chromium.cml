@@ -23,6 +23,9 @@
             protocol: [
                 // Used by the test.
                 "fuchsia.ui.test.input.TouchInputListener",
+
+                // Provided to this Component by the test.
+                "fuchsia.web.ContextProvider",
             ],
         },
     ],
