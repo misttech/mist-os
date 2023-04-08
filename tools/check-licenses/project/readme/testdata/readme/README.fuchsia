@@ -1,0 +1,10 @@
+Name: test
+URL: test.com
+License File: license
+License File URL: test.com/license
+License File Format: Single License File
+Description: multi line directive
+
+with empty spaces
+
+Version: 123

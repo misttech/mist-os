@@ -1,0 +1,29 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/host_test_data.gni")
+
+projects = [
+  "third_party/golibs/vendor/github.com/foo/bar",
+  "third_party/golibs/vendor/golang.org/foo/bar",
+]
+files = [
+  "COPYING",
+  "license.txt",
+  "license_processor.go",
+  "docs/some_other_license.txt",
+  "want.json",
+]
+
+if (is_host) {
+  host_test_data("go") {
+    sources = []
+    foreach(project, projects) {
+      foreach(file, files) {
+        sources += [ project + "/" + file ]
+      }
+    }
+    outputs = [ "$root_gen_dir/{{source}}" ]
+  }
+}

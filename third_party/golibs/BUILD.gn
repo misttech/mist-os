@@ -223,6 +223,25 @@ go_library("gopkg.in/yaml.v2") {
   ]
 }
 
+go_library("github.com/BurntSushi/toml") {
+  name = "github.com/BurntSushi/toml/..."
+  source_dir = "vendor/github.com/BurntSushi/toml"
+  sources = [
+    "decode.go",
+    "decode_go116.go",
+    "deprecated.go",
+    "doc.go",
+    "encode.go",
+    "error.go",
+    "internal/tz.go",
+    "lex.go",
+    "meta.go",
+    "parse.go",
+    "type_fields.go",
+    "type_toml.go",
+  ]
+}
+
 go_library("github.com/golang/glog") {
   name = "github.com/golang/glog/..."
   source_dir = "vendor/github.com/golang/glog"
@@ -526,19 +545,6 @@ go_library("github.com/spdx/tools-golang") {
   name = "github.com/spdx/tools-golang/..."
   source_dir = "vendor/github.com/spdx/tools-golang"
   sources = [
-    "builder/build.go",
-    "builder/builder2v1/build_creation_info.go",
-    "builder/builder2v1/build_file.go",
-    "builder/builder2v1/build_package.go",
-    "builder/builder2v1/build_relationship.go",
-    "builder/builder2v2/build_creation_info.go",
-    "builder/builder2v2/build_file.go",
-    "builder/builder2v2/build_package.go",
-    "builder/builder2v2/build_relationship.go",
-    "builder/builder2v3/build_creation_info.go",
-    "builder/builder2v3/build_file.go",
-    "builder/builder2v3/build_package.go",
-    "builder/builder2v3/build_relationship.go",
     "spdx/common/annotation.go",
     "spdx/common/checksum.go",
     "spdx/common/creation_info.go",

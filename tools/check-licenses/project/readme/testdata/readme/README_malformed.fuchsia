@@ -1,0 +1,11 @@
+Name: test
+URL: test.com
+License File: license
+License File URL: test.com/license
+License File Format: Single License File
+Bogus Directive: foo
+License File Format: Bogus format
+
+No directive at all. Make sure the next directive is still captured properly
+
+Version: 123

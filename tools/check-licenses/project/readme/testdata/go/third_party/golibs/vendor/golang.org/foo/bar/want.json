@@ -1,0 +1,22 @@
+{
+  "name": "bar",
+  "url": "https://golang.org/foo/bar",
+  "malformedLines": [],
+  "licenseInfo": [
+    {
+      "licenseFilePath": "license.txt",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
+    },
+    {
+      "licenseFilePath": "COPYING",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
+    },
+    {
+      "licenseFilePath": "docs/some_other_license.txt",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://pkg.go.dev/golang.org/foo/bar?tab=licenses"
+    }
+  ]
+}

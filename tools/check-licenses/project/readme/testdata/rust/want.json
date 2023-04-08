@@ -1,0 +1,23 @@
+{
+  "name": "foo",
+  "version": "123",
+  "malformedLines": [],
+  "url": "https://example.foo",
+  "licenseInfo": [
+    {
+      "licenseFilePath": "LICENSE.txt",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://example.foo/LICENSE.txt"
+    },
+    {
+      "licenseFilePath": "COPYING",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://example.foo/COPYING"
+    },
+    {
+      "licenseFilePath": "docs/some_other_license_file",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://example.foo/docs/some_other_license_file"
+    }
+  ]
+}

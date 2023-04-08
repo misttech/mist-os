@@ -1,0 +1,14 @@
+{
+  "name": "test",
+  "url": "test.com",
+  "version": "123",
+  "malformedLines": [],
+  "description": "multi line directive\n\nwith empty spaces\n\n",
+  "licenseInfo": [
+    {
+      "licenseFilePath": "license",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "test.com/license"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	cloud.google.com/go/storage v1.26.0
+	github.com/BurntSushi/toml v1.2.1
 	github.com/creack/pty v1.1.18
 	github.com/dustin/go-humanize v1.0.0
 	github.com/fsnotify/fsnotify v1.5.4

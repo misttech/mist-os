@@ -1,0 +1,22 @@
+{
+  "name": "foo",
+  "url": "https://pub.dev/packages/foo",
+  "malformedLines": [],
+  "licenseInfo": [
+    {
+      "licenseFilePath": "LICENSE.txt",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://pub.dev/packages/foo/LICENSE.txt"
+    },
+    {
+      "licenseFilePath": "COPYING",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://pub.dev/packages/foo/COPYING"
+    },
+    {
+      "licenseFilePath": "docs/some_other_license_file",
+      "licenseFileFormat": "Single License File",
+      "licenseFileURL": "https://pub.dev/packages/foo/docs/some_other_license_file"
+    }
+  ]
+}
