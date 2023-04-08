@@ -5,12 +5,13 @@
 #![cfg(test)]
 
 use crate::writer::{Heap, State};
-use inspect_format::{Block, Container, WritableBlockContainer};
+use inspect_format::{Block, Container};
+use std::sync::Arc;
 
 pub fn get_state(size: usize) -> State {
     let (container, storage) = Container::read_and_write(size).unwrap();
     let heap = Heap::new(container).unwrap();
-    State::create(heap, storage).unwrap()
+    State::create(heap, Arc::new(storage)).unwrap()
 }
 
 pub trait GetBlockExt: crate::private::InspectTypeInternal {

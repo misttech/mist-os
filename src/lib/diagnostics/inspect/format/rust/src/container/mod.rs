@@ -7,6 +7,7 @@ mod fuchsia;
 #[cfg(target_os = "fuchsia")]
 use self::fuchsia as implementation;
 
+#[cfg(not(target_os = "fuchsia"))]
 mod portable;
 #[cfg(not(target_os = "fuchsia"))]
 use self::portable as implementation;

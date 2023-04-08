@@ -11,9 +11,10 @@ use {
         Inspector,
     },
     inspect_format::{
-        constants, utils, Block, BlockAccessorExt, BlockIndex, BlockType, Container, ReadBytes,
+        constants, utils, Block, BlockAccessorExt, BlockContainer, BlockIndex, BlockType,
+        Container, CopyBytes, ReadBytes,
     },
-    std::{cmp, convert::TryFrom, sync::Arc},
+    std::{cmp, convert::TryFrom},
 };
 
 pub use crate::reader::tree_reader::SnapshotTree;
@@ -61,7 +62,7 @@ impl Snapshot {
     {
         // Read the generation count one time
         let mut header_bytes: [u8; 32] = [0; 32];
-        ReadBytes::read(source, &mut header_bytes);
+        source.copy_bytes(&mut header_bytes);
         let header_block = header_bytes.at(BlockIndex::HEADER);
         let generation = header_block.header_generation_count();
 
@@ -83,14 +84,15 @@ impl Snapshot {
             cmp::min(source.len(), constants::MAX_VMO_SIZE)
         };
         let mut buffer = vec![0u8; vmo_size];
-        ReadBytes::read(source, &mut buffer[..]);
+        source.copy_bytes(&mut buffer);
         if cfg!(test) {
             read_callback();
         }
 
         // Read the generation count one more time to ensure the previous buffer read is
-        // consistent.
-        ReadBytes::read(source, &mut header_bytes);
+        // consistent. It's safe to unwrap this time, we already checked we can read 32 bytes from
+        // the slice.
+        source.copy_bytes(&mut header_bytes);
         match header_generation_count(&header_bytes) {
             None => Err(ReaderError::InconsistentSnapshot),
             Some(new_generation) if new_generation != gen => Err(ReaderError::InconsistentSnapshot),
@@ -161,7 +163,8 @@ impl TryFrom<&Inspector> for Snapshot {
     type Error = ReaderError;
 
     fn try_from(inspector: &Inspector) -> Result<Self, Self::Error> {
-        let storage = inspector.storage.as_ref().ok_or(ReaderError::NoOpInspector)?;
+        let handle = inspector.get_storage_handle();
+        let storage = handle.as_ref().ok_or(ReaderError::NoOpInspector)?;
         Snapshot::try_from_with_callback(storage, || {})
     }
 }
@@ -175,20 +178,11 @@ impl TryFrom<&fuchsia_zircon::Vmo> for Snapshot {
     }
 }
 
-#[cfg(target_os = "fuchsia")]
-impl TryFrom<&Arc<fuchsia_zircon::Vmo>> for Snapshot {
-    type Error = ReaderError;
-
-    fn try_from(vmo: &Arc<fuchsia_zircon::Vmo>) -> Result<Self, Self::Error> {
-        Snapshot::try_from_with_callback(vmo.as_ref(), || {})
-    }
-}
-
 #[cfg(not(target_os = "fuchsia"))]
-impl TryFrom<&Arc<std::sync::Mutex<Vec<u8>>>> for Snapshot {
+impl TryFrom<&Vec<u8>> for Snapshot {
     type Error = ReaderError;
 
-    fn try_from(buffer: &Arc<std::sync::Mutex<Vec<u8>>>) -> Result<Self, Self::Error> {
+    fn try_from(buffer: &Vec<u8>) -> Result<Self, Self::Error> {
         Snapshot::try_from_with_callback(buffer, || {})
     }
 }
@@ -236,17 +230,16 @@ pub enum BackingBuffer {
 impl TryFrom<&fuchsia_zircon::Vmo> for BackingBuffer {
     type Error = ReaderError;
     fn try_from(source: &fuchsia_zircon::Vmo) -> Result<Self, Self::Error> {
-        let container = Container::try_from(source).map_err(ReaderError::Vmo)?;
+        let container = Container::read_only(source).map_err(ReaderError::Vmo)?;
         Ok(BackingBuffer::Container(container))
     }
 }
 
 #[cfg(not(target_os = "fuchsia"))]
-impl TryFrom<&Arc<std::sync::Mutex<Vec<u8>>>> for BackingBuffer {
+impl TryFrom<&Vec<u8>> for BackingBuffer {
     type Error = ReaderError;
-    fn try_from(source: &Arc<std::sync::Mutex<Vec<u8>>>) -> Result<Self, Self::Error> {
-        use inspect_format::ReadableBlockContainer;
-        let container = Container::read_only(source).map_err(ReaderError::Vmo)?;
+    fn try_from(source: &Vec<u8>) -> Result<Self, Self::Error> {
+        let container = Container::read_only(source);
         Ok(BackingBuffer::Container(container))
     }
 }
@@ -258,12 +251,17 @@ impl From<Vec<u8>> for BackingBuffer {
 }
 
 impl ReadBytes for BackingBuffer {
-    fn read_at(&self, offset: usize, bytes: &mut [u8]) {
-        match self {
-            BackingBuffer::Container(ref m) => m.read_at(offset, bytes),
-            BackingBuffer::Bytes(b) => (b.as_ref() as &[u8]).read_at(offset, bytes),
+    fn get_slice_at(&self, offset: usize, size: usize) -> Option<&[u8]> {
+        match &self {
+            BackingBuffer::Container(m) => m.get_slice_at(offset, size),
+            BackingBuffer::Bytes(b) => b.get_slice_at(offset, size),
         }
     }
+}
+
+impl BlockContainer for BackingBuffer {
+    type Data = Self;
+    type ShareableData = ();
 
     fn len(&self) -> usize {
         match &self {
@@ -277,30 +275,50 @@ impl ReadBytes for BackingBuffer {
 mod tests {
     use super::*;
     use anyhow::Error;
-    use inspect_format::{Container, WritableBlockContainer, WriteBytes};
+    use inspect_format::{BlockAccessorMutExt, Container, WriteBytes};
+
+    #[cfg(target_os = "fuchsia")]
+    macro_rules! get_snapshot {
+        ($container:ident, $storage:ident, $callback:expr) => {
+            Snapshot::try_from_with_callback(&$storage, $callback)
+        };
+    }
+
+    #[cfg(not(target_os = "fuchsia"))]
+    macro_rules! get_snapshot {
+        ($container:ident, $storage:ident, $callback:expr) => {{
+            let _storage = $storage;
+            let slice = $container.get_slice($container.len()).unwrap().to_vec();
+            Snapshot::try_from_with_callback(&slice, $callback)
+        }};
+    }
 
     #[fuchsia::test]
     fn scan() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
         {
-            let mut header =
-                Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+            let mut header = Block::new_free(
+                &mut container,
+                BlockIndex::HEADER,
+                constants::HEADER_ORDER,
+                BlockIndex::EMPTY,
+            )?;
             header.become_reserved()?;
             header.become_header(size)?;
         }
         {
-            let mut b = Block::new_free(&mut container, 2.into(), 2, 0.into())?;
+            let mut b = Block::new_free(&mut container, 2.into(), 2, BlockIndex::EMPTY)?;
             b.become_reserved()?;
             b.become_extent(6.into())?;
         }
         {
-            let mut b = Block::new_free(&mut container, 6.into(), 0, 0.into())?;
+            let mut b = Block::new_free(&mut container, 6.into(), 0, BlockIndex::EMPTY)?;
             b.become_reserved()?;
             b.become_int_value(1, 3.into(), 4.into())?;
         }
 
-        let snapshot = Snapshot::try_from(&storage)?;
+        let snapshot = get_snapshot!(container, storage, || {})?;
 
         // Scan blocks
         let blocks = snapshot.scan().collect::<Vec<ScannedBlock<'_>>>();
@@ -340,33 +358,29 @@ mod tests {
         let (mut container, storage) = Container::read_and_write(4096).unwrap();
 
         // create a header block with an invalid version number
-        container.write_at(
-            0,
-            &[
-                0x00, /* order/reserved */
-                0x02, /* type */
-                0xff, /* invalid version number */
-                'I' as u8, 'N' as u8, 'S' as u8, 'P' as u8,
-            ],
-        );
-        let snapshot = Snapshot::try_from(&storage);
-        assert!(snapshot.is_err());
+        container.copy_from_slice(&[
+            0x00, /* order/reserved */
+            0x02, /* type */
+            0xff, /* invalid version number */
+            'I' as u8, 'N' as u8, 'S' as u8, 'P' as u8,
+        ]);
+        assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
 
     #[fuchsia::test]
     fn invalid_type() -> Result<(), Error> {
         let (mut container, storage) = Container::read_and_write(4096).unwrap();
-        container.write_at(0, &[0x00, 0xff, 0x01]);
-        assert!(Snapshot::try_from(&storage).is_err());
+        container.copy_from_slice(&[0x00, 0xff, 0x01]);
+        assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
 
     #[fuchsia::test]
     fn invalid_order() -> Result<(), Error> {
         let (mut container, storage) = Container::read_and_write(4096).unwrap();
-        container.write_at(0, &[0xff, 0xff]);
-        assert!(Snapshot::try_from(&storage).is_err());
+        container.copy_from_slice(&[0xff, 0xff]);
+        assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
 
@@ -374,12 +388,16 @@ mod tests {
     fn invalid_pending_write() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header =
-            Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+        let mut header = Block::new_free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
         header.lock_header()?;
-        assert!(Snapshot::try_from(&storage).is_err());
+        assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
 
@@ -387,12 +405,16 @@ mod tests {
     fn invalid_magic_number() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header =
-            Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+        let mut header = Block::new_free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
         header.set_header_magic(3)?;
-        assert!(Snapshot::try_from(&storage).is_err());
+        assert!(get_snapshot!(container, storage, || {}).is_err());
         Ok(())
     }
 
@@ -400,15 +422,25 @@ mod tests {
     fn invalid_generation_count() -> Result<(), Error> {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header =
-            Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+        let mut header = Block::new_free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
-        assert!(Snapshot::try_from_with_callback(&storage, || {
+        let result = get_snapshot!(container, storage, || {
+            let mut header = container.at_mut(BlockIndex::HEADER);
             header.lock_header().unwrap();
             header.unlock_header().unwrap();
-        })
-        .is_err());
+        });
+        #[cfg(target_os = "fuchsia")]
+        assert!(result.is_err());
+        // When in the host, we don't have underlying shared memory, so this can't fail as we
+        // had already cloned the underlying vector.
+        #[cfg(not(target_os = "fuchsia"))]
+        assert!(result.is_ok());
         Ok(())
     }
 
@@ -426,19 +458,23 @@ mod tests {
         let size = 4096;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
         {
-            let mut header =
-                Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+            let mut header = Block::new_free(
+                &mut container,
+                BlockIndex::HEADER,
+                constants::HEADER_ORDER,
+                BlockIndex::EMPTY,
+            )?;
             header.become_reserved()?;
             header.become_header(size)?;
         }
-        container.write_at(8, &[0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+        container.copy_from_slice_at(8, &[0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
 
-        let snapshot = Snapshot::try_from(&storage)?;
+        let snapshot = get_snapshot!(container, storage, || {})?;
 
         assert!(matches!(snapshot.buffer, BackingBuffer::Container(_)));
 
-        container.write_at(8, &[2u8; 8]);
-        let snapshot = Snapshot::try_from(&storage)?;
+        container.copy_from_slice_at(8, &[2u8; 8]);
+        let snapshot = get_snapshot!(container, storage, || {})?;
         assert!(matches!(snapshot.buffer, BackingBuffer::Bytes(_)));
 
         Ok(())
@@ -448,13 +484,17 @@ mod tests {
     fn snapshot_vmo_with_unused_space() -> Result<(), Error> {
         let size = 4 * constants::PAGE_SIZE_BYTES;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header =
-            Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+        let mut header = Block::new_free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?;
         header.become_reserved()?;
         header.become_header(constants::PAGE_SIZE_BYTES)?;
 
-        let snapshot = Snapshot::try_from(&storage)?;
-        assert_eq!(ReadBytes::len(&snapshot.buffer), constants::PAGE_SIZE_BYTES);
+        let snapshot = get_snapshot!(container, storage, || {})?;
+        assert_eq!(snapshot.buffer.len(), constants::PAGE_SIZE_BYTES);
 
         Ok(())
     }
@@ -463,13 +503,17 @@ mod tests {
     fn snapshot_vmo_with_very_large_vmo() -> Result<(), Error> {
         let size = 2 * constants::MAX_VMO_SIZE;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header =
-            Block::new_free(&mut container, 0.into(), constants::HEADER_ORDER, 0.into())?;
+        let mut header = Block::new_free(
+            &mut container,
+            BlockIndex::HEADER,
+            constants::HEADER_ORDER,
+            BlockIndex::EMPTY,
+        )?;
         header.become_reserved()?;
         header.become_header(size)?;
 
-        let snapshot = Snapshot::try_from(&storage)?;
-        assert_eq!(ReadBytes::len(&snapshot.buffer), constants::MAX_VMO_SIZE);
+        let snapshot = get_snapshot!(container, storage, || {})?;
+        assert_eq!(snapshot.buffer.len(), constants::MAX_VMO_SIZE);
 
         Ok(())
     }
@@ -478,13 +522,13 @@ mod tests {
     fn snapshot_vmo_with_header_without_size_info() -> Result<(), Error> {
         let size = 2 * constants::PAGE_SIZE_BYTES;
         let (mut container, storage) = Container::read_and_write(size).unwrap();
-        let mut header = Block::new_free(&mut container, 0.into(), 0, 0.into())?;
+        let mut header = Block::new_free(&mut container, BlockIndex::HEADER, 0, BlockIndex::EMPTY)?;
         header.become_reserved()?;
         header.become_header(constants::PAGE_SIZE_BYTES)?;
         header.set_order(0)?;
 
-        let snapshot = Snapshot::try_from(&storage)?;
-        assert_eq!(ReadBytes::len(&snapshot.buffer), size);
+        let snapshot = get_snapshot!(container, storage, || {})?;
+        assert_eq!(snapshot.buffer.len(), size);
 
         Ok(())
     }

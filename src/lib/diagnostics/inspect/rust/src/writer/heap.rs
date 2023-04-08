@@ -174,9 +174,7 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
 
     /// Returns a copy of the bytes stored in this Heap.
     pub(crate) fn bytes(&self) -> Vec<u8> {
-        let mut result = vec![0u8; self.current_size_bytes];
-        self.container.read(&mut result[..]);
-        result
+        self.container.get_slice(self.current_size_bytes).unwrap().to_vec()
     }
 
     fn grow_heap(&mut self, requested_size: usize) -> Result<(), Error> {
@@ -272,7 +270,7 @@ fn buddy(index: BlockIndex, order: u8) -> BlockIndex {
 mod tests {
     use super::*;
     use crate::reader::snapshot::{BackingBuffer, BlockIterator};
-    use inspect_format::{block_testing, BlockIndex, Container, WritableBlockContainer};
+    use inspect_format::{block_testing, BlockIndex, Container};
 
     #[derive(Debug)]
     struct BlockDebug {

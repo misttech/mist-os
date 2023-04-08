@@ -2,81 +2,51 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{ReadBytes, ReadableBlockContainer, WritableBlockContainer, WriteBytes};
-use std::{
-    convert::TryFrom,
-    sync::{Arc, Mutex},
-};
-
-impl ReadBytes for Arc<Mutex<Vec<u8>>> {
-    #[inline]
-    fn read_at(&self, offset: usize, dst: &mut [u8]) {
-        let guard = self.lock().unwrap();
-        ReadBytes::read_at(guard.as_slice(), offset, dst);
-    }
-
-    /// The number of bytes in the buffer.
-    #[inline]
-    fn len(&self) -> usize {
-        self.lock().unwrap().len()
-    }
-}
+use crate::{BlockContainer, CopyBytes, ReadBytes, WriteBytes};
 
 #[derive(Debug)]
 pub struct Container {
-    inner: Arc<Mutex<Vec<u8>>>,
+    buffer: Vec<u8>,
 }
 
-impl ReadableBlockContainer for Container {
-    type BackingStorage = Arc<Mutex<Vec<u8>>>;
-    type Error = ();
+impl Container {
+    pub fn read_and_write(size: usize) -> Result<(Self, ()), ()> {
+        let buffer = vec![0; size];
+        Ok((Self { buffer }, ()))
+    }
+
+    pub fn read_only(buffer: &[u8]) -> Self {
+        Self { buffer: buffer.to_vec() }
+    }
+}
+
+impl BlockContainer for Container {
+    type Data = Vec<u8>;
+    type ShareableData = ();
 
     #[inline]
-    fn read_only(storage: &Self::BackingStorage) -> Result<Self, Self::Error> {
-        Ok(Self { inner: storage.clone() })
+    fn len(&self) -> usize {
+        self.buffer.len()
     }
 }
 
 impl ReadBytes for Container {
     #[inline]
-    fn read_at(&self, offset: usize, dst: &mut [u8]) {
-        self.inner.read_at(offset, dst);
-    }
-
-    /// The number of bytes in the buffer.
-    #[inline]
-    fn len(&self) -> usize {
-        self.inner.len()
+    fn get_slice_at(&self, offset: usize, size: usize) -> Option<&[u8]> {
+        self.buffer.get_slice_at(offset, size)
     }
 }
 
-impl WritableBlockContainer for Container {
+impl CopyBytes for Container {
     #[inline]
-    fn read_and_write(size: usize) -> Result<(Self, Self::BackingStorage), ()> {
-        let inner = Arc::new(Mutex::new(vec![0; size]));
-        let storage = inner.clone();
-        Ok((Self { inner }, storage))
+    fn copy_bytes_at(&self, offset: usize, dst: &mut [u8]) {
+        self.buffer.copy_bytes_at(offset, dst)
     }
 }
 
 impl WriteBytes for Container {
     #[inline]
-    fn write_at(&mut self, offset: usize, src: &[u8]) -> usize {
-        let guard = self.inner.lock().unwrap();
-        if offset >= guard.len() {
-            return 0;
-        }
-        let bytes_written = std::cmp::min(guard.len() - offset, src.len());
-        let base = (guard.as_ptr() as usize).checked_add(offset).unwrap() as *mut u8;
-        unsafe { std::ptr::copy_nonoverlapping(src.as_ptr(), base, bytes_written) };
-        bytes_written
-    }
-}
-
-impl TryFrom<&Arc<Mutex<Vec<u8>>>> for Container {
-    type Error = ();
-
-    fn try_from(storage: &Arc<Mutex<Vec<u8>>>) -> Result<Self, ()> {
-        Container::read_only(storage)
+    fn get_slice_mut_at(&mut self, offset: usize, size: usize) -> Option<&mut [u8]> {
+        self.buffer.get_mut(offset..offset + size)
     }
 }

@@ -73,7 +73,7 @@ pub trait BlockAccessorMutExt: WriteBytes + Sized {
 impl<T> BlockAccessorExt for T where T: ReadBytes {}
 impl<T> BlockAccessorMutExt for T where T: WriteBytes {}
 
-impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T> {
+impl<'a, T: Deref<Target = Q>, Q: ReadBytes + 'a> Block<T> {
     /// Returns index of the block in the vmo.
     pub fn index(&self) -> BlockIndex {
         self.index
@@ -109,9 +109,9 @@ impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T> {
         if self.order() != constants::HEADER_ORDER {
             return Ok(None);
         }
-        let mut bytes = [0u8; 4];
-        self.container.read_at((self.index + 1).offset(), &mut bytes);
-        Ok(Some(u32::from_le_bytes(bytes)))
+        let offset = (self.index + 1).offset();
+        let value = self.container.get_value(offset).ok_or(Error::InvalidOffset(offset))?;
+        Ok(Some(*value))
     }
 
     /// True if the header is locked, false otherwise.
@@ -172,12 +172,11 @@ impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T> {
     }
 
     /// Returns the payload bytes value of an EXTENT block.
-    pub fn extent_contents(&self) -> Result<Vec<u8>, Error> {
+    pub fn extent_contents(&'a self) -> Result<&'a [u8], Error> {
         self.check_type(BlockType::Extent)?;
         let length = utils::payload_size_for_order(self.order());
-        let mut bytes = vec![0u8; length];
-        self.container.read_at(self.payload_offset(), &mut bytes);
-        Ok(bytes)
+        let offset = self.payload_offset();
+        self.container.get_slice_at(offset, length).ok_or(Error::InvalidOffset(offset))
     }
 
     /// Gets the NAME block index of a *_VALUE block.
@@ -219,40 +218,36 @@ impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T> {
             .array_entry_type()?
             .array_element_size()
             .ok_or(Error::InvalidArrayType(self.index()))?;
-        let mut bytes = vec![0u8; entry_type_size];
-        let index = (self.index + 1).offset() + slot_index * entry_type_size;
-        self.container.read_at(index, &mut bytes);
-        // Safety: this is converting a Vec of `entry_type_size` into an array literal.
-        // As long as `entry_type_size` is correct, this is safe. The sizes are statically
-        // declared.
-        Ok(BlockIndex::new(u32::from_le_bytes(bytes.try_into().unwrap())))
+        let offset = (self.index + 1).offset() + slot_index * entry_type_size;
+        let index = self.container.get_value(offset).ok_or(Error::InvalidOffset(offset))?;
+        Ok(BlockIndex::new(*index))
     }
 
     /// Gets the value of an int ARRAY_VALUE slot.
     pub fn array_get_int_slot(&self, slot_index: usize) -> Result<i64, Error> {
         self.check_array_entry_type(BlockType::IntValue)?;
         self.check_array_index(slot_index)?;
-        let mut bytes = [0u8; 8];
-        self.container.read_at((self.index + 1).offset() + slot_index * 8, &mut bytes);
-        Ok(i64::from_le_bytes(bytes))
+        let offset = (self.index + 1).offset() + slot_index * 8;
+        let value = self.container.get_value(offset).ok_or(Error::InvalidOffset(offset))?;
+        Ok(*value)
     }
 
     /// Gets the value of a double ARRAY_VALUE slot.
     pub fn array_get_double_slot(&self, slot_index: usize) -> Result<f64, Error> {
         self.check_array_entry_type(BlockType::DoubleValue)?;
         self.check_array_index(slot_index)?;
-        let mut bytes = [0u8; 8];
-        self.container.read_at((self.index + 1).offset() + slot_index * 8, &mut bytes);
-        Ok(f64::from_bits(u64::from_le_bytes(bytes)))
+        let offset = (self.index + 1).offset() + slot_index * 8;
+        let value = self.container.get_value(offset).ok_or(Error::InvalidOffset(offset))?;
+        Ok(*value)
     }
 
     /// Gets the value of a uint ARRAY_VALUE slot.
     pub fn array_get_uint_slot(&self, slot_index: usize) -> Result<u64, Error> {
         self.check_array_entry_type(BlockType::UintValue)?;
         self.check_array_index(slot_index)?;
-        let mut bytes = [0u8; 8];
-        self.container.read_at((self.index + 1).offset() + slot_index * 8, &mut bytes);
-        Ok(u64::from_le_bytes(bytes))
+        let offset = (self.index + 1).offset() + slot_index * 8;
+        let value = self.container.get_value(offset).ok_or(Error::InvalidOffset(offset))?;
+        Ok(*value)
     }
 
     /// Gets the index of the content of this LINK_VALUE block.
@@ -315,12 +310,13 @@ impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T> {
     }
 
     /// Returns the contents of a NAME block.
-    pub fn name_contents(&self) -> Result<String, Error> {
+    pub fn name_contents(&'a self) -> Result<&'a str, Error> {
         self.check_type(BlockType::Name)?;
         let length = self.name_length()?;
-        let mut bytes = vec![0u8; length];
-        self.container.read_at(self.payload_offset(), &mut bytes);
-        Ok(String::from(std::str::from_utf8(&bytes).map_err(|_| Error::NameNotUtf8)?))
+        let offset = self.payload_offset();
+        let bytes =
+            self.container.get_slice_at(offset, length).ok_or(Error::InvalidOffset(offset))?;
+        Ok(std::str::from_utf8(bytes).map_err(|_| Error::NameNotUtf8)?)
     }
 
     /// Returns the current reference count of a string reference.
@@ -330,16 +326,16 @@ impl<T: Deref<Target = Q>, Q: ReadBytes> Block<T> {
     }
 
     /// Read the inline portion of a STRING_REFERENCE
-    pub fn inline_string_reference(&self) -> Result<Vec<u8>, Error> {
+    pub fn inline_string_reference(&'a self) -> Result<&'a [u8], Error> {
         self.check_type(BlockType::StringReference)?;
         let max_len_inlined = utils::payload_size_for_order(self.order())
             - constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES;
         let length = self.total_length()?;
-        let mut bytes = vec![0u8; min(length, max_len_inlined)];
-        self.container.read_at(
-            self.payload_offset() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
-            &mut bytes,
-        );
+        let offset = self.payload_offset() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES;
+        let bytes = self
+            .container
+            .get_slice_at(offset, min(length, max_len_inlined))
+            .ok_or(Error::InvalidOffset(offset))?;
         Ok(bytes)
     }
 
@@ -508,9 +504,9 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         if self.order() != constants::HEADER_ORDER {
             return Ok(());
         }
-        let bytes_written = self.container.write_at((self.index + 1).offset(), &size.to_le_bytes());
-        if bytes_written != 4 {
-            return Err(Error::SizeNotWritten(size));
+        match self.container.get_value_mut((self.index + 1).offset()) {
+            Some(value) => *value = size,
+            None => return Err(Error::SizeNotWritten(size)),
         }
         Ok(())
     }
@@ -602,8 +598,12 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
     pub fn array_clear(&mut self, start_slot_index: usize) -> Result<(), Error> {
         let array_slots = self.array_slots()? - start_slot_index;
         let type_size = self.array_entry_type_size()?;
-        let values = vec![0u8; array_slots * type_size];
-        self.container.write_at((self.index + 1).offset() + start_slot_index * type_size, &values);
+        let offset = (self.index + 1).offset() + start_slot_index * type_size;
+        let slice = self
+            .container
+            .get_slice_mut_at(offset, array_slots * type_size)
+            .ok_or(Error::InvalidOffset(offset))?;
+        slice.fill(0);
         Ok(())
     }
 
@@ -621,11 +621,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         // 0 is used as special value; the reader won't dereference it
 
         let type_size = self.array_entry_type_size()?;
-        self.container.write_at(
-            (self.index + 1).offset() + slot_index * type_size,
-            &string_index.to_le_bytes(),
-        );
-
+        self.container.set_value((self.index + 1).offset() + slot_index * type_size, *string_index);
         Ok(())
     }
 
@@ -635,9 +631,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         block_type: BlockType,
     ) -> Result<(), Error> {
         if cfg!(any(debug_assertions, test)) {
-            let mut fill = [0u8; constants::MIN_ORDER_SIZE];
-            self.container.read_at(index_to_check.offset(), &mut fill);
-            let block = Block::new(&fill, BlockIndex::from(0));
+            let block = Block::new(&*self.container, index_to_check);
             return block.check_type(block_type);
         }
 
@@ -649,8 +643,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         self.check_array_entry_type(BlockType::IntValue)?;
         self.check_array_index(slot_index)?;
         let type_size = self.array_entry_type_size()?;
-        self.container
-            .write_at((self.index + 1).offset() + slot_index * type_size, &value.to_le_bytes());
+        self.container.set_value((self.index + 1).offset() + slot_index * type_size, value);
         Ok(())
     }
 
@@ -659,10 +652,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         self.check_array_entry_type(BlockType::DoubleValue)?;
         self.check_array_index(slot_index)?;
         let type_size = self.array_entry_type_size()?;
-        self.container.write_at(
-            (self.index + 1).offset() + slot_index * type_size,
-            &value.to_bits().to_le_bytes(),
-        );
+        self.container.set_value((self.index + 1).offset() + slot_index * type_size, value);
         Ok(())
     }
 
@@ -671,8 +661,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
         self.check_array_entry_type(BlockType::UintValue)?;
         self.check_array_index(slot_index)?;
         let type_size = self.array_entry_type_size()?;
-        self.container
-            .write_at((self.index + 1).offset() + slot_index * type_size, &value.to_le_bytes());
+        self.container.set_value((self.index + 1).offset() + slot_index * type_size, value);
         Ok(())
     }
 
@@ -860,10 +849,13 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
             - constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES;
         // we do not care about splitting multibyte UTF-8 characters, because the rest
         // of the split will go in an extent and be joined together at read time.
-        let to_inline = &value[..min(value.len(), max_len)];
-        Ok(self
-            .container
-            .write_at(payload_offset + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES, to_inline))
+        let bytes = min(value.len(), max_len);
+        let to_inline = &value[..bytes];
+        self.container.copy_from_slice_at(
+            payload_offset + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
+            to_inline,
+        );
+        Ok(bytes)
     }
 
     /// Creates a NAME block.
@@ -933,7 +925,7 @@ impl<T: Deref<Target = Q> + DerefMut<Target = Q>, Q: WriteBytes + ReadBytes> Blo
     /// Write |bytes| to the payload section of the block in the container.
     fn write_payload_from_bytes(&mut self, bytes: &[u8]) {
         let offset = self.payload_offset();
-        self.container.write_at(offset, bytes);
+        self.container.copy_from_slice_at(offset, bytes);
     }
 
     /// Increment generation counter in a HEADER block for locking/unlocking
@@ -949,26 +941,25 @@ pub mod testing {
     use super::*;
 
     pub fn override_header<T: WriteBytes + ReadBytes>(block: &mut Block<&mut T>, value: u64) {
-        block.container.write_at(block.header_offset(), &value.to_le_bytes());
+        block.container.set_value(block.header_offset(), value);
     }
 
     pub fn override_payload<T: WriteBytes + ReadBytes>(block: &mut Block<&mut T>, value: u64) {
-        block.container.write_at(block.payload_offset(), &value.to_le_bytes());
+        block.container.set_value(block.payload_offset(), value);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{block_index::BlockIndex, Container, WritableBlockContainer};
+    use crate::{block_index::BlockIndex, Container, CopyBytes};
     use std::collections::BTreeSet;
     use std::iter::FromIterator;
 
     macro_rules! assert_8_bytes {
         ($container:ident, $offset:expr, $expected:expr) => {
-            let mut buffer = [0u8; 8];
-            $container.read_at($offset, &mut buffer);
-            assert_eq!(buffer, $expected);
+            let slice = $container.get_slice_at($offset, 8).unwrap();
+            assert_eq!(slice, &$expected);
         };
     }
 
@@ -1039,24 +1030,21 @@ mod tests {
         assert_eq!(block.order(), 3);
         assert_eq!(*block.free_next_index().unwrap(), 1);
         assert_eq!(block.block_type(), BlockType::Free);
-        let mut buffer = [0u8; 8];
-        container.read(&mut buffer);
-        assert_eq!(buffer, [0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        container.read_at(8, &mut buffer);
-        assert_eq!(buffer, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 0, [0x03, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     }
 
     #[fuchsia::test]
     fn test_block_type_or() {
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
-        container.write_at(1, &[0x02]);
+        container.set_value::<u8>(1, 0x02);
         let block = Block::new(&container, BlockIndex::EMPTY);
         assert_eq!(block.block_type_or().unwrap(), BlockType::Header);
 
         let (mut container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
-        container.write_at(1, &[0x0f]);
+        container.set_value::<u8>(1, 0x0f);
         let block = Block::new(&container, BlockIndex::EMPTY);
         assert!(block.block_type_or().is_err());
     }
@@ -1249,7 +1237,7 @@ mod tests {
 
         // Test overflow: set payload bytes to max u64 value. Ensure we cannot lock
         // and after unlocking, the value is zero.
-        container.write_at(8, &u64::max_value().to_le_bytes());
+        container.set_value(8, u64::max_value());
         let mut block = container.at_mut(BlockIndex::HEADER);
         assert!(block.lock_header().is_err());
         assert!(block.unlock_header().is_ok());
@@ -1381,15 +1369,13 @@ mod tests {
         let mut block = container.at_mut(BlockIndex::EMPTY);
         assert_eq!(block.extent_set_contents(&"test-rust-inspect".as_bytes()).unwrap(), 17);
         assert_eq!(
-            String::from_utf8(block.extent_contents().unwrap()).unwrap(),
+            String::from_utf8(block.extent_contents().unwrap().to_vec()).unwrap(),
             "test-rust-inspect\0\0\0\0\0\0\0"
         );
-        let mut buffer = [0u8; 17];
-        container.read_at(8, &mut buffer);
-        assert_eq!(buffer, "test-rust-inspect".as_bytes());
-        let mut buffer = [0u8; 7];
-        container.read_at(25, &mut buffer);
-        assert_eq!(buffer, [0, 0, 0, 0, 0, 0, 0]);
+        let slice = container.get_slice_at(8, 17).unwrap();
+        assert_eq!(slice, "test-rust-inspect".as_bytes());
+        let slice = container.get_slice_at(25, 7).unwrap();
+        assert_eq!(slice, &[0, 0, 0, 0, 0, 0, 0]);
 
         let mut block = container.at_mut(BlockIndex::EMPTY);
         assert!(block.set_extent_next_index(4.into()).is_ok());
@@ -1577,7 +1563,7 @@ mod tests {
             Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
         let mut bad_format_bytes = [0u8; constants::MIN_ORDER_SIZE];
         bad_format_bytes[15] = 0x30;
-        bad_container.write(&bad_format_bytes);
+        bad_container.copy_from_slice(&bad_format_bytes);
         let bad_block = Block::new(&bad_container, BlockIndex::EMPTY);
         assert!(bad_block.property_format().is_err()); // Make sure we get Error not panic
 
@@ -1616,24 +1602,19 @@ mod tests {
         assert_eq!(block.name_length().unwrap(), 17);
         assert_eq!(block.name_contents().unwrap(), "test-rust-inspect");
         assert_8_bytes!(container, 0, [0x01, 0x09, 0x11, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        let mut buffer = [0u8; 17];
-        container.read_at(8, &mut buffer);
-        assert_eq!(buffer, "test-rust-inspect".as_bytes());
-        let mut buffer = [0u8; 7];
-        container.read_at(25, &mut buffer);
-        assert_eq!(buffer, [0, 0, 0, 0, 0, 0, 0]);
+        let slice = container.get_slice_at(8, 17).unwrap();
+        assert_eq!(slice, "test-rust-inspect".as_bytes());
+        let slice = container.get_slice_at(25, 7).unwrap();
+        assert_eq!(slice, [0, 0, 0, 0, 0, 0, 0]);
 
-        let mut bad_name_bytes = [0u8; constants::MIN_ORDER_SIZE * 2];
-        container.read(&mut bad_name_bytes);
-        bad_name_bytes[24] = 0xff;
-        container.write(&bad_name_bytes);
+        *container.get_value_mut::<u8>(24).unwrap() = 0xff;
         let bad_block = Block::new(&container, BlockIndex::EMPTY);
         assert_eq!(bad_block.name_length().unwrap(), 17); // Sanity check we copied correctly
         assert!(bad_block.name_contents().is_err()); // Make sure we get Error not panic
 
         let types = BTreeSet::from_iter(vec![BlockType::Name]);
         test_ok_types(move |b| b.name_length(), &types);
-        test_ok_types(move |b| b.name_contents(), &types);
+        test_ok_types(move |b| b.name_contents().map(|s| s.to_string()), &types);
         test_ok_types(
             move |mut b| b.become_name("test"),
             &BTreeSet::from_iter(vec![BlockType::Reserved]),
@@ -1655,16 +1636,14 @@ mod tests {
         let mut block = get_reserved(&mut container);
         assert!(block.become_name("abcdefghijklmnopqrstu😀").is_ok());
         assert_eq!(block.name_contents().unwrap(), "abcdefghijklmnopqrstu");
-        let mut buf = [0];
-        container.read_at(31, &mut buf);
-        assert_eq!(buf, [0]);
+        let byte = container.get_value::<u8>(31).unwrap();
+        assert_eq!(*byte, 0);
     }
 
     #[fuchsia::test]
     fn test_invalid_type_for_array() {
         let (mut container, _storage) = Container::read_and_write(2048).unwrap();
-        let buffer = [14u8; 2048 - 24];
-        container.write_at(24, &buffer);
+        container.get_slice_mut_at(24, 2048 - 24).unwrap().fill(14);
         let mut block = get_reserved_of_order(&mut container, 4);
 
         test_ok_types(
@@ -1725,8 +1704,7 @@ mod tests {
     #[fuchsia::test]
     fn test_string_arrays() {
         let (mut container, _storage) = Container::read_and_write(2048).unwrap();
-        let buffer = [14u8; 2048 - 48];
-        container.write_at(48, &buffer);
+        container.get_slice_mut_at(48, 2048 - 48).unwrap().fill(14);
 
         let mut block = get_reserved(&mut container);
         let parent_index = BlockIndex::new(0);
@@ -1761,9 +1739,8 @@ mod tests {
         );
         assert_8_bytes!(container, 8, [0x0E, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         for i in 0..4 {
-            let mut buffer = [0u8; 4];
-            container.read_at(16 + (i * 4), &mut buffer);
-            assert_eq!(buffer, [(i as u8 + 4), 0x00, 0x00, 0x00]);
+            let slice = container.get_slice_at(16 + (i * 4), 4).unwrap();
+            assert_eq!(slice, [(i as u8 + 4), 0x00, 0x00, 0x00]);
         }
     }
 
@@ -1772,8 +1749,7 @@ mod tests {
         // primarily these tests are making sure that arrays clear their payload space
 
         let (mut container, _storage) = Container::read_and_write(128).unwrap();
-        let buffer = [1u8; 128 - 16];
-        container.write_at(16, &buffer);
+        container.get_slice_mut_at(16, 128 - 16).unwrap().fill(1);
 
         let mut block =
             Block::new_free(&mut container, BlockIndex::EMPTY, 7, BlockIndex::EMPTY).unwrap();
@@ -1787,15 +1763,13 @@ mod tests {
                 BlockIndex::EMPTY,
             )
             .unwrap();
-        let mut buffer = [0u8; 128 - 16];
-        container.read_at(16, &mut buffer);
-        buffer
+        let slice = container.get_slice_at(16, 128 - 16).unwrap();
+        slice
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
 
-        let buffer = [1u8; 128 - 16];
-        container.write_at(16, &buffer);
+        container.get_slice_mut_at(16, 128 - 16).unwrap().fill(1);
         let mut block =
             Block::new_free(&mut container, BlockIndex::EMPTY, 7, BlockIndex::EMPTY).unwrap();
         block.become_reserved().unwrap();
@@ -1808,15 +1782,13 @@ mod tests {
                 BlockIndex::EMPTY,
             )
             .unwrap();
-        let mut buffer = [0u8; 128 - 16];
-        container.read_at(16, &mut buffer);
-        buffer
+        let slice = container.get_slice_at(16, 128 - 16).unwrap();
+        slice
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
 
-        let buffer = [1u8; 128 - 16];
-        container.write_at(16, &buffer);
+        container.get_slice_mut_at(16, 128 - 16).unwrap().fill(1);
         let mut block =
             Block::new_free(&mut container, BlockIndex::EMPTY, 7, BlockIndex::EMPTY).unwrap();
         block.become_reserved().unwrap();
@@ -1829,15 +1801,13 @@ mod tests {
                 BlockIndex::EMPTY,
             )
             .unwrap();
-        let mut buffer = [0u8; 128 - 16];
-        container.read_at(16, &mut buffer);
-        buffer
+        let slice = container.get_slice_at(16, 128 - 16).unwrap();
+        slice
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
 
-        let buffer = [1u8; 128 - 16];
-        container.write_at(16, &buffer);
+        container.get_slice_mut_at(16, 128 - 16).unwrap().fill(1);
         let mut block =
             Block::new_free(&mut container, BlockIndex::EMPTY, 7, BlockIndex::EMPTY).unwrap();
         block.become_reserved().unwrap();
@@ -1850,9 +1820,8 @@ mod tests {
                 BlockIndex::EMPTY,
             )
             .unwrap();
-        let mut buffer = [0u8; 128 - 16];
-        container.read_at(16, &mut buffer);
-        buffer
+        let slice = container.get_slice_at(16, 128 - 16).unwrap();
+        slice
             .iter()
             .enumerate()
             .for_each(|(index, i)| assert_eq!(*i, 0, "failed: byte = {} at index {}", *i, index));
@@ -1900,17 +1869,17 @@ mod tests {
 
         let (mut bad_container, _storage) =
             Container::read_and_write(constants::MIN_ORDER_SIZE).unwrap();
-        let mut bad_bytes = [0u8; constants::MIN_ORDER_SIZE * 4];
-        container.read(&mut bad_bytes);
+        let mut bad_bytes = [0u8; constants::MIN_ORDER_SIZE];
+        container.copy_bytes(&mut bad_bytes[..]);
         bad_bytes[8] = 0x12; // LinearHistogram; Header
-        bad_container.write(&bad_bytes);
+        bad_container.copy_from_slice(&bad_bytes);
         let bad_block = Block::new(&bad_container, BlockIndex::EMPTY);
         assert_eq!(bad_block.array_format().unwrap(), ArrayFormat::LinearHistogram);
         // Make sure we get Error not panic or BlockType::Header
         assert!(bad_block.array_entry_type().is_err());
 
         bad_bytes[8] = 0xef; // Not in enum; Not in enum
-        bad_container.write(&bad_bytes);
+        bad_container.copy_from_slice(&bad_bytes);
         let bad_block = Block::new(&bad_container, BlockIndex::EMPTY);
         assert!(bad_block.array_format().is_err());
         assert!(bad_block.array_entry_type().is_err());
@@ -1943,7 +1912,7 @@ mod tests {
     #[fuchsia::test]
     fn array_slots_bigger_than_block_order() {
         let (mut container, _storage) =
-            Container::read_and_write(constants::MIN_ORDER_SIZE * 8).unwrap();
+            Container::read_and_write(constants::MAX_ORDER_SIZE).unwrap();
         // A block of size 7 (max) can hold 254 values: 2048B - 8B (header) - 8B (array metadata)
         // gives 2032, which means 254 values of 8 bytes each maximum.
         let mut block =
@@ -1954,7 +1923,7 @@ mod tests {
             .is_err());
         assert!(block
             .become_array_value(254, ArrayFormat::Default, BlockType::IntValue, 1.into(), 2.into())
-            .is_ok());
+            .is_ok(),);
 
         // A block of size 2 can hold 6 values: 64B - 8B (header) - 8B (array metadata)
         // gives 48, which means 6 values of 8 bytes each maximum.
@@ -1976,7 +1945,7 @@ mod tests {
 
         // Write some sample data in the container after the slot fields.
         let sample = [0xff, 0xff, 0xff];
-        container.write_at(48, &sample);
+        container.copy_from_slice_at(48, &sample);
 
         let mut block = Block::new_free(&mut container, BlockIndex::EMPTY, 2, BlockIndex::EMPTY)
             .expect("new free");
@@ -2013,9 +1982,8 @@ mod tests {
         }
 
         // Sample data shouldn't have been overwritten
-        let mut buffer = [0u8; 3];
-        container.read_at(48, &mut buffer);
-        assert_eq!(buffer, &sample[..]);
+        let slice = container.get_slice_at(48, 3).unwrap();
+        assert_eq!(slice, &sample[..]);
     }
 
     #[fuchsia::test]

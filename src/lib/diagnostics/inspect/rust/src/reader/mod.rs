@@ -357,11 +357,11 @@ impl<'a> ScanResult<'a> {
     }
 
     fn load_name(&self, block: ScannedBlock<'_>) -> Option<String> {
-        block.name_contents().ok()
+        block.name_contents().ok().map(|s| s.to_string())
     }
 
     fn load_string_reference(&self, block: ScannedBlock<'_>) -> Option<String> {
-        let mut data = block.inline_string_reference().ok()?;
+        let mut data = block.inline_string_reference().ok()?.to_vec();
         let total_length = block.total_length().ok()?;
         if data.len() == total_length {
             return String::from_utf8(data).ok();
@@ -581,7 +581,7 @@ mod tests {
         },
         anyhow::Error,
         futures::prelude::*,
-        inspect_format::{constants, PayloadFields, ReadBytes},
+        inspect_format::{constants, BlockContainer, CopyBytes, PayloadFields},
     };
 
     #[fuchsia::test]
@@ -875,9 +875,9 @@ mod tests {
             + constants::HEADER_SIZE_BYTES;
 
         // Get the raw VMO bytes to mess with.
-        let vmo_size = vmo.len();
+        let vmo_size = BlockContainer::len(&vmo);
         let mut buf = vec![0u8; vmo_size as usize];
-        ReadBytes::read(&vmo, &mut buf[..]);
+        vmo.copy_bytes(&mut buf[..]);
 
         // Mess up the first byte of the string property value such that the byte is an invalid
         // UTF8 character.  Then build a new node hierarchy based off those bytes, see if invalid
@@ -898,16 +898,16 @@ mod tests {
         let root = inspector.root();
         let array = root.create_int_array("int-array", 3);
 
-        let vmo = inspector.vmo().await.unwrap();
-        let vmo_size = vmo.len();
-
         // Mess up with the block slots by setting them to a too big number.
         array.get_block_mut(|array_block| {
             PayloadFields::set_array_slots_count(array_block, 255);
         });
 
+        let vmo = inspector.vmo().await.unwrap();
+        let vmo_size = BlockContainer::len(&vmo);
+
         let mut buf = vec![0u8; vmo_size as usize];
-        ReadBytes::read(&vmo, &mut buf[..]);
+        vmo.copy_bytes(&mut buf[..]);
 
         assert!(PartialNodeHierarchy::try_from(Snapshot::build(&buf)).is_err());
 

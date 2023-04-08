@@ -49,6 +49,9 @@ pub enum Error {
 
     #[error("Size (={0}) of the inspect VMO could not be written to the header")]
     SizeNotWritten(u32),
+
+    #[error("Attempted to read a slice at an invalid offset: {0}")]
+    InvalidOffset(usize),
 }
 
 impl Error {

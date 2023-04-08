@@ -381,7 +381,7 @@ impl Scanner {
             block.index(),
             ScannedExtent {
                 next: block.next_extent()?,
-                data: block.extent_contents()?,
+                data: block.extent_contents()?.to_vec(),
                 metrics: Metrics::analyze(block)?,
             },
         );
@@ -392,7 +392,10 @@ impl Scanner {
         check_zero_bits(buffer, &block, 28, 63)?;
         self.names.insert(
             block.index(),
-            ScannedName { name: block.name_contents()?, metrics: Metrics::analyze(block)? },
+            ScannedName {
+                name: block.name_contents()?.to_string(),
+                metrics: Metrics::analyze(block)?,
+            },
         );
         Ok(())
     }
@@ -532,7 +535,7 @@ impl Scanner {
     ) -> Result<ScannedStringReference, Error> {
         let scanned = ScannedStringReference {
             index: block.index(),
-            value: block.inline_string_reference()?,
+            value: block.inline_string_reference()?.to_vec(),
             length: block.total_length()?,
             next_extent: block.next_extent()?,
         };

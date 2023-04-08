@@ -8,8 +8,8 @@ use {
     derivative::Derivative,
     futures::future::BoxFuture,
     inspect_format::{
-        constants, utils, BlockAccessorExt, BlockAccessorMutExt, BlockIndex, BlockType, Container,
-        Error as FormatError, ReadableBlockContainer,
+        constants, utils, BlockAccessorExt, BlockAccessorMutExt, BlockContainer, BlockIndex,
+        BlockType, Container, Error as FormatError,
         {ArrayFormat, Block, LinkNodeDisposition, PropertyFormat},
     },
     parking_lot::{Mutex, MutexGuard},
@@ -251,7 +251,7 @@ impl State {
     /// heap to be initialized with a header.
     pub fn create(
         heap: Heap<Container>,
-        storage: <Container as ReadableBlockContainer>::BackingStorage,
+        storage: Arc<<Container as BlockContainer>::ShareableData>,
     ) -> Result<Self, Error> {
         let inner = Arc::new(Mutex::new(InnerState::new(heap, storage)));
         Ok(Self { inner })
@@ -560,7 +560,7 @@ struct InnerState {
     #[derivative(Debug = "ignore")]
     heap: Heap<Container>,
     #[allow(dead_code)] //  unused in host.
-    storage: <Container as ReadableBlockContainer>::BackingStorage,
+    storage: Arc<<Container as BlockContainer>::ShareableData>,
     next_unique_link_id: AtomicU64,
     transaction_count: usize,
 
@@ -598,7 +598,7 @@ impl InnerState {
     /// Creates a new inner state that performs all operations on the heap.
     pub fn new(
         heap: Heap<Container>,
-        storage: <Container as ReadableBlockContainer>::BackingStorage,
+        storage: Arc<<Container as BlockContainer>::ShareableData>,
     ) -> Self {
         Self {
             heap,
@@ -826,18 +826,20 @@ impl InnerState {
         let block = self.heap.get_block(index)?;
         match block.block_type() {
             BlockType::StringReference => self.read_string_reference(block),
-            BlockType::Name => block.name_contents().map_err(|_| Error::NameNotUtf8),
+            BlockType::Name => {
+                block.name_contents().map(|s| s.to_string()).map_err(|_| Error::NameNotUtf8)
+            }
             wrong_type => Err(Error::InvalidBlockType(index, wrong_type)),
         }
     }
 
     /// Read a StringReference
     fn read_string_reference(&self, block: Block<&Container>) -> Result<String, Error> {
-        let mut content = block.inline_string_reference()?;
+        let mut content = block.inline_string_reference()?.to_vec();
         let mut next = block.next_extent()?;
         while next != BlockIndex::EMPTY {
             let next_block = self.heap.get_block(next)?;
-            content.append(&mut next_block.extent_contents()?);
+            content.extend_from_slice(&mut next_block.extent_contents()?);
             next = next_block.next_extent()?;
         }
 
@@ -1656,7 +1658,7 @@ mod tests {
             assert_eq!(extent_block.block_type(), BlockType::Extent);
             assert_eq!(*extent_block.next_extent().unwrap(), 0);
             assert_eq!(
-                String::from_utf8(extent_block.extent_contents().unwrap()).unwrap(),
+                std::str::from_utf8(extent_block.extent_contents().unwrap()).unwrap(),
                 "test-property\0\0\0\0\0\0\0\0\0\0\0"
             );
             block_index
@@ -1870,7 +1872,7 @@ mod tests {
             assert_eq!(extent_block.block_type(), BlockType::Extent);
             assert_eq!(*extent_block.next_extent().unwrap(), 0);
             assert_eq!(
-                String::from_utf8(extent_block.extent_contents().unwrap()).unwrap(),
+                std::str::from_utf8(extent_block.extent_contents().unwrap()).unwrap(),
                 "test-property\0\0\0\0\0\0\0\0\0\0\0"
             );
             block_index

@@ -12,7 +12,7 @@ use async_trait::async_trait;
 pub type SnapshotSource = fuchsia_zircon::Vmo;
 
 #[cfg(not(target_os = "fuchsia"))]
-pub type SnapshotSource = std::sync::Arc<std::sync::Mutex<Vec<u8>>>;
+pub type SnapshotSource = Vec<u8>;
 
 /// Trait implemented by structs that can provide inspect data and their lazy links.
 #[async_trait]

@@ -8,7 +8,7 @@ use fuchsia_inspect::{
     reader::ReadableTree, ArithmeticArrayProperty, ArrayProperty, ExponentialHistogramParams, Heap,
     HistogramProperty, Inspector, LinearHistogramParams, NumericProperty, Property,
 };
-use inspect_format::{Container, WritableBlockContainer};
+use inspect_format::Container;
 use num::{pow, traits::FromPrimitive, One};
 use rand::Rng;
 use std::ops::{Add, Mul};

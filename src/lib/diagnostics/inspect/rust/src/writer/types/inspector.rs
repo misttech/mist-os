@@ -7,7 +7,7 @@ use diagnostics_hierarchy::{
     testing::{DiagnosticsHierarchyGetter, JsonGetter},
     DiagnosticsHierarchy,
 };
-use inspect_format::{constants, Container, ReadableBlockContainer, WritableBlockContainer};
+use inspect_format::{constants, BlockContainer, Container};
 use std::{borrow::Cow, cmp::max, default::Default, fmt, sync::Arc};
 use tracing::error;
 
@@ -22,7 +22,8 @@ pub struct Inspector {
     root_node: Arc<Node>,
 
     /// The storage backing the inspector. This is a VMO when working on Fuchsia.
-    pub(crate) storage: Option<<Container as ReadableBlockContainer>::BackingStorage>,
+    #[allow(dead_code)] // unused and meaningless in the host build.
+    storage: Option<Arc<<Container as BlockContainer>::ShareableData>>,
 }
 
 impl fmt::Debug for Inspector {
@@ -86,6 +87,11 @@ impl Inspector {
         })
     }
 
+    pub(crate) fn get_storage_handle(&self) -> Option<Arc<zx::Vmo>> {
+        // We can'just share a reference to the underlying vec<u8> storage, so we copy the data
+        self.storage.clone()
+    }
+
     /// Returns Ok(()) if VMO is frozen, and the generation count if it is not.
     /// Very unsafe. Propagates unrelated errors by panicking.
     #[cfg(test)]
@@ -105,10 +111,15 @@ impl Inspector {
 
 #[cfg(not(target_os = "fuchsia"))]
 impl Inspector {
-    pub(crate) fn duplicate_vmo(
-        &self,
-    ) -> Option<<Container as ReadableBlockContainer>::BackingStorage> {
-        self.storage.clone()
+    pub(crate) fn duplicate_vmo(&self) -> Option<<Container as BlockContainer>::Data> {
+        // We don't support getting a duplicate handle to the data on the host so we lock and copy
+        // the udnerlying data.
+        self.copy_vmo_data()
+    }
+
+    pub(crate) fn get_storage_handle(&self) -> Option<Vec<u8>> {
+        // We can'just share a reference to the underlying vec<u8> storage, so we copy the data
+        self.copy_vmo_data()
     }
 }
 
@@ -169,7 +180,7 @@ impl Inspector {
 pub struct InspectorConfig {
     is_no_op: bool,
     size: usize,
-    storage: Option<<Container as ReadableBlockContainer>::BackingStorage>,
+    storage: Option<Arc<<Container as BlockContainer>::ShareableData>>,
 }
 
 impl Default for InspectorConfig {
@@ -224,7 +235,7 @@ impl InspectorConfig {
 
     fn build(self) -> Inspector {
         if self.is_no_op {
-            return Self::create_no_op(self);
+            return self.create_no_op();
         }
 
         match Self::new_root(self.size) {
@@ -233,7 +244,7 @@ impl InspectorConfig {
             }
             Err(e) => {
                 error!("Failed to create root node. Error: {:?}", e);
-                return Self::create_no_op(self);
+                return self.create_no_op();
             }
         }
     }
@@ -241,11 +252,12 @@ impl InspectorConfig {
     /// Allocates a new VMO and initializes it.
     fn new_root(
         max_size: usize,
-    ) -> Result<(<Container as ReadableBlockContainer>::BackingStorage, Node), Error> {
+    ) -> Result<(Arc<<Container as BlockContainer>::ShareableData>, Node), Error> {
         let size = Self::adjusted_buffer_size(max_size);
         let (container, vmo) = Container::read_and_write(size).map_err(Error::AllocateVmo)?;
         let cname = std::ffi::CString::new("InspectHeap").unwrap();
         vmo.set_name(&cname).map_err(Error::AllocateVmo)?;
+        let vmo = Arc::new(vmo);
         let heap = Heap::new(container).map_err(|e| Error::CreateHeap(Box::new(e)))?;
         let state =
             State::create(heap, vmo.clone()).map_err(|e| Error::CreateState(Box::new(e)))?;
@@ -257,7 +269,7 @@ impl InspectorConfig {
 impl InspectorConfig {
     fn build(self) -> Inspector {
         if self.is_no_op {
-            return Self::create_no_op(self);
+            return self.create_no_op();
         }
 
         match Self::new_root(self.size) {
@@ -266,20 +278,20 @@ impl InspectorConfig {
             }
             Err(e) => {
                 error!("Failed to create root node. Error: {:?}", e);
-                return Self::create_no_op(self);
+                self.create_no_op()
             }
         }
     }
 
     fn new_root(
         max_size: usize,
-    ) -> Result<(Node, <Container as ReadableBlockContainer>::BackingStorage), Error> {
+    ) -> Result<(Node, Arc<<Container as BlockContainer>::ShareableData>), Error> {
         let size = Self::adjusted_buffer_size(max_size);
         let (container, storage) = Container::read_and_write(size).unwrap();
         let heap = Heap::new(container).map_err(|e| Error::CreateHeap(Box::new(e)))?;
-        let state =
-            State::create(heap, storage.clone()).map_err(|e| Error::CreateState(Box::new(e)))?;
-        Ok((Node::new_root(state), storage))
+        let state = State::create(heap, Arc::new(storage.clone()))
+            .map_err(|e| Error::CreateState(Box::new(e)))?;
+        Ok((Node::new_root(state), Arc::new(storage)))
     }
 }
 
