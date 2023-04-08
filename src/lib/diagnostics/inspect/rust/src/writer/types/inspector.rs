@@ -94,7 +94,7 @@ impl Inspector {
         let vmo = self.storage.as_ref().unwrap();
         let mut buffer: [u8; 16] = [0; 16];
         vmo.read(&mut buffer, 0).unwrap();
-        let block = Block::new(&buffer[..16], inspect_format::BlockIndex::EMPTY);
+        let block = Block::new(&buffer, inspect_format::BlockIndex::EMPTY);
         if block.header_generation_count().unwrap() == constants::VMO_FROZEN {
             Ok(())
         } else {
@@ -369,7 +369,10 @@ mod tests {
     #[fuchsia::test]
     async fn atomic_update() {
         let insp = Inspector::default();
-        let gen = insp.state().unwrap().generation_count();
+        let gen = insp
+            .state()
+            .unwrap()
+            .with_current_header(|header| header.header_generation_count().unwrap());
         insp.atomic_update(|n| {
             n.record_int("", 1);
             n.record_int("", 2);
@@ -377,7 +380,11 @@ mod tests {
             n.record_string("", "abcd");
         });
 
-        assert_eq!(gen + 2, insp.state().unwrap().generation_count());
+        let current_gen = insp
+            .state()
+            .unwrap()
+            .with_current_header(|header| header.header_generation_count().unwrap());
+        assert_eq!(gen + 2, current_gen);
     }
 }
 
@@ -414,7 +421,10 @@ mod fuchsia_tests {
     #[fuchsia::test]
     fn freeze_vmo_works() {
         let inspector = Inspector::default();
-        let initial = inspector.state().unwrap().generation_count();
+        let initial = inspector
+            .state()
+            .unwrap()
+            .with_current_header(|header| header.header_generation_count().unwrap());
         let vmo = inspector.frozen_vmo_copy();
 
         let is_frozen_result = inspector.is_frozen();

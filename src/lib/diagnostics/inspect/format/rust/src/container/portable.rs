@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{PtrEq, ReadBytes, ReadableBlockContainer, WritableBlockContainer, WriteBytes};
+use crate::{ReadBytes, ReadableBlockContainer, WritableBlockContainer, WriteBytes};
 use std::{
     convert::TryFrom,
     sync::{Arc, Mutex},
@@ -12,7 +12,7 @@ impl ReadBytes for Arc<Mutex<Vec<u8>>> {
     #[inline]
     fn read_at(&self, offset: usize, dst: &mut [u8]) {
         let guard = self.lock().unwrap();
-        ReadBytes::read_at(&guard.as_slice(), offset, dst);
+        ReadBytes::read_at(guard.as_slice(), offset, dst);
     }
 
     /// The number of bytes in the buffer.
@@ -22,15 +22,9 @@ impl ReadBytes for Arc<Mutex<Vec<u8>>> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Container {
     inner: Arc<Mutex<Vec<u8>>>,
-}
-
-impl PtrEq for Container {
-    fn ptr_eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.inner, &other.inner)
-    }
 }
 
 impl ReadableBlockContainer for Container {

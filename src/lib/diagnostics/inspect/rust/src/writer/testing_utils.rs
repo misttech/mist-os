@@ -16,7 +16,7 @@ pub fn get_state(size: usize) -> State {
 pub trait GetBlockExt: crate::private::InspectTypeInternal {
     fn get_block<F>(&self, callback: F)
     where
-        F: FnOnce(&Block<Container>) -> (),
+        F: FnOnce(&Block<&Container>) -> (),
     {
         let block_index = self.block_index().expect("block index is set");
         let state = self.state().expect("state is set");

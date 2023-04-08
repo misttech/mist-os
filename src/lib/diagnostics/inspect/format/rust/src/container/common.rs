@@ -29,7 +29,7 @@ pub trait ReadBytes {
 }
 
 /// Trait implemented by an Inspect container that can be written to.
-pub trait WritableBlockContainer: ReadableBlockContainer + ReadBytes + WriteBytes {
+pub trait WritableBlockContainer: ReadableBlockContainer + WriteBytes {
     /// Creates a block container from which it's possible to read and write.
     fn read_and_write(
         size: usize,
@@ -50,14 +50,7 @@ pub trait WriteBytes {
     }
 }
 
-/// Implemented to compare two inspect containers for equality, not for content equality, but just
-/// whether or not they are backed by the same reference.
-pub trait PtrEq<RHS = Self> {
-    /// Returns true if the other container is the same.
-    fn ptr_eq(&self, other: &RHS) -> bool;
-}
-
-impl ReadBytes for &[u8] {
+impl ReadBytes for [u8] {
     #[inline]
     fn read_at(&self, offset: usize, dst: &mut [u8]) {
         if offset >= self.len() {
@@ -72,5 +65,31 @@ impl ReadBytes for &[u8] {
     #[inline]
     fn len(&self) -> usize {
         <[u8]>::len(&self)
+    }
+}
+
+impl<const N: usize> ReadBytes for [u8; N] {
+    #[inline]
+    fn read_at(&self, offset: usize, dst: &mut [u8]) {
+        self.as_slice().read_at(offset, dst)
+    }
+
+    /// The number of bytes in the buffer.
+    #[inline]
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+}
+
+impl ReadBytes for Vec<u8> {
+    #[inline]
+    fn read_at(&self, offset: usize, dst: &mut [u8]) {
+        self.as_slice().read_at(offset, dst)
+    }
+
+    /// The number of bytes in the buffer.
+    #[inline]
+    fn len(&self) -> usize {
+        self.as_slice().len()
     }
 }

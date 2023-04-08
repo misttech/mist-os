@@ -28,7 +28,7 @@ impl<'t> Property<'t> for UintProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|state| state.set_uint_metric(inner_ref.block_index, value))
+                .and_then(|mut state| state.set_uint_metric(inner_ref.block_index, value))
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
                 });
@@ -42,7 +42,7 @@ impl NumericProperty<'_> for UintProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|state| state.add_uint_metric(inner_ref.block_index, value))
+                .and_then(|mut state| state.add_uint_metric(inner_ref.block_index, value))
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
                 });
@@ -54,7 +54,7 @@ impl NumericProperty<'_> for UintProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|state| state.subtract_uint_metric(inner_ref.block_index, value))
+                .and_then(|mut state| state.subtract_uint_metric(inner_ref.block_index, value))
                 .unwrap_or_else(|err| {
                     error!(?err, "Failed to set property");
                 });

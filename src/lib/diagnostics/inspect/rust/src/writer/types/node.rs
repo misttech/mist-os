@@ -47,7 +47,7 @@ impl Node {
                     .state
                     .try_lock()
                     .and_then(|mut state| state.create_node(name.into(), inner_ref.block_index))
-                    .map(|block| Node::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| Node::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(Node::new_no_op())
@@ -111,7 +111,7 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_int_metric(name.into(), value, inner_ref.block_index)
                     })
-                    .map(|block| IntProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| IntProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(IntProperty::new_no_op())
@@ -135,7 +135,7 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_uint_metric(name.into(), value, inner_ref.block_index)
                     })
-                    .map(|block| UintProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| UintProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(UintProperty::new_no_op())
@@ -159,7 +159,7 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_double_metric(name.into(), value, inner_ref.block_index)
                     })
-                    .map(|block| DoubleProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| DoubleProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(DoubleProperty::new_no_op())
@@ -187,7 +187,9 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_string_array(name.into(), slots, inner_ref.block_index)
                     })
-                    .map(|block| StringArrayProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| {
+                        StringArrayProperty::new(inner_ref.state.clone(), block_index)
+                    })
                     .ok()
             })
             .unwrap_or(StringArrayProperty::new_no_op())
@@ -219,7 +221,7 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_int_array(name.into(), slots, format, inner_ref.block_index)
                     })
-                    .map(|block| IntArrayProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| IntArrayProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(IntArrayProperty::new_no_op())
@@ -251,7 +253,7 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_uint_array(name.into(), slots, format, inner_ref.block_index)
                     })
-                    .map(|block| UintArrayProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| UintArrayProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(UintArrayProperty::new_no_op())
@@ -283,7 +285,9 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_double_array(name.into(), slots, format, inner_ref.block_index)
                     })
-                    .map(|block| DoubleArrayProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| {
+                        DoubleArrayProperty::new(inner_ref.state.clone(), block_index)
+                    })
                     .ok()
             })
             .unwrap_or(DoubleArrayProperty::new_no_op())
@@ -369,7 +373,7 @@ impl Node {
                             callback,
                         )
                     })
-                    .map(|block| LazyNode::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| LazyNode::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(LazyNode::new_no_op())
@@ -404,7 +408,7 @@ impl Node {
                             callback,
                         )
                     })
-                    .map(|block| LazyNode::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| LazyNode::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(LazyNode::new_no_op())
@@ -440,7 +444,7 @@ impl Node {
                             inner_ref.block_index,
                         )
                     })
-                    .map(|block| StringProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| StringProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(StringProperty::new_no_op())
@@ -473,7 +477,7 @@ impl Node {
                             inner_ref.block_index,
                         )
                     })
-                    .map(|block| BytesProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| BytesProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(BytesProperty::new_no_op())
@@ -497,7 +501,7 @@ impl Node {
                     .and_then(|mut state| {
                         state.create_bool(name.into(), value, inner_ref.block_index)
                     })
-                    .map(|block| BoolProperty::new(inner_ref.state.clone(), block.index()))
+                    .map(|block_index| BoolProperty::new(inner_ref.state.clone(), block_index))
                     .ok()
             })
             .unwrap_or(BoolProperty::new_no_op())

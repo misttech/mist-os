@@ -85,7 +85,7 @@ mod tests {
                 inner_ref
                     .state
                     .try_lock()
-                    .and_then(|mut state| {
+                    .and_then(|state| {
                         state.load_string(
                             state
                                 .get_block(self.block_index().unwrap())

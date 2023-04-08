@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{PtrEq, ReadBytes, ReadableBlockContainer, WritableBlockContainer, WriteBytes};
+use crate::{ReadBytes, ReadableBlockContainer, WritableBlockContainer, WriteBytes};
 use fuchsia_zircon as zx;
 use mapped_vmo::Mapping;
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Container {
     inner: Arc<Mapping>,
 }
@@ -33,12 +33,6 @@ impl ReadBytes for Arc<zx::Vmo> {
     #[inline]
     fn len(&self) -> usize {
         self.as_ref().len()
-    }
-}
-
-impl PtrEq for Container {
-    fn ptr_eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.inner, &other.inner)
     }
 }
 

@@ -58,7 +58,7 @@ impl TryFrom<&[u8]> for Scanner {
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
         let scanner = Scanner::new(None);
-        scanner.scan(ireader::snapshot::Snapshot::try_from(bytes)?, bytes)
+        scanner.scan(ireader::snapshot::Snapshot::try_from(bytes.to_vec())?, bytes)
     }
 }
 

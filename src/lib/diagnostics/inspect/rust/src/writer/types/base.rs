@@ -53,7 +53,7 @@ pub trait InspectTypeReparentable: private::InspectTypeInternal {
 
             new_parent_state
                 .try_lock()
-                .and_then(|state| state.reparent(child_index, new_parent_index))?;
+                .and_then(|mut state| state.reparent(child_index, new_parent_index))?;
         }
 
         Ok(())

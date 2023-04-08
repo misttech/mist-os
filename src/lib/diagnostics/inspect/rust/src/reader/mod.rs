@@ -170,7 +170,7 @@ impl TryFrom<Vec<u8>> for PartialNodeHierarchy {
     type Error = ReaderError;
 
     fn try_from(bytes: Vec<u8>) -> Result<Self, Self::Error> {
-        let snapshot = Snapshot::try_from(&bytes[..])?;
+        let snapshot = Snapshot::try_from(bytes)?;
         read_snapshot(&snapshot)
     }
 }
@@ -575,10 +575,9 @@ mod tests {
     use {
         super::*,
         crate::{
-            assert_data_tree, assert_json_diff,
-            private::InspectTypeInternal,
-            writer::{ArrayProperty, HistogramProperty, Inspector, StringReference},
-            ExponentialHistogramParams, LinearHistogramParams,
+            assert_data_tree, assert_json_diff, types::private::InspectTypeInternal, ArrayProperty,
+            ExponentialHistogramParams, HistogramProperty, Inspector, LinearHistogramParams,
+            StringReference,
         },
         anyhow::Error,
         futures::prelude::*,

@@ -417,14 +417,14 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
     bench = bench.with_function("Heap/create_1mb_vmo", |b| {
         b.iter_with_large_drop(|| {
             let (container, _) = Container::read_and_write(1 << 21).unwrap();
-            Heap::new(container).unwrap()
+            Heap::empty(container).unwrap()
         });
     });
     bench = bench.with_function("Heap/allocate_512k", |b| {
         b.iter_batched_ref(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
-                Heap::new(container).unwrap()
+                Heap::empty(container).unwrap()
             },
             |heap| {
                 for _ in 0..512 {
@@ -438,7 +438,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         b.iter_batched_ref(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
-                let mut heap = Heap::new(container).unwrap();
+                let mut heap = Heap::empty(container).unwrap();
                 for _ in 0..512 {
                     heap.allocate_block(2048).unwrap();
                 }
@@ -452,7 +452,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         b.iter_batched(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
-                let mut heap = Heap::new(container).unwrap();
+                let mut heap = Heap::empty(container).unwrap();
                 let mut blocks = vec![];
                 for _ in 0..512 {
                     blocks.push(heap.allocate_block(2048).unwrap());
@@ -471,7 +471,7 @@ fn bench_heap_extend(mut bench: criterion::Benchmark) -> criterion::Benchmark {
         b.iter_with_large_setup(
             || {
                 let (container, _) = Container::read_and_write(1 << 21).unwrap();
-                Heap::new(container).unwrap()
+                Heap::empty(container).unwrap()
             },
             |heap| criterion::black_box(drop(heap)),
         );

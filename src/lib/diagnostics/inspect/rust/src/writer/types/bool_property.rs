@@ -24,7 +24,7 @@ impl<'t> Property<'t> for BoolProperty {
             inner_ref
                 .state
                 .try_lock()
-                .and_then(|state| state.set_bool(inner_ref.block_index, value))
+                .and_then(|mut state| state.set_bool(inner_ref.block_index, value))
                 .unwrap_or_else(|e| {
                     error!("Failed to set property. Error: {:?}", e);
                 });
