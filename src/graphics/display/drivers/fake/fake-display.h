@@ -123,6 +123,8 @@ class FakeDisplay : public DeviceType,
   }
 
  private:
+  enum class BufferCollectionUsage : int32_t;
+
   zx_status_t SetupDisplayInterface();
   int VSyncThread();
   int CaptureThread() __TA_EXCLUDES(capture_lock_, display_lock_);
@@ -134,6 +136,23 @@ class FakeDisplay : public DeviceType,
   // On success, returns ZX_OK and the sysmem allocator client will be open
   // until the device is released.
   zx_status_t InitSysmemAllocatorClient();
+
+  fuchsia_sysmem::BufferCollectionConstraints CreateBufferCollectionConstraints(
+      BufferCollectionUsage usage);
+
+  // Constraints applicable to all buffers used for display images.
+  void SetBufferMemoryConstraints(fuchsia_sysmem::BufferMemoryConstraints& constraints);
+
+  // Constraints applicable to all image buffers used in Display.
+  void SetCommonImageFormatConstraints(fuchsia_sysmem::PixelFormatType pixel_format_type,
+                                       fuchsia_sysmem::FormatModifier format_modifier,
+                                       fuchsia_sysmem::ImageFormatConstraints& constraints);
+
+  // Constraints applicable to images buffers used in image capture.
+  void SetCaptureImageFormatConstraints(fuchsia_sysmem::ImageFormatConstraints& constraints);
+
+  // Constraints applicable to image buffers that will be bound to layers.
+  void SetLayerImageFormatConstraints(fuchsia_sysmem::ImageFormatConstraints& constraints);
 
   // Banjo vtable for fuchsia.hardware.display.controller.DisplayControllerImpl.
   const display_controller_impl_protocol_t display_controller_impl_banjo_protocol_;

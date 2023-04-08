@@ -20,7 +20,9 @@
 
 #include <algorithm>
 #include <cinttypes>
+#include <cstdint>
 #include <iterator>
+#include <limits>
 #include <memory>
 
 #include <ddktl/device.h>
@@ -329,6 +331,109 @@ zx_status_t FakeDisplay::DisplayControllerImplGetSysmemConnection(zx::channel co
   return ZX_OK;
 }
 
+enum class FakeDisplay::BufferCollectionUsage {
+  kPrimaryLayer = 1,
+  kCapture = 2,
+};
+
+fuchsia_sysmem::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionConstraints(
+    BufferCollectionUsage usage) {
+  fuchsia_sysmem::BufferCollectionConstraints constraints;
+  switch (usage) {
+    case BufferCollectionUsage::kCapture:
+      constraints.usage().cpu() =
+          fuchsia_sysmem::kCpuUsageReadOften | fuchsia_sysmem::kCpuUsageWriteOften;
+      break;
+    case BufferCollectionUsage::kPrimaryLayer:
+      constraints.usage().display() = fuchsia_sysmem::kDisplayUsageLayer;
+      break;
+  }
+
+  constraints.has_buffer_memory_constraints() = true;
+  SetBufferMemoryConstraints(constraints.buffer_memory_constraints());
+
+  // When we have C++20, we can use std::to_array to avoid specifying the array
+  // size twice.
+  static constexpr std::array<fuchsia_sysmem::PixelFormatType, 2> kPixelFormats = {
+      fuchsia_sysmem::PixelFormatType::kR8G8B8A8, fuchsia_sysmem::PixelFormatType::kBgra32};
+  static constexpr std::array<uint64_t, 2> kFormatModifiers = {
+      fuchsia_sysmem::kFormatModifierLinear, fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal};
+
+  size_t format_constraints_count = 0;
+  for (fuchsia_sysmem::PixelFormatType pixel_format : kPixelFormats) {
+    for (uint64_t format_modifier : kFormatModifiers) {
+      fuchsia_sysmem::ImageFormatConstraints& image_constraints =
+          constraints.image_format_constraints()[format_constraints_count];
+      ++format_constraints_count;
+
+      SetCommonImageFormatConstraints(pixel_format, fuchsia_sysmem::FormatModifier(format_modifier),
+                                      image_constraints);
+      switch (usage) {
+        case BufferCollectionUsage::kCapture:
+          SetCaptureImageFormatConstraints(image_constraints);
+          break;
+        case BufferCollectionUsage::kPrimaryLayer:
+          SetLayerImageFormatConstraints(image_constraints);
+          break;
+      }
+    }
+  }
+  constraints.image_format_constraints_count() = format_constraints_count;
+  return constraints;
+}
+
+void FakeDisplay::SetBufferMemoryConstraints(fuchsia_sysmem::BufferMemoryConstraints& constraints) {
+  constraints.min_size_bytes() = 0;
+  constraints.max_size_bytes() = std::numeric_limits<uint32_t>::max();
+  constraints.physically_contiguous_required() = false;
+  constraints.secure_required() = false;
+  constraints.ram_domain_supported() = true;
+  constraints.cpu_domain_supported() = true;
+  constraints.inaccessible_domain_supported() = true;
+}
+
+void FakeDisplay::SetCommonImageFormatConstraints(
+    fuchsia_sysmem::PixelFormatType pixel_format_type,
+    fuchsia_sysmem::FormatModifier format_modifier,
+    fuchsia_sysmem::ImageFormatConstraints& constraints) {
+  constraints.pixel_format().type() = pixel_format_type;
+  constraints.pixel_format().has_format_modifier() = true;
+  constraints.pixel_format().format_modifier() = format_modifier;
+
+  constraints.color_spaces_count() = 1;
+  constraints.color_space()[0].type() = fuchsia_sysmem::ColorSpaceType::kSrgb;
+
+  constraints.layers() = 1;
+  constraints.coded_width_divisor() = 1;
+  constraints.coded_height_divisor() = 1;
+  constraints.bytes_per_row_divisor() = 1;
+  constraints.start_offset_divisor() = 1;
+  constraints.display_width_divisor() = 1;
+  constraints.display_height_divisor() = 1;
+}
+
+void FakeDisplay::SetCaptureImageFormatConstraints(
+    fuchsia_sysmem::ImageFormatConstraints& constraints) {
+  constraints.min_coded_width() = kWidth;
+  constraints.max_coded_width() = kWidth;
+  constraints.min_coded_height() = kHeight;
+  constraints.max_coded_height() = kHeight;
+  constraints.min_bytes_per_row() = kWidth * 4;
+  constraints.max_bytes_per_row() = kWidth * 4;
+  constraints.max_coded_width_times_coded_height() = kWidth * kHeight;
+}
+
+void FakeDisplay::SetLayerImageFormatConstraints(
+    fuchsia_sysmem::ImageFormatConstraints& constraints) {
+  constraints.min_coded_width() = 0;
+  constraints.max_coded_width() = std::numeric_limits<uint32_t>::max();
+  constraints.min_coded_height() = 0;
+  constraints.max_coded_height() = std::numeric_limits<uint32_t>::max();
+  constraints.min_bytes_per_row() = 0;
+  constraints.max_bytes_per_row() = std::numeric_limits<uint32_t>::max();
+  constraints.max_coded_width_times_coded_height() = std::numeric_limits<uint32_t>::max();
+}
+
 zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
     const image_t* config, uint64_t collection_id) {
   const auto it = buffer_collections_.find(collection_id);
@@ -338,61 +443,10 @@ zx_status_t FakeDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   }
   const fidl::SyncClient<fuchsia_sysmem::BufferCollection>& collection = it->second;
 
-  fuchsia_sysmem::BufferCollectionConstraints constraints;
-  if (config->type == IMAGE_TYPE_CAPTURE) {
-    constraints.usage().cpu() =
-        fuchsia_sysmem::kCpuUsageReadOften | fuchsia_sysmem::kCpuUsageWriteOften;
-  } else {
-    constraints.usage().display() = fuchsia_sysmem::kDisplayUsageLayer;
-  }
-
-  constraints.has_buffer_memory_constraints() = true;
-  auto& buffer_constraints = constraints.buffer_memory_constraints();
-  buffer_constraints.min_size_bytes() = 0;
-  buffer_constraints.max_size_bytes() = 0xffffffff;
-  buffer_constraints.physically_contiguous_required() = false;
-  buffer_constraints.secure_required() = false;
-  buffer_constraints.ram_domain_supported() = true;
-  buffer_constraints.cpu_domain_supported() = true;
-  buffer_constraints.inaccessible_domain_supported() = true;
-  constraints.image_format_constraints_count() = 4;
-  for (size_t i = 0; i < constraints.image_format_constraints_count(); i++) {
-    auto& image_constraints = constraints.image_format_constraints()[i];
-    image_constraints.pixel_format().type() = i & 0b01 ? fuchsia_sysmem::PixelFormatType::kR8G8B8A8
-                                                       : fuchsia_sysmem::PixelFormatType::kBgra32;
-    image_constraints.pixel_format().has_format_modifier() = true;
-    image_constraints.pixel_format().format_modifier().value() =
-        i & 0b10 ? fuchsia_sysmem::kFormatModifierLinear
-                 : fuchsia_sysmem::kFormatModifierGoogleGoldfishOptimal;
-    image_constraints.color_spaces_count() = 1;
-    image_constraints.color_space()[0].type() = fuchsia_sysmem::ColorSpaceType::kSrgb;
-    if (config->type == IMAGE_TYPE_CAPTURE) {
-      image_constraints.min_coded_width() = kWidth;
-      image_constraints.max_coded_width() = kWidth;
-      image_constraints.min_coded_height() = kHeight;
-      image_constraints.max_coded_height() = kHeight;
-      image_constraints.min_bytes_per_row() = kWidth * 4;
-      image_constraints.max_bytes_per_row() = kWidth * 4;
-      image_constraints.max_coded_width_times_coded_height() = kWidth * kHeight;
-    } else {
-      image_constraints.min_coded_width() = 0;
-      image_constraints.max_coded_width() = 0xffffffff;
-      image_constraints.min_coded_height() = 0;
-      image_constraints.max_coded_height() = 0xffffffff;
-      image_constraints.min_bytes_per_row() = 0;
-      image_constraints.max_bytes_per_row() = 0xffffffff;
-      image_constraints.max_coded_width_times_coded_height() = 0xffffffff;
-    }
-    image_constraints.layers() = 1;
-    image_constraints.coded_width_divisor() = 1;
-    image_constraints.coded_height_divisor() = 1;
-    image_constraints.bytes_per_row_divisor() = 1;
-    image_constraints.start_offset_divisor() = 1;
-    image_constraints.display_width_divisor() = 1;
-    image_constraints.display_height_divisor() = 1;
-  }
-
-  auto set_result = collection->SetConstraints({true, std::move(constraints)});
+  BufferCollectionUsage usage = (config->type == IMAGE_TYPE_CAPTURE)
+                                    ? BufferCollectionUsage::kCapture
+                                    : BufferCollectionUsage::kPrimaryLayer;
+  auto set_result = collection->SetConstraints({true, CreateBufferCollectionConstraints(usage)});
   if (set_result.is_error()) {
     zxlogf(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
            set_result.error_value().status_string());
