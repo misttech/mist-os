@@ -105,7 +105,7 @@ macro_rules! metric_fns {
             ) -> Result<BlockIndex, Error> {
                 let (block_index, name_block_index) = self.allocate_reserved_value(
                     name, parent_index, constants::MIN_ORDER_SIZE)?;
-                self.heap.container.at_mut(block_index)
+                self.heap.container.block_at_mut(block_index)
                     .[<become_ $name _value>](value, name_block_index, parent_index)?;
                 Ok(block_index)
             }
@@ -193,7 +193,7 @@ macro_rules! arithmetic_array_fns {
                 }
                 let (block_index, name_block_index) = self.allocate_reserved_value(
                     name, parent_index, block_size)?;
-                self.heap.container.at_mut(block_index).become_array_value(
+                self.heap.container.block_at_mut(block_index).become_array_value(
                     slots, array_format, BlockType::$value, name_block_index, parent_index)?;
                 Ok(block_index)
             }
@@ -357,7 +357,7 @@ impl<'a> LockedStateGuard<'a> {
 impl<'a> LockedStateGuard<'a> {
     fn new(mut inner_lock: MutexGuard<'a, InnerState>) -> Result<Self, Error> {
         if inner_lock.transaction_count == 0 {
-            let mut header = inner_lock.heap.container.at_mut(BlockIndex::HEADER);
+            let mut header = inner_lock.heap.container.block_at_mut(BlockIndex::HEADER);
             header.lock_header()?;
         }
         Ok(Self {
@@ -511,7 +511,7 @@ impl Drop for LockedStateGuard<'_> {
             self.inner_lock
                 .heap
                 .container
-                .at_mut(BlockIndex::HEADER)
+                .block_at_mut(BlockIndex::HEADER)
                 .unlock_header()
                 .unwrap_or_else(|e| {
                     error!(?e, "Failed to unlock header");
@@ -578,7 +578,7 @@ impl InnerState {
             return Ok(None);
         }
 
-        let mut header = self.heap.container.at_mut(BlockIndex::HEADER);
+        let mut header = self.heap.container.block_at_mut(BlockIndex::HEADER);
         let old = header.freeze_header()?;
         let ret = self
             .storage
@@ -612,7 +612,7 @@ impl InnerState {
 
     fn lock_header(&mut self) {
         if self.transaction_count == 0 {
-            let res = self.heap.container.at_mut(BlockIndex::HEADER).lock_header();
+            let res = self.heap.container.block_at_mut(BlockIndex::HEADER).lock_header();
             debug_assert!(res.is_ok());
         }
         self.transaction_count += 1;
@@ -621,7 +621,7 @@ impl InnerState {
     fn unlock_header(&mut self) {
         self.transaction_count -= 1;
         if self.transaction_count == 0 {
-            let res = self.heap.container.at_mut(BlockIndex::HEADER).unlock_header();
+            let res = self.heap.container.block_at_mut(BlockIndex::HEADER).unlock_header();
             debug_assert!(res.is_ok());
         }
     }
@@ -634,7 +634,10 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        self.heap.container.at_mut(block_index).become_node(name_block_index, parent_index)?;
+        self.heap
+            .container
+            .block_at_mut(block_index)
+            .become_node(name_block_index, parent_index)?;
         Ok(block_index)
     }
 
@@ -693,8 +696,11 @@ impl InnerState {
         let (value_block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
         let result = self.get_or_create_string_reference(content).and_then(|content_block_index| {
-            self.heap.container.at_mut(content_block_index).increment_string_reference_count()?;
-            self.heap.container.at_mut(value_block_index).become_link(
+            self.heap
+                .container
+                .block_at_mut(content_block_index)
+                .increment_string_reference_count()?;
+            self.heap.container.block_at_mut(value_block_index).become_link(
                 name_block_index,
                 parent_index,
                 content_block_index,
@@ -727,7 +733,7 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        self.heap.container.at_mut(block_index).become_property(
+        self.heap.container.block_at_mut(block_index).become_property(
             name_block_index,
             parent_index,
             format,
@@ -753,7 +759,7 @@ impl InnerState {
                 let block_index = self.heap.allocate_block(utils::block_size_for_payload(
                     string_reference.len() + constants::STRING_REFERENCE_TOTAL_LENGTH_BYTES,
                 ))?;
-                self.heap.container.at_mut(block_index).become_string_reference()?;
+                self.heap.container.block_at_mut(block_index).become_string_reference()?;
                 self.write_string_reference_payload(block_index, &string_reference)?;
                 self.string_reference_block_indexes.insert(string_reference, block_index);
                 Ok(block_index)
@@ -778,7 +784,7 @@ impl InnerState {
             Ok(inlined) => (BlockIndex::EMPTY, inlined),
             Err(e) => return Err(e),
         };
-        let mut block = self.heap.container.at_mut(block_index);
+        let mut block = self.heap.container.block_at_mut(block_index);
         block.set_extent_next_index(head_extent)?;
         block.set_total_length(bytes_written)?;
         Ok(())
@@ -795,20 +801,21 @@ impl InnerState {
         // Safety: we convert from usize to u32 here, because we know that there are fewer
         // than u32::MAX bytes written inline in even the largest string reference block.
         // This allows safe promotion to usize anywhere necessary later.
-        Ok(self.heap.container.at_mut(block_index).write_string_reference_inline(value)? as u32)
+        Ok(self.heap.container.block_at_mut(block_index).write_string_reference_inline(value)?
+            as u32)
     }
 
     /// Decrement the reference count on the block and free it if the count is 0.
     /// This is the function to call if you want to give up your hold on a StringReference.
     fn release_string_reference(&mut self, block_index: BlockIndex) -> Result<(), Error> {
-        self.heap.container.at_mut(block_index).decrement_string_reference_count()?;
+        self.heap.container.block_at_mut(block_index).decrement_string_reference_count()?;
         self.maybe_free_string_reference(block_index)
     }
 
     /// Free a STRING_REFERENCE if the count is 0. This should not be
     /// directly called outside of tests.
     fn maybe_free_string_reference(&mut self, block_index: BlockIndex) -> Result<(), Error> {
-        let block = self.heap.container.at(block_index);
+        let block = self.heap.container.block_at(block_index);
         if block.string_reference_count()? != 0 {
             return Ok(());
         }
@@ -896,7 +903,7 @@ impl InnerState {
             original_parent_block.set_child_count(child_count)?;
         }
 
-        self.heap.container.at_mut(being_reparented).set_parent(new_parent)?;
+        self.heap.container.block_at_mut(being_reparented).set_parent(new_parent)?;
 
         if new_parent != BlockIndex::ROOT {
             let mut new_parent_block = self.heap.get_block_mut(new_parent)?;
@@ -915,7 +922,7 @@ impl InnerState {
     ) -> Result<BlockIndex, Error> {
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, constants::MIN_ORDER_SIZE)?;
-        self.heap.container.at_mut(block_index).become_bool_value(
+        self.heap.container.block_at_mut(block_index).become_bool_value(
             value,
             name_block_index,
             parent_index,
@@ -951,7 +958,7 @@ impl InnerState {
         }
         let (block_index, name_block_index) =
             self.allocate_reserved_value(name, parent_index, block_size)?;
-        self.heap.container.at_mut(block_index).become_array_value(
+        self.heap.container.block_at_mut(block_index).become_array_value(
             slots,
             ArrayFormat::Default,
             BlockType::StringReference,
@@ -978,21 +985,21 @@ impl InnerState {
 
         let reference_index = if !value.is_empty() {
             let reference_index = self.get_or_create_string_reference(value.into())?;
-            self.heap.container.at_mut(reference_index).increment_string_reference_count()?;
+            self.heap.container.block_at_mut(reference_index).increment_string_reference_count()?;
             reference_index
         } else {
             BlockIndex::EMPTY
         };
 
         let existing_index =
-            self.heap.container.at(block_index).array_get_string_index_slot(slot_index)?;
+            self.heap.container.block_at(block_index).array_get_string_index_slot(slot_index)?;
         if existing_index != BlockIndex::EMPTY {
             self.release_string_reference(existing_index)?;
         }
 
         self.heap
             .container
-            .at_mut(block_index)
+            .block_at_mut(block_index)
             .array_set_string_slot(slot_index, reference_index)?;
         Ok(())
     }
@@ -1006,13 +1013,13 @@ impl InnerState {
     ) -> Result<(), Error> {
         match self.heap.get_block(block_index)?.array_entry_type()? {
             value if value.is_numeric_value() => {
-                self.heap.container.at_mut(block_index).array_clear(start_slot_index)?
+                self.heap.container.block_at_mut(block_index).array_clear(start_slot_index)?
             }
             BlockType::StringReference => {
-                let array_slots = self.heap.container.at(block_index).array_slots()?;
+                let array_slots = self.heap.container.block_at(block_index).array_slots()?;
                 for i in start_slot_index..array_slots {
                     let index = {
-                        let mut block = self.heap.container.at_mut(block_index);
+                        let mut block = self.heap.container.block_at_mut(block_index);
                         let index = block.array_get_string_index_slot(i)?;
                         if index == BlockIndex::EMPTY {
                             continue;
@@ -1039,7 +1046,7 @@ impl InnerState {
         let block_index = self.heap.allocate_block(block_size)?;
         let name_block_index = match self.get_or_create_string_reference(name) {
             Ok(b_index) => {
-                self.heap.container.at_mut(b_index).increment_string_reference_count()?;
+                self.heap.container.block_at_mut(b_index).increment_string_reference_count()?;
                 b_index
             }
             Err(err) => {
@@ -1049,7 +1056,7 @@ impl InnerState {
         };
 
         let result = {
-            let mut parent_block = self.heap.container.at_mut(parent_index);
+            let mut parent_block = self.heap.container.block_at_mut(parent_index);
             let parent_block_type = parent_block.block_type();
             match parent_block_type {
                 BlockType::NodeValue | BlockType::Tombstone => {
@@ -1098,7 +1105,7 @@ impl InnerState {
 
         // If the block is a NODE and has children, make it a TOMBSTONE so that
         // it's freed when the last of its children is freed. Otherwise, free it.
-        let mut block = self.heap.container.at_mut(block_index);
+        let mut block = self.heap.container.block_at_mut(block_index);
         if block.block_type() == BlockType::NodeValue && block.child_count()? != 0 {
             block.become_tombstone()?;
         } else {
@@ -1113,9 +1120,9 @@ impl InnerState {
         block_index: BlockIndex,
         value: &[u8],
     ) -> Result<(), Error> {
-        self.free_extents(self.heap.container.at(block_index).property_extent_index()?)?;
+        self.free_extents(self.heap.container.block_at(block_index).property_extent_index()?)?;
         let (extent_index, written) = self.write_extents(value)?;
-        let mut block = self.heap.container.at_mut(block_index);
+        let mut block = self.heap.container.block_at_mut(block_index);
         block.set_total_length(written)?;
         block.set_property_extent_index(extent_index)?;
         Ok(())
@@ -1143,7 +1150,7 @@ impl InnerState {
         let mut extent_block_index = head_extent_index;
         while offset < total_size {
             let bytes_written = {
-                let mut extent_block = self.heap.container.at_mut(extent_block_index);
+                let mut extent_block = self.heap.container.block_at_mut(extent_block_index);
                 extent_block.become_extent(BlockIndex::EMPTY)?;
                 extent_block.extent_set_contents(&value[offset..])?
             };
@@ -1162,7 +1169,7 @@ impl InnerState {
                 };
                 self.heap
                     .container
-                    .at_mut(extent_block_index)
+                    .block_at_mut(extent_block_index)
                     .set_extent_next_index(block_index)?;
                 extent_block_index = block_index;
             }

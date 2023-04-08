@@ -58,14 +58,14 @@ impl<T: Deref<Target = Q>, Q> Block<T> {
 
 pub trait BlockAccessorExt: ReadBytes + Sized {
     #[inline]
-    fn at(&self, index: BlockIndex) -> Block<&Self> {
+    fn block_at(&self, index: BlockIndex) -> Block<&Self> {
         Block::new(self, index)
     }
 }
 
 pub trait BlockAccessorMutExt: WriteBytes + Sized {
     #[inline]
-    fn at_mut(&mut self, index: BlockIndex) -> Block<&mut Self> {
+    fn block_at_mut(&mut self, index: BlockIndex) -> Block<&mut Self> {
         Block::new(self, index)
     }
 }
@@ -1198,11 +1198,11 @@ mod tests {
         assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-        let old = container.at_mut(BlockIndex::HEADER).freeze_header().unwrap();
+        let old = container.block_at_mut(BlockIndex::HEADER).freeze_header().unwrap();
         assert_8_bytes!(container, 8, [0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
         assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        assert!(container.at_mut(BlockIndex::HEADER).thaw_header(old).is_ok());
+        assert!(container.block_at_mut(BlockIndex::HEADER).thaw_header(old).is_ok());
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 16, [0x020, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
@@ -1225,7 +1225,7 @@ mod tests {
         assert_8_bytes!(container, 16, [0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         // Can't lock locked header.
-        let mut block = container.at_mut(BlockIndex::HEADER);
+        let mut block = container.block_at_mut(BlockIndex::HEADER);
         assert!(block.lock_header().is_err());
         assert!(block.unlock_header().is_ok());
         assert!(!block.header_is_locked().unwrap());
@@ -1238,7 +1238,7 @@ mod tests {
         // Test overflow: set payload bytes to max u64 value. Ensure we cannot lock
         // and after unlocking, the value is zero.
         container.set_value(8, u64::max_value());
-        let mut block = container.at_mut(BlockIndex::HEADER);
+        let mut block = container.block_at_mut(BlockIndex::HEADER);
         assert!(block.lock_header().is_err());
         assert!(block.unlock_header().is_ok());
         assert_eq!(block.header_generation_count().unwrap(), 0);
@@ -1270,7 +1270,7 @@ mod tests {
         assert_8_bytes!(container, 16, [0x00, 0x00, 0x4, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 24, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_eq!(
-            container.at_mut(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap() as usize,
+            container.block_at_mut(BlockIndex::HEADER).header_vmo_size().unwrap().unwrap() as usize,
             constants::DEFAULT_VMO_SIZE_BYTES
         );
     }
@@ -1327,7 +1327,7 @@ mod tests {
         assert!(block.become_node(2.into(), 3.into()).is_ok());
         assert_8_bytes!(container, 0, [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_child_count(4).is_ok());
         assert_eq!(block.child_count().unwrap(), 4);
         assert_8_bytes!(container, 0, [0x01, 0x03, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
@@ -1366,7 +1366,7 @@ mod tests {
         assert_8_bytes!(container, 0, [0x01, 0x08, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert_eq!(block.extent_set_contents(&"test-rust-inspect".as_bytes()).unwrap(), 17);
         assert_eq!(
             String::from_utf8(block.extent_contents().unwrap().to_vec()).unwrap(),
@@ -1377,7 +1377,7 @@ mod tests {
         let slice = container.get_slice_at(25, 7).unwrap();
         assert_eq!(slice, &[0, 0, 0, 0, 0, 0, 0]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_extent_next_index(4.into()).is_ok());
         assert_eq!(*block.next_extent().unwrap(), 4);
 
@@ -1428,7 +1428,7 @@ mod tests {
         assert_8_bytes!(container, 0, [0x01, 0x06, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0x3f]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_double_value(5.0).is_ok());
         assert_eq!(block.double_value().unwrap(), 5.0);
         assert_8_bytes!(container, 0, [0x01, 0x06, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
@@ -1460,7 +1460,7 @@ mod tests {
         assert_8_bytes!(container, 0, [0x1, 0x04, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_int_value(-5).is_ok());
         assert_eq!(block.int_value().unwrap(), -5);
         assert_8_bytes!(container, 0, [0x1, 0x04, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
@@ -1488,7 +1488,7 @@ mod tests {
         assert_8_bytes!(container, 0, [0x01, 0x05, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_uint_value(5).is_ok());
         assert_eq!(block.uint_value().unwrap(), 5);
         assert_8_bytes!(container, 0, [0x01, 0x05, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
@@ -1517,7 +1517,7 @@ mod tests {
         assert_8_bytes!(container, 0, [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_bool_value(true).is_ok());
         assert_eq!(block.bool_value().unwrap(), true);
         assert_8_bytes!(container, 0, [0x01, 0x0D, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
@@ -1567,13 +1567,13 @@ mod tests {
         let bad_block = Block::new(&bad_container, BlockIndex::EMPTY);
         assert!(bad_block.property_format().is_err()); // Make sure we get Error not panic
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_property_extent_index(4.into()).is_ok());
         assert_eq!(*block.property_extent_index().unwrap(), 4);
         assert_8_bytes!(container, 0, [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
         assert_8_bytes!(container, 8, [0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x10]);
 
-        let mut block = container.at_mut(BlockIndex::EMPTY);
+        let mut block = container.block_at_mut(BlockIndex::EMPTY);
         assert!(block.set_total_length(10).is_ok());
         assert_eq!(block.total_length().unwrap(), 10);
         assert_8_bytes!(container, 0, [0x01, 0x07, 0x03, 0x00, 0x00, 0x02, 0x00, 0x00]);
@@ -1884,7 +1884,7 @@ mod tests {
         assert!(bad_block.array_format().is_err());
         assert!(bad_block.array_entry_type().is_err());
 
-        let block = container.at(BlockIndex::EMPTY);
+        let block = container.block_at(BlockIndex::EMPTY);
         for i in 0..4 {
             assert_eq!(block.array_get_uint_slot(i).unwrap(), (i as u64 + 1) * 5);
         }
@@ -1972,7 +1972,7 @@ mod tests {
         for i in 1..4 {
             assert_eq!(
                 0,
-                container.at(BlockIndex::EMPTY).array_get_uint_slot(i).expect("get uint")
+                container.block_at(BlockIndex::EMPTY).array_get_uint_slot(i).expect("get uint")
             );
             assert_8_bytes!(
                 container,

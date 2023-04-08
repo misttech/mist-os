@@ -40,7 +40,7 @@ impl Snapshot {
     /// Gets the block at the given |index|.
     pub fn get_block(&self, index: BlockIndex) -> Option<ScannedBlock<'_>> {
         if index.offset() < (&self.buffer).len() {
-            Some(self.buffer.at(index))
+            Some(self.buffer.block_at(index))
         } else {
             None
         }
@@ -63,7 +63,7 @@ impl Snapshot {
         // Read the generation count one time
         let mut header_bytes: [u8; 32] = [0; 32];
         source.copy_bytes(&mut header_bytes);
-        let header_block = header_bytes.at(BlockIndex::HEADER);
+        let header_block = header_bytes.block_at(BlockIndex::HEADER);
         let generation = header_block.header_generation_count();
 
         let Ok(gen) = generation else {
@@ -431,7 +431,7 @@ mod tests {
         header.become_reserved()?;
         header.become_header(size)?;
         let result = get_snapshot!(container, storage, || {
-            let mut header = container.at_mut(BlockIndex::HEADER);
+            let mut header = container.block_at_mut(BlockIndex::HEADER);
             header.lock_header().unwrap();
             header.unlock_header().unwrap();
         });
