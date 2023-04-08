@@ -5,7 +5,10 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_PANEL_CONFIG_H_
 
+#include <lib/stdcompat/span.h>
 #include <zircon/types.h>
+
+#include <cstdint>
 
 namespace amlogic_display {
 
