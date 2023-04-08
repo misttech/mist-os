@@ -112,14 +112,14 @@ macro_rules! metric_fns {
 
             fn [<set_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
                 -> Result<(), Error> {
-                let mut block = self.heap.get_block_mut(block_index)?;
+                let mut block = self.heap.container.block_at_mut(block_index);
                 block.[<set_ $name _value>](value)?;
                 Ok(())
             }
 
             fn [<add_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
                 -> Result<(), Error> {
-                let mut block = self.heap.get_block_mut(block_index)?;
+                let mut block = self.heap.container.block_at_mut(block_index);
                 let current_value = block.[<$name _value>]()?;
                 block.[<set_ $name _value>](current_value.safe_add(value))?;
                 Ok(())
@@ -127,7 +127,7 @@ macro_rules! metric_fns {
 
             fn [<subtract_ $name _metric>](&mut self, block_index: BlockIndex, value: $type)
                 -> Result<(), Error> {
-                let mut block = self.heap.get_block_mut(block_index)?;
+                let mut block = self.heap.container.block_at_mut(block_index);
                 let current_value = block.[<$name _value>]()?;
                 let new_value = current_value.safe_sub(value);
                 block.[<set_ $name _value>](new_value)?;
@@ -135,7 +135,7 @@ macro_rules! metric_fns {
             }
 
             fn [<get_ $name _metric>](&self, block_index: BlockIndex) -> Result<$type, Error> {
-                let block = self.heap.get_block(block_index)?;
+                let block = self.heap.container.block_at(block_index);
                 let current_value = block.[<$name _value>]()?;
                 Ok(current_value)
             }
@@ -201,7 +201,7 @@ macro_rules! arithmetic_array_fns {
             pub fn [<set_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
             ) -> Result<(), Error> {
-                let mut block = self.heap.get_block_mut(block_index)?;
+                let mut block = self.heap.container.block_at_mut(block_index);
                 block.[<array_set_ $name _slot>](slot_index, value)?;
                 Ok(())
             }
@@ -209,7 +209,7 @@ macro_rules! arithmetic_array_fns {
             pub fn [<add_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
             ) -> Result<(), Error> {
-                let mut block = self.heap.get_block_mut(block_index)?;
+                let mut block = self.heap.container.block_at_mut(block_index);
                 let previous_value = block.[<array_get_ $name _slot>](slot_index)?;
                 let new_value = previous_value.safe_add(value);
                 block.[<array_set_ $name _slot>](slot_index, new_value)?;
@@ -219,7 +219,7 @@ macro_rules! arithmetic_array_fns {
             pub fn [<subtract_array_ $name _slot>](
                 &mut self, block_index: BlockIndex, slot_index: usize, value: $type
             ) -> Result<(), Error> {
-                let mut block = self.heap.get_block_mut(block_index)?;
+                let mut block = self.heap.container.block_at_mut(block_index);
                 let previous_value = block.[<array_get_ $name _slot>](slot_index)?;
                 let new_value = previous_value.safe_sub(value);
                 block.[<array_set_ $name _slot>](slot_index, new_value)?;
@@ -541,7 +541,7 @@ impl<'a> LockedStateGuard<'a> {
     }
 
     pub(crate) fn get_block(&self, index: BlockIndex) -> Block<&Container> {
-        self.inner_lock.heap.get_block(index).expect("block exists")
+        self.inner_lock.heap.container.block_at(index)
     }
 
     fn header(&self) -> Block<&Container> {
@@ -549,7 +549,7 @@ impl<'a> LockedStateGuard<'a> {
     }
 
     fn get_block_mut(&mut self, index: BlockIndex) -> Block<&mut Container> {
-        self.inner_lock.heap.get_block_mut(index).unwrap()
+        self.inner_lock.heap.container.block_at_mut(index)
     }
 }
 
@@ -662,7 +662,7 @@ impl InnerState {
     /// Frees a LINK block at the given |index|.
     fn free_lazy_node(&mut self, index: BlockIndex) -> Result<(), Error> {
         let (content_block_index, content_block_type) = {
-            let block = self.heap.get_block(index)?;
+            let block = self.heap.container.block_at(index);
             (block.link_content_index()?, block.block_type())
         };
         let content = self.load_key_string(content_block_index)?.into();
@@ -830,7 +830,7 @@ impl InnerState {
     }
 
     fn load_key_string(&self, index: BlockIndex) -> Result<String, Error> {
-        let block = self.heap.get_block(index)?;
+        let block = self.heap.container.block_at(index);
         match block.block_type() {
             BlockType::StringReference => self.read_string_reference(block),
             BlockType::Name => {
@@ -845,7 +845,7 @@ impl InnerState {
         let mut content = block.inline_string_reference()?.to_vec();
         let mut next = block.next_extent()?;
         while next != BlockIndex::EMPTY {
-            let next_block = self.heap.get_block(next)?;
+            let next_block = self.heap.container.block_at(next);
             content.extend_from_slice(&mut next_block.extent_contents()?);
             next = next_block.next_extent()?;
         }
@@ -856,7 +856,7 @@ impl InnerState {
 
     /// Free a PROPERTY block.
     fn free_property(&mut self, index: BlockIndex) -> Result<(), Error> {
-        let property_extent_index = self.heap.get_block(index)?.property_extent_index()?;
+        let property_extent_index = self.heap.container.block_at(index).property_extent_index()?;
         self.free_extents(property_extent_index)?;
         self.delete_value(index)?;
         Ok(())
@@ -884,7 +884,7 @@ impl InnerState {
                 return Err(Error::AdoptAncestor);
             }
 
-            being_checked = self.heap.get_block(being_checked)?.parent_index()?;
+            being_checked = self.heap.container.block_at(being_checked).parent_index()?;
         }
 
         Ok(())
@@ -896,9 +896,9 @@ impl InnerState {
         new_parent: BlockIndex,
     ) -> Result<(), Error> {
         self.check_lineage(being_reparented, new_parent)?;
-        let original_parent_idx = self.heap.get_block(being_reparented)?.parent_index()?;
+        let original_parent_idx = self.heap.container.block_at(being_reparented).parent_index()?;
         if original_parent_idx != BlockIndex::ROOT {
-            let mut original_parent_block = self.heap.get_block_mut(original_parent_idx)?;
+            let mut original_parent_block = self.heap.container.block_at_mut(original_parent_idx);
             let child_count = original_parent_block.child_count()? - 1;
             original_parent_block.set_child_count(child_count)?;
         }
@@ -906,7 +906,7 @@ impl InnerState {
         self.heap.container.block_at_mut(being_reparented).set_parent(new_parent)?;
 
         if new_parent != BlockIndex::ROOT {
-            let mut new_parent_block = self.heap.get_block_mut(new_parent)?;
+            let mut new_parent_block = self.heap.container.block_at_mut(new_parent);
             let child_count = new_parent_block.child_count()? + 1;
             new_parent_block.set_child_count(child_count)?;
         }
@@ -931,7 +931,7 @@ impl InnerState {
     }
 
     fn set_bool(&mut self, block_index: BlockIndex, value: bool) -> Result<(), Error> {
-        let mut block = self.heap.get_block_mut(block_index)?;
+        let mut block = self.heap.container.block_at_mut(block_index);
         block.set_bool_value(value)?;
         Ok(())
     }
@@ -969,7 +969,7 @@ impl InnerState {
     }
 
     fn get_array_size(&self, block_index: BlockIndex) -> Result<usize, Error> {
-        let block = self.heap.get_block(block_index)?;
+        let block = self.heap.container.block_at(block_index);
         block.array_slots().map_err(|e| Error::VmoFormat(e))
     }
 
@@ -979,7 +979,7 @@ impl InnerState {
         slot_index: usize,
         value: StringReference,
     ) -> Result<(), Error> {
-        if self.heap.get_block(block_index)?.array_slots()? <= slot_index {
+        if self.heap.container.block_at(block_index).array_slots()? <= slot_index {
             return Err(Error::VmoFormat(FormatError::ArrayIndexOutOfBounds(slot_index)));
         }
 
@@ -1011,7 +1011,7 @@ impl InnerState {
         block_index: BlockIndex,
         start_slot_index: usize,
     ) -> Result<(), Error> {
-        match self.heap.get_block(block_index)?.array_entry_type()? {
+        match self.heap.container.block_at(block_index).array_entry_type()? {
             value if value.is_numeric_value() => {
                 self.heap.container.block_at_mut(block_index).array_clear(start_slot_index)?
             }
@@ -1079,13 +1079,13 @@ impl InnerState {
     }
 
     fn delete_value(&mut self, block_index: BlockIndex) -> Result<(), Error> {
-        let block = self.heap.get_block(block_index).unwrap();
+        let block = self.heap.container.block_at(block_index);
         let parent_index = block.parent_index()?;
         let name_index = block.name_index()?;
 
         // Decrement parent child count.
         if parent_index != BlockIndex::ROOT {
-            let mut parent = self.heap.get_block_mut(parent_index)?;
+            let mut parent = self.heap.container.block_at_mut(parent_index);
             let child_count = parent.child_count()? - 1;
             if parent.block_type() == BlockType::Tombstone && child_count == 0 {
                 drop(parent); // drop exclusive reference.
@@ -1096,7 +1096,7 @@ impl InnerState {
         }
 
         // Free the name block.
-        match self.heap.get_block(name_index)?.block_type() {
+        match self.heap.container.block_at(name_index).block_type() {
             BlockType::StringReference => {
                 self.release_string_reference(name_index)?;
             }
@@ -1131,7 +1131,7 @@ impl InnerState {
     fn free_extents(&mut self, head_extent_index: BlockIndex) -> Result<(), Error> {
         let mut index = head_extent_index;
         while index != BlockIndex::ROOT {
-            let next_index = self.heap.get_block(index)?.next_extent()?;
+            let next_index = self.heap.container.block_at(index).next_extent()?;
             self.heap.free_block(index)?;
             index = next_index;
         }

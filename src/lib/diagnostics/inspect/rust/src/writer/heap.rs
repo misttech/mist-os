@@ -146,32 +146,6 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
             && block.order() == buddy_block.order()
     }
 
-    /// Returns the block at the given `index` or an error if the index is out of bounds.
-    pub fn get_block(&self, index: BlockIndex) -> Result<Block<&T>, Error> {
-        let offset = index.offset();
-        if offset >= self.current_size_bytes {
-            return Err(Error::invalid_index(index, "offset exceeds current size"));
-        }
-        let block = self.container.block_at(index);
-        if self.current_size_bytes - offset < utils::order_to_size(block.order()) {
-            return Err(Error::invalid_index(index, "order exceeds current size"));
-        }
-        Ok(block)
-    }
-
-    /// Returns the block at the given `index` or an error if the index is out of bounds.
-    pub fn get_block_mut(&mut self, index: BlockIndex) -> Result<Block<&mut T>, Error> {
-        let offset = index.offset();
-        if offset >= self.current_size_bytes {
-            return Err(Error::invalid_index(index, "offset exceeds current size"));
-        }
-        let block = self.container.block_at_mut(index);
-        if self.current_size_bytes - offset < utils::order_to_size(block.order()) {
-            return Err(Error::invalid_index(index, "order exceeds current size"));
-        }
-        Ok(block)
-    }
-
     /// Returns a copy of the bytes stored in this Heap.
     pub(crate) fn bytes(&self) -> Vec<u8> {
         self.container.get_slice(self.current_size_bytes).unwrap().to_vec()
@@ -213,10 +187,8 @@ impl<T: ReadBytes + WriteBytes> Heap<T> {
         if (*index as usize) >= self.current_size_bytes / constants::MIN_ORDER_SIZE {
             return false;
         }
-        match self.get_block(index) {
-            Err(_) => false,
-            Ok(block) => block.block_type() == BlockType::Free && block.order() == expected_order,
-        }
+        let block = self.container.block_at(index);
+        block.block_type() == BlockType::Free && block.order() == expected_order
     }
 
     fn remove_free(&mut self, block_index: BlockIndex) -> Result<bool, Error> {
@@ -434,7 +406,7 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 0);
-        assert_eq!(*heap.get_block(0.into()).unwrap().free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 0);
 
         assert!(heap.free_block(BlockIndex::from(128)).is_ok());
         let expected = [
@@ -443,8 +415,8 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 128);
-        assert_eq!(*heap.get_block(0.into()).unwrap().free_next_index().unwrap(), 0);
-        assert_eq!(*heap.get_block(128.into()).unwrap().free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
         assert_eq!(heap.failed_allocations, 0);
     }
 
@@ -506,8 +478,8 @@ mod tests {
         assert!(BlockIterator::from(&buffer).skip(3).all(|b| *b.free_next_index().unwrap() == 0));
         assert_eq!(*heap.free_head_per_order[1], 0);
         assert_eq!(*heap.free_head_per_order[0], 2);
-        assert_eq!(*heap.get_block(0.into()).unwrap().free_next_index().unwrap(), 0);
-        assert_eq!(*heap.get_block(2.into()).unwrap().free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(2.into()).free_next_index().unwrap(), 0);
 
         assert!(heap.free_block(BlockIndex::from(3)).is_ok());
         let expected = [
@@ -516,8 +488,8 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[1], 0);
-        assert_eq!(*heap.get_block(0.into()).unwrap().free_next_index().unwrap(), 128);
-        assert_eq!(*heap.get_block(128.into()).unwrap().free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 128);
+        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
     }
 
     #[fuchsia::test]
@@ -540,7 +512,7 @@ mod tests {
         ];
         validate(&expected, &heap);
         assert_eq!(*heap.free_head_per_order[7], 384);
-        assert_eq!(*heap.get_block(384.into()).unwrap().free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(384.into()).free_next_index().unwrap(), 0);
 
         let b = heap.allocate_block(2048).unwrap();
         assert_eq!(*b, 384);
@@ -564,12 +536,12 @@ mod tests {
         validate(&expected, &heap);
         assert_eq!(heap.current_size_bytes, 2048 * 4 + 4096);
         assert_eq!(*heap.free_head_per_order[7], 512);
-        assert_eq!(*heap.get_block(512.into()).unwrap().free_next_index().unwrap(), 384);
-        assert_eq!(*heap.get_block(384.into()).unwrap().free_next_index().unwrap(), 256);
-        assert_eq!(*heap.get_block(256.into()).unwrap().free_next_index().unwrap(), 128);
-        assert_eq!(*heap.get_block(128.into()).unwrap().free_next_index().unwrap(), 0);
-        assert_eq!(*heap.get_block(0.into()).unwrap().free_next_index().unwrap(), 640);
-        assert_eq!(*heap.get_block(640.into()).unwrap().free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(512.into()).free_next_index().unwrap(), 384);
+        assert_eq!(*heap.container.block_at(384.into()).free_next_index().unwrap(), 256);
+        assert_eq!(*heap.container.block_at(256.into()).free_next_index().unwrap(), 128);
+        assert_eq!(*heap.container.block_at(128.into()).free_next_index().unwrap(), 0);
+        assert_eq!(*heap.container.block_at(0.into()).free_next_index().unwrap(), 640);
+        assert_eq!(*heap.container.block_at(640.into()).free_next_index().unwrap(), 0);
         assert_eq!(heap.failed_allocations, 0);
     }
 
