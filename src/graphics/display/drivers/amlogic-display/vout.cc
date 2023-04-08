@@ -36,7 +36,7 @@ constexpr supported_features_t kDsiSupportedFeatures = supported_features_t{
 
 constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
     .afbc = false,
-    .capture = false,
+    .capture = true,
     .hpd = true,
 };
 
