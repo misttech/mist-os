@@ -15,6 +15,7 @@ primary node "sdio-function-1" {
   fuchsia.BIND_SDIO_FUNCTION == 1;
   accept fuchsia.BIND_SDIO_PID {
     fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4345,
+    fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4359,
   }
 }
 
@@ -24,6 +25,7 @@ node "sdio-function-2" {
   fuchsia.BIND_SDIO_FUNCTION == 2;
   accept fuchsia.BIND_SDIO_PID {
     fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4345,
+    fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4359,
   }
 }
 
