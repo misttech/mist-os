@@ -1,19 +1,20 @@
-// Copyright 2021 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 composite wifi;
 
-using fuchsia.amlogic.platform.t931;
+using fuchsia.amlogic.platform.a311d;
 using fuchsia.gpio;
 using fuchsia.sdio;
+using fuchsia.broadcom.sdio;
 
 primary node "sdio-function-1" {
   fuchsia.BIND_PROTOCOL == fuchsia.sdio.BIND_PROTOCOL.DEVICE;
   fuchsia.BIND_SDIO_VID == 0x02d0;
   fuchsia.BIND_SDIO_FUNCTION == 1;
   accept fuchsia.BIND_SDIO_PID {
-    0x4345,
+    fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4359
   }
 }
 
@@ -22,11 +23,11 @@ node "sdio-function-2" {
   fuchsia.BIND_SDIO_VID == 0x02d0;
   fuchsia.BIND_SDIO_FUNCTION == 2;
   accept fuchsia.BIND_SDIO_PID {
-    0x4345,
+    fuchsia.broadcom.sdio.BIND_SDIO_PID.BCM4359
   }
 }
 
 node "gpio-oob" {
   fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.t931.GPIOX_PIN_ID.PIN_7; // T931_WIFI_HOST_WAKE
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.a311d.GPIOX_PIN_ID.PIN_7; // VIM3_WIFI_WAKE_HOST
 }

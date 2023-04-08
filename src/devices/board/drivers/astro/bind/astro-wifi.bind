@@ -14,7 +14,6 @@ primary node "sdio-function-1" {
   fuchsia.BIND_SDIO_FUNCTION == 1;
   accept fuchsia.BIND_SDIO_PID {
     0x4345,
-    0x4359,
   }
 }
 
@@ -24,7 +23,6 @@ node "sdio-function-2" {
   fuchsia.BIND_SDIO_FUNCTION == 2;
   accept fuchsia.BIND_SDIO_PID {
     0x4345,
-    0x4359,
   }
 }
 

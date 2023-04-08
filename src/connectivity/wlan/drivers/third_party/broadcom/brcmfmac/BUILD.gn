@@ -332,6 +332,14 @@ brcmfmac_driver("brcmfmac-nelson-mfg") {
   diagnostic_deps = [ "//src/diagnostics/config/triage:brcmfmac-detect" ]
 }
 
+brcmfmac_driver("brcmfmac-vim3") {
+  board = "vim3"
+  bus = "sdio"
+  chip = "brcmfmac4359"
+  clm_present = false
+  diagnostic_deps = [ "//src/diagnostics/config/triage:brcmfmac-detect" ]
+}
+
 # The test package, including tests in subdirs.
 group("brcmfmac_tests") {
   deps = [
