@@ -192,6 +192,18 @@ void riscv64_page_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* f
                 (pf_flags & VMM_PF_FLAG_WRITE) ? "write" : "read", tval);
 }
 
+void riscv64_access_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* frame, bool user) {
+  const char* type_str = (cause == RISCV64_EXCEPTION_IACCESS_FAULT)        ? "instruction"
+                         : (cause == RISCV64_EXCEPTION_STORE_ACCESS_FAULT) ? "write"
+                                                                           : "read";
+
+  LTRACEF("Access fault: %s, address %#lx\n", type_str, tval);
+
+  arch_enable_ints();
+  vmm_accessed_fault_handler(tval);
+  arch_disable_ints();
+}
+
 void riscv64_illegal_instruction_handler(int64_t cause, uint64_t tval, struct iframe_t* frame,
                                          bool user) {
   if (!user) {
@@ -266,6 +278,11 @@ extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame)
       case RISCV64_EXCEPTION_STORE_PAGE_FAULT:
         riscv64_page_fault_handler(cause, tval, frame, user);
         break;
+      case RISCV64_EXCEPTION_IACCESS_FAULT:
+      case RISCV64_EXCEPTION_LOAD_ACCESS_FAULT:
+      case RISCV64_EXCEPTION_STORE_ACCESS_FAULT:
+        riscv64_access_fault_handler(cause, tval, frame, user);
+        break;
       case RISCV64_EXCEPTION_ILLEGAL_INS:
         riscv64_illegal_instruction_handler(cause, tval, frame, user);
         break;
@@ -283,9 +300,6 @@ extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame)
       case RISCV64_EXCEPTION_IADDR_MISALIGN:
       case RISCV64_EXCEPTION_LOAD_ADDR_MISALIGN:
       case RISCV64_EXCEPTION_STORE_ADDR_MISALIGN:
-      case RISCV64_EXCEPTION_IACCESS_FAULT:
-      case RISCV64_EXCEPTION_LOAD_ACCESS_FAULT:
-      case RISCV64_EXCEPTION_STORE_ACCESS_FAULT:
       default:
         fatal_exception(cause, tval, frame);
     }
