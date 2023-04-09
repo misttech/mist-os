@@ -214,6 +214,15 @@ void riscv64_illegal_instruction_handler(int64_t cause, uint64_t tval, struct if
   try_dispatch_user_exception(ZX_EXCP_UNDEFINED_INSTRUCTION, cause, tval, frame, 0);
 }
 
+void riscv64_breakpoint_handler(int64_t cause, uint64_t tval, struct iframe_t* frame, bool user) {
+  if (!user) {
+    // Trapped inside the kernel, this is bad.
+    exception_die(frame, cause, tval,
+                  "ebreak instruction exception in kernel: PC at %#" PRIx64 "\n", frame->regs.pc);
+  }
+  try_dispatch_user_exception(ZX_EXCP_HW_BREAKPOINT, cause, tval, frame, 0);
+}
+
 void riscv64_syscall_handler(struct iframe_t* frame) {
   // Push the PC forward over the ECALL instruction. By definition the ECALL instruction
   // is 32 bits wide, and cannot be implemented as a compressed 16 bit instruction.
@@ -286,6 +295,9 @@ extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame)
       case RISCV64_EXCEPTION_ILLEGAL_INS:
         riscv64_illegal_instruction_handler(cause, tval, frame, user);
         break;
+      case RISCV64_EXCEPTION_BREAKPOINT:
+        riscv64_breakpoint_handler(cause, tval, frame, user);
+        break;
       case RISCV64_EXCEPTION_ENV_CALL_U_MODE:
         if (unlikely(!user)) {
           exception_die(frame, cause, tval, "syscall from supervisor mode\n");
@@ -296,7 +308,6 @@ extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame)
         exception_die(frame, cause, tval, "syscall from supervisor mode\n");
         break;
       // TODO-rvbringup: add handlers for the following
-      case RISCV64_EXCEPTION_BREAKPOINT:
       case RISCV64_EXCEPTION_IADDR_MISALIGN:
       case RISCV64_EXCEPTION_LOAD_ADDR_MISALIGN:
       case RISCV64_EXCEPTION_STORE_ADDR_MISALIGN:
