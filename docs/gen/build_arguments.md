@@ -61,7 +61,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1832
+From //build/config/BUILDCONFIG.gn:1850
 
 ### allow_legacy_data_partition_names
 
@@ -1583,7 +1583,7 @@ Controls whether to promote warnings to errors.
 
 **Current value (from the default):** `true`
 
-From //build/config/BUILD.gn:34
+From //build/config/BUILD.gn:35
 
 ### deprecated_x86_legacy_boot_protocol
 
@@ -2623,7 +2623,7 @@ remove this option when the issues are addressed.
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILD.gn:30
+From //build/config/BUILD.gn:31
 
 ### enable_grpc_ares
 
@@ -3065,7 +3065,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1579
+From //build/config/BUILDCONFIG.gn:1597
 
 ### extra_vbmeta_descriptors
 
@@ -4387,40 +4387,40 @@ Each element of the list is one variant, which is a scope defining:
   name = "novariant"
 }, {
   configs = ["//build/config/profile:coverage"]
-  tags = ["instrumented", "coverage", "llvm-profdata"]
+  tags = ["instrumented", "coverage", "llvm-profdata", "needs-writable-globals"]
 }, {
   configs = ["//build/config/profile:coverage-rust"]
-  tags = ["instrumented", "coverage", "llvm-profdata"]
+  tags = ["instrumented", "coverage", "llvm-profdata", "needs-writable-globals"]
 }, {
   configs = ["//build/config/profile"]
-  tags = ["instrumented", "profile", "llvm-profdata"]
+  tags = ["instrumented", "profile", "llvm-profdata", "needs-writable-globals"]
 }, {
   configs = ["//build/config/profile:coverage-cts"]
   tags = ["instrumented", "coverage", "llvm-profdata"]
 }, {
   configs = ["//build/config/sanitizers:tsan"]
-  tags = ["tsan", "instrumentation-runtime", "instrumented", "uses-shadow", "kernel-excluded"]
+  tags = ["tsan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "uses-shadow", "kernel-excluded"]
 }, {
   configs = ["//build/config/sanitizers:hwasan"]
-  tags = ["hwasan", "instrumentation-runtime", "instrumented", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only"]
+  tags = ["hwasan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only"]
 }, {
   configs = ["//build/config/sanitizers:hwasan", "//build/config/sanitizers:ubsan"]
-  tags = ["hwasan", "instrumentation-runtime", "instrumented", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only", "ubsan"]
+  tags = ["hwasan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "replaces-allocator", "uses-shadow", "fuchsia-only", "ubsan"]
 }, {
   configs = ["//build/config/sanitizers:ubsan"]
   remove_common_configs = ["//build/config:no_rtti"]
-  tags = ["instrumented", "instrumentation-runtime", "kernel-excluded", "ubsan"]
+  tags = ["instrumented", "instrumentation-runtime", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "ubsan"]
 }, {
   configs = ["//build/config/sanitizers:ubsan", "//build/config/sanitizers:sancov"]
   remove_common_configs = ["//build/config:no_rtti"]
-  tags = ["instrumented", "instrumentation-runtime", "kernel-excluded", "sancov", "ubsan"]
+  tags = ["instrumented", "instrumentation-runtime", "needs-compiler-abi", "needs-writable-globals", "kernel-excluded", "sancov", "ubsan"]
 }, {
   configs = ["//build/config/sanitizers:asan"]
   host_only = {
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   remove_common_configs = ["//build/config:default_frame_pointers"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/sanitizers:ubsan"]
@@ -4428,7 +4428,7 @@ Each element of the list is one variant, which is a scope defining:
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   remove_common_configs = ["//build/config:default_frame_pointers", "//build/config:no_rtti"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "ubsan"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "ubsan"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/sanitizers:sancov"]
@@ -4436,25 +4436,25 @@ Each element of the list is one variant, which is a scope defining:
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   remove_common_configs = ["//build/config:default_frame_pointers"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "sancov"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "sancov"]
   toolchain_args = { }
 }, {
-  configs = ["//build/config/sanitizers:asan", "//build/config/zircon:no_safestack"]
+  configs = ["//build/config/sanitizers:asan", "//build/config:no-safe-stack"]
   host_only = {
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   name = "kasan"
   remove_common_configs = []
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-only"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-only"]
   toolchain_args = { }
 }, {
-  configs = ["//build/config/sanitizers:asan", "//build/config/zircon:no_safestack", "//build/config/sanitizers:sancov"]
+  configs = ["//build/config/sanitizers:asan", "//build/config:no-safe-stack", "//build/config/sanitizers:sancov"]
   host_only = {
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
 }
   name = "kasan-sancov"
   remove_common_configs = []
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-only", "sancov"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-only", "sancov"]
   toolchain_args = { }
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config/fuzzer", "//build/config/sanitizers:rust-asan", "//build/config:icf"]
@@ -4464,7 +4464,7 @@ Each element of the list is one variant, which is a scope defining:
   name = "asan-fuzzer"
   remove_common_configs = ["//build/config:default_frame_pointers", "//build/config:icf"]
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
-  tags = ["asan", "instrumentation-runtime", "instrumented", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "fuzzer"]
+  tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-excluded", "fuzzer"]
   toolchain_args = {
   asan_default_options = "alloc_dealloc_mismatch=0:check_malloc_usable_size=0:detect_odr_violation=0:max_uar_stack_size_log=16:print_scariness=1:allocator_may_return_null=1:detect_leaks=0:detect_stack_use_after_return=1:malloc_context_size=128:print_summary=1:print_suppressions=0:strict_memcmp=0:symbolize=0"
 }
@@ -4473,7 +4473,7 @@ Each element of the list is one variant, which is a scope defining:
   name = "ubsan-fuzzer"
   remove_common_configs = ["//build/config:icf", "//build/config:no_rtti"]
   remove_shared_configs = ["//build/config:symbol_no_undefined"]
-  tags = ["fuzzer", "instrumented", "instrumentation-runtime", "ubsan"]
+  tags = ["fuzzer", "instrumented", "instrumentation-runtime", "needs-compiler-abi", "ubsan"]
 }, {
   name = "gcc"
   tags = ["gcc"]
@@ -4485,7 +4485,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1393
+From //build/config/BUILDCONFIG.gn:1401
 
 ### legacy_base_driver_package_labels
 
@@ -7557,7 +7557,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1822
+From //build/config/BUILDCONFIG.gn:1840
 
 ### select_variant_canonical
 
@@ -7567,7 +7567,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1827
+From //build/config/BUILDCONFIG.gn:1845
 
 ### select_variant_shortcuts
 
@@ -7619,7 +7619,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1625
+From //build/config/BUILDCONFIG.gn:1643
 
 ### size_checker_input
 
@@ -8055,7 +8055,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1609
+From //build/config/BUILDCONFIG.gn:1627
 
 ### universe_package_labels
 
