@@ -1,1 +1,3 @@
-mcgrathr@google.com
+include /zircon/system/ulib/c/OWNERS
+
+# COMPONENT: Zircon>libc
