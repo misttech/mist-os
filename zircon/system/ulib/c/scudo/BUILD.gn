@@ -40,6 +40,7 @@ libc_source_set("scudo") {
     "report.cpp",
     "rss_limit_checker.cpp",
     "string_utils.cpp",
+    "timing.cpp",
   ]
 
   # The code needs to be compiled separately for production and test use for
@@ -244,6 +245,7 @@ libc_test("unittests") {
     "tests/size_class_map_test.cpp",
     "tests/stats_test.cpp",
     "tests/strings_test.cpp",
+    "tests/timing_test.cpp",
     "tests/tsd_test.cpp",
     "tests/vector_test.cpp",
   ]
