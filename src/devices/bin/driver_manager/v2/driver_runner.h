@@ -73,7 +73,9 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   // Goes through the orphan list and attempts the bind them again. Sends nodes that are still
   // orphaned back to the orphan list. Tracks the result of the bindings and then when finished
   // uses the result_callback to report the results.
-  void TryBindAllOrphans(NodeBindingInfoResultCallback result_callback);
+  void TryBindAllOrphans(
+      NodeBindingInfoResultCallback result_callback =
+          [](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>) {});
 
   // Only exposed for testing.
   CompositeNodeSpecManager& composite_node_spec_manager() { return composite_node_spec_manager_; }
@@ -100,6 +102,19 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
   std::unordered_set<const DriverHost*> DriverHostsWithDriverUrl(std::string_view url);
 
  private:
+  using BindMatchCompleteCallback = fit::callback<void()>;
+
+  struct CreateComponentOpts {
+    const Node* node = nullptr;
+    zx::handle token;
+    fidl::ServerEnd<fuchsia_io::Directory> exposed_dir;
+  };
+
+  struct BindRequest {
+    std::weak_ptr<Node> node;
+    std::shared_ptr<BindResultTracker> tracker;
+  };
+
   // fidl::WireServer<fuchsia_component_runner::ComponentRunner>
   void Start(StartRequestView request, StartCompleter::Sync& completer) override;
   // NodeManager
@@ -111,14 +126,14 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
 
   zx::result<DriverHost*> CreateDriverHost() override;
 
-  // The untracked version of TryBindAllOrphans.
-  void TryBindAllOrphansUntracked();
+  void BindInternal(
+      Node& node, std::shared_ptr<BindResultTracker> result_tracker,
+      BindMatchCompleteCallback match_complete_callback = []() {});
 
-  struct CreateComponentOpts {
-    const Node* node = nullptr;
-    zx::handle token;
-    fidl::ServerEnd<fuchsia_io::Directory> exposed_dir;
-  };
+  // Process any pending bind requests that were queued during an ongoing bind process.
+  // Should only be called when |bind_orphan_ongoing_| is true.
+  void ProcessPendingBindRequests();
+
   zx::result<> CreateComponent(std::string name, Collection collection, std::string url,
                                CreateComponentOpts opts);
 
@@ -141,6 +156,17 @@ class DriverRunner : public fidl::WireServer<fuchsia_component_runner::Component
 
   std::unordered_map<zx_koid_t, Node&> driver_args_;
   fbl::DoublyLinkedList<std::unique_ptr<DriverHostComponent>> driver_hosts_;
+
+  // True when a call to TryBindAllOrphans() or Bind() was made and not yet completed.
+  // Set to false by ProcessPendingBindRequests().
+  bool bind_orphan_ongoing_ = false;
+
+  // Queue of TryBindAllOrphans() callbacks pending for the next TryBindAllOrphans() trigger.
+  std::vector<NodeBindingInfoResultCallback> pending_orphan_rebind_callbacks_;
+
+  // Queue of Bind() calls that are made while there's an ongoing bind process. Once the process
+  // is complete, ProcessPendingBindRequests() goes through the queue.
+  std::vector<BindRequest> pending_bind_requests_;
 
   // Orphaned nodes are nodes that have failed to bind to a driver, either
   // because no matching driver could be found, or because the matching driver

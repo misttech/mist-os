@@ -187,7 +187,7 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
       loader_service_factory_(std::move(loader_service_factory)),
       dispatcher_(dispatcher),
       root_node_(std::make_shared<Node>(kRootDeviceName, std::vector<Node*>{}, this, dispatcher)),
-      composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphansUntracked(); }),
+      composite_device_manager_(this, dispatcher, [this]() { this->TryBindAllOrphans(); }),
       composite_node_spec_manager_(this) {
   inspector.GetRoot().CreateLazyNode(
       "driver_runner", [this] { return Inspect(); }, &inspector);
@@ -200,7 +200,7 @@ DriverRunner::DriverRunner(fidl::ClientEnd<fcomponent::Realm> realm,
   next_driver_host_id_ = distrib(gen);
 }
 
-void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllOrphansUntracked(); }
+void DriverRunner::BindNodesForCompositeNodeSpec() { TryBindAllOrphans(); }
 
 void DriverRunner::AddSpec(AddSpecRequestView request, AddSpecCompleter::Sync& completer) {
   if (!request->has_name() || !request->has_parents()) {
@@ -311,22 +311,41 @@ void DriverRunner::ScheduleBaseDriversBinding() {
           return;
         }
 
-        TryBindAllOrphansUntracked();
+        TryBindAllOrphans();
       });
 }
 
 void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callback) {
+  // If there's an ongoing process to bind all orphans, queue up this callback. Once
+  // the process is complete, it'll make another attempt to bind all orphans and invoke
+  // all callbacks in the list.
+  if (bind_orphan_ongoing_) {
+    pending_orphan_rebind_callbacks_.push_back(std::move(result_callback));
+    return;
+  }
+
   if (orphaned_nodes_.empty()) {
     result_callback(fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>());
     return;
   }
 
+  bind_orphan_ongoing_ = true;
+
   // Clear our stored map of orphaned nodes. It will be repopulated with in Bind().
   std::unordered_map<std::string, std::weak_ptr<Node>> orphaned_nodes = std::move(orphaned_nodes_);
   orphaned_nodes_ = {};
 
+  // In case there is a pending call to TryBindAllOrphans() after this one, we automatically restart
+  // the process and call all queued up callbacks upon completion.
+  auto next_attempt =
+      [this, result_callback = std::move(result_callback)](
+          fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) mutable {
+        result_callback(results);
+        ProcessPendingBindRequests();
+      };
+
   std::shared_ptr<BindResultTracker> tracker =
-      std::make_shared<BindResultTracker>(orphaned_nodes.size(), std::move(result_callback));
+      std::make_shared<BindResultTracker>(orphaned_nodes.size(), std::move(next_attempt));
 
   for (auto& [path, weak_node] : orphaned_nodes) {
     auto node = weak_node.lock();
@@ -335,14 +354,8 @@ void DriverRunner::TryBindAllOrphans(NodeBindingInfoResultCallback result_callba
       continue;
     }
 
-    Bind(*node, tracker);
+    BindInternal(*node, tracker);
   }
-}
-
-void DriverRunner::TryBindAllOrphansUntracked() {
-  NodeBindingInfoResultCallback empty_callback =
-      [](fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo>) {};
-  TryBindAllOrphans(std::move(empty_callback));
 }
 
 zx::result<> DriverRunner::StartDriver(Node& node, std::string_view url,
@@ -429,13 +442,35 @@ void DriverRunner::Start(StartRequestView request, StartCompleter::Sync& complet
 }
 
 void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tracker) {
-  // Check the DFv1 composites first, and don't bind to others if they match.
-  if (composite_device_manager_.BindNode(node.shared_from_this())) {
+  if (bind_orphan_ongoing_) {
+    pending_bind_requests_.push_back(BindRequest{
+        .node = node.weak_from_this(),
+        .tracker = result_tracker,
+    });
     return;
   }
 
-  auto match_callback = [this, weak_node = node.weak_from_this(), result_tracker](
-                            fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>& result) {
+  bind_orphan_ongoing_ = true;
+
+  auto next_attempt = [this]() mutable { ProcessPendingBindRequests(); };
+  BindInternal(node, result_tracker, next_attempt);
+}
+
+void DriverRunner::BindInternal(Node& node, std::shared_ptr<BindResultTracker> result_tracker,
+                                BindMatchCompleteCallback match_complete_callback) {
+  // Check the DFv1 composites first, and don't bind to others if they match.
+  if (composite_device_manager_.BindNode(node.shared_from_this())) {
+    if (result_tracker) {
+      result_tracker->ReportSuccessfulBind(node.MakeComponentMoniker(), "");
+    }
+    match_complete_callback();
+    return;
+  }
+
+  auto match_callback = [this, weak_node = node.weak_from_this(), result_tracker,
+                         match_complete_callback = std::move(match_complete_callback)](
+                            fidl::WireUnownedResult<fdi::DriverIndex::MatchDriver>&
+                                result) mutable {
     auto shared_node = weak_node.lock();
 
     auto report_no_bind = fit::defer([&result_tracker]() {
@@ -444,18 +479,20 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       }
     });
 
+    // TODO(fxb/125100): Add an additional guard to ensure that the node is still available for
+    // binding when the match callback is fired. Currently, there are no issues from it, but it
+    // is something we should address.
     if (!shared_node) {
       LOGF(WARNING, "Node was freed before it could be bound");
+      match_complete_callback();
       return;
     }
 
     Node& node = *shared_node;
     auto driver_node = &node;
-    auto orphaned = [this, &driver_node] {
-      auto moniker = driver_node->MakeComponentMoniker();
-      ZX_ASSERT_MSG(orphaned_nodes_.emplace(moniker, driver_node->weak_from_this()).second,
-                    "Multiple nodes with the component moniker '%s' are added to orphaned nodes",
-                    moniker.c_str());
+    auto orphaned = [this, &driver_node, &match_complete_callback] {
+      orphaned_nodes_.emplace(driver_node->MakeComponentMoniker(), driver_node->weak_from_this());
+      match_complete_callback();
     };
 
     if (!result.ok()) {
@@ -516,11 +553,12 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
         return;
       }
 
-      auto composite_node_and_driver = result.value();
 
       // If it doesn't have a value but there was no error it just means the node was added
       // to a composite node spec but the spec is still incomplete.
+      auto composite_node_and_driver = result.value();
       if (!composite_node_and_driver.has_value()) {
+        match_complete_callback();
         return;
       }
 
@@ -557,9 +595,39 @@ void DriverRunner::Bind(Node& node, std::shared_ptr<BindResultTracker> result_tr
       result_tracker->ReportSuccessfulBind(driver_node->MakeComponentMoniker(),
                                            driver_info.url().get());
     }
+    match_complete_callback();
   };
   fidl::Arena<> arena;
   driver_index_->MatchDriver(node.CreateMatchArgs(arena)).Then(std::move(match_callback));
+}
+
+void DriverRunner::ProcessPendingBindRequests() {
+  ZX_ASSERT(bind_orphan_ongoing_);
+  bind_orphan_ongoing_ = false;
+
+  // Go through all the pending bind requests.
+  for (auto& request : pending_bind_requests_) {
+    if (auto locked_node = request.node.lock()) {
+      BindInternal(*locked_node, request.tracker);
+      continue;
+    }
+
+    if (request.tracker) {
+      request.tracker->ReportNoBind();
+    }
+  }
+  pending_bind_requests_.clear();
+
+  // If there are any pending callbacks for TryBindAllOrphans(), begin a new attempt.
+  if (!pending_orphan_rebind_callbacks_.empty()) {
+    TryBindAllOrphans(
+        [callbacks = std::move(pending_orphan_rebind_callbacks_)](
+            fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> results) mutable {
+          for (auto& callback : callbacks) {
+            callback(results);
+          }
+        });
+  }
 }
 
 zx::result<DriverHost*> DriverRunner::CreateDriverHost() {
