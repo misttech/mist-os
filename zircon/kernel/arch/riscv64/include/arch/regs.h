@@ -56,10 +56,10 @@ struct alignas(16) iframe_t {
 
 struct arch_exception_context {
   iframe_t* frame;
-  uint64_t scause;
+  int64_t cause;
+  uint64_t tval;
   uint32_t user_synth_code;
   uint32_t user_synth_data;
-  bool is_page_fault;
 };
 
 static_assert(sizeof(iframe_t) % 16u == 0u);
