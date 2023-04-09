@@ -13,6 +13,7 @@ import("//build/config/linker.gni")
 import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/goma.gni")
+import("//build/toolchain/variant.gni")
 
 if (support_rust) {
   import("//build/rust/config.gni")
@@ -300,7 +301,7 @@ config("default_include_dirs") {
   ]
 }
 
-config("linker_gc") {
+variant("linker_gc") {
   cflags = [
     "-fdata-sections",
     "-ffunction-sections",
@@ -317,10 +318,6 @@ config("linker_gc") {
 
 config("default_linker_gc") {
   configs = [ ":linker_gc" ]
-}
-
-# Implicit dependencies for linker_gc config.
-group("linker_gc_deps") {
 }
 
 config("linker_string_merging") {
@@ -1071,8 +1068,35 @@ config("werror") {
   }
 }
 
-config("no_stack_protector") {
+config("no-stack-protector") {
   cflags = [ "-fno-stack-protector" ]
+}
+
+variant("no-safe-stack") {
+  if (!is_gcc) {
+    cflags = [ "-fno-sanitize=safe-stack" ]
+  }
+}
+
+config("no-shadow-call-stack") {
+  if ((current_cpu == "arm64" || current_cpu == "riscv64") && !is_gcc) {
+    cflags = [ "-fno-sanitize=shadow-call-stack" ]
+  }
+}
+
+variant("no-compiler-abi") {
+  configs = [
+    ":no-safe-stack",
+    ":no-shadow-call-stack",
+    ":no-stack-protector",
+  ]
+
+  if (!is_gcc) {
+    ldflags = [
+      # Make sure libc++ is not linked in.  Header-only use is OK.
+      "-nostdlib++",
+    ]
+  }
 }
 
 config("no_profile") {

@@ -1263,7 +1263,7 @@ _asan_variant = {
 # of 'kernel-excluded'.
 _kasan_variant = {
   forward_variables_from(_asan_variant, "*")
-  configs += [ "//build/config/zircon:no_safestack" ]
+  configs += [ "//build/config:no-safe-stack" ]
 
   # NOTE: The line below is necessary because compiling kernel artifacts
   # does not add //build/config:default_frame_pointers.

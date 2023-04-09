@@ -48,7 +48,7 @@ source_set("cfi_only") {
     configs -= [ "//build/config:default_frame_pointers" ]
     configs += [
       "//build/config:no_frame_pointers",
-      "//build/config/sanitizers:no-shadow-call-stack",
+      "//build/config:no-shadow-call-stack",
     ]
   }
 }
@@ -77,7 +77,7 @@ source_set("fp_only") {
     configs -= [ "//build/config:default_frame_pointers" ]
     configs += [
       "//build/config:frame_pointers",
-      "//build/config/sanitizers:no-shadow-call-stack",
+      "//build/config:no-shadow-call-stack",
     ]
   }
 }

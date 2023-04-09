@@ -210,42 +210,29 @@ config("data_sections") {
   ldflags = cflags
 }
 
-# The 'default_assert_level' will point to one of the assert_level_XXX values
+# The 'default_assert_level' will point to one of the assert_level_<n> values
 # below. This allows targets or toolchains to opt out from the default and
 # select a specific value.
-config("assert_level_0") {
-  defines = [
-    "ZX_ASSERT_LEVEL=0",
-    "NDEBUG",
-  ]
+
+foreach(level,
+        [
+          0,
+          1,
+          2,
+        ]) {
+  variant("assert_level_$level") {
+    defines = [ "ZX_ASSERT_LEVEL=$level" ]
+    if (level == 0) {
+      defines += [ "NDEBUG" ]
+    }
+  }
 }
 
-group("assert_level_0_deps") {
-}
-
-config("assert_level_1") {
-  defines = [ "ZX_ASSERT_LEVEL=1" ]
-}
-
-group("assert_level_1_deps") {
-}
-
-config("assert_level_2") {
-  defines = [ "ZX_ASSERT_LEVEL=2" ]
-}
-
-group("assert_level_2_deps") {
-}
-
-config("default_assert_level") {
+variant("default_assert_level") {
   assert(
       zx_assert_level >= 0 && zx_assert_level <= 2,
       "Invalid zx_assert_level value '$zx_assert_level', valid values are 0, 1 or 2")
   configs = [ ":assert_level_$zx_assert_level" ]
-}
-
-group("default_assert_level_deps") {
-  # Implicit dependencies for 'default_assert_level' config.
 }
 
 # This is separate from default_optimize so it can be removed.
@@ -268,22 +255,6 @@ config("no_threadsafe_statics") {
 
 config("default_include_dirs") {
   include_dirs = [ "//zircon/system/public" ]
-}
-
-config("no_stack_protector") {
-  cflags = [ "-fno-stack-protector" ]
-}
-
-config("no_safestack") {
-  if (!is_gcc) {
-    cflags = [ "-fno-sanitize=safe-stack" ]
-  }
-  configs = [ ":no_stack_protector" ]
-}
-
-group("no_safestack_deps") {
-  # Each config added to a zircon_toolchain_suite() must have a corresponding
-  # _deps group listing implicit dependencies if needed.
 }
 
 config("no_fuzzer") {
@@ -322,18 +293,18 @@ config("musl_headers") {
   asmflags = cflags
 }
 
-config("user") {
+variant("user") {
   defines = [ "_ALL_SOURCE" ]
   configs = [
     ":nolibc",
     ":musl_headers",
   ]
-}
 
-config("user_executable") {
-  # NOTE: Was only used in the 'user' Zircon build environment, which is
-  # implemented by the Fuchsia build using the 'target' toolchain instead,
-  # so this is not needed here.
+  if (is_gcc) {
+    # This is the default in Clang for Fuchsia targets.  In shlib toolchains
+    # this config will come before the one that overrides it with -fPIC.
+    common_flags = [ "-fPIE" ]
+  }
 }
 
 config("integer-paranoia") {
@@ -377,15 +348,12 @@ config("static-libc++") {
 config("pure") {
 }
 
-config("rodso") {
+variant("rodso") {
   configs = [ ":pure" ]
   if (is_gcc) {
     inputs = [ "rodso.ld" ]
     ldflags = [ "-Wl,-T," + rebase_path(inputs[0], root_build_dir) ]
   }
-}
-
-group("rodso_deps") {
 }
 
 # This has to be variant() rather than config() to be used in the toolchain
