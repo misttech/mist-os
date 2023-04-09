@@ -204,6 +204,17 @@ void riscv64_access_fault_handler(int64_t cause, uint64_t tval, struct iframe_t*
   arch_disable_ints();
 }
 
+void riscv64_misaligned_fault_handler(int64_t cause, uint64_t tval, struct iframe_t* frame,
+                                      bool user) {
+  if (!user) {
+    // Trapped inside the kernel, this is bad.
+    exception_die(frame, cause, tval, "misaligned exception in kernel: PC at %#" PRIx64 "\n",
+                  frame->regs.pc);
+  }
+
+  try_dispatch_user_exception(ZX_EXCP_UNALIGNED_ACCESS, cause, tval, frame, 0);
+}
+
 void riscv64_illegal_instruction_handler(int64_t cause, uint64_t tval, struct iframe_t* frame,
                                          bool user) {
   if (!user) {
@@ -292,6 +303,11 @@ extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame)
       case RISCV64_EXCEPTION_STORE_ACCESS_FAULT:
         riscv64_access_fault_handler(cause, tval, frame, user);
         break;
+      case RISCV64_EXCEPTION_IADDR_MISALIGN:
+      case RISCV64_EXCEPTION_LOAD_ADDR_MISALIGN:
+      case RISCV64_EXCEPTION_STORE_ADDR_MISALIGN:
+        riscv64_misaligned_fault_handler(cause, tval, frame, user);
+        break;
       case RISCV64_EXCEPTION_ILLEGAL_INS:
         riscv64_illegal_instruction_handler(cause, tval, frame, user);
         break;
@@ -307,10 +323,6 @@ extern "C" void riscv64_exception_handler(int64_t cause, struct iframe_t* frame)
       case RISCV64_EXCEPTION_ENV_CALL_S_MODE:
         exception_die(frame, cause, tval, "syscall from supervisor mode\n");
         break;
-      // TODO-rvbringup: add handlers for the following
-      case RISCV64_EXCEPTION_IADDR_MISALIGN:
-      case RISCV64_EXCEPTION_LOAD_ADDR_MISALIGN:
-      case RISCV64_EXCEPTION_STORE_ADDR_MISALIGN:
       default:
         fatal_exception(cause, tval, frame);
     }
