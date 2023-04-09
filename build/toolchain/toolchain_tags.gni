@@ -21,8 +21,11 @@ all_toolchain_tags += [
   # tag.
   "kernel",
 
-  # Used by the EFI toolchain used to build the Gigaboot bootloader.
+  # This indicates the toolchain targets UEFI.
   "efi",
+
+  # This indicates a toolchain does not provide the Fuchsia Compiler ABI.
+  "no-compiler-abi",
 
   # This tag is used by Zircon toolchains that generate static PIE executable
   # binaries.
@@ -36,7 +39,8 @@ all_toolchain_tags += [
   # to any system runtime (e.g. the C library).
   "standalone",
 
-  # This tag is used by Zircon toolchains that enables the 'tiny' code generation
-  # model (i.e. the program and its statically defined symbols must be within 1 GiB).
+  # This tag is used by Zircon toolchains that enables the 'tiny' code
+  # generation model (i.e. the program and its statically defined symbols must
+  # be within 1 GiB).
   "tiny",
 ]

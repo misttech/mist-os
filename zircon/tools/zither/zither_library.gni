@@ -7,6 +7,7 @@ import("//build/config/clang/clang.gni")
 import("//build/cpp/library_headers.gni")
 import("//build/go/go_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
+import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 if (support_rust) {
   import("//build/rust/config.gni")
@@ -610,6 +611,7 @@ template("_zither_legacy_syscall_cdecl_sources") {
 
   main_target = target_name
   zither_target = "$target_name.gen"
+  headers_target = "$target_name.headers"
 
   not_needed(invoker, [ "source_names" ])
 
@@ -641,13 +643,13 @@ template("_zither_legacy_syscall_cdecl_sources") {
   # HACK: Our build's redefinition of `source_set()` automatically includes
   # a dependency on the Zircon public headers in the conventional, Fuchsia
   # toolchains, which in turn depend on this target. Such a dependency is not
-  # conferred in the vDSO toolchain.
-  if (toolchain_environment == "user.vdso") {
-    library_headers(main_target) {
+  # conferred in the user.basic toolchain.
+  if (toolchain_environment == "user.basic") {
+    library_headers(headers_target) {
+      visibility = [ ":*" ]
       forward_variables_from(invoker,
                              [
                                "testonly",
-                               "visibility",
                                "generated_files",
                              ])
       include_dir = output_dir
@@ -656,16 +658,17 @@ template("_zither_legacy_syscall_cdecl_sources") {
       deps = [ ":${zither_target}.check($default_toolchain)" ]
     }
   } else {
-    group(main_target) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
-      public_deps = [ ":$main_target(//zircon/kernel/lib/userabi/vdso:user.vdso_$current_cpu)" ]
-    }
     not_needed(invoker, "*")
     not_needed("*")
+  }
+
+  user_basic_redirect(main_target) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    public_deps = [ ":$headers_target" ]
   }
 }
 

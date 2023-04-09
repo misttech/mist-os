@@ -242,14 +242,23 @@ template("zircon_toolchain") {
     if (!defined(prefix_configs)) {
       prefix_configs = []
     }
+    if (!defined(executable_configs)) {
+      executable_configs = []
+    }
     if (!defined(remove_common_configs)) {
       remove_common_configs = []
+    }
+    if (!defined(remove_executable_configs)) {
+      remove_executable_configs = []
     }
     if (!defined(remove_shared_configs)) {
       remove_shared_configs = []
     }
     if (!defined(tags)) {
       tags = []
+    }
+    if (defined(invoker.tags)) {
+      tags += invoker.tags
     }
   }
 

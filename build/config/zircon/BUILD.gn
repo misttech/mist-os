@@ -307,6 +307,21 @@ variant("user") {
   }
 }
 
+variant("user-executable") {
+  # This prevents the default dynamic linker from being embedded.  Other deps
+  # can still set PT_INTERP either via link inputs with a `.interp` section, or
+  # ldflags that come later with an explicit `-Wl,-dynamic-linker=...`.
+  ldflags = [ "-Wl,--no-dynamic-linker" ]
+  if (is_gcc) {
+    # This is already the default in Clang for Fuchsia targets.
+    ldflags += [ "-pie" ]
+
+    # Gold doesn't handle --no-dynamic-linker and won't produce a PIE without a
+    # PT_INTERP.
+    ldflags += [ "-fuse-ld=bfd" ]
+  }
+}
+
 config("integer-paranoia") {
   cflags = [
     "-fsanitize=integer-divide-by-zero,signed-integer-overflow",

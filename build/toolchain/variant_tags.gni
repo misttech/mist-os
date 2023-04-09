@@ -24,6 +24,16 @@ all_variant_tags = [
   # the `instrumented` tag as well.
   "instrumentation-runtime",
 
+  # The `needs-compiler-abi` tag is used for variants with an instrumentation
+  # runtime or similar that is built to rely on the Fuchsia Compiler ABI.  This
+  # can be omitted if the runtime calls will never be made by non-buggy code.
+  "needs-compiler-abi",
+
+  # The `needs-writable-globals` tag is used for variants with instrumentation
+  # (via runtime or direct code) that of necessity involves making a binary
+  # with a writable data segment, i.e. has mutable globals of some kind.
+  "needs-writable-globals",
+
   # The `asan` tag is used for variants that implement address-sanitizers.
   # These should always list `instrumented` and `instrumentation-runtime`
   # as well.

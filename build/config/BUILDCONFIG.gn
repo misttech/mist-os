@@ -141,6 +141,8 @@ if (!defined(toolchain_variant.name)) {
   toolchain_variant.name = ""
   toolchain_variant.suffix = ""
   toolchain_variant.configs = []
+  toolchain_variant.executable_configs = []
+  toolchain_variant.remove_executable_configs = []
   toolchain_variant.prefix_configs = []
   toolchain_variant.remove_common_configs = []
   toolchain_variant.remove_shared_configs = []
@@ -521,7 +523,9 @@ if (zircon_toolchain == false) {
                                      "//build/config:shared_library_config",
                                    ] - toolchain_variant.remove_shared_configs
 
-  default_executable_configs = default_common_binary_configs
+  default_executable_configs =
+      default_common_binary_configs + toolchain_variant.executable_configs -
+      toolchain_variant.remove_executable_configs
   default_executable_deps = []
 }
 
@@ -1250,6 +1254,8 @@ _asan_variant = {
     "asan",
     "instrumentation-runtime",
     "instrumented",
+    "needs-compiler-abi",
+    "needs-writable-globals",
     "lsan",
     "replaces-allocator",
     "uses-shadow",
@@ -1306,6 +1312,8 @@ _hwasan_variant = {
     "hwasan",
     "instrumentation-runtime",
     "instrumented",
+    "needs-compiler-abi",
+    "needs-writable-globals",
     "kernel-excluded",
     "replaces-allocator",
     "uses-shadow",
@@ -1413,6 +1421,7 @@ declare_args() {
         "instrumented",
         "coverage",
         "llvm-profdata",
+        "needs-writable-globals",
       ]
     },
 
@@ -1422,6 +1431,7 @@ declare_args() {
         "instrumented",
         "coverage",
         "llvm-profdata",
+        "needs-writable-globals",
       ]
     },
 
@@ -1431,6 +1441,7 @@ declare_args() {
         "instrumented",
         "profile",
         "llvm-profdata",
+        "needs-writable-globals",
       ]
     },
 
@@ -1448,6 +1459,8 @@ declare_args() {
         "tsan",
         "instrumentation-runtime",
         "instrumented",
+        "needs-compiler-abi",
+        "needs-writable-globals",
         "uses-shadow",
         "kernel-excluded",
       ]
@@ -1479,6 +1492,8 @@ declare_args() {
       tags = [
         "instrumented",
         "instrumentation-runtime",
+        "needs-compiler-abi",
+        "needs-writable-globals",
         "kernel-excluded",
         "ubsan",
       ]
@@ -1492,6 +1507,8 @@ declare_args() {
       tags = [
         "instrumented",
         "instrumentation-runtime",
+        "needs-compiler-abi",
+        "needs-writable-globals",
         "kernel-excluded",
         "sancov",
         "ubsan",
@@ -1554,6 +1571,7 @@ declare_args() {
         "fuzzer",
         "instrumented",
         "instrumentation-runtime",
+        "needs-compiler-abi",
         "ubsan",
       ]
     },
@@ -2266,6 +2284,10 @@ template("variant_target") {
     }
   }
 
+  # This isn't used if no variant selector checks it and the target_type also
+  # doesn't use it, e.g. group.
+  not_needed(target_invoker, [ "output_name" ])
+
   # target_type is the real GN target type that builds the thing.
   # selector_target_type is the name matched against target_type selectors.
   if (defined(invoker.variant_selector_target_type)) {
@@ -2548,6 +2570,20 @@ template("variant_target") {
       # NOTE: public_deps is required to ensure shared_library() targets
       # properly export their headers and public configs to dependents.
       public_deps = [ ":${target_name}(${builder_toolchain})" ]
+    }
+  } else if (target_type == "group") {
+    # variant_target("group") just does selection, no other funny business.
+    group(target_name) {
+      forward_variables_from(target_invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      if (defined(visibility)) {
+        visibility += [ ":$target_name" ]
+      }
+
+      public_deps = [ ":$target_name($builder_toolchain)" ]
     }
   } else {
     # When some variant was selected, then this target in all other
@@ -3100,9 +3136,7 @@ template("executable") {
       ]
 
       if (is_fuchsia) {
-        # NOTE: executables built in Zircon toolchains are not meant to be
-        # distributed in Fuchsia packages.
-        if (zircon_toolchain == false) {
+        if (!is_kernel) {
           # Used by the distribution_manifest() template.
           if (!defined(distribution_entries)) {
             distribution_entries = [
@@ -3265,9 +3299,7 @@ template("loadable_module") {
         },
       ]
 
-      # NOTE: loadable modules built with Zircon toolchains should not go
-      # into Fuchsia packages by default.
-      if (is_fuchsia && zircon_toolchain == false) {
+      if (is_fuchsia && !is_kernel) {
         if (!defined(distribution_entries)) {
           # Used by the distribution_manifest template.
           distribution_entries = [

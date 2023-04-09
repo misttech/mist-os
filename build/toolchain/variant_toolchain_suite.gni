@@ -13,8 +13,10 @@ import("//build/toolchain/zircon/zircon_toolchain.gni")
 # List of keys in toolchain_variant scope related to configs.
 _config_keys = [
   "configs",
+  "executable_configs",
   "prefix_configs",
   "remove_common_configs",
+  "remove_executable_configs",
   "remove_shared_configs",
 ]
 
@@ -69,6 +71,12 @@ template("_variant_toolchain") {
       }
       configs += this_invoker.configs
     }
+    if (defined(this_invoker.executable_configs)) {
+      if (!defined(executable_configs)) {
+        executable_configs = []
+      }
+      executable_configs += this_invoker.executable_configs
+    }
     if (defined(this_invoker.prefix_configs)) {
       if (!defined(prefix_configs)) {
         prefix_configs = []
@@ -80,6 +88,12 @@ template("_variant_toolchain") {
         remove_common_configs = []
       }
       remove_common_configs += this_invoker.remove_common_configs
+    }
+    if (defined(this_invoker.remove_executable_configs)) {
+      if (!defined(remove_executable_configs)) {
+        remove_executable_configs = []
+      }
+      remove_executable_configs += this_invoker.remove_executable_configs
     }
     if (defined(this_invoker.remove_shared_configs)) {
       if (!defined(remove_shared_configs)) {
@@ -157,6 +171,9 @@ template("_variant_toolchain") {
 #     instances in this suite. Note that these are added after the default
 #     configs set in //build/config/BUILDCONFIG.gn.
 #
+#   executable_configs:
+#     Optional: Additional configs only for executable() targets.
+#
 #   prefix_configs:
 #     Optional: Like configs, but these configs are added before the default
 #     configs. Should only be used for kernel toolchains that need to
@@ -167,6 +184,10 @@ template("_variant_toolchain") {
 #     Optional: A list of configs that are removed for all targets built by
 #     toolchain() instances in this suite. Useful to remove specific default
 #     configs when needed.
+#
+#   remove_executable_configs:
+#     Optional: Same as remove_common_configs, but will only apply to
+#     executable() targets.
 #
 #   remove_shared_configs:
 #     Optional: Same as remove_common_configs, but will only apply to

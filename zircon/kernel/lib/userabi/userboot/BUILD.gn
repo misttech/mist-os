@@ -123,6 +123,13 @@ if (toolchain_environment == "userboot") {
       "//zircon/third_party/ulib/musl/src/string:minimal_str",
       "//zircon/third_party/ulib/musl/src/string:stdmem",
     ]
+
+    # This ensures that the userboot binary is never installed into filesystem
+    # images since it's materialized at runtime by the kernel.
+    metadata = {
+      distribution_entries_barrier = []
+      distribution_entries = []
+    }
   }
 
   # This generated header lists all the ABI symbols in the vDSO with their
