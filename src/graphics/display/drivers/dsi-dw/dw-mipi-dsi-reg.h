@@ -7,11 +7,9 @@
 
 #include <hwreg/bitfields.h>
 
-/// define register access macros here
+// The register definitions here are from the Synopsis DesignWare Cores MIPI DSI
+// Host Controller Databook version 1.51a, Section 5.1 "DSI Registers".
 
-//////////////////////////////////////////////////
-// DesignWare MIPI DSI Register Definitions
-//////////////////////////////////////////////////
 #define DW_DSI_VERSION (0x00 << 2)              // contains the vers of the DSI host controller
 #define DW_DSI_PWR_UP (0x01 << 2)               // controls the power up of the core
 #define DW_DSI_CLKMGR_CFG (0x02 << 2)           // configs the factor for internal dividers

@@ -5,8 +5,10 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_DSI_H_
 
-// TOP MIPI_DSI AML Registers
 #include <algorithm>
+
+// TOP MIPI_DSI AML Registers
+
 #define MIPI_DSI_TOP_SW_RESET (0x00 << 2)
 #define MIPI_DSI_TOP_CLK_CNTL (0x01 << 2)
 #define MIPI_DSI_TOP_CNTL (0x02 << 2)
@@ -21,6 +23,11 @@
 #define MIPI_DSI_TOP_MEAS_STAT_VS1 (0x0B << 2)
 #define MIPI_DSI_TOP_INTR_CNTL_STAT (0x0C << 2)
 #define MIPI_DSI_TOP_MEM_PD (0x0D << 2)
+
+// The register definitions here are from the AMLogic A311D datasheet revision
+// 08 section 10.2.3.45 "MIPI_DSI". The datasheet specifies that the register
+// addresses are relative to 0xff64'4000. Section 8.1 "Memory Map" states that
+// this is the base of the MMIO register region labeled "MIPI_DSI_PHY".
 
 #define MIPI_DSI_PHY_CTRL (0x000 << 2)
 #define MIPI_DSI_CHAN_CTRL (0x001 << 2)

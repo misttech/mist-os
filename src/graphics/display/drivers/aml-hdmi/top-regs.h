@@ -8,6 +8,10 @@
 // TOP
 #define TOP_OFFSET_MASK (0x0UL << 24)
 
+// Register addresses documented in A311D datasheet Section 10.2.3.44
+// "10.2.3.44 HDCP2.2 IP Register Access" Table 10-2 "HDMITX Top-Level
+// Registers"
+
 #define HDMITX_TOP_SW_RESET (TOP_OFFSET_MASK + 0x000)
 #define HDMITX_TOP_CLK_CNTL (TOP_OFFSET_MASK + 0x001)
 #define HDMITX_TOP_HPD_FILTER (TOP_OFFSET_MASK + 0x002)
