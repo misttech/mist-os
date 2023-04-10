@@ -1,0 +1,59 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/storage_realm_admin",
+    },
+    children: [
+        {
+            name: "memfs",
+            url: "#meta/memfs.cm",
+        },
+        {
+            name: "storage_user_with_instance_id",
+            url: "#meta/storage_user_with_instance_id.cm",
+            startup: "eager",
+        },
+    ],
+    capabilities: [
+        {
+            storage: "data",
+            from: "#memfs",
+            backing_dir: "memfs",
+            storage_id: "static_instance_id",
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.sys2.StorageAdmin",
+            from: "#data",
+        },
+        {
+            event_stream: "stopped",
+            from: "parent",
+        },
+    ],
+    offer: [
+        {
+            storage: "data",
+            from: "self",
+            to: "#storage_user_with_instance_id",
+        },
+        {
+            directory: "memfs",
+            from: "#memfs",
+            to: "#storage_user_with_instance_id",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "parent",
+            to: [
+                "#memfs",
+                "#storage_user_with_instance_id",
+            ],
+        },
+    ],
+}

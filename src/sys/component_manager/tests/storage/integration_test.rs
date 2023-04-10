@@ -65,3 +65,9 @@ async fn storage_from_collection_with_invalid_route() {
             .await;
     wait_for_clean_stop(cm, "./root").await;
 }
+
+#[fasync::run_singlethreaded(test)]
+async fn storage_admin() {
+    let cm = start_nested_cm("#meta/component_manager.cm", "#meta/storage_realm_admin.cm").await;
+    wait_for_clean_stop(cm, "./root").await;
+}
