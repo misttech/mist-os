@@ -342,7 +342,7 @@ zx_status_t ChildProcess::WriteToStdin(std::string_view line) {
 }
 
 ZxPromise<std::string> ChildProcess::ReadFromStdout() {
-  if (!stdout_) {
+  if (killed_ || !stdout_) {
     return fpromise::make_promise(
         []() -> ZxResult<std::string> { return fpromise::error(ZX_ERR_BAD_STATE); });
   }
@@ -357,7 +357,7 @@ ZxPromise<std::string> ChildProcess::ReadFromStdout() {
 }
 
 ZxPromise<std::string> ChildProcess::ReadFromStderr() {
-  if (!stderr_) {
+  if (killed_ || !stderr_) {
     return fpromise::make_promise(
         []() -> ZxResult<std::string> { return fpromise::error(ZX_ERR_BAD_STATE); });
   }
