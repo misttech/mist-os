@@ -91,7 +91,24 @@ int RunDfv2(driver_manager_config::Config config,
       DriverHostLoaderService::Create(loader_loop.dispatcher(), std::move(lib_fd));
   dfv2::DriverRunner driver_runner(
       std::move(realm_result.value()), std::move(driver_index_result.value()),
-      inspect_manager.inspector(), [loader_service]() { return loader_service->Connect(); },
+      inspect_manager.inspector(),
+      [loader_service]() -> zx::result<fidl::ClientEnd<fuchsia_ldsvc::Loader>> {
+        zx::result client = loader_service->Connect();
+        if (client.is_error()) {
+          return client.take_error();
+        }
+    // TODO(https://fxbug.dev/125244): Find a better way to set this config.
+#if __has_feature(address_sanitizer)
+        fidl::WireResult result = fidl::WireCall(client.value())->Config("asan");
+        if (!result.ok()) {
+          return zx::error(result.status());
+        }
+        if (result->rv != ZX_OK) {
+          return zx::error(result->rv);
+        }
+#endif
+        return client;
+      },
       loop.dispatcher());
 
   // Setup devfs.

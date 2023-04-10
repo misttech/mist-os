@@ -34,7 +34,8 @@ class TestEventHandler : public fidl::WireAsyncEventHandler<fldsvc::Loader> {
 
 class TestLoader : public fidl::testing::WireTestBase<fldsvc::Loader> {
  public:
-  void SetLoadObjectVmo(zx::vmo vmo) { vmo_ = std::move(vmo); }
+  TestLoader() : vmo_() {}
+  explicit TestLoader(zx::vmo vmo) : vmo_(std::move(vmo)) {}
 
  private:
   // fidl::WireServer<fuchsia_ldsvc::Loader>
@@ -67,9 +68,10 @@ TEST_F(LoaderTest, LoadObject) {
   zx_koid_t mylib_koid = GetKoid(mylib_vmo);
 
   // Create backing loader.
-  TestLoader backing_loader;
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &backing_loader);
-  backing_loader.SetLoadObjectVmo(std::move(mylib_vmo));
+  TestLoader backing_loader{std::move(mylib_vmo)};
+  async::Loop backing_loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
+  ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
   // Create VMO of compat driver for compat loader.
   zx::vmo loader_vmo;
@@ -78,11 +80,8 @@ TEST_F(LoaderTest, LoadObject) {
   zx_koid_t loader_koid = GetKoid(loader_vmo);
 
   // Create compat loader.
-  compat::Loader loader(dispatcher());
-  status = loader.Bind(std::move(endpoints->client), std::move(loader_vmo)).status_value();
-  ASSERT_EQ(ZX_OK, status);
-  status = loader.Bind({}, {}).status_value();
-  ASSERT_EQ(ZX_ERR_ALREADY_BOUND, status);
+  fidl::ClientEnd loader_client = std::move(endpoints->client);
+  compat::Loader loader(dispatcher(), loader_client.borrow(), std::move(loader_vmo));
 
   // Create loader client.
   endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
@@ -127,12 +126,12 @@ TEST_F(LoaderTest, DoneClosesConnection) {
 
   // Create backing loader.
   TestLoader backing_loader;
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &backing_loader);
+  async::Loop backing_loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
+  ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
   // Create compat loader.
-  compat::Loader loader(dispatcher());
-  zx_status_t status = loader.Bind(std::move(endpoints->client), zx::vmo()).status_value();
-  ASSERT_EQ(ZX_OK, status);
+  compat::Loader loader(dispatcher(), endpoints->client.borrow(), zx::vmo());
 
   // Create event handler.
   TestEventHandler handler;
@@ -155,12 +154,13 @@ TEST_F(LoaderTest, ConfigSucceeds) {
 
   // Create backing loader.
   TestLoader backing_loader;
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &backing_loader);
+  async::Loop backing_loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
+  ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
   // Create compat loader.
-  compat::Loader loader(dispatcher());
-  zx_status_t status = loader.Bind(std::move(endpoints->client), zx::vmo()).status_value();
-  ASSERT_EQ(ZX_OK, status);
+  fidl::ClientEnd loader_client = std::move(endpoints->client);
+  compat::Loader loader(dispatcher(), loader_client.borrow(), zx::vmo());
 
   // Create loader client.
   endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
@@ -182,12 +182,12 @@ TEST_F(LoaderTest, CloneSucceeds) {
 
   // Create backing loader.
   TestLoader backing_loader;
-  fidl::BindServer(dispatcher(), std::move(endpoints->server), &backing_loader);
+  async::Loop backing_loop(&kAsyncLoopConfigNeverAttachToThread);
+  fidl::BindServer(backing_loop.dispatcher(), std::move(endpoints->server), &backing_loader);
+  ASSERT_EQ(ZX_OK, backing_loop.StartThread("loader-loop"));
 
   // Create compat loader.
-  compat::Loader loader(dispatcher());
-  zx_status_t status = loader.Bind(std::move(endpoints->client), zx::vmo()).status_value();
-  ASSERT_EQ(ZX_OK, status);
+  compat::Loader loader(dispatcher(), endpoints->client.borrow(), zx::vmo());
 
   // Create loader client.
   endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
@@ -209,9 +209,7 @@ TEST_F(LoaderTest, NoBackingLoader) {
   auto endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
 
   // Create compat loader.
-  compat::Loader loader(dispatcher());
-  zx_status_t status = loader.Bind(std::move(endpoints->client), {}).status_value();
-  ASSERT_EQ(ZX_OK, status);
+  compat::Loader loader(dispatcher(), endpoints->client.borrow(), zx::vmo());
 
   // Close the server end of the backing loader channel.
   endpoints->server.reset();
@@ -225,12 +223,12 @@ TEST_F(LoaderTest, NoBackingLoader) {
   client->LoadObject("mylib.so").Then([](auto& result) {
     ASSERT_EQ(ZX_OK, result.status());
     auto* response = result.Unwrap();
-    EXPECT_EQ(ZX_ERR_PEER_CLOSED, response->rv);
+    EXPECT_EQ(ZX_ERR_BAD_HANDLE, response->rv);
   });
   client->Config("").Then([](auto& result) {
     ASSERT_EQ(ZX_OK, result.status());
     auto* response = result.Unwrap();
-    EXPECT_EQ(ZX_ERR_PEER_CLOSED, response->rv);
+    EXPECT_EQ(ZX_ERR_BAD_HANDLE, response->rv);
   });
 
   ASSERT_TRUE(RunLoopUntilIdle());

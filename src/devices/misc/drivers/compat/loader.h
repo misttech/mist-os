@@ -19,13 +19,8 @@ constexpr char kLibDriverName[] = "libdriver.so";
 // driver's VMO.
 class Loader : public fidl::WireServer<fuchsia_ldsvc::Loader> {
  public:
-  explicit Loader(async_dispatcher_t* dispatcher);
-
-  async_dispatcher_t* dispatcher();
-
-  // Binds a backing loader, `client_end`, and the VMO for the compatibility
-  // driver, `driver_vmo`.
-  zx::result<> Bind(fidl::ClientEnd<fuchsia_ldsvc::Loader> client_end, zx::vmo driver_vmo);
+  Loader(async_dispatcher_t* dispatcher, fidl::UnownedClientEnd<fuchsia_ldsvc::Loader> loader,
+         zx::vmo driver_vmo);
 
  private:
   // fidl::WireServer<fuchsia_ldsvc::Loader>
@@ -35,7 +30,7 @@ class Loader : public fidl::WireServer<fuchsia_ldsvc::Loader> {
   void Clone(CloneRequestView request, CloneCompleter::Sync& completer) override;
 
   async_dispatcher_t* dispatcher_;
-  fidl::WireSharedClient<fuchsia_ldsvc::Loader> client_;
+  fidl::UnownedClientEnd<fuchsia_ldsvc::Loader> client_;
   zx::vmo driver_vmo_;
 };
 

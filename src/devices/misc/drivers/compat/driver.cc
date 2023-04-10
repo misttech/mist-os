@@ -342,27 +342,15 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
   {
     // This requires a lock because the loader is a global variable.
     std::scoped_lock lock(kDriverGlobalsLock);
-    auto endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
-    if (endpoints.is_error()) {
-      return error(endpoints.status_value());
+    zx::result new_loader_endpoints = fidl::CreateEndpoints<fldsvc::Loader>();
+    if (new_loader_endpoints.is_error()) {
+      return error(new_loader_endpoints.status_value());
     }
-    zx::channel loader_channel(dl_set_loader_service(endpoints->client.channel().release()));
-    fidl::ClientEnd<fldsvc::Loader> loader_client(std::move(loader_channel));
-    auto clone = fidl::CreateEndpoints<fldsvc::Loader>();
-    if (clone.is_error()) {
-      return error(clone.status_value());
-    }
-    auto result = fidl::WireCall(loader_client)->Clone(std::move(clone->server));
-    if (!result.ok()) {
-      FDF_LOG(ERROR, "Failed to load driver '%s', cloning loader failed with FIDL status: %s",
-              url_str.data(), result.status_string());
-      return error(result.status());
-    }
-    if (result.value().rv != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to load driver '%s', cloning loader failed with status: %s",
-              url_str.data(), zx_status_get_string(result.value().rv));
-      return error(result.value().rv);
-    }
+    fidl::ClientEnd<fldsvc::Loader> original_loader(
+        zx::channel(dl_set_loader_service(new_loader_endpoints->client.channel().release())));
+    auto reset_loader = fit::defer([&original_loader]() {
+      zx::channel l = zx::channel(dl_set_loader_service(original_loader.TakeChannel().release()));
+    });
 
     // Start loader.
     async::Loop loader_loop(&kAsyncLoopConfigNeverAttachToThread);
@@ -372,13 +360,8 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
               url_str.data(), zx_status_get_string(status));
       return error(status);
     }
-    Loader loader(loader_loop.dispatcher());
-    auto bind = loader.Bind(fidl::ClientEnd<fldsvc::Loader>(std::move(loader_client)),
-                            std::move(loader_vmo));
-    if (bind.is_error()) {
-      return error(bind.status_value());
-    }
-    fidl::BindServer(loader_loop.dispatcher(), std::move(endpoints->server), &loader);
+    Loader loader(loader_loop.dispatcher(), original_loader.borrow(), std::move(loader_vmo));
+    fidl::BindServer(loader_loop.dispatcher(), std::move(new_loader_endpoints->server), &loader);
 
     // Open driver.
     library_ = dlopen_vmo(driver_vmo.get(), RTLD_NOW);
@@ -387,9 +370,6 @@ result<void, zx_status_t> Driver::LoadDriver(std::tuple<zx::vmo, zx::vmo>& vmos)
               dlerror());
       return error(ZX_ERR_INTERNAL);
     }
-
-    // Return original loader service.
-    loader_channel.reset(dl_set_loader_service(clone->client.channel().release()));
   }
 
   // Load and verify symbols.

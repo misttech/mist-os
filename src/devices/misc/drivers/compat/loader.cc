@@ -8,18 +8,9 @@ namespace fldsvc = fuchsia_ldsvc;
 
 namespace compat {
 
-Loader::Loader(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-
-async_dispatcher_t* Loader::dispatcher() { return dispatcher_; }
-
-zx::result<> Loader::Bind(fidl::ClientEnd<fldsvc::Loader> client_end, zx::vmo driver_vmo) {
-  if (client_) {
-    return zx::error(ZX_ERR_ALREADY_BOUND);
-  }
-  client_.Bind(std::move(client_end), dispatcher_);
-  driver_vmo_ = std::move(driver_vmo);
-  return zx::ok();
-}
+Loader::Loader(async_dispatcher_t* dispatcher, fidl::UnownedClientEnd<fuchsia_ldsvc::Loader> loader,
+               zx::vmo driver_vmo)
+    : dispatcher_(dispatcher), client_(loader), driver_vmo_(std::move(driver_vmo)) {}
 
 void Loader::Done(DoneCompleter::Sync& completer) { completer.Close(ZX_OK); }
 
@@ -37,27 +28,21 @@ void Loader::LoadObject(LoadObjectRequestView request, LoadObjectCompleter::Sync
     return;
   }
 
-  auto callback = [completer = completer.ToAsync()](
-                      fidl::WireUnownedResult<fldsvc::Loader::LoadObject>& result) mutable {
-    if (!result.ok()) {
-      completer.Reply(result.status(), {});
-      return;
-    }
-    completer.Reply(result->rv, std::move(result->object));
-  };
-  client_->LoadObject(request->object_name).ThenExactlyOnce(std::move(callback));
+  fidl::WireResult result = fidl::WireCall(client_)->LoadObject(request->object_name);
+  if (!result.ok()) {
+    completer.Reply(result.status(), {});
+    return;
+  }
+  completer.Reply(result->rv, std::move(result->object));
 }
 
 void Loader::Config(ConfigRequestView request, ConfigCompleter::Sync& completer) {
-  auto callback = [completer = completer.ToAsync()](
-                      fidl::WireUnownedResult<fldsvc::Loader::Config>& result) mutable {
-    if (!result.ok()) {
-      completer.Reply(result.status());
-      return;
-    }
-    completer.Reply(result->rv);
-  };
-  client_->Config(request->config).ThenExactlyOnce(std::move(callback));
+  fidl::WireResult result = fidl::WireCall(client_)->Config(request->config);
+  if (!result.ok()) {
+    completer.Reply(result.status());
+    return;
+  }
+  completer.Reply(result->rv);
 }
 
 void Loader::Clone(CloneRequestView request, CloneCompleter::Sync& completer) {
