@@ -154,23 +154,6 @@ struct zx_device
     completion.Wait();
   }
 
-  zx_status_t ServiceConnectOp(const char* service_name, fdf_handle_t channel) {
-    if (!ops_.service_connect) {
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-
-    libsync::Completion completion;
-    zx_status_t status;
-
-    async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
-      status = ops_.service_connect(ctx(), service_name, channel);
-      completion.Signal();
-    });
-
-    completion.Wait();
-    return status;
-  }
-
   void ReleaseOp() {
     libsync::Completion completion;
 

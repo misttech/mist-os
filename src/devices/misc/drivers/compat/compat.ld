@@ -30,7 +30,6 @@
     device_get_variable;
     device_connect_fidl_protocol2;
     device_connect_fragment_fidl_protocol2;
-    device_service_connect;
     device_connect_runtime_protocol;
   local:
     *;

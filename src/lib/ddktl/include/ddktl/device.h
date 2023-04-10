@@ -174,20 +174,6 @@ class Unbindable : public base_mixin {
   }
 };
 
-template <typename D>
-class ServiceConnectable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckServiceConnectable<D>();
-    proto->service_connect = ServiceConnect;
-  }
-
- private:
-  static zx_status_t ServiceConnect(void* ctx, const char* service_name, fdf_handle_t channel) {
-    return static_cast<D*>(ctx)->DdkServiceConnect(service_name, fdf::Channel(channel));
-  }
-};
-
 template <typename D, typename Protocol>
 class MessageableInternal : public fidl::WireServer<Protocol>, public base_mixin {
  protected:
@@ -587,10 +573,6 @@ class Device : public ::ddk::internal::base_device<D, Mixins...> {
       return zx::error(status);
     }
     return zx::ok(std::move(endpoints->client));
-  }
-
-  zx_status_t DdkServiceConnect(const char* service_name, fdf::Channel channel) {
-    return device_service_connect(parent(), service_name, channel.release());
   }
 
   template <typename ServiceMember>

@@ -320,12 +320,6 @@ __EXPORT zx_status_t device_close_protocol_session_multibindable(const zx_device
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-__EXPORT zx_status_t device_service_connect(zx_device_t* dev, const char* service_name,
-                                            fdf_handle_t channel) {
-  DEBUG_ASSERT_VALID_DEVICE(dev);
-  return dev->ServiceConnectOp(service_name, channel);
-}
-
 __EXPORT zx_status_t device_connect_runtime_protocol(zx_device_t* dev, const char* service_name,
                                                      const char* protocol_name,
                                                      fdf_handle_t request) {
