@@ -128,9 +128,9 @@ void FakeNetworkPortImpl::SetStatus(const port_status_t& status) {
 
 FakeNetworkDeviceImpl::FakeNetworkDeviceImpl()
     : info_({
-          .tx_depth = kTxDepth,
-          .rx_depth = kRxDepth,
-          .rx_threshold = kRxDepth / 2,
+          .tx_depth = kDefaultTxDepth,
+          .rx_depth = kDefaultRxDepth,
+          .rx_threshold = kDefaultRxDepth / 2,
           .max_buffer_length = ZX_PAGE_SIZE / 2,
           .buffer_alignment = ZX_PAGE_SIZE,
       }) {
@@ -216,11 +216,12 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplQueueTx(const tx_buffer_t* buf_list
   ASSERT_TRUE(device_client_.is_valid());
 
   fbl::AutoLock lock(&lock_);
+  queue_tx_called_.push_back(buf_count);
   cpp20::span buffers(buf_list, buf_count);
   if (immediate_return_tx_ || !device_started_) {
     const zx_status_t return_status = device_started_ ? ZX_OK : ZX_ERR_UNAVAILABLE;
-    ASSERT_LE(buf_count, kTxDepth);
-    std::array<tx_result_t, kTxDepth> results;
+    ASSERT_LE(buf_count, info_.tx_depth);
+    std::vector<tx_result_t> results(info_.tx_depth);
     auto results_iter = results.begin();
     for (const tx_buffer_t& buff : buffers) {
       *results_iter++ = {
@@ -244,12 +245,13 @@ void FakeNetworkDeviceImpl::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_
   ASSERT_TRUE(device_client_.is_valid());
 
   fbl::AutoLock lock(&lock_);
+  queue_rx_space_called_.push_back(buf_count);
   cpp20::span buffers(buf_list, buf_count);
   if (immediate_return_rx_ || !device_started_) {
     const uint32_t length = device_started_ ? kAutoReturnRxLength : 0;
-    ASSERT_TRUE(buf_count < kTxDepth);
-    std::array<rx_buffer_t, kTxDepth> results;
-    std::array<rx_buffer_part_t, kTxDepth> parts;
+    ASSERT_TRUE(buf_count < info_.rx_depth);
+    std::vector<rx_buffer_t> results(info_.rx_depth);
+    std::vector<rx_buffer_part_t> parts(info_.rx_depth);
     auto results_iter = results.begin();
     auto parts_iter = parts.begin();
     for (const rx_space_buffer_t& space : buffers) {

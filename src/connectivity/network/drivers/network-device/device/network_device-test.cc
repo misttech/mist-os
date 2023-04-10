@@ -3158,8 +3158,8 @@ TEST_F(NetworkDeviceStressTest, ManyTxFullWaits) {
 
   const netdev::wire::PortId port13_id = GetSaltedPortId(kPort13);
 
-  std::array<uint16_t, kTxDepth> descriptors;
-  for (uint16_t i = 0; i < kTxDepth; i++) {
+  std::array<uint16_t, kDefaultTxDepth> descriptors;
+  for (uint16_t i = 0; i < kDefaultTxDepth; i++) {
     buffer_descriptor_t& buffer = session.ResetDescriptor(i);
     buffer.port_id = {
         .base = port13_id.base,
@@ -3182,6 +3182,75 @@ TEST_F(NetworkDeviceStressTest, ManyTxFullWaits) {
     ASSERT_OK(session.FetchTx(descriptors.data(), descriptors.size(), &actual));
     ASSERT_EQ(actual, descriptors.size());
   }
+}
+
+// Test that QueueTx correctly splits up large numbers of buffers into batches
+// that fit in the maximum FIDL message size.
+TEST_F(NetworkDeviceTest, QueueTxBatches) {
+  constexpr uint16_t kTxDescriptorCount = MAX_TX_BUFFERS + 1;
+  impl_.info().tx_depth = kTxDescriptorCount;
+  ASSERT_OK(CreateDeviceWithPort13());
+  TestSession session;
+  ASSERT_OK(OpenSession(&session, netdev::wire::SessionFlags::kPrimary,
+                        kTxDescriptorCount + kDefaultRxDepth));
+  ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(WaitStart());
+
+  // Send enough tx buffers that netdevice will have to queue them to the parent
+  // driver in batches.
+  std::array<uint16_t, kTxDescriptorCount> descriptors;
+  std::iota(descriptors.begin(), descriptors.end(), 0);
+  const netdev::wire::PortId port13_id = GetSaltedPortId(kPort13);
+  for (uint16_t i = 0; i < kTxDescriptorCount; ++i) {
+    buffer_descriptor_t& desc = session.ResetDescriptor(i);
+    desc.port_id = {
+        .base = port13_id.base,
+        .salt = port13_id.salt,
+    };
+  }
+  size_t actual;
+  ASSERT_OK(session.SendTx(descriptors.data(), kTxDescriptorCount, &actual));
+  ASSERT_EQ(actual, kTxDescriptorCount);
+
+  // Wait for all the tx buffers to be queued.
+  while (impl_.tx_buffer_count() < kTxDescriptorCount) {
+    ASSERT_OK(WaitTx());
+  }
+  ASSERT_EQ(impl_.queue_tx_called(), MAX_TX_BUFFERS);
+  ASSERT_EQ(impl_.queue_tx_called(), 1u);
+}
+
+// Test that QueueRxSpace correctly splits up large numbers of buffers into
+// batches that fit in the maximum FIDL message size.
+TEST_F(NetworkDeviceTest, QueueRxSpaceBatches) {
+  constexpr uint16_t kRxDescriptorCount = MAX_RX_SPACE_BUFFERS + 1;
+  impl_.info().rx_depth = kRxDescriptorCount;
+  ASSERT_OK(CreateDeviceWithPort13());
+  TestSession session;
+  ASSERT_OK(OpenSession(&session, netdev::wire::SessionFlags::kPrimary,
+                        kRxDescriptorCount + kDefaultTxDepth));
+  ASSERT_OK(AttachSessionPort(session, port13_));
+  ASSERT_OK(WaitSessionStarted());
+  ASSERT_OK(WaitStart());
+
+  // Send enough rx space buffers that netdevice will have to queue them to the
+  // parent driver in batches.
+  std::array<uint16_t, kRxDescriptorCount> descriptors;
+  std::iota(descriptors.begin(), descriptors.end(), 0);
+  for (uint16_t i = 0; i < kRxDescriptorCount; ++i) {
+    session.ResetDescriptor(i);
+  }
+  size_t actual;
+  ASSERT_OK(session.SendRx(descriptors.data(), kRxDescriptorCount, &actual));
+  ASSERT_EQ(actual, kRxDescriptorCount);
+
+  // Wait for all the rx space buffers to be queued.
+  while (impl_.rx_buffer_count() < kRxDescriptorCount) {
+    ASSERT_OK(WaitRxAvailable());
+  }
+  ASSERT_EQ(impl_.queue_rx_space_called(), MAX_RX_SPACE_BUFFERS);
+  ASSERT_EQ(impl_.queue_rx_space_called(), 1u);
 }
 
 }  // namespace testing

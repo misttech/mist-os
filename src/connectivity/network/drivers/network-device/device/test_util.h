@@ -20,8 +20,8 @@
 
 namespace network::testing {
 
-constexpr uint16_t kRxDepth = 16;
-constexpr uint16_t kTxDepth = 16;
+constexpr uint16_t kDefaultRxDepth = 16;
+constexpr uint16_t kDefaultTxDepth = 16;
 constexpr uint16_t kDefaultDescriptorCount = 256;
 constexpr uint64_t kDefaultBufferLength = ZX_PAGE_SIZE / 2;
 constexpr uint32_t kAutoReturnRxLength = 512;
@@ -271,6 +271,20 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
     return tx_buffers_.size();
   }
 
+  size_t queue_rx_space_called() __TA_EXCLUDES(lock_) {
+    fbl::AutoLock lock(&lock_);
+    const size_t front = queue_rx_space_called_.front();
+    queue_rx_space_called_.pop_front();
+    return front;
+  }
+
+  size_t queue_tx_called() __TA_EXCLUDES(lock_) {
+    fbl::AutoLock lock(&lock_);
+    const size_t front = queue_tx_called_.front();
+    queue_tx_called_.pop_front();
+    return front;
+  }
+
   std::optional<uint8_t> first_vmo_id() {
     for (size_t i = 0; i < vmos_.size(); i++) {
       if (vmos_[i].is_valid()) {
@@ -310,6 +324,8 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
   ddk::NetworkDeviceIfcProtocolClient device_client_;
   fbl::SizedDoublyLinkedList<std::unique_ptr<RxBuffer>> rx_buffers_ __TA_GUARDED(lock_);
   fbl::SizedDoublyLinkedList<std::unique_ptr<TxBuffer>> tx_buffers_ __TA_GUARDED(lock_);
+  std::deque<size_t> queue_tx_called_ __TA_GUARDED(lock_);
+  std::deque<size_t> queue_rx_space_called_ __TA_GUARDED(lock_);
   zx::event event_;
   std::optional<zx_status_t> auto_start_ = ZX_OK;
   bool auto_stop_ = true;
@@ -323,7 +339,8 @@ class FakeNetworkDeviceImpl : public ddk::NetworkDeviceImplProtocol<FakeNetworkD
 
 class RxReturnTransaction {
  public:
-  explicit RxReturnTransaction(FakeNetworkDeviceImpl* impl) : client_(impl->client()) {}
+  explicit RxReturnTransaction(FakeNetworkDeviceImpl* impl)
+      : return_buffers_(impl->info().rx_depth), client_(impl->client()) {}
 
   void Enqueue(std::unique_ptr<RxReturn> buffer) {
     return_buffers_[count_++] = buffer->buffer();
@@ -335,13 +352,13 @@ class RxReturnTransaction {
   }
 
   void Commit() {
-    client_.CompleteRx(return_buffers_, count_);
+    client_.CompleteRx(return_buffers_.data(), count_);
     count_ = 0;
     buffers_.clear();
   }
 
  private:
-  rx_buffer_t return_buffers_[kRxDepth]{};
+  std::vector<rx_buffer_t> return_buffers_{};
   size_t count_ = 0;
   ddk::NetworkDeviceIfcProtocolClient client_;
   fbl::DoublyLinkedList<std::unique_ptr<RxReturn>> buffers_;
@@ -351,17 +368,20 @@ class RxReturnTransaction {
 
 class TxReturnTransaction {
  public:
-  explicit TxReturnTransaction(FakeNetworkDeviceImpl* impl) : client_(impl->client()) {}
+  explicit TxReturnTransaction(FakeNetworkDeviceImpl* impl)
+      : return_buffers_(impl->info().tx_depth), client_(impl->client()) {
+    return_buffers_.reserve(impl->info().rx_depth);
+  }
 
   void Enqueue(std::unique_ptr<TxBuffer> buffer) { return_buffers_[count_++] = buffer->result(); }
 
   void Commit() {
-    client_.CompleteTx(return_buffers_, count_);
+    client_.CompleteTx(return_buffers_.data(), count_);
     count_ = 0;
   }
 
  private:
-  tx_result_t return_buffers_[kRxDepth]{};
+  std::vector<tx_result_t> return_buffers_{};
   size_t count_ = 0;
   ddk::NetworkDeviceIfcProtocolClient client_;
 

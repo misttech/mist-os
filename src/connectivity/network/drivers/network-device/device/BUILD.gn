@@ -39,6 +39,7 @@ ddk_source_split("device") {
     ":shared_lock",
     "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_cpp_wire",
     "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.network.driver:fuchsia.hardware.network.driver_cpp_wire",
     "//sdk/lib/fidl",
     "//src/connectivity/lib/network-device/buffer_descriptor",
     "//src/lib/vmo_store",

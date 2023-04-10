@@ -308,6 +308,28 @@ protocol NetworkPort {
     Removed();
 };
 
+/// The maximum number of `TxResult` structs that could be sent in a single FIDL
+/// message while staying within the maximum message size enforced by the
+/// bindings.
+///
+/// At the time of writing, FIDL messages are limited to 65 KiB. In the current
+/// FIDL wire format, the size of each `TxResult` is 8 bytes, and the fixed
+/// overhead of the `CompleteTx` request is 32 bytes (16 for the FIDL message
+/// header + 16 for the vector), so we selected the maximum N where
+/// 32 + N * 8 <= 65 KiB.
+const MAX_TX_RESULTS uint32 = 8188;
+
+/// The maximum number of `RxBuffer` structs that could be sent in a single FIDL
+/// message while staying within the maximum message size enforced by the
+/// bindings.
+///
+/// At the time of writing, FIDL messages are limited to 65 KiB. In the current
+/// FIDL wire format, the maximum size of an `RxBuffer` is 104 bytes, and the
+/// fixed overhead of the `CompleteRx` and `Snoop` requests is 32 bytes (16 for
+/// the FIDL message header + 16 for the vector), so we selected the maximum N
+/// where 32 + N * 104 <= 65 KiB.
+const MAX_RX_BUFFERS uint32 = 629;
+
 @transport("Driver")
 @banjo_layout("ddk-interface")
 protocol NetworkDeviceIfc {
@@ -363,7 +385,7 @@ protocol NetworkDeviceIfc {
     ///
     /// + request `rx` buffers containing incoming data.
     CompleteRx(struct {
-        rx vector<RxBuffer>:MAX;
+        rx vector<RxBuffer>:MAX_RX_BUFFERS;
     });
     /// Notifies interface of complete transmit buffers.
     ///
@@ -379,7 +401,7 @@ protocol NetworkDeviceIfc {
     ///
     /// + request `tx` transmit results.
     CompleteTx(struct {
-        tx vector<TxResult>:MAX;
+        tx vector<TxResult>:MAX_TX_RESULTS;
     });
     /// Notifies interface of a snooped tx frame.
     ///
@@ -397,7 +419,7 @@ protocol NetworkDeviceIfc {
     /// + request `rx` snooped transmit frames to be looped back as incoming
     /// data.
     Snoop(struct {
-        rx vector<RxBuffer>:MAX;
+        rx vector<RxBuffer>:MAX_RX_BUFFERS;
     });
 };
 
@@ -511,6 +533,28 @@ type PortStatus = struct {
     flags uint32;
 };
 
+/// The maximum number of `TxBuffer` structs that could be sent in a single FIDL
+/// message while staying within the maximum message size enforced by the
+/// bindings.
+///
+/// At the time of writing, FIDL messages are limited to 65 KiB. In the current
+/// FIDL wire format, the maximum size of a `TxBuffer` is 168 bytes, and the
+/// fixed overhead of the `QueueTx` request is 32 bytes (16 for the FIDL message
+/// header + 16 for the vector), so we selected the maximum N where
+/// 32 + N * 168 <= 65 KiB.
+const MAX_TX_BUFFERS uint32 = 389;
+
+/// The maximum number of `RxSpaceBuffer` structs that could be sent in a single
+/// FIDL message while staying within the maximum message size enforced by the
+/// bindings.
+///
+/// At the time of writing, FIDL messages are limited to 65 KiB. In the current
+/// FIDL wire format, the maximum size of an `RxSpaceBuffer` is 32 bytes, and
+/// the fixed overhead of the `QueueRxSpace` request is 32 bytes (16 for the
+/// FIDL message header + 16 for the vector), so we selected the maximum N where
+/// 32 + N * 32 <= 65 KiB.
+const MAX_RX_SPACE_BUFFERS uint32 = 2047;
+
 @transport("Driver")
 @banjo_layout("ddk-protocol")
 protocol NetworkDeviceImpl {
@@ -589,7 +633,7 @@ protocol NetworkDeviceImpl {
     ///
     /// + request `buffers` tx buffers to enqueue for sending.
     QueueTx(struct {
-        buffers vector<TxBuffer>:MAX;
+        buffers vector<TxBuffer>:MAX_TX_BUFFERS;
     });
     /// Enqueues a list of rx buffer space on the network device.
     ///
@@ -608,7 +652,7 @@ protocol NetworkDeviceImpl {
     /// + request `buffers` rx space buffers to be filled with network data when
     /// it arrives.
     QueueRxSpace(struct {
-        buffers vector<RxSpaceBuffer>:MAX;
+        buffers vector<RxSpaceBuffer>:MAX_RX_SPACE_BUFFERS;
     });
     /// Informs device that a new VMO is being used to store frame data.
     ///

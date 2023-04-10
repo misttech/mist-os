@@ -51,7 +51,15 @@ void TxQueue::SessionTransaction::Commit() {
   // when we destroy a session transaction, we commit all the queued buffers to
   // the device.
   if (queued_ != 0) {
-    queue_->parent_->QueueTx(buffers_.data(), queued_);
+    // Send buffers in batches of at most |MAX_TX_BUFFERS| at a time to stay within the FIDL
+    // channel maximum.
+    tx_buffer_t* buffers = buffers_.data();
+    while (queued_ > 0) {
+      const uint32_t batch = std::min(static_cast<uint32_t>(queued_), MAX_TX_BUFFERS);
+      queue_->parent_->QueueTx(buffers, batch);
+      buffers += batch;
+      queued_ -= batch;
+    }
   }
 }
 

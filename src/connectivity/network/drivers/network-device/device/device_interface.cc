@@ -4,7 +4,10 @@
 
 #include "device_interface.h"
 
+#include <fidl/fuchsia.hardware.network.driver/cpp/wire.h>
 #include <lib/async/cpp/task.h>
+#include <lib/fidl/cpp/wire/sync_call.h>
+#include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/defer.h>
 
 #include <fbl/alloc_checker.h>
@@ -27,6 +30,61 @@ static_assert(offsetof(buffer_descriptor_t, head_length) == 24);
 static_assert(offsetof(buffer_descriptor_t, inbound_flags) == 32);
 // Descriptor length is reported as uint8 words in session info, make sure that fits.
 static_assert(sizeof(buffer_descriptor_t) / sizeof(uint64_t) < std::numeric_limits<uint8_t>::max());
+
+namespace {
+
+namespace fnetwork_driver = fuchsia_hardware_network_driver;
+
+// Assert that the batch sizes dictated by the maximum vector lengths in the
+// FIDL library are the largest they can be while remaining within the maximum
+// FIDL message size.
+
+constexpr size_t kMaxFidlPayloadSize = ZX_CHANNEL_MAX_MSG_BYTES - sizeof(fidl_message_header_t);
+
+// NetworkDeviceImpl.QueueTx
+constexpr size_t kQueueTxSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::NetworkDeviceImplQueueTxRequest,
+                           fidl::MessageDirection::kSending>();
+static_assert(kQueueTxSize <= kMaxFidlPayloadSize);
+constexpr size_t kTxBufferSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::TxBuffer, fidl::MessageDirection::kSending>();
+static_assert(kMaxFidlPayloadSize - kQueueTxSize < kTxBufferSize);
+
+// NetworkDeviceImpl.QueueRxSpace
+constexpr size_t kQueueRxSpaceSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::NetworkDeviceImplQueueRxSpaceRequest,
+                           fidl::MessageDirection::kSending>();
+static_assert(kQueueRxSpaceSize <= kMaxFidlPayloadSize);
+constexpr size_t kRxSpaceBufferSize = fidl::MaxSizeInChannel<fnetwork_driver::wire::RxSpaceBuffer,
+                                                             fidl::MessageDirection::kSending>();
+static_assert(kMaxFidlPayloadSize - kQueueRxSpaceSize < kRxSpaceBufferSize);
+
+// NetworkDeviceIfc.CompleteTx
+constexpr size_t kCompleteTxSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::NetworkDeviceIfcCompleteTxRequest,
+                           fidl::MessageDirection::kSending>();
+static_assert(kCompleteTxSize <= kMaxFidlPayloadSize);
+constexpr size_t kTxResultSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::TxResult, fidl::MessageDirection::kSending>();
+static_assert(kMaxFidlPayloadSize - kCompleteTxSize < kTxResultSize);
+
+// NetworkDeviceIfc.CompleteRx
+constexpr size_t kCompleteRxSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::NetworkDeviceIfcCompleteRxRequest,
+                           fidl::MessageDirection::kSending>();
+static_assert(kCompleteRxSize <= kMaxFidlPayloadSize);
+constexpr size_t kRxBufferSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::RxBuffer, fidl::MessageDirection::kSending>();
+static_assert(kMaxFidlPayloadSize - kCompleteRxSize < kRxBufferSize);
+
+// NetworkDeviceIfc.Snoop
+constexpr size_t kSnoopSize =
+    fidl::MaxSizeInChannel<fnetwork_driver::wire::NetworkDeviceIfcSnoopRequest,
+                           fidl::MessageDirection::kSending>();
+static_assert(kSnoopSize <= kMaxFidlPayloadSize);
+static_assert(kMaxFidlPayloadSize - kSnoopSize < kRxBufferSize);
+
+}  // namespace
 
 namespace {
 const char* DeviceStatusToString(network::internal::DeviceStatus status) {

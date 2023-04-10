@@ -358,7 +358,15 @@ int RxQueue::WatchThread(std::unique_ptr<rx_space_buffer_t[]> space_buffers) {
       control_lock.release();
 
       if (pushed != 0) {
-        parent_->QueueRxSpace(space_buffers.get(), static_cast<uint32_t>(pushed));
+        // Send buffers in batches of at most |MAX_RX_SPACE_BUFFERS| at a time to stay within the
+        // FIDL channel maximum.
+        rx_space_buffer* buffers = space_buffers.get();
+        while (pushed > 0) {
+          const uint32_t batch = std::min(static_cast<uint32_t>(pushed), MAX_RX_SPACE_BUFFERS);
+          parent_->QueueRxSpace(buffers, static_cast<uint32_t>(batch));
+          buffers += batch;
+          pushed -= batch;
+        }
       }
 
       // No point waiting in RX fifo if we filled the device buffers, we'll get a signal to wait
