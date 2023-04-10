@@ -5,8 +5,8 @@
 use crate::lock::RwLock;
 use std::sync::Arc;
 
-const DEFAULT_HOST_NAME: &[u8] = b"local";
-const DEFAULT_DOMAIN_NAME: &[u8] = b"local";
+const DEFAULT_HOST_NAME: &[u8] = b"localhost";
+const DEFAULT_DOMAIN_NAME: &[u8] = b"localdomain";
 
 pub type UtsNamespaceHandle = Arc<RwLock<UtsNamespace>>;
 
