@@ -613,3 +613,8 @@
 	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/packages/modules/Bluetooth
 	name = third_party/android.googlesource.com/platform/packages/modules/Bluetooth
 	ignore = all
+[submodule "third_party/ubpf"]
+	path = third_party/ubpf
+	url = https://fuchsia.googlesource.com/third_party/github.com/iovisor/ubpf/
+	name = third_party/ubpf
+	ignore = all
