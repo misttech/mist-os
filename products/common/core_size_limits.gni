@@ -37,29 +37,6 @@ size_checker_input = {
       creep_limit = 24576  # 24.0 KiB
     },
     {
-      component = "/system (drivers and early boot)"
-      src = [
-        "packages/system/emulator",
-        "packages/system/passthrough",
-        "packages/system/atheros",
-        "packages/system/intel",
-        "packages/system/qmi-usb-transport",
-        "packages/system/acpi-battery",
-        "packages/system/acpi-lid",
-        "packages/system/intel-thermal",
-        "packages/system/msd-arm-mali-test",
-        "packages/system/msd-intel-gen-test",
-        "packages/system/msd-intel-gen",
-        "packages/system/msd-vsi-vip-test",
-        "packages/system/testing_firmware_file",
-        "packages/system/virtual_audio",
-        "packages/system/pkgfs_non_static_pkgs_allowlist_eng",
-        "packages/system/disable-executability-restrictions",
-      ]
-      limit = 7406939  # 7.064 MiB
-      creep_limit = 40960  # 40.0 KiB
-    },
-    {
       component = "Cobalt"
       src = [
         "packages/base/cobalt",
@@ -202,8 +179,14 @@ size_checker_input = {
         "packages/base/system-update-committer",
         "packages/base/system-updater",
         "packages/base/update-bin",
+
+        # These are part of the system-image package, and the only remaining
+        # contents of the "system" packages.
+        "build/images/fuchsia/fuchsia/base",
+        "packages/system/pkgfs_non_static_pkgs_allowlist_eng",
+        "packages/system/disable-executability-restrictions",
       ]
-      limit = 8316106  # 7.931 MiB
+      limit = 8552106  # 8.155 MiB
       creep_limit = 81920  # 80.0 KiB
     },
     {
@@ -221,7 +204,7 @@ size_checker_input = {
     {
       component = "Unallocated"
       src = []
-      limit = 5118550513
+      limit = 5125721452
       creep_limit = 0
     },
   ]
