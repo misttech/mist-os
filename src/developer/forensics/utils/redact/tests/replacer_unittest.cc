@@ -174,6 +174,21 @@ INSTANTIATE_TEST_SUITE_P(IPv4Replacement, IPv4ReplacerTest,
                                  "not_link_local_multicast: 224.0.1.8",
                                  "not_link_local_multicast: <REDACTED-IPV4: 1>",
                              },
+                             {
+                                 "Partial",
+                                 "partial: 192.168.42.x",
+                                 "partial: <REDACTED-IPV4: 1>",
+                             },
+                             {
+                                 "NotPartial",
+                                 "not-partial: 192.168.42 x",
+                                 "not-partial: 192.168.42 x",
+                             },
+                             {
+                                 "WrongDigits",
+                                 "wrong-digits: 192.168.420",
+                                 "wrong-digits: 192.168.420",
+                             },
                          })),
                          GetTestName<IpTestParam>);
 
