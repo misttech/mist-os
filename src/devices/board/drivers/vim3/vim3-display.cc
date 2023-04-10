@@ -103,8 +103,7 @@ zx_status_t Vim3::DisplayInit() {
 
   auto gpio_properties = std::vector{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
-      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
-                        bind_fuchsia_gpio::FUNCTION_HDMI_HOTPLUG_DETECT),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
   };
 
   auto sysmem_bind_rules = std::vector{
