@@ -10,9 +10,9 @@
 #include <utility>
 
 #include "src/developer/debug/ipc/records.h"
-#include "src/developer/debug/unwinder/memory.h"
-#include "src/developer/debug/unwinder/module.h"
 #include "src/developer/debug/zxdb/symbols/build_id_index.h"
+#include "src/lib/unwinder/memory.h"
+#include "src/lib/unwinder/module.h"
 #include "third_party/crashpad/src/snapshot/memory_snapshot.h"
 #include "third_party/crashpad/src/snapshot/minidump/process_snapshot_minidump.h"
 

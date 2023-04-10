@@ -21,8 +21,8 @@
 #include "src/developer/debug/debug_agent/process_handle.h"
 #include "src/developer/debug/debug_agent/thread_handle.h"
 #include "src/developer/debug/ipc/unwinder_support.h"
-#include "src/developer/debug/unwinder/fuchsia.h"
-#include "src/developer/debug/unwinder/unwind.h"
+#include "src/lib/unwinder/fuchsia.h"
+#include "src/lib/unwinder/unwind.h"
 
 namespace debug_agent {
 

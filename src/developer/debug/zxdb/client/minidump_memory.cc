@@ -6,8 +6,8 @@
 
 #include <memory>
 
-#include "src/developer/debug/unwinder/module.h"
 #include "src/lib/elflib/elflib.h"
+#include "src/lib/unwinder/module.h"
 
 namespace zxdb {
 

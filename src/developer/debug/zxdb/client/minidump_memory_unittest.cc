@@ -14,7 +14,7 @@
 #include <gtest/gtest.h>
 
 #include "lib/syslog/cpp/macros.h"
-#include "src/developer/debug/unwinder/error.h"
+#include "src/lib/unwinder/error.h"
 
 namespace zxdb {
 

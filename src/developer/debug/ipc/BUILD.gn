@@ -36,8 +36,8 @@ sdk_source_set("ipc") {
   ]
 
   public_deps = [
-    "//src/developer/debug/unwinder",
     "//src/lib/fxl",
+    "//src/lib/unwinder",
   ]
 }
 

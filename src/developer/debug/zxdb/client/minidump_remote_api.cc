@@ -14,10 +14,10 @@
 #include "src/developer/debug/ipc/unwinder_support.h"
 #include "src/developer/debug/shared/logging/logging.h"
 #include "src/developer/debug/shared/message_loop.h"
-#include "src/developer/debug/unwinder/unwind.h"
 #include "src/developer/debug/zxdb/common/err.h"
 #include "src/developer/debug/zxdb/common/string_util.h"
 #include "src/lib/fxl/strings/string_printf.h"
+#include "src/lib/unwinder/unwind.h"
 #include "third_party/crashpad/src/snapshot/memory_map_region_snapshot.h"
 
 using debug::RegisterCategory;

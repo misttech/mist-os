@@ -6,7 +6,7 @@
 #define SRC_DEVELOPER_DEBUG_IPC_UNWINDER_SUPPORT_H_
 
 #include "src/developer/debug/ipc/records.h"
-#include "src/developer/debug/unwinder/unwind.h"
+#include "src/lib/unwinder/unwind.h"
 
 namespace debug_ipc {
 

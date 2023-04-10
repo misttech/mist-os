@@ -4,7 +4,7 @@
 
 #include "src/developer/debug/ipc/unwinder_support.h"
 
-#include "src/developer/debug/unwinder/registers.h"
+#include "src/lib/unwinder/registers.h"
 
 namespace debug_ipc {
 
