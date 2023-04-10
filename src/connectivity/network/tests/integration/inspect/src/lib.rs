@@ -380,7 +380,6 @@ struct PacketAttributes {
 }
 
 const INVALID_PORT: NonZeroU16 = nonzero!(1234u16);
-const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
 
 #[netstack_test]
 #[test_case(
@@ -388,7 +387,7 @@ const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
     vec![
         PacketAttributes {
             ip_proto: packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Tcp),
-            port: DHCP_CLIENT_PORT,
+            port: dhcpv4::protocol::CLIENT_PORT,
         }
     ]; "invalid_trans_proto")]
 #[test_case(
@@ -404,7 +403,7 @@ const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
     vec![
         PacketAttributes {
             ip_proto: packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Udp),
-            port: DHCP_CLIENT_PORT,
+            port: dhcpv4::protocol::CLIENT_PORT,
         }
     ]; "valid")]
 #[test_case(
@@ -420,7 +419,7 @@ const DHCP_CLIENT_PORT: NonZeroU16 = nonzero!(dhcpv4::protocol::CLIENT_PORT);
         },
             PacketAttributes {
             ip_proto: packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Tcp),
-            port: DHCP_CLIENT_PORT,
+            port: dhcpv4::protocol::CLIENT_PORT,
         }
     ]; "multiple_invalid_port_and_single_invalid_trans_proto")]
 async fn inspect_dhcp<N: Netstack>(
@@ -467,8 +466,9 @@ async fn inspect_dhcp<N: Netstack>(
                             UdpParseArgs::new(packet.src_ip(), packet.dst_ip()),
                         )
                         .expect("failed to parse UDP datagram");
+                        const DHCPV4_SERVER_PORT: u16 = dhcpv4::protocol::SERVER_PORT.get();
                         match datagram.dst_port().get() {
-                            dhcpv4::protocol::SERVER_PORT => {
+                            DHCPV4_SERVER_PORT => {
                                 // Any DHCP message means the client is listening; we don't care
                                 // about the contents.
                                 let _: dhcpv4::protocol::Message =
@@ -526,7 +526,7 @@ async fn inspect_dhcp<N: Netstack>(
         if ip_proto != packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Udp) {
             let _: &mut u64 =
                 invalid_trans_protos.entry(ip_proto.into()).and_modify(|v| *v += 1).or_insert(1);
-        } else if port != DHCP_CLIENT_PORT {
+        } else if port != dhcpv4::protocol::CLIENT_PORT {
             let _: &mut u64 = invalid_ports.entry(port.into()).and_modify(|v| *v += 1).or_insert(1);
         }
     }

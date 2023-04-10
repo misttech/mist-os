@@ -6,16 +6,12 @@
 
 use crate::deps::{self, DatagramInfo, Instant as _};
 use anyhow::Context as _;
-use dhcp_protocol::{AtLeast, AtMostBytes};
+use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
 use futures::{
     channel::mpsc, pin_mut, select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _,
 };
 use rand::Rng as _;
 use std::{net::Ipv4Addr, num::NonZeroU32};
-
-pub const SERVER_PORT: std::num::NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT);
-
-pub const CLIENT_PORT: std::num::NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::CLIENT_PORT);
 
 /// Unexpected, non-recoverable errors encountered by the DHCP client.
 #[derive(thiserror::Error, Debug)]
@@ -586,7 +582,7 @@ mod test {
 
                 let msg = crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
-                    nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT),
+                    dhcp_protocol::SERVER_PORT,
                 )
                 .expect("received packet should parse as DHCP message");
 
@@ -749,7 +745,7 @@ mod test {
             let parse_msg = || {
                 crate::parse::parse_dhcp_message_from_ip_packet(
                     &recv_buf[..length],
-                    nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT),
+                    dhcp_protocol::SERVER_PORT,
                 )
                 .expect("received packet on test socket should parse as DHCP message")
             };

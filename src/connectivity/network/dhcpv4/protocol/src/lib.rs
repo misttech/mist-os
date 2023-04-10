@@ -10,7 +10,7 @@ use std::{
     fmt,
     iter::Iterator,
     net::Ipv4Addr,
-    num::NonZeroU8,
+    num::{NonZeroU16, NonZeroU8},
 };
 use thiserror::Error;
 use tracing::debug;
@@ -26,8 +26,21 @@ pub use crate::size_constrained::{
 mod size_of_contents;
 use crate::size_of_contents::SizeOfContents as _;
 
-pub const SERVER_PORT: u16 = 67;
-pub const CLIENT_PORT: u16 = 68;
+/// The port on which DHCP servers receive messages from DHCP clients.
+///
+/// Per [RFC 2131 section 4.1], "DHCP messages from a client to a server are
+/// sent to the 'DHCP server' port (67)".
+///
+/// [RFC 2131 section 4.1]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.1
+pub const SERVER_PORT: NonZeroU16 = nonzero_ext::nonzero!(67u16);
+
+/// The port on which DHCP clients receive messages from DHCP servers.
+///
+/// Per [RFC 2131 section 4.1], "DHCP messages from a server to a client are
+/// sent to the 'DHCP client' port (68)".
+///
+/// [RFC 2131 section 4.1]: https://datatracker.ietf.org/doc/html/rfc2131#section-4.1
+pub const CLIENT_PORT: NonZeroU16 = nonzero_ext::nonzero!(68u16);
 
 const OP_IDX: usize = 0;
 // currently unused

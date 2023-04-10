@@ -563,9 +563,7 @@ async fn dhcpv4_client_started<N: Netstack>(name: &str) {
                             packet_formats::udp::UdpParseArgs::new(src_ip, dst_ip),
                         ) {
                             Ok(udp) => {
-                                const DHCPV4_SERVER_PORT: std::num::NonZeroU16 =
-                                    nonzero_ext::nonzero!(dhcpv4::protocol::SERVER_PORT);
-                                (udp.dst_port() == DHCPV4_SERVER_PORT).then(|| ())
+                                (udp.dst_port() == dhcpv4::protocol::SERVER_PORT).then(|| ())
                             }
                             Err(packet_formats::error::ParseError::NotExpected) => None,
                             Err(e) => panic!("failed to parse UDP packet: {}", e),

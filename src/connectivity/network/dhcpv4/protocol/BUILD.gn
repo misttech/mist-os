@@ -13,6 +13,7 @@ rustc_library("protocol") {
     "//src/connectivity/lib/net-types",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:serde",

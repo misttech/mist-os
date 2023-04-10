@@ -19,7 +19,6 @@ rustc_library("core") {
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:derive_builder",
     "//third_party/rust_crates:futures",
-    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing",
@@ -29,6 +28,7 @@ rustc_library("core") {
     "//src/connectivity/network/dhcpv4/lib",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-stream",
+    "//third_party/rust_crates:nonzero_ext",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:tracing-subscriber",
   ]

@@ -324,12 +324,10 @@ impl FieldsFromOfferToUseInRequestBuilder {
 mod test {
     use super::*;
     use assert_matches::assert_matches;
+    use dhcp_protocol::{CLIENT_PORT, SERVER_PORT};
     use net_declare::{net_ip_v4, net_mac, std_ip_v4};
     use std::net::Ipv4Addr;
     use test_case::test_case;
-
-    const SERVER_PORT: NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::SERVER_PORT);
-    const CLIENT_PORT: NonZeroU16 = nonzero_ext::nonzero!(dhcp_protocol::CLIENT_PORT);
 
     #[test]
     fn serialize_parse_roundtrip() {

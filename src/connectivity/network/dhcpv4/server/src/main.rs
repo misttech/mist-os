@@ -6,7 +6,7 @@ use {
     anyhow::{Context as _, Error},
     dhcpv4::{
         configuration,
-        protocol::{Message, SERVER_PORT},
+        protocol::{Message, CLIENT_PORT, SERVER_PORT},
         server::{
             DataStore, ResponseTarget, Server, ServerAction, ServerDispatcher, ServerError,
             DEFAULT_STASH_ID,
@@ -184,7 +184,7 @@ impl<DS: DataStore> SocketServerDispatcher for Server<DS> {
         let () = socket.bind_device(Some(name.as_bytes()))?;
         info!("socket bound to device {}", name);
         let () = socket.set_broadcast(true)?;
-        let () = socket.bind(&SocketAddr::new(IpAddr::V4(src), SERVER_PORT).into())?;
+        let () = socket.bind(&SocketAddr::new(IpAddr::V4(src), SERVER_PORT.into()).into())?;
         Ok(UdpSocket::from_socket(socket.into())?)
     }
 
@@ -462,10 +462,6 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
                 .expect("expect server identifier is always present")
                 .into();
             let response = msg.serialize();
-            const SERVER_PORT: std::num::NonZeroU16 =
-                nonzero_ext::nonzero!(dhcpv4::protocol::SERVER_PORT);
-            const CLIENT_PORT: std::num::NonZeroU16 =
-                nonzero_ext::nonzero!(dhcpv4::protocol::CLIENT_PORT);
             let udp_builder = UdpPacketBuilder::new(src_ip, dst_ip, Some(SERVER_PORT), CLIENT_PORT);
             // Use the default TTL shared across UNIX systems.
             const TTL: u8 = 64;
