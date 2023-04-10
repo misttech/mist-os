@@ -4,6 +4,7 @@
 
 group("starnix") {
   deps = [
+    "containers",
     "kernel",
     "runner",
   ]
@@ -11,5 +12,8 @@ group("starnix") {
 
 group("tests") {
   testonly = true
-  deps = [ "kernel:tests" ]
+  deps = [
+    "containers:tests",
+    "kernel:tests",
+  ]
 }

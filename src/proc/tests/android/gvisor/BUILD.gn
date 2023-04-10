@@ -285,15 +285,15 @@ zip_resource("gvisor_runfiles") {
 }
 
 group("container_resources") {
-  deps = [ "//src/proc/bin/containers:default_init" ]
+  deps = [ "//src/starnix/containers:default_init" ]
 
   if (target_cpu == "x64") {
     deps += [
       ":gvisor_runfiles",
       "//src/connectivity/network/netstack:component",
-      "//src/proc/bin/containers:data_tmp_target",
-      "//src/proc/bin/containers/bionic:system_image",
-      "//src/proc/bin/containers/bionic:testcases_image",
+      "//src/starnix/containers:data_tmp_target",
+      "//src/starnix/containers/bionic:system_image",
+      "//src/starnix/containers/bionic:testcases_image",
     ]
   }
 }

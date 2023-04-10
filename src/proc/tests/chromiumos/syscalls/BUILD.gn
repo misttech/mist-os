@@ -101,12 +101,12 @@ starnix_linux_test_component("crash_test") {
 }
 
 group("container_resources") {
-  deps = [ "//src/proc/bin/containers:default_init" ]
+  deps = [ "//src/starnix/containers:default_init" ]
 
   if (target_cpu == "x64") {
     deps += [
-      "//src/proc/bin/containers:data_tmp_target",
-      "//src/proc/bin/containers/chromiumos:system_image",
+      "//src/starnix/containers:data_tmp_target",
+      "//src/starnix/containers/chromiumos:system_image",
     ]
   }
 }
