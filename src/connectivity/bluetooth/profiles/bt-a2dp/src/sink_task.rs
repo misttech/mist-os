@@ -95,6 +95,7 @@ impl ConfiguredSinkTask {
             self.session_id_fut = Some(recv.shared());
             let peer_id = self.peer_id.clone();
             let builder = self.builder.clone();
+            let inspect = self.inspect.clone_weak();
             let session_fut = async move {
                 let _ = &builder;
                 let (player_client, player_requests) = match create_request_stream() {
@@ -115,8 +116,10 @@ impl ConfiguredSinkTask {
                         info!(%peer_id, %session_id, "Published session");
                         // If the receiver has hung up, this task will be dropped.
                         let _ = sender.send(session_id);
+                        let mut avrcp = AvrcpRelay::default();
+                        let _ = avrcp.iattach(&inspect, "avrcp_relay");
                         // We ignore AVRCP relay errors, they are logged.
-                        if let Ok(relay_task) = AvrcpRelay::start(peer_id, player_requests) {
+                        if let Ok(relay_task) = avrcp.start(peer_id, player_requests) {
                             relay_task.await;
                         }
                     }

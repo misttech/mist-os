@@ -83,6 +83,16 @@ To view the current state of the profile, use `ffx inspect show core/bt-a2dp`.
             stream_4:
               endpoint_state = [...]
               media_task:
+                avrcp_relay:
+                  battery_watcher_active
+                  player_status
+                    content_type
+                    duration
+                    repeat_mode
+                    shuffle_on
+                    player_state
+                    timeline_function
+                  recent_player_requests
                 codec_config = MediaCodecConfig { codec_type: MediaCodecType::AUDIO_AAC, codec_extra: [128, 0, 132, 129, 244, 0] }
                 source_type = audio_out
                 data_stream:

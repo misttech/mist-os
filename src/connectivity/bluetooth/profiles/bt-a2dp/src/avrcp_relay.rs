@@ -2,21 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    anyhow::{format_err, Context as _, Error},
-    async_helpers::maybe_stream::MaybeStream,
-    battery_client::{BatteryClient, BatteryInfo, BatteryLevel},
-    fidl::endpoints,
-    fidl_fuchsia_bluetooth_avrcp as avrcp, fidl_fuchsia_media as media,
-    fidl_fuchsia_media_sessions2 as sessions2,
-    fidl_table_validation::ValidFidlTable,
-    fuchsia_async as fasync,
-    fuchsia_bluetooth::types::PeerId,
-    fuchsia_zircon as zx,
-    futures::{select, StreamExt},
-    std::fmt::Debug,
-    tracing::{debug, info, trace},
-};
+use anyhow::{format_err, Context as _, Error};
+use async_helpers::maybe_stream::MaybeStream;
+use battery_client::{BatteryClient, BatteryInfo, BatteryLevel};
+use fidl::endpoints;
+use fidl_fuchsia_bluetooth_avrcp as avrcp;
+use fidl_fuchsia_media as media;
+use fidl_fuchsia_media_sessions2 as sessions2;
+use fidl_table_validation::ValidFidlTable;
+use fuchsia_async as fasync;
+use fuchsia_bluetooth::types::PeerId;
+use fuchsia_inspect::{self as inspect, Property};
+use fuchsia_inspect_contrib::{inspect_log, nodes::BoundedListNode};
+use fuchsia_inspect_derive::{AttachError, Inspect};
+use fuchsia_zircon as zx;
+use futures::{select, StreamExt};
+use std::fmt::Debug;
+use tracing::{debug, info, trace};
 
 #[derive(Debug, Clone, ValidFidlTable, PartialEq)]
 #[fidl_table_src(sessions2::PlayerStatus)]
@@ -69,13 +71,72 @@ impl ValidPlayerStatus {
     }
 }
 
-pub(crate) struct AvrcpRelay {}
+pub(crate) struct AvrcpRelay {
+    /// Whether the battery monitoring service is active.
+    battery_watcher_active: inspect::BoolProperty,
+    /// The last 5 Media Player requests that have been received.
+    recent_player_requests: BoundedListNode,
+    /// The Inspect node associated with the current player state.
+    player_status_node: inspect::Node,
+    /// Inspect node
+    inspect_node: inspect::Node,
+}
+
+impl Inspect for &mut AvrcpRelay {
+    fn iattach(self, parent: &inspect::Node, name: impl AsRef<str>) -> Result<(), AttachError> {
+        self.inspect_node = parent.create_child(name.as_ref());
+        self.battery_watcher_active =
+            self.inspect_node.create_bool("battery_watcher_active", false);
+        self.recent_player_requests =
+            BoundedListNode::new(self.inspect_node.create_child("recent_player_requests"), 5);
+        self.player_status_node = self.inspect_node.create_child("player_status");
+        Ok(())
+    }
+}
+
+impl Default for AvrcpRelay {
+    fn default() -> Self {
+        Self {
+            battery_watcher_active: Default::default(),
+            recent_player_requests: BoundedListNode::new(inspect::Node::default(), 5),
+            player_status_node: Default::default(),
+            inspect_node: Default::default(),
+        }
+    }
+}
 
 impl AvrcpRelay {
+    fn update_player_status_inspect(&mut self, latest: &ValidPlayerStatus) {
+        self.player_status_node.clear_recorded();
+        self.player_status_node
+            .record_string("player_state", &format!("{:?}", latest.player_state));
+        self.player_status_node.record_string("repeat_mode", &format!("{:?}", latest.repeat_mode));
+        self.player_status_node.record_bool("shuffle_on", latest.shuffle_on);
+        self.player_status_node
+            .record_string("content_type", &format!("{:?}", latest.content_type));
+        self.player_status_node.record_int("duration", latest.duration.unwrap_or(0));
+        let Some(timeline_fn) = latest.timeline_function else { return };
+        self.player_status_node.record_child("timeline_function", |node| {
+            node.record_int("subject_time", timeline_fn.subject_time);
+            node.record_int("reference_time", timeline_fn.reference_time);
+            node.record_uint("subject_delta", timeline_fn.subject_delta.into());
+            node.record_uint("reference_delta", timeline_fn.reference_delta.into());
+        });
+    }
+
+    fn record_recent_player_request(&mut self, request: &sessions2::PlayerRequest) {
+        // We don't record the WatchInfoChange player request since it is a noisy hanging-get
+        // request.
+        if !matches!(request, sessions2::PlayerRequest::WatchInfoChange { .. }) {
+            inspect_log!(self.recent_player_requests, request: request.method_name());
+        }
+    }
+
     /// Start a relay between AVRCP and MediaSession.
     /// A MediaSession is published with the information from the AVRCP target.
     /// This starts the relay.  The relay can be stopped by dropping it.
     pub(crate) fn start(
+        self,
         peer_id: PeerId,
         player_request_stream: sessions2::PlayerRequestStream,
     ) -> Result<fasync::Task<()>, Error> {
@@ -84,7 +145,7 @@ impl AvrcpRelay {
                 .context("Failed to connect to Bluetooth AVRCP interface")?;
         let battery_client = BatteryClient::create().ok().into();
         let session_fut =
-            Self::session_relay(avrcp_svc, peer_id, player_request_stream, battery_client);
+            self.session_relay(avrcp_svc, peer_id, player_request_stream, battery_client);
         Ok(fasync::Task::spawn(async move {
             if let Err(e) = session_fut.await {
                 info!(?e, "session completed");
@@ -93,6 +154,7 @@ impl AvrcpRelay {
     }
 
     async fn session_relay(
+        mut self,
         mut avrcp: avrcp::PeerManagerProxy,
         peer_id: PeerId,
         mut player_request_stream: sessions2::PlayerRequestStream,
@@ -134,6 +196,8 @@ impl AvrcpRelay {
         let _ = update_attributes(&controller, &mut building, &mut last_player_status).await;
         let _ = update_status(&controller, &mut last_player_status).await;
         building.player_status = Some(last_player_status.clone().into());
+        self.update_player_status_inspect(&last_player_status);
+        self.battery_watcher_active.set(battery_client.is_some());
 
         let mut avrcp_notify_stream = controller.take_event_stream();
         let mut status_update_interval =
@@ -147,11 +211,13 @@ impl AvrcpRelay {
 
             select! {
                 request = player_request_fut => {
-                    if request.is_none() {
+                    let Some(request) = request else {
                         trace!("Player request stream is closed, quitting AVRCP.");
                         break;
-                    }
-                    match request.unwrap().context("request from player")? {
+                    };
+                    let request = request.context("request from player")?;
+                    self.record_recent_player_request(&request);
+                    match request {
                         sessions2::PlayerRequest::WatchInfoChange { responder } => {
                             if let Some(_) = hanging_watcher.take() {
                                 return Err(format_err!("Concurrent watches issued: not allowed"));
@@ -242,6 +308,7 @@ impl AvrcpRelay {
                         let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
                         building.player_status = Some(last_player_status.clone().into());
                         debug!(%peer_id, ?building, "Updated player status");
+                        self.update_player_status_inspect(&last_player_status);
                     }
 
                     // Notify that the notification is handled so we can receive another one.
@@ -253,10 +320,14 @@ impl AvrcpRelay {
                     }
                     let building = staged_info.get_or_insert(sessions2::PlayerInfoDelta::EMPTY);
                     building.player_status = Some(last_player_status.clone().into());
+                    self.update_player_status_inspect(&last_player_status);
                 }
                 update = battery_client_fut => {
                     match update {
-                        None => debug!(%peer_id, "BatteryClient finished"),
+                        None => {
+                            debug!(%peer_id, "BatteryClient finished");
+                            self.battery_watcher_active.set(false);
+                        }
                         Some(Err(e)) => info!(%peer_id, ?e, "BatteryClient stream error"),
                         Some(Ok(info)) => {
                             if let Err(e) = update_battery_status(&controller, info).await {
@@ -385,6 +456,8 @@ mod tests {
     use fidl::endpoints::{self, RequestStream};
     use fidl_fuchsia_power_battery as fpower;
     use fuchsia_async::pin_mut;
+    use fuchsia_inspect::assert_data_tree;
+    use fuchsia_inspect_derive::WithInspect;
     use futures::{task::Poll, Future};
     use std::{convert::TryInto, pin::Pin};
     use test_battery_manager::TestBatteryManager;
@@ -397,8 +470,8 @@ mod tests {
             endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
         let peer_id = PeerId(0);
 
-        let relay_fut =
-            AvrcpRelay::session_relay(avrcp_proxy, peer_id, player_requests, None.into());
+        let relay = AvrcpRelay::default();
+        let relay_fut = relay.session_relay(avrcp_proxy, peer_id, player_requests, None.into());
         (player_proxy, avrcp_requests, relay_fut)
     }
 
@@ -416,12 +489,9 @@ mod tests {
         pin_mut!(setup_fut);
         let (battery_client, test_battery_manager) = exec.run_singlethreaded(&mut setup_fut);
 
-        let relay_fut = AvrcpRelay::session_relay(
-            avrcp_proxy,
-            peer_id,
-            player_requests,
-            Some(battery_client).into(),
-        );
+        let relay = AvrcpRelay::default();
+        let relay_fut =
+            relay.session_relay(avrcp_proxy, peer_id, player_requests, Some(battery_client).into());
 
         (player_proxy, avrcp_requests, relay_fut, test_battery_manager)
     }
@@ -1034,7 +1104,7 @@ mod tests {
         exec.run_until_stalled(&mut relay_fut).expect_pending("relay fut still running");
     }
 
-    /// When available players changes we fetch for the list of availalbe
+    /// When available players changes we fetch for the list of available
     /// players and change the media session player state based on the
     /// available players status.
     #[fuchsia::test]
@@ -1119,5 +1189,80 @@ mod tests {
             info_delta.player_status.unwrap().player_state.unwrap(),
             sessions2::PlayerState::Idle
         );
+    }
+
+    #[fuchsia::test]
+    fn avrcp_relay_inspect() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::Time::from_nanos(7000));
+        let inspector = fuchsia_inspect::Inspector::default();
+
+        let (player_client, player_requests) =
+            endpoints::create_proxy_and_stream::<sessions2::PlayerMarker>().unwrap();
+        let (avrcp_proxy, avrcp_requests) =
+            endpoints::create_proxy_and_stream::<avrcp::PeerManagerMarker>().unwrap();
+        let peer_id = PeerId(0);
+
+        let relay = AvrcpRelay::default()
+            .with_inspect(inspector.root(), "avrcp_relay")
+            .expect("can attach");
+        let relay_fut = relay.session_relay(avrcp_proxy, peer_id, player_requests, None.into());
+        pin_mut!(relay_fut);
+
+        exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
+
+        // The default Inspect tree doesn't have any player data.
+        assert_data_tree!(inspector, root: {
+            avrcp_relay: {
+                battery_watcher_active: false,
+                recent_player_requests: {},
+                player_status: {},
+            }
+        });
+
+        let (mut controller_requests, _browse_controller_requests) =
+            finish_relay_setup(&mut relay_fut, &mut exec, avrcp_requests);
+        // After finishing the initial relay set up, the inspect data should be updated. This data
+        // is populated by `expect_media_attributes_request` and `expect_play_status_request`.
+        assert_data_tree!(inspector, root: {
+            avrcp_relay: {
+                battery_watcher_active: false,
+                player_status: {
+                    content_type: "Audio",
+                    duration: 237000000000i64,
+                    repeat_mode: "Single",
+                    shuffle_on: false,
+                    player_state: "Playing",
+                    timeline_function: {
+                        subject_time: 1000000000i64,
+                        reference_time: 7000i64,
+                        subject_delta: 1u64,
+                        reference_delta: 1u64,
+                    },
+                },
+                recent_player_requests: {},
+            }
+        });
+        exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
+
+        // Receiving player commands should also update the Inspect tree.
+        player_client.pause().expect("should have been done");
+        player_client.play().expect("should have been done");
+        // WatchInfoChange should not be recorded to the Inspect tree.
+        let watch_fut = player_client.watch_info_change();
+        exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
+        expect_panel_command(&mut exec, &mut controller_requests, avrcp::AvcPanelCommand::Pause);
+        exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
+        expect_panel_command(&mut exec, &mut controller_requests, avrcp::AvcPanelCommand::Play);
+        exec.run_until_stalled(&mut relay_fut).expect_pending("relay active");
+        let (_delta, _relay_fut) = run_while(&mut exec, relay_fut, watch_fut);
+        assert_data_tree!(inspector, root: {
+            avrcp_relay: contains {
+                recent_player_requests: {
+                    "0": { "@time": 7000i64, request: "pause" },
+                    "1": { "@time": 7000i64, request: "play" },
+                },
+            }
+        });
     }
 }

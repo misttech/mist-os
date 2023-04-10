@@ -27,6 +27,7 @@ shared_deps = [
   "//src/connectivity/bluetooth/lib/fuchsia-bluetooth",
   "//src/connectivity/bluetooth/lib/profile-client",
   "//src/lib/async-utils",
+  "//src/lib/diagnostics/inspect/contrib/rust",
   "//src/lib/diagnostics/inspect/derive",
   "//src/lib/diagnostics/inspect/runtime/rust",
   "//src/lib/diagnostics/inspect/rust",
