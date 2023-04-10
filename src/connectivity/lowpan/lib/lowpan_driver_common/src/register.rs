@@ -71,6 +71,7 @@ impl<T: Driver> ServeTo<DriverRequestStream> for T {
                         handle_protocol!(futures, protocols.device_route);
                         handle_protocol!(futures, protocols.device_route_extra);
                         handle_protocol!(futures, protocols.thread_dataset);
+                        handle_protocol!(futures, protocols.thread_feature);
 
                         if let Some(server_end) = protocols.thread_legacy_joining {
                             match server_end.into_stream() {

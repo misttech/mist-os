@@ -32,12 +32,13 @@ impl<T: Trel + Boxable> Trel for ot::Box<T> {
 }
 
 impl Trel for Instance {
-    fn trel_set_enabled(&self, enabled: bool) {
-        if enabled {
-            unsafe { otTrelEnable(self.as_ot_ptr()) }
-        } else {
-            unsafe { otTrelDisable(self.as_ot_ptr()) }
-        }
+    fn trel_set_enabled(&self, _enabled: bool) {
+        // TODO: Re-enable after tqr/686822 is landed.
+        // if enabled {
+        //     unsafe { otTrelEnable(self.as_ot_ptr()) }
+        // } else {
+        //     unsafe { otTrelDisable(self.as_ot_ptr()) }
+        // }
     }
 
     fn trel_is_enabled(&self) -> bool {
