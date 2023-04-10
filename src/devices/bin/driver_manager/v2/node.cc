@@ -612,8 +612,10 @@ void Node::Remove(RemovalSet removal_set, NodeRemovalTracker* removal_tracker) {
   // Removing kPkg, and state is Running
   if ((node_state_ != NodeState::kPrestop && node_state_ != NodeState::kRunning) ||
       (node_state_ == NodeState::kPrestop && removal_set == RemovalSet::kPackage)) {
-    LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
-         MakeComponentMoniker().c_str(), State2String(node_state_));
+    if (parents_.size() <= 1) {
+      LOGF(WARNING, "Node::Remove() %s called late, already in state %s",
+           MakeComponentMoniker().c_str(), State2String(node_state_));
+    }
     return;
   }
 
