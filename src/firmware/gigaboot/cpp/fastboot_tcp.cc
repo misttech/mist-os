@@ -88,7 +88,7 @@ zx::result<> FastbootTcpMain() {
   fbl::Vector<uint8_t> download_buffer;
   // TODO(b/268532862): This needs to be large enough to hold the entire FVM image until we
   // implement sparse flashing support.
-  download_buffer.resize(2ULL * 1024 * 1024 * 1024);  // 2GB
+  download_buffer.resize(4ULL * 1024 * 1024 * 1024);  // 4GB
   Fastboot fastboot(download_buffer, zb_ops);
 
   constexpr uint32_t namegen = 1;
