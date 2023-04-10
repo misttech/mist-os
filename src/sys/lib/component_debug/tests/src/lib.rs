@@ -3,13 +3,18 @@
 // found in the LICENSE file.
 
 use {
-    component_debug::{capability, cli::*},
+    assert_matches::assert_matches,
+    component_debug::{
+        capability,
+        cli::*,
+        route::{DeclType, RouteReport},
+    },
     fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol,
     moniker::{AbsoluteMoniker, AbsoluteMonikerBase},
 };
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn list() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
@@ -32,7 +37,7 @@ async fn list() {
     assert!(instance.url.ends_with("#meta/foo.cm"));
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn show() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
@@ -54,11 +59,15 @@ async fn show() {
     // fuchsia.logger.LogSink
     // fuchsia.sys2.RealmExplorer
     // fuchsia.sys2.RealmQuery
-    assert_eq!(resolved.incoming_capabilities.len(), 4);
+    // fuchsia.sys2.RouteValidator
+    // fuchsia.foo.Bar
+    assert_eq!(resolved.incoming_capabilities.len(), 6);
 
     // The expected exposed capabilities are:
     // fuchsia.test.Suite
-    assert_eq!(resolved.exposed_capabilities.len(), 1);
+    // data
+    // fuchsia.foo.Bar
+    assert_eq!(resolved.exposed_capabilities.len(), 3);
 
     // This package must have a merkle root.
     assert!(resolved.merkle_root.is_some());
@@ -87,19 +96,121 @@ async fn show() {
     assert_eq!(field2.value, "Uint8(255)");
 }
 
-#[fuchsia_async::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn capability() {
     let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
 
     let mut segments =
         capability::get_all_route_segments("data".to_string(), &realm_query).await.unwrap();
 
-    assert_eq!(segments.len(), 1);
-    let segment = segments.remove(0);
+    assert_eq!(segments.len(), 2);
 
+    let segment = segments.remove(0);
     if let capability::RouteSegment::DeclareBy { moniker, .. } = segment {
         assert!(moniker.is_root());
     } else {
         panic!("unexpected segment");
     }
+
+    let segment = segments.remove(0);
+    if let capability::RouteSegment::ExposeBy { moniker, .. } = segment {
+        assert!(moniker.is_root());
+    } else {
+        panic!("unexpected segment");
+    }
+}
+
+#[fuchsia::test]
+async fn route() {
+    // Exact match, multiple filters
+    let route_validator = connect_to_protocol::<fsys::RouteValidatorMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let mut reports = route_cmd_serialized(
+        "/".into(),
+        Some("use:fuchsia.foo.Bar,expose:data".into()),
+        route_validator,
+        realm_query,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(reports.len(), 2);
+
+    let report = reports.remove(0);
+    assert_matches!(
+        report,
+        RouteReport {
+            decl_type: DeclType::Use,
+            capability,
+            error_summary: Some(_),
+            source_moniker: None,
+            service_instances: None,
+        } if capability == "fuchsia.foo.Bar"
+    );
+
+    let report = reports.remove(0);
+    assert_matches!(
+        report,
+        RouteReport {
+            decl_type: DeclType::Expose,
+            capability,
+            error_summary: None,
+            source_moniker: Some(m),
+            service_instances: None,
+        } if capability == "data" && m == "."
+    );
+
+    // Fuzzy match
+    let route_validator = connect_to_protocol::<fsys::RouteValidatorMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let mut reports =
+        route_cmd_serialized("/".into(), Some("fuchsia.foo".into()), route_validator, realm_query)
+            .await
+            .unwrap();
+
+    assert_eq!(reports.len(), 2);
+
+    let report = reports.remove(0);
+    assert_matches!(
+        report,
+        RouteReport {
+            decl_type: DeclType::Use,
+            capability,
+            error_summary: Some(_),
+            source_moniker: None,
+            service_instances: None,
+        } if capability == "fuchsia.foo.Bar"
+    );
+
+    let report = reports.remove(0);
+    assert_matches!(
+        report,
+        RouteReport {
+            decl_type: DeclType::Expose,
+            capability,
+            error_summary: None,
+            source_moniker: Some(m),
+            service_instances: None,
+        } if capability == "fuchsia.foo.Bar" && m == "."
+    );
+
+    // No filter (match all)
+    let route_validator = connect_to_protocol::<fsys::RouteValidatorMarker>().unwrap();
+    let realm_query = connect_to_protocol::<fsys::RealmQueryMarker>().unwrap();
+    let reports =
+        route_cmd_serialized("/".into(), None, route_validator, realm_query).await.unwrap();
+
+    // The expected incoming capabilities are:
+    // fidl.examples.routing.echo.Echo
+    // fuchsia.foo.Bar
+    // fuchsia.logger.LogSink
+    // fuchsia.sys2.RealmExplorer
+    // fuchsia.sys2.RealmQuery
+    // fuchsia.sys2.RouteValidator
+    //
+    // The expected exposed capabilities are:
+    // fuchsia.foo.bar
+    // fuchsia.test.Suite
+    // data
+    assert_eq!(reports.len(), 6 + 3);
 }

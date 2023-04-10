@@ -26,6 +26,7 @@
             rights: [ "rw*" ],
             path: "/data",
         },
+        { protocol: "fuchsia.foo.Bar" },
     ],
     use: [
         {
@@ -37,8 +38,28 @@
             from: "framework",
         },
         {
+            protocol: "fuchsia.sys2.RouteValidator",
+            from: "framework",
+        },
+        {
             protocol: "fidl.examples.routing.echo.Echo",
             from: "#echo_server",
+        },
+
+        // These capabilities aren't actually being used, but commands should still be able to
+        // find them.
+        { protocol: "fuchsia.foo.Bar" },
+    ],
+    expose: [
+        // These capabilities aren't actually being served, but commands should still be able to
+        // find them.
+        {
+            directory: "data",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.foo.Bar",
+            from: "self",
         },
     ],
 }

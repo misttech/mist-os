@@ -11,6 +11,7 @@ pub mod graph;
 pub mod list;
 pub mod reload;
 pub mod resolve;
+pub mod route;
 pub mod run;
 pub mod show;
 pub mod start;
@@ -29,6 +30,7 @@ pub use {
     list::{list_cmd_print, list_cmd_serialized, ListFilter},
     reload::reload_cmd,
     resolve::resolve_cmd,
+    route::{route_cmd_print, route_cmd_serialized},
     run::run_cmd,
     show::{show_cmd_print, show_cmd_serialized},
     start::start_cmd,

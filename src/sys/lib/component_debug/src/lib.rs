@@ -15,6 +15,7 @@ pub mod lifecycle;
 pub mod path;
 pub mod query;
 pub mod realm;
+pub mod route;
 pub mod storage;
 
 #[cfg(test)]
