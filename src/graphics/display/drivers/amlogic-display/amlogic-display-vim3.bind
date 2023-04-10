@@ -19,7 +19,7 @@ primary node "pdev" {
 
 node "gpio" {
   fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
-  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.LCD_RESET;
+  fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
 }
 
 node "sysmem" {
