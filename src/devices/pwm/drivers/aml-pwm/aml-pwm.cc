@@ -47,6 +47,47 @@ void DutyCycleToClockCount(float duty_cycle, uint32_t period_ns, uint16_t* high_
   }
 }
 
+bool IsValidConfig(const pwm_config_t* config) {
+  if (config == nullptr) {
+    zxlogf(ERROR, "config is null");
+    return false;
+  }
+  if (config->mode_config_buffer == nullptr) {
+    zxlogf(ERROR, "mode_config_buffer not found");
+    return false;
+  }
+  if (config->mode_config_size != sizeof(mode_config)) {
+    zxlogf(ERROR, "mode_config_size incorrect: expected %lu, actual %lu", sizeof(mode_config),
+           config->mode_config_size);
+    return false;
+  }
+
+  auto mode_cfg = reinterpret_cast<const mode_config*>(config->mode_config_buffer);
+  Mode mode = static_cast<Mode>(mode_cfg->mode);
+  switch (mode) {
+    case Mode::OFF:
+      return true;
+    case Mode::TWO_TIMER:
+      if (!(mode_cfg->two_timer.duty_cycle2 >= 0.0f && mode_cfg->two_timer.duty_cycle2 <= 100.0f)) {
+        zxlogf(ERROR, "timer #2 duty cycle (%0.3f) is not in [0.0, 100.0]",
+               mode_cfg->two_timer.duty_cycle2);
+        return false;
+      }
+      [[fallthrough]];
+    case Mode::ON:
+    case Mode::DELTA_SIGMA:
+      if (!(config->duty_cycle >= 0.0f && config->duty_cycle <= 100.0f)) {
+        zxlogf(ERROR, "timer #1 duty cycle (%0.3f) is not in [0.0, 100.0]", config->duty_cycle);
+        return false;
+      }
+      break;
+    default:
+      zxlogf(ERROR, "Unsupported mode (%u)", static_cast<uint32_t>(mode));
+      return false;
+  }
+  return true;
+}
+
 zx_status_t CopyConfig(pwm_config_t* dest, const pwm_config_t* src) {
   if (!dest->mode_config_buffer || (dest->mode_config_size != src->mode_config_size) ||
       (dest->mode_config_size != sizeof(mode_config))) {
@@ -69,9 +110,10 @@ zx_status_t AmlPwm::PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config) {
 }
 
 zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
-  auto mode_cfg = reinterpret_cast<const mode_config*>(config->mode_config_buffer);
-  Mode mode = static_cast<Mode>(mode_cfg->mode);
-  if (idx > 1 || mode >= UNKNOWN) {
+  if (idx > 1) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (!IsValidConfig(config)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -91,6 +133,9 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
     zxlogf(ERROR, "%s: could not save new config %d", __func__, status);
     return status;
   }
+
+  auto mode_cfg = reinterpret_cast<const mode_config*>(config->mode_config_buffer);
+  Mode mode = static_cast<Mode>(mode_cfg->mode);
 
   bool mode_eq = (old_mode_cfg->mode == mode);
   if (!mode_eq && ((status = SetMode(idx, mode)) != ZX_OK)) {

@@ -180,26 +180,103 @@ TEST_F(AmlPwmDeviceTest, GetConfigTest) {
   EXPECT_NOT_OK(pwm_->PwmImplGetConfig(0, &cfg));
 }
 
-TEST_F(AmlPwmDeviceTest, SetConfigTest) {
-  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, nullptr));  // Fail
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidNullConfig) {
+  // config is null
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, nullptr));
+}
 
-  mode_config fail{
-      .mode = 100,
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidNoModeBuffer) {
+  pwm_config fail_cfg{
+      .polarity = false,
+      .period_ns = 1250,
+      .duty_cycle = 100.0,
+      // config has no mode buffer
+      .mode_config_buffer = nullptr,
+      .mode_config_size = 0,
+  };
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+}
+
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidModeConfigSizeIncorrect) {
+  mode_config fail_mode{
+      .mode = Mode::ON,
       .regular = {},
   };
   pwm_config fail_cfg{
       .polarity = false,
       .period_ns = 1250,
       .duty_cycle = 100.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail),
-      .mode_config_size = sizeof(fail),
+      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail_mode),
+      // mode_config_size incorrect
+      .mode_config_size = 10,
   };
-  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));  // Fail
 
-  for (uint32_t i = 0; i < UNKNOWN; i++) {
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+}
+
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidTwoTimerTimer2InvalidDutyCycle) {
+  mode_config fail_mode{
+      .mode = Mode::TWO_TIMER,
+      .two_timer = {},
+  };
+  pwm_config fail_cfg{
+      .polarity = false,
+      .period_ns = 1250,
+      .duty_cycle = 100.0,
+      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail_mode),
+      .mode_config_size = sizeof(fail_mode),
+  };
+
+  // Invalid duty cycle for timer 2.
+  fail_mode.two_timer.duty_cycle2 = -10.0;
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+
+  fail_mode.two_timer.duty_cycle2 = 120.0;
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+}
+
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidTimer1InvalidDutyCycle) {
+  mode_config fail_mode{
+      .mode = Mode::ON,
+      .regular = {},
+  };
+  pwm_config fail_cfg{
+      .polarity = false,
+      .period_ns = 1250,
+      .duty_cycle = 100.0,
+      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail_mode),
+      .mode_config_size = sizeof(fail_mode),
+  };
+
+  // Invalid duty cycle for timer 1.
+  fail_cfg.duty_cycle = -10.0;
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+
+  fail_cfg.duty_cycle = 120.0;
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+}
+
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidTimer1InvalidMode) {
+  mode_config fail_mode{
+      // Invalid mode
+      .mode = static_cast<Mode>(100),
+      .regular = {},
+  };
+  pwm_config fail_cfg{
+      .polarity = false,
+      .period_ns = 1250,
+      .duty_cycle = 100.0,
+      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail_mode),
+      .mode_config_size = sizeof(fail_mode),
+  };
+
+  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
+}
+
+TEST_F(AmlPwmDeviceTest, SetConfigInvalidPwmId) {
+  for (Mode mode : {Mode::ON, Mode::OFF, Mode::TWO_TIMER, Mode::DELTA_SIGMA}) {
     mode_config fail{
-        .mode = i,
-        .regular = {},
+        .mode = mode,
     };
     pwm_config fail_cfg{
         .polarity = false,
@@ -208,10 +285,13 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
         .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail),
         .mode_config_size = sizeof(fail),
     };
-    EXPECT_NOT_OK(pwm_->PwmImplSetConfig(10, &fail_cfg));  // Fail
+    // Incorrect pwm ID.
+    EXPECT_NOT_OK(pwm_->PwmImplSetConfig(10, &fail_cfg));
   }
+}
 
-  // OFF
+TEST_F(AmlPwmDeviceTest, SetConfigTest) {
+  // Mode::OFF
   mode_config off{
       .mode = OFF,
       .regular = {},
@@ -331,12 +411,9 @@ TEST_F(AmlPwmDeviceTest, SetConfigFailTest) {
   };
   EXPECT_OK(pwm_->PwmImplSetConfig(0, &on_cfg));  // Success
 
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x04000000);  // Invert
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xEFFFFFFF);  // EnableConst
-                                                                         // Fail
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
-  (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
+  // Nothing should happen on the register if the input is incorrect.
+  (*mock_mmio0_)[2 * 4].VerifyAndClear();
+  (*mock_mmio0_)[0 * 4].VerifyAndClear();
   on_cfg.polarity = true;
   on_cfg.duty_cycle = 120.0;
   EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &on_cfg));  // Fail
