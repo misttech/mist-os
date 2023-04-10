@@ -57,7 +57,9 @@ func isUsedForTesting(s *Shard, image build.Image, pave bool) bool {
 		}
 
 		// TODO(fxbug.dev/47531): Remove zedboot images once we switch to flashing.
-		return !s.Env.TargetsEmulator() && len(image.PaveZedbootArgs) != 0
+		// TODO(fxbug.dev/124946): Remove flashing deps once we no longer need to fastboot boot zedboot
+		// for release branches.
+		return !s.Env.TargetsEmulator() && (len(image.PaveZedbootArgs) != 0 || isFlashingDep(image))
 	}
 
 	if s.Env.TargetsEmulator() {

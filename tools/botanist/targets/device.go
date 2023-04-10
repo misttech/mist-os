@@ -13,6 +13,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync/atomic"
 	"time"
 
@@ -39,6 +40,10 @@ const (
 	// String to look for in serial log that indicates system booted. From
 	// https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/kernel/top/main.cc;l=116;drc=6a0fd696cde68b7c65033da57ab911ee5db75064
 	bootedLogSignature = "welcome to Zircon"
+
+	// Whether we should place the device in Zedboot if idling in fastboot.
+	// TODO(fxbug.dev/124946): Remove once release branches no longer need this.
+	mustLoadThroughZedboot = false
 )
 
 // DeviceConfig contains the static properties of a target device.
@@ -188,29 +193,13 @@ func (t *Device) SSHClient() (*sshutil.Client, error) {
 	return t.sshClient(&net.IPAddr{IP: addr})
 }
 
+func (t *Device) mustLoadThroughZedboot() bool {
+	return mustLoadThroughZedboot || t.config.FastbootSernum == "" || !t.UseFFXExperimental(1)
+}
+
 // Start starts the device target.
 func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []string) error {
 	serialSocketPath := t.SerialSocketPath()
-	// Initialize the tftp client if:
-	// 1. It is currently uninitialized.
-	// 2. The device cannot be accessed via fastboot.
-	if t.config.FastbootSernum == "" && t.tftp == nil {
-		// Discover the node on the network and initialize a tftp client to
-		// talk to it.
-		addr, err := netutil.GetNodeAddress(ctx, t.Nodename())
-		if err != nil {
-			return err
-		}
-		tftpClient, err := tftp.NewClient(&net.UDPAddr{
-			IP:   addr.IP,
-			Port: tftp.ClientPort,
-			Zone: addr.Zone,
-		}, 0, 0)
-		if err != nil {
-			return err
-		}
-		t.tftp = tftpClient
-	}
 
 	// Set up log listener and dump kernel output to stdout.
 	l, err := netboot.NewLogListener(t.Nodename())
@@ -268,7 +257,7 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 		}
 		var imgs []bootserver.Image
 		var ffxFlashDeps []string
-		if t.UseFFXExperimental(1) && !t.opts.Netboot {
+		if t.UseFFXExperimental(1) && !t.opts.Netboot && !t.mustLoadThroughZedboot() {
 			ffxFlashDeps, err = ffxutil.GetFlashDeps(wd, "fuchsia")
 			if err != nil {
 				return err
@@ -298,7 +287,11 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 			}
 		}
 
-		if t.opts.Netboot {
+		if t.mustLoadThroughZedboot() {
+			if err := t.bootZedboot(ctx, imgs); err != nil {
+				return err
+			}
+		} else if t.opts.Netboot {
 			if err := t.ramBoot(ctx, imgs); err != nil {
 				return err
 			}
@@ -307,7 +300,28 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				return err
 			}
 		}
-	} else {
+	}
+	if t.mustLoadThroughZedboot() {
+		// Initialize the tftp client if:
+		// 1. It is currently uninitialized.
+		// 2. The device has been placed in Zedboot.
+		if t.tftp == nil {
+			// Discover the node on the network and initialize a tftp client to
+			// talk to it.
+			addr, err := netutil.GetNodeAddress(ctx, t.Nodename())
+			if err != nil {
+				return err
+			}
+			tftpClient, err := tftp.NewClient(&net.UDPAddr{
+				IP:   addr.IP,
+				Port: tftp.ClientPort,
+				Zone: addr.Zone,
+			}, 0, 0)
+			if err != nil {
+				return err
+			}
+			t.tftp = tftpClient
+		}
 		var imgs []bootserver.Image
 		for _, img := range images {
 			if t.imageOverrides.IsEmpty() {
@@ -349,6 +363,38 @@ func getImage(imgs []bootserver.Image, label, typ string) *bootserver.Image {
 		}
 	}
 	return nil
+}
+
+func (t *Device) bootZedboot(ctx context.Context, images []bootserver.Image) error {
+	fastboot := getImageByName(images, "exe.linux-x64_fastboot")
+	if fastboot == nil {
+		return errors.New("fastboot not found")
+	}
+	zbi := getImageByName(images, "zbi_zircon-r")
+	vbmeta := getImageByName(images, "vbmeta_zircon-r")
+	logger.Debugf(ctx, "zbi: %s, vbmeta: %s", zbi.Path, vbmeta.Path)
+	zbiContents, err := os.ReadFile(zbi.Path)
+	if err != nil {
+		return err
+	}
+	vbmetaContents, err := os.ReadFile(vbmeta.Path)
+	if err != nil {
+		return err
+	}
+	combinedZBIVBMeta := filepath.Join(filepath.Dir(zbi.Path), "zedboot.combined")
+	err = os.WriteFile(combinedZBIVBMeta, append(zbiContents, vbmetaContents...), 0666)
+	if err != nil {
+		return err
+	}
+	cmd := exec.CommandContext(ctx, fastboot.Path, "-s", t.config.FastbootSernum, "boot", combinedZBIVBMeta)
+	stdout, stderr, flush := botanist.NewStdioWriters(ctx)
+	defer flush()
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
+	logger.Debugf(ctx, "starting: %v", cmd.Args)
+	err = cmd.Run()
+	logger.Debugf(ctx, "done booting zedboot")
+	return err
 }
 
 func (t *Device) ramBoot(ctx context.Context, images []bootserver.Image) error {
@@ -496,7 +542,7 @@ func (t *Device) neededForFlashing(img bootserver.Image) bool {
 
 	// If we have specified image overrides, then we are only looking for image
 	// among those specifications in the case of flashing.
-	if t.imageOverrides.ZBI != "" || t.imageOverrides.VBMeta != "" {
+	if !t.mustLoadThroughZedboot() && (t.imageOverrides.ZBI != "" || t.imageOverrides.VBMeta != "") {
 		return img.Label == t.imageOverrides.ZBI || img.Label == t.imageOverrides.VBMeta
 	}
 

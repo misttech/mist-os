@@ -516,8 +516,10 @@ func (r *RunCommand) runPreflights(ctx context.Context) error {
 			return err
 		}
 	}
-	// Some preflight commands can cause side effects that take up to 30s.
-	time.Sleep(30 * time.Second)
+	if len(cmds.Commands) > 0 {
+		// Some preflight commands can cause side effects that take up to 30s.
+		time.Sleep(30 * time.Second)
+	}
 	logger.Debugf(ctx, "done running preflights")
 	return nil
 }
