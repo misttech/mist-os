@@ -6,7 +6,7 @@ use crate::server::Facade;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use ieee80211::Ssid;
-use serde_json::{to_value, Value};
+use serde_json::{from_value, to_value, Value};
 use std::convert::TryFrom;
 use tracing::*;
 
@@ -56,15 +56,13 @@ impl Facade for WlanFacade {
                     _ => vec![0; 0],
                 };
 
-                let target_bss_desc = match args.get("target_bss_desc") {
-                    Some(target_bss_desc) => {
-                        types::BssDescriptionDef::deserialize(target_bss_desc)?
-                    }
+                let target_bss_desc: types::BssDescriptionDef = match args.get("target_bss_desc") {
+                    Some(target_bss_desc) => from_value(target_bss_desc.clone())?,
                     None => return Err(format_err!("Please provide a target BSS description")),
                 };
 
                 info!(tag = "WlanFacade", "performing wlan connect to SSID: {:?}", target_ssid);
-                let results = self.connect(target_ssid, target_pwd, target_bss_desc).await?;
+                let results = self.connect(target_ssid, target_pwd, target_bss_desc.into()).await?;
                 to_value(results)
                     .map_err(|e| format_err!("error handling connection result: {}", e))
             }

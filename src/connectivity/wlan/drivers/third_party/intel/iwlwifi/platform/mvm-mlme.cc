@@ -404,11 +404,11 @@ zx_status_t mac_join_bss(struct iwl_mvm_vif* mvmvif,
   zx_status_t ret = ZX_OK;
 
   IWL_INFO(mvmvif, "mac_join_bss(bssid=" FMT_SSID ", type=%d, remote=%d, beacon_period=%u)\n",
-           FMT_SSID_BYTES(config->bssid.data(), sizeof(config->bssid)), config->bss_type,
-           config->remote, config->beacon_period);
+           FMT_SSID_BYTES(config->bssid.data(), sizeof(config->bssid)),
+           static_cast<uint32_t>(config->bss_type), config->remote, config->beacon_period);
 
   if (config->bss_type != fuchsia_wlan_internal::BssType::kInfrastructure) {
-    IWL_ERR(mvmvif, "invalid bss_type requested: %d\n", config->bss_type);
+    IWL_ERR(mvmvif, "invalid bss_type requested: %d\n", static_cast<uint32_t>(config->bss_type));
     return ZX_ERR_INVALID_ARGS;
   }
 

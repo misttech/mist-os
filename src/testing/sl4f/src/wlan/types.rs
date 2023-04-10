@@ -109,8 +109,13 @@ pub(crate) struct WlanChannelDef {
     pub secondary80: u8,
 }
 
+// Since fidl_internal::BssType is a flexible enum, the generated Rust enum is declared
+// non-exhaustive, requiring a wildcard arm on all match expressions.
+//
+// However, deriving Serialize/Deserialize on a non-exhaustive enum generates code that have match
+// expressions that do not have wildcard arms. As a workaround, define the types used by serde
+// separately from the FIDL type and implement conversion functions between the two types.
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "fidl_internal::BssType")]
 pub(crate) enum BssTypeDef {
     Infrastructure = 1,
     Personal = 2,
@@ -119,12 +124,34 @@ pub(crate) enum BssTypeDef {
     Unknown = 255,
 }
 
+impl From<BssTypeDef> for fidl_internal::BssType {
+    fn from(serde_type: BssTypeDef) -> Self {
+        match serde_type {
+            BssTypeDef::Infrastructure => Self::Infrastructure,
+            BssTypeDef::Personal => Self::Personal,
+            BssTypeDef::Independent => Self::Independent,
+            BssTypeDef::Mesh => Self::Mesh,
+            BssTypeDef::Unknown => Self::unknown(),
+        }
+    }
+}
+
+impl From<fidl_internal::BssType> for BssTypeDef {
+    fn from(fidl_type: fidl_internal::BssType) -> Self {
+        match fidl_type {
+            fidl_internal::BssType::Infrastructure => Self::Infrastructure,
+            fidl_internal::BssType::Personal => Self::Personal,
+            fidl_internal::BssType::Independent => Self::Independent,
+            fidl_internal::BssType::Mesh => Self::Mesh,
+            _ => Self::Unknown,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
-#[serde(remote = "fidl_internal::BssDescription")]
 pub(crate) struct BssDescriptionDef {
     pub bssid: [u8; 6],
-    #[serde(with = "BssTypeDef")]
-    pub bss_type: fidl_internal::BssType,
+    pub bss_type: BssTypeDef,
     pub beacon_period: u16,
     pub capability_info: u16,
     pub ies: Vec<u8>,
@@ -134,10 +161,35 @@ pub(crate) struct BssDescriptionDef {
     pub snr_db: i8,
 }
 
-#[derive(Serialize)]
-pub(crate) struct BssDescriptionWrapper(
-    #[serde(with = "BssDescriptionDef")] pub fidl_internal::BssDescription,
-);
+impl From<BssDescriptionDef> for fidl_internal::BssDescription {
+    fn from(serde_type: BssDescriptionDef) -> Self {
+        Self {
+            bssid: serde_type.bssid,
+            bss_type: serde_type.bss_type.into(),
+            beacon_period: serde_type.beacon_period,
+            capability_info: serde_type.capability_info,
+            ies: serde_type.ies,
+            channel: serde_type.channel,
+            rssi_dbm: serde_type.rssi_dbm,
+            snr_db: serde_type.snr_db,
+        }
+    }
+}
+
+impl From<fidl_internal::BssDescription> for BssDescriptionDef {
+    fn from(fidl_type: fidl_internal::BssDescription) -> Self {
+        Self {
+            bssid: fidl_type.bssid,
+            bss_type: fidl_type.bss_type.into(),
+            beacon_period: fidl_type.beacon_period,
+            capability_info: fidl_type.capability_info,
+            ies: fidl_type.ies,
+            channel: fidl_type.channel,
+            rssi_dbm: fidl_type.rssi_dbm,
+            snr_db: fidl_type.snr_db,
+        }
+    }
+}
 
 #[derive(Serialize)]
 #[serde(remote = "fidl_sme::ServingApInfo")]

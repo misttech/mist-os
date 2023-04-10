@@ -96,14 +96,16 @@ impl WlanFacade {
 
     pub async fn scan_for_bss_info(
         &self,
-    ) -> Result<HashMap<String, Vec<Box<types::BssDescriptionWrapper>>>, Error> {
+    ) -> Result<HashMap<String, Vec<Box<types::BssDescriptionDef>>>, Error> {
         let mut scan_results_by_ssid_string = HashMap::new();
         for scan_result in self.passive_scan().await? {
             let scan_result = scan_result.context("Failed to convert scan result")?;
             let entry = scan_results_by_ssid_string
                 .entry(String::from(scan_result.bss_description.ssid.to_string_not_redactable()))
                 .or_insert(vec![]);
-            entry.push(Box::new(types::BssDescriptionWrapper(scan_result.bss_description.into())));
+
+            let fidl_bss_desc: fidl_internal::BssDescription = scan_result.bss_description.into();
+            entry.push(Box::new(fidl_bss_desc.into()));
         }
         Ok(scan_results_by_ssid_string)
     }
