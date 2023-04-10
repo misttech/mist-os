@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//zircon/system/ulib/c/libc.gni")
+
 source_set("locale") {
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
@@ -17,13 +19,18 @@ source_set("locale") {
     "localeconv.c",
     "newlocale.c",
     "setlocale.c",
-    "strcoll.c",
     "strfmon.c",
-    "strxfrm.c",
     "uselocale.c",
     "wcscoll.c",
     "wcsxfrm.c",
   ]
+
+  if (!use_llvm_libc_string_functions) {
+    sources += [
+      "strcoll.c",
+      "strxfrm.c",
+    ]
+  }
 
   configs -= [ "//build/config:symbol_visibility_hidden" ]
 

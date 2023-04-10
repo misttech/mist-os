@@ -2,7 +2,7 @@
 
 #include "libc.h"
 
-void* __memrchr(const void* m, int c, size_t n) {
+__attribute__((visibility("hidden"))) void* __memrchr(const void* m, int c, size_t n) {
   const unsigned char* s = m;
   c = (unsigned char)c;
   while (n--)
@@ -11,4 +11,4 @@ void* __memrchr(const void* m, int c, size_t n) {
   return 0;
 }
 
-weak_alias(__memrchr, memrchr);
+strong_alias(__memrchr, memrchr);

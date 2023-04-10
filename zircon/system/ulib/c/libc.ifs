@@ -73,7 +73,6 @@ Symbols:
   - { Name: __madvise, Type: Func }
   - { Name: __map_file, Type: Func }
   - { Name: __memfd_create, Type: Func }
-  - { Name: __memrchr, Type: Func }
   - { Name: __mkostemps, Type: Func }
   - { Name: __mmap, Type: Func }
   - { Name: __mprotect, Type: Func }
@@ -129,9 +128,6 @@ Symbols:
   - { Name: __sinl, Type: Func }
   - { Name: __stack_chk_fail, Type: Func }
   - { Name: __stack_chk_guard, Type: Object }
-  - { Name: __stpcpy, Type: Func }
-  - { Name: __stpncpy, Type: Func }
-  - { Name: __strchrnul, Type: Func }
   - { Name: __strftime_fmt_1, Type: Func }
   - { Name: __sysv_signal, Type: Func, Weak: true }
   - { Name: __tan, Type: Func }
@@ -787,7 +783,7 @@ Symbols:
   - { Name: memmem, Type: Func }
   - { Name: memmove, Type: Func }
   - { Name: mempcpy, Type: Func }
-  - { Name: memrchr, Type: Func, Weak: true }
+  - { Name: memrchr, Type: Func }
   - { Name: memset, Type: Func }
   - { Name: mkdir, Type: Func, Weak: true }
   - { Name: mkdirat, Type: Func, Weak: true }
@@ -1197,13 +1193,13 @@ Symbols:
   - { Name: stdin, Type: Object }
   - { Name: stdout, Type: Object }
   - { Name: stime, Type: Func }
-  - { Name: stpcpy, Type: Func, Weak: true }
-  - { Name: stpncpy, Type: Func, Weak: true }
+  - { Name: stpcpy, Type: Func }
+  - { Name: stpncpy, Type: Func }
   - { Name: strcasecmp, Type: Func }
   - { Name: strcasestr, Type: Func }
   - { Name: strcat, Type: Func }
   - { Name: strchr, Type: Func }
-  - { Name: strchrnul, Type: Func, Weak: true }
+  - { Name: strchrnul, Type: Func }
   - { Name: strcmp, Type: Func }
   - { Name: strcoll, Type: Func }
   - { Name: strcpy, Type: Func }

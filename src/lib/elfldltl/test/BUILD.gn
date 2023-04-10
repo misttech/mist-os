@@ -181,8 +181,8 @@ if (is_fuchsia) {
     deps = [
       ":static-pie",
       "//src/zircon/lib/zircon",
+      "//zircon/system/ulib/c/string:mem",
       "//zircon/third_party/ulib/musl/src/exit:abort",
-      "//zircon/third_party/ulib/musl/src/string:stdmem",
     ]
 
     exclude_toolchain_tags = [ "instrumented" ]

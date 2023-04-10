@@ -4,21 +4,172 @@
 
 import("../libc.gni")
 
-llvm_libc_source_set("string") {
+llvm_libc_group("string") {
+  deps = [
+    ":compat",
+    ":mem",
+    ":str",
+  ]
+
+  non_test_deps = [
+    # TODO(fxbug.dev/102687): not yet using the llvm-libc versions of these
+    "//zircon/third_party/ulib/musl/src/string:strerror_r",
+    "//zircon/third_party/ulib/musl/src/string:strsignal",
+    "//zircon/third_party/ulib/musl/src/string:strverscmp",
+  ]
+}
+
+llvm_libc_source_set("mem") {
+  visibility = [
+    "//src/lib/elfldltl/*",
+    "//zircon/kernel/*",
+  ]
+
   functions = [
-    "strcat",
-    "strcspn",
+    "memccpy",
+    "mempcpy",
+    "memrchr",
+  ]
+
+  deps = [
+    ":memchr",
+    ":memcmp",
+    ":memcpy",
+    ":memset",
+  ]
+}
+
+unsanitized_funcs = [
+  "memcpy",
+  "memmove",
+  "memset",
+]
+
+# The compiler will turn code that looks like it implements these functions
+# into calls to their standard names.  It doesn't recognize that the internal
+# implementation layers are going to be inlined into the public standard C
+# function, so it just produces an infinite recursion (or a call via a PLT
+# entry that hasn't been fixed up yet).  Using `-fno-builtin-FUNCTION` for the
+# particular functions works around this.
+foreach(funcs,
+        [
+          [ "memchr" ],
+          [ "memcmp" ],
+          [
+            "memcpy",
+            "memmove",
+          ],
+          [ "memset" ],
+          [ "strlen" ],
+        ]) {
+  config("no-builtin-${funcs[0]}") {
+    visibility = [ ":*" ]
+
+    cflags = []
+    defines = []
+    foreach(func, funcs) {
+      cflags += [ "-fno-builtin-$func" ]
+    }
+  }
+
+  llvm_libc_source_set(funcs[0]) {
+    visibility = [ ":*" ]
+
+    functions = funcs
+
+    # Avoid self-referential libcalls.
+    configs = [ ":no-builtin-${funcs[0]}" ]
+
+    # These also need to stick to the basic machine ABI so that dynlink.c can
+    # use them early.
+    basic_abi = true
+
+    non_test_vars = {
+      # The user.basic environment doesn't export the symbols it defines.
+      # When building for export in libc.so, we want these compiled in the
+      # user.basic environment, but we also want to export names for them.  At
+      # the same time, dynlink.c needs to use hidden symbols to access these
+      # so that it won't use PLT entries before they're ready.  So compile
+      # them using an override for the "src/__support/common.h" internal
+      # header that redefines the implementation's LLVM_LIBC_FUNCTION macro to
+      # add extra aliases.
+      #
+      # Note this is plumbed directly as include_dirs in the source_set() so
+      # that it comes before all the include_dirs plumbs via configs.  If this
+      # instead used non_test_deps to point at a group with public_configs
+      # pointing at a config(), then those include_dirs would come after all
+      # the ones from configs used to compile libc.  This needs to preempt
+      # those, so it should come first as include_dirs et al directly in a
+      # target like source_set() do.
+      include_dirs = [ "mem-aliases-include" ]
+
+      if (funcs + unsanitized_funcs - unsanitized_funcs != funcs) {
+        defines = [ "LIBC_UNSANITIZED" ]
+      }
+    }
+  }
+}
+
+# These are the functions that are nonproblematic in any context.
+llvm_libc_source_set("minimal-str") {
+  visibility = [
+    "//src/lib/elfldltl/*",
+    "//zircon/kernel/*",
+  ]
+
+  functions = [
+    "stpcpy",
+    "strchrnul",
     "strcpy",
-    "strdup",
-    "strncat",
-    "strncpy",
-    "strpbrk",
-    "strrchr",
+    "strchr",
     "strspn",
+    "strcat",
     "strstr",
+    "strsep",
+    "strcspn",
+    "strncat",
+    "strlcat",
+    "strlcpy",
+    "strncmp",
+    "strrchr",
+    "strncpy",
+    "strcmp",
+    "strnlen",
+    "strpbrk",
+    "stpncpy",
+  ]
+
+  deps = [
+    ":mem",
+    ":strlen",
+  ]
+}
+
+llvm_libc_source_set("str") {
+  functions = [
+    "strcasecmp",
+    "strcasestr",
+    "strcoll",
+    "strxfrm",
+    "strdup",
+    "strncasecmp",
+    "strndup",
     "strtok",
     "strtok_r",
-    "strchr",
-    "strcmp",
+
+    # TODO(fxbug.dev/102687): the llvm-libc versions of these are problematic
+    #"strerror",
+    #"strerror_r",
+    #"strsignal",
+  ]
+
+  deps = [ ":minimal-str" ]
+}
+
+llvm_libc_source_set("compat") {
+  functions = [
+    "bcmp",
+    "bcopy",
+    "bzero",
   ]
 }

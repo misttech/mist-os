@@ -9,7 +9,8 @@
 #define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
 #define HASZERO(x) (((x)-ONES) & ~(x)&HIGHS)
 
-char* __stpncpy(char* restrict d, const char* restrict s, size_t n) {
+__attribute__((visibility("hidden"))) char* __stpncpy(char* restrict d, const char* restrict s,
+                                                      size_t n) {
   // This reads past the end of the string, which is usually OK since
   // it won't cross a page boundary.  But under ASan, even one byte
   // past the actual end is diagnosed.
@@ -32,4 +33,4 @@ tail:
   return d;
 }
 
-weak_alias(__stpncpy, stpncpy);
+strong_alias(__stpncpy, stpncpy);

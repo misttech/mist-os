@@ -9,7 +9,7 @@
 #define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
 #define HASZERO(x) (((x)-ONES) & ~(x)&HIGHS)
 
-char* __stpcpy(char* restrict d, const char* restrict s) {
+__attribute__((visibility("hidden"))) char* __stpcpy(char* restrict d, const char* restrict s) {
 #if STRICT_BYTE_ACCESS
   // This reads past the end of the string, which is usually OK since
   // it won't cross a page boundary.  But under ASan, even one byte
@@ -32,4 +32,4 @@ char* __stpcpy(char* restrict d, const char* restrict s) {
   return d;
 }
 
-weak_alias(__stpcpy, stpcpy);
+strong_alias(__stpcpy, stpcpy);

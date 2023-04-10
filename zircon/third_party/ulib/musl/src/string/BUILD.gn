@@ -7,18 +7,27 @@ import("//zircon/system/ulib/c/libc.gni")
 
 group("string") {
   deps = [
-    ":bsd",
-    ":extmem",
-    ":extstr",
-    ":stdmem",
-    ":stdstr",
+    ":strerror_r",
+    ":strsignal",
+    ":strverscmp",
     ":wcs",
     ":wmem",
   ]
+  if (!use_llvm_libc_string_functions) {
+    deps += [
+      ":bsd",
+      ":extmem",
+      ":extstr",
+      ":stdmem",
+      ":stdstr",
+    ]
+  }
 }
 
 # These are the functions the compiler produces implicit calls to.
 source_set("compiler") {
+  visibility = [ ":*" ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   if (current_cpu == "arm64") {
     # These use '#include "third_party/lib/cortex-strings/src/aarch64/..."'.
@@ -54,6 +63,8 @@ source_set("compiler") {
 }
 
 source_set("stdmem") {
+  visibility = [ ":*" ]
+
   deps = [
     ":compiler",
     "//zircon/third_party/ulib/musl:musl_internal",
@@ -87,6 +98,8 @@ source_set("stdmem") {
 }
 
 source_set("extmem") {
+  visibility = [ ":*" ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "memccpy.c",
@@ -111,6 +124,8 @@ source_set("extmem") {
 }
 
 source_set("minimal_str") {
+  visibility = [ ":*" ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   if (current_cpu == "arm64") {
     # These use '#include "third_party/lib/cortex-strings/src/aarch64/..."'.
@@ -133,7 +148,9 @@ source_set("minimal_str") {
   }
 }
 
-source_set("stdstr.musl") {
+source_set("stdstr") {
+  visibility = [ ":*" ]
+
   deps = [
     ":minimal_str",
     "//zircon/third_party/ulib/musl:musl_internal",
@@ -178,7 +195,11 @@ source_set("stdstr.musl") {
 }
 
 source_set("strerror_r") {
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//zircon/system/ulib/c/*",
+  ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [ "strerror_r.c" ]
   if (zircon_toolchain != false) {
@@ -186,16 +207,39 @@ source_set("strerror_r") {
   }
 }
 
-group("stdstr") {
-  visibility = [ ":*" ]
-  deps = [ ":strerror_r" ]
-  if (!use_llvm_libc_string_functions) {
-    deps += [ ":stdstr.musl" ]
+source_set("strsignal") {
+  visibility = [
+    ":*",
+    "//zircon/system/ulib/c/*",
+  ]
+
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  sources = [ "strsignal.c" ]
+  if (zircon_toolchain != false) {
+    configs -= [ "//build/config:symbol_visibility_hidden" ]
+  }
+}
+
+source_set("strverscmp") {
+  visibility = [
+    ":*",
+    "//zircon/system/ulib/c/*",
+  ]
+
+  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  sources = [ "strverscmp.c" ]
+  if (zircon_toolchain != false) {
+    configs -= [ "//build/config:symbol_visibility_hidden" ]
   }
 }
 
 source_set("extstr") {
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
+  visibility = [ ":*" ]
+
+  deps = [
+    ":strverscmp",
+    "//zircon/third_party/ulib/musl:musl_internal",
+  ]
   sources = [
     "stpcpy.c",
     "stpncpy.c",
@@ -206,8 +250,6 @@ source_set("extstr") {
     "strncasecmp.c",
     "strndup.c",
     "strsep.c",
-    "strsignal.c",
-    "strverscmp.c",
   ]
   if (current_cpu == "arm64") {
     # These use '#include "third_party/lib/cortex-strings/src/aarch64/..."'.
@@ -231,6 +273,8 @@ source_set("extstr") {
 }
 
 source_set("bsd") {
+  visibility = [ ":*" ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "bcmp.c",
@@ -249,6 +293,8 @@ source_set("bsd") {
 }
 
 source_set("wcs") {
+  visibility = [ ":*" ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "wcpcpy.c",
@@ -282,6 +328,8 @@ source_set("wcs") {
 }
 
 source_set("wmem") {
+  visibility = [ ":*" ]
+
   deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
   sources = [
     "wmemchr.c",

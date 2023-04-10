@@ -9,7 +9,7 @@
 #define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
 #define HASZERO(x) (((x)-ONES) & ~(x)&HIGHS)
 
-char* __strchrnul(const char* s, int c) {
+__attribute__((visibility("hidden"))) char* __strchrnul(const char* s, int c) {
   c = (unsigned char)c;
   if (!c)
     return (char*)s + strlen(s);
@@ -31,4 +31,4 @@ char* __strchrnul(const char* s, int c) {
   return (char*)s;
 }
 
-weak_alias(__strchrnul, strchrnul);
+strong_alias(__strchrnul, strchrnul);
