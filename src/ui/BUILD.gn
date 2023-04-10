@@ -58,14 +58,6 @@ core_shard("ui_with_root_presenter_core_shard") {
   shard_file = "meta/ui_with_root_presenter.core_shard.cml"
 }
 
-# TODO(b/215402056): Include Scenic for Root Presenter until Input Pipeline
-# supports required FIDL services like FactoryResetCountdown. Otherwise
-# switch to ui_headless.core_shard.cml
-core_shard("ui_headless_core_shard") {
-  shard_file = "meta/ui_with_root_presenter.core_shard.cml"
-  #shard_file = "meta/ui_headless.core_shard.cml"
-}
-
 fuchsia_component("ui_component") {
   if (use_scene_manager_as_scene_owner) {
     component_name = "ui"
@@ -91,18 +83,6 @@ fuchsia_component("ui_with_root_presenter_component") {
   manifest = "meta/ui_with_root_presenter.cml"
 }
 
-# TODO(b/215402056): Include Scenic for Root Presenter until Input Pipeline
-# supports required FIDL services like FactoryResetCountdown. Otherwise
-# switch to ui_headless.cml
-fuchsia_component("ui_headless_component") {
-  component_name = "ui_with_root_presenter"
-
-  #component_name = "ui_headless"
-  manifest = "meta/ui_with_root_presenter.cml"
-
-  #manifest = "meta/ui_headless.cml"
-}
-
 fuchsia_package("ui_package") {
   package_name = "ui"
 
@@ -119,12 +99,6 @@ fuchsia_package("ui_with_root_presenter_package") {
   package_name = "ui"
 
   deps = [ ":ui_with_root_presenter_component" ]
-}
-
-fuchsia_package("ui_headless_package") {
-  package_name = "ui"
-
-  deps = [ ":ui_headless_component" ]
 }
 
 group("ui_packages_base") {
@@ -185,29 +159,9 @@ group("ui_with_root_presenter_packages") {
   ]
 }
 
-group("ui_headless_packages") {
-  deps = [
-    ":ui_headless_package",
-
-    # TODO(b/215402056): Include Scenic for Root Presenter until Input Pipeline
-    # supports required FIDL services like FactoryResetCountdown. Otherwise
-    # remove and replace with a headless-specific list.
-    ":ui_packages_base",
-    "bin/input-pipeline:pkg",
-    "bin/root_presenter",
-    "//src/graphics/bundles:vulkan",
-  ]
-}
-
 # Runtime_root_presenter is the set of package dependencies typically desired
 # for the construction of a product that includes UI (Scenic, A11y) and root
 # presenter (as opposed to scene manager).
 group("runtime_with_root_presenter") {
   deps = [ ":ui_with_root_presenter_packages" ]
-}
-
-# runtime_headless is the set of package dependencies desired for the construction
-# of any product that includes headless UI (button input and a11y features only).
-group("runtime_headless") {
-  deps = [ ":ui_headless_packages" ]
 }
