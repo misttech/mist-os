@@ -210,7 +210,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 			test := Test{Test: spec.Test, Runs: 1}
 			testListEntry, exists := testListEntries[spec.Test.Name]
 			if exists {
-				test.applyTestListTags(testListEntry)
+				test.updateFromTestList(testListEntry)
 			}
 			if spec.Test.Isolated {
 				shards = append(shards, &Shard{

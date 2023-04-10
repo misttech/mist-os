@@ -229,7 +229,7 @@ func TestMakeShards(t *testing.T) {
 		assertEqual(t, expected, actual)
 	})
 
-	t.Run("tags from test-list.json are copied over", func(t *testing.T) {
+	t.Run("values from test-list.json are copied over", func(t *testing.T) {
 		testListEntry := build.TestListEntry{
 			Name: fullTestName(1, "fuchsia"),
 			Tags: []build.TestTag{
@@ -238,6 +238,7 @@ func TestMakeShards(t *testing.T) {
 					Value: "value",
 				},
 			},
+			Execution: build.ExecutionDef{Realm: "/some/realm"},
 		}
 		actual := MakeShards(
 			[]build.TestSpec{
@@ -251,19 +252,20 @@ func TestMakeShards(t *testing.T) {
 			basicOpts,
 		)
 
-		makeTestWithTags := func(id int, tags []build.TestTag) Test {
+		makeTestWithTagsAndRealm := func(id int, tags []build.TestTag, realm string) Test {
 			test := makeTest(id, "fuchsia")
 			test.Tags = tags
+			test.Realm = realm
 			return test
 		}
 		expected := []*Shard{
 			{
 				Name:  environmentName(env1),
-				Tests: []Test{makeTestWithTags(1, testListEntry.Tags), makeTest(2, "fuchsia")},
+				Tests: []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(2, "fuchsia")},
 				Env:   env1,
 			}, {
 				Name:  environmentName(env2),
-				Tests: []Test{makeTestWithTags(1, testListEntry.Tags), makeTest(3, "fuchsia")},
+				Tests: []Test{makeTestWithTagsAndRealm(1, testListEntry.Tags, "/some/realm"), makeTest(3, "fuchsia")},
 				Env:   env2,
 			},
 		}

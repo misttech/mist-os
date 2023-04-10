@@ -25,11 +25,12 @@ rustc_test("tests_bin") {
   ]
 }
 
-fuchsia_component("rust_runner_integration_test") {
+fuchsia_test_component("rust_runner_integration_test") {
   restricted_features = [ "allow_non_hermetic_packages" ]
   testonly = true
   manifest = "meta/rust_runner_integration_test.cml"
   deps = [ ":tests_bin" ]
+  test_type = "system"
 }
 
 rustc_test("stress_tests_bin") {
@@ -51,11 +52,11 @@ rustc_test("stress_tests_bin") {
   ]
 }
 
-fuchsia_component("rust_runner_stress_test") {
+fuchsia_test_component("rust_runner_stress_test") {
   restricted_features = [ "allow_non_hermetic_packages" ]
-  testonly = true
   manifest = "meta/rust_runner_stress_test.cml"
   deps = [ ":stress_tests_bin" ]
+  test_type = "system"
 }
 
 fuchsia_test_package("rust-runner-integration-test") {

@@ -1118,6 +1118,30 @@ func TestCommandForTest(t *testing.T) {
 			timeout:  time.Second,
 			expected: []string{"run-test-suite", "--filter-ansi", "--timeout", "1", "fuchsia-pkg://example.com/test.cm"},
 		},
+		{
+			name:        "components v2 with realm",
+			useRuntests: false,
+			test: testsharder.Test{
+				Test: build.Test{
+					Path:       "/path/to/test",
+					PackageURL: "fuchsia-pkg://example.com/test.cm",
+				},
+				Realm: "/some/realm",
+			},
+			expected: []string{"run-test-suite", "--filter-ansi", "--realm", "/some/realm", "fuchsia-pkg://example.com/test.cm"},
+		},
+		{
+			name:        "components v2 with empty realm",
+			useRuntests: false,
+			test: testsharder.Test{
+				Test: build.Test{
+					Path:       "/path/to/test",
+					PackageURL: "fuchsia-pkg://example.com/test.cm",
+				},
+				Realm: "",
+			},
+			expected: []string{"run-test-suite", "--filter-ansi", "fuchsia-pkg://example.com/test.cm"},
+		},
 	}
 
 	for _, c := range cases {

@@ -39,6 +39,10 @@ type Test struct {
 	// realm.
 	RealmLabel string `json:"realm_label,omitempty"`
 
+	// Realm is an optional arg passed to test runner to specify a realm to run the test
+	// in.
+	Realm string `json:"realm,omitempty"`
+
 	// StopRepeatingAfterSecs is the duration for which to repeatedly run a
 	// test.
 	StopRepeatingAfterSecs int `json:"stop_repeating_after_secs,omitempty"`
@@ -91,8 +95,9 @@ func (t *Test) maxRuns() int {
 	return t.Runs
 }
 
-func (t *Test) applyTestListTags(tl build.TestListEntry) {
+func (t *Test) updateFromTestList(tl build.TestListEntry) {
 	t.Tags = tl.Tags
+	t.Realm = tl.Execution.Realm
 }
 
 func (t *Test) Hermetic() bool {

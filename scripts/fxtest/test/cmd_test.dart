@@ -36,6 +36,7 @@ void main() {
             'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json',
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       ));
       expect(await cmd.maybeAddPackageHash(bundle), true);
@@ -64,6 +65,7 @@ void main() {
                 'fuchsia-pkg://fuchsia.com/cmp_test#meta/cmp_test.cm',
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       ));
       expect(await cmd.maybeAddPackageHash(bundle), true);
@@ -114,6 +116,7 @@ void main() {
                 'fuchsia-pkg://fuchsia.com/cmp_test#meta/cmp_test.cm',
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       ));
       expect(await cmd.maybeAddPackageHash(bundle), true);

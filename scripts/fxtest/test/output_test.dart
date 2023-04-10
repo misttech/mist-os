@@ -17,6 +17,7 @@ class EmptyTestManifestReader extends TestsManifestReader {
           {required String buildDir,
           required String fxLocation,
           required String manifestFileName,
+          required String testComponentManifestFileName,
           bool usePackageHash = true}) async =>
       <TestDefinition>[];
 
@@ -58,6 +59,7 @@ void main() {
         'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json'
       }
     },
+    testComponentMap: {},
     buildDir: '/whatever',
   );
 

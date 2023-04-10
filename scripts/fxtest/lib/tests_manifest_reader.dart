@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:fxtest/fxtest.dart';
 import 'package:io/ansi.dart';
 import 'package:path/path.dart' as p;
+import 'package:collection/collection.dart';
 
 /// Harness for the completely processed tests manifest from a Fuchsia build.
 class ParsedManifest {
@@ -56,20 +57,52 @@ class TestsManifestReader {
     required String buildDir,
     required String fxLocation,
     required String manifestFileName,
+    required String testComponentManifestFileName,
   }) async {
     List<dynamic> testJson = await readManifest(
       p.join(buildDir, manifestFileName),
     );
+    List<dynamic> testComponentJson = [];
+    // Don't fail if the file does not exist so that this tool can keep working
+    // with previous versions of the build.
+    var testComponentManifestFilePath =
+        p.join(buildDir, testComponentManifestFileName);
+    if (await new File(testComponentManifestFilePath).exists()) {
+      testComponentJson = await readManifest(
+        testComponentManifestFilePath,
+      );
+    }
     return parseManifest(
       testJson: testJson,
+      testComponentMap: parseTestComponentManifest(testComponentJson),
       buildDir: buildDir,
       fxLocation: fxLocation,
     );
   }
 
+  Map<String, dynamic> parseTestComponentManifest(
+      List<dynamic> testComponentJson) {
+    Map<String, dynamic> map = <String, dynamic>{};
+    for (var data in testComponentJson) {
+      Map<String, dynamic> componentDetails = data['test_component'] ?? {};
+      var label = componentDetails['label'] ?? {};
+      var oldEntry = map[label];
+      if (oldEntry != null &&
+          !DeepCollectionEquality().equals(oldEntry, componentDetails)) {
+        var error =
+            'Conflicting entries in test_components.json: $componentDetails, $oldEntry';
+        throw UnparsedTestException(error);
+      } else {
+        map[label] = componentDetails;
+      }
+    }
+    return map;
+  }
+
   /// Finishes loading the raw test manifest into a list of usable objects.
   List<TestDefinition> parseManifest({
     required List<dynamic> testJson,
+    required Map<String, dynamic> testComponentMap,
     required String buildDir,
     required String fxLocation,
   }) {
@@ -77,6 +110,7 @@ class TestsManifestReader {
     for (var data in testJson) {
       TestDefinition testDefinition = TestDefinition.fromJson(
         Map<String, dynamic>.from(data),
+        testComponentMap: testComponentMap,
         buildDir: buildDir,
       );
       testDefinitions.add(testDefinition);

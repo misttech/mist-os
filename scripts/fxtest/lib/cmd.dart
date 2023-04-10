@@ -292,10 +292,10 @@ class FuchsiaTestCommand {
     TestsManifestReader manifestReader,
   ) async {
     List<TestDefinition> testDefinitions = await manifestReader.loadTestsJson(
-      buildDir: testsConfig.fxEnv.outputDir!,
-      fxLocation: testsConfig.fxEnv.fx,
-      manifestFileName: 'tests.json',
-    );
+        buildDir: testsConfig.fxEnv.outputDir!,
+        fxLocation: testsConfig.fxEnv.fx,
+        manifestFileName: 'tests.json',
+        testComponentManifestFileName: 'test_components.json');
     return manifestReader.aggregateTests(
       eventEmitter: emitEvent,
       matchLength: testsConfig.flags.matchLength,

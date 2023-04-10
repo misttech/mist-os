@@ -17,6 +17,8 @@ class TestDefinition {
   final String? runtimeDeps;
   final String? path;
   final String? label;
+  final String? componentLabel;
+  final String? realm;
   final String? packageLabel;
   final List<String>? packageManifests;
   final String name;
@@ -40,6 +42,8 @@ class TestDefinition {
     this.runtimeDeps,
     this.label,
     this.packageLabel,
+    this.componentLabel,
+    this.realm,
     this.packageManifests,
     this.path,
     this.maxLogSeverity,
@@ -50,6 +54,7 @@ class TestDefinition {
 
   factory TestDefinition.fromJson(
     Map<String, dynamic> data, {
+    required Map<String, dynamic> testComponentMap,
     required String buildDir,
   }) {
     Map<String, dynamic> testDetails = data['test'] ?? {};
@@ -59,6 +64,14 @@ class TestDefinition {
             .cast<TestEnvironment>()
             .toList() ??
         [];
+    String? realm;
+    var componentLabel = testDetails['component_label'];
+    if (componentLabel != null) {
+      var component = testComponentMap[componentLabel];
+      if (component != null) {
+        realm = component['moniker'];
+      }
+    }
     Map<dynamic, dynamic> logSettings = testDetails['log_settings'] ?? {};
     return TestDefinition(
       buildDir: buildDir,
@@ -67,6 +80,8 @@ class TestDefinition {
       runtimeDeps: testDetails['runtime_deps'] ?? '',
       label: testDetails['label'] ?? '',
       packageLabel: testDetails['package_label'] ?? '',
+      componentLabel: componentLabel ?? '',
+      realm: realm,
       packageManifests:
           List<String>.from(testDetails['package_manifests'] ?? []),
       name: testDetails['name'] ?? '',
@@ -89,6 +104,8 @@ class TestDefinition {
   deps_file: $runtimeDeps
   label: $label
   package_label: ${packageLabel ?? ''}
+  component_label: ${componentLabel ?? ''}
+  realm: ${realm ?? ''}
   package_manifests: ${(packageManifests ?? []).join(" ")}
   package_url: ${packageUrl ?? ''}
   path: $path
@@ -161,6 +178,9 @@ class TestDefinition {
           flags.addAll(['--timeout', timeoutSecondsOverride]);
         } else if (timeoutSeconds != null) {
           flags.addAll(['--timeout', timeoutSeconds!]);
+        }
+        if (realm != null) {
+          flags.addAll(['--realm', realm!]);
         }
 
         if (useRunTestSuiteForV2) {

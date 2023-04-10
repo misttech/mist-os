@@ -576,6 +576,7 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 			TimeoutSeconds:  int(test.Timeout.Seconds()),
 			Parallel:        test.Parallel,
 			MaxSeverityLogs: test.LogSettings.MaxSeverity,
+			Realm:           test.Realm,
 		},
 		Tags: test.Tags,
 	}}
@@ -1422,6 +1423,9 @@ func commandForTest(test *testsharder.Test, useSerial bool, timeout time.Duratio
 	} else if test.PackageURL != "" {
 		if test.IsComponentV2() {
 			command = []string{runTestSuiteName, "--filter-ansi"}
+			if test.Realm != "" {
+				command = append(command, "--realm", fmt.Sprintf("%s", test.Realm))
+			}
 			if test.LogSettings.MaxSeverity != "" {
 				command = append(command, "--max-severity-logs", fmt.Sprintf("%s", test.LogSettings.MaxSeverity))
 			}

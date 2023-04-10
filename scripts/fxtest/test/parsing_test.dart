@@ -22,6 +22,7 @@ void main() {
       ];
       List<TestDefinition> tds = tr.parseManifest(
         testJson: testJson,
+        testComponentMap: {},
         buildDir: FakeFxEnv.shared.outputDir,
         fxLocation: FakeFxEnv.shared.fx,
       );
@@ -52,6 +53,7 @@ void main() {
       ];
       List<TestDefinition> tds = tr.parseManifest(
         testJson: testJson,
+        testComponentMap: {},
         buildDir: FakeFxEnv.shared.outputDir,
         fxLocation: FakeFxEnv.shared.fx,
       );
@@ -85,6 +87,7 @@ void main() {
       ];
       List<TestDefinition> tds = tr.parseManifest(
         testJson: testJson,
+        testComponentMap: {},
         buildDir: FakeFxEnv.shared.outputDir,
         fxLocation: FakeFxEnv.shared.fx,
       );
@@ -116,6 +119,7 @@ void main() {
       ];
       List<TestDefinition> tds = tr.parseManifest(
         testJson: testJson,
+        testComponentMap: {},
         buildDir: FakeFxEnv.shared.outputDir,
         fxLocation: FakeFxEnv.shared.fx,
       );
@@ -155,6 +159,7 @@ void main() {
       ];
       List<TestDefinition> tds = tr.parseManifest(
         testJson: testJson,
+        testComponentMap: {},
         buildDir: FakeFxEnv.shared.outputDir,
         fxLocation: FakeFxEnv.shared.fx,
       );
@@ -179,6 +184,7 @@ void main() {
       ];
       List<TestDefinition> tds = tr.parseManifest(
         testJson: testJson,
+        testComponentMap: {},
         buildDir: FakeFxEnv.shared.outputDir,
         fxLocation: FakeFxEnv.shared.fx,
       );
@@ -491,6 +497,7 @@ void main() {
           'runtime_deps': 'host_x64/gen/scripts/fxtest/fxtest_tests.deps.json'
         }
       },
+      testComponentMap: {},
       buildDir: '/whatever',
     );
     var randomDef = TestDefinition.fromJson(
@@ -506,6 +513,7 @@ void main() {
               'host_x64/gen/scripts/whatever/whatever_tests.deps.json'
         }
       },
+      testComponentMap: {},
       buildDir: '/whatever',
     );
     test('with a typo inside a path', () {
@@ -750,6 +758,7 @@ void main() {
       List<TestDefinition> testDefinitions =
           TestsManifestReader().parseManifest(
         testJson: [testData],
+        testComponentMap: {},
         buildDir: '/whatever',
         fxLocation: '/whatever/fx',
       );
@@ -782,6 +791,7 @@ void main() {
         TestDefinition.fromJson(
           Map<String, dynamic>.from(testJson)
             ..update('environments', (current) => environments),
+          testComponentMap: {},
           buildDir: 'whatever',
         );
 
@@ -853,6 +863,139 @@ void main() {
       expect(testDef.testEnvironments.first.os, 'Fuchsia');
       expect(testDef.testEnvironments.first.deviceDimension, null);
       expect(testDef.isE2E, true);
+    });
+  });
+
+  group('test moniker parameter', () {
+    test('test component has moniker', () {
+      List<dynamic> testJson = [
+        {
+          'environments': [],
+          'test': {
+            'cpu': 'arm64',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
+            'os': 'fuchsia',
+            'component_label': '//src/sys/component/test:test_component',
+            'package_url':
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cm',
+            'log_settings': {},
+          }
+        },
+      ];
+      List<TestDefinition> testDefinitions =
+          TestsManifestReader().parseManifest(
+        testJson: testJson,
+        testComponentMap: {
+          '//src/sys/component/test:test_component': {
+            'moniker': '/some/moniker',
+            'label': '//src/sys/component/test:test_component'
+          }
+        },
+        buildDir: '/whatever',
+        fxLocation: '/whatever/fx',
+      );
+      expect(testDefinitions[0].testType, TestType.suite);
+
+      var commandTokens =
+          testDefinitions[0].createExecutionHandle().getInvocationTokens([]);
+      var fullCommand = commandTokens.fullCommandDisplay([]);
+      expect(fullCommand, contains('--realm'));
+      expect(fullCommand, contains('/some/moniker'));
+    });
+
+    test('test component does not have moniker', () {
+      List<dynamic> testJson = [
+        {
+          'environments': [],
+          'test': {
+            'cpu': 'arm64',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
+            'os': 'fuchsia',
+            'component_label': '//src/sys/component/test:test_component',
+            'package_url':
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cm',
+            'log_settings': {},
+          }
+        },
+      ];
+      List<TestDefinition> testDefinitions =
+          TestsManifestReader().parseManifest(
+        testJson: testJson,
+        testComponentMap: {
+          '//src/sys/component/test:test_component': {
+            'label': '//src/sys/component/test:test_component'
+          }
+        },
+        buildDir: '/whatever',
+        fxLocation: '/whatever/fx',
+      );
+      expect(testDefinitions[0].testType, TestType.suite);
+
+      var commandTokens =
+          testDefinitions[0].createExecutionHandle().getInvocationTokens([]);
+      var fullCommand = commandTokens.fullCommandDisplay([]);
+      expect(fullCommand, isNot(contains('--realm')));
+      expect(fullCommand, isNot(contains('/some/moniker')));
+    });
+
+    test('match correct component label', () {
+      List<dynamic> testJson = [
+        {
+          'environments': [],
+          'test': {
+            'cpu': 'arm64',
+            'path': '/pkgfs/packages/component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
+            'os': 'fuchsia',
+            'component_label': '//src/sys/component/test:test_component',
+            'package_url':
+                'fuchsia-pkg://fuchsia.com/component_test#meta/component_test.cm',
+            'log_settings': {},
+          }
+        },
+        {
+          'environments': [],
+          'test': {
+            'cpu': 'arm64',
+            'path':
+                '/pkgfs/packages/second_component_test/0/test/component_test',
+            'name': '//src/sys/component/test:component_test',
+            'os': 'fuchsia',
+            'component_label': '//src/sys/second_component/test:test_component',
+            'package_url':
+                'fuchsia-pkg://fuchsia.com/second_component_test#meta/component_test.cm',
+            'log_settings': {},
+          }
+        },
+      ];
+      List<TestDefinition> testDefinitions =
+          TestsManifestReader().parseManifest(
+        testJson: testJson,
+        testComponentMap: {
+          '//src/sys/second_component/test:test_component': {
+            'moniker': '/some/moniker',
+            'label': '//src/sys/component/test:test_component'
+          }
+        },
+        buildDir: '/whatever',
+        fxLocation: '/whatever/fx',
+      );
+      expect(testDefinitions[0].testType, TestType.suite);
+      expect(testDefinitions[1].testType, TestType.suite);
+
+      var commandTokens =
+          testDefinitions[0].createExecutionHandle().getInvocationTokens([]);
+      var fullCommand = commandTokens.fullCommandDisplay([]);
+      expect(fullCommand, isNot(contains('--realm')));
+      expect(fullCommand, isNot(contains('/some/moniker')));
+
+      commandTokens =
+          testDefinitions[1].createExecutionHandle().getInvocationTokens([]);
+      fullCommand = commandTokens.fullCommandDisplay([]);
+      expect(fullCommand, contains('--realm'));
+      expect(fullCommand, contains('/some/moniker'));
     });
   });
 }

@@ -23,6 +23,7 @@ void main() {
             'parallel': 2,
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       );
       final commandTokens =
@@ -44,6 +45,7 @@ void main() {
             'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json',
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       );
 
@@ -83,6 +85,7 @@ void main() {
             'parallel': 2,
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       );
       final commandTokens = testDef
@@ -111,6 +114,7 @@ void main() {
             'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json',
           }
         },
+        testComponentMap: {},
         buildDir: '/whatever',
       );
       final commandTokens = testDef

@@ -147,6 +147,7 @@ void main() {
                 'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json'
               }
             },
+            testComponentMap: {},
             buildDir: '/whatever',
           ),
         ),
@@ -181,6 +182,7 @@ void main() {
                 'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json'
               }
             },
+            testComponentMap: {},
             buildDir: '/whatever',
           ),
         ),
@@ -216,6 +218,7 @@ void main() {
                 'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json'
               }
             },
+            testComponentMap: {},
             buildDir: '/whatever',
           ),
         ),
@@ -362,6 +365,7 @@ void main() {
                 'runtime_deps': 'host_x64/gen/scripts/e2e/e2e_tests.deps.json'
               }
             },
+            testComponentMap: {},
             buildDir: '/whatever',
           ),
         ),
@@ -379,6 +383,7 @@ void main() {
                 'runtime_deps': 'host_x64/gen/scripts/lib/lib_tests.deps.json'
               }
             },
+            testComponentMap: {},
             buildDir: '/whatever',
           ),
         ),
@@ -428,8 +433,8 @@ void main() {
       );
 
       return json
-          .map((e) => cmd.testBundleBuilder(
-              TestDefinition.fromJson(e, buildDir: FakeFxEnv.shared.outputDir)))
+          .map((e) => cmd.testBundleBuilder(TestDefinition.fromJson(e,
+              testComponentMap: {}, buildDir: FakeFxEnv.shared.outputDir)))
           .toList();
     }
 

@@ -61,6 +61,7 @@ dart_tool("fxtest") {
     "//scripts/fxutils",
     "//sdk/dart/zircon",
     "//third_party/dart-pkg/pub/args",
+    "//third_party/dart-pkg/pub/collection",
     "//third_party/dart-pkg/pub/io",
     "//third_party/dart-pkg/pub/meta",
     "//third_party/dart-pkg/pub/path",
