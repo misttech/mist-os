@@ -23,6 +23,9 @@ class TestConnection : public magma::TestDeviceBase {
  public:
   TestConnection() : magma::TestDeviceBase(MAGMA_VENDOR_ID_INTEL) {
     magma_device_create_connection(device(), &connection_);
+    if (!connection_) {
+      return;
+    }
 
     magma_status_t status = magma_device_query(device(), kMagmaIntelGenQueryExtraPageCount, nullptr,
                                                &extra_page_count_);
@@ -138,7 +141,7 @@ class TestConnection : public magma::TestDeviceBase {
   }
 
  private:
-  magma_connection_t connection_;
+  magma_connection_t connection_ = 0;
   uint64_t extra_page_count_ = 0;
   uint64_t gpu_addr_ = 0;
 };
@@ -146,12 +149,11 @@ class TestConnection : public magma::TestDeviceBase {
 TEST(Shutdown, Test) {
   constexpr uint32_t kMaxCount = 10;
   for (uint32_t i = 0; i < kMaxCount; i++) {
-    std::future wait_future = std::async([]() {
-      TestConnection test;
+    std::future wait_future = std::async([test = std::make_unique<TestConnection>()]() mutable {
       magma_status_t status = MAGMA_STATUS_OK;
       // Keep testing the driver until we see that it has gone away (because of the restart).
       while (status == MAGMA_STATUS_OK) {
-        status = test.Test();
+        status = test->Test();
       }
       EXPECT_EQ(MAGMA_STATUS_CONNECTION_LOST, status);
     });
