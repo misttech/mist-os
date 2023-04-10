@@ -274,7 +274,7 @@ void WlanSoftmacDevice::JoinBss(JoinBssRequestView request, fdf::Arena& arena,
   }
 
   ap_mvm_sta_ = std::move(ap_mvm_sta);
-  completer.buffer(arena).ReplyError(ZX_OK);
+  completer.buffer(arena).ReplySuccess();
 }
 
 void WlanSoftmacDevice::EnableBeaconing(EnableBeaconingRequestView request, fdf::Arena& arena,

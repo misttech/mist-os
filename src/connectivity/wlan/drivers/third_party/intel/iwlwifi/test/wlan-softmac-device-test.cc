@@ -549,6 +549,7 @@ class MacInterfaceTest : public WlanSoftmacDeviceTest, public MockTrans {
     auto result = client_.buffer(test_arena_)->JoinBss(*config);
     EXPECT_TRUE(result.ok());
     if (result->is_error()) {
+      EXPECT_NE(ZX_OK, result->error_value());
       return result->error_value();
     }
     return ZX_OK;
