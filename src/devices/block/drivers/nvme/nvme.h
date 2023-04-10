@@ -45,8 +45,10 @@ class Nvme;
 using DeviceType = ddk::Device<Nvme, ddk::Initializable>;
 class Nvme : public DeviceType {
  public:
-  explicit Nvme(zx_device_t* parent, ddk::Pci pci, fdf::MmioBuffer mmio,
-                fuchsia_hardware_pci::InterruptMode irq_mode, zx::interrupt irq, zx::bti bti)
+  static constexpr char kDriverName[] = "nvme";
+
+  Nvme(zx_device_t* parent, ddk::Pci pci, fdf::MmioBuffer mmio,
+       fuchsia_hardware_pci::InterruptMode irq_mode, zx::interrupt irq, zx::bti bti)
       : DeviceType(parent),
         pci_(std::move(pci)),
         mmio_(std::move(mmio)),
@@ -55,7 +57,7 @@ class Nvme : public DeviceType {
         bti_(std::move(bti)) {}
   ~Nvme() = default;
 
-  static zx_status_t Bind(void* ctx, zx_device_t* dev);
+  static zx_status_t Bind(void* ctx, zx_device_t* parent);
   zx_status_t AddDevice();
 
   void DdkInit(ddk::InitTxn txn);
@@ -80,8 +82,6 @@ class Nvme : public DeviceType {
  private:
   friend class fake_nvme::FakeController;
 
-  static int IrqThread(void* arg) { return static_cast<Nvme*>(arg)->IrqLoop(); }
-  static int IoThread(void* arg) { return static_cast<Nvme*>(arg)->IoLoop(); }
   int IrqLoop();
   int IoLoop();
 

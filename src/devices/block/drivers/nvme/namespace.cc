@@ -20,9 +20,7 @@
 
 namespace nvme {
 
-zx_status_t Namespace::AddNamespace() {
-  return DdkAdd(ddk::DeviceAddArgs(NamespaceName().c_str()));
-}
+zx_status_t Namespace::AddNamespace() { return DdkAdd(NamespaceName().c_str()); }
 
 zx_status_t Namespace::Bind(Nvme* controller, uint32_t namespace_id) {
   if (namespace_id == 0 || namespace_id == ~0u) {
@@ -71,32 +69,32 @@ static void PopulateNamespaceInspect(const IdentifyNvmeNamespace& ns,
   auto inspect_ns = inspect_node->CreateChild(namespace_name);
   uint16_t nawun = ns.ns_atomics() ? ns.n_aw_un + 1 : atomic_write_unit_normal;
   uint16_t nawupf = ns.ns_atomics() ? ns.n_aw_u_pf + 1 : atomic_write_unit_power_fail;
-  inspect_ns.CreateInt("atomic_write_unit_normal_blocks", nawun, inspector);
-  inspect_ns.CreateInt("atomic_write_unit_power_fail_blocks", nawupf, inspector);
-  inspect_ns.CreateInt("namespace_atomic_boundary_size_normal_blocks", ns.n_abs_n, inspector);
-  inspect_ns.CreateInt("namespace_atomic_boundary_offset_blocks", ns.n_ab_o, inspector);
-  inspect_ns.CreateInt("namespace_atomic_boundary_size_power_fail_blocks", ns.n_abs_pf, inspector);
-  inspect_ns.CreateInt("namespace_optimal_io_boundary_blocks", ns.n_oio_b, inspector);
+  inspect_ns.RecordInt("atomic_write_unit_normal_blocks", nawun);
+  inspect_ns.RecordInt("atomic_write_unit_power_fail_blocks", nawupf);
+  inspect_ns.RecordInt("namespace_atomic_boundary_size_normal_blocks", ns.n_abs_n);
+  inspect_ns.RecordInt("namespace_atomic_boundary_offset_blocks", ns.n_ab_o);
+  inspect_ns.RecordInt("namespace_atomic_boundary_size_power_fail_blocks", ns.n_abs_pf);
+  inspect_ns.RecordInt("namespace_optimal_io_boundary_blocks", ns.n_oio_b);
   // table of block formats
   for (int i = 0; i < ns.n_lba_f; i++) {
     if (ns.lba_formats[i].value) {
       auto& fmt = ns.lba_formats[i];
-      inspect_ns.CreateInt(fbl::StringPrintf("lba_format_%u_block_size_bytes", i),
-                           fmt.lba_data_size_bytes(), inspector);
-      inspect_ns.CreateInt(fbl::StringPrintf("lba_format_%u_relative_performance", i),
-                           fmt.relative_performance(), inspector);
-      inspect_ns.CreateInt(fbl::StringPrintf("lba_format_%u_metadata_size_bytes", i),
-                           fmt.metadata_size_bytes(), inspector);
+      inspect_ns.RecordInt(fbl::StringPrintf("lba_format_%u_block_size_bytes", i),
+                           fmt.lba_data_size_bytes());
+      inspect_ns.RecordInt(fbl::StringPrintf("lba_format_%u_relative_performance", i),
+                           fmt.relative_performance());
+      inspect_ns.RecordInt(fbl::StringPrintf("lba_format_%u_metadata_size_bytes", i),
+                           fmt.metadata_size_bytes());
     }
   }
-  inspect_ns.CreateInt("active_lba_format_index", ns.lba_format_index(), inspector);
-  inspect_ns.CreateInt("data_protection_caps", ns.dpc & 0x3F, inspector);
-  inspect_ns.CreateInt("data_protection_set", ns.dps & 3, inspector);
-  inspect_ns.CreateInt("namespace_size_blocks", ns.n_sze, inspector);
-  inspect_ns.CreateInt("namespace_cap_blocks", ns.n_cap, inspector);
-  inspect_ns.CreateInt("namespace_util_blocks", ns.n_use, inspector);
-  inspect_ns.CreateInt("max_transfer_bytes", max_transfer_bytes, inspector);
-  inspect_ns.CreateInt("block_size_bytes", block_size_bytes, inspector);
+  inspect_ns.RecordInt("active_lba_format_index", ns.lba_format_index());
+  inspect_ns.RecordInt("data_protection_caps", ns.dpc & 0x3F);
+  inspect_ns.RecordInt("data_protection_set", ns.dps & 3);
+  inspect_ns.RecordInt("namespace_size_blocks", ns.n_sze);
+  inspect_ns.RecordInt("namespace_cap_blocks", ns.n_cap);
+  inspect_ns.RecordInt("namespace_util_blocks", ns.n_use);
+  inspect_ns.RecordInt("max_transfer_bytes", max_transfer_bytes);
+  inspect_ns.RecordInt("block_size_bytes", block_size_bytes);
   inspector->emplace(std::move(inspect_ns));
 }
 

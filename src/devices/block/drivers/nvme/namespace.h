@@ -24,22 +24,21 @@ class Namespace : public NamespaceDeviceType,
 
   // Create a namespace on |controller| with |namespace_id|.
   static zx_status_t Bind(Nvme* controller, uint32_t namespace_id);
-  zx_status_t AddNamespace();
   fbl::String NamespaceName() const { return fbl::StringPrintf("namespace-%u", namespace_id_); }
 
   void DdkInit(ddk::InitTxn txn);
   void DdkRelease();
 
-  // BlockImpl implementations
+  // ddk::BlockImplProtocol implementations.
   void BlockImplQuery(block_info_t* out_info, uint64_t* out_block_op_size);
   void BlockImplQueue(block_op_t* op, block_impl_queue_callback callback, void* cookie);
 
  private:
+  // Invokes DdkAdd().
+  zx_status_t AddNamespace();
+
   // Main driver initialization.
   zx_status_t Init();
-
-  // Check that the range of Read/Write IO command is valid.
-  zx_status_t IsValidIoRwCommand(const block_op_t& op) const;
 
   Nvme* const controller_;
   const uint32_t namespace_id_;
