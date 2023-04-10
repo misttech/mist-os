@@ -6,6 +6,8 @@
 
 #include <lib/ddk/metadata.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 
 #include <soc/aml-a1/a1-pwm.h>
 #include <soc/aml-a113/a113-pwm.h>
@@ -88,16 +90,15 @@ bool IsValidConfig(const pwm_config_t* config) {
   return true;
 }
 
-zx_status_t CopyConfig(pwm_config_t* dest, const pwm_config_t* src) {
-  if (!dest->mode_config_buffer || (dest->mode_config_size != src->mode_config_size) ||
-      (dest->mode_config_size != sizeof(mode_config))) {
-    return ZX_ERR_BAD_STATE;
-  }
+void CopyConfig(pwm_config_t* dest, const pwm_config_t* src) {
+  ZX_DEBUG_ASSERT(dest->mode_config_buffer);
+  ZX_DEBUG_ASSERT(dest->mode_config_size == src->mode_config_size);
+  ZX_DEBUG_ASSERT(dest->mode_config_size == sizeof(mode_config));
+
   dest->polarity = src->polarity;
   dest->period_ns = src->period_ns;
   dest->duty_cycle = src->duty_cycle;
   memcpy(dest->mode_config_buffer, src->mode_config_buffer, src->mode_config_size);
-  return ZX_OK;
 }
 
 }  // namespace
@@ -106,7 +107,13 @@ zx_status_t AmlPwm::PwmImplGetConfig(uint32_t idx, pwm_config_t* out_config) {
   if (idx > 1) {
     return ZX_ERR_INVALID_ARGS;
   }
-  return CopyConfig(out_config, &configs_[idx]);
+  if (out_config->mode_config_buffer == nullptr ||
+      out_config->mode_config_size != configs_[idx].mode_config_size ||
+      out_config->mode_config_size != sizeof(mode_config)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  CopyConfig(out_config, &configs_[idx]);
+  return ZX_OK;
 }
 
 zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
@@ -117,31 +124,22 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  zx_status_t status;
   // Save old config
   mode_config tmp_cfg = {UNKNOWN, {}};
   pwm_config_t old_config = {false, 0, 0.0, reinterpret_cast<uint8_t*>(&tmp_cfg),
                              sizeof(mode_config)};
-  if ((status = CopyConfig(&old_config, &configs_[idx])) != ZX_OK) {
-    zxlogf(ERROR, "%s: could not save old config %d", __func__, status);
-    return status;
-  }
+  CopyConfig(&old_config, &configs_[idx]);
   auto old_mode_cfg = reinterpret_cast<const mode_config*>(old_config.mode_config_buffer);
 
   // Update new
-  if ((status = CopyConfig(&configs_[idx], config)) != ZX_OK) {
-    zxlogf(ERROR, "%s: could not save new config %d", __func__, status);
-    return status;
-  }
+  CopyConfig(&configs_[idx], config);
 
   auto mode_cfg = reinterpret_cast<const mode_config*>(config->mode_config_buffer);
   Mode mode = static_cast<Mode>(mode_cfg->mode);
 
   bool mode_eq = (old_mode_cfg->mode == mode);
-  if (!mode_eq && ((status = SetMode(idx, mode)) != ZX_OK)) {
-    zxlogf(ERROR, "%s: Set Mode failed %d", __func__, status);
-    PwmImplSetConfig(idx, &old_config);
-    return status;
+  if (!mode_eq) {
+    SetMode(idx, mode);
   }
 
   bool en_const = (config->duty_cycle == 0 || config->duty_cycle == 100);
@@ -153,11 +151,8 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
       break;
     case DELTA_SIGMA:
       val_eq = (old_mode_cfg->delta_sigma.delta == mode_cfg->delta_sigma.delta);
-      if (!(mode_eq && val_eq) &&
-          ((status = SetDSSetting(idx, mode_cfg->delta_sigma.delta)) != ZX_OK)) {
-        zxlogf(ERROR, "%s: Set Delta Sigma Setting failed %d", __func__, status);
-        PwmImplSetConfig(idx, &old_config);
-        return status;
+      if (!(mode_eq && val_eq)) {
+        SetDSSetting(idx, mode_cfg->delta_sigma.delta);
       }
       break;
     case TWO_TIMER:
@@ -166,20 +161,14 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
 
       val_eq = (old_mode_cfg->two_timer.period_ns2 == mode_cfg->two_timer.period_ns2) &&
                (old_mode_cfg->two_timer.duty_cycle2 == mode_cfg->two_timer.duty_cycle2);
-      if (!(mode_eq && val_eq) &&
-          ((status = SetDutyCycle2(idx, mode_cfg->two_timer.period_ns2,
-                                   mode_cfg->two_timer.duty_cycle2)) != ZX_OK)) {
-        zxlogf(ERROR, "%s: Set Duty Cycle 2 failed %d", __func__, status);
-        PwmImplSetConfig(idx, &old_config);
-        return status;
+      if (!(mode_eq && val_eq)) {
+        SetDutyCycle2(idx, mode_cfg->two_timer.period_ns2, mode_cfg->two_timer.duty_cycle2);
       }
+
       val_eq = (old_mode_cfg->two_timer.timer1 == mode_cfg->two_timer.timer1) &&
                (old_mode_cfg->two_timer.timer2 == mode_cfg->two_timer.timer2);
-      if (!(mode_eq && val_eq) && ((status = SetTimers(idx, mode_cfg->two_timer.timer1,
-                                                       mode_cfg->two_timer.timer2)) != ZX_OK)) {
-        zxlogf(ERROR, "%s: Set Timers failed %d", __func__, status);
-        PwmImplSetConfig(idx, &old_config);
-        return status;
+      if (!(mode_eq && val_eq)) {
+        SetTimers(idx, mode_cfg->two_timer.timer1, mode_cfg->two_timer.timer2);
       }
       break;
     case UNKNOWN:
@@ -189,23 +178,15 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
   }
 
   val_eq = (old_config.polarity == config->polarity);
-  if (!(mode_eq && val_eq) && ((status = Invert(idx, config->polarity)) != ZX_OK)) {
-    zxlogf(ERROR, "%s: Invert failed %d", __func__, status);
-    PwmImplSetConfig(idx, &old_config);
-    return status;
+  if (!(mode_eq && val_eq)) {
+    Invert(idx, config->polarity);
   }
-  if ((status = EnableConst(idx, en_const)) != ZX_OK) {
-    zxlogf(ERROR, "%s: Enable Const failed %d", __func__, status);
-    PwmImplSetConfig(idx, &old_config);
-    return status;
-  }
+  EnableConst(idx, en_const);
+
   val_eq =
       (old_config.period_ns == config->period_ns) && (old_config.duty_cycle == config->duty_cycle);
-  if (!(mode_eq && val_eq) &&
-      ((status = SetDutyCycle(idx, config->period_ns, config->duty_cycle)) != ZX_OK)) {
-    zxlogf(ERROR, "%s: Set Duty Cycle failed %d", __func__, status);
-    PwmImplSetConfig(idx, &old_config);
-    return status;
+  if (!(mode_eq && val_eq)) {
+    SetDutyCycle(idx, config->period_ns, config->duty_cycle);
   }
 
   return ZX_OK;
@@ -215,11 +196,12 @@ zx_status_t AmlPwm::PwmImplEnable(uint32_t idx) {
   if (idx > 1) {
     return ZX_ERR_INVALID_ARGS;
   }
-  zx_status_t status = ZX_OK;
-  if (enabled_[idx] || ((status = EnableClock(idx, true)) == ZX_OK)) {
+
+  if (!enabled_[idx]) {
+    EnableClock(idx, true);
     enabled_[idx] = true;
   }
-  return status;
+  return ZX_OK;
 }
 
 zx_status_t AmlPwm::PwmImplDisable(uint32_t idx) {
@@ -227,16 +209,15 @@ zx_status_t AmlPwm::PwmImplDisable(uint32_t idx) {
     return ZX_ERR_INVALID_ARGS;
   }
   zx_status_t status = ZX_OK;
-  if (!enabled_[idx] || ((status = EnableClock(idx, false)) == ZX_OK)) {
+  if (enabled_[idx]) {
+    EnableClock(idx, false);
     enabled_[idx] = false;
   }
   return status;
 }
 
-zx_status_t AmlPwm::SetMode(uint32_t idx, Mode mode) {
-  if (mode >= UNKNOWN) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+void AmlPwm::SetMode(uint32_t idx, Mode mode) {
+  ZX_ASSERT(mode < UNKNOWN);
 
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
@@ -250,14 +231,11 @@ zx_status_t AmlPwm::SetMode(uint32_t idx, Mode mode) {
         .set_en_a2(mode == TWO_TIMER);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetDutyCycle(uint32_t idx, uint32_t period_ns, float duty_cycle) {
-  if (duty_cycle > 100 || duty_cycle < 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+void AmlPwm::SetDutyCycle(uint32_t idx, uint32_t period_ns, float duty_cycle) {
+  ZX_ASSERT(duty_cycle >= 0.0f);
+  ZX_ASSERT(duty_cycle <= 100.0f);
 
   // Write duty cycle to registers
   uint16_t high_count = 0, low_count = 0;
@@ -269,14 +247,11 @@ zx_status_t AmlPwm::SetDutyCycle(uint32_t idx, uint32_t period_ns, float duty_cy
     fbl::AutoLock lock(&locks_[REG_A]);
     DutyCycleReg::GetA().ReadFrom(&mmio_).set_high(high_count).set_low(low_count).WriteTo(&mmio_);
   }
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetDutyCycle2(uint32_t idx, uint32_t period_ns, float duty_cycle) {
-  if (duty_cycle > 100 || duty_cycle < 0) {
-    return ZX_ERR_INVALID_ARGS;
-  }
+void AmlPwm::SetDutyCycle2(uint32_t idx, uint32_t period_ns, float duty_cycle) {
+  ZX_ASSERT(duty_cycle >= 0.0f);
+  ZX_ASSERT(duty_cycle <= 100.0f);
 
   // Write duty cycle to registers
   uint16_t high_count = 0, low_count = 0;
@@ -288,11 +263,9 @@ zx_status_t AmlPwm::SetDutyCycle2(uint32_t idx, uint32_t period_ns, float duty_c
     fbl::AutoLock lock(&locks_[REG_A2]);
     DutyCycleReg::GetA2().ReadFrom(&mmio_).set_high(high_count).set_low(low_count).WriteTo(&mmio_);
   }
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::Invert(uint32_t idx, bool on) {
+void AmlPwm::Invert(uint32_t idx, bool on) {
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -301,11 +274,9 @@ zx_status_t AmlPwm::Invert(uint32_t idx, bool on) {
     misc_reg.set_inv_en_a(on);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::EnableHiZ(uint32_t idx, bool on) {
+void AmlPwm::EnableHiZ(uint32_t idx, bool on) {
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -314,11 +285,9 @@ zx_status_t AmlPwm::EnableHiZ(uint32_t idx, bool on) {
     misc_reg.set_hiz_a(on);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::EnableClock(uint32_t idx, bool on) {
+void AmlPwm::EnableClock(uint32_t idx, bool on) {
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -327,11 +296,9 @@ zx_status_t AmlPwm::EnableClock(uint32_t idx, bool on) {
     misc_reg.set_clk_en_a(on);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::EnableConst(uint32_t idx, bool on) {
+void AmlPwm::EnableConst(uint32_t idx, bool on) {
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -340,11 +307,9 @@ zx_status_t AmlPwm::EnableConst(uint32_t idx, bool on) {
     misc_reg.set_constant_en_a(on);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetClock(uint32_t idx, uint8_t sel) {
+void AmlPwm::SetClock(uint32_t idx, uint8_t sel) {
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -353,11 +318,9 @@ zx_status_t AmlPwm::SetClock(uint32_t idx, uint8_t sel) {
     misc_reg.set_clk_sel_a(sel);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetClockDivider(uint32_t idx, uint8_t div) {
+void AmlPwm::SetClockDivider(uint32_t idx, uint8_t div) {
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -366,11 +329,9 @@ zx_status_t AmlPwm::SetClockDivider(uint32_t idx, uint8_t div) {
     misc_reg.set_clk_div_a(div);
   }
   misc_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::EnableBlink(uint32_t idx, bool on) {
+void AmlPwm::EnableBlink(uint32_t idx, bool on) {
   fbl::AutoLock lock(&locks_[REG_BLINK]);
   auto blink_reg = BlinkReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -379,11 +340,9 @@ zx_status_t AmlPwm::EnableBlink(uint32_t idx, bool on) {
     blink_reg.set_enable_a(on);
   }
   blink_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetBlinkTimes(uint32_t idx, uint8_t times) {
+void AmlPwm::SetBlinkTimes(uint32_t idx, uint8_t times) {
   fbl::AutoLock lock(&locks_[REG_BLINK]);
   auto blink_reg = BlinkReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -392,11 +351,9 @@ zx_status_t AmlPwm::SetBlinkTimes(uint32_t idx, uint8_t times) {
     blink_reg.set_times_a(times);
   }
   blink_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetDSSetting(uint32_t idx, uint16_t val) {
+void AmlPwm::SetDSSetting(uint32_t idx, uint16_t val) {
   fbl::AutoLock lock(&locks_[REG_DS]);
   auto ds_reg = DeltaSigmaReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -405,11 +362,9 @@ zx_status_t AmlPwm::SetDSSetting(uint32_t idx, uint16_t val) {
     ds_reg.set_a(val);
   }
   ds_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
-zx_status_t AmlPwm::SetTimers(uint32_t idx, uint8_t timer1, uint8_t timer2) {
+void AmlPwm::SetTimers(uint32_t idx, uint8_t timer1, uint8_t timer2) {
   fbl::AutoLock lock(&locks_[REG_TIME]);
   auto time_reg = TimeReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
@@ -418,8 +373,6 @@ zx_status_t AmlPwm::SetTimers(uint32_t idx, uint8_t timer1, uint8_t timer2) {
     time_reg.set_a1(timer1).set_a2(timer2);
   }
   time_reg.WriteTo(&mmio_);
-
-  return ZX_OK;
 }
 
 zx_status_t AmlPwmDevice::Create(void* ctx, zx_device_t* parent) {
