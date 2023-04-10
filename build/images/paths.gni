@@ -116,11 +116,11 @@ files = {
     # only Bazel assembly is enabled.
     if (!use_bazel_images_only) {
       flash_manifest = "${images_outdir}/flash_manifest/flash.json"
-    }
-  }
 
-  if (use_gigaboot) {
-    esp = "${root_out_dir}/fuchsia.esp.blk"
+      if (use_gigaboot) {
+        esp = "${root_out_dir}/fuchsia.esp.blk"
+      }
+    }
   }
 
   _image_suffix = "zbi"
