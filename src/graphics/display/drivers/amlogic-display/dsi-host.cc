@@ -81,7 +81,7 @@ const PanelConfig* GetPanelConfig(uint32_t panel_type) {
 DsiHost::DsiHost(zx_device_t* parent, uint32_t panel_type)
     : pdev_(ddk::PDevFidl::FromFragment(parent)),
       dsiimpl_(parent, "dsi"),
-      lcd_gpio_(parent, "gpio"),
+      lcd_gpio_(parent, "gpio-lcd-reset"),
       panel_type_(panel_type) {}
 
 // static

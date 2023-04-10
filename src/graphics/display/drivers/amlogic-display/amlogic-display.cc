@@ -915,9 +915,11 @@ int AmlogicDisplay::HpdThread() {
 }
 
 zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
-  if (zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(parent_, "gpio", &hpd_gpio_);
+  if (zx_status_t status = ddk::GpioProtocolClient::CreateFromDevice(
+          parent_, "gpio-hdmi-hotplug-detect", &hpd_gpio_);
       status != ZX_OK) {
-    DISP_ERROR("Could not obtain GPIO protocol %d\n", status);
+    DISP_ERROR("Could not obtain GPIO protocol for HDMI hotplug detection: %s\n",
+               zx_status_get_string(status));
     return status;
   }
 

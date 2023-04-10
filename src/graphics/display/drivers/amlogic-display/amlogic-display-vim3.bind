@@ -17,7 +17,7 @@ primary node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.DISPLAY;
 }
 
-node "gpio" {
+node "gpio-hdmi-hotplug-detect" {
   fuchsia.BIND_PROTOCOL == fuchsia.gpio.BIND_PROTOCOL.DEVICE;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
 }
