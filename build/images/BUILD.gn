@@ -278,8 +278,11 @@ group("default-images") {
     }
 
     # TODO(https://fxbug.dev/125008): Support size checking in Bazel assembly.
-    if (!bootfs_only) {
+    if (size_checker_input != {
+        }) {
       deps += [ "size_checker:run_product_size_checker" ]
+    }
+    if (!bootfs_only) {
       if (!use_bringup_assembly) {
         deps += [ ":record_filesystem_sizes" ]
       }
