@@ -41,8 +41,7 @@ impl EmptyTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for EmptyTable {}
+impl fidl::encoding::Persistable for EmptyTable {}
 
 fidl_table! {
     name: EmptyTable,
@@ -62,8 +61,7 @@ impl ExtensionTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for ExtensionTable {}
+impl fidl::encoding::Persistable for ExtensionTable {}
 
 fidl_table! {
     name: ExtensionTable,
@@ -86,8 +84,7 @@ impl NewerSimpleTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, y: None, z: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for NewerSimpleTable {}
+impl fidl::encoding::Persistable for NewerSimpleTable {}
 
 fidl_table! {
     name: NewerSimpleTable,
@@ -120,8 +117,7 @@ impl OlderSimpleTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for OlderSimpleTable {}
+impl fidl::encoding::Persistable for OlderSimpleTable {}
 
 fidl_table! {
     name: OlderSimpleTable,
@@ -148,8 +144,7 @@ impl ReverseOrdinalTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { z: None, y: None, x: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for ReverseOrdinalTable {}
+impl fidl::encoding::Persistable for ReverseOrdinalTable {}
 
 fidl_table! {
     name: ReverseOrdinalTable,
@@ -183,8 +178,7 @@ impl SimpleTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, y: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for SimpleTable {}
+impl fidl::encoding::Persistable for SimpleTable {}
 
 fidl_table! {
     name: SimpleTable,
@@ -342,8 +336,7 @@ impl SixtyFourOrdinalTable {
         __non_exhaustive: (),
     };
 }
-
-impl fidl::encoding::TopLevel for SixtyFourOrdinalTable {}
+impl fidl::encoding::Persistable for SixtyFourOrdinalTable {}
 
 fidl_table! {
     name: SixtyFourOrdinalTable,
@@ -620,8 +613,7 @@ impl TableWithAttributes {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for TableWithAttributes {}
+impl fidl::encoding::Persistable for TableWithAttributes {}
 
 fidl_table! {
     name: TableWithAttributes,

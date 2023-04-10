@@ -36,8 +36,7 @@ use {
 pub struct Payload {
     pub value: u32,
 }
-
-impl fidl::encoding::TopLevel for Payload {}
+impl fidl::encoding::Persistable for Payload {}
 
 fidl_struct! {
     copy: true,

@@ -764,21 +764,44 @@ And then unpersist it later:
 ### Standalone {#standalone}
 
 For advanced use cases where the [persistence API](#persistence) is not
-sufficient, you can use the [`standalone_encode`] and [`standalone_decode`].
-This works for structs, tables, and unions, even if they contain handles.
+sufficient, you can use the standalone encoding and decoding API. This works for
+all structs, tables, and unions. There are two sets of functions: one for
+[value][lang-resource] types, and one for [resource][lang-resource] types.
 
-For example, you can encode a [`JsonValue` union](#types-unions):
+For example, since [`JsonValue` union](#types-unions) is a value type, we encode
+it using [`standalone_encode_value`]:
 
 ```rust
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/persistence/src/lib.rs" region_tag="standalone_encode" adjust_indentation="auto" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/persistence/src/lib.rs" region_tag="standalone_encode_value" adjust_indentation="auto" %}
 ```
 
-This returns a vector of bytes, a vector of [`HandleDisposition`]s, and an
-opaque object that stores wire format metadata. To decode, you need to provide
-all three values, with handle dispositions converted to [`HandleInfo`]s:
+This returns a vector of bytes and an opaque object that stores wire format
+metadata. To decode, pass both values to [`standalone_decode_value`]:
 
 ```rust
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/persistence/src/lib.rs" region_tag="standalone_decode" adjust_indentation="auto" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/persistence/src/lib.rs" region_tag="standalone_decode_value" adjust_indentation="auto" %}
+```
+
+As another example, consider the struct `EventStruct`:
+
+```fidl
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples/types.test.fidl" region_tag="resource_structs" %}
+```
+
+Since this is a resource type, we encode it using
+[`standalone_encode_resource`]:
+
+```rust
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/persistence/src/lib.rs" region_tag="standalone_encode_resource" adjust_indentation="auto" %}
+```
+
+In addition to bytes and wire format metadata, this also returns a vector of
+[`HandleDisposition`]s. To decode, convert the handle dispositions to
+[`HandleInfo`]s, and then pass all three values to
+[`standalone_decode_resource`]:
+
+```rust
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/rust/persistence/src/lib.rs" region_tag="standalone_decode_resource" adjust_indentation="auto" %}
 ```
 
 ## Appendix A: Derived traits {#derived-traits}
@@ -800,8 +823,10 @@ The calculation of traits derivation rules is visible in
 [`HandleDisposition`]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_zircon/struct.HandleDisposition.html
 [`HandleInfo`]: https://fuchsia-docs.firebaseapp.com/rust/fuchsia_zircon/struct.HandleInfo.html
 [`persist`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.persist.html
-[`standalone_decode`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.standalone_decode.html
-[`standalone_encode`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.standalone_encode.html
+[`standalone_encode_value`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.standalone_encode_value.html
+[`standalone_encode_resource`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.standalone_encode_resource.html
+[`standalone_decode_value`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.standalone_decode_value.html
+[`standalone_decode_resource`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.standalone_decode_resource.html
 [`unpersist`]: https://fuchsia-docs.firebaseapp.com/rust/fidl/encoding/fn.unpersist.html
 [anon-names]: /docs/reference/fidl/language/language.md#inline-layouts
 [lang-bits]: /docs/reference/fidl/language/language.md#bits

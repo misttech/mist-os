@@ -289,8 +289,7 @@ impl Expression {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for Expression {}
+impl fidl::encoding::Persistable for Expression {}
 
 fidl_union! {
     name: Expression,
@@ -363,8 +362,7 @@ impl UnionMember {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for UnionMember {}
+impl fidl::encoding::Persistable for UnionMember {}
 
 fidl_union! {
     name: UnionMember,
@@ -383,8 +381,7 @@ pub struct OverrideTest {
     pub left: Option<Box<Expression>>,
     pub right: Option<Box<Expression>>,
 }
-
-impl fidl::encoding::TopLevel for OverrideTest {}
+impl fidl::encoding::Persistable for OverrideTest {}
 
 fidl_struct! {
     name: OverrideTest,
@@ -436,8 +433,7 @@ pub struct SomeProtocolSomeMethodRequest {
     pub union_member: UnionMember,
     pub table_member: TableMember,
 }
-
-impl fidl::encoding::TopLevel for SomeProtocolSomeMethodRequest {}
+impl fidl::encoding::Persistable for SomeProtocolSomeMethodRequest {}
 
 fidl_struct! {
     name: SomeProtocolSomeMethodRequest,
@@ -471,8 +467,7 @@ fidl_struct! {
 pub struct SomeProtocolSomeMethodResponse {
     pub bits_member: BitsMember,
 }
-
-impl fidl::encoding::TopLevel for SomeProtocolSomeMethodResponse {}
+impl fidl::encoding::Persistable for SomeProtocolSomeMethodResponse {}
 
 fidl_struct! {
     name: SomeProtocolSomeMethodResponse,
@@ -502,8 +497,7 @@ fidl_struct! {
 pub struct TableData {
     pub data: u8,
 }
-
-impl fidl::encoding::TopLevel for TableData {}
+impl fidl::encoding::Persistable for TableData {}
 
 fidl_struct! {
     copy: true,
@@ -542,8 +536,7 @@ impl FunctionApplication {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { func: None, args: None, flags: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for FunctionApplication {}
+impl fidl::encoding::Persistable for FunctionApplication {}
 
 fidl_table! {
     name: FunctionApplication,
@@ -576,8 +569,7 @@ impl TableMember {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { table_data: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for TableMember {}
+impl fidl::encoding::Persistable for TableMember {}
 
 fidl_table! {
     name: TableMember,

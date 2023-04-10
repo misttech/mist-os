@@ -2711,9 +2711,12 @@ macro_rules! fidl_struct_impl_copy {
             }
         }
 
-        $crate::impl_value_type_by_ref!($name);
+        $crate::impl_value_or_resource_type!($name, $($resource)?);
 
-        unsafe impl $crate::encoding::Encode<$name> for &$name {
+        unsafe impl $crate::encoding::Encode<$name> for $crate::switch! {
+            $($resource)? => { &mut $name }
+            _ => { &$name }
+        } {
             #[inline]
             unsafe fn encode(self, encoder: &mut $crate::encoding::Encoder<'_>, offset: usize, _depth: $crate::encoding::Depth) -> $crate::Result<()> {
                 encoder.debug_check_bounds::<$name>(offset);
@@ -3955,15 +3958,19 @@ pub fn decode_transaction_header(bytes: &[u8]) -> Result<(TransactionHeader, &[u
 // Persistence
 ////////////////////////////////////////////////////////////////////////////////
 
-/// Marker trait for types that can be used as top level requests/responses, and
-/// support the standalone encoding/decoding API. This is applied to all
-/// structs, tables, and unions.
-pub trait TopLevel: TypeMarker<Owned = Self> + Decode<Self> {}
+/// Marker trait implemented for FIDL non-resource structs, tables, and unions.
+/// These can be used with the persistence API and standalone encoding/decoding API.
+pub trait Persistable:
+    TypeMarker<Owned = Self> + Decode<Self> + for<'a> ValueTypeMarker<Borrowed<'a> = &'a Self>
+{
+}
 
-/// Marker trait for types that support the persistence API. This is applied to
-/// non-resource structs, tables, and unions.
-pub trait Persistable: TopLevel + for<'a> ValueTypeMarker<Borrowed<'a> = &'a Self> {}
-impl<T: TopLevel + for<'a> ValueTypeMarker<Borrowed<'a> = &'a Self>> Persistable for T {}
+/// Marker trait implemented for FIDL resource structs, tables, and unions.
+/// These can be used with the standalone encoding/decoding API, but not the persistence API.
+pub trait Standalone:
+    TypeMarker<Owned = Self> + Decode<Self> + for<'a> ResourceTypeMarker<Borrowed<'a> = &'a mut Self>
+{
+}
 
 /// Header for RFC-0120 persistent FIDL messages.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -4074,12 +4081,12 @@ pub fn persist_with_context<'a, T: ValueTypeMarker>(
         &mut handles,
         msg,
     )?;
-    debug_assert!(handles.is_empty(), "Persistent message contains handles");
+    debug_assert!(handles.is_empty(), "value type contains handles");
     Ok(combined_bytes)
 }
 
-/// Decode a FIDL object from bytes following RFC-0120. This only works for
-/// non-resource structs, tables, and unions. See `persist` for the reverse.
+/// Decodes a FIDL object from bytes following RFC-0120. Must be a non-resource
+/// struct, table, or union. See `persist` for the reverse.
 pub fn unpersist<T: Persistable>(bytes: &[u8]) -> Result<T> {
     // TODO(fxbug.dev/45252): Only accept the new header format.
     //
@@ -4115,24 +4122,52 @@ pub fn unpersist<T: Persistable>(bytes: &[u8]) -> Result<T> {
     Ok(output)
 }
 
+/// Encodes a FIDL object to bytes and wire metadata following RFC-0120. Must be
+/// a non-resource struct, table, or union.
+pub fn standalone_encode_value<T: Persistable>(body: &T) -> Result<(Vec<u8>, WireMetadata)> {
+    // This helper is needed to convince rustc that &T implements Encode<T>.
+    fn helper<T: ValueTypeMarker>(body: T::Borrowed<'_>) -> Result<(Vec<u8>, WireMetadata)> {
+        let context = default_persistent_encode_context();
+        let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
+        let mut bytes = Vec::<u8>::new();
+        let mut handles = Vec::<HandleDisposition<'static>>::new();
+        Encoder::encode_with_context::<T>(context, &mut bytes, &mut handles, body)?;
+        debug_assert!(handles.is_empty(), "value type contains handles");
+        Ok((bytes, metadata))
+    }
+    helper::<T>(body)
+}
+
 /// Encodes a FIDL object to bytes, handles, and wire metadata following
-/// RFC-0120. This only works for structs, tables, and unions. See
-/// `standalone_decode` for the reverse.
-pub fn standalone_encode<T: TopLevel>(
-    body: impl Encode<T>,
+/// RFC-0120. Must be a resource struct, table, or union.
+pub fn standalone_encode_resource<T: Standalone>(
+    mut body: T,
 ) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)> {
-    let context = default_persistent_encode_context();
-    let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
-    let mut bytes = Vec::<u8>::new();
-    let mut handles = Vec::<HandleDisposition<'static>>::new();
-    Encoder::encode_with_context::<T>(context, &mut bytes, &mut handles, body)?;
-    Ok((bytes, handles, metadata))
+    // This helper is needed to convince rustc that &mut T implements Encode<T>.
+    fn helper<T: ResourceTypeMarker>(
+        body: T::Borrowed<'_>,
+    ) -> Result<(Vec<u8>, Vec<HandleDisposition<'static>>, WireMetadata)> {
+        let context = default_persistent_encode_context();
+        let metadata = WireMetadata::new_full(context, MAGIC_NUMBER_INITIAL);
+        let mut bytes = Vec::<u8>::new();
+        let mut handles = Vec::<HandleDisposition<'static>>::new();
+        Encoder::encode_with_context::<T>(context, &mut bytes, &mut handles, body)?;
+        Ok((bytes, handles, metadata))
+    }
+    helper::<T>(&mut body)
+}
+
+/// Decodes a FIDL object from bytes and wire metadata following RFC-0120. Must
+/// be a non-resource struct, table, or union.
+pub fn standalone_decode_value<T: Persistable>(bytes: &[u8], metadata: &WireMetadata) -> Result<T> {
+    let mut output = T::Owned::new_empty();
+    Decoder::decode_with_context::<T>(metadata.decoding_context(), bytes, &mut [], &mut output)?;
+    Ok(output)
 }
 
 /// Decodes a FIDL object from bytes, handles, and wire metadata following
-/// RFC-0120. This only works for structs, tables, and unions. See
-/// `standalone_encode` for the reverse.
-pub fn standalone_decode<T: TopLevel>(
+/// RFC-0120. Must be a resource struct, table, or union.
+pub fn standalone_decode_resource<T: Standalone>(
     bytes: &[u8],
     handles: &mut [HandleInfo],
     metadata: &WireMetadata,

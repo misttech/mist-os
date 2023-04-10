@@ -119,8 +119,7 @@ impl TheUnion {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for TheUnion {}
+impl fidl::encoding::Persistable for TheUnion {}
 
 fidl_union! {
     name: TheUnion,
@@ -141,8 +140,7 @@ pub struct ChannelProtocolEventARequest {
     pub a: i64,
     pub b: i64,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolEventARequest {}
+impl fidl::encoding::Persistable for ChannelProtocolEventARequest {}
 
 fidl_struct! {
     copy: true,
@@ -181,8 +179,7 @@ pub struct ChannelProtocolMethodARequest {
     pub a: i64,
     pub b: i64,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolMethodARequest {}
+impl fidl::encoding::Persistable for ChannelProtocolMethodARequest {}
 
 fidl_struct! {
     copy: true,
@@ -221,8 +218,7 @@ pub struct ChannelProtocolMethodBRequest {
     pub a: i64,
     pub b: i64,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolMethodBRequest {}
+impl fidl::encoding::Persistable for ChannelProtocolMethodBRequest {}
 
 fidl_struct! {
     copy: true,
@@ -260,8 +256,7 @@ fidl_struct! {
 pub struct ChannelProtocolMethodBResponse {
     pub result: i64,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolMethodBResponse {}
+impl fidl::encoding::Persistable for ChannelProtocolMethodBResponse {}
 
 fidl_struct! {
     copy: true,
@@ -289,8 +284,7 @@ fidl_struct! {
 pub struct ChannelProtocolMutateSocketRequest {
     pub a: fidl::Socket,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolMutateSocketRequest {}
+impl fidl::encoding::Standalone for ChannelProtocolMutateSocketRequest {}
 
 fidl_struct! {
     name: ChannelProtocolMutateSocketRequest,
@@ -319,8 +313,7 @@ fidl_struct! {
 pub struct ChannelProtocolMutateSocketResponse {
     pub b: fidl::Socket,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolMutateSocketResponse {}
+impl fidl::encoding::Standalone for ChannelProtocolMutateSocketResponse {}
 
 fidl_struct! {
     name: ChannelProtocolMutateSocketResponse,
@@ -349,8 +342,7 @@ fidl_struct! {
 pub struct ChannelProtocolTakeHandleRequest {
     pub h: fidl::Handle,
 }
-
-impl fidl::encoding::TopLevel for ChannelProtocolTakeHandleRequest {}
+impl fidl::encoding::Standalone for ChannelProtocolTakeHandleRequest {}
 
 fidl_struct! {
     name: ChannelProtocolTakeHandleRequest,
@@ -379,8 +371,7 @@ fidl_struct! {
 pub struct HandleRightsProtocolAnEventRequest {
     pub h: fidl::Socket,
 }
-
-impl fidl::encoding::TopLevel for HandleRightsProtocolAnEventRequest {}
+impl fidl::encoding::Standalone for HandleRightsProtocolAnEventRequest {}
 
 fidl_struct! {
     name: HandleRightsProtocolAnEventRequest,
@@ -409,8 +400,7 @@ fidl_struct! {
 pub struct HandleRightsProtocolNoResponseMethodRequest {
     pub h: fidl::Socket,
 }
-
-impl fidl::encoding::TopLevel for HandleRightsProtocolNoResponseMethodRequest {}
+impl fidl::encoding::Standalone for HandleRightsProtocolNoResponseMethodRequest {}
 
 fidl_struct! {
     name: HandleRightsProtocolNoResponseMethodRequest,
@@ -439,8 +429,7 @@ fidl_struct! {
 pub struct HandleRightsProtocolResponseMethodRequest {
     pub h: fidl::Socket,
 }
-
-impl fidl::encoding::TopLevel for HandleRightsProtocolResponseMethodRequest {}
+impl fidl::encoding::Standalone for HandleRightsProtocolResponseMethodRequest {}
 
 fidl_struct! {
     name: HandleRightsProtocolResponseMethodRequest,
@@ -469,8 +458,7 @@ fidl_struct! {
 pub struct HandleRightsProtocolResponseMethodResponse {
     pub h: fidl::Socket,
 }
-
-impl fidl::encoding::TopLevel for HandleRightsProtocolResponseMethodResponse {}
+impl fidl::encoding::Standalone for HandleRightsProtocolResponseMethodResponse {}
 
 fidl_struct! {
     name: HandleRightsProtocolResponseMethodResponse,
@@ -513,8 +501,7 @@ pub struct ManyParametersFifteenRequest {
     pub p14: bool,
     pub p15: bool,
 }
-
-impl fidl::encoding::TopLevel for ManyParametersFifteenRequest {}
+impl fidl::encoding::Persistable for ManyParametersFifteenRequest {}
 
 fidl_struct! {
     name: ManyParametersFifteenRequest,
@@ -639,8 +626,7 @@ fidl_struct! {
 pub struct MethodWithUnionUnionMethodRequest {
     pub u: TheUnion,
 }
-
-impl fidl::encoding::TopLevel for MethodWithUnionUnionMethodRequest {}
+impl fidl::encoding::Persistable for MethodWithUnionUnionMethodRequest {}
 
 fidl_struct! {
     name: MethodWithUnionUnionMethodRequest,
@@ -667,8 +653,7 @@ fidl_struct! {
 pub struct MethodWithUnionUnionMethodResponse {
     pub u: Option<Box<TheUnion>>,
 }
-
-impl fidl::encoding::TopLevel for MethodWithUnionUnionMethodResponse {}
+impl fidl::encoding::Persistable for MethodWithUnionUnionMethodResponse {}
 
 fidl_struct! {
     name: MethodWithUnionUnionMethodResponse,
@@ -698,8 +683,7 @@ pub struct ProtocolEnds {
     pub client_opt: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
     pub server_opt: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
 }
-
-impl fidl::encoding::TopLevel for ProtocolEnds {}
+impl fidl::encoding::Standalone for ProtocolEnds {}
 
 fidl_struct! {
     name: ProtocolEnds,
@@ -755,8 +739,7 @@ fidl_struct! {
 pub struct TransitionalEventRequest {
     pub x: i64,
 }
-
-impl fidl::encoding::TopLevel for TransitionalEventRequest {}
+impl fidl::encoding::Persistable for TransitionalEventRequest {}
 
 fidl_struct! {
     copy: true,
@@ -787,8 +770,7 @@ fidl_struct! {
 pub struct TransitionalOneWayRequest {
     pub x: i64,
 }
-
-impl fidl::encoding::TopLevel for TransitionalOneWayRequest {}
+impl fidl::encoding::Persistable for TransitionalOneWayRequest {}
 
 fidl_struct! {
     copy: true,
@@ -819,8 +801,7 @@ fidl_struct! {
 pub struct TransitionalRequestRequest {
     pub x: i64,
 }
-
-impl fidl::encoding::TopLevel for TransitionalRequestRequest {}
+impl fidl::encoding::Persistable for TransitionalRequestRequest {}
 
 fidl_struct! {
     copy: true,
@@ -851,8 +832,7 @@ fidl_struct! {
 pub struct TransitionalRequestResponse {
     pub y: i64,
 }
-
-impl fidl::encoding::TopLevel for TransitionalRequestResponse {}
+impl fidl::encoding::Persistable for TransitionalRequestResponse {}
 
 fidl_struct! {
     copy: true,
@@ -880,8 +860,7 @@ fidl_struct! {
 pub struct WithAndWithoutRequestResponseNoRequestWithResponseResponse {
     pub ret: String,
 }
-
-impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseNoRequestWithResponseResponse {}
+impl fidl::encoding::Persistable for WithAndWithoutRequestResponseNoRequestWithResponseResponse {}
 
 fidl_struct! {
     name: WithAndWithoutRequestResponseNoRequestWithResponseResponse,
@@ -908,8 +887,7 @@ fidl_struct! {
 pub struct WithAndWithoutRequestResponseOnWithResponseRequest {
     pub ret: String,
 }
-
-impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseOnWithResponseRequest {}
+impl fidl::encoding::Persistable for WithAndWithoutRequestResponseOnWithResponseRequest {}
 
 fidl_struct! {
     name: WithAndWithoutRequestResponseOnWithResponseRequest,
@@ -936,8 +914,7 @@ fidl_struct! {
 pub struct WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
     pub arg: String,
 }
-
-impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {}
+impl fidl::encoding::Persistable for WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {}
 
 fidl_struct! {
     name: WithAndWithoutRequestResponseWithRequestEmptyResponseRequest,
@@ -964,8 +941,7 @@ fidl_struct! {
 pub struct WithAndWithoutRequestResponseWithRequestNoResponseRequest {
     pub arg: String,
 }
-
-impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestNoResponseRequest {}
+impl fidl::encoding::Persistable for WithAndWithoutRequestResponseWithRequestNoResponseRequest {}
 
 fidl_struct! {
     name: WithAndWithoutRequestResponseWithRequestNoResponseRequest,
@@ -992,8 +968,7 @@ fidl_struct! {
 pub struct WithAndWithoutRequestResponseWithRequestWithResponseRequest {
     pub arg: String,
 }
-
-impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestWithResponseRequest {}
+impl fidl::encoding::Persistable for WithAndWithoutRequestResponseWithRequestWithResponseRequest {}
 
 fidl_struct! {
     name: WithAndWithoutRequestResponseWithRequestWithResponseRequest,
@@ -1020,8 +995,7 @@ fidl_struct! {
 pub struct WithAndWithoutRequestResponseWithRequestWithResponseResponse {
     pub ret: String,
 }
-
-impl fidl::encoding::TopLevel for WithAndWithoutRequestResponseWithRequestWithResponseResponse {}
+impl fidl::encoding::Persistable for WithAndWithoutRequestResponseWithRequestWithResponseResponse {}
 
 fidl_struct! {
     name: WithAndWithoutRequestResponseWithRequestWithResponseResponse,
@@ -1048,8 +1022,7 @@ fidl_struct! {
 pub struct WithErrorSyntaxHandleInResultResponse {
     pub h: fidl::Handle,
 }
-
-impl fidl::encoding::TopLevel for WithErrorSyntaxHandleInResultResponse {}
+impl fidl::encoding::Standalone for WithErrorSyntaxHandleInResultResponse {}
 
 fidl_struct! {
     name: WithErrorSyntaxHandleInResultResponse,
@@ -1083,8 +1056,7 @@ pub struct WithErrorSyntaxResponseAsStructResponse {
     pub b: i64,
     pub c: i64,
 }
-
-impl fidl::encoding::TopLevel for WithErrorSyntaxResponseAsStructResponse {}
+impl fidl::encoding::Persistable for WithErrorSyntaxResponseAsStructResponse {}
 
 fidl_struct! {
     copy: true,
@@ -1126,8 +1098,7 @@ fidl_struct! {
 pub struct WithProtocolEndsClientEndsRequest {
     pub in_: fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>,
 }
-
-impl fidl::encoding::TopLevel for WithProtocolEndsClientEndsRequest {}
+impl fidl::encoding::Standalone for WithProtocolEndsClientEndsRequest {}
 
 fidl_struct! {
     name: WithProtocolEndsClientEndsRequest,
@@ -1156,8 +1127,7 @@ fidl_struct! {
 pub struct WithProtocolEndsClientEndsResponse {
     pub out: Option<fidl::endpoints::ClientEnd<DiscoverableProtocolMarker>>,
 }
-
-impl fidl::encoding::TopLevel for WithProtocolEndsClientEndsResponse {}
+impl fidl::encoding::Standalone for WithProtocolEndsClientEndsResponse {}
 
 fidl_struct! {
     name: WithProtocolEndsClientEndsResponse,
@@ -1186,8 +1156,7 @@ fidl_struct! {
 pub struct WithProtocolEndsServerEndsRequest {
     pub in_: Option<fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>>,
 }
-
-impl fidl::encoding::TopLevel for WithProtocolEndsServerEndsRequest {}
+impl fidl::encoding::Standalone for WithProtocolEndsServerEndsRequest {}
 
 fidl_struct! {
     name: WithProtocolEndsServerEndsRequest,
@@ -1216,8 +1185,7 @@ fidl_struct! {
 pub struct WithProtocolEndsServerEndsResponse {
     pub out: fidl::endpoints::ServerEnd<DiscoverableProtocolMarker>,
 }
-
-impl fidl::encoding::TopLevel for WithProtocolEndsServerEndsResponse {}
+impl fidl::encoding::Standalone for WithProtocolEndsServerEndsResponse {}
 
 fidl_struct! {
     name: WithProtocolEndsServerEndsResponse,
@@ -1246,8 +1214,7 @@ fidl_struct! {
 pub struct WithProtocolEndsStructContainingEndsRequest {
     pub in_: ProtocolEnds,
 }
-
-impl fidl::encoding::TopLevel for WithProtocolEndsStructContainingEndsRequest {}
+impl fidl::encoding::Standalone for WithProtocolEndsStructContainingEndsRequest {}
 
 fidl_struct! {
     name: WithProtocolEndsStructContainingEndsRequest,
@@ -1276,8 +1243,7 @@ fidl_struct! {
 pub struct WithProtocolEndsStructContainingEndsResponse {
     pub out: ProtocolEnds,
 }
-
-impl fidl::encoding::TopLevel for WithProtocolEndsStructContainingEndsResponse {}
+impl fidl::encoding::Standalone for WithProtocolEndsStructContainingEndsResponse {}
 
 fidl_struct! {
     name: WithProtocolEndsStructContainingEndsResponse,

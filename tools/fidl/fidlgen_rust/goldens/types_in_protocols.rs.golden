@@ -176,8 +176,7 @@ impl ResourceUnion {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for ResourceUnion {}
+impl fidl::encoding::Standalone for ResourceUnion {}
 
 fidl_union! {
     name: ResourceUnion,
@@ -243,8 +242,7 @@ impl Union {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for Union {}
+impl fidl::encoding::Persistable for Union {}
 
 fidl_union! {
     name: Union,
@@ -272,8 +270,7 @@ pub struct ArrayBasic {
     pub array_string: [String; 5],
     pub array_opt_string: [Option<String>; 5],
 }
-
-impl fidl::encoding::TopLevel for ArrayBasic {}
+impl fidl::encoding::Persistable for ArrayBasic {}
 
 fidl_struct! {
     name: ArrayBasic,
@@ -431,8 +428,7 @@ pub struct ArrayCompound {
     pub array_table: [Table; 5],
     pub array_union: [Union; 5],
 }
-
-impl fidl::encoding::TopLevel for ArrayCompound {}
+impl fidl::encoding::Persistable for ArrayCompound {}
 
 fidl_struct! {
     name: ArrayCompound,
@@ -498,8 +494,7 @@ pub struct ArrayVectorNested {
     pub vector_array_uint8: Vec<[u8; 5]>,
     pub vector_vector_uint8: Vec<Vec<u8>>,
 }
-
-impl fidl::encoding::TopLevel for ArrayVectorNested {}
+impl fidl::encoding::Persistable for ArrayVectorNested {}
 
 fidl_struct! {
     name: ArrayVectorNested,
@@ -544,8 +539,7 @@ pub struct Basic {
     pub string: String,
     pub opt_string: Option<String>,
 }
-
-impl fidl::encoding::TopLevel for Basic {}
+impl fidl::encoding::Persistable for Basic {}
 
 fidl_struct! {
     name: Basic,
@@ -685,8 +679,7 @@ pub struct Compound {
     pub opt_struct: Option<Box<Struct>>,
     pub opt_union: Option<Box<Union>>,
 }
-
-impl fidl::encoding::TopLevel for Compound {}
+impl fidl::encoding::Persistable for Compound {}
 
 fidl_struct! {
     name: Compound,
@@ -791,8 +784,7 @@ pub struct Resource {
     pub vector_table: Vec<ResourceTable>,
     pub vector_union: Vec<ResourceUnion>,
 }
-
-impl fidl::encoding::TopLevel for Resource {}
+impl fidl::encoding::Standalone for Resource {}
 
 fidl_struct! {
     name: Resource,
@@ -1047,8 +1039,7 @@ fidl_struct! {
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct ResourceStruct;
-
-impl fidl::encoding::TopLevel for ResourceStruct {}
+impl fidl::encoding::Standalone for ResourceStruct {}
 
 fidl_struct! {
     empty: true,
@@ -1058,8 +1049,7 @@ fidl_struct! {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Struct;
-
-impl fidl::encoding::TopLevel for Struct {}
+impl fidl::encoding::Persistable for Struct {}
 
 fidl_struct! {
     empty: true,
@@ -1081,8 +1071,7 @@ pub struct VectorBasic {
     pub vector_string: Vec<String>,
     pub vector_opt_string: Vec<Option<String>>,
 }
-
-impl fidl::encoding::TopLevel for VectorBasic {}
+impl fidl::encoding::Persistable for VectorBasic {}
 
 fidl_struct! {
     name: VectorBasic,
@@ -1192,8 +1181,7 @@ pub struct VectorCompound {
     pub vector_opt_struct: Vec<Option<Box<Struct>>>,
     pub vector_opt_union: Vec<Option<Box<Union>>>,
 }
-
-impl fidl::encoding::TopLevel for VectorCompound {}
+impl fidl::encoding::Persistable for VectorCompound {}
 
 fidl_struct! {
     name: VectorCompound,
@@ -1265,8 +1253,7 @@ pub struct VectorOptional {
     pub opt_vector_struct: Option<Vec<Struct>>,
     pub opt_vector_opt_struct: Option<Vec<Option<Box<Struct>>>>,
 }
-
-impl fidl::encoding::TopLevel for VectorOptional {}
+impl fidl::encoding::Persistable for VectorOptional {}
 
 fidl_struct! {
     name: VectorOptional,
@@ -1322,8 +1309,7 @@ impl ResourceTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for ResourceTable {}
+impl fidl::encoding::Standalone for ResourceTable {}
 
 fidl_table! {
     name: ResourceTable,
@@ -1344,8 +1330,7 @@ impl Table {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for Table {}
+impl fidl::encoding::Persistable for Table {}
 
 fidl_table! {
     name: Table,

@@ -4,7 +4,7 @@
 
 //! This file tests FIDL's persistent encoding/decoding API.
 
-use fidl::encoding::{persist, standalone_decode, standalone_encode, unpersist};
+use fidl::encoding::{persist, standalone_decode_value, standalone_encode_value, unpersist};
 use fidl_test_external::{Coordinate, FlexibleValueThing, ValueRecord};
 
 // TODO(fxbug.dev/45252): Remove this.
@@ -53,18 +53,20 @@ fn persist_unpersist_with_old_header() {
 #[test]
 fn standalone_encode_decode_value() {
     let value = FlexibleValueThing::Name("foo".to_string());
-    let (bytes, handles, metadata) =
-        standalone_encode::<FlexibleValueThing>(&value).expect("encoding failed");
-    assert_eq!(handles, &[]);
-    let value_out = standalone_decode::<FlexibleValueThing>(&bytes, &mut [], &metadata)
-        .expect("decoding failed");
+    let (bytes, metadata) = standalone_encode_value(&value).expect("encoding failed");
+    let value_out = standalone_decode_value(&bytes, &metadata).expect("decoding failed");
     assert_eq!(value, value_out);
 }
 
 #[cfg(target_os = "fuchsia")]
 mod zx {
-    use super::*;
-    use fidl::{encoding::convert_handle_dispositions_to_infos, AsHandleRef};
+    use fidl::{
+        encoding::{
+            convert_handle_dispositions_to_infos, standalone_decode_resource,
+            standalone_encode_resource,
+        },
+        AsHandleRef,
+    };
     use fidl_test_external::StructWithHandles;
     use fuchsia_zircon as zx;
 
@@ -74,16 +76,16 @@ mod zx {
         let c1_koid = c1.get_koid();
         let c2_koid = c2.get_koid();
 
-        let mut value = StructWithHandles { v: vec![c1, c2] };
+        let value = StructWithHandles { v: vec![c1, c2] };
 
         let (bytes, handle_dispositions, metadata) =
-            standalone_encode::<StructWithHandles>(&mut value).expect("encoding failed");
+            standalone_encode_resource(value).expect("encoding failed");
         assert_eq!(handle_dispositions.len(), 2);
 
         let mut handle_infos = convert_handle_dispositions_to_infos(handle_dispositions)
             .expect("converting to handle infos failed");
-        let value_out =
-            standalone_decode::<StructWithHandles>(&bytes, &mut handle_infos, &metadata)
+        let value_out: StructWithHandles =
+            standalone_decode_resource(&bytes, &mut handle_infos, &metadata)
                 .expect("decoding failed");
 
         assert_eq!(value_out.v[0].get_koid(), c1_koid);

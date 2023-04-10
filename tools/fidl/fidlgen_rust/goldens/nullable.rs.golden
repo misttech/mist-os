@@ -51,8 +51,7 @@ impl SimpleUnion {
         false
     }
 }
-
-impl fidl::encoding::TopLevel for SimpleUnion {}
+impl fidl::encoding::Persistable for SimpleUnion {}
 
 fidl_union! {
     name: SimpleUnion,
@@ -75,8 +74,7 @@ fidl_union! {
 pub struct Int32Wrapper {
     pub val: i32,
 }
-
-impl fidl::encoding::TopLevel for Int32Wrapper {}
+impl fidl::encoding::Persistable for Int32Wrapper {}
 
 fidl_struct! {
     copy: true,
@@ -108,8 +106,7 @@ pub struct SimpleProtocolAddRequest {
     pub a: i32,
     pub b: i32,
 }
-
-impl fidl::encoding::TopLevel for SimpleProtocolAddRequest {}
+impl fidl::encoding::Persistable for SimpleProtocolAddRequest {}
 
 fidl_struct! {
     copy: true,
@@ -147,8 +144,7 @@ fidl_struct! {
 pub struct SimpleProtocolAddResponse {
     pub sum: i32,
 }
-
-impl fidl::encoding::TopLevel for SimpleProtocolAddResponse {}
+impl fidl::encoding::Persistable for SimpleProtocolAddResponse {}
 
 fidl_struct! {
     copy: true,
@@ -176,8 +172,7 @@ fidl_struct! {
 pub struct StructWithNullableHandle {
     pub val: Option<fidl::Vmo>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableHandle {}
+impl fidl::encoding::Standalone for StructWithNullableHandle {}
 
 fidl_struct! {
     name: StructWithNullableHandle,
@@ -206,8 +201,7 @@ fidl_struct! {
 pub struct StructWithNullableProtocol {
     pub val: Option<fidl::endpoints::ClientEnd<SimpleProtocolMarker>>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableProtocol {}
+impl fidl::encoding::Standalone for StructWithNullableProtocol {}
 
 fidl_struct! {
     name: StructWithNullableProtocol,
@@ -236,8 +230,7 @@ fidl_struct! {
 pub struct StructWithNullableRequest {
     pub val: Option<fidl::endpoints::ServerEnd<SimpleProtocolMarker>>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableRequest {}
+impl fidl::encoding::Standalone for StructWithNullableRequest {}
 
 fidl_struct! {
     name: StructWithNullableRequest,
@@ -266,8 +259,7 @@ fidl_struct! {
 pub struct StructWithNullableString {
     pub val: Option<String>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableString {}
+impl fidl::encoding::Persistable for StructWithNullableString {}
 
 fidl_struct! {
     name: StructWithNullableString,
@@ -294,8 +286,7 @@ fidl_struct! {
 pub struct StructWithNullableStruct {
     pub val: Option<Box<Int32Wrapper>>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableStruct {}
+impl fidl::encoding::Persistable for StructWithNullableStruct {}
 
 fidl_struct! {
     name: StructWithNullableStruct,
@@ -322,8 +313,7 @@ fidl_struct! {
 pub struct StructWithNullableUnion {
     pub val: Option<Box<SimpleUnion>>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableUnion {}
+impl fidl::encoding::Persistable for StructWithNullableUnion {}
 
 fidl_struct! {
     name: StructWithNullableUnion,
@@ -350,8 +340,7 @@ fidl_struct! {
 pub struct StructWithNullableVector {
     pub val: Option<Vec<i32>>,
 }
-
-impl fidl::encoding::TopLevel for StructWithNullableVector {}
+impl fidl::encoding::Persistable for StructWithNullableVector {}
 
 fidl_struct! {
     name: StructWithNullableVector,

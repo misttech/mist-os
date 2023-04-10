@@ -10,6 +10,8 @@
 library fuchsia.examples;
 // [END lib]
 
+using zx;
+
 // [START consts]
 const BOARD_SIZE uint8 = 9;
 const NAME string = "Tic-Tac-Toe";
@@ -54,6 +56,12 @@ type Color = struct {
     name string:MAX_STRING_LENGTH = "red";
 };
 // [END structs]
+
+// [START resource_structs]
+type EventStruct = resource struct {
+    event zx.handle:<EVENT, optional>;
+};
+// [END resource_structs]
 
 // [START unions]
 type JsonValue = strict union {

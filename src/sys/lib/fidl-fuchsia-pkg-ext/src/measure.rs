@@ -91,8 +91,8 @@ mod tests {
             item in arb_package_index_entry()
         ) {
             let actual = item.measure();
-            let (bytes, _, _) =
-                ::fidl::encoding::standalone_encode::<fidl::PackageIndexEntry>(&item).unwrap();
+            let (bytes, _) =
+                ::fidl::encoding::standalone_encode_value(&item).unwrap();
             let expected = bytes.len();
             prop_assert_eq!(expected, actual);
         }

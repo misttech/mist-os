@@ -83,8 +83,7 @@ impl LocalUnionPayload {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for LocalUnionPayload {}
+impl fidl::encoding::Persistable for LocalUnionPayload {}
 
 fidl_union! {
     name: LocalUnionPayload,
@@ -149,8 +148,7 @@ impl MainProtocolOnAnonRequest {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for MainProtocolOnAnonRequest {}
+impl fidl::encoding::Persistable for MainProtocolOnAnonRequest {}
 
 fidl_union! {
     name: MainProtocolOnAnonRequest,
@@ -215,8 +213,7 @@ impl MainProtocolTwoWayAnonRequest {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonRequest {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonRequest {}
 
 fidl_union! {
     name: MainProtocolTwoWayAnonRequest,
@@ -281,8 +278,7 @@ impl MainProtocolTwoWayAnonWithErrorResponse {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonWithErrorResponse {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
 fidl_union! {
     name: MainProtocolTwoWayAnonWithErrorResponse,
@@ -308,8 +304,7 @@ impl LocalTablePayload {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for LocalTablePayload {}
+impl fidl::encoding::Persistable for LocalTablePayload {}
 
 fidl_table! {
     name: LocalTablePayload,
@@ -334,8 +329,7 @@ impl MainProtocolOneWayAnonRequest {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for MainProtocolOneWayAnonRequest {}
+impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
 
 fidl_table! {
     name: MainProtocolOneWayAnonRequest,
@@ -360,8 +354,7 @@ impl MainProtocolTwoWayAnonResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonResponse {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
 
 fidl_table! {
     name: MainProtocolTwoWayAnonResponse,
@@ -386,8 +379,7 @@ impl MainProtocolTwoWayAnonWithErrorRequest {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonWithErrorRequest {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 fidl_table! {
     name: MainProtocolTwoWayAnonWithErrorRequest,
@@ -412,8 +404,7 @@ impl MainProtocolOnAnonWithErrorResponse {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { a: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for MainProtocolOnAnonWithErrorResponse {}
+impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
 fidl_table! {
     name: MainProtocolOnAnonWithErrorResponse,

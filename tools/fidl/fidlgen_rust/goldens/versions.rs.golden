@@ -180,8 +180,7 @@ impl Union {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for Union {}
+impl fidl::encoding::Persistable for Union {}
 
 fidl_union! {
     name: Union,
@@ -201,8 +200,7 @@ fidl_union! {
 pub struct Struct {
     pub x: u32,
 }
-
-impl fidl::encoding::TopLevel for Struct {}
+impl fidl::encoding::Persistable for Struct {}
 
 fidl_struct! {
     copy: true,
@@ -239,8 +237,7 @@ impl Table {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { x: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for Table {}
+impl fidl::encoding::Persistable for Table {}
 
 fidl_table! {
     name: Table,

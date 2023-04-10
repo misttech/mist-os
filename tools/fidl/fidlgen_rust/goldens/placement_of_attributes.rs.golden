@@ -110,8 +110,7 @@ impl ExampleUnion {
         false
     }
 }
-
-impl fidl::encoding::TopLevel for ExampleUnion {}
+impl fidl::encoding::Persistable for ExampleUnion {}
 
 fidl_union! {
     name: ExampleUnion,
@@ -127,8 +126,7 @@ fidl_union! {
 pub struct ExampleProtocolMethodRequest {
     pub arg: fidl_test_exampleusing::Empty,
 }
-
-impl fidl::encoding::TopLevel for ExampleProtocolMethodRequest {}
+impl fidl::encoding::Persistable for ExampleProtocolMethodRequest {}
 
 fidl_struct! {
     name: ExampleProtocolMethodRequest,
@@ -158,8 +156,7 @@ fidl_struct! {
 pub struct ExampleStruct {
     pub member: u32,
 }
-
-impl fidl::encoding::TopLevel for ExampleStruct {}
+impl fidl::encoding::Persistable for ExampleStruct {}
 
 fidl_struct! {
     copy: true,
@@ -196,8 +193,7 @@ impl ExampleTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { member: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for ExampleTable {}
+impl fidl::encoding::Persistable for ExampleTable {}
 
 fidl_table! {
     name: ExampleTable,

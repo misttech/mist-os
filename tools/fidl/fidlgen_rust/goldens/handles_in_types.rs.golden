@@ -111,8 +111,7 @@ impl EmptyResourceUnion {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for EmptyResourceUnion {}
+impl fidl::encoding::Standalone for EmptyResourceUnion {}
 
 fidl_union! {
     name: EmptyResourceUnion,
@@ -174,8 +173,7 @@ impl UnionWithHandle {
         }
     }
 }
-
-impl fidl::encoding::TopLevel for UnionWithHandle {}
+impl fidl::encoding::Standalone for UnionWithHandle {}
 
 fidl_union! {
     name: UnionWithHandle,
@@ -192,8 +190,7 @@ fidl_union! {
 
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct EmptyResourceStruct;
-
-impl fidl::encoding::TopLevel for EmptyResourceStruct {}
+impl fidl::encoding::Standalone for EmptyResourceStruct {}
 
 fidl_struct! {
     empty: true,
@@ -210,8 +207,7 @@ pub struct HandlesInTypes {
     pub table_with_handle: TableWithHandle,
     pub union_with_handle: UnionWithHandle,
 }
-
-impl fidl::encoding::TopLevel for HandlesInTypes {}
+impl fidl::encoding::Standalone for HandlesInTypes {}
 
 fidl_struct! {
     name: HandlesInTypes,
@@ -308,8 +304,7 @@ impl EmptyResourceTable {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for EmptyResourceTable {}
+impl fidl::encoding::Standalone for EmptyResourceTable {}
 
 fidl_table! {
     name: EmptyResourceTable,
@@ -331,8 +326,7 @@ impl TableWithHandle {
     #[allow(deprecated)]
     pub const EMPTY: Self = Self { h: None, __non_exhaustive: () };
 }
-
-impl fidl::encoding::TopLevel for TableWithHandle {}
+impl fidl::encoding::Standalone for TableWithHandle {}
 
 fidl_table! {
     name: TableWithHandle,

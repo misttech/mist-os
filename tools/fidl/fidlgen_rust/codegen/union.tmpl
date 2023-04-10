@@ -92,7 +92,11 @@ impl {{ .Name }} {
 {{- end }}
 }
 
-impl fidl::encoding::TopLevel for {{ .Name }} {}
+{{- if .IsResourceType }}
+impl fidl::encoding::Standalone for {{ .Name }} {}
+{{- else }}
+impl fidl::encoding::Persistable for {{ .Name }} {}
+{{- end }}
 
 fidl_union! {
     name: {{ .Name }},

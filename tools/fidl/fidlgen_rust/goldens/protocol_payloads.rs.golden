@@ -39,8 +39,7 @@ pub struct LocalStructPayload {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for LocalStructPayload {}
+impl fidl::encoding::Persistable for LocalStructPayload {}
 
 fidl_struct! {
     copy: true,
@@ -79,8 +78,7 @@ pub struct MainProtocolOnAnonRequest {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolOnAnonRequest {}
+impl fidl::encoding::Persistable for MainProtocolOnAnonRequest {}
 
 fidl_struct! {
     copy: true,
@@ -119,8 +117,7 @@ pub struct MainProtocolOneWayAnonRequest {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolOneWayAnonRequest {}
+impl fidl::encoding::Persistable for MainProtocolOneWayAnonRequest {}
 
 fidl_struct! {
     copy: true,
@@ -159,8 +156,7 @@ pub struct MainProtocolTwoWayAnonRequest {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonRequest {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonRequest {}
 
 fidl_struct! {
     copy: true,
@@ -199,8 +195,7 @@ pub struct MainProtocolTwoWayAnonResponse {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonResponse {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonResponse {}
 
 fidl_struct! {
     copy: true,
@@ -239,8 +234,7 @@ pub struct MainProtocolTwoWayAnonWithErrorRequest {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonWithErrorRequest {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorRequest {}
 
 fidl_struct! {
     copy: true,
@@ -279,8 +273,7 @@ pub struct MainProtocolOnAnonWithErrorResponse {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolOnAnonWithErrorResponse {}
+impl fidl::encoding::Persistable for MainProtocolOnAnonWithErrorResponse {}
 
 fidl_struct! {
     copy: true,
@@ -319,8 +312,7 @@ pub struct MainProtocolTwoWayAnonWithErrorResponse {
     pub a: u32,
     pub b: u32,
 }
-
-impl fidl::encoding::TopLevel for MainProtocolTwoWayAnonWithErrorResponse {}
+impl fidl::encoding::Persistable for MainProtocolTwoWayAnonWithErrorResponse {}
 
 fidl_struct! {
     copy: true,
