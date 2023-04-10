@@ -470,5 +470,5 @@ func (g *GCE) SSHClient() (*sshutil.Client, error) {
 }
 
 func (g *GCE) TestConfig(netboot bool) (any, error) {
-	return TargetInfo(g, netboot)
+	return TargetInfo(g, netboot, nil)
 }

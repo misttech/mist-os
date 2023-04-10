@@ -62,6 +62,10 @@ type DeviceConfig struct {
 
 	// SerialMux is the path to the device's serial multiplexer.
 	SerialMux string `json:"serial_mux,omitempty"`
+
+	// PDU is an optional reference to the power distribution unit controlling
+	// power delivery to the target. This will not always be present.
+	PDU *targetPDU `json:"pdu,omitempty"`
 }
 
 // NetworkProperties are the static network properties of a target.
@@ -70,11 +74,11 @@ type NetworkProperties struct {
 	Nodename string `json:"nodename"`
 
 	// IPv4Addr is the IPv4 address, if statically given. If not provided, it may be
-	// resolved via the netstack's MDNS server.
+	// resolved via the netstack's mDNS server.
 	IPv4Addr string `json:"ipv4"`
 }
 
-// LoadDeviceConfigs unmarshalls a slice of device configs from a given file.
+// LoadDeviceConfigs unmarshals a slice of device configs from a given file.
 func LoadDeviceConfigs(path string) ([]DeviceConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -508,7 +512,7 @@ func (t *Device) Wait(context.Context) error {
 
 // Config returns fields describing the target.
 func (t *Device) TestConfig(netboot bool) (any, error) {
-	return TargetInfo(t, netboot)
+	return TargetInfo(t, netboot, t.config.PDU)
 }
 
 func parseOutSigners(keyPaths []string) ([]ssh.Signer, error) {

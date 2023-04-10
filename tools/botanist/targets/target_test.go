@@ -6,8 +6,11 @@ package targets
 
 import (
 	"context"
+	"net"
 	"reflect"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestAddressLogic(t *testing.T) {
@@ -72,6 +75,78 @@ func TestFromJSON(t *testing.T) {
 			}
 			if reflect.TypeOf(target) != test.expected {
 				t.Errorf("expected target type %q, got %q", test.expected, reflect.TypeOf(target))
+			}
+		})
+	}
+}
+
+// Test implementation of FuchsiaTarget using TargetInfo as its implementation
+// of TestConfig.
+type testTarget struct {
+	FuchsiaTarget
+	nodename string
+	serial   string
+	pdu      *targetPDU
+	ipv4     net.IP
+	ipv6     *net.IPAddr
+}
+
+func (t *testTarget) TestConfig(netboot bool) (any, error) { return TargetInfo(t, netboot, t.pdu) }
+func (t *testTarget) IPv4() (net.IP, error)                { return t.ipv4, nil }
+func (t *testTarget) IPv6() (*net.IPAddr, error)           { return t.ipv6, nil }
+func (t *testTarget) Nodename() string                     { return t.nodename }
+func (t *testTarget) SerialSocketPath() string             { return t.serial }
+func (t *testTarget) SSHKey() string                       { return "" }
+
+func TestTargetInfo(t *testing.T) {
+	tests := []struct {
+		name    string
+		target  testTarget
+		netboot bool
+		want    targetInfo
+	}{
+		{
+			name:    "valid",
+			target:  testTarget{nodename: "node", serial: "serial", ipv4: net.IPv4zero, ipv6: &net.IPAddr{IP: net.IPv6zero}},
+			netboot: false,
+			want:    targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", IPv4: net.IPv4zero.String(), IPv6: net.IPv6zero.String(), PDU: nil},
+		},
+		{
+			name:    "valid with netboot",
+			target:  testTarget{nodename: "node", serial: "serial", ipv4: net.IPv4zero, ipv6: &net.IPAddr{IP: net.IPv6zero}},
+			netboot: true,
+			want:    targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: nil},
+		},
+		{
+			name:    "valid no ip addresses",
+			target:  testTarget{nodename: "node", serial: "serial"},
+			netboot: false,
+			want:    targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: nil},
+		},
+		{
+			name: "valid with pdu",
+			target: testTarget{nodename: "node", serial: "serial", pdu: &targetPDU{
+				IP:   "192.168.1.1",
+				MAC:  "12:34:56:78:9a:bc",
+				Port: 1,
+			}},
+			netboot: false,
+			want: targetInfo{Type: "FuchsiaDevice", Nodename: "node", SerialSocket: "serial", PDU: &targetPDU{
+				IP:   "192.168.1.1",
+				MAC:  "12:34:56:78:9a:bc",
+				Port: 1,
+			}},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			got, err := test.target.TestConfig(test.netboot)
+			if err != nil {
+				t.Errorf("unexpected error from target.TestConfig(false): %s", err)
+			}
+			if diff := cmp.Diff(test.want, got); diff != "" {
+				t.Errorf("TestConfig(false) mismatch (-want +got):\n%s", diff)
 			}
 		})
 	}

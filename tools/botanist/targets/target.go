@@ -675,17 +675,33 @@ type targetInfo struct {
 
 	// SSHKey is a path to a private key that can be used to access the target.
 	SSHKey string `json:"ssh_key"`
+
+	// PDU is an optional reference to the power distribution unit controlling
+	// power delivery to the target. This will not always be present.
+	PDU *targetPDU `json:"pdu,omitempty"`
+}
+
+type targetPDU struct {
+	// IP is the IPv4 or IPv6 address of the PDU.
+	IP string `json:"ip"`
+
+	// MAC is the MAC address of the PDU.
+	MAC string `json:"mac"`
+
+	// Port is the PDU port index the target is connected to.
+	Port uint8 `json:"port"`
 }
 
 // LINT.ThenChange(//src/testing/end_to_end/mobly_driver/api_mobly.py)
 
 // TargetInfo returns config used to communicate with the target (device
 // properties, serial paths, SSH properties, etc.) for use by subprocesses.
-func TargetInfo(t FuchsiaTarget, netboot bool) (targetInfo, error) {
+func TargetInfo(t FuchsiaTarget, netboot bool, pdu *targetPDU) (targetInfo, error) {
 	cfg := targetInfo{
 		Type:         "FuchsiaDevice",
 		Nodename:     t.Nodename(),
 		SerialSocket: t.SerialSocketPath(),
+		PDU:          pdu,
 	}
 	if netboot {
 		return cfg, nil

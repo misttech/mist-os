@@ -102,6 +102,7 @@ go_test("botanist_lib_tests") {
 
 go_test("botanist_targets_tests") {
   library = ":targets"
+  deps = [ "//third_party/golibs:github.com/google/go-cmp" ]
 }
 
 go_library("constants") {
