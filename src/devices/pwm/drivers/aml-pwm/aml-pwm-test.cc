@@ -149,7 +149,7 @@ class AmlPwmDeviceTest : public zxtest::Test {
 
 TEST_F(AmlPwmDeviceTest, ProtectTest) {
   mode_config mode_cfg{
-      .mode = 100,
+      .mode = static_cast<Mode>(100),
       .regular = {},
   };
   pwm_config cfg{
@@ -164,7 +164,7 @@ TEST_F(AmlPwmDeviceTest, ProtectTest) {
 
 TEST_F(AmlPwmDeviceTest, GetConfigTest) {
   mode_config mode_cfg{
-      .mode = 100,
+      .mode = static_cast<Mode>(100),
       .regular = {},
   };
   pwm_config cfg{
@@ -199,7 +199,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigInvalidNoModeBuffer) {
 
 TEST_F(AmlPwmDeviceTest, SetConfigInvalidModeConfigSizeIncorrect) {
   mode_config fail_mode{
-      .mode = Mode::ON,
+      .mode = Mode::kOn,
       .regular = {},
   };
   pwm_config fail_cfg{
@@ -216,7 +216,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigInvalidModeConfigSizeIncorrect) {
 
 TEST_F(AmlPwmDeviceTest, SetConfigInvalidTwoTimerTimer2InvalidDutyCycle) {
   mode_config fail_mode{
-      .mode = Mode::TWO_TIMER,
+      .mode = Mode::kTwoTimer,
       .two_timer = {},
   };
   pwm_config fail_cfg{
@@ -237,7 +237,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigInvalidTwoTimerTimer2InvalidDutyCycle) {
 
 TEST_F(AmlPwmDeviceTest, SetConfigInvalidTimer1InvalidDutyCycle) {
   mode_config fail_mode{
-      .mode = Mode::ON,
+      .mode = Mode::kOn,
       .regular = {},
   };
   pwm_config fail_cfg{
@@ -274,7 +274,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigInvalidTimer1InvalidMode) {
 }
 
 TEST_F(AmlPwmDeviceTest, SetConfigInvalidPwmId) {
-  for (Mode mode : {Mode::ON, Mode::OFF, Mode::TWO_TIMER, Mode::DELTA_SIGMA}) {
+  for (Mode mode : {Mode::kOn, Mode::kOff, Mode::kTwoTimer, Mode::kDeltaSigma}) {
     mode_config fail{
         .mode = mode,
     };
@@ -291,9 +291,9 @@ TEST_F(AmlPwmDeviceTest, SetConfigInvalidPwmId) {
 }
 
 TEST_F(AmlPwmDeviceTest, SetConfigTest) {
-  // Mode::OFF
+  // Mode::kOff
   mode_config off{
-      .mode = OFF,
+      .mode = Mode::kOff,
       .regular = {},
   };
   pwm_config off_cfg{
@@ -310,7 +310,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
   (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
   mode_config on{
-      .mode = ON,
+      .mode = Mode::kOn,
       .regular = {},
   };
   pwm_config on_cfg{
@@ -326,7 +326,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   EXPECT_OK(pwm_->PwmImplSetConfig(0, &off_cfg));
   EXPECT_OK(pwm_->PwmImplSetConfig(0, &off_cfg));  // same configs
 
-  // ON
+  // Mode::kOn
   (*mock_mmio0_)[2 * 4].ExpectRead(0x01000000).ExpectWrite(0x00000002);  // SetMode
   (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xF7FFFFFF);  // Invert
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x20000000);  // EnableConst
@@ -344,14 +344,14 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFEFFFFF5);  // SetMode
   EXPECT_OK(pwm_->PwmImplSetConfig(1, &off_cfg));                        // Change Mode
 
-  // DELTA_SIGMA
+  // Mode::kDeltaSigma
   (*mock_mmio1_)[2 * 4].ExpectRead(0x02000000).ExpectWrite(0x00000004);  // SetMode
   (*mock_mmio1_)[3 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF0064);  // SetDSSetting
   (*mock_mmio1_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
   (*mock_mmio1_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xEFFFFFFF);  // EnableConst
   (*mock_mmio1_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00060010);  // SetDutyCycle
   mode_config ds{
-      .mode = DELTA_SIGMA,
+      .mode = Mode::kDeltaSigma,
       .delta_sigma =
           {
               .delta = 100,
@@ -366,7 +366,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   };
   EXPECT_OK(pwm_->PwmImplSetConfig(2, &ds_cfg));
 
-  // TWO_TIMER
+  // Mode::kTwoTimer
   (*mock_mmio3_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x01000002);  // SetMode
   (*mock_mmio3_)[6 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00130003);  // SetDutyCycle2
   (*mock_mmio3_)[4 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF0302);  // SetTimers
@@ -374,7 +374,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   (*mock_mmio3_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xDFFFFFFF);  // EnableConst
   (*mock_mmio3_)[1 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00060010);  // SetDutyCycle
   mode_config timer2{
-      .mode = TWO_TIMER,
+      .mode = Mode::kTwoTimer,
       .two_timer =
           {
               .period_ns2 = 1000,
@@ -399,7 +399,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigFailTest) {
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
   (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
   mode_config on{
-      .mode = ON,
+      .mode = Mode::kOn,
       .regular = {},
   };
   pwm_config on_cfg{
@@ -455,7 +455,7 @@ TEST_F(AmlPwmDeviceTest, SetConfigPeriodNotDivisibleBy100Test) {
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
   (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x10420000);  // SetDutyCycle
   mode_config on{
-      .mode = ON,
+      .mode = Mode::kOn,
       .regular = {},
   };
   pwm_config on_cfg{

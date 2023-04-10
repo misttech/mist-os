@@ -25,7 +25,7 @@ void AmlPwmRegulator::SetVoltageStep(SetVoltageStepRequestView request,
     return;
   }
 
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {
       false, period_ns_,
       static_cast<float>((num_steps_ - 1 - request->step) * 100.0 / ((num_steps_ - 1) * 1.0)),

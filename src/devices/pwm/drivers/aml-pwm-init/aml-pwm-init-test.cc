@@ -49,7 +49,7 @@ TEST(PwmInitDeviceTest, InitTest) {
   wifi_gpio_.ExpectSetAltFunction(ZX_OK, 1);
   pwm_.ExpectEnable(ZX_OK);
   aml_pwm::mode_config two_timer = {
-      .mode = aml_pwm::TWO_TIMER,
+      .mode = aml_pwm::Mode::kTwoTimer,
       .two_timer =
           {
               .period_ns2 = 30052,

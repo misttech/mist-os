@@ -5,6 +5,8 @@
 #ifndef SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_PWM_REGS_H_
 #define SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_COMMON_AML_PWM_REGS_H_
 
+#include <cstdint>
+
 namespace aml_pwm {
 
 enum RegIdx : uint8_t {
@@ -32,12 +34,11 @@ constexpr uint32_t kBlinkOffset = 0x1c;
 constexpr uint32_t kLockOffset = 0x20;
 
 // Mode indices
-enum Mode : uint32_t {
-  OFF = 0,
-  ON = 1,
-  DELTA_SIGMA = 2,
-  TWO_TIMER = 3,
-  UNKNOWN = 4,
+enum class Mode : uint32_t {
+  kOff = 0,
+  kOn = 1,
+  kDeltaSigma = 2,
+  kTwoTimer = 3,
 };
 
 struct mode_config_regular {};
@@ -54,7 +55,7 @@ struct mode_config_two_timer {
 };
 
 struct mode_config {
-  uint32_t mode;
+  Mode mode;
   union {
     struct mode_config_regular regular;
     struct mode_config_delta_sigma delta_sigma;

@@ -68,7 +68,7 @@ zx_status_t set_config(fidl::WireSyncClient<fuchsia_hardware_pwm::Pwm>& client, 
 
   // TODO(fxbug.dev/41256): This is AML specific, factor this into a plugin or something.
   aml_pwm::mode_config cfg;
-  cfg.mode = aml_pwm::ON;
+  cfg.mode = aml_pwm::Mode::kOn;
 
   fuchsia_hardware_pwm::wire::PwmConfig config;
   config.polarity = polarity;

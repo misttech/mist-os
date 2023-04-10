@@ -482,7 +482,7 @@ class AmlVoltageRegulatorTest : public zxtest::Test {
   }
 
   void Create(uint32_t pid) {
-    aml_pwm::mode_config on = {aml_pwm::ON, {}};
+    aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
     pwm_config_t cfg = {false, 1250, 43, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
 
     switch (pid) {
@@ -541,7 +541,7 @@ TEST_F(AmlVoltageRegulatorTest, AstroGetVoltageTest) {
 TEST_F(AmlVoltageRegulatorTest, SherlockSetVoltageTest) {
   Create(4);
   // SetBigClusterVoltage(761000)
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {false, 1250, 53, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
   cfg.duty_cycle = 63;
@@ -577,7 +577,7 @@ TEST_F(AmlVoltageRegulatorTest, SherlockSetVoltageTest) {
 TEST_F(AmlVoltageRegulatorTest, AstroSetVoltageTest) {
   Create(3);
   // SetBigClusterVoltage(861000)
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {false, 1250, 23, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
   cfg.duty_cycle = 33;
@@ -997,7 +997,7 @@ class AmlThermalTest : public zxtest::Test {
   void Create(uint32_t pid) {
     ddk_mock::MockMmioRegRegion& tsensor_mmio = *tsensor_mock_pll_mmio_;
 
-    aml_pwm::mode_config on = {aml_pwm::ON, {}};
+    aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
     pwm_config_t cfg = {false, 1250, 43, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
     switch (pid) {
       case 4: {  // Sherlock

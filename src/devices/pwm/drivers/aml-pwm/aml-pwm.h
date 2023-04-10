@@ -34,12 +34,12 @@ class AmlPwm {
 
   void Init() {
     for (size_t i = 0; i < kPwmPairCount; i++) {
-      mode_configs_[i].mode = OFF;
+      mode_configs_[i].mode = Mode::kOff;
       mode_configs_[i].regular = {};
       configs_[i] = {false, 0, 0.0, reinterpret_cast<uint8_t*>(&mode_configs_[i]),
                      sizeof(mode_config)};
       if (ids_[i].init) {
-        SetMode(i, OFF);
+        SetMode(i, Mode::kOff);
       }
     }
   }

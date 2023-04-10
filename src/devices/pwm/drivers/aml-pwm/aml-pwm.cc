@@ -12,6 +12,7 @@
 #include <soc/aml-a1/a1-pwm.h>
 #include <soc/aml-a113/a113-pwm.h>
 #include <soc/aml-a5/a5-pwm.h>
+#include <soc/aml-common/aml-pwm-regs.h>
 #include <soc/aml-s905d2/s905d2-pwm.h>
 #include <soc/aml-t931/t931-pwm.h>
 
@@ -65,19 +66,19 @@ bool IsValidConfig(const pwm_config_t* config) {
   }
 
   auto mode_cfg = reinterpret_cast<const mode_config*>(config->mode_config_buffer);
-  Mode mode = static_cast<Mode>(mode_cfg->mode);
+  Mode mode = mode_cfg->mode;
   switch (mode) {
-    case Mode::OFF:
+    case Mode::kOff:
       return true;
-    case Mode::TWO_TIMER:
+    case Mode::kTwoTimer:
       if (!(mode_cfg->two_timer.duty_cycle2 >= 0.0f && mode_cfg->two_timer.duty_cycle2 <= 100.0f)) {
         zxlogf(ERROR, "timer #2 duty cycle (%0.3f) is not in [0.0, 100.0]",
                mode_cfg->two_timer.duty_cycle2);
         return false;
       }
       [[fallthrough]];
-    case Mode::ON:
-    case Mode::DELTA_SIGMA:
+    case Mode::kOn:
+    case Mode::kDeltaSigma:
       if (!(config->duty_cycle >= 0.0f && config->duty_cycle <= 100.0f)) {
         zxlogf(ERROR, "timer #1 duty cycle (%0.3f) is not in [0.0, 100.0]", config->duty_cycle);
         return false;
@@ -125,7 +126,7 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
   }
 
   // Save old config
-  mode_config tmp_cfg = {UNKNOWN, {}};
+  mode_config tmp_cfg = {Mode::kOff, {}};
   pwm_config_t old_config = {false, 0, 0.0, reinterpret_cast<uint8_t*>(&tmp_cfg),
                              sizeof(mode_config)};
   CopyConfig(&old_config, &configs_[idx]);
@@ -135,7 +136,7 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
   CopyConfig(&configs_[idx], config);
 
   auto mode_cfg = reinterpret_cast<const mode_config*>(config->mode_config_buffer);
-  Mode mode = static_cast<Mode>(mode_cfg->mode);
+  Mode mode = mode_cfg->mode;
 
   bool mode_eq = (old_mode_cfg->mode == mode);
   if (!mode_eq) {
@@ -145,17 +146,17 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
   bool en_const = (config->duty_cycle == 0 || config->duty_cycle == 100);
   bool val_eq;
   switch (mode) {
-    case OFF:
+    case Mode::kOff:
       return ZX_OK;
-    case ON:
+    case Mode::kOn:
       break;
-    case DELTA_SIGMA:
+    case Mode::kDeltaSigma:
       val_eq = (old_mode_cfg->delta_sigma.delta == mode_cfg->delta_sigma.delta);
       if (!(mode_eq && val_eq)) {
         SetDSSetting(idx, mode_cfg->delta_sigma.delta);
       }
       break;
-    case TWO_TIMER:
+    case Mode::kTwoTimer:
       en_const = (en_const || mode_cfg->two_timer.duty_cycle2 == 0 ||
                   mode_cfg->two_timer.duty_cycle2 == 100);
 
@@ -171,7 +172,6 @@ zx_status_t AmlPwm::PwmImplSetConfig(uint32_t idx, const pwm_config_t* config) {
         SetTimers(idx, mode_cfg->two_timer.timer1, mode_cfg->two_timer.timer2);
       }
       break;
-    case UNKNOWN:
     default:
       zxlogf(ERROR, "%s: Unsupported Mode %d", __func__, mode);
       return ZX_ERR_NOT_SUPPORTED;
@@ -217,18 +217,16 @@ zx_status_t AmlPwm::PwmImplDisable(uint32_t idx) {
 }
 
 void AmlPwm::SetMode(uint32_t idx, Mode mode) {
-  ZX_ASSERT(mode < UNKNOWN);
-
   fbl::AutoLock lock(&locks_[REG_MISC]);
   auto misc_reg = MiscReg::Get().ReadFrom(&mmio_);
   if (idx % 2) {
-    misc_reg.set_en_b(mode == ON || mode == TWO_TIMER)
-        .set_ds_en_b(mode == DELTA_SIGMA)
-        .set_en_b2(mode == TWO_TIMER);
+    misc_reg.set_en_b(mode == Mode::kOn || mode == Mode::kTwoTimer)
+        .set_ds_en_b(mode == Mode::kDeltaSigma)
+        .set_en_b2(mode == Mode::kTwoTimer);
   } else {
-    misc_reg.set_en_a(mode == ON || mode == TWO_TIMER)
-        .set_ds_en_a(mode == DELTA_SIGMA)
-        .set_en_a2(mode == TWO_TIMER);
+    misc_reg.set_en_a(mode == Mode::kOn || mode == Mode::kTwoTimer)
+        .set_ds_en_a(mode == Mode::kDeltaSigma)
+        .set_en_a2(mode == Mode::kTwoTimer);
   }
   misc_reg.WriteTo(&mmio_);
 }

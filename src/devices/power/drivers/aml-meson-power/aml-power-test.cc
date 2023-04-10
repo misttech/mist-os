@@ -200,7 +200,7 @@ TEST_F(AmlPowerTest, SetVoltage) {
   constexpr uint32_t kTestVoltageInitial = 690'000;
   constexpr uint32_t kTestVoltageFinal = 1'040'000;
 
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
 
   // Initialize to 0.69V
   pwm_config_t cfg = {false, 1250, 100, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
@@ -273,7 +273,7 @@ TEST_F(AmlPowerTest, GetVoltage) {
   EXPECT_OK(Create(PDEV_PID_ASTRO));
 
   // Initialize to 0.69V
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {false, 1250, 100, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
 
@@ -308,7 +308,7 @@ TEST_F(AmlPowerTest, SetVoltageRoundDown) {
   constexpr uint32_t kTestVoltageFinalRequest = 935'000;
   constexpr uint32_t kTestVoltageFinalActual = 930'000;
 
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {false, 1250, 62, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   big_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
   cfg = {false, 1250, 54, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
@@ -341,7 +341,7 @@ TEST_F(AmlPowerTest, SetVoltageLittleCluster) {
   constexpr uint32_t kTestVoltageInitial = 730'000;
   constexpr uint32_t kTestVoltageFinal = 930'000;
 
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {false, 1250, 89, reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   little_cluster_pwm_.ExpectSetConfig(ZX_OK, cfg);
   cfg = {false, 1250, 81, reinterpret_cast<uint8_t*>(&on), sizeof(on)};

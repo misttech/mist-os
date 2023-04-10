@@ -63,7 +63,7 @@ zx_status_t LightDevice::SetBrightnessValue(double value) {
   }
 
   zx_status_t status = ZX_OK;
-  aml_pwm::mode_config regular = {aml_pwm::ON, {}};
+  aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
   pwm_config_t config = {
       .polarity = false,
       .period_ns = static_cast<uint32_t>(pwm_period_.to_nsecs()),

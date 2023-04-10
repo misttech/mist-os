@@ -87,7 +87,7 @@ class AmlLightTest : public zxtest::Test {
 
 TEST_F(AmlLightTest, GetInfoTest1) {
   pwm_.ExpectEnable(ZX_OK);
-  aml_pwm::mode_config regular = {aml_pwm::ON, {}};
+  aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
   pwm_config_t init_config = {false, 170625, 100.0, reinterpret_cast<uint8_t*>(&regular),
                               sizeof(regular)};
   pwm_.ExpectSetConfig(ZX_OK, init_config);
@@ -177,7 +177,7 @@ TEST_F(AmlLightTest, SetValueTest1) {
 
 TEST_F(AmlLightTest, SetValueTest2) {
   pwm_.ExpectEnable(ZX_OK);
-  aml_pwm::mode_config regular = {aml_pwm::ON, {}};
+  aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
   pwm_config_t config = {false, 170625, 100.0, reinterpret_cast<uint8_t*>(&regular),
                          sizeof(regular)};
   pwm_.ExpectSetConfig(ZX_OK, config);
@@ -237,7 +237,7 @@ TEST_F(AmlLightTest, SetValueTest2) {
 
 TEST_F(AmlLightTest, SetInvalidValueTest) {
   pwm_.ExpectEnable(ZX_OK);
-  aml_pwm::mode_config regular = {aml_pwm::ON, {}};
+  aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
   pwm_config_t config = {false, 170625, 100.0, reinterpret_cast<uint8_t*>(&regular),
                          sizeof(regular)};
   pwm_.ExpectSetConfig(ZX_OK, config);
@@ -286,7 +286,7 @@ TEST_F(AmlLightTest, SetInvalidValueTest) {
 
 TEST_F(AmlLightTest, SetValueTestNelson) {
   pwm_.ExpectEnable(ZX_OK);
-  aml_pwm::mode_config regular = {aml_pwm::ON, {}};
+  aml_pwm::mode_config regular = {aml_pwm::Mode::kOn, {}};
   pwm_config_t config = {false, 500'000, 100.0, reinterpret_cast<uint8_t*>(&regular),
                          sizeof(regular)};
   pwm_.ExpectSetConfig(ZX_OK, config);

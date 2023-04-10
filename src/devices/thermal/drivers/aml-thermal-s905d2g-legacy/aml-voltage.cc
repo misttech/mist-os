@@ -157,7 +157,7 @@ zx_status_t AmlVoltageRegulator::SetClusterVoltage(int* current_voltage_index,
   // we directly set it.
   if (*current_voltage_index < 0) {
     // Update new duty cycle.
-    aml_pwm::mode_config on = {aml_pwm::ON, {}};
+    aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
     pwm_config_t cfg = {false, thermal_info_.voltage_pwm_period_ns,
                         static_cast<float>(thermal_info_.voltage_table[target_index].duty_cycle),
                         reinterpret_cast<uint8_t*>(&on), sizeof(on)};
@@ -188,7 +188,7 @@ zx_status_t AmlVoltageRegulator::SetClusterVoltage(int* current_voltage_index,
       }
     }
     // Update new duty cycle.
-    aml_pwm::mode_config on = {aml_pwm::ON, {}};
+    aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
     pwm_config_t cfg = {
         false, thermal_info_.voltage_pwm_period_ns,
         static_cast<float>(thermal_info_.voltage_table[*current_voltage_index].duty_cycle),

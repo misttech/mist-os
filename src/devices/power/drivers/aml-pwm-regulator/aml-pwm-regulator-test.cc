@@ -75,7 +75,7 @@ TEST(AmlPwmRegulatorTest, RegulatorTest) {
   EXPECT_EQ(voltage_step->result, 11);
 
   aml_pwm::mode_config mode = {
-      .mode = aml_pwm::ON,
+      .mode = aml_pwm::Mode::kOn,
       .regular = {},
   };
   pwm_config_t cfg = {

@@ -74,7 +74,7 @@ zx_status_t PwmInitDevice::Init() {
     return status;
   }
   aml_pwm::mode_config two_timer = {
-      .mode = aml_pwm::TWO_TIMER,
+      .mode = aml_pwm::Mode::kTwoTimer,
       .two_timer =
           {
               .period_ns2 = 30052,

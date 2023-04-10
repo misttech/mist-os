@@ -243,7 +243,7 @@ zx_status_t AmlPower::GetTargetIndex(const fidl::WireSyncClient<fuchsia_hardware
 }
 
 zx_status_t AmlPower::Update(const ddk::PwmProtocolClient& pwm, uint32_t idx) {
-  aml_pwm::mode_config on = {aml_pwm::ON, {}};
+  aml_pwm::mode_config on = {aml_pwm::Mode::kOn, {}};
   pwm_config_t cfg = {false, pwm_period_, static_cast<float>(voltage_table_[idx].duty_cycle),
                       reinterpret_cast<uint8_t*>(&on), sizeof(on)};
   return pwm.SetConfig(&cfg);
