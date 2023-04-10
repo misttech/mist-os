@@ -97,7 +97,7 @@ void TemplateIsIpVersion() {
 // Measures the time to write `transfer` bytes on one end of the socket and read them on the other
 // end on the same thread and calculates the throughput.
 template <typename Ip>
-bool TcpWriteRead(perftest::RepeatState* state, size_t transfer) {
+bool TcpWriteRead(perftest::RepeatState* state, int transfer) {
   TemplateIsIpVersion<Ip>();
   using Addr = typename Ip::SockAddr;
   fbl::unique_fd listen_sock;
@@ -114,9 +114,26 @@ bool TcpWriteRead(perftest::RepeatState* state, size_t transfer) {
 
   // Set send buffer to transfer size to ensure we can write `transfer` bytes before reading it on
   // the other end.
-  FX_CHECK(transfer < std::numeric_limits<int32_t>::max());
-  int32_t sndbuf = static_cast<int32_t>(transfer);
-  CHECK_ZERO_ERRNO(setsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf, sizeof(sndbuf)));
+  CHECK_ZERO_ERRNO(
+      setsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &transfer, sizeof(transfer)));
+  {
+    int sndbuf_opt;
+    socklen_t sndbuf_optlen = sizeof(sndbuf_opt);
+    CHECK_ZERO_ERRNO(
+        getsockopt(client_sock.get(), SOL_SOCKET, SO_SNDBUF, &sndbuf_opt, &sndbuf_optlen));
+
+    int want_sndbuf = transfer;
+#ifdef __linux__
+    // The desired return value for SO_SNDBUF on Linux is double the amount of
+    // payload bytes due to the fact that Linux doubles the value when setting
+    // SO_SNDBUF to account for overhead according to the [man page].
+    //
+    // [man page]: https://man7.org/linux/man-pages/man7/socket.7.html
+    want_sndbuf *= 2;
+#endif
+    FX_CHECK(sndbuf_opt >= want_sndbuf)
+        << "sndbuf size (" << sndbuf_opt << ") < want (" << want_sndbuf << ")";
+  }
   // Disable the Nagle algorithm, it introduces artificial latency that defeats this test.
   const int32_t no_delay = 1;
   CHECK_ZERO_ERRNO(
@@ -135,12 +152,12 @@ bool TcpWriteRead(perftest::RepeatState* state, size_t transfer) {
 
   state->SetBytesProcessedPerRun(transfer);
   while (state->KeepRunning()) {
-    for (size_t sent = 0; sent < transfer;) {
+    for (int sent = 0; sent < transfer;) {
       ssize_t wr = write(client_sock.get(), send_bytes.data() + sent, transfer - sent);
       CHECK_POSITIVE(wr);
       sent += wr;
     }
-    for (size_t recv = 0; recv < transfer;) {
+    for (int recv = 0; recv < transfer;) {
       ssize_t rd = read(server_sock.get(), recv_bytes.data() + recv, transfer - recv);
       CHECK_POSITIVE(rd);
       recv += rd;
@@ -156,7 +173,7 @@ bool TcpWriteRead(perftest::RepeatState* state, size_t transfer) {
 // bytes on one end of the socket and read them out on the other end on the
 // same thread and calculates the throughput.
 template <typename Ip>
-bool UdpWriteRead(perftest::RepeatState* state, size_t message_size, size_t message_count) {
+bool UdpWriteRead(perftest::RepeatState* state, int message_size, int message_count) {
   TemplateIsIpVersion<Ip>();
   using Addr = typename Ip::SockAddr;
 
@@ -165,27 +182,35 @@ bool UdpWriteRead(perftest::RepeatState* state, size_t message_size, size_t mess
   Addr sockaddr = Ip::loopback();
   CHECK_ZERO_ERRNO(bind(server_sock.get(), sockaddr.as_sockaddr(), sockaddr.socklen()));
 
-  uint32_t rcvbuf_opt;
+  int rcvbuf_opt;
   socklen_t rcvbuf_optlen = sizeof(rcvbuf_opt);
   CHECK_ZERO_ERRNO(
       getsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcvbuf_opt, &rcvbuf_optlen));
 
+  int want_rcvbuf = message_size * message_count;
+  // The desired return value for SO_RCVBUF on Linux is double the amount of
+  // payload bytes due to the fact that Linux doubles the value when setting
+  // SO_RCVBUF to account for overhead according to the [man page].
+  //
+  // [man page]: https://man7.org/linux/man-pages/man7/socket.7.html
+#ifdef __linux__
+  want_rcvbuf *= 2;
+#endif
   // On Linux, payloads are stored with a fixed per-packet overhead. Linux
   // accounts for this overhead by setting the actual buffer size to double
   // the size set with SO_RCVBUF. This hack fails when SO_RCVBUF is small and
   // many packets are sent; avoid that case by setting RCVBUF only when the
   // bytes-to-be-sent exceed the default value (which is large).
-  if (rcvbuf_opt < message_size * message_count) {
-    int rcv_bufsize = static_cast<int>(message_size * message_count);
+  if (rcvbuf_opt < want_rcvbuf) {
+    int rcv_bufsize = message_size * message_count;
     CHECK_ZERO_ERRNO(
         setsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcv_bufsize, sizeof(rcv_bufsize)));
     CHECK_ZERO_ERRNO(
         getsockopt(server_sock.get(), SOL_SOCKET, SO_RCVBUF, &rcvbuf_opt, &rcvbuf_optlen));
   }
 
-  FX_CHECK(rcvbuf_opt >= message_size * message_count)
-      << "rcvbuf size (" << rcvbuf_opt << ") < transfer size (" << message_size * message_count
-      << ")";
+  FX_CHECK(rcvbuf_opt >= want_rcvbuf)
+      << "rcvbuf size (" << rcvbuf_opt << ") < want (" << want_rcvbuf << ")";
 
   socklen_t socklen = sockaddr.socklen();
   CHECK_ZERO_ERRNO(getsockname(server_sock.get(), sockaddr.as_sockaddr(), &socklen));
@@ -202,16 +227,16 @@ bool UdpWriteRead(perftest::RepeatState* state, size_t message_size, size_t mess
 
   state->SetBytesProcessedPerRun(message_size);
   while (state->KeepRunning()) {
-    for (size_t i = 0; i < message_count; i++) {
+    for (int i = 0; i < message_count; i++) {
       ssize_t wr = write(client_sock.get(), send_bytes.data(), message_size);
       CHECK_TRUE_ERRNO(wr >= 0);
-      FX_CHECK(static_cast<size_t>(wr) == message_size)
+      FX_CHECK(wr == static_cast<ssize_t>(message_size))
           << "wrote " << wr << " expected " << message_size;
     }
-    for (size_t i = 0; i < message_count; i++) {
+    for (int i = 0; i < message_count; i++) {
       ssize_t rd = read(server_sock.get(), recv_bytes.data(), message_size);
       CHECK_TRUE_ERRNO(rd >= 0);
-      FX_CHECK(static_cast<size_t>(rd) == message_size)
+      FX_CHECK(rd == static_cast<ssize_t>(message_size))
           << "read " << rd << " expected " << message_size;
     }
   }
@@ -311,10 +336,10 @@ void RegisterTests() {
     }
   };
 
-  constexpr size_t kTransferSizesForTcp[] = {
+  constexpr int kTransferSizesForTcp[] = {
       1 << 10, 10 << 10, 100 << 10, 500 << 10, 1000 << 10,
   };
-  for (size_t transfer : kTransferSizesForTcp) {
+  for (int transfer : kTransferSizesForTcp) {
     perftest::RegisterTest(get_tcp_test_name(Network::kIpv4, transfer).c_str(), TcpWriteRead<Ipv4>,
                            transfer);
     perftest::RegisterTest(get_tcp_test_name(Network::kIpv6, transfer).c_str(), TcpWriteRead<Ipv6>,
@@ -323,10 +348,10 @@ void RegisterTests() {
 
   // NB: Knowledge encoded at a distance: these datagrams avoid IP fragmentation
   // only because loopback has a very large MTU.
-  constexpr size_t kMessageSizesForUdp[] = {1, 100, 1 << 10, 10 << 10, 60 << 10};
-  constexpr size_t kMessageCountsForUdp[] = {1, 10, 50};
-  for (size_t message_size : kMessageSizesForUdp) {
-    for (size_t message_count : kMessageCountsForUdp) {
+  constexpr int kMessageSizesForUdp[] = {1, 100, 1 << 10, 10 << 10, 60 << 10};
+  constexpr int kMessageCountsForUdp[] = {1, 10, 50};
+  for (int message_size : kMessageSizesForUdp) {
+    for (int message_count : kMessageCountsForUdp) {
       perftest::RegisterTest(get_udp_test_name(Network::kIpv4, message_size, message_count).c_str(),
                              UdpWriteRead<Ipv4>, message_size, message_count);
       perftest::RegisterTest(get_udp_test_name(Network::kIpv6, message_size, message_count).c_str(),
