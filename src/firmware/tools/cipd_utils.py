@@ -259,21 +259,22 @@ def get_cipd_version_manifest(package: str,
 
 
 def changelog(
-        repo: Repo, package: str, old_version_or_path: str,
-        new_version_or_path: str) -> str:
+        repo: Repo, old_package: str, old_version_or_path: str,
+        new_package: str, new_version_or_path: str) -> str:
     """Generates a changelog between the two versions.
 
     Args:
         repo: Repo object.
-        package: CIPD package name.
+        old_package: old CIPD package name.
         old_version_or_path: old CIPD version or path.
+        new_package: new CIPD package name.
         new_version_or_path: new CIPD version or path.
 
     Returns:
         A changelog formatted for use in a git commit message.
     """
-    old_manifest = get_cipd_version_manifest(package, old_version_or_path)
-    new_manifest = get_cipd_version_manifest(package, new_version_or_path)
+    old_manifest = get_cipd_version_manifest(old_package, old_version_or_path)
+    new_manifest = get_cipd_version_manifest(new_package, new_version_or_path)
 
     # The manifests don't necessarily have the exact same items, repos may be
     # added or removed over time, make sure we track them all.
@@ -361,11 +362,16 @@ def _parse_args() -> argparse.Namespace:
         "changelog",
         help="Generate a source changelog between two CIPD packages")
     changelog_parser.add_argument("repo", help="Path to the repo root")
-    changelog_parser.add_argument("package", help="The CIPD package name")
+    changelog_parser.add_argument("package", help="The old CIPD package name")
     changelog_parser.add_argument(
-        "old_version", help="The old CIPD version (ref/tag/ID) or path")
+        "old_version", help="The old version: ref, tag, ID, or local path")
     changelog_parser.add_argument(
-        "new_version", help="The new CIPD version (ref/tag/ID) or path")
+        "new_package_or_version",
+        help="The new CIPD package (4-arg form) or version (3-arg form)")
+    changelog_parser.add_argument(
+        "new_version",
+        nargs="?",
+        help="The new version: ref, tag, ID, or local path")
     changelog_parser.add_argument(
         "--spec-file",
         help="Repo specification file as a JSON {path, alias} mapping. By"
@@ -397,10 +403,21 @@ def main() -> int:
         else:
             spec = None
 
-        print(
-            changelog(
-                Repo(args.repo, spec=spec), args.package, args.old_version,
-                args.new_version))
+        repo = Repo(args.repo, spec=spec)
+
+        if args.new_version:
+            # 4-arg format: |new_package_or_version| is a package.
+            result = changelog(
+                repo, args.package, args.old_version,
+                args.new_package_or_version, args.new_version)
+        else:
+            # 3-arg format: re-use |package| for both, |new_package_or_version|
+            # is a version.
+            result = changelog(
+                repo, args.package, args.old_version, args.package,
+                args.new_package_or_version)
+
+        print(result)
 
     elif args.action == "copy":
         copy(args.source_package, args.source_version, args.dest_package)

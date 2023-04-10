@@ -301,7 +301,7 @@ class ChangelogTests(unittest.TestCase):
             })
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_name", "cipd_ver_A", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -337,7 +337,7 @@ class ChangelogTests(unittest.TestCase):
             })
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_name", "cipd_ver_A", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -374,7 +374,7 @@ class ChangelogTests(unittest.TestCase):
             })
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_name", "cipd_ver_A", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -410,7 +410,7 @@ class ChangelogTests(unittest.TestCase):
             })
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_name", "cipd_ver_A", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
         self.assertEqual(
             changelog,
             textwrap.dedent(
@@ -437,7 +437,7 @@ class ChangelogTests(unittest.TestCase):
             ]})
 
         changelog = cipd_utils.changelog(
-            mock_repo, "package_name", "cipd_ver_A", "cipd_ver_B")
+            mock_repo, "package_A", "cipd_ver_A", "package_B", "cipd_ver_B")
         self.assertEqual(
             changelog,
             textwrap.dedent(
