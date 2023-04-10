@@ -75,7 +75,7 @@ fn export(store: &mut HashMap<String, Vec<u8>>, vmo: Vmo) -> Result<Vmo, ExportE
 
     // Encode the bytes - there is a bug in persistent FIDL if this operation fails. Even if it
     // succeeds, make sure to check that the VMO has enough space to handle the encoded export data.
-    let encoded_bytes = persist(&mut exportable).map_err(|_| ExportError::Unknown)?;
+    let encoded_bytes = persist(&exportable).map_err(|_| ExportError::Unknown)?;
     if encoded_bytes.len() as u64 > vmo.get_content_size().map_err(|_| ExportError::Unknown)? {
         return Err(ExportError::StorageTooSmall);
     }

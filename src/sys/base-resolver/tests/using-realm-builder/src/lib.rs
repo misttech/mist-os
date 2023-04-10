@@ -334,7 +334,7 @@ async fn manipulated_context_rejected() {
 
 #[fuchsia::test]
 async fn resolve_component() {
-    let manifest = fidl::encoding::persist(&mut fcomponent_decl::Component {
+    let manifest = fidl::encoding::persist(&fcomponent_decl::Component {
         config: Some(fcomponent_decl::ConfigSchema {
             value_source: Some(fcomponent_decl::ConfigValueSource::PackagePath(
                 "meta/config-data.cvf".to_string(),
@@ -344,7 +344,7 @@ async fn resolve_component() {
         ..fcomponent_decl::Component::EMPTY
     })
     .unwrap();
-    let config_data = fidl::encoding::persist(&mut fcomponent_config::ValuesData {
+    let config_data = fidl::encoding::persist(&fcomponent_config::ValuesData {
         ..fcomponent_config::ValuesData::EMPTY
     })
     .unwrap();
@@ -382,7 +382,7 @@ async fn resolve_component() {
 
 #[fuchsia::test]
 async fn resolve_with_context_component() {
-    let manifest = fidl::encoding::persist(&mut fcomponent_decl::Component::EMPTY.clone()).unwrap();
+    let manifest = fidl::encoding::persist(&fcomponent_decl::Component::EMPTY.clone()).unwrap();
     let sub_sub_pkg = fuchsia_pkg_testing::PackageBuilder::new("a-sub-sub-package")
         .add_resource_at("meta/manifest.cm", &*manifest)
         .build()

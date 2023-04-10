@@ -344,7 +344,7 @@ impl FidlStorage {
     where
         T: FidlStorageConvertible,
     {
-        let new_value = persist(&mut new_value.to_storable())?;
+        let new_value = persist(&new_value.to_storable())?;
         self.inner_write(T::KEY, new_value).await
     }
 
@@ -462,7 +462,7 @@ mod tests {
     #[fasync::run_until_stalled(test)]
     async fn test_get() {
         let value_to_get = TestStruct { value: VALUE1 };
-        let content = persist(&mut value_to_get.to_storable()).unwrap();
+        let content = persist(&value_to_get.to_storable()).unwrap();
         let fs = mut_pseudo_directory! {
             "xyz.pfidl" => read_write(content, /*capacity*/ None),
         };

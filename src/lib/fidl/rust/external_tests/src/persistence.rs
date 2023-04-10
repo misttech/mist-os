@@ -27,26 +27,26 @@ fn transform_new_to_old_header(buf: &mut Vec<u8>) {
 
 #[test]
 fn persist_unpersist() {
-    let mut body = Coordinate { x: 1, y: 2 };
-    let buf = persist(&mut body).expect("encoding failed");
-    let body_out = unpersist::<Coordinate>(&buf).expect("decoding failed");
+    let body = Coordinate { x: 1, y: 2 };
+    let buf = persist(&body).expect("encoding failed");
+    let body_out = unpersist(&buf).expect("decoding failed");
     assert_eq!(body, body_out);
 }
 
 #[test]
 fn persist_unpersist_presence() {
-    let mut body = ValueRecord { name: Some("testing".to_string()), ..ValueRecord::EMPTY };
-    let buf = persist(&mut body).expect("encoding failed");
-    let body_out = unpersist::<ValueRecord>(&buf).expect("decoding failed");
+    let body = ValueRecord { name: Some("testing".to_string()), ..ValueRecord::EMPTY };
+    let buf = persist(&body).expect("encoding failed");
+    let body_out = unpersist(&buf).expect("decoding failed");
     assert_eq!(body, body_out);
 }
 
 #[test]
 fn persist_unpersist_with_old_header() {
-    let mut body = Coordinate { x: 1, y: 2 };
-    let mut buf = persist(&mut body).expect("encoding failed");
+    let body = Coordinate { x: 1, y: 2 };
+    let mut buf = persist(&body).expect("encoding failed");
     transform_new_to_old_header(&mut buf);
-    let body_out = unpersist::<Coordinate>(&buf).expect("decoding failed");
+    let body_out = unpersist(&buf).expect("decoding failed");
     assert_eq!(body, body_out);
 }
 

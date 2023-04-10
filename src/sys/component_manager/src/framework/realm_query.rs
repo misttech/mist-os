@@ -333,12 +333,12 @@ pub async fn get_manifest(
 
     let state = instance.lock_state().await;
 
-    let mut decl = match &*state {
+    let decl = match &*state {
         InstanceState::Resolved(r) => r.decl().clone().native_into_fidl(),
         _ => return Err(fsys::GetManifestError::InstanceNotResolved),
     };
 
-    let bytes = fidl::encoding::persist(&mut decl).map_err(|error| {
+    let bytes = fidl::encoding::persist(&decl).map_err(|error| {
         warn!(%moniker, %error, "RealmQuery failed to encode manifest");
         fsys::GetManifestError::EncodeFailed
     })?;

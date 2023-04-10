@@ -480,8 +480,8 @@ fn compile(args: Args) -> Result<(), Error> {
     let config_json =
         configs.into_iter().try_fold(Config::default(), |acc, next| acc.merge(next))?;
 
-    let mut config_fidl: component_internal::Config = config_json.try_into()?;
-    let bytes = persist(&mut config_fidl).map_err(|e| Error::FidlEncoding(e))?;
+    let config_fidl: component_internal::Config = config_json.try_into()?;
+    let bytes = persist(&config_fidl).map_err(|e| Error::FidlEncoding(e))?;
     let mut file = File::create(args.output).map_err(|e| Error::Io(e))?;
     file.write_all(&bytes).map_err(|e| Error::Io(e))?;
     Ok(())

@@ -559,7 +559,7 @@ mod tests {
         };
 
         // Binary encoded FIDL message, with header and padding.
-        let fidl_bytes = persist(&mut data).unwrap();
+        let fidl_bytes = persist(&data).unwrap();
 
         write_fidl(&file, &mut data).await.unwrap();
 

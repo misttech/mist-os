@@ -255,7 +255,7 @@ impl Mounts {
         if let DirOrProxy::Dir(ref d) = self.pkg_resolver_data {
             let mut f = BufWriter::new(File::create(d.path().join("eager_packages.pf")).unwrap());
 
-            let mut packages = PersistentEagerPackages {
+            let packages = PersistentEagerPackages {
                 packages: Some(
                     packages
                         .into_iter()
@@ -272,7 +272,7 @@ impl Mounts {
                 ..PersistentEagerPackages::EMPTY
             };
 
-            let data = persist(&mut packages).unwrap();
+            let data = persist(&packages).unwrap();
             f.write_all(&data).unwrap();
             f.flush().unwrap();
         } else {

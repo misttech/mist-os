@@ -42,9 +42,9 @@ fn serve_instance_iterator(
 }
 
 fn serve_manifest_bytes_iterator(
-    mut manifest: fcdecl::Component,
+    manifest: fcdecl::Component,
 ) -> ClientEnd<fsys::ManifestBytesIteratorMarker> {
-    let bytes = fidl::encoding::persist(&mut manifest).unwrap();
+    let bytes = fidl::encoding::persist(&manifest).unwrap();
     let (client, mut stream) =
         create_request_stream::<fsys::ManifestBytesIteratorMarker>().unwrap();
     Task::spawn(async move {

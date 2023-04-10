@@ -387,7 +387,7 @@ mod tests {
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
         let server = async move {
-            let cm_bytes = fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone()).unwrap();
+            let cm_bytes = fidl::encoding::persist(&fdecl::Component::EMPTY.clone()).unwrap();
             let fs = pseudo_directory! {
                 "meta" => pseudo_directory! {
                     "test.cm" => read_only(cm_bytes),
@@ -435,7 +435,7 @@ mod tests {
         let (proxy, mut server) =
             fidl::endpoints::create_proxy_and_stream::<fpkg::PackageResolverMarker>().unwrap();
         let server = async move {
-            let cm_bytes = fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone()).unwrap();
+            let cm_bytes = fidl::encoding::persist(&fdecl::Component::EMPTY.clone()).unwrap();
             let fs = pseudo_directory! {
                 "meta" => pseudo_directory! {
                     "test.cm" => read_only(cm_bytes),
@@ -593,7 +593,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_succeeds_with_config() {
-        let cm_bytes = fidl::encoding::persist(&mut fdecl::Component {
+        let cm_bytes = fidl::encoding::persist(&fdecl::Component {
             config: Some(fdecl::ConfigSchema {
                 value_source: Some(fdecl::ConfigValueSource::PackagePath(
                     "meta/test_with_config.cvf".to_owned(),
@@ -612,7 +612,7 @@ mod tests {
             }]),
             ..fconfig::ValuesData::EMPTY
         };
-        let cvf_bytes = fidl::encoding::persist(&mut expected_config.clone()).unwrap();
+        let cvf_bytes = fidl::encoding::persist(&expected_config.clone()).unwrap();
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {
             "meta" => pseudo_directory! {
@@ -652,7 +652,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_fails_missing_config_value_file() {
-        let cm_bytes = fidl::encoding::persist(&mut fdecl::Component {
+        let cm_bytes = fidl::encoding::persist(&fdecl::Component {
             config: Some(fdecl::ConfigSchema {
                 value_source: Some(fdecl::ConfigValueSource::PackagePath(
                     "meta/test_with_config.cvf".to_string(),
@@ -689,12 +689,12 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_component_fails_bad_config_strategy() {
-        let cm_bytes = fidl::encoding::persist(&mut fdecl::Component {
+        let cm_bytes = fidl::encoding::persist(&fdecl::Component {
             config: Some(fdecl::ConfigSchema::EMPTY.clone()),
             ..fdecl::Component::EMPTY
         })
         .unwrap();
-        let cvf_bytes = fidl::encoding::persist(&mut fconfig::ValuesData::EMPTY.clone()).unwrap();
+        let cvf_bytes = fidl::encoding::persist(&fconfig::ValuesData::EMPTY.clone()).unwrap();
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         pseudo_directory! {
             "meta" => pseudo_directory! {
@@ -724,7 +724,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn resolve_component_sets_pkg_abi_revision() {
         let (dir, dir_server) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
-        let cm_bytes = fidl::encoding::persist(&mut fdecl::Component::EMPTY.clone())
+        let cm_bytes = fidl::encoding::persist(&fdecl::Component::EMPTY.clone())
             .expect("failed to encode ComponentDecl FIDL");
         pseudo_directory! {
             "meta" => pseudo_directory! {

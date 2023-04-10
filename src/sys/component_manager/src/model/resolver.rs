@@ -480,10 +480,8 @@ mod tests {
     #[fuchsia::test]
     async fn test_read_and_validate_manifest() {
         let manifest = fmem::Data::Bytes(
-            fidl::encoding::persist::<fdecl::Component>(
-                &mut (COMPONENT_DECL.clone()).native_into_fidl(),
-            )
-            .expect("failed to encode manifest"),
+            fidl::encoding::persist(&COMPONENT_DECL.clone().native_into_fidl())
+                .expect("failed to encode manifest"),
         );
         let actual =
             read_and_validate_manifest(&manifest).await.expect("failed to decode manifest");
@@ -492,7 +490,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_and_validate_config_values() {
-        let mut fidl_config_values = fconfig::ValuesData {
+        let fidl_config_values = fconfig::ValuesData {
             values: Some(vec![
                 fconfig::ValueSpec {
                     value: Some(fconfig::Value::Single(fconfig::SingleValue::Bool(false))),
@@ -553,8 +551,7 @@ mod tests {
             checksum: cm_rust::ConfigChecksum::Sha256([0; 32]),
         };
         let data = fmem::Data::Bytes(
-            fidl::encoding::persist(&mut fidl_config_values)
-                .expect("failed to encode config values"),
+            fidl::encoding::persist(&fidl_config_values).expect("failed to encode config values"),
         );
         let actual =
             read_and_validate_config_values(&data).expect("failed to decode config values");

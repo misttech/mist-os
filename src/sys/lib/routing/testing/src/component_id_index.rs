@@ -11,8 +11,7 @@ use {
 /// Makes a temporary component ID index file with contents from the given `index`.
 pub fn make_index_file(index: Index) -> Result<NamedTempFile> {
     let mut tmp_file = NamedTempFile::new()?;
-    tmp_file.write_all(
-        persist(&mut fcomponent_internal::ComponentIdIndex::try_from(index)?)?.as_ref(),
-    )?;
+    tmp_file
+        .write_all(persist(&fcomponent_internal::ComponentIdIndex::try_from(index)?)?.as_ref())?;
     Ok(tmp_file)
 }

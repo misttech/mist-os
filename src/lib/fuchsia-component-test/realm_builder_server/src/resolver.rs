@@ -182,7 +182,7 @@ impl Registry {
         cm_fidl_validator::validate_values_data(&values_data)
             .context("ensuring all values are populated")?;
 
-        let data = fidl::encoding::persist(&mut values_data)?;
+        let data = fidl::encoding::persist(&values_data)?;
         let data = fmem::Data::Bytes(data);
         return Ok(data);
     }
@@ -363,9 +363,9 @@ impl Registry {
     }
 }
 
-fn encode(mut component_decl: fcdecl::Component) -> Result<fmem::Data, Error> {
+fn encode(component_decl: fcdecl::Component) -> Result<fmem::Data, Error> {
     let encoded =
-        fidl::encoding::persist(&mut component_decl).context("failed to encode ComponentDecl")?;
+        fidl::encoding::persist(&component_decl).context("failed to encode ComponentDecl")?;
     let encoded_size = encoded.len() as u64;
     let vmo = Vmo::create(encoded_size)?;
     vmo.write(&encoded, 0)?;

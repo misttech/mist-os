@@ -43,8 +43,8 @@ impl GenerateValueFile {
         // combine the manifest and provided values
         let values_data = config_value_file::populate_value_file(config_decl, values)
             .context("populating config values")?;
-        let mut values_data = values_data.native_into_fidl();
-        let encoded_output = persist(&mut values_data).context("encoding value file")?;
+        let values_data = values_data.native_into_fidl();
+        let encoded_output = persist(&values_data).context("encoding value file")?;
 
         // write result to value file output
         if let Some(parent) = self.output.parent() {

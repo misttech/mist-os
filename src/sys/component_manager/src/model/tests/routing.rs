@@ -2192,8 +2192,8 @@ async fn use_resolver_from_parent_environment() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes(
-                                    fidl::encoding::persist::<fdecl::Component>(
-                                        &mut default_component_decl().native_into_fidl(),
+                                    fidl::encoding::persist(
+                                        &default_component_decl().native_into_fidl(),
                                     )
                                     .unwrap(),
                                 )),
@@ -2299,8 +2299,8 @@ async fn use_resolver_from_grandparent_environment() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://c".into()),
                                 decl: Some(fmem::Data::Bytes(
-                                    fidl::encoding::persist::<fdecl::Component>(
-                                        &mut default_component_decl().native_into_fidl(),
+                                    fidl::encoding::persist(
+                                        &default_component_decl().native_into_fidl(),
                                     )
                                     .unwrap(),
                                 )),
@@ -2405,8 +2405,8 @@ async fn resolver_is_not_available() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes(
-                                    fidl::encoding::persist::<fdecl::Component>(
-                                        &mut default_component_decl().native_into_fidl(),
+                                    fidl::encoding::persist(
+                                        &default_component_decl().native_into_fidl(),
                                     )
                                     .unwrap(),
                                 )),
@@ -2509,7 +2509,7 @@ async fn resolver_component_decl_is_validated() {
                             .send(&mut Ok(fresolution::Component {
                                 url: Some("test://b".into()),
                                 decl: Some(fmem::Data::Bytes({
-                                    let mut fidl = fdecl::Component {
+                                    let fidl = fdecl::Component {
                                         exposes: Some(vec![fdecl::Expose::Protocol(
                                             fdecl::ExposeProtocol {
                                                 source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
@@ -2518,7 +2518,7 @@ async fn resolver_component_decl_is_validated() {
                                         )]),
                                         ..fdecl::Component::EMPTY
                                     };
-                                    fidl::encoding::persist(&mut fidl).unwrap()
+                                    fidl::encoding::persist(&fidl).unwrap()
                                 })),
                                 package: None,
                                 // this test only resolves one component_url

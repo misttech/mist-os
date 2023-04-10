@@ -139,14 +139,13 @@ fn generate_kernel_config_directory(
     // The name of the file that the starnix_kernel's configuration is written to.
     const CONFIG_FILE: &str = "config";
 
-    let mut program_block = component_start_info
+    let program_block = component_start_info
         .program
         .take()
         .ok_or(anyhow!("Missing program block in container."))?;
 
     // Add the container configuration file to the directory that is provided to the starnix_kernel.
-    let kernel_config_file =
-        vfs::file::vmo::read_only(fidl::encoding::persist(&mut program_block)?);
+    let kernel_config_file = vfs::file::vmo::read_only(fidl::encoding::persist(&program_block)?);
 
     let kernel_config_dir = vfs::directory::immutable::simple();
     kernel_config_dir.add_entry(CONFIG_FILE, kernel_config_file)?;

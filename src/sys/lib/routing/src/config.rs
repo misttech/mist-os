@@ -1201,10 +1201,10 @@ mod tests {
 
     fn write_config_to_file(
         tmp_dir: &TempDir,
-        mut config: component_internal::Config,
+        config: component_internal::Config,
     ) -> Result<PathBuf, Error> {
         let path = tmp_dir.path().join("test_config.fidl");
-        let content = fidl::encoding::persist(&mut config)?;
+        let content = fidl::encoding::persist(&config)?;
         std::fs::write(&path, &content)?;
         Ok(path)
     }

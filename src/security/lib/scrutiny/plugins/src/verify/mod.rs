@@ -285,8 +285,8 @@ mod tests {
     }
 
     fn make_v2_manifest(component_id: i32, decl: ComponentDecl) -> Result<Manifest> {
-        let mut decl_fidl: fdecl::Component = decl.native_into_fidl();
-        let cm_base64 = base64::encode(&persist(&mut decl_fidl)?);
+        let decl_fidl: fdecl::Component = decl.native_into_fidl();
+        let cm_base64 = base64::encode(&persist(&decl_fidl)?);
         Ok(Manifest {
             component_id,
             manifest: ManifestData::Version2 { cm_base64, cvf_bytes: None },
@@ -509,7 +509,7 @@ mod tests {
 
         bootfs.insert(
             DEFAULT_CONFIG_PATH.to_string(),
-            fidl::encoding::persist(&mut runtime_config).unwrap(),
+            fidl::encoding::persist(&runtime_config).unwrap(),
         );
         return Zbi { sections: Vec::default(), bootfs, cmdline: "".to_string() };
     }

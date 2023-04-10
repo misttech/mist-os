@@ -47,7 +47,7 @@ impl Migration for V1653667208LightMigration {
         let light_data = serde_json::from_str::<LightInfo>(&str_json)
             .context("failed to deserialize light data")?;
 
-        let mut light_groups = LightGroups {
+        let light_groups = LightGroups {
             groups: light_data
                 .light_groups
                 .into_values()
@@ -68,7 +68,7 @@ impl Migration for V1653667208LightMigration {
                     .unwrap_err()
                     .into(),
             })?;
-        let encoded = persist(&mut light_groups).context("failed to serialize new fidl format")?;
+        let encoded = persist(&light_groups).context("failed to serialize new fidl format")?;
         let _ = file.write(&encoded).await.context("file to call write")?.map_err(|e| {
             let status = zx::Status::from_raw(e);
             if status == zx::Status::NO_SPACE {

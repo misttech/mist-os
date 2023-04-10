@@ -62,8 +62,8 @@ pub fn compile(
     util::ensure_directory_exists(&output)?;
     let mut out_file =
         fs::OpenOptions::new().create(true).truncate(true).write(true).open(output)?;
-    let mut out_data = cml::compile(&document, config_package_path)?;
-    out_file.write_all(&persist(&mut out_data)?)?;
+    let out_data = cml::compile(&document, config_package_path)?;
+    out_file.write_all(&persist(&out_data)?)?;
 
     // Write includes to depfile
     if let Some(depfile_path) = depfile {

@@ -9,12 +9,12 @@ use fidl_fuchsia_examples as fex;
 #[test]
 fn persist_unpersist() -> Result<(), fidl::Error> {
     // [START persist]
-    let mut original_value = fex::Color { id: 0, name: "red".to_string() };
-    let bytes = fidl::encoding::persist(&mut original_value)?;
+    let original_value = fex::Color { id: 0, name: "red".to_string() };
+    let bytes = fidl::encoding::persist(&original_value)?;
     // [END persist]
 
     // [START unpersist]
-    let decoded_value = fidl::encoding::unpersist::<fex::Color>(&bytes)?;
+    let decoded_value = fidl::encoding::unpersist(&bytes)?;
     assert_eq!(original_value, decoded_value);
     // [END unpersist]
 

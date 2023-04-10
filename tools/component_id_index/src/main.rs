@@ -80,9 +80,9 @@ fn run(opts: CommandLineOpts) -> anyhow::Result<()> {
     fs::write(&opts.output_index_json, serialized_output_json.as_bytes())
         .context("Could not write merged JSON-encoded index to file")?;
 
-    let mut merged_index_fidl: fcomponent_internal::ComponentIdIndex = merged_index.try_into()?;
+    let merged_index_fidl: fcomponent_internal::ComponentIdIndex = merged_index.try_into()?;
     let serialized_output_fidl =
-        persist(&mut merged_index_fidl).context("Could not fidl-encode merged index")?;
+        persist(&merged_index_fidl).context("Could not fidl-encode merged index")?;
     fs::write(&opts.output_index_fidl, serialized_output_fidl)
         .context("Could not write merged FIDL-encoded index to file")?;
 

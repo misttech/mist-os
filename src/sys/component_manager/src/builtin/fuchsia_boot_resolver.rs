@@ -518,7 +518,7 @@ mod tests {
     #[fuchsia::test]
     async fn config_works() {
         let fake_checksum = cm_rust::ConfigChecksum::Sha256([0; 32]);
-        let mut manifest = fdecl::Component {
+        let manifest = fdecl::Component {
             config: Some(
                 cm_rust::ConfigDecl {
                     value_source: cm_rust::ConfigValueSource::PackagePath(
@@ -534,7 +534,7 @@ mod tests {
             ),
             ..fdecl::Component::EMPTY
         };
-        let mut values_data = fconfig::ValuesData {
+        let values_data = fconfig::ValuesData {
             values: Some(vec![fconfig::ValueSpec {
                 value: Some(fconfig::Value::Single(fconfig::SingleValue::String(
                     "hello, world!".to_string(),
@@ -544,8 +544,8 @@ mod tests {
             checksum: Some(fake_checksum.clone().native_into_fidl()),
             ..fconfig::ValuesData::EMPTY
         };
-        let manifest_encoded = persist(&mut manifest).unwrap();
-        let values_data_encoded = persist(&mut values_data).unwrap();
+        let manifest_encoded = persist(&manifest).unwrap();
+        let values_data_encoded = persist(&values_data).unwrap();
         let root = pseudo_directory! {
             "meta" => pseudo_directory! {
                 "has_config.cm" => read_only(manifest_encoded),
@@ -590,7 +590,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn config_requires_values() {
-        let mut manifest = fdecl::Component {
+        let manifest = fdecl::Component {
             config: Some(
                 cm_rust::ConfigDecl {
                     value_source: cm_rust::ConfigValueSource::PackagePath(
@@ -606,7 +606,7 @@ mod tests {
             ),
             ..fdecl::Component::EMPTY
         };
-        let manifest_encoded = persist(&mut manifest).unwrap();
+        let manifest_encoded = persist(&manifest).unwrap();
         let root = pseudo_directory! {
             "meta" => pseudo_directory! {
                 "has_config.cm" => read_only(manifest_encoded),
@@ -644,7 +644,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn resolve_errors_test() {
-        let manifest_encoded = persist(&mut fdecl::Component {
+        let manifest_encoded = persist(&fdecl::Component {
             program: Some(fdecl::Program {
                 runner: None,
                 info: Some(fdata::Dictionary { entries: Some(vec![]), ..fdata::Dictionary::EMPTY }),

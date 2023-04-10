@@ -4054,7 +4054,7 @@ impl WireMetadata {
 
 /// Encodes a FIDL object to bytes following RFC-0120. This only works on
 /// non-resource structs, tables, and unions. See `unpersist` for the reverse.
-pub fn persist<'a, T: Persistable>(body: &'a mut T) -> Result<Vec<u8>> {
+pub fn persist<T: Persistable>(body: &T) -> Result<Vec<u8>> {
     persist_with_context::<T>(body, default_persistent_encode_context())
 }
 
