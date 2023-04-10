@@ -88,6 +88,8 @@ int run_test_ui_stack(int argc, const char** argv) {
                                                           realm_exposed_services.get());
   AddPublicService<fuchsia::ui::pointerinjector::Registry>(context.get(),
                                                            realm_exposed_services.get());
+  AddPublicService<fuchsia::ui::composition::ScreenCapture>(context.get(),
+                                                            realm_exposed_services.get());
   AddPublicService<fuchsia::ui::composition::Screenshot>(context.get(),
                                                          realm_exposed_services.get());
   AddPublicService<fuchsia::ui::display::singleton::Info>(context.get(),
