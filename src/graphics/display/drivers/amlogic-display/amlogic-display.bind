@@ -10,6 +10,13 @@ using fuchsia.platform;
 using fuchsia.sysmem;
 using fuchsia.amlogic.platform;
 
+// TODO(fxbug.dev/125227): `dsi` must be the primary node.
+//
+// amlogic-display driver needs to create a DsiImpl banjo client, but there's
+// no fragment proxy support for the DsiImpl protocol.
+//
+// As a result, the driver implementing DsiImpl protocol has to be a "primary"
+// ancestor of amlogic-display and they must be colocated in the same devhost.
 primary node "dsi" {
   fuchsia.BIND_PROTOCOL == fuchsia.hardware.dsi.BIND_PROTOCOL.IMPL;
 }
