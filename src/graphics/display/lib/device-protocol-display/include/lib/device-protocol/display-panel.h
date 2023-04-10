@@ -1,6 +1,9 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#ifndef SRC_GRAPHICS_DISPLAY_LIB_DEVICE_PROTOCOL_DISPLAY_INCLUDE_LIB_DEVICE_PROTOCOL_DISPLAY_PANEL_H_
+#define SRC_GRAPHICS_DISPLAY_LIB_DEVICE_PROTOCOL_DISPLAY_INCLUDE_LIB_DEVICE_PROTOCOL_DISPLAY_PANEL_H_
+
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <zircon/types.h>
 
@@ -151,20 +154,20 @@ const display_setting_t kDisplaySettingKD070D82_FT = {
     .vsync_pol = 0,
 };
 const display_setting_t kDisplaySettingTV070WSM_ST7703I = {
-  .lane_num = 4,
-  .bit_rate_max = 400,
-  .clock_factor = 0,
-  .lcd_clock = 44226000,
-  .h_active = 600,
-  .v_active = 1024,
-  .h_period = 700,
-  .v_period = 1053,
-  .hsync_width = 24,
-  .hsync_bp = 36,
-  .hsync_pol = 0,
-  .vsync_width = 2,
-  .vsync_bp = 8,
-  .vsync_pol = 0,
+    .lane_num = 4,
+    .bit_rate_max = 400,
+    .clock_factor = 0,
+    .lcd_clock = 44226000,
+    .h_active = 600,
+    .v_active = 1024,
+    .h_period = 700,
+    .v_period = 1053,
+    .hsync_width = 24,
+    .hsync_bp = 36,
+    .hsync_pol = 0,
+    .vsync_width = 2,
+    .vsync_bp = 8,
+    .vsync_pol = 0,
 };
 
 typedef struct {
@@ -172,3 +175,5 @@ typedef struct {
   uint32_t height;
   uint32_t panel_type;
 } display_panel_t;
+
+#endif  // SRC_GRAPHICS_DISPLAY_LIB_DEVICE_PROTOCOL_DISPLAY_INCLUDE_LIB_DEVICE_PROTOCOL_DISPLAY_PANEL_H_
