@@ -9,6 +9,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdf/env.h>
 #include <lib/inspect/service/cpp/service.h>
+#include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/vfs/cpp/pseudo_dir.h>
@@ -16,6 +17,7 @@
 #include <zircon/status.h>
 
 #include "driver_host.h"
+#include "src/devices/lib/log/log.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
 namespace fdf {
@@ -27,6 +29,8 @@ namespace fi = fuchsia::inspect;
 constexpr char kDiagnosticsDir[] = "diagnostics";
 
 int main(int argc, char** argv) {
+  syslog::SetTags({"driver_host2", "driver"});
+  driver_logger::GetLogger().AddTag("driver_host2").AddTag("driver");
   // TODO(fxbug.dev/33183): Lock down job.
   zx_status_t status = StdoutToDebuglog::Init();
   if (status != ZX_OK) {

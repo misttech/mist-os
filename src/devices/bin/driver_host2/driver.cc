@@ -309,6 +309,8 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
         }
         auto driver = Driver::Load(url, std::move(result->vmo()));
         if (driver.is_error()) {
+          LOGF(ERROR, "Failed to start driver '%s', could not Load driver: %s", url.c_str(),
+               driver.status_string());
           callback(driver.take_error());
           return;
         }
@@ -316,6 +318,8 @@ void LoadDriver(fuchsia_driver_framework::DriverStartArgs start_args,
         zx::result<fdf::Dispatcher> driver_dispatcher =
             CreateDispatcher(*driver, default_dispatcher_opts);
         if (driver_dispatcher.is_error()) {
+          LOGF(ERROR, "Failed to start driver '%s', could not create dispatcher: %s", url.c_str(),
+               driver_dispatcher.status_string());
           callback(driver_dispatcher.take_error());
           return;
         }

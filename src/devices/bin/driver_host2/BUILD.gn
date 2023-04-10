@@ -158,6 +158,7 @@ executable("bin") {
     "//sdk/lib/inspect/service/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
+    "//src/devices/lib/log",
     "//src/sys/lib/stdout-to-debuglog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/trace-provider",
