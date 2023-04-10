@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/clang/clang_cpu.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
 # Source directory for Fucshia libc.
@@ -311,6 +312,19 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #       the name of the directory containing the invoking BUILD.gn file.
 #     - Type: list(string)
 #
+#   * cpu_functions
+#     - Optional: A subset of $functions that whose implementations come from
+#       the $llvm_libc/src/$dir/$clang_cpu directory instead.
+#     - Type: list(string)
+#     - Default: []
+#
+#   * noncpu_dir
+#     - Optional: Subdir of $llvm_libc/src/$dir where implementations are found
+#       for $functions not found in $cpu_functions.
+#
+#   * no_test_functions
+#     - Optional: A subset of $functions that don't have tests.
+#
 #   * basic_abi, configs, non_test_deps, testonly_deps
 #     - Optional: See libc_source_set().
 #
@@ -328,6 +342,20 @@ template("llvm_libc_source_set") {
     test_target = "unittests"
   } else {
     test_target = "$target_name.unittests"
+  }
+
+  cpu_functions = []
+  if (defined(invoker.cpu_functions)) {
+    cpu_functions = invoker.cpu_functions
+    assert(cpu_functions + invoker.functions - invoker.functions == [],
+           "cpu_functions must be a subset of functions")
+  }
+
+  no_test_functions = []
+  if (defined(invoker.no_test_functions)) {
+    no_test_functions = invoker.no_test_functions
+    assert(no_test_functions + invoker.functions - invoker.functions == [],
+           "no_test_functions must be a subset of functions")
   }
 
   libc_source_set(main_target) {
@@ -348,7 +376,14 @@ template("llvm_libc_source_set") {
 
     foreach(function, invoker.functions) {
       public += [ "$function.h" ]
-      sources += [ "$function.cpp" ]
+      if (cpu_functions + [ function ] - [ function ] != cpu_functions) {
+        sources += [ "$clang_cpu/$function.cpp" ]
+        not_needed(invoker, [ "noncpu_dir" ])
+      } else if (defined(invoker.noncpu_dir)) {
+        sources += [ "${invoker.noncpu_dir}/$function.cpp" ]
+      } else {
+        sources += [ "$function.cpp" ]
+      }
     }
 
     if (defined(invoker.deps)) {
@@ -370,7 +405,7 @@ template("llvm_libc_source_set") {
     deps = [ ":$main_target.testonly" ]
     sources = []
 
-    foreach(function, invoker.functions) {
+    foreach(function, invoker.functions - no_test_functions) {
       sources += [ "${function}_test.cpp" ]
     }
 

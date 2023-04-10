@@ -1,0 +1,21 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../libc.gni")
+
+llvm_libc_source_set("math") {
+  noncpu_dir = "generic"
+
+  # TODO(fxbug.dev/62780): for now only using functions that are trivial
+  # machine instructions in the aarch64 and x86_64 implementations.
+  functions = [
+    "fabs",
+    "fabsf",
+    "sqrt",
+    "sqrtf",
+  ]
+
+  # The llvm-libc math tests require gtest and MPFR.
+  no_test_functions = functions
+}

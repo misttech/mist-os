@@ -132,8 +132,6 @@ source_set("math") {
       "x86_64/exp2l.S",
       "x86_64/expl.S",
       "x86_64/expm1l.S",
-      "x86_64/fabs.S",
-      "x86_64/fabsf.S",
       "x86_64/fabsl.S",
       "x86_64/floorl.S",
       "x86_64/fmodl.S",
@@ -149,8 +147,6 @@ source_set("math") {
       "x86_64/lrintl.S",
       "x86_64/remainderl.S",
       "x86_64/rintl.S",
-      "x86_64/sqrt.S",
-      "x86_64/sqrtf.S",
       "x86_64/sqrtl.S",
       "x86_64/truncl.S",
     ]
@@ -170,14 +166,6 @@ source_set("math") {
       "rintl.c",
       "sqrtl.c",
       "truncl.c",
-    ]
-  }
-  if (current_cpu == "arm64") {
-    sources += [
-      "aarch64/fabs.S",
-      "aarch64/fabsf.S",
-      "aarch64/sqrt.S",
-      "aarch64/sqrtf.S",
     ]
   }
   deps = [

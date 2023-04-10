@@ -21,6 +21,7 @@ libc_components = [
   "ctype",
   "fenv",
   "inttypes",
+  "math",
   "pthread",
   "scudo",
   "stdlib",
