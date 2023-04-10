@@ -24,6 +24,9 @@ type DictError = flexible enum {
 
     /// The Dict already contains an item with the given key.
     ALREADY_EXISTS = 2;
+
+    /// The `Capability` handle was invalid.
+    BAD_HANDLE = 3;
 };
 
 protocol Dict {

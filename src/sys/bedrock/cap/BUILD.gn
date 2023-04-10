@@ -23,6 +23,7 @@ rustc_library("cap") {
     "//src/sys/bedrock/fidl:fuchsia.component.bedrock_rust",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:downcast-rs",
+    "//third_party/rust_crates:dyn-clone",
     "//third_party/rust_crates:futures",
   ]
 

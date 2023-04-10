@@ -2,8 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{AnyCapability, Capability, Remote},
-    crate::handle::Handle,
+    crate::cap::{AnyCapability, AnyCloneCapability, Capability, Remote},
     anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_bedrock as fbedrock, fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -17,18 +16,21 @@ use {
 pub type Key = String;
 
 /// A capability that represents a dictionary of capabilities.
-#[derive(Debug)]
-pub struct Dict {
-    pub entries: HashMap<Key, AnyCapability>,
+#[derive(Debug, Clone)]
+pub struct Dict<T> {
+    pub entries: HashMap<Key, T>,
 }
 
-impl Capability for Dict {}
-
-impl Dict {
+impl<T> Dict<T> {
     pub fn new() -> Self {
         Dict { entries: HashMap::new() }
     }
+}
 
+impl<T: ?Sized + Capability> Dict<Box<T>>
+where
+    Box<T>: TryFrom<zx::Handle>,
+{
     /// Serve the `fuchsia.component.bedrock.Dict` protocol for this `Dict`.
     pub async fn serve_dict(
         &mut self,
@@ -44,10 +46,13 @@ impl Dict {
                 fbedrock::DictRequest::Insert { key, value, responder, .. } => {
                     let mut result = match self.entries.entry(key) {
                         Entry::Occupied(_) => Err(fbedrock::DictError::AlreadyExists),
-                        Entry::Vacant(entry) => {
-                            entry.insert(Box::new(Handle::from(value)));
-                            Ok(())
-                        }
+                        Entry::Vacant(entry) => match Box::<T>::try_from(value) {
+                            Ok(cap) => {
+                                entry.insert(cap);
+                                Ok(())
+                            }
+                            Err(_) => Err(fbedrock::DictError::BadHandle),
+                        },
                     };
                     responder.send(&mut result).context("failed to send response")?;
                 }
@@ -70,9 +75,7 @@ impl Dict {
 
         Ok(())
     }
-}
 
-impl Remote for Dict {
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         let (dict_client_end, dict_stream) =
             create_request_stream::<fbedrock::DictMarker>().unwrap();
@@ -86,10 +89,28 @@ impl Remote for Dict {
     }
 }
 
+impl Remote for Dict<AnyCapability> {
+    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+        self.to_zx_handle()
+    }
+}
+
+impl Remote for Dict<AnyCloneCapability> {
+    fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
+        self.to_zx_handle()
+    }
+}
+
+impl Capability for Dict<AnyCapability> {}
+impl Capability for Dict<AnyCloneCapability> {}
+
 #[cfg(test)]
 mod tests {
     use {
-        crate::{dict::*, handle::Handle},
+        crate::{
+            dict::*,
+            handle::{CloneHandle, Handle},
+        },
         anyhow::{anyhow, Error},
         assert_matches::assert_matches,
         fidl::endpoints::create_proxy_and_stream,
@@ -104,7 +125,7 @@ mod tests {
     /// and that the value is the same capability.
     #[fuchsia::test]
     async fn serve_insert() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let mut dict = Dict::<AnyCapability>::new();
 
         let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
@@ -145,7 +166,7 @@ mod tests {
     /// that was previously inserted.
     #[fuchsia::test]
     async fn serve_remove() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let mut dict = Dict::<AnyCapability>::new();
 
         // Create an event and get its koid.
         let event = zx::Event::create();
@@ -180,11 +201,11 @@ mod tests {
         Ok(())
     }
 
-    /// Tests that the `Dict.Insert` returns `ALREADY_EXISTS` when there is already an item with
+    /// Tests that `Dict.Insert` returns `ALREADY_EXISTS` when there is already an item with
     /// the same key.
     #[fuchsia::test]
     async fn insert_already_exists() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let mut dict = Dict::<AnyCapability>::new();
 
         let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
@@ -217,7 +238,7 @@ mod tests {
     /// Tests that the `Dict.Remove` returns `NOT_FOUND` when there is no item with the given key.
     #[fuchsia::test]
     async fn remove_not_found() -> Result<(), Error> {
-        let mut dict = Dict::new();
+        let mut dict = Dict::<AnyCapability>::new();
 
         let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
         let server = dict.serve_dict(dict_stream);
@@ -231,5 +252,83 @@ mod tests {
         };
 
         try_join!(client, server).map(|_| ())
+    }
+
+    /// Tests that `Dict<AnyCloneCapability>.Insert` let the client to insert a cloneable handle.
+    #[fuchsia::test]
+    async fn clone_insert() -> Result<(), Error> {
+        let mut dict = Dict::<AnyCloneCapability>::new();
+
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let server = dict.serve_dict(dict_stream);
+
+        let client = async move {
+            let event = zx::Event::create();
+            let handle = event.into_handle();
+
+            let result =
+                dict_proxy.insert(CAP_KEY, handle).await.context("failed to call Insert")?;
+            assert_matches!(result, Ok(()));
+
+            Ok(())
+        };
+
+        try_join!(client, server).map(|_| ())
+    }
+
+    /// Tests that `Dict<AnyCloneCapability>.Insert` returns `BAD_HANDLE` when the handle
+    /// does not have ZX_RIGHT_DUPLICATE.
+    #[fuchsia::test]
+    async fn clone_insert_bad_handle() -> Result<(), Error> {
+        let mut dict = Dict::<AnyCloneCapability>::new();
+
+        let (dict_proxy, dict_stream) = create_proxy_and_stream::<fbedrock::DictMarker>()?;
+        let server = dict.serve_dict(dict_stream);
+
+        let client = async move {
+            let event = zx::Event::create();
+
+            // Create a handle without ZX_RIGHT_DUPLICATE.
+            let handle =
+                event.as_handle_ref().duplicate(zx::Rights::BASIC - zx::Rights::DUPLICATE).unwrap();
+
+            let result =
+                dict_proxy.insert(CAP_KEY, handle).await.context("failed to call Insert")?;
+            assert_matches!(result, Err(fbedrock::DictError::BadHandle));
+
+            Ok(())
+        };
+
+        try_join!(client, server).map(|_| ())
+    }
+
+    /// Tests that cloning a `Dict<AnyCloneCapability>` with an item results in a Dict that
+    /// contains a handle to the same object.
+    #[fuchsia::test]
+    async fn clone_contains_same_object() -> Result<(), Error> {
+        let mut dict = Dict::<AnyCloneCapability>::new();
+
+        // Create an event and get its koid.
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
+
+        // Put the event into the dict as a `CloneHandle`.
+        dict.entries.insert(
+            CAP_KEY.to_string(),
+            Box::new(CloneHandle::try_from(event.into_handle()).unwrap()),
+        );
+        assert_eq!(dict.entries.len(), 1);
+
+        let dict_clone = dict.clone();
+
+        assert_eq!(dict_clone.entries.len(), 1);
+        let event_clone = dict.entries.remove(CAP_KEY).unwrap();
+
+        let (handle, _) = event_clone.to_zx_handle();
+        let got_koid = handle.as_handle_ref().get_koid().unwrap();
+
+        assert_eq!(got_koid, expected_koid);
+
+        Ok(())
     }
 }
