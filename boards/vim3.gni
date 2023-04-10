@@ -36,6 +36,7 @@ _common_bootfs_deps = [
   "//src/graphics/display/drivers/aml-canvas",
   "//src/graphics/display/drivers/aml-hdmi",
   "//src/graphics/display/drivers/amlogic-display:amlogic-display-vim3",
+  "//src/graphics/display/drivers/dsi-dw",
   "//src/graphics/drivers/aml-gpu",
 ]
 
