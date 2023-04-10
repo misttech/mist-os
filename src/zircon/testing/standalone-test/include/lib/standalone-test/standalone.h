@@ -37,6 +37,9 @@ const BootOptions& GetBootOptions();
 // It does line-buffering and at '\n' boundaries it writes to the debuglog.
 void LogWrite(std::string_view str);
 
+// This can be used as the main() function to run zxtest tests.
+int TestMain();
+
 }  // namespace standalone
 
 #endif  // SRC_ZIRCON_TESTING_STANDALONE_TEST_INCLUDE_LIB_STANDALONE_TEST_STANDALONE_H_

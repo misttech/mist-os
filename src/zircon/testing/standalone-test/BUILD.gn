@@ -18,6 +18,7 @@ static_library("standalone-test") {
   testonly = true
   sources = [
     "standalone-io.cc",
+    "standalone-main.cc",
     "standalone-options.cc",
     "zxtest-main.cc",
   ]

@@ -14,7 +14,6 @@
 
 #include <algorithm>
 #include <cstdio>
-#include <vector>
 
 #include <zxtest/zxtest.h>
 
@@ -171,21 +170,7 @@ void GetDebugDataMessage(zx::unowned_channel svc, Message& msg) {
 }
 
 int main() {
-  int argc = 1;
-  const char* argv[4] = {"standalone-test"};
-
-  standalone::Option filter = {"--gtest_filter="};
-  standalone::Option repeat = {"--gtest_repeat="};
-  standalone::GetOptions({filter, repeat});
-
-  if (!filter.option.empty()) {
-    argv[argc++] = filter.option.c_str();
-  }
-  if (!repeat.option.empty()) {
-    argv[argc++] = repeat.option.c_str();
-  }
-
-  auto res = RUN_ALL_TESTS(argc, const_cast<char**>(argv));
+  int res = standalone::TestMain();
   if (res == 0) {
     printf(BOOT_TEST_SUCCESS_STRING "\n");
   }
