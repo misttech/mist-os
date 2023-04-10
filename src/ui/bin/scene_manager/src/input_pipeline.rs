@@ -36,7 +36,6 @@ use {
         self, dead_keys_handler,
         factory_reset_handler::FactoryResetHandler,
         ime_handler::ImeHandler,
-        immersive_mode_shortcut_handler::ImmersiveModeShortcutHandler,
         input_device,
         input_pipeline::{InputDeviceBindingHashMap, InputPipeline, InputPipelineAssembly},
         keyboard_handler, keymap_handler,
@@ -309,7 +308,6 @@ async fn register_keyboard_related_input_handlers(
     assembly = add_key_meaning_modifier_handler(assembly);
     assembly = assembly.add_autorepeater();
     assembly = add_dead_keys_handler(assembly, icu_data_loader);
-    assembly = add_immersive_mode_shortcut_handler(assembly);
     assembly = add_ime(assembly).await;
 
     // Forward focus to Text Manager.
@@ -536,10 +534,6 @@ fn add_pointer_display_scale_handler(
 fn add_pointer_sensor_scale_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
     assembly
         .add_handler(input_pipeline::pointer_sensor_scale_handler::PointerSensorScaleHandler::new())
-}
-
-fn add_immersive_mode_shortcut_handler(assembly: InputPipelineAssembly) -> InputPipelineAssembly {
-    assembly.add_handler(ImmersiveModeShortcutHandler::new())
 }
 
 fn add_touchpad_gestures_handler(

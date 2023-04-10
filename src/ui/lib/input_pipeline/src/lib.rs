@@ -5,7 +5,6 @@
 #[macro_use]
 mod testing_utilities;
 mod fake_input_device_binding;
-mod mouse_config;
 mod mouse_model_database;
 mod observe_fake_events_input_handler;
 mod utils;
@@ -22,7 +21,6 @@ pub mod dead_keys_handler;
 pub mod display_ownership;
 pub mod factory_reset_handler;
 pub mod ime_handler;
-pub mod immersive_mode_shortcut_handler;
 pub mod input_handler;
 pub mod inspect_handler;
 pub mod keyboard_handler;

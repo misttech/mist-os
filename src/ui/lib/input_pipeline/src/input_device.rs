@@ -5,7 +5,7 @@
 use {
     crate::{
         consumer_controls_binding, keyboard_binding, light_sensor_binding, mouse_binding,
-        mouse_config, touch_binding,
+        touch_binding,
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
@@ -137,7 +137,6 @@ pub enum InputDeviceEvent {
     Mouse(mouse_binding::MouseEvent),
     TouchScreen(touch_binding::TouchScreenEvent),
     Touchpad(touch_binding::TouchpadEvent),
-    MouseConfig(mouse_config::MouseConfigEvent),
     #[cfg(test)]
     Fake,
 }
@@ -159,7 +158,6 @@ pub enum InputDeviceDescriptor {
     Mouse(mouse_binding::MouseDeviceDescriptor),
     TouchScreen(touch_binding::TouchScreenDeviceDescriptor),
     Touchpad(touch_binding::TouchpadDeviceDescriptor),
-    MouseConfig,
     #[cfg(test)]
     Fake,
 }

@@ -36,7 +36,6 @@ impl UnhandledInputHandler for PointerSensorScaleHandler {
         unhandled_input_event: input_device::UnhandledInputEvent,
     ) -> Vec<input_device::InputEvent> {
         match unhandled_input_event {
-            // TODO(https://fxbug.dev/98699) Disable scaling when in immersive mode.
             input_device::UnhandledInputEvent {
                 device_event:
                     input_device::InputDeviceEvent::Mouse(mouse_binding::MouseEvent {
