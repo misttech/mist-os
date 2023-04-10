@@ -696,9 +696,9 @@ void ArmArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
     case ArmAspaceType::kUser: {
       // flush this address for the specific asid
       if (terminal) {
-        ARM64_TLBI(vale1is, vaddr >> 12 | (vaddr_t)asid_ << 48);
+        ARM64_TLBI(vale1is, ((vaddr >> 12) & TLBI_VADDR_MASK) | (vaddr_t)asid_ << 48);
       } else {
-        ARM64_TLBI(vae1is, vaddr >> 12 | (vaddr_t)asid_ << 48);
+        ARM64_TLBI(vae1is, ((vaddr >> 12) & TLBI_VADDR_MASK) | (vaddr_t)asid_ << 48);
       }
       return;
     }
@@ -706,9 +706,9 @@ void ArmArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
       DEBUG_ASSERT(asid_ == MMU_ARM64_GLOBAL_ASID);
       // flush this address on all ASIDs
       if (terminal) {
-        ARM64_TLBI(vaale1is, vaddr >> 12);
+        ARM64_TLBI(vaale1is, (vaddr >> 12) & TLBI_VADDR_MASK);
       } else {
-        ARM64_TLBI(vaae1is, vaddr >> 12);
+        ARM64_TLBI(vaae1is, (vaddr >> 12) & TLBI_VADDR_MASK);
       }
       return;
     }

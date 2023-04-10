@@ -391,6 +391,10 @@
 #define MMU_PTE_IDENT_DEVICE_FLAGS \
     (MMU_PTE_IDENT_DESCRIPTOR | \
      MMU_INITIAL_MAP_DEVICE)
+
+/* TLBI VADDR mask, VA[55:12], bits [43:0] */
+#define TLBI_VADDR_MASK                BM(0, 44, 0xfffffffffff)
+
 // clang-format on
 
 #ifndef __ASSEMBLER__
