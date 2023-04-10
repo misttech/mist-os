@@ -143,19 +143,13 @@ class AmlogicSecureMemTest : public zxtest::Test {
     // aml-securemem doesn't yet implement DdkUnbind() - and arguably it doesn't really need to
     // given what aml-securemem is.
 
+    ddk::SuspendTxn txn(dev()->zxdev(), DEV_POWER_STATE_D3COLD, false, DEVICE_SUSPEND_REASON_MEXEC);
+    libsync::Completion completion;
     async::PostTask(dispatcher_.async_dispatcher(), [&]() {
-      dev()->zxdev()->SuspendNewOp(DEV_POWER_STATE_D3COLD, false, DEVICE_SUSPEND_REASON_MEXEC);
+      dev()->DdkSuspend(std::move(txn));
+      completion.Signal();
     });
-
-    ASSERT_OK(dev()->zxdev()->WaitUntilSuspendReplyCalled());
-
-    // Destroy the driver object in the dispatcher context.
-    libsync::Completion destroy_completion;
-    async::PostTask(dispatcher_.async_dispatcher(), [&]() {
-      root_ = nullptr;
-      destroy_completion.Signal();
-    });
-    destroy_completion.Wait();
+    completion.Wait();
 
     dispatcher_.ShutdownAsync();
     shutdown_completion_.Wait();
