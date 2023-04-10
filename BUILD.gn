@@ -838,7 +838,10 @@ compiled_action("test-list") {
   tool = "//tools/test_list_tool"
   tool_output_name = "test_list_tool"
 
-  inputs = [ "$root_build_dir/tests.json" ]
+  inputs = [
+    "$root_build_dir/tests.json",
+    "$root_build_dir/test_components.json",
+  ]
   outputs = [ "$root_build_dir/test-list.json" ]
   depfile = "$root_build_dir/test-list.json.d"
 
@@ -846,13 +849,18 @@ compiled_action("test-list") {
     test_list = [ rebase_path(outputs[0], root_out_dir) ]
   }
 
-  deps = [ ":tests" ]
+  deps = [
+    ":test_components",
+    ":tests",
+  ]
 
   args = [
     "--build-dir",
     ".",
     "--input",
     "tests.json",
+    "--test-components",
+    "test_components.json",
     "--output",
     "test-list.json",
     "--depfile",

@@ -12,6 +12,10 @@ pub struct Opt {
     // Path to the tests.json file.
     pub input: Utf8PathBuf,
 
+    #[structopt(short = "t", long = "test-components")]
+    // Path to the test_components.json file.
+    pub test_components_list: Utf8PathBuf,
+
     #[structopt(short = "o", long = "output")]
     // Path to output test-list.
     pub output: Utf8PathBuf,
@@ -28,6 +32,11 @@ pub struct Opt {
 impl Opt {
     pub fn validate(&self) -> Result<(), Error> {
         ensure!(self.input.exists(), "input {:?} does not exist", self.input);
+        ensure!(
+            self.test_components_list.exists(),
+            "test_components_list {:?} does not exist",
+            self.test_components_list
+        );
         ensure!(self.build_dir.exists(), "build-dir {:?} does not exist", self.build_dir);
         Ok(())
     }

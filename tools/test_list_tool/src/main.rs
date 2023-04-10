@@ -5,7 +5,7 @@
 //! test_list_tool generates test-list.json.
 
 use {
-    anyhow::Error,
+    anyhow::{format_err, Error},
     camino::{Utf8Path, Utf8PathBuf},
     fidl::encoding::unpersist,
     fidl_fuchsia_component_decl::Component,
@@ -16,6 +16,7 @@ use {
     serde_json,
     std::{
         cmp::{Eq, PartialEq},
+        collections::HashMap,
         fmt::Debug,
         fs,
         io::Read,
@@ -45,6 +46,7 @@ struct TestEntry {
     cpu: String,
     os: String,
     package_url: Option<String>,
+    component_label: Option<String>,
     package_manifests: Option<Vec<String>>,
     log_settings: Option<LogSettings>,
     build_rule: Option<String>,
@@ -55,6 +57,39 @@ struct TestEntry {
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct LogSettings {
     max_severity: Option<diagnostics_data::Severity>,
+}
+
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
+struct TestComponentsJsonEntry {
+    test_component: TestComponentEntry,
+}
+
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Default, Clone)]
+struct TestComponentEntry {
+    label: String,
+    moniker: Option<String>,
+}
+
+impl TestComponentsJsonEntry {
+    fn convert_to_map(
+        value: Vec<TestComponentsJsonEntry>,
+    ) -> Result<HashMap<String, TestComponentsJsonEntry>, Error> {
+        let mut map = HashMap::<String, TestComponentsJsonEntry>::default();
+        for entry in value {
+            if let Some(old_entry) = map.get(&entry.test_component.label) {
+                if !old_entry.eq(&entry) {
+                    return Err(format_err!(
+                        "Conflicting test components: {:?}, {:?}",
+                        old_entry,
+                        entry
+                    ));
+                }
+            } else {
+                map.insert(entry.test_component.label.clone(), entry);
+            }
+        }
+        Ok(map)
+    }
 }
 
 /// This struct contains the set of tags that can be added to tests in the fuchsia.git build.
@@ -123,12 +158,11 @@ fn update_tags_from_facets(
     test_tags: &mut FuchsiaTestTags,
     facets: &fdata::Dictionary,
 ) -> Result<(), Error> {
-    test_tags.realm = Some(HERMETIC_TEST_REALM.to_string());
-    let mut runs_in_hermetic_realm = true;
+    let mut runs_in_hermetic_realm = test_tags.realm.is_none();
     let mut depends_on_system_packages = false;
     for facet in facets.entries.as_ref().unwrap_or(&vec![]) {
         // TODO(rudymathu): CFv1 tests should not have a hermetic tag.
-        if facet.key.eq(TEST_REALM_FACET_NAME) {
+        if facet.key.eq(TEST_REALM_FACET_NAME) && test_tags.realm.is_none() {
             let val = facet
                 .value
                 .as_ref()
@@ -165,6 +199,9 @@ fn update_tags_from_facets(
             }
         }
     }
+    if test_tags.realm.is_none() {
+        test_tags.realm = Some(HERMETIC_TEST_REALM.to_string());
+    }
     // Only hermetic if the test is executed in `hermetic` realm and does not depend on any system
     // packages.
     test_tags.hermetic = Some(!depends_on_system_packages && runs_in_hermetic_realm);
@@ -172,7 +209,7 @@ fn update_tags_from_facets(
     Ok(())
 }
 
-fn to_test_list_entry(test_entry: &TestEntry) -> TestListEntry {
+fn to_test_list_entry(test_entry: &TestEntry, realm: Option<String>) -> TestListEntry {
     let execution = match &test_entry.package_url {
         Some(url) => Some(ExecutionEntry::FuchsiaComponent(FuchsiaComponentExecutionEntry {
             component_url: url.to_string(),
@@ -182,6 +219,7 @@ fn to_test_list_entry(test_entry: &TestEntry) -> TestListEntry {
             also_run_disabled_tests: false,
             parallel: None,
             max_severity_logs: test_entry.get_max_log_severity(),
+            realm: realm,
         })),
         None => None,
     };
@@ -250,6 +288,13 @@ fn read_tests_json(file: &Utf8PathBuf) -> Result<Vec<TestsJsonEntry>, Error> {
     Ok(t)
 }
 
+fn read_test_components_json(file: &Utf8PathBuf) -> Result<Vec<TestComponentsJsonEntry>, Error> {
+    let mut buffer = String::new();
+    fs::File::open(&file)?.read_to_string(&mut buffer)?;
+    let t: Vec<TestComponentsJsonEntry> = serde_json::from_str(&buffer)?;
+    Ok(t)
+}
+
 fn update_tags_from_manifest(
     test_tags: &mut FuchsiaTestTags,
     package_url: String,
@@ -288,12 +333,22 @@ fn run_tool() -> Result<(), Error> {
     opt.validate()?;
 
     let tests_json = read_tests_json(&opt.input)?;
+    let test_components_json = read_test_components_json(&opt.test_components_list)?;
+    let test_components_map = TestComponentsJsonEntry::convert_to_map(test_components_json)?;
     let mut test_list = TestList::Experimental { data: vec![] };
     let mut inputs: Vec<Utf8PathBuf> = vec![];
 
     for entry in tests_json {
+        let realm = match &entry.test.component_label {
+            Some(component_label) => match test_components_map.get(component_label) {
+                Some(test_component) => test_component.test_component.moniker.clone(),
+                None => None,
+            },
+            None => None,
+        };
+
         // Construct the base TestListEntry.
-        let mut test_list_entry = to_test_list_entry(&entry.test);
+        let mut test_list_entry = to_test_list_entry(&entry.test, realm.clone());
         let mut test_tags = FuchsiaTestTags::new();
         let pkg_manifests = entry.test.package_manifests.clone().unwrap_or(vec![]);
 
@@ -314,6 +369,7 @@ fn run_tool() -> Result<(), Error> {
             }
             let meta_far_path = res.unwrap();
             inputs.push(meta_far_path.clone());
+            test_tags.realm = realm;
 
             // Find additional tags. Note that this can override existing tags (e.g. to set the test type based on realm)
             match update_tags_from_manifest(&mut test_tags, pkg_url.clone(), &meta_far_path) {
@@ -529,6 +585,22 @@ mod tests {
         ]);
         update_tags_from_facets(&mut tags, &facets).expect("failed get tags in tags_from_facets");
         assert_eq!(tags, non_hermetic_tags);
+
+        let mut tags = FuchsiaTestTags::default();
+        tags.realm = Some("/some/moniker".into());
+        facets.entries = Some(vec![
+            fdata::DictionaryEntry {
+                key: TEST_REALM_FACET_NAME.to_string(),
+                value: Some(Box::new(fdata::DictionaryValue::Str("other_collection".to_string()))),
+            },
+            fdata::DictionaryEntry {
+                key: TEST_DEPRECATED_ALLOWED_PACKAGES_FACET_KEY.to_string(),
+                value: Some(Box::new(fdata::DictionaryValue::StrVec(vec![]))),
+            },
+        ]);
+        update_tags_from_facets(&mut tags, &facets).expect("failed get tags in tags_from_facets");
+        assert_eq!(tags.hermetic, Some(false));
+        assert_eq!(tags.realm, Some("/some/moniker".into()));
     }
 
     #[test]
@@ -575,29 +647,55 @@ mod tests {
                 also_run_disabled_tests: false,
                 parallel: None,
                 max_severity_logs,
+                realm: None,
             })),
         };
 
         // Default severity.
-        let test_list_entry = to_test_list_entry(&make_test_entry(None));
+        let test_list_entry = to_test_list_entry(&make_test_entry(None), None);
         assert_eq!(test_list_entry, make_expected_test_list_entry(None),);
 
         // Inner default severity.
         let test_list_entry =
-            to_test_list_entry(&make_test_entry(Some(LogSettings { max_severity: None })));
+            to_test_list_entry(&make_test_entry(Some(LogSettings { max_severity: None })), None);
         assert_eq!(test_list_entry, make_expected_test_list_entry(None),);
 
         // Explicit severity
-        let test_list_entry = to_test_list_entry(&make_test_entry(Some(LogSettings {
-            max_severity: Some(diagnostics_data::Severity::Error),
-        })));
+        let test_list_entry = to_test_list_entry(
+            &make_test_entry(Some(LogSettings {
+                max_severity: Some(diagnostics_data::Severity::Error),
+            })),
+            None,
+        );
         assert_eq!(
             test_list_entry,
             make_expected_test_list_entry(Some(diagnostics_data::Severity::Error))
         );
 
+        // pass in realm
+        let test_list_entry =
+            to_test_list_entry(&make_test_entry(None), Some("/some/moniker".into()));
+        let expected_list = TestListEntry {
+            name: "test-name".to_string(),
+            labels: vec!["test-label".to_string()],
+            tags: vec![],
+            execution: Some(ExecutionEntry::FuchsiaComponent(FuchsiaComponentExecutionEntry {
+                component_url:
+                    "fuchsia-pkg://fuchsia.com/echo-integration-test#meta/echo-client-test.cm"
+                        .to_string(),
+                test_args: vec![],
+                timeout_seconds: None,
+                test_filters: None,
+                also_run_disabled_tests: false,
+                parallel: None,
+                max_severity_logs: None,
+                realm: Some("/some/moniker".into()),
+            })),
+        };
+        assert_eq!(test_list_entry, expected_list);
+
         // Host test
-        let test_list_entry = to_test_list_entry(&host_test_entry);
+        let test_list_entry = to_test_list_entry(&host_test_entry, None);
         assert_eq!(
             test_list_entry,
             TestListEntry {
@@ -951,5 +1049,88 @@ mod tests {
                 }
             ],
         );
+    }
+
+    #[test]
+    fn test_read_test_components_json() {
+        let data = r#"
+            [
+                {
+                    "test_component": {
+                        "label": "//build/components/tests:echo-integration-test(//build/toolchain/fuchsia:x64)"
+                    }
+                },
+                {
+                    "test_component": {
+                        "label": "//build/components/tests:echo-system-integration-test(//build/toolchain/fuchsia:x64)",
+                        "moniker": "/some/moniker"
+                    }
+                }
+            ]"#;
+        let tmp = tempdir().expect("failed to get tempdir");
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+        let json_path = dir.join("test_components.json");
+        fs::write(&json_path, data).expect("failed to write tests.json to tempfile");
+        let tests_json =
+            read_test_components_json(&json_path).expect("read_test_components_json() failed");
+        assert_eq!(
+            tests_json,
+            vec![
+                TestComponentsJsonEntry{
+                    test_component: TestComponentEntry {
+                        label: "//build/components/tests:echo-integration-test(//build/toolchain/fuchsia:x64)".into(),
+                        moniker: None
+                    }
+                },
+                TestComponentsJsonEntry{
+                    test_component: TestComponentEntry {
+                        label: "//build/components/tests:echo-system-integration-test(//build/toolchain/fuchsia:x64)".into(),
+                        moniker: Some("/some/moniker".into())
+                    }
+                }
+            ],
+        );
+    }
+
+    #[test]
+    fn convert_test_components_to_map() {
+        let entry1 = TestComponentsJsonEntry {
+            test_component: TestComponentEntry {
+                label:
+                    "//build/components/tests:echo-integration-test(//build/toolchain/fuchsia:x64)"
+                        .into(),
+                moniker: None,
+            },
+        };
+        let entry2 = TestComponentsJsonEntry{
+            test_component: TestComponentEntry {
+                label: "//build/components/tests:echo-system-integration-test(//build/toolchain/fuchsia:x64)".into(),
+                moniker: Some("/some/moniker".into())
+            }
+        };
+        let entries = vec![entry1.clone(), entry2.clone()];
+        let map = TestComponentsJsonEntry::convert_to_map(entries).unwrap();
+        let mut expected_map = HashMap::new();
+        expected_map.insert(entry1.test_component.label.clone(), entry1.clone());
+        expected_map.insert(entry2.test_component.label.clone(), entry2.clone());
+
+        assert_eq!(map, expected_map);
+
+        // test non-conflicting entries
+
+        // duplicate entries.
+        let entries = vec![entry1.clone(), entry2.clone(), entry1.clone(), entry2.clone()];
+        let map = TestComponentsJsonEntry::convert_to_map(entries).unwrap();
+        let mut expected_map = HashMap::new();
+        expected_map.insert(entry1.test_component.label.clone(), entry1.clone());
+        expected_map.insert(entry2.test_component.label.clone(), entry2.clone());
+        assert_eq!(map, expected_map);
+
+        // test non-conflicting entries
+        let mut entry3 = entry1.clone();
+        entry3.test_component.moniker = Some("moniker".into());
+        let entries = vec![entry1, entry2, entry3];
+        let _ = TestComponentsJsonEntry::convert_to_map(entries)
+            .expect_err("This should error out due to conflicting entries");
     }
 }

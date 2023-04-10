@@ -207,6 +207,12 @@ async fn test_params_from_args(
     cmd: RunCommand,
     json_input_experiment_enabled: bool,
 ) -> Result<impl ExactSizeIterator<Item = run_test_suite_lib::TestParams> + Debug, FfxError> {
+    let lifecycle_controller = ffx_component::rcs::connect_to_lifecycle_controller(&remote_control)
+        .await
+        .map_err(|e| ffx_error!("Parsing realm: Cannot connect to lifecycle controller: {}", e))?;
+    let realm_query = ffx_component::rcs::connect_to_realm_query(&remote_control)
+        .await
+        .map_err(|e| ffx_error!("Parsing realm: Cannot connect to realm query: {}", e))?;
     match &cmd.test_file {
         Some(_) if !json_input_experiment_enabled => {
             return Err(ffx_error!(
@@ -223,8 +229,11 @@ async fn test_params_from_args(
                     .map_err(|e| ffx_error!("Failed to open file {}: {:?}", filename, e))?;
                 suite_definition::test_params_from_reader(
                     file,
+                    &lifecycle_controller,
+                    &realm_query,
                     TestParamsOptions { ignore_test_without_known_execution: false },
                 )
+                .await
                 .map_err(|e| ffx_error!("Failed to read test definitions: {:?}", e))
             }
         }
@@ -240,19 +249,6 @@ async fn test_params_from_args(
 
             let mut provided_realm = None;
             if let Some(realm_str) = &cmd.realm {
-                let lifecycle_controller =
-                    ffx_component::rcs::connect_to_lifecycle_controller(&remote_control)
-                        .await
-                        .map_err(|e| {
-                            ffx_error!(
-                                "Parsing realm: Cannot connect to lifecycle controller: {}",
-                                e
-                            )
-                        })?;
-                let realm_query =
-                    ffx_component::rcs::connect_to_realm_query(&remote_control).await.map_err(
-                        |e| ffx_error!("Parsing realm: Cannot connect to realm query: {}", e),
-                    )?;
                 provided_realm = Some(
                     run_test_suite_lib::parse_provided_realm(
                         &lifecycle_controller,
@@ -320,8 +316,11 @@ async fn get_tests<W: Write>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl::endpoints::create_proxy_and_stream;
+    use futures::prelude::*;
     use lazy_static::lazy_static;
     use std::num::NonZeroU32;
+    use std::sync::Arc;
     use test_list::TestTag;
 
     const VALID_INPUT_FILENAME: &str = "valid_defs.json";
@@ -372,6 +371,51 @@ mod test {
         static ref VALID_FILE_INPUT: Vec<u8> =
             VALID_INPUT_FORMAT.replace("{}", "file").into_bytes();
         static ref INVALID_INPUT: Vec<u8> = vec![1u8; 64];
+    }
+
+    struct FakeRemoteControllerProvider {
+        controller: Arc<fremotecontrol::RemoteControlProxy>,
+        _task: fuchsia_async::Task<()>,
+    }
+
+    impl FakeRemoteControllerProvider {
+        fn new() -> FakeRemoteControllerProvider {
+            let (remote_control, mut stream) =
+                create_proxy_and_stream::<fremotecontrol::RemoteControlMarker>().unwrap();
+            let _task = fuchsia_async::Task::spawn(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    // store channels so that they do not die.
+                    let mut server_channels = vec![];
+                    match request {
+                        fremotecontrol::RemoteControlRequest::RootLifecycleController {
+                            server,
+                            responder,
+                        } => {
+                            server_channels.push(server.into_channel());
+                            let mut r = Ok(());
+                            responder.send(&mut r).expect("error sending EchoString response");
+                        }
+
+                        fremotecontrol::RemoteControlRequest::RootRealmQuery {
+                            server,
+                            responder,
+                        } => {
+                            server_channels.push(server.into_channel());
+                            let mut r = Ok(());
+                            responder.send(&mut r).expect("error sending EchoString response");
+                        }
+                        _ => {
+                            panic!("Not implemented: {:?}", request);
+                        }
+                    }
+                }
+            });
+            FakeRemoteControllerProvider { controller: remote_control.into(), _task }
+        }
+
+        fn remote_controller(&self) -> &fremotecontrol::RemoteControlProxy {
+            self.controller.as_ref()
+        }
     }
 
     #[fuchsia::test]
@@ -541,10 +585,14 @@ mod test {
                 ],
             ),
         ];
-        let (remote_control, _server_end) =
-            create_proxy::<fremotecontrol::RemoteControlMarker>().unwrap();
+        let fake_contoller = FakeRemoteControllerProvider::new();
         for (run_command, expected_test_params) in cases.into_iter() {
-            let result = test_params_from_args(&remote_control, run_command.clone(), true).await;
+            let result = test_params_from_args(
+                fake_contoller.remote_controller(),
+                run_command.clone(),
+                true,
+            )
+            .await;
             assert!(
                 result.is_ok(),
                 "Error getting test params from {:?}: {:?}",
@@ -561,10 +609,9 @@ mod test {
         // large test count should result in a modest memory allocation. If
         // that wasn't the case, this test would fail.
         const COUNT: u32 = u32::MAX;
-        let (remote_control, _server_end) =
-            create_proxy::<fremotecontrol::RemoteControlMarker>().unwrap();
+        let fake_contoller = FakeRemoteControllerProvider::new();
         let params = test_params_from_args(
-            &remote_control,
+            fake_contoller.remote_controller(),
             RunCommand {
                 test_args: vec!["my-test-url".to_string()],
                 count: Some(COUNT),
@@ -670,10 +717,14 @@ mod test {
                 },
             ),
         ];
-        let (remote_control, _server_end) =
-            create_proxy::<fremotecontrol::RemoteControlMarker>().unwrap();
+        let fake_contoller = FakeRemoteControllerProvider::new();
         for (case_name, invalid_run_command) in cases.into_iter() {
-            let result = test_params_from_args(&remote_control, invalid_run_command, true).await;
+            let result = test_params_from_args(
+                fake_contoller.remote_controller(),
+                invalid_run_command,
+                true,
+            )
+            .await;
             assert!(
                 result.is_err(),
                 "Getting test params for case '{}' unexpectedly succeeded",

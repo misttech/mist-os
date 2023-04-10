@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
+use fidl_fuchsia_sys2 as fsys;
 use run_test_suite_lib::TestParams;
 use std::io::Read;
 use test_list::{ExecutionEntry, FuchsiaComponentExecutionEntry, TestList, TestListEntry};
@@ -14,60 +15,70 @@ pub struct TestParamsOptions {
     pub ignore_test_without_known_execution: bool,
 }
 
-pub fn test_params_from_reader<R: Read>(
+pub async fn test_params_from_reader<R: Read>(
     reader: R,
+    lifecycle_controller: &fsys::LifecycleControllerProxy,
+    realm_query: &fsys::RealmQueryProxy,
     options: TestParamsOptions,
 ) -> Result<Vec<TestParams>> {
     let test_list: TestList = serde_json::from_reader(reader).map_err(anyhow::Error::from)?;
     let TestList::Experimental { data } = test_list;
-    if options.ignore_test_without_known_execution {
-        Ok(data
-            .into_iter()
-            .filter_map(|entry| maybe_convert_test_list_entry_to_test_params(entry).ok())
-            .collect())
-    } else {
-        data.into_iter()
-            .map(maybe_convert_test_list_entry_to_test_params)
-            .collect::<Result<Vec<TestParams>, anyhow::Error>>()
-    }
-}
-
-fn maybe_convert_test_list_entry_to_test_params(entry: TestListEntry) -> Result<TestParams> {
-    let TestListEntry { tags, execution, name, .. } = entry;
-
-    match execution {
-        Some(ExecutionEntry::FuchsiaComponent(component_execution)) => {
-            let FuchsiaComponentExecutionEntry {
-                component_url,
-                test_args,
-                timeout_seconds,
-                test_filters,
-                also_run_disabled_tests,
-                parallel,
-                max_severity_logs,
-            } = component_execution;
-
-            Ok(TestParams {
-                test_url: component_url,
-                realm: None.into(),
-                test_args,
-                timeout_seconds,
-                test_filters,
-                also_run_disabled_tests,
-                parallel,
-                max_severity_logs,
-                tags,
-            })
+    let mut result = vec![];
+    for entry in data {
+        let TestListEntry { tags, execution, name, .. } = entry;
+        match execution {
+            Some(ExecutionEntry::FuchsiaComponent(component_execution)) => {
+                let FuchsiaComponentExecutionEntry {
+                    component_url,
+                    test_args,
+                    timeout_seconds,
+                    test_filters,
+                    also_run_disabled_tests,
+                    parallel,
+                    max_severity_logs,
+                    realm,
+                } = component_execution;
+                let mut provided_realm = None;
+                if let Some(realm_str) = &realm {
+                    provided_realm = Some(
+                        run_test_suite_lib::parse_provided_realm(
+                            &lifecycle_controller,
+                            &realm_query,
+                            &realm_str,
+                        )
+                        .await
+                        .map_err(|e| {
+                            errors::ffx_error!("Error parsing realm '{}': {}", realm_str, e)
+                        })?,
+                    );
+                }
+                result.push(TestParams {
+                    test_url: component_url,
+                    realm: provided_realm.into(),
+                    test_args,
+                    timeout_seconds,
+                    test_filters,
+                    also_run_disabled_tests,
+                    parallel,
+                    max_severity_logs,
+                    tags,
+                });
+            }
+            _ => {
+                if !options.ignore_test_without_known_execution {
+                    return Err(format_err!(
+            "Cannot execute {name}, only \"fuchsia_component\" test execution is supported."));
+                }
+            }
         }
-        _ => Err(format_err!(
-            "Cannot execute {name}, only \"fuchsia_component\" test execution is supported."
-        )),
     }
+    Ok(result)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use fidl::endpoints::create_proxy;
 
     const VALID_JSON: &'static str = r#"
     {
@@ -108,34 +119,52 @@ mod test {
     }
     "#;
 
-    #[test]
-    fn test_params_from_reader_valid() {
+    #[fuchsia::test]
+    async fn test_params_from_reader_valid() {
         let reader = VALID_JSON.as_bytes();
+        let (lifecycle_controller, _server_end1) =
+            create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
+        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>().unwrap();
         let test_params = test_params_from_reader(
             reader,
+            &lifecycle_controller,
+            &realm_query,
             TestParamsOptions { ignore_test_without_known_execution: false },
         )
+        .await
         .expect("read file");
         assert_eq!(1, test_params.len());
     }
 
-    #[test]
-    fn test_params_from_reader_invalid() {
+    #[fuchsia::test]
+    async fn test_params_from_reader_invalid() {
         let reader = CONTAINS_VALID_AND_INVALID.as_bytes();
+        let (lifecycle_controller, _server_end1) =
+            create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
+        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>().unwrap();
         let test_params = test_params_from_reader(
             reader,
+            &lifecycle_controller,
+            &realm_query,
             TestParamsOptions { ignore_test_without_known_execution: false },
-        );
+        )
+        .await;
         assert!(test_params.is_err());
     }
 
-    #[test]
-    fn test_params_from_reader_invalid_skipped() {
+    #[fuchsia::test]
+    async fn test_params_from_reader_invalid_skipped() {
         let reader = CONTAINS_VALID_AND_INVALID.as_bytes();
+        let (lifecycle_controller, _server_end1) =
+            create_proxy::<fsys::LifecycleControllerMarker>().unwrap();
+        let (realm_query, _server_end2) = create_proxy::<fsys::RealmQueryMarker>().unwrap();
         let test_params = test_params_from_reader(
             reader,
+            &lifecycle_controller,
+            &realm_query,
             TestParamsOptions { ignore_test_without_known_execution: true },
         )
+        .await
         .expect("should have ignored errors");
         assert_eq!(1, test_params.len());
     }

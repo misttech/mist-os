@@ -89,4 +89,7 @@ pub struct FuchsiaComponentExecutionEntry {
     /// that all logging during test execution is equal to or below
     /// this level.
     pub max_severity_logs: Option<diagnostics_data::Severity>,
+
+    /// The moniker of the realm to to run this test in.
+    pub realm: Option<String>,
 }
