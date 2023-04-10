@@ -366,13 +366,14 @@ __EXPORT NO_ASAN LIBC_NO_SAFESTACK _Noreturn void __libc_start_main(zx_handle_t 
         // would ignore the original real frame _start pushed because that FP
         // value is not in the recorded bounds of the thread's machine stack.
         "add sp, sp, -16\n"
-        "sd %[return_address], 0(sp)\n"
-        "sd zero, 8(sp)\n"
+        "sd %[return_address], 8(sp)\n"
+        "sd zero, 0(sp)\n"
         // Since we force frame pointers on when compiling this function, we
         // assume that the compiler will have defined its CFI rule for the
         // caller's FP register in terms of the CFA, so that's still correct
-        // after we clobber it here.
-        "mv fp, sp\n"
+        // after we clobber it here.  On RISC-V, the FP points to the CFA, not
+        // to the bottom of the FP, PC pair.
+        "add fp, sp, 16\n"
 
         // Save the caller's s2 in another call-saved register.
         "mv s3, s2\n"
