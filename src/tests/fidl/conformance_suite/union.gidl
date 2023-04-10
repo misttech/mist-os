@@ -35,8 +35,6 @@ success("UnionWithBoundString") {
 }
 
 encode_failure("UnionWithBoundString_ExceedsBounds") {
-    // TODO(fxbug.dev/37304) Enforce size bounds in rust
-    bindings_denylist = [rust],
     value = UnionWithBoundStringStruct{
         v: UnionWithBoundString{
             boundFiveStr: "abcdef",

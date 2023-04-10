@@ -393,6 +393,7 @@ mod tests {
                 testing::{mocks::*, out_dir::OutDir, test_helpers::*, test_hook::*},
             },
         },
+        assert_matches::assert_matches,
         cm_rust::{
             self, CapabilityName, CapabilityPath, ComponentDecl, ExposeDecl, ExposeProtocolDecl,
             ExposeSource, ExposeTarget,
@@ -623,7 +624,8 @@ mod tests {
         }
         // Long dynamic child name violations.
         {
-            // `allow_long_names` is not set
+            // Name exceeds MAX_NAME_LENGTH when `allow_long_names` is not set.
+            // The FIDL call succeeds but the server responds with an error.
             let mut collection_ref = fdecl::CollectionRef { name: "coll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("a".repeat(cm_types::MAX_NAME_LENGTH + 1).to_string()),
@@ -641,6 +643,8 @@ mod tests {
             assert_eq!(err, fcomponent::Error::InvalidArguments);
 
             // Name length exceeds the MAX_LONG_NAME_LENGTH when `allow_long_names` is set.
+            // In this case the FIDL call fails to encode because the name field
+            // is defined in the FIDL library as `string:MAX_LONG_NAME_LENGTH`.
             let mut collection_ref = fdecl::CollectionRef { name: "pcoll".to_string() };
             let child_decl = fdecl::Child {
                 name: Some("a".repeat(cm_types::MAX_LONG_NAME_LENGTH + 1).to_string()),
@@ -653,9 +657,10 @@ mod tests {
                 .realm_proxy
                 .create_child(&mut collection_ref, child_decl, fcomponent::CreateChildArgs::EMPTY)
                 .await
-                .expect("fidl call failed")
                 .expect_err("unexpected success");
-            assert_eq!(err, fcomponent::Error::InvalidArguments);
+            // When exceeding the long max name length, the FIDL call itself
+            // fails because the name field is defined as `string:1024`.
+            assert_matches!(err, fidl::Error::StringTooLong { .. });
         }
 
         // Instance already exists.

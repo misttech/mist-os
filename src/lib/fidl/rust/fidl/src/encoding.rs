@@ -1576,8 +1576,7 @@ unsafe impl<'a, T: ValueTypeMarker, const N: usize> Encode<Vector<T, N>> for &'a
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Vector<T, N>>(offset);
-        // TODO(fxbug.dev/37304): Check vector length against N.
-        encode_vector_value::<T>(self, encoder, offset, depth)
+        encode_vector_value::<T>(self, N, check_vector_length, encoder, offset, depth)
     }
 }
 
@@ -1587,8 +1586,7 @@ unsafe impl<'a, T: ResourceTypeMarker, const N: usize> Encode<Vector<T, N>>
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Vector<T, N>>(offset);
-        // TODO(fxbug.dev/37304): Check vector length against N.
-        encode_vector_resource::<T>(self, encoder, offset, depth)
+        encode_vector_resource::<T>(self, N, encoder, offset, depth)
     }
 }
 
@@ -1603,8 +1601,7 @@ unsafe impl<T: TypeMarker, const N: usize, E: Encode<T>, I: ExactSizeIterator<It
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<Vector<T, N>>(offset);
-        // TODO(fxbug.dev/37304): Check vector length against N.
-        encode_vector_iter::<T, E>(self.0, encoder, offset, depth)
+        encode_vector_iter::<T, E>(self.0, N, encoder, offset, depth)
     }
 }
 
@@ -1622,14 +1619,15 @@ impl<T: TypeMarker, const N: usize> Decode<Vector<T, N>> for Vec<T::Owned> {
         depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<Vector<T, N>>(offset);
-        // TODO(fxbug.dev/37304): Check vector length against N.
-        decode_vector::<T>(self, decoder, offset, depth)
+        decode_vector::<T>(self, N, decoder, offset, depth)
     }
 }
 
 #[inline]
 unsafe fn encode_vector_value<T: ValueTypeMarker>(
     slice: &[T::Owned],
+    max_length: usize,
+    check_length: impl Fn(usize, usize) -> Result<()>,
     encoder: &mut Encoder<'_>,
     offset: usize,
     mut depth: Depth,
@@ -1640,6 +1638,7 @@ unsafe fn encode_vector_value<T: ValueTypeMarker>(
     if slice.len() == 0 {
         return Ok(());
     }
+    check_length(slice.len(), max_length)?;
     depth.increment()?;
     let bytes_len = slice.len() * T::inline_size(encoder.context);
     let offset = encoder.out_of_line_offset(bytes_len);
@@ -1649,6 +1648,7 @@ unsafe fn encode_vector_value<T: ValueTypeMarker>(
 #[inline]
 unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
     slice: &mut [T::Owned],
+    max_length: usize,
     encoder: &mut Encoder<'_>,
     offset: usize,
     mut depth: Depth,
@@ -1659,6 +1659,7 @@ unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
     if slice.len() == 0 {
         return Ok(());
     }
+    check_vector_length(slice.len(), max_length)?;
     depth.increment()?;
     let bytes_len = slice.len() * T::inline_size(encoder.context);
     let offset = encoder.out_of_line_offset(bytes_len);
@@ -1669,6 +1670,7 @@ unsafe fn encode_vector_resource<T: ResourceTypeMarker>(
 #[inline]
 unsafe fn encode_vector_iter<T: TypeMarker, E: Encode<T>>(
     iter: impl ExactSizeIterator<Item = E>,
+    max_length: usize,
     encoder: &mut Encoder<'_>,
     offset: usize,
     mut depth: Depth,
@@ -1679,6 +1681,7 @@ unsafe fn encode_vector_iter<T: TypeMarker, E: Encode<T>>(
     if iter.len() == 0 {
         return Ok(());
     }
+    check_vector_length(iter.len(), max_length)?;
     depth.increment()?;
     let stride = T::inline_size(encoder.context);
     let bytes_len = iter.len() * stride;
@@ -1692,6 +1695,7 @@ unsafe fn encode_vector_iter<T: TypeMarker, E: Encode<T>>(
 #[inline]
 unsafe fn decode_vector<T: TypeMarker>(
     vec: &mut Vec<T::Owned>,
+    max_length: usize,
     decoder: &mut Decoder<'_>,
     offset: usize,
     mut depth: Depth,
@@ -1699,6 +1703,7 @@ unsafe fn decode_vector<T: TypeMarker>(
     let Some(len) = decode_vector_header(decoder, offset)? else {
         return Err(Error::NotNullable);
     };
+    check_vector_length(len, max_length)?;
     depth.increment()?;
     let bytes_len = len * T::inline_size(decoder.context);
     let offset = decoder.out_of_line_offset(bytes_len)?;
@@ -1744,6 +1749,14 @@ pub fn decode_vector_header(decoder: &mut Decoder<'_>, offset: usize) -> Result<
     }
 }
 
+#[inline(always)]
+fn check_vector_length(actual_length: usize, max_length: usize) -> Result<()> {
+    if actual_length > max_length {
+        return Err(Error::VectorTooLong { max_length, actual_length });
+    }
+    Ok(())
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Strings
 ////////////////////////////////////////////////////////////////////////////////
@@ -1780,8 +1793,7 @@ unsafe impl<'a, const N: usize> Encode<BoundedString<N>> for &'a str {
     #[inline]
     unsafe fn encode(self, encoder: &mut Encoder<'_>, offset: usize, depth: Depth) -> Result<()> {
         encoder.debug_check_bounds::<BoundedString<N>>(offset);
-        // TODO(fxbug.dev/37304): Check string length against N.
-        encode_vector_value::<u8>(self.as_bytes(), encoder, offset, depth)
+        encode_vector_value::<u8>(self.as_bytes(), N, check_string_length, encoder, offset, depth)
     }
 }
 
@@ -1799,14 +1811,14 @@ impl<const N: usize> Decode<BoundedString<N>> for String {
         depth: Depth,
     ) -> Result<()> {
         decoder.debug_check_bounds::<BoundedString<N>>(offset);
-        // TODO(fxbug.dev/37304): Check string length against N.
-        decode_string(self, decoder, offset, depth)
+        decode_string(self, N, decoder, offset, depth)
     }
 }
 
 #[inline]
 fn decode_string(
     string: &mut String,
+    max_length: usize,
     decoder: &mut Decoder<'_>,
     offset: usize,
     mut depth: Depth,
@@ -1814,6 +1826,7 @@ fn decode_string(
     let Some(len) = decode_vector_header(decoder, offset)? else {
         return Err(Error::NotNullable);
     };
+    check_string_length(len, max_length)?;
     depth.increment()?;
     let offset = decoder.out_of_line_offset(len)?;
     // Safety: `out_of_line_offset` does this bounds check.
@@ -1821,6 +1834,14 @@ fn decode_string(
     let utf8 = str::from_utf8(bytes).map_err(|_| Error::Utf8Error)?;
     let boxed_utf8: Box<str> = utf8.into();
     *string = boxed_utf8.into_string();
+    Ok(())
+}
+
+#[inline(always)]
+fn check_string_length(actual_bytes: usize, max_bytes: usize) -> Result<()> {
+    if actual_bytes > max_bytes {
+        return Err(Error::StringTooLong { max_bytes, actual_bytes });
+    }
     Ok(())
 }
 

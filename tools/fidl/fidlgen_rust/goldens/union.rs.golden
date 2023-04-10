@@ -896,7 +896,7 @@ fidl_union! {
     name: StrictBoundedUnion,
     members: [
         V {
-            ty: fidl::encoding::UnboundedVector<u8>,
+            ty: fidl::encoding::Vector<u8, 10>,
             ordinal: 1,
         },
     ],
@@ -1276,7 +1276,7 @@ fidl_struct! {
     name: Pasta,
     members: [
         sauce {
-            ty: fidl::encoding::UnboundedString,
+            ty: fidl::encoding::BoundedString<16>,
             index: 0,
             typevar: T0,
             offset_v1: 0,
@@ -1303,7 +1303,7 @@ fidl_struct! {
     name: Pizza,
     members: [
         toppings {
-            ty: fidl::encoding::UnboundedVector<fidl::encoding::UnboundedString>,
+            ty: fidl::encoding::UnboundedVector<fidl::encoding::BoundedString<16>>,
             index: 0,
             typevar: T0,
             offset_v1: 0,
