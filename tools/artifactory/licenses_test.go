@@ -63,11 +63,18 @@ func TestLicenseUploads(t *testing.T) {
 		t.Fatalf("failed to write to fake runFilesArchive: %s", err)
 	}
 
-	complianceFile := "compliance.csv"
+	complianceFile := "some_compliance.csv"
 	complianceFileAbs := filepath.Join(dir, complianceFile)
 	content = []byte("LICENSE,type,url,etc")
 	if err := os.WriteFile(complianceFileAbs, content, 0o600); err != nil {
 		t.Fatalf("failed to write to fake compliance file: %s", err)
+	}
+
+	licenseReviewArchive := "some_license_review.zip"
+	licenseReviewArchiveAbs := filepath.Join(dir, licenseReviewArchive)
+	content = []byte("blabla")
+	if err := os.WriteFile(licenseReviewArchiveAbs, content, 0o600); err != nil {
+		t.Fatalf("failed to write to fake license review archive file: %s", err)
 	}
 
 	m := &mockLicenseModules{
@@ -78,12 +85,15 @@ func TestLicenseUploads(t *testing.T) {
 				LicenseFilesDir: licenseFilesDir,
 				RunFilesArchive: runFilesArchive,
 			},
+			{
+				LicenseReviewArchive: licenseReviewArchive,
+			},
 		},
 	}
 	want := []Upload{
 		{
 			Source:      complianceFileAbs,
-			Destination: filepath.Join(namespace, complianceFile),
+			Destination: filepath.Join(namespace, "compliance.csv"),
 			Deduplicate: false,
 		},
 		{
@@ -95,6 +105,10 @@ func TestLicenseUploads(t *testing.T) {
 		{
 			Source:      runFilesArchiveAbs,
 			Destination: filepath.Join(namespace, runFilesArchive),
+		},
+		{
+			Source:      licenseReviewArchiveAbs,
+			Destination: filepath.Join(namespace, "license_review.zip"),
 		},
 	}
 	got, err := licenseUploads(m, namespace)

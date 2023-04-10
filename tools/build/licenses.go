@@ -14,4 +14,7 @@ type License struct {
 
 	// RunFilesArchive is an archive of all the check-licenses output artifacts
 	RunFilesArchive string `json:"run_files_archive"`
+
+	// LicenseReviewArchive is the output of `generate_license_review` Bazel rule
+	LicenseReviewArchive string `json:"license_review_archive"`
 }

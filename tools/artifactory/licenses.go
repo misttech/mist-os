@@ -21,11 +21,13 @@ func licenseUploads(mods licModules, namespace string) ([]Upload, error) {
 	files := []Upload{}
 
 	for _, lic := range mods.Licenses() {
-		// Compliance file
-		files = append(files, Upload{
-			Source:      path.Join(mods.BuildDir(), lic.ComplianceFile),
-			Destination: path.Join(namespace, "compliance.csv"),
-		})
+		if lic.ComplianceFile != "" {
+			// Compliance file
+			files = append(files, Upload{
+				Source:      path.Join(mods.BuildDir(), lic.ComplianceFile),
+				Destination: path.Join(namespace, "compliance.csv"),
+			})
+		}
 
 		if lic.LicenseFilesDir != "" {
 			// License files
@@ -41,6 +43,14 @@ func licenseUploads(mods licModules, namespace string) ([]Upload, error) {
 			files = append(files, Upload{
 				Source:      path.Join(mods.BuildDir(), lic.RunFilesArchive),
 				Destination: path.Join(namespace, lic.RunFilesArchive),
+			})
+		}
+
+		if lic.LicenseReviewArchive != "" {
+			// Bazel license review archive
+			files = append(files, Upload{
+				Source:      path.Join(mods.BuildDir(), lic.LicenseReviewArchive),
+				Destination: path.Join(namespace, "license_review.zip"),
 			})
 		}
 	}

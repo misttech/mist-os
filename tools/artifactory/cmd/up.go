@@ -132,7 +132,8 @@ Emits a GCS upload manifest for a build with the following structure:
 │   │   │   │   ├── texts/
 │   │   │   │   │   └── <License text files>
 │   │   │   │   ├── compliance.csv
-│   │   │   │   └── runfiles.tar.gz (zipped check-licenses configs & artifacts)
+│   │   │   │   ├── runfiles.tar.gz (zipped check-licenses configs & artifacts)
+│   │   │   │   └── license_review.zip (output of fuchsia_license_review bazel rule)
 
 
 Where $GCS_BUCKET is defined by the infrastructure.
