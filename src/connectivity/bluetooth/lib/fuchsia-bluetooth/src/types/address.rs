@@ -155,7 +155,7 @@ pub(crate) mod proptest_util {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::proptest_util::*;
     use super::*;
 

@@ -520,7 +520,7 @@ pub mod example {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use {super::*, fidl_fuchsia_bluetooth_sys as sys};
 
     // Tests for conversions from fuchsia.bluetooth.sys API
