@@ -280,6 +280,7 @@ GlobalMatrixVector ComputeGlobalMatrices(
     const GlobalTopologyData::TopologyVector& global_topology,
     const GlobalTopologyData::ParentIndexVector& parent_indices,
     const UberStruct::InstanceMap& uber_structs) {
+  TRACE_DURATION("gfx", "ComputeGlobalMatrices");
   GlobalMatrixVector matrices;
 
   if (global_topology.empty()) {
@@ -326,6 +327,7 @@ GlobalImageSampleRegionVector ComputeGlobalImageSampleRegions(
     const GlobalTopologyData::TopologyVector& global_topology,
     const GlobalTopologyData::ParentIndexVector& parent_indices,
     const UberStruct::InstanceMap& uber_structs) {
+  TRACE_DURATION("gfx", "ComputeGlobalImageSampleRegions");
   GlobalImageSampleRegionVector sample_regions;
   sample_regions.reserve(global_topology.size());
   for (size_t i = 0; i < global_topology.size(); ++i) {
@@ -351,6 +353,7 @@ GlobalTransformClipRegionVector ComputeGlobalTransformClipRegions(
     const GlobalTopologyData::TopologyVector& global_topology,
     const GlobalTopologyData::ParentIndexVector& parent_indices,
     const GlobalMatrixVector& matrix_vector, const UberStruct::InstanceMap& uber_structs) {
+  TRACE_DURATION("gfx", "ComputeGlobalTransformClipRegions");
   FX_DCHECK(global_topology.size() == parent_indices.size());
   FX_DCHECK(global_topology.size() == matrix_vector.size());
 
@@ -414,6 +417,7 @@ GlobalHitRegionsMap ComputeGlobalHitRegions(
     const GlobalTopologyData::TopologyVector& global_topology,
     const GlobalTopologyData::ParentIndexVector& parent_indices,
     const GlobalMatrixVector& matrix_vector, const UberStruct::InstanceMap& uber_structs) {
+  TRACE_DURATION("gfx", "ComputeGlobalHitRegions");
   FX_DCHECK(global_topology.size() == parent_indices.size());
   FX_DCHECK(global_topology.size() == matrix_vector.size());
 
@@ -451,6 +455,7 @@ GlobalRectangleVector ComputeGlobalRectangles(
     const GlobalMatrixVector& matrices, const GlobalImageSampleRegionVector& sample_regions,
     const GlobalTransformClipRegionVector& clip_regions,
     const std::vector<allocation::ImageMetadata>& images) {
+  TRACE_DURATION("gfx", "ComputeGlobalRectangles");
   GlobalRectangleVector rectangles;
 
   if (matrices.empty() || sample_regions.empty()) {
@@ -492,7 +497,7 @@ GlobalRectangleVector ComputeGlobalRectangles(
 
 void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector* images_in_out,
                     uint64_t display_width, uint64_t display_height) {
-  TRACE_DURATION("gfx", "flatland::CullRectangles");
+  TRACE_DURATION("gfx", "CullRectangles");
   FX_DCHECK(rectangles_in_out && images_in_out);
   FX_DCHECK(rectangles_in_out->size() == images_in_out->size());
   auto is_occluder = [display_width, display_height](

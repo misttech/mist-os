@@ -27,6 +27,7 @@ ReleaseFenceManager::ReleaseFenceManager(async_dispatcher_t* dispatcher) : dispa
 void ReleaseFenceManager::OnGpuCompositedFrame(
     uint64_t frame_number, zx::event render_finished_fence, std::vector<zx::event> release_fences,
     scheduling::FramePresentedCallback frame_presented_callback) {
+  TRACE_DURATION("gfx", "ReleaseFenceManager::OnGpuCompositedFrame", "frame number", frame_number);
   auto record = NewGpuCompositionFrameRecord(frame_number, std::move(render_finished_fence),
                                              std::move(frame_presented_callback));
   SignalOrScheduleSignalForReleaseFences(frame_number, *record, std::move(release_fences));
@@ -36,6 +37,7 @@ void ReleaseFenceManager::OnGpuCompositedFrame(
 void ReleaseFenceManager::OnDirectScanoutFrame(
     uint64_t frame_number, std::vector<zx::event> release_fences,
     scheduling::FramePresentedCallback frame_presented_callback) {
+  TRACE_DURATION("gfx", "ReleaseFenceManager::OnDirectScanoutFrame", "frame number", frame_number);
   auto record = NewDirectScanoutFrameRecord(std::move(frame_presented_callback));
   SignalOrScheduleSignalForReleaseFences(frame_number, *record, std::move(release_fences));
   StashFrameRecord(frame_number, std::move(record));

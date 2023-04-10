@@ -9,6 +9,7 @@
 #include "src/ui/lib/escher/impl/vulkan_utils.h"
 #include "src/ui/lib/escher/resources/resource_recycler.h"
 #include "src/ui/lib/escher/util/image_utils.h"
+#include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/lib/escher/vk/image.h"
 
 namespace escher {
@@ -67,6 +68,7 @@ ImageViewAllocator::ImageViewAllocator(ResourceRecycler* resource_recycler)
     : resource_recycler_(resource_recycler) {}
 
 ImageViewPtr ImageViewAllocator::ObtainImageView(ImagePtr image, vk::ImageAspectFlags aspect_mask) {
+  TRACE_DURATION("gfx", "ImageViewAllocator::ObtainImageView");
   Hasher h;
   h.pointer(image.get());
   h.u64(static_cast<VkFlags>(aspect_mask));

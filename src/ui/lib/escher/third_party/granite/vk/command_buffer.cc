@@ -142,6 +142,7 @@ void CommandBuffer::BeginGraphicsOrComputeContext() {
 }
 
 void CommandBuffer::BeginRenderPass(const RenderPassInfo& info) {
+  TRACE_DURATION("gfx", "CommandBuffer::BeginRenderPass");
   FX_DCHECK(!IsInRenderPass());
   FX_DCHECK(pipeline_state_.current_subpass() == 0);
 

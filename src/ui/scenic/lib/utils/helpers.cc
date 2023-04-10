@@ -6,6 +6,7 @@
 
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 
 #include "src/lib/fsl/handles/object_info.h"
 #include "zircon/system/ulib/fbl/include/fbl/algorithm.h"
@@ -64,6 +65,7 @@ bool IsEventSignalled(const zx::event& event, zx_signals_t signal) {
 }
 
 zx::event CreateEvent() {
+  TRACE_DURATION("gfx", "CreateEvent");
   zx::event event;
   FX_CHECK(zx::event::create(0, &event) == ZX_OK);
   return event;

@@ -26,6 +26,7 @@
 #include "src/ui/lib/escher/third_party/granite/vk/render_pass_info.h"
 
 #include "src/ui/lib/escher/util/bit_ops.h"
+#include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/lib/escher/vk/texture.h"
 
 namespace escher {
@@ -326,6 +327,7 @@ bool RenderPassInfo::InitRenderPassInfo(RenderPassInfo* rp, vk::Rect2D render_ar
                                         const TexturePtr& depth_texture,
                                         const TexturePtr& msaa_texture,
                                         ImageViewAllocator* allocator) {
+  TRACE_DURATION("gfx", "RenderPassInfo::InitRenderPassInfo");
   FX_DCHECK(output_image->info().sample_count == 1);
   rp->render_area = render_area;
 

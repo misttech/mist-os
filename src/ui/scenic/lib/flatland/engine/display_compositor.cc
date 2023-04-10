@@ -474,6 +474,7 @@ uint64_t DisplayCompositor::CreateDisplayLayer() {
 
 void DisplayCompositor::SetDisplayLayers(const uint64_t display_id,
                                          const std::vector<uint64_t>& layers) {
+  TRACE_DURATION("gfx", "flatland::DisplayCompositor::SetDisplayLayers");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Set all of the layers for each of the images on the display.
   const auto status = (*display_controller_)->SetDisplayLayers(display_id, layers);
@@ -639,6 +640,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
                                               const std::vector<RenderData>& render_data_list,
                                               std::vector<zx::event> release_fences,
                                               scheduling::FramePresentedCallback callback) {
+  TRACE_DURATION("gfx", "flatland::DisplayCompositor::PerformGpuComposition");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   // Create an event that will be signaled when the final display's content has finished
   // rendering; it will be passed into |release_fence_manager_.OnGpuCompositedFrame()|.  If there
@@ -658,6 +660,7 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
 
     // Clear any past CC state here, before applying GPU CC.
     if (cc_state_machine_.GpuRequiresDisplayClearing()) {
+      TRACE_DURATION("gfx", "flatland::DisplayCompositor::PerformGpuComposition[cc]");
       const zx_status_t status =
           (*display_controller_)
               ->SetDisplayColorConversion(render_data.display_id, kDefaultColorConversionOffsets,

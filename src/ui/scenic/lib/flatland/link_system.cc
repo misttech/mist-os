@@ -197,6 +197,7 @@ void LinkSystem::UpdateLinks(const GlobalTopologyData::TopologyVector& global_to
                              const GlobalMatrixVector& global_matrices,
                              const glm::vec2& device_pixel_ratio,
                              const UberStruct::InstanceMap& uber_structs) {
+  TRACE_DURATION("gfx", "LinkSystem::UpdateLinks");
   std::scoped_lock lock(mutex_);
 
   // Since the global topology may not contain every Flatland instance, manually update the

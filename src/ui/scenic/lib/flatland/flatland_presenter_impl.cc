@@ -37,6 +37,7 @@ void FlatlandPresenterImpl::AccumulateReleaseFences(
 }
 
 std::vector<zx::event> FlatlandPresenterImpl::TakeReleaseFences() {
+  TRACE_DURATION("gfx", "FlatlandPresenterImpl::TakeReleaseFences");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
 
   std::vector<zx::event> result(std::move(accumulated_release_fences_));

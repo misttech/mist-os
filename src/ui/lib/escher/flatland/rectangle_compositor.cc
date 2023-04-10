@@ -10,6 +10,7 @@
 #include "src/ui/lib/escher/renderer/render_funcs.h"
 #include "src/ui/lib/escher/third_party/granite/vk/render_pass.h"
 #include "src/ui/lib/escher/util/image_utils.h"
+#include "src/ui/lib/escher/util/trace_macros.h"
 #include "src/ui/lib/escher/vk/impl/render_pass_cache.h"
 #include "src/ui/lib/escher/vk/pipeline_builder.h"
 #include "src/ui/lib/escher/vk/shader_program.h"
@@ -260,6 +261,7 @@ void RectangleCompositor::DrawBatch(CommandBuffer* cmd_buf,
                                     const std::vector<ColorData>& color_data,
                                     const ImagePtr& output_image, const TexturePtr& depth_buffer,
                                     bool apply_color_conversion) {
+  TRACE_DURATION("gfx", "RectangleCompositor::DrawBatch");
   // TODO(fxbug.dev/43278): Add custom clear colors. We could either pass in another parameter to
   // this function or try to embed clear-data into the existing api. For example, one could
   // check to see if the back rectangle is fullscreen and solid-color, in which case we can
@@ -342,6 +344,7 @@ void RectangleCompositor::DrawBatch(CommandBuffer* cmd_buf,
 // TODO(fxbug.dev/94252): It doesn't seem like all platforms actually support transient images.
 // So this is going to be a regular image for now.
 ImagePtr RectangleCompositor::CreateOrFindTransientImage(const ImagePtr& image) {
+  TRACE_DURATION("gfx", "RectangleCompositor::CreateOrFindTransientImage");
   auto itr = transient_image_map_.find(image->info());
   if (itr != transient_image_map_.end()) {
     return itr->second;

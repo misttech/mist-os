@@ -32,6 +32,7 @@ CommandBuffer::~CommandBuffer() {
 }
 
 void CommandBuffer::Begin(uint64_t sequence_number) {
+  TRACE_DURATION("gfx", "escher::CommandBuffer::Begin", "ptr", TA_POINTER(this));
   FX_DCHECK(!is_active_ && !is_submitted_);
   FX_DCHECK(sequence_number > sequence_number_);
   is_active_ = true;

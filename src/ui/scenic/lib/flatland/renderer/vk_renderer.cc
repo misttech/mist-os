@@ -889,6 +889,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
     info.handleType = vk::ExternalSemaphoreHandleTypeFlagBits::eZirconEventFUCHSIA;
 
     {
+      TRACE_DURATION("gfx", "VkRenderer::Render[importSemaphoreZirconHandleFUCHSIA]");
       const auto result = escher_->vk_device().importSemaphoreZirconHandleFUCHSIA(
           info, escher_->device()->dispatch_loader());
       FX_DCHECK(result == vk::Result::eSuccess);
@@ -906,6 +907,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
     // TODO(fxbug.dev/93069): Semaphore lifetime should be guaranteed by Escher. This wait is a
     // workaround for the issue where we destroy semaphores before they are signalled.
+    TRACE_DURATION("gfx", "VkRenderer::Render[WaitOnce]");
     auto wait = std::make_shared<async::WaitOnce>(fence_original.get(), ZX_EVENT_SIGNALED,
                                                   ZX_WAIT_ASYNC_TIMESTAMP);
     zx_status_t wait_status =
