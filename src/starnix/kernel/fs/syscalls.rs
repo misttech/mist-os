@@ -1438,10 +1438,8 @@ pub fn sys_pselect6(
     let exceptfds = read_fd_set(exceptfds_addr)?;
 
     let sets = &[(read_events, &readfds), (write_events, &writefds), (except_events, &exceptfds)];
+    let waiter = FileWaiter::<FdNumber>::default();
 
-    let mut num_fds = 0;
-    let file_object = EpollFileObject::new_file(current_task);
-    let epoll_file = file_object.downcast_file::<EpollFileObject>().unwrap();
     for fd in 0..nfds {
         let mut aggregated_events = 0;
         for (events, fds) in sets.iter() {
@@ -1450,29 +1448,29 @@ pub fn sys_pselect6(
             }
         }
         if aggregated_events != 0 {
-            let event = EpollEvent::new(aggregated_events, fd as u64);
-            let file = current_task.files.get(FdNumber::from_raw(fd as i32))?;
-            epoll_file.add(current_task, &file, &file_object, event)?;
-            num_fds += 1;
+            let fd = FdNumber::from_raw(fd as i32);
+            let file = current_task.files.get(fd)?;
+            waiter.add(current_task, fd, &file, FdEvents::from_bits_truncate(aggregated_events));
         }
     }
 
-    let mask = if sigmask_addr.is_null() {
-        current_task.read().signals.mask()
-    } else {
+    let mask = if !sigmask_addr.is_null() {
         let sigmask = current_task.mm.read_object(sigmask_addr)?;
-        if sigmask.ss.is_null() {
+        let mask = if sigmask.ss.is_null() {
             current_task.read().signals.mask()
         } else {
             if sigmask.ss_len < std::mem::size_of::<sigset_t>() {
                 return error!(EINVAL);
             }
             current_task.mm.read_object(sigmask.ss.into())?
-        }
+        };
+        Some(mask)
+    } else {
+        None
     };
-    let ready_fds = current_task.wait_with_temporary_mask(mask, |current_task| {
-        epoll_file.wait(current_task, num_fds, timeout)
-    })?;
+
+    waiter.wait(current_task, mask, zx::Time::after(timeout))?;
+
     let mut num_fds = 0;
     let mut readfds: __kernel_fd_set = Default::default();
     let mut writefds: __kernel_fd_set = Default::default();
@@ -1483,13 +1481,13 @@ pub fn sys_pselect6(
         (except_events, &mut exceptfds),
     ];
 
-    for event in &ready_fds {
-        let fd = event.data as usize;
+    let ready_items = waiter.ready_items.lock();
+    for ready_item in ready_items.iter() {
         sets.iter_mut().for_each(|entry| {
-            let events = entry.0;
+            let events = FdEvents::from_bits_truncate(entry.0);
             let fds: &mut __kernel_fd_set = entry.1;
-            if events & event.events > 0 {
-                add_fd_to_set(fds, fd);
+            if events.intersects(ready_item.events) {
+                add_fd_to_set(fds, ready_item.key.raw() as usize);
                 num_fds += 1;
             }
         });
@@ -1623,9 +1621,64 @@ pub fn sys_epoll_pwait2(
     do_epoll_pwait(current_task, epfd, events, max_events, timeout, user_sigmask)
 }
 
-struct ReadyPollItem {
-    index: usize,
+trait ReadItemKey: Copy + Send + Sync + 'static {}
+impl<T> ReadItemKey for T where T: Copy + Send + Sync + 'static {}
+
+struct ReadyItem<Key: ReadItemKey> {
+    key: Key,
     events: FdEvents,
+}
+
+struct FileWaiter<Key: ReadItemKey> {
+    waiter: Waiter,
+    ready_items: Arc<Mutex<Vec<ReadyItem<Key>>>>,
+}
+
+impl<Key: ReadItemKey> Default for FileWaiter<Key> {
+    fn default() -> Self {
+        Self { waiter: Waiter::new(), ready_items: Default::default() }
+    }
+}
+
+impl<Key: ReadItemKey> FileWaiter<Key> {
+    fn add(
+        &self,
+        current_task: &CurrentTask,
+        key: Key,
+        file: &FileHandle,
+        requested_events: FdEvents,
+    ) {
+        let sought_events = requested_events | FdEvents::POLLERR | FdEvents::POLLHUP;
+
+        let ready_items = self.ready_items.clone();
+        let handler = Box::new(move |observed: FdEvents| {
+            ready_items.lock().push(ReadyItem::<Key> { key, events: observed });
+        });
+
+        file.wait_async(current_task, &self.waiter, sought_events, handler);
+        let current_events = file.query_events(current_task) & sought_events;
+        if !current_events.is_empty() {
+            self.ready_items.lock().push(ReadyItem::<Key> { key, events: current_events });
+        }
+    }
+
+    fn wait(
+        &self,
+        current_task: &mut CurrentTask,
+        signal_mask: Option<SigSet>,
+        deadline: zx::Time,
+    ) -> Result<(), Errno> {
+        if self.ready_items.lock().is_empty() {
+            let signal_mask = signal_mask.unwrap_or_else(|| current_task.read().signals.mask());
+            match current_task.wait_with_temporary_mask(signal_mask, |current_task| {
+                self.waiter.wait_until(current_task, deadline)
+            }) {
+                Err(err) if err == ETIMEDOUT => {}
+                result => result?,
+            };
+        }
+        Ok(())
+    }
 }
 
 pub fn poll(
@@ -1641,8 +1694,7 @@ pub fn poll(
 
     let timeout = duration_from_poll_timeout(timeout)?;
     let mut pollfds = vec![pollfd::default(); num_fds as usize];
-    let ready_items = Arc::new(Mutex::new(Vec::<ReadyPollItem>::new()));
-    let waiter = Waiter::new();
+    let waiter = FileWaiter::<usize>::default();
 
     for (index, poll_descriptor) in pollfds.iter_mut().enumerate() {
         *poll_descriptor = current_task.mm.read_object(user_pollfds.at(index))?;
@@ -1651,39 +1703,23 @@ pub fn poll(
             continue;
         }
         let file = current_task.files.get(FdNumber::from_raw(poll_descriptor.fd))?;
-        let handler_ready_items = ready_items.clone();
-        let handler = move |observed: FdEvents| {
-            handler_ready_items.lock().push(ReadyPollItem { index, events: observed });
-        };
+        waiter.add(
+            current_task,
+            index,
+            &file,
+            FdEvents::from_bits_truncate(poll_descriptor.events as u32),
+        );
+    }
 
-        let sought_events = FdEvents::from_bits_truncate(poll_descriptor.events as u32)
+    waiter.wait(current_task, mask, zx::Time::after(timeout))?;
+
+    let ready_items = waiter.ready_items.lock();
+    for ready_item in ready_items.iter() {
+        let interested_events = FdEvents::from_bits_truncate(pollfds[ready_item.key].events as u32)
             | FdEvents::POLLERR
             | FdEvents::POLLHUP;
-        file.wait_async(current_task, &waiter, sought_events, Box::new(handler));
-        let events = file.query_events(current_task) & sought_events;
-        if !events.is_empty() {
-            ready_items.lock().push(ReadyPollItem { index, events });
-        }
-    }
-
-    if ready_items.lock().is_empty() {
-        let mask = mask.unwrap_or_else(|| current_task.read().signals.mask());
-        match current_task.wait_with_temporary_mask(mask, |current_task| {
-            waiter.wait_until(current_task, zx::Time::after(timeout))
-        }) {
-            Err(err) if err == ETIMEDOUT => {}
-            result => result?,
-        }
-    }
-
-    let ready_items = ready_items.lock();
-    for ready_item in ready_items.iter() {
-        let interested_events =
-            FdEvents::from_bits_truncate(pollfds[ready_item.index].events as u32)
-                | FdEvents::POLLERR
-                | FdEvents::POLLHUP;
         let return_events = (interested_events & ready_item.events).bits();
-        pollfds[ready_item.index].revents = return_events as i16;
+        pollfds[ready_item.key].revents = return_events as i16;
     }
 
     for (index, poll_descriptor) in pollfds.iter().enumerate() {

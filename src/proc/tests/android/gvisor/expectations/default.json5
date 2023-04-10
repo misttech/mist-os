@@ -771,9 +771,6 @@
                 "SeccompTest.RetKillCausesDeathBySIGSYS",
                 "SeccompTest.FiltersPreservedAcrossForkAndExecve",
 
-                // select_test
-                "SelectTest.SetrlimitCallNOFILE",
-
                 // sendfile_socket_test
                 "AddressFamily/SendFileTest.SendpageFromEmptyFileToUDP/*",
 
