@@ -15,6 +15,8 @@ config("logging_config") {
 
 source_set("utils") {
   sources = [
+    "cleanup_until_done.cc",
+    "cleanup_until_done.h",
     "dispatcher_holder.cc",
     "dispatcher_holder.h",
     "helpers.cc",

@@ -243,7 +243,6 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   }
 
   timings->OnFrameCpuRendered(async::Now(async_get_default_dispatcher()));
-  CleanupEscher();
 }
 
 void Engine::SignalFencesWhenPreviousRendersAreDone(std::vector<zx::event> fences) {
@@ -366,36 +365,6 @@ void Engine::UpdateMetrics(Node* node, const fuchsia::ui::gfx::Metrics& parent_m
   ForEachChildFrontToBack(*node, [this, &local_metrics, updated_nodes](Node* node) {
     UpdateMetrics(node, local_metrics, updated_nodes);
   });
-}
-
-void Engine::CleanupEscher() {
-  // Either there is already a cleanup scheduled (meaning that this was already
-  // called recently), or there is no Escher because we're running tests.
-  if (!escher_ || escher_cleanup_scheduled_) {
-    return;
-  }
-  // Only trace when there is the possibility of doing work.
-  TRACE_DURATION("gfx", "Engine::CleanupEscher");
-
-  if (!escher_->Cleanup()) {
-    // Wait long enough to give GPU work a chance to finish.
-    //
-    // NOTE: If this value changes, you should also change the corresponding
-    // kCleanupDelay inside timestamp_profiler.h.
-    const zx::duration kCleanupDelay = zx::msec(1);
-
-    escher_cleanup_scheduled_ = true;
-    async::PostDelayedTask(
-        async_get_default_dispatcher(),
-        [weak = weak_factory_.GetWeakPtr()] {
-          if (weak) {
-            // Recursively reschedule if cleanup is incomplete.
-            weak->escher_cleanup_scheduled_ = false;
-            weak->CleanupEscher();
-          }
-        },
-        kCleanupDelay);
-  }
 }
 
 void Engine::DumpScenes(std::ostream& output,

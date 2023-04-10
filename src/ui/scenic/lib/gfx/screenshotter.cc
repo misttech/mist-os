@@ -148,7 +148,8 @@ void Screenshotter::OnCommandBufferDone(
 }
 
 void Screenshotter::TakeScreenshot(
-    Engine* engine, fuchsia::ui::scenic::Scenic::TakeScreenshotCallback done_callback) {
+    Engine* engine, fuchsia::ui::scenic::Scenic::TakeScreenshotCallback done_callback,
+    const std::shared_ptr<utils::CleanupUntilDone>& escher_cleanup) {
   TRACE_DURATION("gfx", "Screenshotter::TakeScreenshot");
   auto* escher = engine->escher();
   const CompositorWeakPtr& compositor = engine->scene_graph()->first_compositor();
@@ -230,9 +231,10 @@ void Screenshotter::TakeScreenshot(
         OnCommandBufferDone(buffer, width, height, rotation, std::move(done_callback));
       });
 
-  // Force the command buffer to retire to guarantee that |done_callback| will
-  // be called in a timely fashion.
-  engine->CleanupEscher();
+  // Force the command buffer to retire to guarantee that |done_callback| will be called in a timely
+  // fashion.  Always defer the first cleanup attempt, because the first try is almost guaranteed to
+  // fail, and checking the status of a `VkFence` is fairly expensive.
+  escher_cleanup->Cleanup(/*ok_to_run_immediately=*/false);
 }
 
 }  // namespace gfx

@@ -13,6 +13,7 @@
 #include "src/lib/fxl/macros.h"
 #include "src/ui/lib/escher/vk/buffer.h"
 #include "src/ui/scenic/lib/gfx/engine/engine.h"
+#include "src/ui/scenic/lib/utils/cleanup_until_done.h"
 
 namespace scenic_impl {
 namespace gfx {
@@ -20,7 +21,8 @@ namespace gfx {
 class Screenshotter {
  public:
   static void TakeScreenshot(Engine* engine,
-                             fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback);
+                             fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback,
+                             const std::shared_ptr<utils::CleanupUntilDone>& escher_cleanup);
 
  private:
   static void OnCommandBufferDone(

@@ -36,7 +36,11 @@ namespace {
 // fsl::DeviceWatcher on it.
 static const char* kDependencyPath = "/gpu-manifest-fs";
 
-static constexpr zx::duration kShutdownTimeout{1000000000};  // 1 second
+static constexpr zx::duration kShutdownTimeout = zx::sec(1);
+
+// NOTE: If this value changes, you should also change the corresponding kCleanupDelay inside
+// escher/profiling/timestamp_profiler.cc.
+static constexpr zx::duration kEscherCleanupRetryInterval{1'000'000};  // 1 millisecond
 
 // Populates a ConfigValues struct by reading a config file and retrieving
 // overrides from the stash.
@@ -409,6 +413,15 @@ void App::InitializeServices(escher::EscherUniquePtr escher,
   }
 
   escher_ = std::move(escher);
+  escher_cleanup_ = std::make_shared<utils::CleanupUntilDone>(kEscherCleanupRetryInterval,
+                                                              [escher = escher_->GetWeakPtr()]() {
+                                                                if (!escher) {
+                                                                  // Escher is destroyed, so there
+                                                                  // is no cleanup to be done.
+                                                                  return true;
+                                                                }
+                                                                return escher->Cleanup();
+                                                              });
 
   InitializeGraphics(display);
   InitializeInput();
@@ -647,7 +660,8 @@ void App::InitializeGraphics(std::shared_ptr<display::Display> display) {
           return flatland_engine_->GetRenderables(*display);
         },
         [this](fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) {
-          gfx::Screenshotter::TakeScreenshot(&engine_.value(), std::move(callback));
+          gfx::Screenshotter::TakeScreenshot(&engine_.value(), std::move(callback),
+                                             escher_cleanup_);
         },
         std::move(screen_capture_importers), display_info_delegate_->GetDisplayDimensions(),
         config_values_.display_rotation);
@@ -784,6 +798,9 @@ void App::InitializeHeartbeat(display::Display& display) {
         flatland_manager_->SendHintsToStartRendering();
         screen_capture2_manager_->RenderPendingScreenCaptures();
         view_tree_snapshotter_->UpdateSnapshot();
+        // Always defer the first cleanup attempt, because the first try is almost guaranteed to
+        // fail, and checking the status of a `VkFence` is fairly expensive.
+        escher_cleanup_->Cleanup(/*ok_to_run_immediately=*/false);
       },
       /*on_frame_presented*/
       [this](auto latched_times, auto present_times) {

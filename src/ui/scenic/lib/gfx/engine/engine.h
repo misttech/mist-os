@@ -120,11 +120,6 @@ class Engine {
         scene_graph(), view_linker_.get(), buffer_collection_importer_};
   }
 
-  // Invoke Escher::Cleanup().  If more work remains afterward, post a delayed
-  // task to try again; this is typically because cleanup couldn't finish due
-  // to unfinished GPU work.
-  void CleanupEscher();
-
   // Dumps the contents of all scene graphs.
   void DumpScenes(std::ostream& output,
                   std::unordered_set<GlobalId, GlobalId::Hash>* visited_resources) const;

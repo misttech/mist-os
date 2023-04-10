@@ -149,7 +149,7 @@ void TimestampProfiler::TraceGpuQueryResults(
   constexpr static const char* kCategoryLiteral = "gfx";
 
   // NOTE: If this value changes, you should also change the corresponding
-  // kCleanupDelay inside engine.cc.
+  // kCleanupDelay inside scenic/bin/app.cc.
   zx::duration kCleanupDelay = zx::msec(1);
 
   // Shift the vthread events by kCleanupDelay / 2. This is specifically chosen

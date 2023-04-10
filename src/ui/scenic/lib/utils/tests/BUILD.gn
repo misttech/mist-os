@@ -13,7 +13,10 @@ executable("unittests") {
   output_name = "scenic_utils_unittests"
 
   testonly = true
-  sources = [ "dispatcher_holder_unittest.cc" ]
+  sources = [
+    "cleanup_until_done_unittest.cc",
+    "dispatcher_holder_unittest.cc",
+  ]
   deps = [
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",

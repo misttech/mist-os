@@ -9,6 +9,7 @@
 
 namespace scenic_impl {
 
+// TODO(jjosh): hopefully delete this.
 // TODO(fxbug.dev/23901): Remove this and move the screenshot API out of Scenic.
 class TakeScreenshotDelegateDeprecated {
  public:

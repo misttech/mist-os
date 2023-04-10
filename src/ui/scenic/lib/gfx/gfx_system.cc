@@ -27,6 +27,7 @@ namespace scenic_impl {
 namespace gfx {
 
 static const uint32_t kDumpScenesBufferCapacity = 1024 * 64;
+static const zx::duration kEscherCleanupRetryInterval(1'000'000);  // 1 millisecond
 const char* GfxSystem::kName = "GfxSystem";
 
 GfxSystem::GfxSystem(SystemContext context, Engine* engine, Sysmem* sysmem,
@@ -37,7 +38,15 @@ GfxSystem::GfxSystem(SystemContext context, Engine* engine, Sysmem* sysmem,
       sysmem_(sysmem),
       engine_(engine),
       session_manager_(this->context()->inspect_node()->CreateChild("SessionManager")),
-      image_pipe_updater_(std::move(image_pipe_updater)) {
+      image_pipe_updater_(std::move(image_pipe_updater)),
+      escher_cleanup_for_screenshot_(std::make_shared<utils::CleanupUntilDone>(
+          kEscherCleanupRetryInterval, [escher = engine->GetEscherWeakPtr()]() {
+            if (!escher) {
+              // Escher is destroyed, so there is no cleanup to be done.
+              return true;
+            }
+            return escher->Cleanup();
+          })) {
   FX_DCHECK(engine_);
 
   // Create a pseudo-file that dumps alls the Scenic scenes.
@@ -219,7 +228,7 @@ void GfxSystem::DumpSessionMapResources(
 }
 
 void GfxSystem::TakeScreenshot(fuchsia::ui::scenic::Scenic::TakeScreenshotCallback callback) {
-  Screenshotter::TakeScreenshot(engine_, std::move(callback));
+  Screenshotter::TakeScreenshot(engine_, std::move(callback), escher_cleanup_for_screenshot_);
 }
 
 scheduling::SessionsWithFailedUpdates GfxSystem::UpdateSessions(

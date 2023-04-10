@@ -36,6 +36,7 @@
 #include "src/ui/scenic/lib/screen_capture2/screen_capture2_manager.h"
 #include "src/ui/scenic/lib/screenshot/screenshot_manager.h"
 #include "src/ui/scenic/lib/shutdown/shutdown_manager.h"
+#include "src/ui/scenic/lib/utils/cleanup_until_done.h"
 #include "src/ui/scenic/lib/utils/metrics_impl.h"
 #include "src/ui/scenic/lib/view_tree/geometry_provider.h"
 #include "src/ui/scenic/lib/view_tree/observer_registry.h"
@@ -124,6 +125,7 @@ class App {
   // destroyed before |display_manager_|.
   std::optional<display::DisplayPowerManager> display_power_manager_;
   escher::EscherUniquePtr escher_;
+  std::shared_ptr<utils::CleanupUntilDone> escher_cleanup_;
 
   std::shared_ptr<gfx::ImagePipeUpdater> image_pipe_updater_;
   std::optional<gfx::Engine> engine_;

@@ -15,6 +15,7 @@
 #include "src/ui/scenic/lib/gfx/engine/image_pipe_updater.h"
 #include "src/ui/scenic/lib/scenic/system.h"
 #include "src/ui/scenic/lib/scenic/take_screenshot_delegate_deprecated.h"
+#include "src/ui/scenic/lib/utils/cleanup_until_done.h"
 
 namespace scenic_impl {
 namespace gfx {
@@ -59,6 +60,13 @@ class GfxSystem final : public System, public scenic_impl::TakeScreenshotDelegat
   SessionManager session_manager_;
   ViewTreeUpdater view_tree_updater_;
   const std::shared_ptr<ImagePipeUpdater> image_pipe_updater_;
+
+  // This is a bit of a hack, needed to guarantee that command buffers are retired properly after
+  // a screenshot.  This was added in fxr/832244 while refactoring Escher cleanup to work for both
+  // Flatland and Gfx.  This can be deleted if/when Scenic.TakeScreenshot is deleted.  Or, just
+  // wait until Gfx is completely deleted.  The only downside is a slight inefficiency when this
+  // cleanup runs concurrently with the one in scenic/app.h, but this will be minimal.
+  std::shared_ptr<utils::CleanupUntilDone> escher_cleanup_for_screenshot_;
 };
 
 }  // namespace gfx
