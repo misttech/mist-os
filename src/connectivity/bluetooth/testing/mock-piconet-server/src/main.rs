@@ -471,11 +471,8 @@ async fn handle_test_client_connection(
     }
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags=["bt-mock-piconet-server"])]
 async fn main() -> Result<(), anyhow::Error> {
-    fuchsia_syslog::init_with_tags(&["bt-mock-piconet-server"])
-        .expect("Unable to initialize logger");
-
     let server = MockPiconetServer::new();
 
     let (test_sender, test_receiver) = mpsc::channel(MAX_CONCURRENT_PICONET_MEMBER_REQUESTS);

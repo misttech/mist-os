@@ -38,7 +38,6 @@ rust_fuchsia_syslog_visibility_allowlist = [
   "//src/connectivity/bluetooth/core/bt-init:*",
   "//src/connectivity/bluetooth/examples/bt-device-id-client:*",
   "//src/connectivity/bluetooth/profiles/bt-device-id:*",
-  "//src/connectivity/bluetooth/testing/mock-piconet-server:*",
   "//src/connectivity/bluetooth/testing/test-call-manager:*",
   "//src/connectivity/bluetooth/testing/test-harness:*",
   "//src/connectivity/bluetooth/tests/bt-manifest-integration-tests:*",
