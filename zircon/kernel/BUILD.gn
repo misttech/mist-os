@@ -20,6 +20,12 @@ import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("kernel_package.gni")
 import("params.gni")
 
+declare_args() {
+  # Cause //zircon/kernel:boot_tests to generate the phys boot tests
+  # for all supported CPUs, not just $target_cpu.
+  all_cpu_kernel_boot_tests = false
+}
+
 if (current_cpu == "x64") {
   declare_args() {
     # **TODO(fxbug.dev/32255): This is a temporary switch that will be removed.**
@@ -124,6 +130,10 @@ if (current_toolchain == default_toolchain) {
       # variant selectors. Using an exclude_variant_tag is
       # enough to fix the issue.
       exclude_variant_tags = [ "fuzzer" ]
+      if (cpu == "riscv64") {
+        # TODO(fxbug.dev/125245): no asan for riscv64 yet
+        exclude_variant_tags += [ "asan" ]
+      }
 
       # Always enable frame pointers in the kernel so there are panic
       # backtraces and such.
@@ -809,6 +819,11 @@ if (!is_efi_toolchain) {
       "phys:boot_tests",
       "//zircon/kernel/lib/userabi/userboot/tests:boot_tests",
     ]
+    if (all_cpu_kernel_boot_tests) {
+      foreach(cpu, standard_fuchsia_cpus) {
+        deps += [ ":boot_tests.$cpu" ]
+      }
+    }
   }
 
   zbi_test("kernel-unittests-boot-test") {
@@ -820,5 +835,15 @@ if (!is_efi_toolchain) {
 
   kernel_cmdline("kernel-unittests-boot-test.cmdline") {
     args = [ "kernel.shell.script=ut+all;boot-test-success;graceful-shutdown" ]
+  }
+}
+
+foreach(cpu, standard_fuchsia_cpus) {
+  group("boot_tests.$cpu") {
+    testonly = true
+    deps = [
+      ":kernel-unittests-boot-test(:kernel_$cpu)",
+      "phys/test:$cpu",
+    ]
   }
 }
