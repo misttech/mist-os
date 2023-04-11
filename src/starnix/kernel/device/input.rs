@@ -726,25 +726,11 @@ mod test {
         assert_matches!(waiter2.wait_until(&current_task, zx::Time::ZERO), Err(_));
 
         // Reply to first `Watch` request.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending first Watch reply");
-            }
-            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
         // from above.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending second Watch reply");
-            }
-            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
@@ -777,14 +763,7 @@ mod test {
         assert!(!waiter_thread.is_finished());
 
         // Reply to first `Watch` request.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending first Watch reply");
-            }
-            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
         // from above.
@@ -792,14 +771,7 @@ mod test {
         // TODO(https://fxbug.dev/124609): Without this, `relay_thread` gets stuck `await`-ing
         // the reply to its first request. Figure out why that happens, and remove this second
         // reply.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending second Watch reply");
-            }
-            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // Block until `waiter_thread` completes.
         waiter_thread.join().expect("join() failed").expect("wait() failed");
@@ -849,25 +821,11 @@ mod test {
         waitkeys.into_iter().next().expect("failed to get first waitkey").cancel();
 
         // Reply to first `Watch` request.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending first Watch reply");
-            }
-            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
         // from above.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending second Watch reply");
-            }
-            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // `InputFile` should be done processing the first reply, since it has sent its second
         // request. And, as part of processing the first reply, `InputFile` should have notified
@@ -894,25 +852,11 @@ mod test {
         );
 
         // Reply to first `Watch` request.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![make_touch_event()].into_iter())
-                    .expect("failure sending first Watch reply");
-            }
-            unexpected_request => panic!("unexpected first request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
 
         // Wait for another `Watch`, to ensure `relay_thread` has consumed the `Watch` reply
         // from above.
-        match touch_source_stream.next().await {
-            Some(Ok(TouchSourceRequest::Watch { responder, .. })) => {
-                responder
-                    .send(&mut vec![TouchEvent::EMPTY].into_iter())
-                    .expect("failure sending second Watch reply");
-            }
-            unexpected_request => panic!("unexpected second request {:?}", unexpected_request),
-        }
+        answer_next_watch_request(&mut touch_source_stream, TouchEvent::EMPTY).await;
 
         // Check post-watch expectation.
         assert_eq!(
