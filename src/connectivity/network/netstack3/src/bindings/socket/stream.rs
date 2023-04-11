@@ -126,20 +126,25 @@ impl BindingsNonSyncCtxImpl {
         socket
     }
 
-    /// Returns a mutable reference to state for an existing listener.
+    /// Calls the function with a mutable reference to state for an existing
+    /// listener.
     ///
     /// # Panics
     ///
     /// Panics if `id` does not correspond to a listener.
-    fn get_listener_mut<I: Ip>(&mut self, id: ListenerId<I>) -> &mut ListenerState {
-        match I::VERSION {
+    fn with_listener_mut<I: Ip, O, F: FnOnce(&mut ListenerState) -> O>(
+        &mut self,
+        id: ListenerId<I>,
+        cb: F,
+    ) -> O {
+        cb(match I::VERSION {
             IpVersion::V4 => {
                 self.tcp_v4_listeners.get_mut(id.into()).expect("invalid v4 ListenerId")
             }
             IpVersion::V6 => {
                 self.tcp_v6_listeners.get_mut(id.into()).expect("invalid v6 ListenerId")
             }
-        }
+        })
     }
 
     /// Registers a newly created connection with its state.
@@ -177,20 +182,25 @@ impl BindingsNonSyncCtxImpl {
         status
     }
 
-    /// Returns a mutable reference to state for an existing connection.
+    /// Calls the function with a mutable reference to state for an existing
+    /// connection.
     ///
     /// # Panics
     ///
     /// Panics if `id` does not correspond to a connection.
-    fn get_connection_mut<I: Ip>(&mut self, id: ConnectionId<I>) -> &mut ConnectionStatus {
-        match I::VERSION {
+    fn with_connection_mut<I: Ip, O, F: FnOnce(&mut ConnectionStatus) -> O>(
+        &mut self,
+        id: ConnectionId<I>,
+        cb: F,
+    ) -> O {
+        cb(match I::VERSION {
             IpVersion::V4 => {
                 self.tcp_v4_connections.get_mut(id.into()).expect("invalid v4 ConnectionId")
             }
             IpVersion::V6 => {
                 self.tcp_v6_connections.get_mut(id.into()).expect("invalid v6 ConnectionId")
             }
-        }
+        })
     }
 }
 
@@ -242,13 +252,14 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
     type ProvidedBuffers = LocalZirconSocketAndNotifier;
 
     fn on_waiting_connections_change<I: Ip>(&mut self, listener: ListenerId<I>, count: usize) {
-        let ListenerState(socket) = self.get_listener_mut(listener);
-        if count == 0 {
-            socket.signal_peer(ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE)
+        let (clear, set) = if count == 0 {
+            (ZXSIO_SIGNAL_INCOMING, zx::Signals::NONE)
         } else {
-            socket.signal_peer(zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
-        }
-        .expect("failed to signal for available connections");
+            (zx::Signals::NONE, ZXSIO_SIGNAL_INCOMING)
+        };
+
+        self.with_listener_mut(listener, |ListenerState(socket)| socket.signal_peer(clear, set))
+            .expect("failed to signal for available connections")
     }
 
     fn new_passive_open_buffers(
@@ -268,21 +279,22 @@ impl tcp::socket::NonSyncContext for BindingsNonSyncCtxImpl {
         connection: ConnectionId<I>,
         update: ConnectionStatusUpdate,
     ) {
-        let status = self.get_connection_mut(connection);
-        match status {
-            ConnectionStatus::InProgress => match update {
-                ConnectionStatusUpdate::Connected => {
-                    *status = ConnectionStatus::Connected { reported: false }
+        self.with_connection_mut(connection, |status| {
+            match status {
+                ConnectionStatus::InProgress => match update {
+                    ConnectionStatusUpdate::Connected => {
+                        *status = ConnectionStatus::Connected { reported: false }
+                    }
+                    ConnectionStatusUpdate::Reset => {
+                        *status = ConnectionStatus::Rejected { reported: false }
+                    }
+                },
+                ConnectionStatus::Connected { reported: _ }
+                | ConnectionStatus::Rejected { reported: _ } => {
+                    // TODO(https://fxbug.dev/103982): Signal peer on reset.
                 }
-                ConnectionStatusUpdate::Reset => {
-                    *status = ConnectionStatus::Rejected { reported: false }
-                }
-            },
-            ConnectionStatus::Connected { reported: _ }
-            | ConnectionStatus::Rejected { reported: _ } => {
-                // TODO(https://fxbug.dev/103982): Signal peer on reset.
             }
-        }
+        })
     }
 
     fn default_buffer_sizes() -> BufferSizes {
@@ -801,8 +813,7 @@ where
             }
             SocketId::Listener(_) => Err(fposix::Errno::Einval),
             SocketId::Connection(id) => {
-                let status = non_sync_ctx.get_connection_mut(id);
-                match status {
+                non_sync_ctx.with_connection_mut(id, |status| match status {
                     ConnectionStatus::Connected { reported } => {
                         if !*reported {
                             *reported = true;
@@ -812,7 +823,8 @@ where
                     }
                     ConnectionStatus::Rejected { reported: _ } => Err(fposix::Errno::Econnrefused),
                     ConnectionStatus::InProgress => Err(fposix::Errno::Ealready),
-                }
+                })?;
+                return Ok(());
             }
         }?;
         // It's safe to register the connection as in-progress because it can't
@@ -952,8 +964,7 @@ where
             SocketId::Connection(conn_id) => {
                 let mut guard = ctx.lock().await;
                 let Ctx { sync_ctx: _, non_sync_ctx } = guard.deref_mut();
-                let status = non_sync_ctx.get_connection_mut(conn_id);
-                match status {
+                non_sync_ctx.with_connection_mut(conn_id, |status| match status {
                     ConnectionStatus::InProgress => Err(fposix::Errno::Einprogress),
                     ConnectionStatus::Connected { reported: _ } => Ok(()),
                     ConnectionStatus::Rejected { reported } => {
@@ -964,7 +975,7 @@ where
                             Ok(())
                         }
                     }
-                }
+                })
             }
         }
     }
