@@ -7,15 +7,20 @@ use crate::types::{errno, Errno};
 use futures::channel::oneshot;
 use futures::TryFutureExt;
 use std::future::Future;
-use std::sync::mpsc::{sync_channel, SyncSender, TrySendError};
+use std::sync::mpsc::{sync_channel, SendError, SyncSender, TrySendError};
 use std::sync::Arc;
 use std::thread::JoinHandle;
+
+type BoxedClosure = Box<dyn FnOnce() + Send + 'static>;
 
 /// A thread pool that immediately execute any new work sent to it and keep a maximum number of
 /// idle threads.
 #[derive(Debug)]
 pub struct DynamicThreadPool {
     state: Arc<Mutex<DynamicThreadPoolState>>,
+    /// A persistent thread that is used to create new thread. This ensures that threads are
+    /// created from the initial starnix process and are not tied to a specific task.
+    persistent_thread: RunningThread,
 }
 
 #[derive(Debug, Default)]
@@ -32,6 +37,7 @@ impl DynamicThreadPool {
                 max_idle_threads,
                 ..Default::default()
             })),
+            persistent_thread: RunningThread::new_persistent(),
         }
     }
 
@@ -62,12 +68,13 @@ impl DynamicThreadPool {
     where
         F: FnOnce() + Send + 'static,
     {
-        let mut function: Box<dyn FnOnce() + Send + 'static> = Box::new(f);
+        // Check whether a thread already exists to handle the request.
+        let mut function: BoxedClosure = Box::new(f);
         let mut state = self.state.lock();
         if state.idle_threads > 0 {
             let mut i = 0;
             while i < state.threads.len() {
-                // Increases it immediately, so that it can be decreased it the thread must be
+                // Increases `i` immediately, so that it can be decreased it the thread must be
                 // dropped.
                 let thread_index = i;
                 i += 1;
@@ -91,22 +98,31 @@ impl DynamicThreadPool {
                 }
             }
         }
-        state.threads.push(RunningThread::new(self.state.clone(), function));
+
+        // A new thread must be created. It needs to be done from the persistent thread.
+        let (sender, receiver) = sync_channel::<RunningThread>(0);
+        let self_state = self.state.clone();
+        let dispatch_function: BoxedClosure = Box::new(move || {
+            sender
+                .send(RunningThread::new(self_state, function))
+                .expect("receiver must not be dropped");
+        });
+        self.persistent_thread
+            .dispatch(dispatch_function)
+            .expect("persistent thread should not have ended.");
+        state.threads.push(receiver.recv().expect("persistent thread should not have ended."));
     }
 }
 
 #[derive(Debug)]
 struct RunningThread {
     thread: Option<JoinHandle<()>>,
-    sender: Option<SyncSender<Box<dyn FnOnce() + Send + 'static>>>,
+    sender: Option<SyncSender<BoxedClosure>>,
 }
 
 impl RunningThread {
-    fn new(
-        state: Arc<Mutex<DynamicThreadPoolState>>,
-        f: Box<(dyn FnOnce() + std::marker::Send + 'static)>,
-    ) -> Self {
-        let (sender, receiver) = sync_channel::<Box<dyn FnOnce() + Send + 'static>>(0);
+    fn new(state: Arc<Mutex<DynamicThreadPoolState>>, f: BoxedClosure) -> Self {
+        let (sender, receiver) = sync_channel::<BoxedClosure>(0);
         let thread = Some(std::thread::spawn(move || {
             while let Ok(f) = receiver.recv() {
                 f();
@@ -133,11 +149,23 @@ impl RunningThread {
         result
     }
 
-    fn try_dispatch(
-        &self,
-        f: Box<(dyn FnOnce() + std::marker::Send + 'static)>,
-    ) -> Result<(), TrySendError<Box<(dyn FnOnce() + std::marker::Send + 'static)>>> {
+    fn new_persistent() -> Self {
+        // The persistent thread doesn't need to do any rendez-vous when received task.
+        let (sender, receiver) = sync_channel::<BoxedClosure>(20);
+        let thread = Some(std::thread::spawn(move || {
+            while let Ok(f) = receiver.recv() {
+                f();
+            }
+        }));
+        Self { thread, sender: Some(sender) }
+    }
+
+    fn try_dispatch(&self, f: BoxedClosure) -> Result<(), TrySendError<BoxedClosure>> {
         self.sender.as_ref().expect("sender should never be None").try_send(f)
+    }
+
+    fn dispatch(&self, f: BoxedClosure) -> Result<(), SendError<BoxedClosure>> {
+        self.sender.as_ref().expect("sender should never be None").send(f)
     }
 }
 
