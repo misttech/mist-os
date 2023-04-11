@@ -4,6 +4,7 @@
 
 #ifndef LIB_MIPI_DSI_MIPI_DSI_H_
 #define LIB_MIPI_DSI_MIPI_DSI_H_
+
 #include <fidl/fuchsia.hardware.dsi/cpp/wire.h>
 #include <fuchsia/hardware/dsiimpl/c/banjo.h>
 #include <lib/zx/result.h>
@@ -15,10 +16,21 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+// Some of the constants here are from the MIPI Alliance Specification for
+// Display Serial Interface (DSI), which can be obtained from
+// https://www.mipi.org/specifications/dsi
+//
+// mipi_dsi1 is Version 1.3.2, adopted on 23 September 2021.
+
 // Assigned Virtual Channel ID
 // TODO(payamm): Will need to generate and maintain VCID for multi-display
 // solutions
 constexpr uint8_t kMipiDsiVirtualChanId = 0;
+
+// Data types for DSI Processor-to-Peripheral packets.
+//
+// mipi_dsi1 8.7.1 "Processor-sourced Data Type Summary" Table 16 "Data Types
+// for Processor-Sourced Packets"
 
 constexpr uint8_t kMipiDsiDtVsyncStart = 0x01;
 constexpr uint8_t kMipiDsiDtVsyncEnd = 0x11;
@@ -55,7 +67,11 @@ constexpr uint8_t kMipiDsiDtRgb666L = 0x2E;
 constexpr uint8_t kMipiDsiDtRgb888 = 0x3E;
 constexpr uint8_t kMipiDsiDtUnknown = 0xFF;
 
-// MIPI-DSI Response Types
+// Data types for DSI Peripheral-to-Processor (response) packets.
+//
+// mipi_dsi1 8.10 "Peripheral-to-Processor Transactions – Detailed Format
+// Description" Table 22 "Data Types for Peripheral-Sourced Packets"
+
 constexpr uint8_t kMipiDsiRspGenShort1 = 0x11;
 constexpr uint8_t kMipiDsiRspGenShort2 = 0x12;
 constexpr uint8_t kMipiDsiRspGenLong = 0x1A;
