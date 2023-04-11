@@ -69,7 +69,7 @@ zx_status_t Astro::LightInit() {
   };
 
   zx_status_t status = DdkAddCompositeNodeSpec(
-      "tcs3400_light", ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
+      "tcs3400-light", ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
                            .AddParentSpec(kGpioLightInterruptRules, kGpioLightInterruptProperties)
                            .set_metadata(metadata));
 
@@ -162,17 +162,17 @@ zx_status_t Astro::LightInit() {
   fdf::Arena arena('LIGH');
 
   auto aml_light_spec = fuchsia_driver_framework::CompositeNodeSpec{
-      {.name = "aml_light", .parents = aml_light_parents}};
+      {.name = "light_dev", .parents = aml_light_parents}};
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, light_dev),
                                                           fidl::ToWire(fidl_arena, aml_light_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Light(aml_light) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Light(light_dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Light(aml_light) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec Light(light_dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

@@ -48,18 +48,18 @@ zx_status_t TestBoard::CompositeNodeSpecInit() {
       }},
   };
 
-  auto composite_node_spec = fuchsia_driver_framework::CompositeNodeSpec{
-      {.name = "composite_node_spec", .parents = parents}};
+  auto composite_node_spec =
+      fuchsia_driver_framework::CompositeNodeSpec{{.name = "test_composite", .parents = parents}};
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, dev), fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec composite_node_spec(dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec test_composite(dev) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec composite_node_spec(dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddCompositeNodeSpec test_composite(dev) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }

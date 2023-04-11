@@ -23,7 +23,6 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
   ZX_ASSERT(info.has_node_index() && info.has_node_index() && info.has_node_names() &&
             info.has_primary_index());
   ZX_ASSERT(info.has_composite() && info.composite().has_composite_name());
-  ZX_ASSERT(info.has_name());
 
   if (!parent_set_collector_) {
     parent_set_collector_ = ParentSetCollector(info.node_names().count());
@@ -51,16 +50,16 @@ zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV2::BindParentImpl(
     return zx::ok(std::nullopt);
   }
 
+  auto composite_name = std::string(info.composite().composite_name().get());
   auto node_names = std::vector<std::string>(info.node_names().count());
   for (size_t i = 0; i < info.node_names().count(); i++) {
     node_names[i] = std::string(info.node_names()[i].get());
   }
 
-  auto node_name = std::string(info.name().get());
-
   // Create a composite node for the composite node spec with our complete parent set.
-  auto composite = Node::CreateCompositeNode(node_name, std::move(*completed_parents), node_names,
-                                             {}, node_manager_, dispatcher_, info.primary_index());
+  auto composite =
+      Node::CreateCompositeNode(composite_name, std::move(*completed_parents), node_names, {},
+                                node_manager_, dispatcher_, info.primary_index());
   if (composite.is_error()) {
     // If we are returning an error we should clear out what we have.
     parent_set_collector_->RemoveNode(info.node_index());

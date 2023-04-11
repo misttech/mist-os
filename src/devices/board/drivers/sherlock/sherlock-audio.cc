@@ -325,7 +325,7 @@ zx_status_t Sherlock::AudioInit() {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('AUDI');
     auto sherlock_tdm_i2s_spec = fdf::CompositeNodeSpec{{
-        .name = "aml_tdm",
+        .name = name,
         .parents = sherlock_tdm_i2s_parents,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(

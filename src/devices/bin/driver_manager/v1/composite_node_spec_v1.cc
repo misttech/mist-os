@@ -85,7 +85,6 @@ void CompositeNodeSpecV1::SetupCompositeDevice(
             info.composite().driver_info().has_url() && info.composite().has_composite_name());
   ZX_ASSERT(info.has_node_index() && info.has_num_nodes() && info.has_node_names() &&
             info.has_primary_index());
-  ZX_ASSERT(info.has_name());
 
   auto parent_names = std::vector<std::string>(info.node_names().count());
   for (size_t i = 0; i < info.node_names().count(); i++) {
@@ -102,7 +101,7 @@ void CompositeNodeSpecV1::SetupCompositeDevice(
   CompositeNodeSpecInfo composite_info = {
       .spec_name = name(),
       .driver = matched_driver_info,
-      .composite_name = std::string(info.name().get()),
+      .composite_name = std::string(info.composite().composite_name().get()),
       .primary_index = info.primary_index(),
       .parent_names = std::move(parent_names),
   };

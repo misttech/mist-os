@@ -83,7 +83,7 @@ zx_status_t Sherlock::CpuInit() {
   }};
 
   auto composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
-      .name = "aml_cpu_legacy",
+      .name = "aml_cpu_legacy_spec",
       .parents = {{aml_cpu_legacy_thermal_node}},
   }};
 

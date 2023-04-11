@@ -85,7 +85,7 @@ class RootDriver : public fdf::DriverBase {
     }};
 
     auto spec = fuchsia_driver_framework::CompositeNodeSpec{{
-        .name = "H",
+        .name = "D_E_F_group",
         .parents = {{
             parent_d,
             parent_e,

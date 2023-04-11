@@ -72,7 +72,7 @@ zx_status_t Sherlock::TouchInit() {
       {.type = DEVICE_METADATA_PRIVATE, .data = &device_info, .length = sizeof(device_info)},
   };
 
-  auto status = DdkAddCompositeNodeSpec("focaltech_touch",
+  auto status = DdkAddCompositeNodeSpec("ft5726_touch",
                                         ddk::CompositeNodeSpec(kI2cRules, kI2cProperties)
                                             .AddParentSpec(kInterruptRules, kInterruptProperties)
                                             .AddParentSpec(kResetRules, kResetProperties)

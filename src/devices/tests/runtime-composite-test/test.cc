@@ -16,7 +16,7 @@ TEST(SimpleDriverTestRealmTest, CompositeDriverConnectsToRuntimeProtocol) {
       device_watcher::RecursiveWaitForFile("/dev/sys/test/composite_fragment_b").status_value(),
       ZX_OK);
   ASSERT_EQ(device_watcher::RecursiveWaitForFile(
-                "/dev/sys/test/composite_fragment_a/test_composite_1/composite")
+                "/dev/sys/test/composite_fragment_a/composite_driver/composite")
                 .status_value(),
             ZX_OK);
 }

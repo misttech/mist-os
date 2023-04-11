@@ -107,10 +107,10 @@ zx_status_t Astro::TouchInit() {
     }
   } else {
     auto status = DdkAddCompositeNodeSpec(
-        "focaltech_touch", ddk::CompositeNodeSpec(kFocaltechI2cRules, kFocaltechI2cProperties)
-                               .AddParentSpec(kInterruptRules, kInterruptProperties)
-                               .AddParentSpec(kResetRules, kResetProperties)
-                               .set_metadata(ft3x27_touch_metadata));
+        "ft3x27_touch", ddk::CompositeNodeSpec(kFocaltechI2cRules, kFocaltechI2cProperties)
+                            .AddParentSpec(kInterruptRules, kInterruptProperties)
+                            .AddParentSpec(kResetRules, kResetProperties)
+                            .set_metadata(ft3x27_touch_metadata));
     if (status != ZX_OK) {
       zxlogf(ERROR, "ft3x27: DdkAddCompositeNodeSpec failed: %s", zx_status_get_string(status));
       return status;
