@@ -172,7 +172,7 @@ void found_driver(zircon_driver_note_payload_t* note,
     return;
   }
 
-  drv->flags = note->flags;
+  drv->is_asan = (note->flags & ZIRCON_DRIVER_NOTE_FLAG_ASAN) != 0;
   drv->url = url;
   drv->name = note->name;
   drv->service_uses = service_uses;

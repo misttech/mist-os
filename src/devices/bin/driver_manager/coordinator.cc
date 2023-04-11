@@ -640,7 +640,7 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
   }
   const Driver& driver = *matched_driver.v1();
 
-  if (!driver_host_is_asan() && driver.flags & ZIRCON_DRIVER_NOTE_FLAG_ASAN) {
+  if (!driver_host_is_asan() && driver.is_asan) {
     LOGF(ERROR, "%s (%s) requires ASAN, but we are not in an ASAN environment", driver.url.data(),
          driver.name.data());
     return ZX_ERR_BAD_STATE;

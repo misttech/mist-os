@@ -23,21 +23,22 @@
 struct Driver {
   Driver() = default;
 
+  // The name for this driver, parsed out of the driver's ELF header.
   fbl::String name;
+
+  // The URL for this driver. It points to the driver's component manifest.
+  fbl::String url;
 
   // If this is true, this driver should only be bound after /system/ comes up.
   bool fallback = false;
 
-  uint32_t flags = 0;
-  zx::vmo dso_vmo;
+  // If this is true, the driver library has been instrumented with ASAN.
+  bool is_asan = false;
 
-  fbl::String url;
+  zx::vmo dso_vmo;
 
   // If this is valid, it's the root directory of the Driver's package.
   fbl::unique_fd package_dir;
-
-  // If true, this driver never tries to match against new devices.
-  bool never_autoselect = false;
 
   // A list of service uses parsed out of the driver's component manifest.
   std::vector<std::string> service_uses;
