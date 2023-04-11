@@ -1,0 +1,9 @@
+Name: ubpf
+URL: https://github.com/iovisor/ubpf
+License: Apache 2.0
+License File: LICENSE.txt
+Upstream Git: https://github.com/iovisor/ubpf
+Security Critical: yes
+Description:
+
+A standalone runtime for the Extended Berkeley Packet Filter (ebpf) format.

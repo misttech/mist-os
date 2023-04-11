@@ -1,0 +1,41 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+config("ubpf_build_config") {
+  # Suppress warnings in upstream code that are triggered by Fuchsia
+  # compilation flags.
+  cflags = [
+    "-Wno-implicit-fallthrough",
+    "-Wno-implicit-int-conversion",
+    "-Wno-shorten-64-to-32",
+    "-Wno-sign-compare",
+  ]
+}
+
+source_set("ubpf") {
+  sources = [
+    "src/vm/ubpf_jit.c",
+    "src/vm/ubpf_jit_arm64.c",
+    "src/vm/ubpf_jit_x86_64.c",
+    "src/vm/ubpf_loader.c",
+    "src/vm/ubpf_vm.c",
+  ]
+
+  include_dirs = [
+    "src/vm/inc",
+    get_label_info(":ubpf_config", "target_gen_dir"),
+  ]
+
+  deps = [ ":ubpf_config" ]
+
+  public = [ "src/vm/inc/ubpf.h" ]
+
+  configs += [ ":ubpf_build_config" ]
+}
+
+action("ubpf_config") {
+  script = "generate_config.sh"
+  args = [ rebase_path("$target_gen_dir", root_build_dir) ]
+  outputs = [ "$target_gen_dir/ubpf_config.h" ]
+}
