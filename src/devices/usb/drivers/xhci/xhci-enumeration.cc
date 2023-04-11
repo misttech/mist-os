@@ -103,6 +103,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
       .and_then([=](TRB*& result) -> TRBPromise {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
+          zxlogf(ERROR, "Enable slot command failed: %d", completion_event->CompletionCode());
           return fpromise::make_error_promise(ZX_ERR_IO);
         }
         // After successfully obtaining a device slot, issue an Address Device command and enable
@@ -117,6 +118,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
         // If we fail during the retry, give up.
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
+          zxlogf(ERROR, "Address device command failed: %d", completion_event->CompletionCode());
           return fpromise::make_error_promise(ZX_ERR_IO);
         }
         return UpdateMaxPacketSize(hci, *state->slot);
@@ -124,6 +126,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
       .and_then([=](TRB*& result) -> TRBPromise {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
+          zxlogf(ERROR, "Update max packat size failed: %d", completion_event->CompletionCode());
           return fpromise::make_ok_promise(result);
         }
         // Issue a SET_ADDRESS request to the device
@@ -132,6 +135,7 @@ fpromise::promise<void, zx_status_t> RetryEnumeration(UsbXhci* hci, uint8_t port
       .and_then([=](TRB*& result) -> fpromise::result<void, zx_status_t> {
         auto completion_event = static_cast<CommandCompletionEvent*>(result);
         if (completion_event->CompletionCode() != CommandCompletionEvent::Success) {
+          zxlogf(ERROR, "Address device command failed: %d", completion_event->CompletionCode());
           return fpromise::error(ZX_ERR_IO);
         }
         return fpromise::ok();

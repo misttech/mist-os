@@ -204,6 +204,7 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
         // USB 2.0 requires a port reset to advance to U0
         Usb2DeviceAttach(port_id);
         needs_enum = true;
+        zxlogf(DEBUG, "Port %d is a USB 2 device and will be enumerated.", port_id);
       }
     } else {
       // USB 3.0 port connect, since we got a connect status bit set,
@@ -211,6 +212,7 @@ fpromise::promise<void, zx_status_t> EventRing::HandlePortStatusChangeEvent(uint
       if (!hci_->GetPortState()[port_id - 1].is_connected) {
         Usb3DeviceAttach(port_id);
         needs_enum = true;
+        zxlogf(DEBUG, "Port %d is a USB 3 device and will be enumerated.", port_id);
       }
       if ((sc.PLS() == PORTSC::U0) && (sc.PED()) && (!sc.PR()) &&
           !hci_->GetPortState()[port_id - 1].link_active) {
@@ -882,6 +884,7 @@ void EventRing::HandleTransferInterrupt() {
 fpromise::promise<void, zx_status_t> EventRing::LinkUp(uint8_t port_id) {
   // Port is in U0 state (link up)
   // Enumerate device
+  zxlogf(DEBUG, "Event Link Up %d.", port_id);
   return EnumerateDevice(hci_, port_id, std::nullopt);
 }
 

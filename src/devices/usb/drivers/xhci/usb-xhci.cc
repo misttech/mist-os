@@ -509,6 +509,11 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciHubDeviceAddedAsync(uint32_t
       hub.tt_info = state->GetHubLocked()->tt_info;
     }
   }
+  zxlogf(INFO,
+         "Hub found: Speed: %d, Port: %d, Parent port:%d "
+         "Route String:%d, Multi_tt:%d, Device ID:%d",
+         hub.hub_speed, port, hub.parent_port_number, hub.route_string, hub.multi_tt, device_id);
+
   return EnumerateDevice(this, static_cast<uint8_t>(port), std::make_optional(hub));
 }
 
