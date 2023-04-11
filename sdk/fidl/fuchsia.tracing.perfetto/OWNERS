@@ -1,3 +1,0 @@
-include /src/performance/perfetto-bridge/OWNERS
-
-# COMPONENT: PerformanceTools>tracing
