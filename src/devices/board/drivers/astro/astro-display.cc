@@ -125,65 +125,64 @@ zx_status_t Astro::DisplayInit() {
     return dev;
   }();
 
-  auto dsi_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                               bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
   };
 
-  auto dsi_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> dsi_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
   };
 
-  auto gpio_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> gpio_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN,
                               bind_fuchsia_amlogic_platform_s905d2::GPIOH_PIN_ID_PIN_6),
   };
 
-  auto gpio_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> gpio_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
   };
 
-  auto sysmem_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
   };
 
-  auto sysmem_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> sysmem_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
   };
 
-  auto canvas_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                               bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
   };
 
-  auto canvas_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> canvas_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL,
                         bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
   };
 
-  auto parents = std::vector{
-      fuchsia_driver_framework::ParentSpec{{
+  std::vector<fuchsia_driver_framework::ParentSpec> parents = {
+      {{
           .bind_rules = dsi_bind_rules,
           .properties = dsi_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = gpio_bind_rules,
           .properties = gpio_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = sysmem_bind_rules,
           .properties = sysmem_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = canvas_bind_rules,
           .properties = canvas_properties,
       }},
   };
 
-  auto node_group =
-      fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents = parents}};
+  fuchsia_driver_framework::CompositeNodeSpec node_group{{.name = "display", .parents = parents}};
 
   // TODO(payamm): Change from "dsi" to nullptr to separate DSI and Display into two different
   // driver hosts once support for it lands.

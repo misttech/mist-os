@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <lib/ddk/binding.h>
@@ -139,91 +140,92 @@ zx_status_t Vim3::DisplayInit() {
     return dev;
   }();
 
-  auto dsi_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> dsi_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                               bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
   };
 
-  auto dsi_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> dsi_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
   };
 
-  auto hdmi_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> hdmi_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
-  auto hdmi_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> hdmi_properties{
       fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
                         bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
-  auto gpio_lcd_reset_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> gpio_lcd_reset_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_LCD_RESET)),
   };
 
-  auto gpio_lcd_reset_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> gpio_lcd_reset_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
   };
 
-  auto gpio_hdmi_hotplug_detect_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> gpio_hdmi_hotplug_detect_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_HPD_IN)),
   };
 
-  auto gpio_hdmi_hotplug_detect_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> gpio_hdmi_hotplug_detect_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
                         bind_fuchsia_gpio::FUNCTION_HDMI_HOTPLUG_DETECT),
   };
 
-  auto sysmem_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
   };
 
-  auto sysmem_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> sysmem_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_sysmem::BIND_PROTOCOL_DEVICE),
   };
 
-  auto canvas_bind_rules = std::vector{
+  std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
                               bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
   };
 
-  auto canvas_properties = std::vector{
+  std::vector<fuchsia_driver_framework::NodeProperty> canvas_properties{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL,
                         bind_fuchsia_amlogic_platform::BIND_PROTOCOL_CANVAS),
   };
 
-  auto parents = std::vector{
-      fuchsia_driver_framework::ParentSpec{{
+  std::vector<fuchsia_driver_framework::ParentSpec> parents{
+      {{
           .bind_rules = dsi_bind_rules,
           .properties = dsi_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = hdmi_bind_rules,
           .properties = hdmi_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = gpio_lcd_reset_bind_rules,
           .properties = gpio_lcd_reset_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = gpio_hdmi_hotplug_detect_bind_rules,
           .properties = gpio_hdmi_hotplug_detect_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = sysmem_bind_rules,
           .properties = sysmem_properties,
       }},
-      fuchsia_driver_framework::ParentSpec{{
+      {{
           .bind_rules = canvas_bind_rules,
           .properties = canvas_properties,
       }},
   };
-  auto spec = fuchsia_driver_framework::CompositeNodeSpec{{.name = "display", .parents = parents}};
+
+  fuchsia_driver_framework::CompositeNodeSpec spec{{.name = "display", .parents = parents}};
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('DISP');
