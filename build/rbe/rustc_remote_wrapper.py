@@ -285,7 +285,7 @@ class RustRemoteAction(object):
         local_depfile = Path(str(self.depfile) + '.nolink')
         self._cleanup_files.append(local_depfile)
 
-        dep_only_command = remote_action.auto_env_prefix_command(
+        dep_only_command = cl_utils.auto_env_prefix_command(
             list(self._rust_action.dep_only_command(local_depfile)))
         dep_status = _make_local_depfile(dep_only_command)
         if dep_status != 0:

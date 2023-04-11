@@ -353,7 +353,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         main_args, other = p.parse_known_args(['--'] + local_command)
         action = remote_action.remote_action_from_args(main_args)
         self.assertEqual(
-            action.local_command, [remote_action._ENV] + local_command)
+            action.local_command, [cl_utils._ENV] + local_command)
 
     def test_verbose(self):
         p = self._make_main_parser()

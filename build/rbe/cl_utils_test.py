@@ -10,6 +10,20 @@ from unittest import mock
 
 import cl_utils
 
+class AutoEnvPrefixCommandTests(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(cl_utils.auto_env_prefix_command([]), [])
+
+    def test_no_prefix(self):
+        self.assertEqual(cl_utils.auto_env_prefix_command(['echo']), ['echo'])
+
+    def test_env_looking_arg(self):
+        self.assertEqual(cl_utils.auto_env_prefix_command(['echo', 'BAR=FOO']), ['echo', 'BAR=FOO'])
+
+    def test_need_prefix(self):
+        self.assertEqual(cl_utils.auto_env_prefix_command(['FOO=BAR', 'echo']), [cl_utils._ENV, 'FOO=BAR', 'echo'])
+
 
 class FlattenCommaListTests(unittest.TestCase):
 

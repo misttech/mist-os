@@ -44,10 +44,6 @@ def _relpath(path: Path, start: Path) -> Path:
 # to support testing a fake (test-only) value of PROJECT_ROOT.
 PROJECT_ROOT_REL = _relpath(PROJECT_ROOT, start=os.curdir)
 
-# Local subprocess and remote environment calls need this when a
-# command is prefixed with an X=Y environment variable.
-_ENV = '/usr/bin/env'
-
 # This is a known path where remote execution occurs.
 # This should only be used for workarounds as a last resort.
 _REMOTE_PROJECT_ROOT = Path('/b/f/w')
@@ -132,16 +128,6 @@ def _expand_common_files_between_dirs(
     for left, right in path_pairs:
         for f in sorted(_common_files_under_dirs(left, right)):
             yield left / f, right / f
-
-
-def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
-    if not command:
-        return []
-    if '=' in command[0]:
-        # Commands that start with X=Y local environment variables
-        # need to be run with 'env'.
-        return [_ENV] + command
-    return command
 
 
 def resolved_shlibs_from_ldd(lines: Iterable[str]) -> Iterable[Path]:
@@ -643,7 +629,7 @@ class RemoteAction(object):
         """This is the original command that would have been run locally.
         All of the --remote-* flags have been removed at this point.
         """
-        return auto_env_prefix_command(self._remote_command)
+        return cl_utils.auto_env_prefix_command(self._remote_command)
 
     def _generate_options(self) -> Iterable[str]:
         if self.config:
@@ -771,14 +757,13 @@ class RemoteAction(object):
         ]
 
     def _fsatrace_command_prefix(self, log: Path) -> Sequence[str]:
-        return [
-            _ENV,
+        return cl_utils.auto_env_prefix_command([
             'FSAT_BUF_SIZE=5000000',
             str(self._fsatrace_path),
             'erwdtmq',
             str(log),
             '--',
-        ]
+        ])
 
     def _generate_remote_launch_command(self) -> Iterable[str]:
         # TODO(http://fxbug.dev/124190): detect that reproxy is needed, by checking the environment

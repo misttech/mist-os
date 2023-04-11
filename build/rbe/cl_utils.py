@@ -17,6 +17,20 @@ import platform
 from typing import Any, Callable, Dict, FrozenSet, Iterable, Sequence
 
 
+# Local subprocess and remote environment calls need this when a
+# command is prefixed with an X=Y environment variable.
+_ENV = '/usr/bin/env'
+
+def auto_env_prefix_command(command: Sequence[str]) -> Sequence[str]:
+    if not command:
+        return []
+    if '=' in command[0]:
+        # Commands that start with X=Y local environment variables
+        # need to be run with 'env'.
+        return [_ENV] + command
+    return command
+
+
 def command_quoted_str(command: Iterable[str]) -> str:
     return ' '.join(shlex.quote(t) for t in command)
 
