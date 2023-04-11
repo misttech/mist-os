@@ -316,6 +316,7 @@ pub fn sys_bpf(
                 .as_bytes()
                 .to_owned()
             } else if let Some(_prog) = fd.downcast::<Program>() {
+                #[allow(unknown_lints, clippy::unnecessary_struct_initialization)]
                 bpf_prog_info {
                     // Doesn't matter yet
                     ..Default::default()
