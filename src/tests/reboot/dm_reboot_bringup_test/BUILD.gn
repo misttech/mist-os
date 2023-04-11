@@ -5,8 +5,7 @@ group("tests") {
   testonly = true
   deps = []
   if (host_os == "linux") {
-    # Disabled: See https://fxbug.dev/118767
-    # deps += [ ":dm_reboot_bringup_test($host_toolchain)" ]
+    deps += [ ":dm_reboot_bringup_test($host_toolchain)" ]
   }
 }
 
