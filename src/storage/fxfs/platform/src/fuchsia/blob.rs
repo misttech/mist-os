@@ -315,15 +315,19 @@ impl DirectoryEntry for BlobDirectory {
                         .await;
                     } else if node.is::<FxBlob>() {
                         let node = node.downcast::<FxBlob>().unwrap_or_else(|_| unreachable!());
-                        node.take()
-                            .create_connection(scope.clone(), flags, server_end, shutdown)
+                        FxBlob::create_connection(node, scope.clone(), flags, server_end, shutdown)
                             .await;
                     } else if node.is::<FxUnsealedBlob>() {
                         let node =
                             node.downcast::<FxUnsealedBlob>().unwrap_or_else(|_| unreachable!());
-                        node.take()
-                            .create_connection(scope.clone(), flags, server_end, shutdown)
-                            .await;
+                        FxUnsealedBlob::create_connection(
+                            node,
+                            scope.clone(),
+                            flags,
+                            server_end,
+                            shutdown,
+                        )
+                        .await;
                     } else {
                         unreachable!();
                     }
@@ -417,18 +421,19 @@ impl FxBlob {
     }
 
     async fn create_connection(
-        self: Arc<Self>,
+        this: OpenedNode<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
         shutdown: oneshot::Receiver<()>,
     ) {
         if flags.intersects(fio::OpenFlags::NODE_REFERENCE) {
-            create_node_reference_connection_async(scope, self, flags, server_end, shutdown).await;
+            create_node_reference_connection_async(scope, this.take(), flags, server_end, shutdown)
+                .await;
         } else {
             let options = create_stream_options_from_open_flags(flags)
                 .unwrap_or_else(|| panic!("Invalid flags for stream connection: {:?}", flags));
-            let stream = match zx::Stream::create(options, self.buffer.vmo(), 0) {
+            let stream = match zx::Stream::create(options, this.buffer.vmo(), 0) {
                 Ok(stream) => stream,
                 Err(status) => {
                     send_on_open_with_error(flags, server_end, status);
@@ -436,8 +441,15 @@ impl FxBlob {
                 }
             };
             create_stream_connection_async(
-                scope, self, flags, server_end, /*readable=*/ true, /*writable=*/ false,
-                /*executable=*/ true, stream, shutdown,
+                scope,
+                this.take(),
+                flags,
+                server_end,
+                /*readable=*/ true,
+                /*writable=*/ false,
+                /*executable=*/ true,
+                stream,
+                shutdown,
             )
             .await;
         }
@@ -458,7 +470,7 @@ impl DirectoryEntry for FxBlob {
             return;
         }
         scope.clone().spawn_with_shutdown(move |shutdown| {
-            self.create_connection(scope, flags, server_end, shutdown)
+            Self::create_connection(OpenedNode::new(self), scope, flags, server_end, shutdown)
         });
     }
 
@@ -901,15 +913,21 @@ impl FxUnsealedBlob {
 
 impl FxUnsealedBlob {
     async fn create_connection(
-        self: Arc<Self>,
+        this: OpenedNode<Self>,
         scope: ExecutionScope,
         flags: fio::OpenFlags,
         server_end: ServerEnd<fio::NodeMarker>,
         shutdown: oneshot::Receiver<()>,
     ) {
         create_connection_async(
-            scope, self, flags, server_end, /*readable=*/ true, /*writable=*/ true,
-            /*executable=*/ false, shutdown,
+            scope,
+            this.take(),
+            flags,
+            server_end,
+            /*readable=*/ true,
+            /*writable=*/ true,
+            /*executable=*/ false,
+            shutdown,
         )
         .await;
     }
@@ -928,7 +946,7 @@ impl DirectoryEntry for FxUnsealedBlob {
             return;
         }
         scope.clone().spawn_with_shutdown(move |shutdown| {
-            self.create_connection(scope, flags, server_end, shutdown)
+            Self::create_connection(OpenedNode::new(self), scope, flags, server_end, shutdown)
         });
     }
 
