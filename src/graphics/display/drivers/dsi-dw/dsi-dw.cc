@@ -665,7 +665,7 @@ zx_status_t DsiDw::GenWriteShort(const mipi_dsi_cmd_t& cmd) {
 zx_status_t DsiDw::DcsWriteShort(const fidl_dsi::wire::MipiDsiCmd& cmd,
                                  fidl::VectorView<uint8_t>& txdata) {
   // Check that the payload size and command match
-  if ((txdata.count() > 1) ||
+  if ((txdata.count() != 1 && txdata.count() != 2) ||
       (cmd.dsi_data_type() & kMipiDsiDtDcsShortWrite0) != kMipiDsiDtDcsShortWrite0) {
     DSI_ERROR("Invalid DCS short command\n");
     return ZX_ERR_INVALID_ARGS;
@@ -675,7 +675,7 @@ zx_status_t DsiDw::DcsWriteShort(const fidl_dsi::wire::MipiDsiCmd& cmd,
   regVal |= GEN_HDR_DT(cmd.dsi_data_type());
   regVal |= GEN_HDR_VC(cmd.virtual_channel_id());
   regVal |= GEN_HDR_WC_LSB(txdata[0]);
-  if (txdata.count() == 1) {
+  if (txdata.count() == 2) {
     regVal |= GEN_HDR_WC_MSB(txdata[1]);
   }
 
@@ -684,7 +684,7 @@ zx_status_t DsiDw::DcsWriteShort(const fidl_dsi::wire::MipiDsiCmd& cmd,
 
 zx_status_t DsiDw::DcsWriteShort(const mipi_dsi_cmd_t& cmd) {
   // Check that the payload size and command match
-  if ((cmd.pld_data_count > 1) || (cmd.pld_data_list == nullptr) ||
+  if ((cmd.pld_data_count != 1 && cmd.pld_data_count != 2) || (cmd.pld_data_list == nullptr) ||
       (cmd.dsi_data_type & kMipiDsiDtDcsShortWrite0) != kMipiDsiDtDcsShortWrite0) {
     DSI_ERROR("Invalid DCS short command\n");
     return ZX_ERR_INVALID_ARGS;
@@ -694,7 +694,7 @@ zx_status_t DsiDw::DcsWriteShort(const mipi_dsi_cmd_t& cmd) {
   regVal |= GEN_HDR_DT(cmd.dsi_data_type);
   regVal |= GEN_HDR_VC(cmd.virt_chn_id);
   regVal |= GEN_HDR_WC_LSB(cmd.pld_data_list[0]);
-  if (cmd.pld_data_count == 1) {
+  if (cmd.pld_data_count == 2) {
     regVal |= GEN_HDR_WC_MSB(cmd.pld_data_list[1]);
   }
 
