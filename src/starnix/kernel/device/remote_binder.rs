@@ -25,7 +25,7 @@ use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{channel::oneshot, TryStreamExt};
+use futures::{channel::oneshot, select, TryStreamExt};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::rc::Rc;
 use std::sync::Arc;
@@ -64,9 +64,107 @@ impl DeviceOps for RemoteBinderDevice {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(
-            current_task.thread_group.clone(),
-        )))
+        Ok(RemoteBinderFileOps::new(current_task.thread_group.clone()))
+    }
+}
+
+struct RemoteBinderFileOps(Arc<RemoteBinderHandle<DefaultRemoteControllerConnector>>);
+
+impl RemoteBinderFileOps {
+    fn new(thread_group: Arc<ThreadGroup>) -> Box<Self> {
+        Box::new(Self(RemoteBinderHandle::<DefaultRemoteControllerConnector>::new(thread_group)))
+    }
+}
+
+impl FileOps for RemoteBinderFileOps {
+    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
+        FdEvents::empty()
+    }
+
+    fn close(&self, _file: &FileObject) {
+        self.0.close();
+    }
+
+    fn ioctl(
+        &self,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        user_addr: UserAddress,
+    ) -> Result<SyscallResult, Errno> {
+        self.0.ioctl(current_task, request, user_addr)
+    }
+
+    fn get_vmo(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _length: Option<usize>,
+        _prot: zx::VmarFlags,
+    ) -> Result<Arc<zx::Vmo>, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn mmap(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _addr: DesiredAddress,
+        _vmo_offset: u64,
+        _length: usize,
+        _flags: zx::VmarFlags,
+        _mapping_options: MappingOptions,
+        _filename: NamespaceNode,
+    ) -> Result<MappedVmo, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn read(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn write(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn seek(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: off_t,
+        _whence: SeekOrigin,
+    ) -> Result<off_t, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn read_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(EOPNOTSUPP)
+    }
+
+    fn write_at(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(EOPNOTSUPP)
     }
 }
 
@@ -168,35 +266,38 @@ struct RemoteBinderHandle<F: RemoteControllerConnector> {
 /// of an unassigned task, it will associate itself with the remote thread and from then on, only
 /// accept request for that thread, or for any task.
 struct RemoteBinderHandleState {
-    // The thread_group of the tasks that interact with this remote binder. This is used to
-    // ionterrupt a random thread in the task group is a taskless request needs to be handled.
+    /// The thread_group of the tasks that interact with this remote binder. This is used to
+    /// ionterrupt a random thread in the task group is a taskless request needs to be handled.
     thread_group: Arc<ThreadGroup>,
 
-    // Mapping from the koid of the remote process to the local task.
+    /// Mapping from the koid of the remote process to the local task.
     koid_to_task: HashMap<u64, pid_t>,
 
-    // Set of tasks that contacted the remote binder device driver but are not yet associated to a
-    // remote process. Once associated, a task will have an entry in `pending_requests`.
+    /// Set of tasks that contacted the remote binder device driver but are not yet associated to a
+    /// remote process. Once associated, a task will have an entry in `pending_requests`.
     unassigned_tasks: HashSet<pid_t>,
 
-    // Pending request for each associated task. Once as task is registered and associated with a
-    // remote process, it will have an entry in this map. If the entry is None, it has no work to
-    // do, otherwise, it must executed the given request.
+    /// Pending request for each associated task. Once as task is registered and associated with a
+    /// remote process, it will have an entry in this map. If the entry is None, it has no work to
+    /// do, otherwise, it must executed the given request.
     pending_requests: HashMap<pid_t, Option<BoundTaskRequest>>,
 
-    // Queue of request that must be executed and for which no assigned task exists. The next time
-    // a unassigned task requires a new request, the first request will be retrieved and the task
-    // will be associated with the koid of the request.
+    /// Queue of request that must be executed and for which no assigned task exists. The next time
+    /// a unassigned task requires a new request, the first request will be retrieved and the task
+    /// will be associated with the koid of the request.
     unassigned_requests: VecDeque<BoundTaskRequest>,
 
-    // Queue of request that can be executed by any task.
+    /// Queue of request that can be executed by any task.
     taskless_requests: VecDeque<TaskRequest>,
 
-    // If present, any ioctl should immediately return the given value. Used to end the userspace
-    // process.
+    /// If present, any ioctl should immediately return the given value. Used to end the userspace
+    /// process.
     exit: Option<Result<(), ErrnoCode>>,
 
-    // Notification queue to wake tasks waiting for requests.
+    /// Channels that must receive a element at the time the handle exits.
+    exit_notifiers: Vec<oneshot::Sender<()>>,
+
+    /// Notification queue to wake tasks waiting for requests.
     waiters: WaitQueue,
 }
 
@@ -249,10 +350,29 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 pending_requests: Default::default(),
                 taskless_requests: Default::default(),
                 exit: Default::default(),
+                exit_notifiers: Default::default(),
                 waiters: Default::default(),
             }),
             _phantom: Default::default(),
         })
+    }
+
+    fn close(self: &Arc<Self>) {
+        self.exit(Ok(()));
+    }
+
+    fn ioctl(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        request: u32,
+        user_addr: UserAddress,
+    ) -> Result<SyscallResult, Errno> {
+        match request {
+            uapi::REMOTE_BINDER_START => self.start(current_task, user_addr.into())?,
+            uapi::REMOTE_BINDER_WAIT => self.wait(current_task, user_addr.into())?,
+            _ => return error!(ENOTSUP),
+        }
+        Ok(SUCCESS)
     }
 
     /// Serve the given `binder` handle, by opening `path`.
@@ -277,11 +397,25 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
           remote_binder_connection.close();
         }
 
-        // Serve the Binder protocol
+        // Register a receiver to be notified of exit
+        let (sender, mut receiver) = oneshot::channel::<()>();
+        {
+            let mut state = self.state.lock();
+            if state.exit.is_some() {
+                return Ok(());
+            }
+            state.exit_notifiers.push(sender);
+        }
+
+        // The stream for the Binder protocol
         let mut stream = fbinder::BinderRequestStream::from_channel(fasync::Channel::from_channel(
             binder.into_channel(),
         )?);
-        while let Some(event) = stream.try_next().await? {
+
+        while let Some(event) = select! {
+            event = stream.try_next() => event,
+            _ = receiver => Ok(None),
+        }? {
             match event {
                 fbinder::BinderRequest::SetVmo { vmo, mapped_address, control_handle } => {
                     self.state.lock().enqueue_taskless_request(TaskRequest::SetVmo(
@@ -469,6 +603,9 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         let mut state = self.state.lock();
         state.exit = Some(result.map_err(|e| e.code));
         state.waiters.notify_all();
+        for notifier in std::mem::take(&mut state.exit_notifiers) {
+            let _ = notifier.send(());
+        }
     }
 
     /// Implementation of the REMOTE_BINDER_START ioctl.
@@ -553,99 +690,6 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
                 return Err(errno);
             }
         }
-    }
-}
-
-impl<F: RemoteControllerConnector> FileOps for Arc<RemoteBinderHandle<F>> {
-    fn query_events(&self, _current_task: &CurrentTask) -> FdEvents {
-        FdEvents::empty()
-    }
-
-    fn ioctl(
-        &self,
-        _file: &FileObject,
-        current_task: &CurrentTask,
-        request: u32,
-        user_addr: UserAddress,
-    ) -> Result<SyscallResult, Errno> {
-        match request {
-            uapi::REMOTE_BINDER_START => self.start(current_task, user_addr.into())?,
-            uapi::REMOTE_BINDER_WAIT => self.wait(current_task, user_addr.into())?,
-            _ => return error!(ENOTSUP),
-        }
-        Ok(SUCCESS)
-    }
-
-    fn get_vmo(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _length: Option<usize>,
-        _prot: zx::VmarFlags,
-    ) -> Result<Arc<zx::Vmo>, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn mmap(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _addr: DesiredAddress,
-        _vmo_offset: u64,
-        _length: usize,
-        _flags: zx::VmarFlags,
-        _mapping_options: MappingOptions,
-        _filename: NamespaceNode,
-    ) -> Result<MappedVmo, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn read(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn write(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn seek(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: off_t,
-        _whence: SeekOrigin,
-    ) -> Result<off_t, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn read_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn OutputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EOPNOTSUPP)
-    }
-
-    fn write_at(
-        &self,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        _data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        error!(EOPNOTSUPP)
     }
 }
 
@@ -735,20 +779,14 @@ mod tests {
                 UserAddress::default(),
                 std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
             );
-            let file = PanickingFile::new_file(&task);
 
-            let start_result = remote_binder_handle.ioctl(
-                &file,
-                &task,
-                uapi::REMOTE_BINDER_START,
-                start_command_address,
-            );
+            let start_result =
+                remote_binder_handle.ioctl(&task, uapi::REMOTE_BINDER_START, start_command_address);
             if must_interrupt(&start_result).is_none() {
                 panic!("Unexpected result for start ioctl: {start_result:?}");
             }
             loop {
                 let result = remote_binder_handle.ioctl(
-                    &file,
                     &task,
                     uapi::REMOTE_BINDER_WAIT,
                     wait_command_address,
