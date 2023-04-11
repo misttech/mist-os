@@ -639,11 +639,10 @@ async fn load_base_drivers(
     Ok(())
 }
 
-#[fasync::run_singlethreaded]
+// NOTE: This tag is load-bearing to make sure that the output
+// shows up in serial.
+#[fuchsia::main(logging_tags = ["driver"])]
 async fn main() -> Result<(), anyhow::Error> {
-    // This is to make sure driver_index's logs show up in serial.
-    fuchsia_syslog::init_with_tags(&["driver"]).unwrap();
-
     let mut service_fs = ServiceFs::new_local();
 
     service_fs.dir("svc").add_fidl_service(IncomingRequest::DriverIndexProtocol);
@@ -905,9 +904,8 @@ mod tests {
 
     // This test depends on '/pkg/config/drivers_for_test.json' existing in the test package.
     // The test reads that json file to determine which bind rules to read and index.
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn read_from_json() {
-        fuchsia_syslog::init().unwrap();
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .unwrap();
@@ -1014,7 +1012,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_bind_string() {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
@@ -1088,7 +1086,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_bind_enum() {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
@@ -1162,7 +1160,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_drivers_v1() {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
@@ -1267,7 +1265,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_driver_multiple_non_fallbacks() {
         // Make the bind instructions.
         let always_match = bind::compiler::BindRules {
@@ -1337,7 +1335,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_driver_non_fallback_boot_priority() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/fallback-boot.cm";
@@ -1428,7 +1426,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_driver_non_fallback_base_priority() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str =
             "fuchsia-pkg://fuchsia.com/package#driver/fallback-boot.cm";
@@ -1535,7 +1533,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_drivers_v1_non_fallback_boot_priority() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str = "fuchsia-boot:///#driver/fallback-boot.cm";
         const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
@@ -1632,7 +1630,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_drivers_v1_non_fallback_base_priority() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str = "fuchsia-boot:///#driver/fallback-boot.cm";
         const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
@@ -1759,7 +1757,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_fallback_driver() {
         const DRIVER_URL: &str = "fuchsia-boot:///#meta/test-fallback-component.cm";
         let driver_url = url::Url::parse(&DRIVER_URL).unwrap();
@@ -1773,7 +1771,7 @@ mod tests {
         assert!(fallback_driver.fallback);
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_eager_fallback_boot_driver() {
         let eager_driver_component_url =
             url::Url::parse("fuchsia-boot:///#meta/test-fallback-component.cm").unwrap();
@@ -1796,14 +1794,13 @@ mod tests {
         );
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_load_eager_fallback_base_driver() {
         let eager_driver_component_url = url::Url::parse(
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-fallback-component.cm",
         )
         .unwrap();
 
-        fuchsia_syslog::init().unwrap();
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .unwrap();
@@ -1844,7 +1841,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dont_load_disabled_fallback_boot_driver() {
         let disabled_driver_component_url =
             url::Url::parse("fuchsia-boot:///#meta/test-fallback-component.cm").unwrap();
@@ -1864,14 +1861,13 @@ mod tests {
             .is_none());
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_dont_load_disabled_fallback_base_driver() {
         let disabled_driver_component_url = url::Url::parse(
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-fallback-component.cm",
         )
         .unwrap();
 
-        fuchsia_syslog::init().unwrap();
         let (resolver, resolver_stream) =
             fidl::endpoints::create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
                 .unwrap();
@@ -1909,7 +1905,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_driver_when_require_system_true_and_base_repo_not_resolved() {
         let always_match = create_always_match_bind_rules();
         let boot_repo = vec![ResolvedDriver {
@@ -1943,7 +1939,7 @@ mod tests {
         .await;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_driver_when_require_system_false_and_base_repo_not_resolved() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str = "fuchsia-boot:///#driver/fallback-boot.cm";
         const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
@@ -1988,7 +1984,7 @@ mod tests {
         .await;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_drivers_v1_when_require_system_true_and_base_repo_not_resolved() {
         let always_match = create_always_match_bind_rules();
         let boot_repo = vec![ResolvedDriver {
@@ -2022,7 +2018,7 @@ mod tests {
         .await;
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_match_drivers_v1_when_require_system_false_and_base_repo_not_resolved() {
         const FALLBACK_BOOT_DRIVER_COMPONENT_URL: &str = "fuchsia-boot:///#driver/fallback-boot.cm";
         const FALLBACK_BOOT_DRIVER_V1_DRIVER_PATH: &str = "meta/fallback-boot.so";
@@ -2069,9 +2065,8 @@ mod tests {
 
     // This test relies on two drivers existing in the /pkg/ directory of the
     // test package.
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_boot_drivers() {
-        fuchsia_syslog::init().unwrap();
         let boot = fuchsia_fs::directory::open_in_namespace("/pkg", fio::OpenFlags::RIGHT_READABLE)
             .unwrap();
         let drivers = load_boot_drivers(boot, &HashSet::new(), &HashSet::new()).await.unwrap();
@@ -2152,7 +2147,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_parent_spec_match() {
         let base_repo = BaseRepo::Resolved(std::vec![]);
 
@@ -2256,7 +2251,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_parent_spec_match_v1() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
@@ -2407,7 +2402,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_matched_composite() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -2597,7 +2592,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_no_optional_matched_composite_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -2798,7 +2793,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_with_optional_matched_composite_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -2962,7 +2957,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_then_driver() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -3149,7 +3144,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_no_optional_then_driver_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -3347,7 +3342,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_with_optional_then_driver_with_optional() {
         // Create the Composite Bind rules.
         let primary_node_inst = vec![SymbolicInstructionInfo {
@@ -3554,7 +3549,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_duplicate_path() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
@@ -3655,7 +3650,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_add_composite_node_spec_duplicate_key() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
@@ -3732,10 +3727,8 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_register_and_match_ephemeral_driver() {
-        fuchsia_syslog::init().unwrap();
-
         let component_manifest_url =
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
         let driver_library_url =
@@ -3820,10 +3813,8 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_register_and_get_ephemeral_driver() {
-        fuchsia_syslog::init().unwrap();
-
         let component_manifest_url =
             "fuchsia-pkg://fuchsia.com/driver-index-unittests#meta/test-bind-component.cm";
         let driver_library_url =
@@ -3886,7 +3877,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_register_exists_in_base() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
@@ -3952,7 +3943,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_register_exists_in_boot() {
         let always_match_rules = bind::compiler::BindRules {
             instructions: vec![],
@@ -4018,7 +4009,7 @@ mod tests {
         }
     }
 
-    #[fasync::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_get_device_categories_from_component_data() {
         assert_eq!(
             resolved_driver::get_device_categories_from_component_data(&vec![

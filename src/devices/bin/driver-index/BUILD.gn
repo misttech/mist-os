@@ -60,10 +60,10 @@ rustc_binary("bin") {
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//src/devices/lib/bind:lib",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
-    "//src/lib/syslog/rust:syslog",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/cm_rust",
     "//src/sys/pkg/lib/fuchsia-pkg",
@@ -157,6 +157,11 @@ driver_manifest("driver-manifest") {
 # Run with `fx test driver-index-unittests`.
 fuchsia_unittest_package("driver-index-unittests") {
   manifest = "meta/driver-index-unittests.cml"
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
   deps = [
     ":bin_test",
     ":driver-manifest",
