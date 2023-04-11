@@ -55,10 +55,10 @@ TEST_F(LogParserTest, NoMarkup) {
 
 TEST_F(LogParserTest, ResetWithContext) {
   EXPECT_CALL(symbolizer_, Reset(false)).Times(1);
-  ProcessOneLine("context: {{{reset}}}");
+  ProcessOneLine("prefix {{{reset}}} suffix");
   ASSERT_EQ(output_.str(), "");
   printer_.OutputWithContext("");
-  ASSERT_EQ(output_.str(), "context: \n");
+  ASSERT_EQ(output_.str(), "prefix  suffix\n");
 }
 
 TEST_F(LogParserTest, Module) {

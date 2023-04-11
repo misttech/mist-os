@@ -18,11 +18,14 @@ class Printer {
  public:
   explicit Printer(std::ostream& output) : output_(output) {}
 
-  void SetContext(std::string_view context) { context_ = context; }
+  void SetContext(std::string_view prefix, std::string_view suffix) {
+    prefix_ = prefix;
+    suffix_ = suffix;
+  }
 
   template <typename T>
   void OutputWithContext(T&& string) {
-    output_ << context_ << std::forward<T>(string) << std::endl;
+    output_ << prefix_ << std::forward<T>(string) << suffix_ << std::endl;
   }
 
   template <typename T>
@@ -32,7 +35,8 @@ class Printer {
 
  private:
   std::ostream& output_;
-  std::string context_;
+  std::string prefix_;
+  std::string suffix_;
 };
 
 }  // namespace symbolizer

@@ -17,6 +17,7 @@
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <iterator>
 #include <vector>
 
@@ -29,6 +30,8 @@
 
 #include "dso-list-impl.h"
 #include "inspector/inspector.h"
+#include "src/lib/unwinder/fuchsia.h"
+#include "src/lib/unwinder/unwind.h"
 #include "utils-impl.h"
 
 namespace inspector {
@@ -37,8 +40,65 @@ constexpr int kBacktraceFrameLimit = 50;
 
 struct Frame {
   uint64_t pc;
-  fbl::String source;
+
+  // Extra message that is shown after the frame.
+  fbl::String message;
 };
+
+static std::vector<Frame> unwind_from_unwinder(zx_handle_t process, zx_handle_t thread,
+                                               inspector_dsoinfo_t* dso_list) {
+  // Setup memory and modules.
+  unwinder::FuchsiaMemory memory(process);
+  std::vector<uint64_t> modules;
+  while (dso_list) {
+    modules.push_back(dso_list->base);
+    dso_list = dso_list->next;
+  }
+
+  // Setup registers.
+  zx_thread_state_general_regs_t regs;
+  if (inspector_read_general_regs(thread, &regs) != ZX_OK) {
+    print_error("inspector_read_general_regs failed");
+    return {};
+  }
+  auto registers = unwinder::FromFuchsiaRegisters(regs);
+
+  auto frames = unwinder::Unwind(&memory, modules, registers, kBacktraceFrameLimit);
+
+  // Convert frames.
+  std::vector<Frame> res;
+  res.reserve(frames.size());
+  for (auto& frame : frames) {
+    uint64_t pc = 0;
+    frame.regs.GetPC(pc);  // won't fail.
+    std::string source = "from ";
+    switch (frame.trust) {
+      case unwinder::Frame::Trust::kScan:
+        source += "scan";
+        break;
+      case unwinder::Frame::Trust::kSCS:
+        source += "SCS";
+        break;
+      case unwinder::Frame::Trust::kPLT:
+        source += "PLT";
+        break;
+      case unwinder::Frame::Trust::kFP:
+        source += "FP";
+        break;
+      case unwinder::Frame::Trust::kCFI:
+        source += "CFI";
+        break;
+      case unwinder::Frame::Trust::kContext:
+        source += "context";
+        break;
+    }
+    if (frame.error.has_err()) {
+      source += "\nerror: " + frame.error.msg();
+    }
+    res.push_back({pc, source});
+  }
+  return res;
+}
 
 static int dso_lookup_for_unw(void* context, unw_word_t pc, unw_word_t* base, const char** name) {
   auto dso_list = reinterpret_cast<inspector_dsoinfo_t*>(context);
@@ -209,7 +269,12 @@ static std::vector<Frame> unwind_from_shadow_call_stack(zx_handle_t process, zx_
 static void print_stack(FILE* f, const std::vector<Frame>& stack) {
   int n = 0;
   for (auto& frame : stack) {
-    fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s}}}\n", n++, frame.pc, frame.source.c_str());
+    const char* address_type = "ra";
+    if (n == 0) {
+      address_type = "pc";
+    }
+    fprintf(f, "{{{bt:%u:%#" PRIxPTR ":%s}}} %s\n", n++, frame.pc, address_type,
+            frame.message.c_str());
   }
   if (n >= kBacktraceFrameLimit) {
     fprintf(f, "warning: backtrace frame limit exceeded; backtrace may be truncated\n");
@@ -227,8 +292,16 @@ extern "C" __EXPORT void inspector_print_backtrace_markup(FILE* f, zx_handle_t p
 void print_backtrace_markup(FILE* f, zx_handle_t process, zx_handle_t thread,
                             inspector_dsoinfo_t* dso_list, uintptr_t pc, uintptr_t sp, uintptr_t fp,
                             const bool skip_markup_context) {
+  constexpr bool kUseNewUnwinder = false;
+
+  std::vector<Frame> stack;
+  if (kUseNewUnwinder) {
+    stack = unwind_from_unwinder(process, thread, dso_list);
+  } else {
+    stack = unwind_from_ngunwind(process, thread, dso_list, pc, sp, fp);
+  }
+
   // Check the consistency between ngunwind's stack and SCS. Print both if they mismatch.
-  std::vector<Frame> stack = unwind_from_ngunwind(process, thread, dso_list, pc, sp, fp);
   std::vector<Frame> scs = unwind_from_shadow_call_stack(process, thread);
 
   // The SCS should be a subsequence of the real stack, because some functions may have SCS disabled

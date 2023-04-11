@@ -55,7 +55,7 @@ bool LogParser::ProcessNextLine() {
   }
   if (end != std::string::npos) {
     std::string_view line_view(line);
-    printer_->SetContext(line_view.substr(0, start));
+    printer_->SetContext(line_view.substr(0, start), line_view.substr(end + 3));
     if (ProcessMarkup(line_view.substr(start + 3, end - start - 3))) {
       // Skip outputting only if we have the starting and the ending braces and the markup is valid.
       return true;
