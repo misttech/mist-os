@@ -476,7 +476,7 @@ impl Task {
             initial_name,
             thread_group,
             thread,
-            FdTable::new(),
+            FdTable::default(),
             memory_manager,
             root_fs,
             Credentials::root(),

@@ -53,11 +53,29 @@ impl FdTableEntry {
 }
 
 #[derive(Debug, Default)]
+struct FdTableInner {
+    map: RwLock<HashMap<FdNumber, FdTableEntry>>,
+}
+
+impl FdTableInner {
+    fn id(&self) -> FdTableId {
+        FdTableId::new(self.map.read().deref() as *const HashMap<FdNumber, FdTableEntry>)
+    }
+
+    fn unshare(&self) -> FdTableInner {
+        let inner = FdTableInner { map: RwLock::new(self.map.read().clone()) };
+        let id = inner.id();
+        inner.map.write().values_mut().for_each(|entry| entry.fd_table_id = id);
+        inner
+    }
+}
+
+#[derive(Debug, Default)]
 pub struct FdTable {
     // TODO(fxb/122600) The external mutex is only used to be able to drop the file descriptor
     // while keeping the table itself. It will be unneeded once the live state of a task is deleted
     // as soon as the task dies, instead of relying on Drop.
-    table: Mutex<Arc<RwLock<HashMap<FdNumber, FdTableEntry>>>>,
+    table: Mutex<Arc<FdTableInner>>,
 }
 
 pub enum TargetFdNumber {
@@ -72,24 +90,23 @@ pub enum TargetFdNumber {
 }
 
 impl FdTable {
-    pub fn new() -> FdTable {
-        Default::default()
-    }
-
     pub fn id(&self) -> FdTableId {
-        FdTableId::new(self.table.lock().read().deref() as *const HashMap<FdNumber, FdTableEntry>)
+        self.table.lock().id()
     }
 
     pub fn fork(&self) -> FdTable {
-        let result =
-            FdTable { table: Mutex::new(Arc::new(RwLock::new(self.table.lock().read().clone()))) };
-        let id = result.id();
-        result.table.lock().write().values_mut().for_each(|entry| entry.fd_table_id = id);
-        result
+        let inner = self.table.lock().unshare();
+        FdTable { table: Mutex::new(Arc::new(inner)) }
+    }
+
+    pub fn unshare(&self) {
+        let mut table = self.table.lock();
+        let unshared_inner = table.unshare();
+        *table = Arc::new(unshared_inner);
     }
 
     pub fn exec(&self) {
-        self.table.lock().write().retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
+        self.table.lock().map.write().retain(|_fd, entry| !entry.flags.contains(FdFlags::CLOEXEC));
     }
 
     pub fn insert(&self, task: &Task, fd: FdNumber, file: FileHandle) -> Result<(), Errno> {
@@ -104,9 +121,9 @@ impl FdTable {
         flags: FdFlags,
     ) -> Result<(), Errno> {
         let id = self.id();
-        let state = self.table.lock();
-        let mut table = state.write();
-        self.insert_entry(task, &mut table, fd, FdTableEntry::new(file, id, flags))
+        let inner = self.table.lock();
+        let mut map = inner.map.write();
+        self.insert_entry(task, &mut map, fd, FdTableEntry::new(file, id, flags))
     }
 
     pub fn add_with_flags(
@@ -116,24 +133,24 @@ impl FdTable {
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         let id = self.id();
-        let state = self.table.lock();
-        let mut table = state.write();
-        let fd = self.get_lowest_available_fd(&table, FdNumber::from_raw(0));
-        self.insert_entry(task, &mut table, fd, FdTableEntry::new(file, id, flags))?;
+        let inner = self.table.lock();
+        let mut map = inner.map.write();
+        let fd = self.get_lowest_available_fd(&map, FdNumber::from_raw(0));
+        self.insert_entry(task, &mut map, fd, FdTableEntry::new(file, id, flags))?;
         Ok(fd)
     }
 
     fn insert_entry(
         &self,
         task: &Task,
-        table: &mut HashMap<FdNumber, FdTableEntry>,
+        map: &mut HashMap<FdNumber, FdTableEntry>,
         fd: FdNumber,
         entry: FdTableEntry,
     ) -> Result<(), Errno> {
         if fd.raw() as u64 >= task.thread_group.get_rlimit(Resource::NOFILE) {
             return error!(EMFILE);
         }
-        table.insert(fd, entry);
+        map.insert(fd, entry);
         Ok(())
     }
 
@@ -151,22 +168,22 @@ impl FdTable {
         let _removed_file;
         let result = {
             let id = self.id();
-            let state = self.table.lock();
-            let mut table = state.write();
+            let inner = self.table.lock();
+            let mut map = inner.map.write();
             let file =
-                table.get(&oldfd).map(|entry| entry.file.clone()).ok_or_else(|| errno!(EBADF))?;
+                map.get(&oldfd).map(|entry| entry.file.clone()).ok_or_else(|| errno!(EBADF))?;
 
             let fd = match target {
                 TargetFdNumber::Specific(fd) => {
-                    _removed_file = table.remove(&fd);
+                    _removed_file = map.remove(&fd);
                     fd
                 }
-                TargetFdNumber::Minimum(fd) => self.get_lowest_available_fd(&table, fd),
+                TargetFdNumber::Minimum(fd) => self.get_lowest_available_fd(&map, fd),
                 TargetFdNumber::Default => {
-                    self.get_lowest_available_fd(&table, FdNumber::from_raw(0))
+                    self.get_lowest_available_fd(&map, FdNumber::from_raw(0))
                 }
             };
-            self.insert_entry(task, &mut table, fd, FdTableEntry::new(file, id, flags))?;
+            self.insert_entry(task, &mut map, fd, FdTableEntry::new(file, id, flags))?;
             Ok(fd)
         };
         result
@@ -179,6 +196,7 @@ impl FdTable {
     pub fn get_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
         self.table
             .lock()
+            .map
             .read()
             .get(&fd)
             .map(|entry| (entry.file.clone(), entry.flags))
@@ -196,7 +214,7 @@ impl FdTable {
     pub fn close(&self, fd: FdNumber) -> Result<(), Errno> {
         // Drop the file object only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
-        let removed = { self.table.lock().write().remove(&fd) };
+        let removed = { self.table.lock().map.write().remove(&fd) };
         removed.ok_or_else(|| errno!(EBADF)).map(|_| {})
     }
 
@@ -216,6 +234,7 @@ impl FdTable {
     pub fn set_fd_flags(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
         self.table
             .lock()
+            .map
             .write()
             .get_mut(&fd)
             .map(|entry| {
@@ -226,11 +245,11 @@ impl FdTable {
 
     fn get_lowest_available_fd(
         &self,
-        table: &HashMap<FdNumber, FdTableEntry>,
+        map: &HashMap<FdNumber, FdTableEntry>,
         minfd: FdNumber,
     ) -> FdNumber {
         let mut fd = minfd;
-        while table.contains_key(&fd) {
+        while map.contains_key(&fd) {
             fd = FdNumber::from_raw(fd.raw() + 1);
         }
         fd
@@ -238,7 +257,7 @@ impl FdTable {
 
     /// Returns a vector of all current file descriptors in the table.
     pub fn get_all_fds(&self) -> Vec<FdNumber> {
-        self.table.lock().read().keys().cloned().collect()
+        self.table.lock().map.read().keys().cloned().collect()
     }
 }
 
@@ -267,7 +286,7 @@ mod test {
     #[::fuchsia::test]
     fn test_fd_table_install() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let files = FdTable::new();
+        let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
         let fd0 = add(&current_task, &files, file.clone()).unwrap();
@@ -283,7 +302,7 @@ mod test {
     #[::fuchsia::test]
     fn test_fd_table_fork() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let files = FdTable::new();
+        let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
         let fd0 = add(&current_task, &files, file.clone()).unwrap();
@@ -305,7 +324,7 @@ mod test {
     #[::fuchsia::test]
     fn test_fd_table_exec() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let files = FdTable::new();
+        let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
         let fd0 = add(&current_task, &files, file.clone()).unwrap();
@@ -325,7 +344,7 @@ mod test {
     #[::fuchsia::test]
     fn test_fd_table_pack_values() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let files = FdTable::new();
+        let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
         // Add two FDs.

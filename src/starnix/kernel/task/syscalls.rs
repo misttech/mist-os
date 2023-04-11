@@ -1080,7 +1080,7 @@ pub fn sys_setpriority(
 }
 
 pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> {
-    const IMPLEMENTED_FLAGS: u32 = CLONE_NEWNS | CLONE_NEWUTS;
+    const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
         not_implemented!(
             current_task,
@@ -1088,6 +1088,10 @@ pub fn sys_unshare(current_task: &CurrentTask, flags: u32) -> Result<(), Errno> 
             flags & !IMPLEMENTED_FLAGS
         );
         return error!(EINVAL);
+    }
+
+    if (flags & CLONE_FILES) != 0 {
+        current_task.files.unshare();
     }
 
     if (flags & CLONE_NEWNS) != 0 {
