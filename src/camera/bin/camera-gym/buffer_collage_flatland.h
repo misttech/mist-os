@@ -145,11 +145,6 @@ class BufferCollageFlatland : public fuchsia::ui::app::ViewProvider {
   void SetupBaseView();
 
   // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair view_token,
-                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) override;
-
-  // |fuchsia::ui::app::ViewProvider|
   void CreateView2(fuchsia::ui::app::CreateView2Args args) override;
 
   // |fuchsia::ui::app::ViewProvider|

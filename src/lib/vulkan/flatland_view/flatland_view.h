@@ -62,9 +62,6 @@ class FlatlandViewProviderService : public fuchsia::ui::app::ViewProvider {
                               CreateView2Callback create_view_callback);
 
   // fuchsia::ui::app::ViewProvider methods.
-  void CreateView(zx::eventpair view_token,
-                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) override;
   void CreateViewWithViewRef(zx::eventpair view_token,
                              fuchsia::ui::views::ViewRefControl view_ref_control,
                              fuchsia::ui::views::ViewRef view_ref) override;

@@ -31,11 +31,6 @@ class ViewProviderService : private fuchsia::ui::app::ViewProvider {
   ~ViewProviderService();
 
   // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair view_token,
-                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) override;
-
-  // |fuchsia::ui::app::ViewProvider|
   void CreateViewWithViewRef(zx::eventpair view_token,
                              fuchsia::ui::views::ViewRefControl view_ref_control,
                              fuchsia::ui::views::ViewRef view_ref) override;

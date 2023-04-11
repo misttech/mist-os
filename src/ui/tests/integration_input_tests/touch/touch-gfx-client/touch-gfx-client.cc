@@ -120,18 +120,6 @@ class TouchGfxClient : public fuchsia::ui::app::ViewProvider {
        {128, 0, 255, 255}}};  // purple
 
   // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair token,
-                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> /*unused*/,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> /*unused*/) override {
-    FX_LOGS(INFO) << "CreateView called.";
-
-    view_ = std::make_unique<scenic::View>(session_.get(), std::move(token), "cpp-gfx-client view");
-    view_->AddChild(*root_node_);
-
-    session_->Present2(/*when*/ zx_clock_get_monotonic(), /*span*/ 0, [](auto) {});
-  }
-
-  // |fuchsia::ui::app::ViewProvider|
   void CreateViewWithViewRef(zx::eventpair token,
                              fuchsia::ui::views::ViewRefControl view_ref_control,
                              fuchsia::ui::views::ViewRef view_ref) override {

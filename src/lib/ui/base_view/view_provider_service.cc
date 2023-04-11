@@ -30,14 +30,6 @@ ViewProviderService::~ViewProviderService() {
   component_context_->outgoing()->RemovePublicService<fuchsia::ui::app::ViewProvider>();
 }
 
-void ViewProviderService::CreateView(
-    zx::eventpair view_token,
-    fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-    fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) {
-  auto [view_ref_control, view_ref] = scenic::ViewRefPair::New();
-  CreateViewWithViewRef(std::move(view_token), std::move(view_ref_control), std::move(view_ref));
-}
-
 void ViewProviderService::CreateViewWithViewRef(zx::eventpair view_token,
                                                 fuchsia::ui::views::ViewRefControl view_ref_control,
                                                 fuchsia::ui::views::ViewRef view_ref) {

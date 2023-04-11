@@ -111,9 +111,9 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
     // Plumb view to child.
     FX_LOGS(INFO) << "Waiting for view creation args from parent";
 
-    // The client view could be attached by any of `CreateView`,
-    // `CreateViewWithViewRef`, or `CreateView2`, so we need to account for all
-    // three possibilities here.
+    // The client view could be attached by
+    // `CreateViewWithViewRef` or `CreateView2`, so we need to account for both
+    // possibilities here.
     RunLoopUntil([&] { return view_token_.has_value() || create_view2_args_.has_value(); });
 
     if (view_token_.has_value()) {
@@ -226,13 +226,6 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
           view_provider_binding_.Bind(std::move(request));
         };
     context_->outgoing()->AddPublicService(std::move(handler));
-  }
-
-  // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair token,
-                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) override {
-    view_token_ = scenic::ToViewToken(std::move(token));
   }
 
   // |fuchsia::ui::app::ViewProvider|

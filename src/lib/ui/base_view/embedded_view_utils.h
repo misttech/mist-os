@@ -5,6 +5,7 @@
 #ifndef SRC_LIB_UI_BASE_VIEW_EMBEDDED_VIEW_UTILS_H_
 #define SRC_LIB_UI_BASE_VIEW_EMBEDDED_VIEW_UTILS_H_
 
+#include <fuchsia/sys/cpp/fidl.h>
 #include <fuchsia/ui/app/cpp/fidl.h>
 #include <fuchsia/ui/gfx/cpp/fidl.h>
 #include <fuchsia/ui/input/cpp/fidl.h>

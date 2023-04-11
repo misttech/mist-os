@@ -22,14 +22,6 @@ class ViewProviderImpl : fuchsia::ui::app::ViewProvider {
 
  private:
   // |fuchsia.ui.app.ViewProvider|
-  void CreateView(
-      zx::eventpair view_handle,
-      fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> /*incoming_services*/,
-      fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> /*outgoing_services*/) override {
-    std::cout << "WARNING: ViewControllerImpl.CreateView is not implemented" << std::endl;
-  }
-
-  // |fuchsia.ui.app.ViewProvider|
   void CreateViewWithViewRef(zx::eventpair view_handle,
                              fuchsia::ui::views::ViewRefControl view_ref_control,
                              fuchsia::ui::views::ViewRef view_ref) override {

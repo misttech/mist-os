@@ -43,12 +43,6 @@ ViewProviderImpl::~ViewProviderImpl() {
   context_->outgoing()->RemovePublicService<fuchsia::ui::app::ViewProvider>();
 }
 
-void ViewProviderImpl::CreateView(zx::eventpair view_handle,
-                                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider>,
-                                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider>) {
-  FX_NOTIMPLEMENTED() << "CreateView() is not implemented.";
-}
-
 void ViewProviderImpl::CreateView2(fuchsia::ui::app::CreateView2Args args) {
   context_->svc()->Connect(sysmem_allocator_.NewRequest());
   context_->svc()->Connect(flatland_allocator_.NewRequest());

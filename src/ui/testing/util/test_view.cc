@@ -93,12 +93,6 @@ void TestView::CreateViewWithViewRef(zx::eventpair token,
   FX_LOGS(ERROR) << "CreateViewWithViewRef() is not implemented";
 }
 
-void TestView::CreateView(zx::eventpair view_handle,
-                          fidl::InterfaceRequest<fuchsia::sys::ServiceProvider>,
-                          fidl::InterfaceHandle<fuchsia::sys::ServiceProvider>) {
-  FX_LOGS(ERROR) << "CreateView() is not implemented.";
-}
-
 void TestView::CreateView2(fuchsia::ui::app::CreateView2Args args) {
   FX_LOGS(ERROR) << "CreateView2() is not implemented.";
 }

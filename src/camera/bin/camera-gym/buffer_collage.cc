@@ -17,6 +17,7 @@
 #include <lib/trace/event.h>
 #include <lib/ui/scenic/cpp/commands.h>
 #include <lib/ui/scenic/cpp/resources.h>
+#include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/eventpair.h>
 #include <zircon/errors.h>
@@ -775,7 +776,9 @@ void BufferCollage::MaybeTakeDisplay() {
   FX_LOGS(WARNING) << "Component host did not create a view within " << kViewRequestTimeoutMs
                    << "ms. camera-gym will now take over the display.";
   auto tokens = scenic::NewViewTokenPair();
-  CreateView(std::move(tokens.first.value), nullptr, nullptr);
+  auto view_ref_pair = scenic::ViewRefPair::New();
+  CreateViewWithViewRef(std::move(tokens.first.value), std::move(view_ref_pair.control_ref),
+                        std::move(view_ref_pair.view_ref));
   presenter_->PresentOrReplaceView(std::move(tokens.second), nullptr);
 }
 
@@ -862,22 +865,6 @@ void BufferCollage::OnTouchEvents(std::vector<fuchsia::ui::pointer::TouchEvent> 
   }
 
   touch_source_->Watch(std::move(responses), fit::bind_member(this, &BufferCollage::OnTouchEvents));
-}
-
-void BufferCollage::CreateView(
-    zx::eventpair view_token,
-    fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-    fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) {
-  async::PostTask(loop_.dispatcher(), [this, view_token = std::move(view_token)]() mutable {
-    if (view_) {
-      FX_LOGS(ERROR) << "Clients may only call this method once per view provider lifetime.";
-      view_provider_binding_.Close(ZX_ERR_BAD_STATE);
-      return;
-    }
-    view_ = std::make_unique<scenic::View>(
-        session_.get(), scenic::ToViewToken(std::move(view_token)), "Camera Gym");
-    SetupView();
-  });
 }
 
 void BufferCollage::CreateViewWithViewRef(zx::eventpair view_token,

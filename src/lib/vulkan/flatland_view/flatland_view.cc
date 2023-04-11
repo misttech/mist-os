@@ -101,13 +101,6 @@ FlatlandViewProviderService::FlatlandViewProviderService(sys::ComponentContext* 
       });
 }
 
-void FlatlandViewProviderService::CreateView(
-    zx::eventpair view_token,
-    fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-    fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) {
-  FX_NOTIMPLEMENTED() << "Only Flatland is supported. This is a Gfx ViewProvider method.";
-}
-
 void FlatlandViewProviderService::CreateViewWithViewRef(
     zx::eventpair view_token, fuchsia::ui::views::ViewRefControl view_ref_control,
     fuchsia::ui::views::ViewRef view_ref) {

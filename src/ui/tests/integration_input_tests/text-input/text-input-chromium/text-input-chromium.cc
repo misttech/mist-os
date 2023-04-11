@@ -327,15 +327,6 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
   // This test does not work under GFX.
   //
   // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair, fidl::InterfaceRequest<fuchsia::sys::ServiceProvider>,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider>) override {
-    FX_LOGS(FATAL) << "CreateView() is not implemented.";
-  }
-
-  // This is a GFX API call, not a flatland call, so it is not implemented.
-  // This test does not work under GFX.
-  //
-  // |fuchsia::ui::app::ViewProvider|
   void CreateViewWithViewRef(zx::eventpair, fuchsia::ui::views::ViewRefControl,
                              fuchsia::ui::views::ViewRef) override {
     FX_LOGS(FATAL) << "CreateViewWithViewRef() is not implemented.";

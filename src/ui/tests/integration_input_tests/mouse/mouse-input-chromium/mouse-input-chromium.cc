@@ -308,14 +308,6 @@ class WebApp : public fuchsia::ui::app::ViewProvider {
   }
 
   // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair token,
-                  fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) override {
-    // Flatland only use |CreateView2|.
-    FX_LOGS(FATAL) << "CreateView() is not implemented.";
-  }
-
-  // |fuchsia::ui::app::ViewProvider|
   void CreateViewWithViewRef(zx::eventpair token,
                              fuchsia::ui::views::ViewRefControl view_ref_control,
                              fuchsia::ui::views::ViewRef view_ref) override {

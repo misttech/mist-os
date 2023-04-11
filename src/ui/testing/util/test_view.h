@@ -97,10 +97,6 @@ class TestView : public fuchsia::ui::app::ViewProvider,
                              fuchsia::ui::views::ViewRefControl view_ref_control,
                              fuchsia::ui::views::ViewRef view_ref) override;
 
-  // |fuchsia::ui::app::ViewProvider|
-  void CreateView(zx::eventpair view_handle, fidl::InterfaceRequest<fuchsia::sys::ServiceProvider>,
-                  fidl::InterfaceHandle<fuchsia::sys::ServiceProvider>) override;
-
   // |fuchsia.ui.app.ViewProvider|
   void CreateView2(fuchsia::ui::app::CreateView2Args args) override;
 

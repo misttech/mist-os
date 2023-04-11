@@ -379,13 +379,6 @@ void BufferCollageFlatland::SetupBaseView() {
   flatland_->SetRootTransform(kRootTransformId);
 }
 
-void BufferCollageFlatland::CreateView(
-    zx::eventpair view_token,
-    fidl::InterfaceRequest<fuchsia::sys::ServiceProvider> incoming_services,
-    fidl::InterfaceHandle<fuchsia::sys::ServiceProvider> outgoing_services) {
-  FX_NOTIMPLEMENTED() << "GFX is deprecated.";
-}
-
 void BufferCollageFlatland::CreateViewWithViewRef(
     zx::eventpair view_token, fuchsia::ui::views::ViewRefControl view_ref_control,
     fuchsia::ui::views::ViewRef view_ref) {

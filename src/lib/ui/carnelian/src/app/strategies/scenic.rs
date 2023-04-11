@@ -184,13 +184,8 @@ impl AppStrategy for ScenicAppStrategy {
             fasync::Task::local(
                 stream
                     .try_for_each(move |req| {
+                        #[allow(unreachable_patterns)]
                         match req {
-                            ViewProviderRequest::CreateView { token, .. } => {
-                                // We do not get passed a view ref so create our own
-                                let ViewRefPair { control_ref, view_ref } =
-                                    ViewRefPair::new().expect("unable to create view ref pair");
-                                Self::create_scenic_view(&sender, token, control_ref, view_ref);
-                            }
                             ViewProviderRequest::CreateViewWithViewRef {
                                 token,
                                 view_ref_control,
@@ -215,6 +210,8 @@ impl AppStrategy for ScenicAppStrategy {
                                     ))
                                     .expect("unbounded_send");
                             }
+
+                            _ => {}
                         };
                         futures::future::ready(Ok(()))
                     })

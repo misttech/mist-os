@@ -630,11 +630,10 @@ async fn view_provider_local_child(
             while let Some(request) = stream.try_next().await.expect("failed to serve ViewProvider")
             {
                 match request {
-                    fuiapp::ViewProviderRequest::CreateView { token, .. }
-                    | fuiapp::ViewProviderRequest::CreateViewWithViewRef { token, .. } => {
+                    fuiapp::ViewProviderRequest::CreateViewWithViewRef { token, .. } => {
                         token_sender.try_send(token).expect("failed to send view token");
                     }
-                    _ => panic!("unexpected ViewProvider request"),
+                    request => panic!("unexpected request: {:?}", request),
                 }
             }
         })
