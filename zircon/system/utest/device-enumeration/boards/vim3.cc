@@ -30,7 +30,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:06:17/mali/aml-gpu",
       "sys/platform/05:00:10/aml-canvas",
-      "sys/platform/05:06:d/display/amlogic-display/display-controller",
+      "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-controller",
       "sys/platform/05:06:2b/aml-hdmi",
       "sys/platform/05:06:1d",  // pwm
       "sys/platform/05:06:1d/aml-pwm-device/pwm-9/aml_pwm_regulator/pwm-0-regulator",
