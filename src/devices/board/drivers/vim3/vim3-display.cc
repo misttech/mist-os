@@ -7,13 +7,16 @@
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
+#include <bind/fuchsia/hardware/dsi/cpp/bind.h>
 #include <bind/fuchsia/hardware/hdmi/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-a311d/a311d-gpio.h>
@@ -26,14 +29,48 @@
 namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
+namespace {
+
+// Returns true iff the board has a MIPI-DSI display attached.
+bool Vim3HasLcd(zx_device_t* platform_bus) {
+  // It checks the availability of DSI display by checking the boot variable set
+  // by the bootloader (or overridden by build configuration).
+  //
+  // TODO(fxbug.dev/125228): Currently either this is hardcoded at build-time or
+  // it relies on the bootloader to set up the value. We should support probing
+  // LCD display availability directly in Fuchsia instead.
+  constexpr const char* kBootVariable = "driver.vim3.has_lcd";
+  char value[32];
+  zx_status_t status =
+      device_get_variable(platform_bus, kBootVariable, value, sizeof(value), nullptr);
+  if (status == ZX_OK) {
+    return strncmp(value, "true", sizeof("true")) == 0 || strncmp(value, "1", sizeof("1")) == 0;
+  }
+  if (status == ZX_ERR_NOT_FOUND) {
+    return false;
+  }
+  zxlogf(ERROR, "Cannot get boot variable (%s): %s", kBootVariable, zx_status_get_string(status));
+  return false;
+}
+
+}  // namespace
+
 static const std::vector<fpbus::Mmio> display_mmios{
     {{
         // VBUS/VPU
         .base = A311D_VPU_BASE,
         .length = A311D_VPU_LENGTH,
     }},
-    {},
-    {},
+    {{
+        // DSI Host Controller
+        .base = A311D_TOP_MIPI_DSI_BASE,
+        .length = A311D_TOP_MIPI_DSI_LENGTH,
+    }},
+    {{
+        // DSI PHY
+        .base = A311D_DSI_PHY_BASE,
+        .length = A311D_DSI_PHY_LENGTH,
+    }},
     {{
         // HHI
         .base = A311D_HIU_BASE,
@@ -69,19 +106,48 @@ static const std::vector<fpbus::Bti> display_btis{
     }},
 };
 
-static const fpbus::Node display_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "display";
-  dev.vid() = PDEV_VID_AMLOGIC;
-  dev.pid() = PDEV_PID_AMLOGIC_A311D;
-  dev.did() = PDEV_DID_AMLOGIC_DISPLAY;
-  dev.mmio() = display_mmios;
-  dev.irq() = display_irqs;
-  dev.bti() = display_btis;
-  return dev;
-}();
-
 zx_status_t Vim3::DisplayInit() {
+  static const display_panel_t display_panel_info[] = {
+      {
+          .width = 1080,
+          .height = 1920,
+          .panel_type = PANEL_MTF050FHDI_03,
+      },
+  };
+
+  std::vector<fpbus::Metadata> display_panel_metadata{
+      {{
+          .type = DEVICE_METADATA_DISPLAY_CONFIG,
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&display_panel_info),
+              reinterpret_cast<const uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),
+      }},
+  };
+
+  static const fpbus::Node display_dev = [&]() {
+    fpbus::Node dev = {};
+    dev.name() = "display";
+    dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
+    dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_A311D;
+    dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_DISPLAY;
+    if (Vim3HasLcd(/*platform_bus=*/parent_)) {
+      dev.metadata() = std::move(display_panel_metadata);
+    }
+    dev.mmio() = display_mmios;
+    dev.irq() = display_irqs;
+    dev.bti() = display_btis;
+    return dev;
+  }();
+
+  auto dsi_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                              bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
+  };
+
+  auto dsi_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_hardware_dsi::BIND_PROTOCOL_IMPL),
+  };
+
   auto hdmi_bind_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
@@ -92,12 +158,22 @@ zx_status_t Vim3::DisplayInit() {
                         bind_fuchsia_hardware_hdmi::BIND_FIDL_PROTOCOL_SERVICE),
   };
 
-  auto gpio_bind_rules = std::vector{
+  auto gpio_lcd_reset_bind_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_LCD_RESET)),
+  };
+
+  auto gpio_lcd_reset_properties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
+  };
+
+  auto gpio_hdmi_hotplug_detect_bind_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeAcceptBindRule(bind_fuchsia::GPIO_PIN, static_cast<uint32_t>(VIM3_HPD_IN)),
   };
 
-  auto gpio_properties = std::vector{
+  auto gpio_hdmi_hotplug_detect_properties = std::vector{
       fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_gpio::BIND_PROTOCOL_DEVICE),
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION,
                         bind_fuchsia_gpio::FUNCTION_HDMI_HOTPLUG_DETECT),
@@ -123,12 +199,20 @@ zx_status_t Vim3::DisplayInit() {
 
   auto parents = std::vector{
       fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = dsi_bind_rules,
+          .properties = dsi_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
           .bind_rules = hdmi_bind_rules,
           .properties = hdmi_properties,
       }},
       fuchsia_driver_framework::ParentSpec{{
-          .bind_rules = gpio_bind_rules,
-          .properties = gpio_properties,
+          .bind_rules = gpio_lcd_reset_bind_rules,
+          .properties = gpio_lcd_reset_properties,
+      }},
+      fuchsia_driver_framework::ParentSpec{{
+          .bind_rules = gpio_hdmi_hotplug_detect_bind_rules,
+          .properties = gpio_hdmi_hotplug_detect_properties,
       }},
       fuchsia_driver_framework::ParentSpec{{
           .bind_rules = sysmem_bind_rules,

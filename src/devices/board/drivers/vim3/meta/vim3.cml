@@ -15,6 +15,7 @@
         colocate: "true",
     },
     use: [
+        { protocol: "fuchsia.boot.Arguments" },
         { service: "fuchsia.hardware.platform.bus.Service" },
     ],
 }
