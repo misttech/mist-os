@@ -10,8 +10,7 @@ namespace composite_node_specs {
 
 zx::result<std::unique_ptr<CompositeNodeSpecV1>> CompositeNodeSpecV1::Create(
     CompositeNodeSpecCreateInfo create_info,
-    fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec, DriverLoader& driver_loader,
-    DeviceManager& device_manager) {
+    fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec, DeviceManager& device_manager) {
   fbl::Array<std::unique_ptr<Metadata>> metadata(
       new std::unique_ptr<Metadata>[spec.metadata.count()], spec.metadata.count());
   for (size_t i = 0; i < spec.metadata.count(); i++) {
@@ -29,16 +28,15 @@ zx::result<std::unique_ptr<CompositeNodeSpecV1>> CompositeNodeSpecV1::Create(
   }
 
   return zx::ok(std::make_unique<CompositeNodeSpecV1>(std::move(create_info), std::move(metadata),
-                                                      driver_loader, device_manager));
+                                                      device_manager));
 }
 
 CompositeNodeSpecV1::CompositeNodeSpecV1(CompositeNodeSpecCreateInfo create_info,
                                          fbl::Array<std::unique_ptr<Metadata>> metadata,
-                                         DriverLoader& driver_loader, DeviceManager& device_manager)
+                                         DeviceManager& device_manager)
     : CompositeNodeSpec(std::move(create_info)),
       metadata_(std::move(metadata)),
       has_composite_device_(false),
-      driver_loader_(driver_loader),
       device_manager_(device_manager) {}
 
 zx::result<std::optional<DeviceOrNode>> CompositeNodeSpecV1::BindParentImpl(
@@ -94,8 +92,11 @@ void CompositeNodeSpecV1::SetupCompositeDevice(
 
   auto fidl_driver_info = info.composite().driver_info();
   MatchedDriverInfo matched_driver_info = {
-      .driver = driver_loader_.LoadDriverUrl(std::string(fidl_driver_info.url().get())),
       .colocate = fidl_driver_info.has_colocate() && fidl_driver_info.colocate(),
+      .is_dfv2 = !fidl_driver_info.has_driver_url(),
+      .is_fallback = fidl_driver_info.has_is_fallback() && fidl_driver_info.is_fallback(),
+      .package_type = fidl_driver_info.package_type(),
+      .component_url = std::string(fidl_driver_info.url().get()),
   };
 
   CompositeNodeSpecInfo composite_info = {

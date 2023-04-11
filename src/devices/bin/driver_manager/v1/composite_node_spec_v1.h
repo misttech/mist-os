@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BIN_DRIVER_MANAGER_V1_COMPOSITE_NODE_SPEC_V1_H_
 
 #include "src/devices/bin/driver_manager/composite_device.h"
-#include "src/devices/bin/driver_manager/driver_loader.h"
+#include "src/devices/bin/driver_manager/composite_node_spec/composite_manager_bridge.h"
 #include "src/devices/bin/driver_manager/v1/device_manager.h"
 
 // Wrapper struct for a fbl::RefPtr<Device>. This allows the composite node spec
@@ -25,11 +25,11 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
  public:
   static zx::result<std::unique_ptr<CompositeNodeSpecV1>> Create(
       CompositeNodeSpecCreateInfo create_info,
-      fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec, DriverLoader& driver_loader,
+      fuchsia_device_manager::wire::CompositeNodeSpecDescriptor spec,
       DeviceManager& device_manager);
 
   CompositeNodeSpecV1(CompositeNodeSpecCreateInfo create_info,
-                      fbl::Array<std::unique_ptr<Metadata>> metadata, DriverLoader& driver_loader,
+                      fbl::Array<std::unique_ptr<Metadata>> metadata,
                       DeviceManager& device_manager);
 
  private:
@@ -50,9 +50,6 @@ class CompositeNodeSpecV1 : public CompositeNodeSpec {
   // True if a CompositeDevice object is created for the spec. Set true by SetupCompositeDevice()
   // after the first BindParentImpl() call.
   bool has_composite_device_;
-
-  // Must outlive CompositeNodeSpecV1.
-  DriverLoader& driver_loader_;
 
   // Must outlive CompositeNodeSpecV1.
   DeviceManager& device_manager_;

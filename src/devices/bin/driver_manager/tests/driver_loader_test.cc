@@ -144,7 +144,7 @@ TEST_F(DriverLoaderTest, TestFallbackGetsRemoved) {
   fidl::VectorView<fdf::wire::NodeProperty> props{};
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
   ASSERT_EQ(drivers.size(), 1);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->url, not_fallback_url);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, not_fallback_url);
 }
 
 TEST_F(DriverLoaderTest, TestFallbackAcceptedAfterBaseLoaded) {
@@ -180,8 +180,8 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedAfterBaseLoaded) {
 
   ASSERT_EQ(drivers.size(), 2);
   // The non-fallback should always be first.
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->url, not_fallback_url);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[1]).v1()->url, fallback_url);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, not_fallback_url);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[1]).component_url, fallback_url);
 }
 
 TEST_F(DriverLoaderTest, TestFallbackAcceptedWhenSystemNotRequired) {
@@ -212,8 +212,8 @@ TEST_F(DriverLoaderTest, TestFallbackAcceptedWhenSystemNotRequired) {
 
   ASSERT_EQ(drivers.size(), 2);
   // The non-fallback should always be first.
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->url, not_fallback_url);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[1]).v1()->url, fallback_url);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, not_fallback_url);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[1]).component_url, fallback_url);
 }
 
 TEST_F(DriverLoaderTest, TestUrl) {
@@ -241,7 +241,7 @@ TEST_F(DriverLoaderTest, TestUrl) {
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->url, name2);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, name2);
 }
 
 TEST_F(DriverLoaderTest, TestRelativeUrl) {
@@ -270,7 +270,7 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
     auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
     ASSERT_EQ(1, drivers.size());
-    ASSERT_EQ(name1, std::get<MatchedDriverInfo>(drivers[0]).v1()->url);
+    ASSERT_EQ(name1, std::get<MatchedDriverInfo>(drivers[0]).component_url);
   }
 
   {
@@ -280,7 +280,7 @@ TEST_F(DriverLoaderTest, TestRelativeUrl) {
     auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
     ASSERT_EQ(1, drivers.size());
-    ASSERT_EQ(name2, std::get<MatchedDriverInfo>(drivers[0]).v1()->url);
+    ASSERT_EQ(name2, std::get<MatchedDriverInfo>(drivers[0]).component_url);
   }
 }
 
@@ -341,8 +341,8 @@ TEST_F(DriverLoaderTest, TestOnlyReturnBaseAndFallback) {
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 2);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->url, name1);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[1]).v1()->url, name3);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, name1);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[1]).component_url, name3);
 }
 
 TEST_F(DriverLoaderTest, TestReturnOnlyNodeGroups) {
@@ -426,7 +426,7 @@ TEST_F(DriverLoaderTest, TestReturnDriversAndNodeGroups) {
   ASSERT_EQ(drivers.size(), 2);
 
   // Check driver.
-  ASSERT_EQ(driver_name, std::get<MatchedDriverInfo>(drivers[0]).v1()->url);
+  ASSERT_EQ(driver_name, std::get<MatchedDriverInfo>(drivers[0]).component_url);
 
   // Check composite node spec.
   auto spec_result = std::get<fdi::MatchedCompositeNodeParentInfo>(drivers[1]);
@@ -542,7 +542,7 @@ TEST_F(DriverLoaderTest, TestEphemeralDriver) {
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v1()->url, name1);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, name1);
 }
 
 TEST_F(DriverLoaderTest, TestV2Driver) {
@@ -561,6 +561,6 @@ TEST_F(DriverLoaderTest, TestV2Driver) {
   auto drivers = driver_loader.MatchPropertiesDriverIndex("test_device", props, config);
 
   ASSERT_EQ(drivers.size(), 1);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).is_v1(), false);
-  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).v2().url, name);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).is_dfv2, true);
+  ASSERT_EQ(std::get<MatchedDriverInfo>(drivers[0]).component_url, name);
 }

@@ -62,8 +62,7 @@ zx_status_t CompositeDeviceFragment::Bind(const fbl::RefPtr<Device>& dev) {
   ZX_ASSERT(!bound_device_);
 
   uses_fragment_driver_ = true;
-  zx_status_t status = dev->coordinator->AttemptBind(
-      MatchedDriverInfo{.driver = dev->coordinator->LoadFragmentDriver(), .colocate = true}, dev);
+  zx_status_t status = dev->coordinator->AttemptBind(fdf::kFragmentDriverInfo, dev);
   if (status != ZX_OK) {
     return status;
   }
@@ -142,9 +141,7 @@ zx_status_t CompositeDeviceFragment::CreateProxy(const fbl::RefPtr<DriverHost> d
   if (status != ZX_OK) {
     return status;
   }
-  status = parent->coordinator->AttemptBind(
-      MatchedDriverInfo{.driver = parent->coordinator->LoadFragmentProxyDriver(), .colocate = true},
-      fidl_proxy);
+  status = parent->coordinator->AttemptBind(fdf::kFragmentProxyDriverInfo, fidl_proxy);
   if (status != ZX_OK) {
     return status;
   }

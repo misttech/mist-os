@@ -30,7 +30,7 @@
 #include "src/devices/bin/driver_manager/tests/fake_driver_index.h"
 
 constexpr char kDriverPath[] = "driver/mock-device.so";
-constexpr char kDriverUrl[] = "#meta/mock-device.cml";
+constexpr char kDriverUrl[] = "#meta/mock-device.cm";
 
 static CoordinatorConfig NullConfig() { return DefaultConfig(nullptr, nullptr, nullptr); }
 
@@ -220,16 +220,11 @@ TEST(MiscTestCase, BindDevices) {
       fidl::ClientEnd<fuchsia_io::Directory>(), zx::process{});
   dev->set_host(std::move(host));
 
-  std::unique_ptr<Driver> driver;
-  // Load the driver and force bind it to the device.
-  ASSERT_OK(load_driver(nullptr, [&coordinator, &dev, &driver](Driver* drv, const char* version) {
-    driver = std::unique_ptr<Driver>(drv);
-
-    MatchedDriverInfo info;
-    info.driver = driver.get();
-    info.colocate = true;
-    ASSERT_OK(coordinator.AttemptBind(info, dev));
-  }));
+  MatchedDriverInfo info = {
+      .colocate = true,
+      .component_url = kDriverUrl,
+  };
+  ASSERT_OK(coordinator.AttemptBind(info, dev));
   loop.RunUntilIdle();
   ASSERT_NO_FATAL_FAILURE();
 

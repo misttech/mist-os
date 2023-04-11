@@ -232,8 +232,9 @@ class Coordinator : public CompositeManagerBridge,
       UnregisterSystemStorageForShutdownCompleter::Sync& completer) override;
   void SuspendWithoutExit(SuspendWithoutExitCompleter::Sync& completer) override;
 
-  // Creates a DFv2 component with a given `url` and attaches it to `dev`.
-  zx_status_t CreateAndStartDFv2Component(const Dfv2Driver& driver, const fbl::RefPtr<Device>& dev);
+  // Creates a DFv2 component with a given driver and attaches it to `dev`.
+  zx_status_t CreateAndStartDFv2Component(const MatchedDriverInfo& driver,
+                                          const fbl::RefPtr<Device>& dev);
 
   CoordinatorConfig config_;
   async_dispatcher_t* const dispatcher_;

@@ -42,9 +42,8 @@ zx_status_t BindDriverManager::BindDriverToDevice(const MatchedDriver& driver,
   }
 
   if (status != ZX_OK) {
-    LOGF(ERROR, "Failed to bind driver '%s' to device '%.*s': %s", driver_info.name(),
-         static_cast<uint32_t>(dev->name().size()), dev->name().data(),
-         zx_status_get_string(status));
+    LOGF(ERROR, "Failed to bind driver '%s' to device '%s': %s", driver_info.component_url.c_str(),
+         dev->name().c_str(), zx_status_get_string(status));
   }
   return status;
 }

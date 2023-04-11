@@ -252,42 +252,38 @@ const std::vector<MatchedDriver> DriverLoader::MatchPropertiesDriverIndex(
 
     ZX_ASSERT(driver.is_driver());
 
+    MatchedDriverInfo matched_driver_info = {};
+
     auto fidl_driver_info = driver.driver();
     if (!fidl_driver_info.has_is_fallback()) {
       LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing is_fallback");
       continue;
     }
+    matched_driver_info.is_fallback = fidl_driver_info.is_fallback();
 
-    MatchedDriverInfo matched_driver_info = {};
+    if (!fidl_driver_info.has_url()) {
+      LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing url");
+      continue;
+    }
+    matched_driver_info.component_url = std::string(fidl_driver_info.url().get());
+
     if (fidl_driver_info.has_colocate()) {
       matched_driver_info.colocate = fidl_driver_info.colocate();
     }
 
     // If we have a driver_url we are a DFv1 driver. Otherwise are are DFv2.
-    if (fidl_driver_info.has_driver_url()) {
-      auto loaded_driver = LoadDriverUrl(fidl_driver_info);
-      if (!loaded_driver) {
-        continue;
-      }
-      matched_driver_info.driver = loaded_driver;
-    } else if (fidl_driver_info.has_url()) {
-      matched_driver_info.driver = Dfv2Driver{
-          .url = std::string(fidl_driver_info.url().get()),
-          .package_type = fidl_driver_info.package_type(),
-      };
-    } else {
-      LOGF(ERROR, "DriverIndex: MatchDriversV1 response is missing url");
-      continue;
+    if (!fidl_driver_info.has_driver_url()) {
+      matched_driver_info.is_dfv2 = true;
     }
 
-    auto driver_url = std::string(matched_driver_info.name());
-    if (!fidl_driver_info.is_fallback() && config.only_return_base_and_fallback_drivers &&
-        IsFuchsiaBootScheme(driver_url)) {
+    if (!matched_driver_info.is_fallback && config.only_return_base_and_fallback_drivers &&
+        IsFuchsiaBootScheme(matched_driver_info.component_url)) {
       continue;
     }
 
     if (config.driver_url_suffix.empty() ||
-        cpp20::ends_with(std::string_view(driver_url), config.driver_url_suffix)) {
+        cpp20::ends_with(std::string_view(matched_driver_info.component_url),
+                         config.driver_url_suffix)) {
       if (fidl_driver_info.is_fallback()) {
         if (include_fallback_drivers_ || !config.driver_url_suffix.empty()) {
           matched_fallback_drivers.push_back(matched_driver_info);

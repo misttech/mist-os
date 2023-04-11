@@ -44,27 +44,20 @@ struct Driver {
   std::vector<std::string> service_uses;
 };
 
-struct Dfv2Driver {
-  std::string url;
-  fuchsia_driver_index::DriverPackageType package_type;
-};
-
 struct MatchedDriverInfo {
-  std::variant<const Driver*, Dfv2Driver> driver;
+  // If this is true, the driver expects to be colcated with its parent.
   bool colocate = false;
+  // If this is true, this driver expects to be loaded in DFv2.
+  bool is_dfv2 = false;
 
-  bool is_v1() const { return std::holds_alternative<const Driver*>(driver); }
+  // If this is true, the driver should only be bound after /system/ comes up.
+  bool is_fallback = false;
 
-  const Driver* v1() const { return std::get<const Driver*>(driver); }
+  // The type of package the driver is in.
+  fuchsia_driver_index::DriverPackageType package_type;
 
-  const Dfv2Driver& v2() const { return std::get<Dfv2Driver>(driver); }
-
-  const char* name() const {
-    if (is_v1()) {
-      return v1()->url.c_str();
-    }
-    return v2().url.c_str();
-  }
+  // The url for the driver component.
+  std::string component_url;
 };
 
 using MatchedDriver =

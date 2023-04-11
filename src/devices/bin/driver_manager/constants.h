@@ -7,10 +7,26 @@
 
 #include <string_view>
 
+#include "src/devices/bin/driver_manager/driver.h"
+
 namespace fdf {
 
 constexpr std::string_view kFragmentDriverUrl = "#meta/fragment.cm";
 constexpr std::string_view kFragmentProxyDriverUrl = "#meta/fragment.proxy.cm";
+
+const MatchedDriverInfo kFragmentDriverInfo = {
+    .colocate = true,
+    .is_dfv2 = false,
+    .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+    .component_url = std::string(kFragmentDriverUrl),
+};
+
+const MatchedDriverInfo kFragmentProxyDriverInfo = {
+    .colocate = true,
+    .is_dfv2 = false,
+    .package_type = fuchsia_driver_index::DriverPackageType::kBoot,
+    .component_url = std::string(kFragmentProxyDriverUrl),
+};
 
 }  // namespace fdf
 

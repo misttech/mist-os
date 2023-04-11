@@ -424,13 +424,14 @@ zx_status_t Coordinator::NewDriverHost(const char* name, fbl::RefPtr<DriverHost>
   return ZX_OK;
 }
 
-zx_status_t Coordinator::CreateAndStartDFv2Component(const Dfv2Driver& driver,
+zx_status_t Coordinator::CreateAndStartDFv2Component(const MatchedDriverInfo& driver,
                                                      const fbl::RefPtr<Device>& dev) {
   auto node = dev->CreateDFv2Device();
   if (node.is_error()) {
     return node.error_value();
   }
-  return driver_runner_->StartDriver(*node.value(), driver.url, driver.package_type).status_value();
+  return driver_runner_->StartDriver(*node.value(), driver.component_url, driver.package_type)
+      .status_value();
 }
 
 zx_status_t Coordinator::MakeVisible(const fbl::RefPtr<Device>& dev) {
@@ -628,17 +629,16 @@ zx_status_t Coordinator::AttemptBind(const MatchedDriverInfo matched_driver,
     return ZX_ERR_ALREADY_BOUND;
   }
 
-  if (!matched_driver.is_v1()) {
-    return CreateAndStartDFv2Component(matched_driver.v2(), dev);
+  if (matched_driver.is_dfv2) {
+    return CreateAndStartDFv2Component(matched_driver, dev);
   }
 
-  if (!matched_driver.v1()) {
-    zx::result path = dev->GetTopologicalPath();
-    LOGF(ERROR, "Trying to match device '%s' but received a null driver",
-         path.is_ok() ? path.value().c_str() : "<bad_path>");
+  const Driver* driver_ptr = driver_loader_.LoadDriverUrl(matched_driver.component_url);
+  if (!driver_ptr) {
+    LOGF(ERROR, "Failed to load %s", matched_driver.component_url.c_str());
     return ZX_ERR_INTERNAL;
   }
-  const Driver& driver = *matched_driver.v1();
+  const Driver& driver = *driver_ptr;
 
   if (!driver_host_is_asan() && driver.is_asan) {
     LOGF(ERROR, "%s (%s) requires ASAN, but we are not in an ASAN environment", driver.url.data(),
@@ -727,7 +727,7 @@ zx_status_t Coordinator::AddCompositeNodeSpec(
           .name = std::string(name.data()),
           .size = spec.parents.count(),
       },
-      spec, driver_loader_, *device_manager_);
+      spec, *device_manager_);
   if (!spec_result.is_ok()) {
     LOGF(ERROR, "Failed to create composite node spec");
     return spec_result.status_value();

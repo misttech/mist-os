@@ -331,8 +331,8 @@ zx::result<fbl::RefPtr<DriverHost>> CompositeDevice::GetDriverHost() {
            "Inconsistent colocation flags in driver: %s. The legacy flag is %s "
            "whereas the Driver CML colocate value is %s. This is only an issue if you "
            "want the driver to be co-located. See fxb/121385 for more details.",
-           driver_.value().name(), legacy_colocate_flag_.value() ? "true" : "false",
-           driver_->colocate ? "true" : "false");
+           driver_.value().component_url.c_str(), legacy_colocate_flag_.value() ? "true" : "false",
+           driver_.value().colocate ? "true" : "false");
     }
 
     should_colocate = driver_->colocate && legacy_colocate_flag_.value();
@@ -447,7 +447,8 @@ zx_status_t CompositeDevice::TryAssemble() {
   status = coordinator_.AttemptBind(driver_.value(), device_);
   if (status != ZX_OK) {
     LOGF(ERROR, "%s: Failed to bind driver '%s' to device '%s': %s", __func__,
-         driver_.value().name(), device_->name().data(), zx_status_get_string(status));
+         driver_.value().component_url.c_str(), device_->name().data(),
+         zx_status_get_string(status));
     return status;
   }
 
@@ -483,7 +484,7 @@ fdd::wire::CompositeInfo CompositeDevice::GetCompositeInfo(fidl::AnyArena& arena
                             .primary_index(primary_fragment_index_);
 
   if (driver_.has_value()) {
-    composite_info.driver(driver_->name());
+    composite_info.driver(driver_->component_url);
   }
 
   if (from_composite_node_spec_) {
