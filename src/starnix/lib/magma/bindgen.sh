@@ -40,8 +40,8 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --with-derive-default \
   --explicit-padding \
   --raw-line "${RAW_LINES}" \
-  -o src/proc/lib/magma/src/magma.rs \
-  src/proc/lib/magma/wrapper.h \
+  -o src/starnix/lib/magma/src/magma.rs \
+  src/starnix/lib/magma/wrapper.h \
   -- \
   -I zircon/system/public \
   -I $(scripts/fx get-build-dir)/linux_x64/gen/src/graphics/lib/magma/include \
@@ -53,4 +53,4 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
 #       See https://github.com/rust-lang/rust-bindgen/issues/1089
 sed -i \
   's/derive(Debug, Default, Copy, Clone)/derive(Debug, Default, Copy, Clone, AsBytes, FromBytes)/' \
-  src/proc/lib/magma/src/magma.rs
+  src/starnix/lib/magma/src/magma.rs

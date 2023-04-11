@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_PROC_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_
-#define SRC_PROC_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_
+#ifndef SRC_STARNIX_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_
+#define SRC_STARNIX_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_
 
 // Adding includes that are not detected by rust-bindings because they are
 // defined using functions
@@ -46,4 +46,4 @@ const zxio_seek_origin_t _ZXIO_SEEK_ORIGIN_END = ZXIO_SEEK_ORIGIN_END;
 #undef ZXIO_SEEK_ORIGIN_END
 const zxio_seek_origin_t ZXIO_SEEK_ORIGIN_END = _ZXIO_SEEK_ORIGIN_END;
 
-#endif  // SRC_PROC_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_
+#endif  // SRC_STARNIX_LIB_SYNCIO_STUB_MISSING_INCLUDES_H_

@@ -5,7 +5,7 @@
 
 set -e
 
-if [[ ! -f src/proc/lib/syncio/wrapper.h ]]; then
+if [[ ! -f src/starnix/lib/syncio/wrapper.h ]]; then
   echo 'Please run this script from the root of your Fuchsia source tree.'
   exit 1
 fi
@@ -27,8 +27,8 @@ PATH="$PWD/prebuilt/third_party/rust/linux-x64/bin:$PATH" \
   --allowlist-var "ZXIO_SEEK_ORIGIN.*" \
   --allowlist-var "E[A-Z]*" \
   --raw-line "${RAW_LINES}" \
-  -o src/proc/lib/syncio/src/zxio.rs \
-  src/proc/lib/syncio/wrapper.h \
+  -o src/starnix/lib/syncio/src/zxio.rs \
+  src/starnix/lib/syncio/wrapper.h \
   -- \
   -I sdk/lib/zxio/include \
   -I zircon/system/public

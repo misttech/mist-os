@@ -78,19 +78,19 @@ ARCH_INFO = [
     ArchInfo(
         'x86_64', 'crate::x86_64_types', 'x86_64-pc-linux-gnu',
         'third_party/android/platform/bionic/libc/kernel/uapi/asm-x86',
-        'src/proc/lib/linux_uapi/src/x86_64.rs'),
+        'src/starnix/lib/linux_uapi/src/x86_64.rs'),
     ArchInfo(
         'arm64', 'crate::arm64_types', 'aarch64-linux-gnu',
         'third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64',
-        'src/proc/lib/linux_uapi/src/arm64.rs'),
+        'src/starnix/lib/linux_uapi/src/arm64.rs'),
 ]
 
 # Cross-architecture include paths (the ArchInfo class also has an arch-specific one to add).
 INCLUDE_DIRS = [
     'third_party/android/platform/bionic/libc/kernel/uapi',
     'third_party/android/platform/bionic/libc/kernel/android/uapi',
-    'src/proc/lib/linux_uapi/stub',
     'src/starnix/kernel/vdso',
+    'src/starnix/lib/linux_uapi/stub',
 ]
 
 RAW_LINES = """// Copyright 2022 The Fuchsia Authors. All rights reserved.
@@ -136,7 +136,7 @@ def run_bindgen(type_prefix, raw_line, output_file, clang_target, include_dirs):
     for t in OPAQUE_TYPES:
         args += ['--opaque-type=' + t]
 
-    args += ["src/proc/lib/linux_uapi/wrapper.h"]
+    args += ["src/starnix/lib/linux_uapi/wrapper.h"]
 
     # Clang arguments (after the "--").
     args += [

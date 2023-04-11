@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_PROC_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_
-#define SRC_PROC_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_
+#ifndef SRC_STARNIX_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_
+#define SRC_STARNIX_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_
 
 // This file contains typedefs required by linux headers that may break convention and rely
 // on libc types, which we do not include in bindgen.
@@ -23,4 +23,4 @@ struct sockaddr {
   char sa_data[14];
 };
 
-#endif  // SRC_PROC_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_
+#endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_TYPEDEFS_H_

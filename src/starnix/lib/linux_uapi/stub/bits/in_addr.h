@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_PROC_LIB_LINUX_UAPI_STUB_BITS_IN_ADDR_H_
-#define SRC_PROC_LIB_LINUX_UAPI_STUB_BITS_IN_ADDR_H_
+#ifndef SRC_STARNIX_LIB_LINUX_UAPI_STUB_BITS_IN_ADDR_H_
+#define SRC_STARNIX_LIB_LINUX_UAPI_STUB_BITS_IN_ADDR_H_
 
 #include <stdint.h>
 
@@ -15,4 +15,4 @@ struct in_addr {
   in_addr_t s_addr;
 };
 
-#endif  // SRC_PROC_LIB_LINUX_UAPI_STUB_BITS_IN_ADDR_H_
+#endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_BITS_IN_ADDR_H_

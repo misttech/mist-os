@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_PROC_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_
-#define SRC_PROC_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_
+#ifndef SRC_STARNIX_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_
+#define SRC_STARNIX_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_
 
 // Adding includes that are not detected by rust-bindings because they are
 // defined using functions
@@ -129,4 +129,4 @@ const __u32 REMOTE_BINDER_START = _REMOTE_BINDER_START;
 const __u32 _REMOTE_BINDER_WAIT = _IOW('R', 2, struct remote_binder_wait_command);
 const __u32 REMOTE_BINDER_WAIT = _REMOTE_BINDER_WAIT;
 
-#endif  // SRC_PROC_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_
+#endif  // SRC_STARNIX_LIB_LINUX_UAPI_STUB_MISSING_INCLUDES_H_

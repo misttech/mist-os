@@ -4,14 +4,15 @@
 
 group("lib") {
   deps = [
-    "//src/starnix/lib/linux_uapi",
-    "//src/starnix/lib/magma",
-    "//src/starnix/lib/syncio",
+    "kernel_config",
+    "linux_uapi",
+    "magma",
+    "syncio",
   ]
 }
 
 group("tests") {
   testonly = true
 
-  deps = [ "//src/starnix/lib/syncio:tests" ]
+  deps = [ "syncio:tests" ]
 }
