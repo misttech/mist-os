@@ -9,3 +9,7 @@ fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/1024
 fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/32000
 fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/UnsignedInt
 fuchsia.diagnostics_log_rust.encoding: Encoder/Create
+fuchsia.diagnostics_log_rust.encoding: Encoder/WriteEvent/AllArguments
+fuchsia.diagnostics_log_rust.encoding: Encoder/WriteEvent/MessageAsString
+fuchsia.diagnostics_log_rust.encoding: Encoder/WriteEvent/MessageWithSomeArguments
+fuchsia.diagnostics_log_rust.encoding: Encoder/WriteEvent/NoArguments
