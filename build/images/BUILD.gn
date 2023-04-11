@@ -323,7 +323,13 @@ group("default-images") {
   }
 
   # Include Bazel assembly target if they are set.
-  deps += bazel_assembly_targets
+  if (bazel_product_bundle_target != "") {
+    deps += [ bazel_product_bundle_target ]
+    deps += extra_bazel_assembly_targets
+  } else {
+    # TODO(jayzhuang): Remove this line when `bazel_assembly_targets` is removed.
+    deps += bazel_assembly_targets
+  }
 }
 
 # Write delivery_blob_config.json file to be uploaded as a build artifact.

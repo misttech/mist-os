@@ -30,21 +30,32 @@ flash_manifest_version = 3
 # These are the common assembly-related labels.
 labels = {
   if (use_bazel_images_only) {
-    assert(
-        bazel_assembly_targets == [ bazel_assembly_targets[0] ],
-        "bazel_assembly_targets should define exactly one element when use_bazel_images_only=true")
-
     # For now only Fuchsia images built by Bazel are useful.
     assembly_name = "fuchsia"
-    images = bazel_assembly_targets[0]
 
-    # images_prime target is used to provide extra metadata, for Bazel assembly
-    # we consolidate metadata on the same product bundle GN wrapper.
-    images_prime = bazel_assembly_targets[0]
+    if (bazel_product_bundle_target != "") {
+      # TODO(jayzhuang): Remove this if check when soft-transition is done and
+      # `bazel_assembly_targets` is removed.
+      images = bazel_product_bundle_target
+
+      # images_prime target is used to provide extra metadata, for Bazel assembly
+      # we consolidate metadata on the same product bundle GN wrapper.
+      images_prime = bazel_product_bundle_target
+    } else {
+      assert(
+          bazel_assembly_targets == [ bazel_assembly_targets[0] ],
+          "bazel_assembly_targets should define exactly one element when use_bazel_images_only=true")
+
+      images = bazel_assembly_targets[0]
+
+      # images_prime target is used to provide extra metadata, for Bazel assembly
+      # we consolidate metadata on the same product bundle GN wrapper.
+      images_prime = bazel_assembly_targets[0]
+    }
 
     # Path to the `package_tool_package_manifest_list_create` target defined in
     # `bazel_product_bundle`.
-    bazel_package_manifests_list = images + "_package_manifests_list"
+    bazel_package_manifests_list = "${images}_package_manifests_list"
   } else if (use_bringup_assembly) {
     images = "//build/images/bringup(${default_toolchain})"
     assembly_name = "bringup"
