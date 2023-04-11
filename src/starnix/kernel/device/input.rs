@@ -651,11 +651,7 @@ mod test {
     #[::fuchsia::test()]
     async fn initial_watch_request_has_empty_responses_arg() {
         // Set up resources.
-        let input_file = InputFile::new();
-        let (touch_source_proxy, mut touch_source_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
-        let relay_thread = input_file.start_relay(touch_source_proxy);
+        let (_input_file, mut touch_source_stream, relay_thread) = start_input();
 
         // Verify that the watch request has empty `responses`.
         assert_matches!(
@@ -672,12 +668,8 @@ mod test {
     #[::fuchsia::test]
     async fn later_watch_requests_have_responses_arg_matching_earlier_watch_replies() {
         // Set up resources.
-        let input_file = InputFile::new();
-        let (touch_source_proxy, mut touch_source_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
+        let (_input_file, mut touch_source_stream, relay_thread) = start_input();
         let fake_touch_events = std::iter::repeat(TouchEvent::EMPTY);
-        let relay_thread = input_file.start_relay(touch_source_proxy);
 
         // Reply to first `Watch` with two `TouchEvent`s.
         match touch_source_stream.next().await {
@@ -714,14 +706,8 @@ mod test {
 
     #[::fuchsia::test]
     async fn notifies_polling_waiters_of_new_data() {
-        // Set up input resources.
-        let input_file = InputFile::new();
-        let (touch_source_proxy, mut touch_source_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
-        let relay_thread = input_file.start_relay(touch_source_proxy);
-
-        // Set up waiter resources.
+        // Set up resources.
+        let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
         let (_kernel, current_task) = create_kernel_and_task();
@@ -781,14 +767,8 @@ mod test {
 
     #[::fuchsia::test]
     async fn notifies_blocked_waiter_of_new_data() {
-        // Set up input resources.
-        let input_file = InputFile::new();
-        let (touch_source_proxy, mut touch_source_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
-        let relay_thread = input_file.start_relay(touch_source_proxy);
-
-        // Set up waiter resources.
+        // Set up resources.
+        let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let waiter = Waiter::new();
         let (_kernel, current_task) = create_kernel_and_task();
 
@@ -860,13 +840,7 @@ mod test {
     #[::fuchsia::test]
     async fn honors_wait_cancellation() {
         // Set up input resources.
-        let input_file = InputFile::new();
-        let (touch_source_proxy, mut touch_source_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
-        let relay_thread = input_file.start_relay(touch_source_proxy);
-
-        // Set up waiter resources.
+        let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
         let (_kernel, current_task) = create_kernel_and_task();
@@ -933,11 +907,7 @@ mod test {
     #[::fuchsia::test]
     async fn query_events() {
         // Set up resources.
-        let input_file = InputFile::new();
-        let (touch_source_proxy, mut touch_source_stream) =
-            fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
-                .expect("failed to create TouchSource channel");
-        let relay_thread = input_file.start_relay(touch_source_proxy);
+        let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let (_kernel, current_task) = create_kernel_and_task();
 
         // Check initial expectation.
