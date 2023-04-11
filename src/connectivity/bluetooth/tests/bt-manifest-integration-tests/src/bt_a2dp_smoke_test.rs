@@ -22,7 +22,6 @@ use {
     fidl_fuchsia_settings::{AudioMarker, AudioRequestStream},
     fidl_fuchsia_sysmem::{AllocatorMarker, AllocatorRequestStream},
     fidl_fuchsia_tracing_provider::{RegistryMarker, RegistryRequestStream},
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -196,9 +195,8 @@ async fn add_a2dp_dependency_route<S: DiscoverableProtocolMarker>(builder: &Real
 
 /// Tests that the v2 A2DP component has the correct topology and verifies that
 /// it connects and provides the expected services.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn a2dp_v2_component_topology() {
-    fuchsia_syslog::init().unwrap();
     info!("Starting A2DP v2 smoke test...");
 
     let (sender, mut receiver) = mpsc::channel(0);

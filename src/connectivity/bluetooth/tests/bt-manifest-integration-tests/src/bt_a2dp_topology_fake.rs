@@ -35,9 +35,8 @@ where
     }
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main]
 async fn main() -> Result<(), Error> {
-    fuchsia_syslog::init().unwrap();
     info!("Starting bt-a2dp-topology-fake component...");
 
     // Set up the outgoing `svc` directory with the services A2DP provides.

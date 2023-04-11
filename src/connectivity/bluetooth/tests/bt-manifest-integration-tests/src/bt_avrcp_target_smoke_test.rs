@@ -98,9 +98,8 @@ async fn mock_avrcp_target_client(
 
 /// Tests that the v2 AVRCP-TG component has the correct topology and verifies that
 /// it connects to the expected services.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn avrcp_tg_v2_connects_to_avrcp_service() {
-    fuchsia_syslog::init().unwrap();
     info!("Starting AVRCP-TG v2 smoke test...");
 
     let (sender, mut receiver) = mpsc::channel(2);

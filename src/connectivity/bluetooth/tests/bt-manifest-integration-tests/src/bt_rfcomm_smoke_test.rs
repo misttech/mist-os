@@ -6,7 +6,6 @@ use {
     anyhow::Error,
     fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy, ProfileRequestStream},
     fidl_fuchsia_bluetooth_rfcomm_test::{RfcommTestMarker, RfcommTestProxy},
-    fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
     fuchsia_component_test::{
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, Ref, Route,
@@ -65,9 +64,8 @@ async fn mock_profile_component(
 
 /// Tests that the v2 RFCOMM component has the correct topology and verifies that
 /// it connects and provides the expected services.
-#[fasync::run_singlethreaded(test)]
+#[fuchsia::test]
 async fn rfcomm_v2_component_topology() {
-    fuchsia_syslog::init().unwrap();
     info!("Starting RFCOMM v2 smoke test...");
 
     let (sender, mut receiver) = mpsc::channel(3);
