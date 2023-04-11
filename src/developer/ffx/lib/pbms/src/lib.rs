@@ -111,6 +111,10 @@ pub enum ListingMode {
     RemovableBundles,
 }
 
+pub fn is_local_product_bundle(product_bundle: &str) -> bool {
+    Utf8Path::new(product_bundle).exists()
+}
+
 /// Load a product bundle by name, uri, or local path.
 /// This is capable of loading both v1 and v2 ProductBundles.
 pub async fn load_product_bundle(
@@ -121,7 +125,7 @@ pub async fn load_product_bundle(
     tracing::debug!("Loading a product bundle: {:?}", product_bundle);
 
     //  If `product_bundle` is a local path, load it directly.
-    if let Some(path) = product_bundle.as_ref().map(|s| Utf8Path::new(s)).filter(|p| p.exists()) {
+    if let Some(path) = product_bundle.as_ref().filter(|s| is_local_product_bundle(s)) {
         return ProductBundle::try_load_from(path);
     }
 
@@ -608,6 +612,15 @@ mod tests {
         pbm_file.write_all(PRODUCT_BUNDLE_JSON.as_bytes()).expect("write pbm file");
 
         temp_dir
+    }
+
+    #[test]
+    fn test_is_local_product_bundle() {
+        let temp_dir = TempDir::new().expect("temp dir");
+        let temp_path = temp_dir.path();
+
+        assert!(is_local_product_bundle(temp_path.as_os_str().to_str().unwrap()));
+        assert!(!is_local_product_bundle("gs://fuchsia/test_fake.tgz"));
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

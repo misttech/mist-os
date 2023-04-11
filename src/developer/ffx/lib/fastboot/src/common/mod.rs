@@ -7,7 +7,7 @@ use crate::{
         cmd::{ManifestParams, OemFile},
         file::*,
     },
-    manifest::{from_in_tree, from_path, from_sdk},
+    manifest::{from_in_tree, from_local_product_bundle, from_path, from_sdk},
     sparse::build_sparse_files,
 };
 use anyhow::{anyhow, bail, Context, Error, Result};
@@ -23,8 +23,9 @@ use fidl_fuchsia_developer_ffx::{
     UploadProgressListenerMarker, UploadProgressListenerRequest,
 };
 use futures::{prelude::*, try_join};
+use pbms::is_local_product_bundle;
 use sdk::SdkVersion;
-use std::{convert::Into, io::Write};
+use std::{convert::Into, io::Write, path::PathBuf};
 use termion::{color, style};
 
 pub const MISSING_CREDENTIALS: &str =
@@ -645,17 +646,23 @@ where
             from_path(writer, manifest.to_path_buf(), fastboot_proxy, cmd).await
         }
         None => {
-            let sdk = ffx_config::global_env_context()
-                .context("loading global environment context")?
-                .get_sdk()
-                .await?;
-            let mut path = sdk.get_path_prefix().to_path_buf();
-            writeln!(writer, "No manifest path was given, using SDK from {}.", path.display())?;
-            path.push("flash.json"); // Not actually used, placeholder value needed.
-            match sdk.get_version() {
-                SdkVersion::InTree => from_in_tree(&sdk, writer, path, fastboot_proxy, cmd).await,
-                SdkVersion::Version(_) => from_sdk(&sdk, writer, fastboot_proxy, cmd).await,
-                _ => ffx_bail!("Unknown SDK type"),
+            if let Some(path) = cmd.product_bundle.as_ref().filter(|s| is_local_product_bundle(s)) {
+                from_local_product_bundle(writer, PathBuf::from(&*path), fastboot_proxy, cmd).await
+            } else {
+                let sdk = ffx_config::global_env_context()
+                    .context("loading global environment context")?
+                    .get_sdk()
+                    .await?;
+                let mut path = sdk.get_path_prefix().to_path_buf();
+                writeln!(writer, "No manifest path was given, using SDK from {}.", path.display())?;
+                path.push("flash.json"); // Not actually used, placeholder value needed.
+                match sdk.get_version() {
+                    SdkVersion::InTree => {
+                        from_in_tree(&sdk, writer, path, fastboot_proxy, cmd).await
+                    }
+                    SdkVersion::Version(_) => from_sdk(&sdk, writer, fastboot_proxy, cmd).await,
+                    _ => ffx_bail!("Unknown SDK type"),
+                }
             }
         }
     }

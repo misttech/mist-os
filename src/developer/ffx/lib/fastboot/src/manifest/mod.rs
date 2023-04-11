@@ -17,6 +17,7 @@ use anyhow::{anyhow, Context, Result};
 use assembly_manifest::Image as AssemblyManifestImage;
 use assembly_partitions_config::{Partition, Slot};
 use async_trait::async_trait;
+use camino::Utf8Path;
 use chrono::Utc;
 use errors::{ffx_bail, ffx_error};
 use fidl_fuchsia_developer_ffx::FastbootProxy;
@@ -457,6 +458,23 @@ pub async fn from_sdk<W: Write>(
             "Please supply the `--product-bundle` option to identify which product bundle to flash"
         ),
     }
+}
+
+#[tracing::instrument(skip(writer, cmd))]
+pub async fn from_local_product_bundle<W: Write>(
+    writer: &mut W,
+    path: PathBuf,
+    fastboot_proxy: FastbootProxy,
+    cmd: ManifestParams,
+) -> Result<()> {
+    tracing::debug!("fastboot manifest from_local_product_bundle");
+    let product_bundle = ProductBundle::try_load_from(Utf8Path::from_path(&*path).unwrap())?;
+    FlashManifest {
+        resolver: Resolver::new(path)?,
+        version: FlashManifestVersion::from_product_bundle(&product_bundle)?,
+    }
+    .flash(writer, fastboot_proxy, cmd)
+    .await
 }
 
 pub async fn from_in_tree<W: Write>(
