@@ -1,0 +1,23 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/fuchsia/platform_version.gni")
+import("//sdk/ctf/build/internal/ctf.gni")
+
+# To list all packages:
+#   fx gn ls out/default //sdk/ctf/release/packages:* | grep -E "[0-9][0-9]$"
+#
+# To list all packages for a specific API level (e.g. 11):
+#   fx gn ls out/default //sdk/ctf/release/packages:* | grep -E "(11)$"
+group("packages") {
+  testonly = true
+  deps = [ ":packages_canary" ]
+}
+
+# TODO(125231): Generate packages for API levels 12+ after the next bump.
+
+generate_ctf_packages("packages_canary") {
+  api_level = "canary"
+  manifest = "//prebuilt/cts/canary/$host_platform/cts/package_archives.json"
+}

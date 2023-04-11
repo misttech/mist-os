@@ -1,0 +1,55 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/packages/prebuilt_package.gni")
+
+# Generates a target for each prebuilt CTF package in the given manifest.
+#
+# Each package is named according the API level it tests. For example, a package
+# originally named "fuchsia-echo-tests" in the CTF release for API level 11 can
+# be referred to using the label :fuchsia-echo-tests_api11.
+#
+# The JSON manifest is a list whose objects share the following schema.
+#   archive_name
+#     The basename of the archive, relative the manifest's parent directory.
+#     Type: string
+#
+#   package_name
+#     The name of the package within the archive.
+#     Type: string
+#
+template("generate_ctf_packages") {
+  assert(defined(invoker.api_level), "api_level is required")
+  assert(defined(invoker.manifest), "manifest is required")
+
+  manifest = invoker.manifest
+  api_level = invoker.api_level
+
+  packages = []
+
+  root_dir = get_path_info(manifest, "dir")
+  foreach(item, read_file(manifest, "json")) {
+    actual_package_name = item.package_name
+    package_target_name = "${actual_package_name}_api${api_level}"
+    packages += [ ":$package_target_name" ]
+
+    # Without this the build fails with an error that
+    # ${package_target_name}_meta_package.txt is missing.
+    meta_package_target = "${package_target_name}_meta_package"
+    generate_meta_package(meta_package_target) {
+      package_name = actual_package_name
+    }
+
+    prebuilt_package(package_target_name) {
+      archive = "$root_dir/${item.archive_name}.far"
+      package_name = actual_package_name
+      deps = [ ":$meta_package_target" ]
+    }
+  }
+
+  group(target_name) {
+    testonly = true
+    deps = packages
+  }
+}
