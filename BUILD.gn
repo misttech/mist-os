@@ -88,10 +88,6 @@ declare_args() {
   # Extra sdk() archive labels to be uploaded to the artifacts store. This is
   # an extension mechanism for SDK bits outside of the main repository.
   sdk_archive_labels = []
-
-  # This is a build that imports a board (vs. sdk).  If a board is set
-  # (fx set <product>.<board>) this is true.
-  has_board = false
 }
 
 if (host_os == "mac") {
