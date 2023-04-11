@@ -37,6 +37,10 @@ void RadarProviderProxy::DeviceAdded(fidl::UnownedClientEnd<fuchsia_io::Director
 
 void RadarProviderProxy::on_fidl_error(fidl::UnbindInfo info) {
   FX_PLOGS(ERROR, info.status()) << "Connection to radar device closed, attempting to reconnect";
+
+  // Invalidate the client so that subsequent calls know that there is no connection to the driver.
+  radar_client_ = {};
+
   // Check for available devices now, just in case one was added before the connection closed. If
   // not, the DeviceWatcher will signal to connect when a new device becomes available.
   connector_->ConnectToFirstRadarDevice(
