@@ -23,6 +23,7 @@ mod notification_stream;
 
 use crate::packets::Error as PacketError;
 use crate::peer::*;
+use crate::profile::*;
 use crate::types::PeerError as Error;
 
 // TODO(fxbug.dev/105464): consider calling this function on available players
@@ -389,12 +390,17 @@ pub(super) async fn state_watcher(peer: Arc<RwLock<RemotePeer>>) {
         }
 
         trace!("state_watcher browse channel {:?}", peer_guard.browse_channel);
+        let target_supports_browsing = peer_guard.supports_target_browsing()
+            && CONTROLLER_SUPPORTED_FEATURES.contains(AvrcpControllerFeatures::SUPPORTSBROWSING);
+        let controller_supports_browsing = peer_guard.supports_controller_browsing()
+            && TARGET_SUPPORTED_FEATURES.contains(AvrcpTargetFeatures::SUPPORTSBROWSING);
+
         match peer_guard.browse_channel.state() {
             &PeerChannelState::Connecting => {}
             &PeerChannelState::Disconnected => {
                 browse_channel_task = None;
                 if peer_guard.control_connected()
-                    && peer_guard.supports_browsing()
+                    && (target_supports_browsing || controller_supports_browsing)
                     && peer_guard.attempt_browse_connection
                 {
                     trace!("Starting make_connection task for browse channel on peer {}", id);

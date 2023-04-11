@@ -61,6 +61,24 @@ const AV_REMOTE_TARGET_CLASS: u16 = 0x110c;
 const AV_REMOTE_CLASS: u16 = 0x110e;
 const AV_REMOTE_CONTROLLER_CLASS: u16 = 0x110f;
 
+/// Set of features supported when we are the CT role.
+/// See AVRCP v1.6.2 Section 8 Table 8.1.
+pub(crate) const CONTROLLER_SUPPORTED_FEATURES: AvrcpControllerFeatures =
+    AvrcpControllerFeatures::from_bits_truncate(
+        AvrcpControllerFeatures::CATEGORY1.bits()
+            | AvrcpControllerFeatures::CATEGORY2.bits()
+            | AvrcpControllerFeatures::SUPPORTSBROWSING.bits(),
+    );
+
+/// Set of features supported when we are the TG role.
+/// See AVRCP v1.6.2 Section 8 Table 8.2.
+pub(crate) const TARGET_SUPPORTED_FEATURES: AvrcpTargetFeatures =
+    AvrcpTargetFeatures::from_bits_truncate(
+        AvrcpTargetFeatures::CATEGORY1.bits()
+            | AvrcpTargetFeatures::CATEGORY2.bits()
+            | AvrcpTargetFeatures::SUPPORTSBROWSING.bits(),
+    );
+
 /// The common service definition for AVRCP Target and Controller.
 /// AVRCP 1.6, Section 8.
 fn build_common_service_definition() -> ServiceDefinition {
@@ -96,11 +114,7 @@ fn make_controller_service_definition() -> ServiceDefinition {
 
     service.additional_attributes = Some(vec![Attribute {
         id: SDP_SUPPORTED_FEATURES, // SDP Attribute "SUPPORTED FEATURES"
-        element: DataElement::Uint16(
-            AvrcpControllerFeatures::CATEGORY1.bits()
-                | AvrcpControllerFeatures::CATEGORY2.bits()
-                | AvrcpControllerFeatures::SUPPORTSBROWSING.bits(),
-        ),
+        element: DataElement::Uint16(CONTROLLER_SUPPORTED_FEATURES.bits()),
     }]);
 
     service.additional_protocol_descriptor_lists = Some(vec![vec![
@@ -129,11 +143,7 @@ fn make_target_service_definition() -> ServiceDefinition {
 
     service.additional_attributes = Some(vec![Attribute {
         id: SDP_SUPPORTED_FEATURES, // SDP Attribute "SUPPORTED FEATURES"
-        element: DataElement::Uint16(
-            AvrcpTargetFeatures::CATEGORY1.bits()
-                | AvrcpTargetFeatures::CATEGORY2.bits()
-                | AvrcpTargetFeatures::SUPPORTSBROWSING.bits(),
-        ),
+        element: DataElement::Uint16(TARGET_SUPPORTED_FEATURES.bits()),
     }]);
 
     service.additional_protocol_descriptor_lists = Some(vec![vec![
