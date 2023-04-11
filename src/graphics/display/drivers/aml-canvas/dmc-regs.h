@@ -5,8 +5,35 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AML_CANVAS_DMC_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AML_CANVAS_DMC_REGS_H_
 
-
 #include <hwreg/bitfields.h>
+
+// The register definitions here are stitched together from the AMLogic A311D
+// datasheet revision 08 section 13.1.2 "Memory Interface" > "DDR" >
+// "Register Description" and the S912 datasheet revision 0.1 section 30.2 "DDR"
+// > "Register Description".
+//
+// The A311D defines two sets of registers, and lists the same base
+// 0xff63'8000 for both sets. Fortunately, the S912 datasheet has enough
+// information to recover from this typographical error.
+//
+// The S912 datasheet lists separate base addresses for the two sets - the DMC_
+// registers are based at 0xc883'8000, while the AM_DDR_ registers (for the DDR
+// PHY) are based at 0xc883'7000. Section 16 "Memory Map" in the S912 datasheet
+// tells us that the DMC_ registers are in the MMIO region labeled "DMC",
+// whereas the AM_DDR_ registers are in the second half of the "DDR TOP" MMIO
+// region.
+//
+// Section 8.1 "Memory Map" lists 0xff63'8000 as the
+// base of the DMC register set.
+// registers here are in the second set, with the base .
+//
+// Section 13.1.2 has some (fortunately obvious) typographical errors in some of
+// the register names. The "DMC_" prefix is incorrectly replaced with "DC_". The
+// correct names are listed in the S912 datasheet
+
+// The DMC is briefly described in A311D datasheet section 13.1.1 "Memory
+// Interface" > "DDR" > "Overview" and S912 datasheet section 30.1 "DDR" >
+// "Overview".
 
 namespace aml_canvas {
 
@@ -16,6 +43,8 @@ constexpr uint32_t kDmcCavLutAddr = (0x14 << 2);
 constexpr uint32_t kDmcCavMaxRegAddr = kDmcCavLutAddr;
 
 // DMC_CAV_LUT_DATAL
+//
+// This register is typo-ed as DC_CAV_LUT_DATAL in the A311D datasheet
 class CanvasLutDataLow : public hwreg::RegisterBase<CanvasLutDataLow, uint32_t> {
  public:
   DEF_FIELD(31, 29, dmc_cav_width);
@@ -31,7 +60,7 @@ class CanvasLutDataLow : public hwreg::RegisterBase<CanvasLutDataLow, uint32_t> 
   static constexpr uint32_t kDmcCavWidthLmask_ = 7;
 };
 
-// DMC_CAV_LUT_DATAH
+// DMC_CAV_LUT_DATAH, typo-ed as DC_CAV_LUT_DATAH
 class CanvasLutDataHigh : public hwreg::RegisterBase<CanvasLutDataHigh, uint32_t> {
  public:
   DEF_FIELD(29, 26, dmc_cav_endianness);
@@ -53,7 +82,7 @@ class CanvasLutDataHigh : public hwreg::RegisterBase<CanvasLutDataHigh, uint32_t
   static constexpr uint32_t kDmcCavWidthLwidth_ = 3;
 };
 
-// DMC_CAV_LUT_ADDR
+// DMC_CAV_LUT_ADDR, typo-ed as DC_CAV_LUT_ADDR
 class CanvasLutAddr : public hwreg::RegisterBase<CanvasLutAddr, uint32_t> {
  public:
   DEF_BIT(9, dmc_cav_addr_wr);
