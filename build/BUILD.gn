@@ -279,7 +279,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/log-writer-textfile:*",
     "//zircon/system/ulib/mbr:*",
     "//zircon/system/ulib/mini-process:*",
-    "//zircon/system/ulib/mipi-dsi:*",
     "//zircon/system/ulib/mmio-ptr:*",
     "//zircon/system/ulib/mock-boot-arguments:*",
     "//zircon/system/ulib/mock-function:*",

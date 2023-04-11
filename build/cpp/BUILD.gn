@@ -223,6 +223,10 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
+    "//src/graphics/display/lib/mipi-dsi",
+
+    #------------------
+    #------------------
     "//src/graphics/display/testing",
 
     #------------------
@@ -432,10 +436,6 @@ config("fidl-wire-deprecated-mutable-tables") {
     #------------------
     #------------------
     "//zircon/system/ulib/image-format/test:image-format-test",
-
-    #------------------
-    #------------------
-    "//zircon/system/ulib/mipi-dsi",
 
     #------------------
     #------------------

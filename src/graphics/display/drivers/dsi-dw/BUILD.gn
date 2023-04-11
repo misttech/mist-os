@@ -31,6 +31,7 @@ source_set("common_srcs") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/mipi-dsi",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
     "//src/lib/ddktl",
@@ -40,7 +41,6 @@ source_set("common_srcs") {
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/mipi-dsi",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
   ]

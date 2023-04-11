@@ -2,19 +2,23 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/zircon/zx_library.gni")
+import("//build/cpp/library_headers.gni")
 
-zx_library("mipi-dsi") {
-  sdk = "source"
-  sdk_headers = [ "lib/mipi-dsi/mipi-dsi.h" ]
+library_headers("mipi-dsi-headers") {
+  headers = [ "lib/mipi-dsi/mipi-dsi.h" ]
+}
+
+source_set("mipi-dsi") {
   sources = [ "mipi-dsi.cc" ]
   public_deps = [
+    ":mipi-dsi-headers",
     "//sdk/fidl/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp_wire",
     "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
+
   deps = [
     "//sdk/banjo/fuchsia.hardware.dsiimpl:fuchsia.hardware.dsiimpl_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.dsi:fuchsia.hardware.dsi_cpp_wire",
