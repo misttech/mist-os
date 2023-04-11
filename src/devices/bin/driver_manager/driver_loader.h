@@ -71,10 +71,10 @@ class DriverLoader {
   const Driver* LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info);
 
  private:
-  const Driver* UrlToDriver(std::string_view url) const;
+  const Driver* UrlToDriver(const std::string& url);
 
-  // Drivers we cached from the DriverIndex.
-  fbl::DoublyLinkedList<std::unique_ptr<Driver>> driver_index_drivers_;
+  // Drivers we cached from the DriverIndex, mapped via URL.
+  std::unordered_map<std::string, std::unique_ptr<Driver>> driver_index_drivers_;
 
   internal::PackageResolverInterface* base_resolver_;
   fidl::WireSharedClient<fdi::DriverIndex> driver_index_;

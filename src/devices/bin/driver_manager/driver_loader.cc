@@ -44,13 +44,11 @@ bool ShouldUseUniversalResolver(fdi::wire::DriverPackageType package_type) {
 
 }  // namespace
 
-const Driver* DriverLoader::UrlToDriver(std::string_view url) const {
-  for (const auto& drv : driver_index_drivers_) {
-    if (url.compare(drv.url) == 0) {
-      return &drv;
-    }
+const Driver* DriverLoader::UrlToDriver(const std::string& url) {
+  if (driver_index_drivers_.count(url) == 0) {
+    return nullptr;
   }
-  return nullptr;
+  return driver_index_drivers_[url].get();
 }
 
 void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
@@ -84,19 +82,18 @@ void DriverLoader::WaitForBaseDrivers(fit::callback<void()> callback) {
 const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
                                           bool use_universe_resolver) {
   // Check if we've already loaded this driver. If we have then return it.
-  auto driver = UrlToDriver(manifest_url);
-  if (driver != nullptr) {
+  if (const Driver* driver = UrlToDriver(manifest_url); driver != nullptr) {
     return driver;
   }
 
   // Pick the correct package resolver to use.
-  auto resolver = base_resolver_;
+  internal::PackageResolverInterface* resolver = base_resolver_;
   if (use_universe_resolver && universe_resolver_) {
     resolver = universe_resolver_;
   }
 
   // We've never seen the driver before so add it, then return it.
-  auto fetched_driver = resolver->FetchDriver(manifest_url);
+  zx::result fetched_driver = resolver->FetchDriver(manifest_url);
   if (fetched_driver.is_error()) {
     LOGF(ERROR, "Error fetching driver: %s: %d", manifest_url.data(), fetched_driver.error_value());
     return nullptr;
@@ -107,8 +104,8 @@ const Driver* DriverLoader::LoadDriverUrl(const std::string& manifest_url,
   }
 
   // Success. Return driver.
-  driver_index_drivers_.push_back(std::move(fetched_driver.value()));
-  return &driver_index_drivers_.back();
+  driver_index_drivers_[manifest_url] = std::move(fetched_driver.value());
+  return driver_index_drivers_[manifest_url].get();
 }
 
 const Driver* DriverLoader::LoadDriverUrl(fdi::wire::MatchedDriverInfo driver_info) {

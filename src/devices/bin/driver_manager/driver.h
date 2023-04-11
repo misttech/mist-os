@@ -20,7 +20,7 @@
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
 
-struct Driver : public fbl::DoublyLinkedListable<std::unique_ptr<Driver>> {
+struct Driver {
   Driver() = default;
 
   fbl::String name;
