@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use {
-    crate::validators::{Validator, ValidatorError},
-    fuchsia_syslog as syslog,
-};
+use crate::validators::{Validator, ValidatorError};
 
 /// Validator that always returns `Ok`.
 ///
@@ -16,7 +13,7 @@ pub struct PassValidator;
 impl Validator for PassValidator {
     /// Pass through validation function. Always returns `Ok`.
     fn validate(&self, file_name: &str, _contents: &[u8]) -> Result<(), ValidatorError> {
-        syslog::fx_log_info!("Passing validation of {}", file_name);
+        tracing::info!("Passing validation of {}", file_name);
         Ok(())
     }
 }

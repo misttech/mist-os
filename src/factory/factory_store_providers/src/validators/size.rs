@@ -6,7 +6,6 @@ use {
     crate::config::ValidatorFileArgsMap,
     crate::validators::{Validator, ValidatorError},
     anyhow::{format_err, Error},
-    fuchsia_syslog as syslog,
     serde_json::{map::Map, value::Value},
     std::collections::HashMap,
 };
@@ -132,7 +131,7 @@ impl Validator for SizeValidator {
     /// Any file passed to this validator whose name is not associated with a size constraint will
     /// result in a `ValidatorError::FailedToValidate` error.
     fn validate(&self, file_name: &str, contents: &[u8]) -> Result<(), ValidatorError> {
-        syslog::fx_log_info!("Validating size of {}", file_name);
+        tracing::info!("Validating size of {}", file_name);
 
         let size_constraint =
             self.file_sizes.get(file_name).ok_or_else(|| ValidatorError::FailedToValidate {

@@ -13,9 +13,8 @@ use {
         WeaveFactoryStoreProviderRequestStream, WidevineFactoryStoreProviderRequest,
         WidevineFactoryStoreProviderRequestStream,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_io as fio,
     fuchsia_component::server::ServiceFs,
-    fuchsia_syslog::{self as syslog, macros::*},
     futures::{lock::Mutex, prelude::*},
     serde_json::from_reader,
     std::{collections::HashMap, fs::File, str::FromStr, sync::Arc},
@@ -41,12 +40,16 @@ fn start_test_dir(config_path: &str) -> Result<fio::DirectoryProxy, Error> {
     let files: HashMap<String, String> = match File::open(&config_path) {
         Ok(file) => from_reader(file)?,
         Err(err) => {
-            fx_log_warn!("publishing empty directory for {} due to error: {:?}", &config_path, err);
+            tracing::warn!(
+                "publishing empty directory for {} due to error: {:?}",
+                &config_path,
+                err
+            );
             HashMap::new()
         }
     };
 
-    fx_log_info!("Files from {}: {:?}", &config_path, files);
+    tracing::info!("Files from {}: {:?}", &config_path, files);
 
     let mut tree = TreeBuilder::empty_dir();
 
@@ -175,9 +178,8 @@ struct Flags {
     config: String,
 }
 
-#[fasync::run_singlethreaded]
+#[fuchsia::main(logging_tags = ["fake_factory_store_providers"])]
 async fn main() -> Result<(), Error> {
-    syslog::init_with_tags(&["fake_factory_store_providers"])?;
     let flags = Flags::from_args();
     let dir = Arc::new(Mutex::new(start_test_dir(&flags.config)?));
 
@@ -201,7 +203,7 @@ async fn main() -> Result<(), Error> {
 
     fs.take_and_serve_directory_handle()?;
     fs.for_each_concurrent(10, |req| {
-        run_server(req, dir.clone()).unwrap_or_else(|e| fx_log_err!("{:?}", e))
+        run_server(req, dir.clone()).unwrap_or_else(|e| tracing::error!("{:?}", e))
     })
     .await;
     Ok(())

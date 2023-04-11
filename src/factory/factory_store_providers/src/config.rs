@@ -6,7 +6,6 @@ use {
     crate::validators::{new_validator_context_by_name, Validator},
     anyhow::Error,
     fidl::endpoints::DiscoverableProtocolMarker,
-    fuchsia_syslog as syslog,
     serde::Deserialize,
     serde_json::{self, value::Value},
     std::{collections::HashMap, default::Default, io},
@@ -58,7 +57,7 @@ impl Config {
         T: DiscoverableProtocolMarker,
     {
         let config_data_file = format!("/config/data/{}.config", &T::PROTOCOL_NAME);
-        syslog::fx_log_info!("Loading {}", &config_data_file);
+        tracing::info!("Loading {}", &config_data_file);
         Config::load_file(&config_data_file)
     }
 
@@ -69,7 +68,7 @@ impl Config {
         // De-dupe validator configurations over the collection of file specs.
         for file in self.files.into_iter() {
             if file.validators.is_empty() {
-                syslog::fx_log_warn!(
+                tracing::warn!(
                     "Entry {:?} must have at least one validator to be processed, skipping",
                     &file.path
                 );
@@ -92,7 +91,7 @@ impl Config {
             let dest = file.dest.unwrap_or(file.path.clone());
             match file_path_map.get(&file.path) {
                 Some(old_dest) => {
-                    syslog::fx_log_warn!(
+                    tracing::warn!(
                         "Entry {:?} already mapped to destination {:?}, ignoring mapping to {:?}",
                         &file.path,
                         old_dest,

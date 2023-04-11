@@ -12,7 +12,6 @@ use {
     },
     fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_fs,
     fuchsia_fs::file::{AsyncFile, AsyncGetSizeExt},
-    fuchsia_syslog as syslog,
     std::fs,
     std::path::Path,
     std::vec::Vec,
@@ -47,7 +46,7 @@ async fn read_file_from_proxy<'a>(
 
 async fn wait_for_ramdisk() -> Result<(), Error> {
     if !Path::new(FACTORY_DEVICE_CONFIG).exists() {
-        syslog::fx_log_info!("{} doesn't exist. Assuming none ext4 test", FACTORY_DEVICE_CONFIG);
+        tracing::info!("{} doesn't exist. Assuming none ext4 test", FACTORY_DEVICE_CONFIG);
         return Ok(());
     }
     let dev = fuchsia_fs::directory::open_in_namespace("/dev", fio::OpenFlags::empty())?;
