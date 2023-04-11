@@ -77,10 +77,11 @@ impl Start for EchoServer {
                 incoming.entries.remove(ECHO_CAP_NAME).context("no echo cap in incoming")?;
 
             let echo_receiver = echo_cap
-                .downcast::<cap::multishot::Receiver>()
+                .downcast::<cap::multishot::Receiver<cap::AnyCapability>>()
                 .map_err(|_| anyhow!("echo cap is not a Handle"))?;
 
             echo_receiver
+                .0
                 .for_each_concurrent(None, |item| async {
                     run_server(item).await.expect("FIDL server should not fail")
                 })
@@ -117,8 +118,8 @@ impl Start for EchoClient {
                 incoming.entries.get_mut(ECHO_CAP_NAME).context("no echo cap in incoming")?;
 
             let echo_sender = echo_cap
-                .downcast_mut::<cap::multishot::Sender>()
-                .ok_or_else(|| anyhow!("echo cap is not a Sender"))?;
+                .downcast_mut::<cap::multishot::Sender<cap::AnyCapability>>()
+                .ok_or_else(|| anyhow!("echo cap is not a Sender<AnyCapability>"))?;
             info!("(client) echo sender: {:?}", echo_sender);
 
             // Reconnect a few times.
@@ -128,6 +129,7 @@ impl Start for EchoClient {
                     fidl::endpoints::create_proxy::<fexamples::EchoMarker>()
                         .context("failed to create proxy")?;
                 echo_sender
+                    .0
                     .send(Box::new(cap::Handle::from(echo_server_end.into_handle())))
                     .await
                     .map_err(|e| anyhow::Error::from(e))?;
@@ -148,7 +150,7 @@ impl Start for EchoClient {
 
 #[fuchsia::test]
 async fn test_echo_multishot() -> Result<(), Error> {
-    let (echo_sender, echo_receiver) = cap::multishot();
+    let (echo_sender, echo_receiver) = cap::multishot::<cap::AnyCapability>();
 
     let mut server_incoming = Box::new(cap::Dict::new());
     server_incoming.entries.insert(ECHO_CAP_NAME.into(), Box::new(echo_receiver));

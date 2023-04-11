@@ -2,33 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::cap::{AnyCapability, Capability, Remote},
+    crate::cap::{Capability, Remote},
     fuchsia_zircon as zx,
     futures::channel::mpsc,
     futures::future::BoxFuture,
 };
 
-pub type Sender = mpsc::UnboundedSender<AnyCapability>;
+#[derive(Debug, Clone)]
+pub struct Sender<T: Capability>(pub mpsc::UnboundedSender<T>);
 
-impl Capability for Sender {}
+impl<T: Capability> Capability for Sender<T> {}
 
-impl Remote for Sender {
+impl<T: Capability> Remote for Sender<T> {
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         todo!()
     }
 }
 
-pub type Receiver = mpsc::UnboundedReceiver<AnyCapability>;
+#[derive(Debug)]
+pub struct Receiver<T: Capability>(pub mpsc::UnboundedReceiver<T>);
 
-impl Capability for Receiver {}
+impl<T: Capability> Capability for Receiver<T> {}
 
-impl Remote for Receiver {
+impl<T: Capability> Remote for Receiver<T> {
     fn to_zx_handle(self: Box<Self>) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         todo!()
     }
 }
 
 /// A stream of capabilities from a sender to a receiver.
-pub fn multishot() -> (Sender, Receiver) {
-    mpsc::unbounded::<AnyCapability>()
+pub fn multishot<T: Capability>() -> (Sender<T>, Receiver<T>) {
+    let (sender, receiver) = mpsc::unbounded::<T>();
+    (Sender(sender), Receiver(receiver))
 }
