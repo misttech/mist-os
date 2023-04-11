@@ -7,7 +7,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM",
-                    "fuchsia.BIND_PWM_ID": "fuchsia.amlogic.platform.t931.GPIOZ_PIN_ID.PIN_9"
+                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_LITTLE_CLUSTER"
                 }
             }
         ]
@@ -20,7 +20,7 @@
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_PROTOCOL": "fuchsia.pwm.BIND_PROTOCOL.PWM",
-                    "fuchsia.BIND_PWM_ID": "fuchsia.amlogic.platform.t931.GPIOZ_PIN_ID.PIN_0"
+                    "fuchsia.pwm.PWM_ID_FUNCTION": "fuchsia.pwm.PWM_ID_FUNCTION.CORE_POWER_BIG_CLUSTER"
                 }
             }
         ]

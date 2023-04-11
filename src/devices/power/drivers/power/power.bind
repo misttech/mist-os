@@ -5,4 +5,10 @@
 using fuchsia.platform;
 
 fuchsia.BIND_COMPOSITE == 1;
-fuchsia.BIND_POWER_DOMAIN_COMPOSITE == fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_DOMAIN_COMPOSITE;
+if fuchsia.BIND_POWER_DOMAIN_COMPOSITE == fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_DOMAIN_COMPOSITE {
+    true;
+} else {
+    fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
+    fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
+    fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.POWER_CORE;
+}

@@ -7,6 +7,7 @@
 #include <fuchsia/hardware/power/c/banjo.h>
 #include <fuchsia/hardware/power/cpp/banjo.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
+#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -20,8 +21,6 @@
 #include <ddk/metadata/power.h>
 #include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-
-#include "src/devices/power/drivers/power/power-bind.h"
 
 void GetUniqueId(uint64_t* id) {
   static std::atomic<size_t> unique_id = 0;
