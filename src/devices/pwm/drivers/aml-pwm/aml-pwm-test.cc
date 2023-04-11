@@ -10,7 +10,6 @@
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
-#include <soc/aml-common/aml-pwm-regs.h>
 
 namespace {
 
@@ -291,43 +290,6 @@ TEST_F(AmlPwmDeviceTest, SetConfigInvalidPwmId) {
   }
 }
 
-TEST_F(AmlPwmDeviceTest, SetConfigInvalidTimer1PeriodExceedsLimit) {
-  mode_config fail_mode{
-      .mode = aml_pwm::Mode::kOn,
-      .regular = {},
-  };
-  pwm_config fail_cfg{
-      .polarity = false,
-      // period = 1 second, exceeds the maximum allowed period (343'927'680 ns).
-      .period_ns = 1'000'000'000,
-      .duty_cycle = 100.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail_mode),
-      .mode_config_size = sizeof(fail_mode),
-  };
-
-  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
-}
-
-TEST_F(AmlPwmDeviceTest, SetConfigInvalidTwoTimerModeTimer2PeriodExceedsLimit) {
-  mode_config fail_mode{
-      .mode = aml_pwm::Mode::kTwoTimer,
-      .two_timer =
-          {
-              // period = 1 second, exceeds the maximum allowed period (343'927'680 ns).
-              .period_ns2 = 1'000'000'000,
-          },
-  };
-  pwm_config fail_cfg{
-      .polarity = false,
-      .period_ns = 1000,
-      .duty_cycle = 100.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&fail_mode),
-      .mode_config_size = sizeof(fail_mode),
-  };
-
-  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &fail_cfg));
-}
-
 TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   // Mode::kOff
   mode_config off{
@@ -344,7 +306,6 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   EXPECT_OK(pwm_->PwmImplSetConfig(0, &off_cfg));
 
   (*mock_mmio0_)[2 * 4].ExpectRead(0x01000000).ExpectWrite(0x01000001);  // SetMode
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF80FF);  // SetClockDivider
   (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
   (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
@@ -367,7 +328,6 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
 
   // Mode::kOn
   (*mock_mmio0_)[2 * 4].ExpectRead(0x01000000).ExpectWrite(0x00000002);  // SetMode
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFF80FFFF);  // SetClockDivider
   (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xF7FFFFFF);  // Invert
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x20000000);  // EnableConst
   (*mock_mmio0_)[1 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
@@ -386,7 +346,6 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
 
   // Mode::kDeltaSigma
   (*mock_mmio1_)[2 * 4].ExpectRead(0x02000000).ExpectWrite(0x00000004);  // SetMode
-  (*mock_mmio1_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF80FF);  // SetClockDivider
   (*mock_mmio1_)[3 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF0064);  // SetDSSetting
   (*mock_mmio1_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
   (*mock_mmio1_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xEFFFFFFF);  // EnableConst
@@ -409,7 +368,6 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
 
   // Mode::kTwoTimer
   (*mock_mmio3_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x01000002);  // SetMode
-  (*mock_mmio3_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFF80FFFF);  // SetClockDivider
   (*mock_mmio3_)[6 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00130003);  // SetDutyCycle2
   (*mock_mmio3_)[4 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF0302);  // SetTimers
   (*mock_mmio3_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xF7FFFFFF);  // Invert
@@ -435,90 +393,8 @@ TEST_F(AmlPwmDeviceTest, SetConfigTest) {
   EXPECT_OK(pwm_->PwmImplSetConfig(7, &timer2_cfg));
 }
 
-TEST_F(AmlPwmDeviceTest, SingleTimerModeClockDividerChange) {
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x01000000).ExpectWrite(0x01000001);  // SetMode
-  // Expected clock divider value = 1, raw value of divider register field = 0
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF80FF);  // SetClockDivider
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
-  (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
-  mode_config on{
-      .mode = Mode::kOn,
-      .regular = {},
-  };
-  pwm_config on_cfg{
-      .polarity = false,
-      .period_ns = 1250,
-      .duty_cycle = 100.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&on),
-      .mode_config_size = sizeof(on),
-  };
-  EXPECT_OK(pwm_->PwmImplSetConfig(0, &on_cfg));  // Success
-
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
-  (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x5F460000);  // SetDutyCycle
-  on_cfg.period_ns = 1'000'000;                   // Doesn't trigger the divider change.
-  EXPECT_OK(pwm_->PwmImplSetConfig(0, &on_cfg));  // Success
-
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF81FF);  // SetClockDivider
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
-  (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x8EE90000);  // SetDutyCycle
-  on_cfg.period_ns = 3'000'000;
-  EXPECT_OK(pwm_->PwmImplSetConfig(0, &on_cfg));  // Success
-
-  on_cfg.period_ns = 1'000'000'000;                   // 1 Hz, exceeds the maximum period
-  EXPECT_NOT_OK(pwm_->PwmImplSetConfig(0, &on_cfg));  // Failure
-}
-
-TEST_F(AmlPwmDeviceTest, TwoTimerModeClockDividerChange) {
-  (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x01000002);  // SetMode
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFF80FFFF);  // SetClockDivider
-  (*mock_mmio0_)[6 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00130003);  // SetDutyCycle2
-  (*mock_mmio0_)[4 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF0302);  // SetTimers
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xF7FFFFFF);  // Invert
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xDFFFFFFF);  // EnableConst
-  (*mock_mmio0_)[1 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00060010);  // SetDutyCycle
-  mode_config timer2{
-      .mode = Mode::kTwoTimer,
-      .two_timer =
-          {
-              .period_ns2 = 1000,
-              .duty_cycle2 = 80.0,
-              .timer1 = 3,
-              .timer2 = 2,
-          },
-  };
-  pwm_config timer2_cfg{
-      .polarity = false,
-      .period_ns = 1000,
-      .duty_cycle = 30.0,
-      .mode_config_buffer = reinterpret_cast<uint8_t*>(&timer2),
-      .mode_config_size = sizeof(timer2),
-  };
-  EXPECT_OK(pwm_->PwmImplSetConfig(1, &timer2_cfg));
-
-  // timer1 needs divider = 2, timer2 needs divider = 1,
-  // so the divider = max(2, 1) = 2. The raw value is set to (2 - 1) = 1.
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFF81FFFF);  // SetClockDivider
-  (*mock_mmio0_)[6 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x00090001);  // SetDutyCycle2
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xDFFFFFFF);  // EnableConst
-  (*mock_mmio0_)[1 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x2ADF6408);  // SetDutyCycle
-  timer2_cfg.period_ns = 3'000'000;
-  EXPECT_OK(pwm_->PwmImplSetConfig(1, &timer2_cfg));  // Success
-
-  // timer1 needs divider = 2, timer2 needs divider = 3,
-  // so the divider = max(2, 3) = 3. The raw value is set to (3 - 1) = 2.
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFF82FFFF);  // SetClockDivider
-  (*mock_mmio0_)[6 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x986F261B);  // SetDutyCycle2
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xDFFFFFFF);  // EnableConst
-  (*mock_mmio0_)[1 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x1C9442B0);  // SetDutyCycle
-  timer2.two_timer.period_ns2 = 6'000'000;
-  EXPECT_OK(pwm_->PwmImplSetConfig(1, &timer2_cfg));  // Success
-}
-
 TEST_F(AmlPwmDeviceTest, SetConfigFailTest) {
   (*mock_mmio0_)[2 * 4].ExpectRead(0x01000000).ExpectWrite(0x01000001);  // SetMode
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF80FF);  // SetClockDivider
   (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
   (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x001E0000);  // SetDutyCycle
@@ -575,7 +451,6 @@ TEST_F(AmlPwmDeviceTest, DisableTest) {
 
 TEST_F(AmlPwmDeviceTest, SetConfigPeriodNotDivisibleBy100Test) {
   (*mock_mmio0_)[2 * 4].ExpectRead(0x01000000).ExpectWrite(0x01000001);  // SetMode
-  (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFFFF80FF);  // SetClockDivider
   (*mock_mmio0_)[2 * 4].ExpectRead(0xFFFFFFFF).ExpectWrite(0xFBFFFFFF);  // Invert
   (*mock_mmio0_)[2 * 4].ExpectRead(0x00000000).ExpectWrite(0x10000000);  // EnableConst
   (*mock_mmio0_)[0 * 4].ExpectRead(0xA39D9259).ExpectWrite(0x10420000);  // SetDutyCycle

@@ -56,21 +56,18 @@ class AmlPwm {
 
   // Sets the PWM controller working mode. `mode` must be a valid PWM mode.
   void SetMode(uint32_t idx, Mode mode);
-  // Sets the duty cycle for the default timer.
-  // `divider` is the actual PWM clock divider factor in range [1, 128].
-  // `duty_cycle` must be a float value in the range [0.0, 100.0].
-  void SetDutyCycle(uint32_t idx, int divider, uint32_t period, float duty_cycle);
-  // Sets the duty cycle for the second timer in two-timer mode.
-  // `divider` is the actual PWM clock divider factor in range [1, 128].
-  // `duty_cycle` must be a float value in the range [0.0, 100.0].
-  void SetDutyCycle2(uint32_t idx, int divider, uint32_t period, float duty_cycle);
+  // Sets the duty cycle for the default timer. `duty_cycle` must be a float
+  // value in the range [0.0, 100.0].
+  void SetDutyCycle(uint32_t idx, uint32_t period, float duty_cycle);
+  // Sets the duty cycle for the second timer in two-timer mode. `duty_cycle`
+  // must be a float value in the range [0.0, 100.0].
+  void SetDutyCycle2(uint32_t idx, uint32_t period, float duty_cycle);
   void Invert(uint32_t idx, bool on);
   void EnableHiZ(uint32_t idx, bool on);
   void EnableClock(uint32_t idx, bool on);
   void EnableConst(uint32_t idx, bool on);
   void SetClock(uint32_t idx, uint8_t sel);
-  // Sets the PWM clock divider factor. `divider` must be in range [1, 128].
-  void SetClockDivider(uint32_t idx, int divider);
+  void SetClockDivider(uint32_t idx, uint8_t div);
   void EnableBlink(uint32_t idx, bool on);
   void SetBlinkTimes(uint32_t idx, uint8_t times);
   void SetDSSetting(uint32_t idx, uint16_t val);
