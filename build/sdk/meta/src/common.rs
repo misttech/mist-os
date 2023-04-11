@@ -115,6 +115,9 @@ pub enum ScreenUnits {
 
 display_impl!(ScreenUnits);
 
+/// TODO(fxbug.dev/124906): This uses power-of-10 terminology (kilobyte, i.e. 1000 bytes), but the
+/// semantics are power-of-two (kibibyte, i.e. 1024 bytes).  Correcting this is difficult due to
+/// lack of versioning on the serialized structs, but might be worth addressing at some point.
 #[derive(Serialize, Deserialize, Debug, Default, Hash, Clone, PartialOrd, Ord, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DataUnits {
@@ -143,6 +146,16 @@ impl DataUnits {
             DataUnits::Megabytes => "M",
             DataUnits::Gigabytes => "G",
             DataUnits::Terabytes => "T",
+        }
+    }
+
+    pub fn as_bytes(&self) -> u64 {
+        match self {
+            Self::Bytes => 1,
+            Self::Kilobytes => 1024,
+            Self::Megabytes => 1024 * 1024,
+            Self::Gigabytes => 1024 * 1024 * 1024,
+            Self::Terabytes => 1024 * 1024 * 1024 * 1024,
         }
     }
 }

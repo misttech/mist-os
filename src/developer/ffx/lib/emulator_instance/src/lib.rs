@@ -5,7 +5,12 @@
 use nix;
 pub use sdk_metadata::{AudioDevice, DataAmount, DataUnits, PointingDevice, Screen};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, ops::Deref, path::PathBuf, time::Duration};
+use std::{
+    collections::HashMap,
+    ops::Deref,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 mod enumerations;
 mod instances;
@@ -76,6 +81,12 @@ pub struct FlagData {
 pub enum DiskImage {
     Fvm(PathBuf),
     Fxfs(PathBuf),
+}
+
+impl AsRef<Path> for DiskImage {
+    fn as_ref(&self) -> &Path {
+        self.as_path()
+    }
 }
 
 impl Deref for DiskImage {

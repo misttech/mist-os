@@ -43,6 +43,7 @@ use std::{
     sync::{mpsc::channel, Arc},
     time::{Duration, Instant},
 };
+use tempfile::NamedTempFile;
 
 #[cfg(test)]
 use mockall::automock;
@@ -261,7 +262,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 }
                 Some(DiskImage::Fvm(fvm_path))
             }
-            // TODO(fxbug.dev/122056): Support resizing Fxfs images.
             Some(DiskImage::Fxfs(src_path)) => {
                 let image_path = instance_root.join(
                     src_path.file_name().ok_or_else(|| anyhow!("malformed Fxfs image path"))?,
@@ -272,7 +272,23 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                         image_path.file_name().unwrap()
                     );
                 } else {
-                    fs::copy(src_path, &image_path).context("cannot stage Fxfs image")?;
+                    let target_size = emu_config.device.storage.as_bytes().ok_or(anyhow!(
+                        "Storage size {:?} overflows u64",
+                        emu_config.device.storage
+                    ))?;
+                    let size = fs::metadata(src_path)?.len();
+                    let tmp = NamedTempFile::new_in(&instance_root)?;
+                    fs::copy(src_path, tmp.path()).context("cannot stage Fxfs image")?;
+                    if size < target_size {
+                        // Resize the image if needed.
+                        tmp.as_file()
+                            .set_len(target_size)
+                            .context(format!("Failed to temp file to {} bytes", target_size))?;
+                    }
+                    tmp.persist(&image_path).context(format!(
+                        "Failed to persist temp Fxfs image to {:?}",
+                        image_path
+                    ))?;
                 }
                 Some(DiskImage::Fxfs(image_path))
             }
@@ -661,7 +677,7 @@ mod tests {
 
     use super::*;
     use async_trait::async_trait;
-    use emulator_instance::{DiskImage, EngineType};
+    use emulator_instance::{DataAmount, DataUnits, DiskImage, EngineType};
     use ffx_config::{query, ConfigLevel};
     use serde::Serialize;
     use serde_json::json;
@@ -694,17 +710,36 @@ mod tests {
     const ORIGINAL: &str = "THIS_STRING";
     const UPDATED: &str = "THAT_VALUE*";
 
+    #[derive(Copy, Clone)]
+    enum DiskImageFormat {
+        Fvm,
+        Fxfs,
+    }
+
+    impl DiskImageFormat {
+        pub fn as_disk_image(&self, path: impl AsRef<Path>) -> DiskImage {
+            match self {
+                Self::Fvm => DiskImage::Fvm(path.as_ref().to_path_buf()),
+                Self::Fxfs => DiskImage::Fxfs(path.as_ref().to_path_buf()),
+            }
+        }
+    }
+
     // Note that the caller MUST initialize the ffx_config environment before calling this function
     // since we override config values as part of the test. This looks like:
     //     let _env = ffx_config::test_init().await?;
     // The returned structure must remain in scope for the duration of the test to function
     // properly.
-    async fn setup(guest: &mut GuestConfig, temp: &TempDir) -> Result<PathBuf> {
+    async fn setup(
+        guest: &mut GuestConfig,
+        temp: &TempDir,
+        disk_image_format: DiskImageFormat,
+    ) -> Result<PathBuf> {
         let root = temp.path();
 
         let kernel_path = root.join("kernel");
         let zbi_path = root.join("zbi");
-        let fvm_path = root.join("fvm");
+        let disk_image_path = disk_image_format.as_disk_image(root.join("disk"));
 
         let _ = fs::File::options()
             .write(true)
@@ -719,8 +754,8 @@ mod tests {
         let _ = fs::File::options()
             .write(true)
             .create(true)
-            .open(&fvm_path)
-            .context("cannot create test fvm file")?;
+            .open(&*disk_image_path)
+            .context("cannot create test disk image file")?;
 
         query(config::EMU_INSTANCE_ROOT_DIR)
             .level(Some(ConfigLevel::User))
@@ -729,7 +764,7 @@ mod tests {
 
         guest.kernel_image = kernel_path;
         guest.zbi_image = zbi_path;
-        guest.disk_image = Some(DiskImage::Fvm(fvm_path));
+        guest.disk_image = Some(disk_image_path);
 
         // Set the paths to use for the SSH keys
         query("ssh.pub")
@@ -756,14 +791,12 @@ mod tests {
         Ok(())
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
-    #[serial_test::serial]
-    async fn test_staging_no_reuse() -> Result<()> {
+    async fn test_staging_no_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
-        let root = setup(&mut emu_config.guest, &temp).await?;
+        let root = setup(&mut emu_config.guest, &temp, disk_image_format).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -771,7 +804,7 @@ mod tests {
         write_to(&emu_config.guest.kernel_image, ORIGINAL)
             .context("cannot write original value to kernel file")?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
-            .context("cannot write original value to fvm file")?;
+            .context("cannot write original value to disk image file")?;
 
         let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
             instance_name,
@@ -787,7 +820,9 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            disk_image: Some(
+                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+            ),
         };
         assert_eq!(actual, expected);
 
@@ -795,7 +830,7 @@ mod tests {
         write_to(&emu_config.guest.kernel_image, UPDATED)
             .context("cannot write updated value to kernel file")?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
-            .context("cannot write updated value to fvm file")?;
+            .context("cannot write updated value to disk image file")?;
 
         let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
             instance_name,
@@ -811,7 +846,9 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            disk_image: Some(
+                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+            ),
         };
         assert_eq!(actual, expected);
 
@@ -819,8 +856,8 @@ mod tests {
         println!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
         let mut kernel = File::open(&actual.kernel_image)
             .context("cannot open overwritten kernel file for read")?;
-        let mut fvm = File::open(&*actual.disk_image.unwrap())
-            .context("cannot open overwritten fvm file for read")?;
+        let mut disk_image = File::open(&*actual.disk_image.unwrap())
+            .context("cannot open overwritten disk image file for read")?;
 
         let mut kernel_contents = String::new();
         let mut fvm_contents = String::new();
@@ -828,7 +865,9 @@ mod tests {
         kernel
             .read_to_string(&mut kernel_contents)
             .context("cannot read contents of reused kernel file")?;
-        fvm.read_to_string(&mut fvm_contents).context("cannot read contents of reused fvm file")?;
+        disk_image
+            .read_to_string(&mut fvm_contents)
+            .context("cannot read contents of reused disk image file")?;
 
         assert_eq!(kernel_contents, UPDATED);
         assert_eq!(fvm_contents, UPDATED);
@@ -838,13 +877,23 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     #[serial_test::serial]
-    async fn test_staging_with_reuse() -> Result<()> {
+    async fn test_staging_no_reuse_fvm() -> Result<()> {
+        test_staging_no_reuse_common(DiskImageFormat::Fvm).await
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_staging_no_reuse_fxfs() -> Result<()> {
+        test_staging_no_reuse_common(DiskImageFormat::Fxfs).await
+    }
+
+    async fn test_staging_with_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
 
-        let root = setup(&mut emu_config.guest, &temp).await?;
+        let root = setup(&mut emu_config.guest, &temp, disk_image_format).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
@@ -853,7 +902,7 @@ mod tests {
         write_to(&emu_config.guest.kernel_image, ORIGINAL)
             .context("cannot write original value to kernel file")?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
-            .context("cannot write original value to fvm file")?;
+            .context("cannot write original value to disk image file")?;
 
         let updated: Result<GuestConfig> = <TestEngine as QemuBasedEngine>::stage_image_files(
             instance_name,
@@ -869,7 +918,9 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            disk_image: Some(
+                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+            ),
         };
         assert_eq!(actual, expected);
 
@@ -878,7 +929,7 @@ mod tests {
         write_to(&emu_config.guest.kernel_image, UPDATED)
             .context("cannot write updated value to kernel file")?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
-            .context("cannot write updated value to fvm file")?;
+            .context("cannot write updated value to disk image file")?;
 
         let updated = <TestEngine as QemuBasedEngine>::stage_image_files(
             instance_name,
@@ -894,7 +945,9 @@ mod tests {
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
             zbi_image: root.join(instance_name).join("zbi"),
-            disk_image: Some(DiskImage::Fvm(root.join(instance_name).join("fvm"))),
+            disk_image: Some(
+                disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
+            ),
         };
         assert_eq!(actual, expected);
 
@@ -920,12 +973,74 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     #[serial_test::serial]
+    async fn test_staging_with_reuse_fvm() -> Result<()> {
+        test_staging_with_reuse_common(DiskImageFormat::Fvm).await
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_staging_with_reuse_fxfs() -> Result<()> {
+        test_staging_with_reuse_common(DiskImageFormat::Fxfs).await
+    }
+
+    // There's no equivalent test for FVM for now -- extending FVM images is more complex and
+    // depends on an external binary, making testing challenging.
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
+    async fn test_staging_resize_fxfs() -> Result<()> {
+        let _env = ffx_config::test_init().await?;
+        let temp = tempdir().context("cannot get tempdir")?;
+        let instance_name = "test-instance";
+        let mut emu_config = EmulatorConfiguration::default();
+        let root = setup(&mut emu_config.guest, &temp, DiskImageFormat::Fxfs).await?;
+
+        let ctx = mock_modules::get_host_tool_context();
+        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
+
+        const EXPECTED_DATA: &[u8] = b"hello, world";
+
+        std::fs::write(&emu_config.guest.kernel_image, "whatever")?;
+        std::fs::write(emu_config.guest.disk_image.as_ref().unwrap(), EXPECTED_DATA)?;
+
+        emu_config.device.storage = DataAmount { units: DataUnits::Kilobytes, quantity: 4 };
+
+        let config = <TestEngine as QemuBasedEngine>::stage_image_files(
+            instance_name,
+            &emu_config,
+            &None,
+            false,
+        )
+        .await
+        .context("Failed to get guest config")?;
+
+        let expected = GuestConfig {
+            kernel_image: root.join(instance_name).join("kernel"),
+            zbi_image: root.join(instance_name).join("zbi"),
+            disk_image: Some(DiskImage::Fxfs(root.join(instance_name).join("disk"))),
+        };
+        assert_eq!(config, expected);
+
+        let mut disk_image = File::open(&*config.disk_image.unwrap())?;
+        let mut disk_contents = vec![];
+        disk_image
+            .read_to_end(&mut disk_contents)
+            .context("cannot read contents of reused disk image file")?;
+
+        assert_eq!(disk_contents.len(), 4096);
+        assert_eq!(&disk_contents[..EXPECTED_DATA.len()], EXPECTED_DATA);
+        assert_eq!(&disk_contents[EXPECTED_DATA.len()..], &[0u8; 4096 - EXPECTED_DATA.len()]);
+
+        Ok(())
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    #[serial_test::serial]
     async fn test_embed_boot_data() -> Result<()> {
         let _env = ffx_config::test_init().await?;
         let temp = tempdir().context("cannot get tempdir")?;
         let mut emu_config = EmulatorConfiguration::default();
 
-        let root = setup(&mut emu_config.guest, &temp).await?;
+        let root = setup(&mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
 
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));

@@ -53,6 +53,14 @@ pub struct DataAmount {
     pub units: DataUnits,
 }
 
+impl DataAmount {
+    /// Returns None if the result would overflow.
+    pub fn as_bytes(&self) -> Option<u64> {
+        let quantity: u64 = self.quantity.try_into().ok()?;
+        quantity.checked_mul(self.units.as_bytes())
+    }
+}
+
 /// Specifics for a given platform.
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
 pub struct Hardware {
