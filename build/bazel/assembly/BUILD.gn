@@ -33,6 +33,14 @@ if (use_bringup_assembly) {
     bazel_assembly_target = "//build/bazel/assembly:minimal"
   }
 
+  group("minimal_with_verifications") {
+    testonly = true
+    deps = [
+      ":minimal",
+      "assembly_outputs:verifications",
+    ]
+  }
+
   bazel_assembled_system("workstation_eng") {
     testonly = true
     allow_eng_platform_bundle_use = true

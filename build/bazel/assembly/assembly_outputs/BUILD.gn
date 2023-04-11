@@ -1,0 +1,68 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/bazel/assembly/assembly_outputs/verify_images_manifest.gni")
+import("//build/info/info.gni")
+import("//build/product.gni")
+
+if (use_bringup_assembly) {
+  # Until bringup assembly is enabled by default,
+  # add this target with
+  # fx set bringup.x64 --with=//build/bazel/assembly/assembly_outputs:verifications
+  verify_images_manifest("verify_bringup") {
+    testonly = true
+    gn_assembled_system_target =
+        "//build/images/bringup:bringup($default_toolchain)"
+    bazel_assembled_system_target =
+        "//build/bazel/assembly:bringup($default_toolchain)"
+
+    exclude_images = [
+      "bringup.vbmeta",
+      "bringup.zbi",
+    ]
+  }
+} else {
+  verify_images_manifest("verify_fuchsia") {
+    testonly = true
+    gn_assembled_system_target =
+        "//build/images/fuchsia:fuchsia($default_toolchain)"
+    bazel_assembled_system_target =
+        "//build/bazel/assembly:minimal($default_toolchain)"
+
+    exclude_packages = [
+      # TODO(124454): Address these diffs
+      "core",
+      "wlancfg",
+      "wlandevicemonitor",
+      "wlansoftmac",
+      "regulatory_region",
+
+      ## Assembly-generated packages with diffs
+      "driver-manager-base-config",
+      "system_image",
+    ]
+
+    # These are affected by the missing packages, confirm they are the
+    # same once the other list is emptied
+    exclude_images = [
+      "meta.far",
+      "blob.blk",
+      "fvm.blk",
+      "fvm.sparse.blk",
+      "fvm.blob.sparse.blk",
+      "fvm.fastboot.blk",
+      "fuchsia.zbi",
+      "fuchsia.vbmeta",
+    ]
+  }
+}
+group("verifications") {
+  testonly = true
+  deps = []
+  if (use_bringup_assembly) {
+    deps += [ ":verify_bringup" ]
+  } else if (build_info_product == "minimal") {
+    deps += [ ":verify_fuchsia" ]
+  }
+}
