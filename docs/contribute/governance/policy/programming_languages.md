@@ -4,15 +4,20 @@
 
 ## Scope
 
-This document describes which programming languages the Fuchsia project uses and
-supports for production software on the target device, both within the Fuchsia
-Platform Source Tree and for end-developers building for Fuchsia outside the
-Fuchsia Source Platform Tree. The policy does not apply to (a) developer
-tooling, either on target or host devices, or (b) software on the target device
+This document describes which programming languages the Fuchsia project uses, and
+supports authoring with, for production software that runs on the target device, both
+within the Fuchsia Platform Source Tree and for end-developers building software that
+runs on the target Fuchsia device outside the Fuchsia Source Platform Tree.
+
+The policy does not apply to (a) developer tooling that end-developers execute,
+either on target or host devices, or (b) software on the target device
 that is not executed in normal, end-user operation of the device. For example,
 this policy does not apply to zxdb (a debugger) because zxdb is a developer
-tool; the policy does apply to pkgfs because pkgfs (a file system) executes in
-the normal, end-user operation of the device.
+tool that end-developers execute; the policy does apply to pkgfs because
+pkgfs (a file system) executes in the normal, end-user operation of the device.
+
+This policy is an _allowlist_. Languages not explicitly allowed below are
+considered not allowed.
 
 ## Definitions
 
