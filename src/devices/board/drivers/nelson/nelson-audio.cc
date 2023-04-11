@@ -283,17 +283,16 @@ zx_status_t Nelson::AudioInit() {
           .length = sizeof(tas_metadata),
       },
   };
-  status =
-      DdkAddCompositeNodeSpec("audio-tas58xx", ddk::CompositeNodeSpec(kOutI2cRules, kOutI2cProps)
-                                                   .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
-                                                   .set_metadata(codec_metadata));
+  status = DdkAddCompositeNodeSpec("tas58xx", ddk::CompositeNodeSpec(kOutI2cRules, kOutI2cProps)
+                                                  .AddParentSpec(kFaultGpioRules, kFaultGpioProps)
+                                                  .set_metadata(codec_metadata));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s DdkAddCompositeNodeSpec failed %d", __FILE__, status);
     return status;
   }
   {
     auto controller_out_spec = fdf::CompositeNodeSpec{{
-        "nelson-i2s-audio-out-tdm",
+        "aml_tdm",
         kOutControllerParents,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(

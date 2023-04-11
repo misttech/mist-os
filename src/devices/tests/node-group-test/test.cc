@@ -25,11 +25,11 @@ TEST(SimpleDriverTestRealmTest, DriversExist) {
       device_watcher::RecursiveWaitForFile("/dev/sys/test/node_group_fragment_c_2").status_value(),
       ZX_OK);
   ASSERT_EQ(device_watcher::RecursiveWaitForFile(
-                "/dev/sys/test/node_group_fragment_a_1/node_group_driver/node_group")
+                "/dev/sys/test/node_group_fragment_a_1/test_composite_1/node_group")
                 .status_value(),
             ZX_OK);
   ASSERT_EQ(device_watcher::RecursiveWaitForFile(
-                "/dev/sys/test/node_group_fragment_a_2/node_group_driver/node_group")
+                "/dev/sys/test/node_group_fragment_a_2/test_composite_2/node_group")
                 .status_value(),
             ZX_OK);
 }

@@ -409,7 +409,7 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.irq() = frddr_b_irqs;
     tdm_dev.metadata() = tdm_metadata;
     auto tdm_spec = fdf::CompositeNodeSpec{{
-        "astro-i2s-audio-out-tdm",
+        "aml_tdm",
         kTdmI2sSpec,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),

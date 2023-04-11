@@ -1874,22 +1874,21 @@ TEST_F(DriverRunnerTest, CreateAndBindCompositeNodeSpec) {
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(
       hierarchy,
-      {.node_name = {"node_topology", "dev", "dev-group-0"}, .child_names = {"test-composite"}}));
+      {.node_name = {"node_topology", "dev", "dev-group-0"}, .child_names = {"test-group"}}));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(
       hierarchy,
-      {.node_name = {"node_topology", "dev", "dev-group-1"}, .child_names = {"test-composite"}}));
+      {.node_name = {"node_topology", "dev", "dev-group-1"}, .child_names = {"test-group"}}));
 
   ASSERT_NO_FATAL_FAILURE(
-      CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "dev-group-0", "test-composite"},
+      CheckNode(hierarchy, {.node_name = {"node_topology", "dev", "dev-group-0", "test-group"},
                             .str_properties = {
                                 {"driver", "fuchsia-boot:///#meta/composite-driver.cm"},
                             }}));
 
   StopDriverComponent(std::move(root_driver.value()));
-  realm().AssertDestroyedChildren(
-      {CreateChildRef("dev", "boot-drivers"),
-       CreateChildRef("dev.dev-group-1.test-composite", "boot-drivers")});
+  realm().AssertDestroyedChildren({CreateChildRef("dev", "boot-drivers"),
+                                   CreateChildRef("dev.dev-group-1.test-group", "boot-drivers")});
 }
 
 // Start a driver and inspect the driver runner.
