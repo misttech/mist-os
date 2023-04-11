@@ -12,11 +12,21 @@
 #define LLVM_LIBC_FUNCTION_IMPL(type, name, arglist)                                      \
   LLVM_LIBC_FUNCTION_ATTR decltype(__llvm_libc::name) __##name##_impl__ __asm__(#name);   \
   decltype(__llvm_libc::name) name [[gnu::alias(#name)]];                                 \
-  extern "C" decltype(__llvm_libc::name) __libc_##name [[gnu::alias(#name)]];             \
+  MEM_INTERNAL_NAME(name, __libc_)                                                        \
+  MEM_INTERNAL_NAME(name, __asan_, gnu::weak)                                             \
+  MEM_INTERNAL_NAME(name, __hwasan_, gnu::weak)                                           \
   IF_LIBC_UNSANITIZED(                                                                    \
       extern "C" LLVM_LIBC_FUNCTION_ATTR decltype(__llvm_libc::name) __unsanitized_##name \
       [[gnu::alias(#name)]];)                                                             \
   type __##name##_impl__ arglist
+
+// Since this code is built without sanitizers, it unconditionally defines the
+// (hidden) weak __asan_ and __hwasan_ symbols that are needed for the
+// sanitized libc.so not to have any undefined symbols.  These are never
+// exported so it doesn't matter that they're defined in unsanitized builds.
+
+#define MEM_INTERNAL_NAME(name, prefix, ...) \
+  extern "C" decltype(__llvm_libc::name) prefix##name [[gnu::alias(#name), ##__VA_ARGS__]];
 
 #ifdef LIBC_UNSANITIZED
 #define IF_LIBC_UNSANITIZED(x) x
