@@ -91,7 +91,7 @@ declare_args() {
   # their own `__hwasan_default_options` C function.  Instead, they can use a
   # sanitizer_extra_options() target in their `deps` and then any options
   # injected that way can override that option's setting in this list.
-  hwasan_default_options = []
+  hwasan_default_options = [ "allocator_may_return_null=1" ]
 }
 
 # This lists the GN build arguments declared above.
