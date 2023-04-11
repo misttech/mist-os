@@ -325,12 +325,8 @@ if (is_fuchsia) {
     must_exist_deps = must_exist
   }
 
-  if (has_board) {
-    assert(partitions_config_label != false,
-           "Need to define partitions_config_label")
-  } else {
-    partitions_config_label = "//boards/partitions:default"
-  }
+  assert(partitions_config_label != false,
+         "Need to define partitions_config_label")
   _partitions_config_file =
       get_label_info(partitions_config_label, "target_out_dir") + "/" +
       get_label_info(partitions_config_label, "name") + ".json"
