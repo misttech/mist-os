@@ -58,6 +58,7 @@ trap cleanup EXIT
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/fvm.sh || exit $?
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/disktools.sh || exit $?
 
 build_flag=true
 KERNEL_IMAGE=
@@ -172,12 +173,15 @@ fi
 
 if [[ -n "${image_source}" ]]; then
   img_raw="${imgdir}/raw.blk"
+  # Stage the disk image and expand to IMAGE_SIZE if needed.
   if (( $is_fvm )); then
     fvm_tool="$(fx-command-run host-tool --print fvm)"
     fx-fvm-extend-image "${fvm_tool}" "${FUCHSIA_BUILD_DIR}/${image_source}" "${img_raw}" "${IMAGE_SIZE}"
   else
-    # TODO(fxbug.dev/122056): Support expanding Fxfs images.
     cp "${FUCHSIA_BUILD_DIR}/${image_source}" "${img_raw}"
+    if [[ -n "${IMAGE_SIZE}" ]]; then
+      fx-extend "${img_raw}" "${IMAGE_SIZE}"
+    fi
   fi
   args+=(-D "${img_raw}" --diskfmt=raw)
 fi

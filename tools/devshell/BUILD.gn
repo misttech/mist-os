@@ -67,6 +67,7 @@ group("tests") {
 # test the bash fx scripts.
 test_scripts = [
   "tests/fx-internal/bash_test_framework_test",
+  "tests/fx-internal/disktools_test",
   "tests/fx-internal/ffx_target_list_usage_test",
   "tests/fx-internal/fvm_test",
   "tests/fx-internal/fx_helpers_test",
@@ -169,6 +170,7 @@ host_script_test_data("fx_bash_tests") {
         "//tools/devshell/host-tool",
         "//tools/devshell/jq.fx",
         "//tools/devshell/klog",
+        "//tools/devshell/lib/disktools.sh",
         "//tools/devshell/lib/fvm.sh",
         "//tools/devshell/lib/fx-cmd-locator.sh",
         "//tools/devshell/lib/fx-flash.sh",
