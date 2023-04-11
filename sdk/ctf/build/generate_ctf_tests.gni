@@ -1,0 +1,93 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Instructions for CTF test authors.
+#
+# When adding a new CTF test, you must create a template below to ensure that
+# when the test is released in CTF and rolled back into Fuchsia, the build
+# knows how to wrap the prebuilt test into a runnable Fuchsia package.
+#
+# The template name should follow the pattern "generate_${package_name}".
+# If you're unsure what package name to use, run this command and see which
+# missing template name causes the build to fail:
+#
+#   fx set core.x64 //sdk/ctf:check_test_templates && fx build
+#
+# The template must take a single `test_info` scope as input which has the
+# following attributes:
+#
+#    name
+#      The name of the prebuilt CTF test package.
+#      Type: string
+#
+#    target_label
+#      The absolute GN label of the prebuilt package.
+#      Type: string
+#
+#    target_api_level
+#      The API level validated by this test.
+#      Type: int
+#
+# See generate_pkgdir-tests for an example.
+
+import("//build/config/fuchsia/platform_version.gni")
+import("//sdk/ctf/build/internal/fuchsia_package_with_test.gni")
+
+template("generate_pkgdir-tests") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component_name = "test-root.cm"
+    subpackages = [
+      test_info.target_label,
+      "//src/sys/pkg/tests/pkgdir/test_realm_proxy",
+    ]
+    deps = [ "//src/sys/pkg/tests/pkgdir:test-root" ]
+  }
+}
+
+# Expands a prebuilt CTF test into a runnable fuchsia package.
+#
+# This template is called several times with every combination of ctf_test and
+# api_level, where api_level is a supported API level and ctf_test is a prebuilt
+# CTF package in the current checkout.
+#
+# CTF Test Authors: Do not modify this. See the comments at the top of this file.
+template("generate_ctf_test") {
+  assert(defined(invoker.test_info))
+  test = invoker.test_info
+  target("generate_${test.name}", target_name) {
+    test_info = test
+  }
+}
+
+# Generates test targets for prebuilt CTF tests at the given API level.
+#
+# CTF Test Authors: Do not modify this. See the comments at the top of this file.
+template("generate_ctf_tests") {
+  assert(defined(invoker.api_level))
+  assert(defined(invoker.manifest))
+
+  manifest = invoker.manifest
+  api_level = invoker.api_level
+  tests = []
+
+  foreach(prebuilt_package, read_file(manifest, "json")) {
+    test_name = "${prebuilt_package.package_name}_api${api_level}"
+    generate_ctf_test(test_name) {
+      # If you change these properties, change the docs at the top of this file.
+      test_info = {
+        name = prebuilt_package.package_name
+        target_label = "//sdk/ctf/release/packages:$test_name"
+        target_api_level = api_level
+      }
+    }
+
+    tests += [ ":$test_name" ]
+  }
+
+  group(target_name) {
+    testonly = true
+    deps = tests
+  }
+}

@@ -114,6 +114,7 @@ group("non_hermetic_deps") {
   visibility += [
     "//examples/fortune:fortune_teller",
     "//sdk/ctf/release:*",
+    "//sdk/ctf/release/packages:*",
     "//src/cast:cast_runner_pkg",
     "//src/chromium:chrome_pkg",
     "//src/chromium:chromium_cast_runner_tests_cast_runner_integration_tests",

@@ -21,3 +21,9 @@ generate_ctf_packages("packages_canary") {
   api_level = "canary"
   manifest = "//prebuilt/cts/canary/$host_platform/cts/package_archives.json"
 }
+
+# Dummy target for testing, needed by //sdk/ctf:check_test_templates
+generate_ctf_packages("packages_test") {
+  api_level = "test"
+  manifest = "//prebuilt/cts/canary/$host_platform/cts/package_archives.json"
+}

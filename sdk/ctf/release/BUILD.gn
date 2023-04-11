@@ -2,17 +2,25 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/config/fuchsia/platform_version.gni")
 import("//sdk/ctf/build/compatibility_test_suite.gni")
+import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
   testonly = true
   deps = [
     ":canary_tests",
+    ":canary_tests_deprecated_target",
     ":current_milestone_tests",
   ]
 }
 
-compatibility_test_suite("canary_tests") {
+generate_ctf_tests("canary_tests") {
+  api_level = "canary"
+  manifest = "//prebuilt/cts/canary/$host_platform/cts/package_archives.json"
+}
+
+compatibility_test_suite("canary_tests_deprecated_target") {
   path = "//prebuilt/cts/canary/$host_platform/cts"
   disabled_tests = [
     # TODO(https://fxbug.dev/116940): Remove this tests's dependency on the experimental //sdk/lib/device_watcher.
