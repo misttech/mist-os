@@ -114,16 +114,20 @@ impl OtCliCommand {
 
                 // If the previous command is sent out, try to get a new command string, if there is any
                 if outbound_buffer_received_bytes.is_empty() {
-                    match cmd_receiver_stream.poll_next_unpin(cx) {
-                        Poll::Ready(Some(mut cmd)) => {
-                            cmd.push('\n');
-                            outbound_buffer_received_bytes = cmd.into_bytes();
-                        }
-                        Poll::Ready(None) => {
-                            println!("cmd receiver err: stream ended");
-                        }
-                        Poll::Pending => {}
-                    };
+                    loop {
+                        match cmd_receiver_stream.poll_next_unpin(cx) {
+                            Poll::Ready(Some(mut cmd)) => {
+                                cmd.push('\n');
+                                outbound_buffer_received_bytes.append(&mut cmd.into_bytes());
+                            }
+                            Poll::Ready(None) => {
+                                println!("cmd receiver err: stream ended");
+                            }
+                            Poll::Pending => {
+                                break;
+                            }
+                        };
+                    }
                 }
 
                 // If there is a command ready for send out, write it to socket.
