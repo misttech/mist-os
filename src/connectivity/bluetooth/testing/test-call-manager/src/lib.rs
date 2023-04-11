@@ -16,8 +16,6 @@ use fidl_fuchsia_bluetooth_hfp::{
 use fidl_fuchsia_bluetooth_hfp_test::{ConnectionBehavior, HfpTestMarker, HfpTestProxy};
 use fuchsia_async as fasync;
 use fuchsia_component::client;
-// TODO (fxbug.dev/72691): Replace usage with `log` macros.
-use fuchsia_syslog::macros::*;
 use fuchsia_zircon as zx;
 use futures::{lock::Mutex, stream::StreamExt, FutureExt, TryStreamExt};
 use serde::Serialize;
@@ -25,6 +23,7 @@ use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
 };
+use tracing::*;
 
 type CallId = u64;
 type Number = String;
@@ -61,7 +60,7 @@ impl Dialer {
         .to_owned();
 
         let result = self.dial_result.get(&number).cloned().unwrap_or(zx::Status::NOT_FOUND);
-        fx_log_info!("Dial action result: {:?} - {:?}", action, result);
+        info!("Dial action result: {:?} - {:?}", action, result);
         if result == zx::Status::OK {
             self.last_dialed = Some(number.clone());
             Ok(number)
@@ -349,7 +348,7 @@ impl TestCallManager {
         let mut inner = self.inner.lock().await;
 
         if inner.manager.peer_watcher.is_none() {
-            fx_log_info!("Connecting to HFP and setting new service proxy");
+            info!("Connecting to HFP and setting new service proxy");
 
             let hfp_service_proxy = client::connect_to_protocol::<HfpMarker>()
                 .map_err(|err| format_err!("Failed to create HFP service proxy: {}", err))?;
@@ -600,7 +599,7 @@ impl TestCallManager {
         id: PeerId,
         request: PeerHandlerRequest,
     ) -> Result<(), Error> {
-        fx_log_info!("Received Peer Handler request for {:?}: {:?}", id, request);
+        info!("Received Peer Handler request for {:?}: {:?}", id, request);
         match request {
             PeerHandlerRequest::WatchNetworkInformation { responder, .. } => {
                 let mut inner = self.inner.lock().await;
@@ -629,7 +628,7 @@ impl TestCallManager {
                     this.report_calls(id, inner)?;
                 } else {
                     let err = format_err!("double hanging get call on PeerHandler::WatchNextCall");
-                    fx_log_err!("{}", err);
+                    error!(%err);
                     *inner = TestCallManagerInner::default();
                     return Err(err);
                 }
@@ -661,21 +660,17 @@ impl TestCallManager {
                     } {
                         Ok(number) => match self.outgoing_call(&number).await {
                             Ok(id) => {
-                                fx_log_info!(
-                                    "Initiated outgoing call to {}. CallId: {}",
-                                    number,
-                                    id
-                                );
+                                info!(CallId = id, "Initiated outgoing call to {}", number);
                                 Ok(())
                             }
                             Err(e) => {
-                                fx_log_err!("Could not initiate outgoing call action: {}", e);
+                                error!("Could not initiate outgoing call action: {}", e);
                                 Err(zx::Status::INTERNAL.into_raw())
                             }
                         },
                         Err(status) => Err(status.into_raw()),
                     };
-                    fx_log_info!("sending result to peer: {:?}", result);
+                    info!("sending result to peer: {:?}", result);
 
                     // Once dialing and hanging gets have been handled, send response.
                     let _ = responder.send(&mut result);
@@ -750,7 +745,7 @@ impl TestCallManager {
                             }
                         }
                     }
-                    fx_log_info!("Headset gain control channel for peer {:?} closed", id);
+                    info!("Headset gain control channel for peer {:?} closed", id);
                 });
                 let mut inner = self.inner.lock().await;
                 let peer = inner
@@ -778,8 +773,8 @@ impl TestCallManager {
     ///     `stream`: A stream of requests associated with a single peer.
     async fn manage_peer(mut self, id: PeerId, mut stream: PeerHandlerRequestStream) {
         while let Some(Ok(request)) = stream.next().await {
-            if let Err(e) = self.handle_peer_request(id, request).await {
-                fx_log_err!("{}", e);
+            if let Err(err) = self.handle_peer_request(id, request).await {
+                error!(%err);
                 break;
             };
         }
@@ -805,7 +800,7 @@ impl TestCallManager {
             stream.try_next().await?
         {
             let stream = handle.into_stream()?;
-            fx_log_info!("Handling Peer: {:?}", id);
+            info!("Handling Peer: {:?}", id);
             {
                 let mut inner = self.inner.lock().await;
                 let _ = inner.peers.insert(id, PeerState::default());
@@ -828,63 +823,61 @@ impl TestCallManager {
     ///     `stream`: A stream of requests associated with a single call.
     async fn manage_call(self, peer_id: PeerId, call_id: CallId, mut stream: CallRequestStream) {
         while let Some(request) = stream.next().await {
-            fx_log_info!("Got call request: {:?} {:?} -> {:?}", peer_id, call_id, request);
+            info!("Got call request: {:?} {:?} -> {:?}", peer_id, call_id, request);
             let mut inner = self.inner.lock().await;
             let state = if let Some(state) = inner.calls.get_mut(&call_id) {
                 state
             } else {
-                fx_log_info!("Call management by {:?} ended: {:?}", peer_id, call_id);
+                info!("Call management by {:?} ended: {:?}", peer_id, call_id);
                 break;
             };
             match request {
                 Ok(CallRequest::WatchState { responder, .. }) => {
                     if state.responder.is_some() {
-                        fx_log_warn!(
-                            "Call client sent multiple WatchState requests. Closing channel"
-                        );
+                        warn!("Call client sent multiple WatchState requests. Closing channel");
                         break;
                     }
                     state.responder = Some(responder);
                     // Trigger an update with the existing state to send it on the responder if
                     // necessary.
                     if let Err(e) = state.update_state(state.state) {
-                        fx_log_info!("Call ended: {}", e);
+                        info!("Call ended: {}", e);
                         break;
                     }
                 }
                 Ok(CallRequest::RequestHold { .. }) => {
                     if let Err(e) = state.update_state(FidlCallState::OngoingHeld) {
-                        fx_log_info!("Call ended: {}", e);
+                        info!("Call ended: {}", e);
                         break;
                     }
                 }
                 Ok(CallRequest::RequestActive { .. }) => {
                     if let Err(e) = state.update_state(FidlCallState::OngoingActive) {
-                        fx_log_info!("Call ended: {}", e);
+                        info!("Call ended: {}", e);
                         break;
                     }
                 }
                 Ok(CallRequest::RequestTerminate { .. }) => {
                     if let Err(e) = state.update_state(FidlCallState::Terminated) {
-                        fx_log_info!("Call ended: {}", e);
+                        info!("Call ended: {}", e);
                         break;
                     }
                 }
                 Ok(CallRequest::RequestTransferAudio { .. }) => {
                     if let Err(e) = state.update_state(FidlCallState::TransferredToAg) {
-                        fx_log_info!("Call ended: {}", e);
+                        info!("Call ended: {}", e);
                         break;
                     }
                 }
                 Ok(CallRequest::SendDtmfCode { code, responder, .. }) => {
                     state.dtmf_codes.push(code);
                     if let Err(e) = responder.send(&mut Ok(())) {
-                        fx_log_info!("Call ended: {}", e);
+                        info!("Call ended: {}", e);
                         break;
                     }
                 }
                 Err(e) => {
-                    fx_log_warn!("Call fidl channel error: {}", e);
+                    warn!("Call fidl channel error: {}", e);
                 }
             }
         }
