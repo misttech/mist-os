@@ -20,6 +20,9 @@
 #define PANEL_KD070D82_FT UINT8_C(0x09)
 #define PANEL_KD070D82_FT_9365 UINT8_C(0x0a)
 #define PANEL_TV070WSM_ST7703I UINT8_C(0x0b)
+// Microtech MTF050FHDI-03 LCD panel. Used by Khadas TS050 touchscreen.
+// It has a Novatek NT35596 controller IC.
+#define PANEL_MTF050FHDI_03 UINT8_C(0x0c)
 
 #define PANEL_UNKNOWN UINT8_C(0xFF)
 
@@ -167,6 +170,25 @@ const display_setting_t kDisplaySettingTV070WSM_ST7703I = {
     .hsync_pol = 0,
     .vsync_width = 2,
     .vsync_bp = 8,
+    .vsync_pol = 0,
+};
+
+// Display timing information of MTF050FHDI-03 LCD used for Khadas TS050
+// touchscreen, dumped from VIM3 bootloader output.
+const display_setting_t kDisplaySettingMTF050FHDI_03 = {
+    .lane_num = 4,
+    .bit_rate_max = 1000,
+    .clock_factor = 0,
+    .lcd_clock = 120'000'000,
+    .h_active = 1080,
+    .v_active = 1920,
+    .h_period = 1120,
+    .v_period = 1933,
+    .hsync_width = 2,
+    .hsync_bp = 23,
+    .hsync_pol = 0,
+    .vsync_width = 4,
+    .vsync_bp = 7,
     .vsync_pol = 0,
 };
 

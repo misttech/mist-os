@@ -59,6 +59,8 @@ zx::result<display_setting_t> GetDisplaySettingForPanel(uint32_t panel_type) {
       return zx::ok(kDisplaySettingTV080WXM_FT);
     case PANEL_TV070WSM_ST7703I:
       return zx::ok(kDisplaySettingTV070WSM_ST7703I);
+    case PANEL_MTF050FHDI_03:
+      return zx::ok(kDisplaySettingMTF050FHDI_03);
     default:
       DISP_ERROR("Unsupported panel detected!\n");
       return zx::error(ZX_ERR_NOT_SUPPORTED);

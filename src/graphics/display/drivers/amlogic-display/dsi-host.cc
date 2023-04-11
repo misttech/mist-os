@@ -62,12 +62,14 @@ PanelConfig kPanelConfig[] = {
                {lcd_init_sequence_KD070D82_FT_9365, std::size(lcd_init_sequence_KD070D82_FT_9365)}),
     MakeConfig("TV070WSM_ST7703I",
                {lcd_init_sequence_TV070WSM_ST7703I, std::size(lcd_init_sequence_TV070WSM_ST7703I)}),
+    MakeConfig("MTF050FHDI_03",
+               {lcd_init_sequence_MTF050FHDI_03, std::size(lcd_init_sequence_MTF050FHDI_03)}),
 
 };
 // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
 
 const PanelConfig* GetPanelConfig(uint32_t panel_type) {
-  ZX_DEBUG_ASSERT(panel_type <= PANEL_TV070WSM_ST7703I);
+  ZX_DEBUG_ASSERT(panel_type <= PANEL_MTF050FHDI_03);
   ZX_DEBUG_ASSERT(panel_type != PANEL_ILI9881C);
   ZX_DEBUG_ASSERT(panel_type != PANEL_ST7701S);
   if (panel_type == PANEL_ILI9881C || panel_type == PANEL_ST7701S) {
