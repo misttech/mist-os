@@ -199,24 +199,6 @@ macro_rules! fx_log_trace {
     )
 }
 
-/// Convenience macro to log verbose messages.
-///
-/// Example:
-///
-/// ```rust
-/// fx_vlog!(tag: "my_tag", 1 /*verbosity*/, "print integer {}", 10);
-/// fx_vlog!(2 /*verbosity*/, "print integer {}", 10);
-/// ```
-#[macro_export]
-macro_rules! fx_vlog {
-    (tag: $tag:expr, $verbosity:expr, $($arg:tt)*) => (
-        $crate::fx_log!(tag: $tag, $crate::get_severity_from_verbosity($verbosity), $($arg)*);
-    );
-    ($verbosity:expr, $($arg:tt)*) => (
-        $crate::fx_log!($crate::get_severity_from_verbosity($verbosity), $($arg)*);
-    )
-}
-
 /// C API logger wrapper which provides wrapper for C APIs.
 pub struct Logger {
     logger: *mut syslog::fx_logger_t,
@@ -435,29 +417,6 @@ pub fn set_severity(severity: levels::LogLevel) {
     }
 }
 
-/// Get the severity corresponding to the given verbosity. Note that
-/// verbosity relative to the default severity and can be thought of
-/// as incrementally "more vebose than" the baseline.
-pub fn get_severity_from_verbosity(verbosity: u8) -> levels::LogLevel {
-    use std::convert::TryFrom as _;
-
-    // verbosity scale sits in the interstitial space between INFO and DEBUG
-    let default = syslog::FX_LOG_DEBUG + 1;
-    match i8::try_from(verbosity * syslog::FX_LOG_VERBOSITY_STEP_SIZE) {
-        Err(std::num::TryFromIntError { .. }) => default,
-        Ok(offset) => match syslog::FX_LOG_INFO.checked_sub(offset) {
-            None => default,
-            Some(severity) => std::cmp::max(severity, default),
-        },
-    }
-}
-
-/// Set default logger verbosity.
-#[inline]
-pub fn set_verbosity(verbosity: u8) {
-    set_severity(get_severity_from_verbosity(verbosity));
-}
-
 /// Checks if default logger is enabled for given log level.
 pub fn is_enabled(severity: levels::LogLevel) -> bool {
     LOGGER.is_enabled(severity)
@@ -476,7 +435,6 @@ mod test {
     fn assert_message(
         socket: &zx::Socket,
         severity: Severity,
-        verbosity: Option<i8>,
         tags: &[&str],
         payload: impl AsRef<str>,
     ) {
@@ -486,7 +444,6 @@ mod test {
             .expect("couldn't decode message from buffer");
 
         assert_eq!(msg.severity, severity);
-        assert_eq!(msg.verbosity, verbosity);
         assert_eq!(&*msg.message, payload.as_ref());
         assert_eq!(msg.tags.iter().map(|s| &**s).collect::<Vec<_>>().as_slice(), tags);
     }
@@ -502,7 +459,7 @@ mod test {
         let logger = build_with_tags_and_socket(tx, &tags).expect("failed to create logger");
         logger.log_f(levels::ERROR, format_args!("{}-{}", "hello", "world"), None);
 
-        assert_message(&rx, Severity::Error, None, &tags[..], "hello-world");
+        assert_message(&rx, Severity::Error, &tags[..], "hello-world");
     }
 
     #[test]
@@ -519,47 +476,34 @@ mod test {
         assert_eq!(status, zx::Status::OK.into_raw());
 
         fx_log_info!("info msg {}", 10);
-        assert_message(&rx, Severity::Info, None, &[], "info msg 10");
+        assert_message(&rx, Severity::Info, &[], "info msg 10");
 
         fx_log_warn!("warn msg {}", 10);
-        assert_message(&rx, Severity::Warn, None, &[], "warn msg 10");
+        assert_message(&rx, Severity::Warn, &[], "warn msg 10");
 
         fx_log_err!("err msg {}", 10);
         let line = line!() - 1;
         assert_message(
             &rx,
             Severity::Error,
-            None,
             &[],
             format!("[{}({})] err msg 10", file!().trim_start_matches("../"), line),
         );
 
         fx_log_info!(tag:"info_tag", "info msg {}", 10);
-        assert_message(&rx, Severity::Info, None, &["info_tag"], "info msg 10");
+        assert_message(&rx, Severity::Info, &["info_tag"], "info msg 10");
 
         fx_log_warn!(tag:"warn_tag", "warn msg {}", 10);
-        assert_message(&rx, Severity::Warn, None, &["warn_tag"], "warn msg 10");
+        assert_message(&rx, Severity::Warn, &["warn_tag"], "warn msg 10");
 
         fx_log_err!(tag:"err_tag", "err msg {}", 10);
         let line = line!() - 1;
         assert_message(
             &rx,
             Severity::Error,
-            None,
             &["err_tag"],
             format!("[{}({})] err msg 10", file!().trim_start_matches("../"), line),
         );
-
-        //test verbosity
-        fx_vlog!(1, "verbose msg {}", 10); // will not log
-        fx_vlog!(tag:"v_tag", 1, "verbose msg {}", 10); // will not log
-
-        set_verbosity(1);
-        fx_vlog!(1, "verbose2 msg {}", 10);
-        assert_message(&rx, Severity::Debug, Some(1), &[], "verbose2 msg 10");
-
-        fx_vlog!(tag:"v_tag", 1, "verbose2 msg {}", 10);
-        assert_message(&rx, Severity::Debug, Some(1), &["v_tag"], "verbose2 msg 10");
 
         // test log crate
         let tag = "fuchsia_syslog_lib_test::test";
@@ -567,36 +511,35 @@ mod test {
         set_severity(levels::DEBUG);
 
         info!("log info: {}", 10);
-        assert_message(&rx, Severity::Info, None, &[tag], "log info: 10");
+        assert_message(&rx, Severity::Info, &[tag], "log info: 10");
 
         warn!("log warn: {}", 10);
-        assert_message(&rx, Severity::Warn, None, &[tag], "log warn: 10");
+        assert_message(&rx, Severity::Warn, &[tag], "log warn: 10");
 
         error!("log err: {}", 10);
         let line = line!() - 1;
         assert_message(
             &rx,
             Severity::Error,
-            None,
             &[tag],
             format!("[{}({})] log err: 10", file!().trim_start_matches("../"), line),
         );
 
         debug!("log debug: {}", 10);
-        assert_message(&rx, Severity::Debug, None, &[tag], "log debug: 10");
+        assert_message(&rx, Severity::Debug, &[tag], "log debug: 10");
 
         trace!("log trace: {}", 10); // will not log
 
         set_severity(levels::TRACE);
 
         trace!("log trace2: {}", 10);
-        assert_message(&rx, Severity::Trace, None, &[tag], "log trace2: 10");
+        assert_message(&rx, Severity::Trace, &[tag], "log trace2: 10");
 
         // test set_severity
         set_severity(levels::WARN);
 
         info!("log info, will not log: {}", 10);
         warn!("log warn, will log: {}", 10);
-        assert_message(&rx, Severity::Warn, None, &[tag], "log warn, will log: 10");
+        assert_message(&rx, Severity::Warn, &[tag], "log warn, will log: 10");
     }
 }

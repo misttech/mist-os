@@ -14,7 +14,6 @@ pub const FX_LOG_WARNING: fx_log_severity_t = 64;
 pub const FX_LOG_ERROR: fx_log_severity_t = 80;
 pub const FX_LOG_FATAL: fx_log_severity_t = 96;
 pub const FX_LOG_SEVERITY_DEFAULT: fx_log_severity_t = 48;
-pub const FX_LOG_VERBOSITY_STEP_SIZE: u8 = 1;
 pub type fx_log_severity_t = i8;
 #[repr(C)]
 pub struct fx_logger_config {
