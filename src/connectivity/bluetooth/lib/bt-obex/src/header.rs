@@ -10,6 +10,50 @@ use tracing::trace;
 use crate::error::PacketError;
 use crate::obex_string::ObexString;
 
+/// Specifies the type of action of the Action Operation.
+/// Defined in OBEX 1.5 Section 2.2.20.
+#[derive(Debug, PartialEq)]
+#[repr(u8)]
+pub enum ActionIdentifier {
+    Copy = 0x00,
+    MoveOrRename = 0x01,
+    SetPermissions = 0x02,
+    /// 0x03 - 0x7f is RFA.
+    /// 0x80 - 0xff is reserved for vendor specific actions.
+    Vendor(u8),
+}
+
+impl ActionIdentifier {
+    fn is_vendor(id_raw: u8) -> bool {
+        id_raw >= 0x80
+    }
+}
+
+impl From<&ActionIdentifier> for u8 {
+    fn from(src: &ActionIdentifier) -> u8 {
+        match src {
+            ActionIdentifier::Copy => 0x00,
+            ActionIdentifier::MoveOrRename => 0x01,
+            ActionIdentifier::SetPermissions => 0x02,
+            ActionIdentifier::Vendor(v) => *v,
+        }
+    }
+}
+
+impl TryFrom<u8> for ActionIdentifier {
+    type Error = PacketError;
+
+    fn try_from(src: u8) -> Result<ActionIdentifier, Self::Error> {
+        match src {
+            0x00 => Ok(ActionIdentifier::Copy),
+            0x01 => Ok(ActionIdentifier::MoveOrRename),
+            0x02 => Ok(ActionIdentifier::SetPermissions),
+            v if ActionIdentifier::is_vendor(v) => Ok(ActionIdentifier::Vendor(v)),
+            _v => Err(Self::Error::Reserved),
+        }
+    }
+}
+
 decodable_enum! {
     /// The Header Encoding is the upper 2 bits of the Header Identifier (HI) and describes the type
     /// of payload included in the Header.
@@ -201,6 +245,7 @@ pub struct UserDefinedHeader {
 }
 
 /// The building block of an OBEX object. A single OBEX object consists of one or more Headers.
+/// Defined in OBEX 1.5 Section 2.0.
 #[derive(Debug, PartialEq)]
 pub enum Header {
     Count(u32),
@@ -229,7 +274,7 @@ pub enum Header {
     ObjectClass(Vec<u8>),
     SessionParameters(Vec<u8>),
     SessionSequenceNumber(u8),
-    ActionId(u8),
+    ActionId(ActionIdentifier),
     DestName(ObexString),
     /// 4-byte bit mask.
     Permissions(u32),
@@ -379,12 +424,12 @@ impl Encodable for Header {
                 let n = src.len();
                 buf[start_index..start_index + n].copy_from_slice(&src[..]);
             }
-            ActionId(v)
-            | SessionSequenceNumber(v)
-            | SingleResponseMode(v)
-            | SingleResponseModeParameters(v) => {
+            SessionSequenceNumber(v) | SingleResponseMode(v) | SingleResponseModeParameters(v) => {
                 // Encode all 1-byte value headers.
                 buf[start_index] = *v;
+            }
+            ActionId(v) => {
+                buf[start_index] = v.into();
             }
             TimeIso8601(time) => {
                 let mut formatted = time.format(Self::ISO_8601_TIME_FORMAT).to_string();
@@ -534,7 +579,9 @@ impl Decodable for Header {
             HeaderIdentifier::SessionSequenceNumber => {
                 Ok(Header::SessionSequenceNumber(buf[start_idx]))
             }
-            HeaderIdentifier::ActionId => Ok(Header::ActionId(buf[start_idx])),
+            HeaderIdentifier::ActionId => {
+                Ok(Header::ActionId(ActionIdentifier::try_from(buf[start_idx])?))
+            }
             HeaderIdentifier::DestName => Ok(Header::DestName(ObexString::try_from(data)?)),
             HeaderIdentifier::Permissions => {
                 Ok(Header::Permissions(u32::from_be_bytes(data[..].try_into().unwrap())))
@@ -557,6 +604,30 @@ mod tests {
 
     use assert_matches::assert_matches;
     use chrono::{NaiveDate, NaiveTime};
+
+    #[fuchsia::test]
+    fn convert_action_identifier_success() {
+        let id_raw = 0x00;
+        let result = ActionIdentifier::try_from(id_raw).expect("valid identifier");
+        assert_eq!(result, ActionIdentifier::Copy);
+        let converted: u8 = (&result).into();
+        assert_eq!(id_raw, converted);
+
+        let vendor_id_raw = 0x85;
+        let result = ActionIdentifier::try_from(vendor_id_raw).expect("valid identifier");
+        assert_eq!(result, ActionIdentifier::Vendor(0x85));
+        let converted: u8 = (&result).into();
+        assert_eq!(vendor_id_raw, converted);
+    }
+
+    #[fuchsia::test]
+    fn convert_action_identifier_error() {
+        let invalid = 0x03;
+        assert_matches!(ActionIdentifier::try_from(invalid), Err(PacketError::Reserved));
+
+        let invalid = 0x7f;
+        assert_matches!(ActionIdentifier::try_from(invalid), Err(PacketError::Reserved));
+    }
 
     #[fuchsia::test]
     fn is_user_id() {
