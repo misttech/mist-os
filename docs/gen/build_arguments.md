@@ -8298,7 +8298,7 @@ From //build/toolchain/goma.gni:13
 
 **Current value (from the default):** `false`
 
-From //zircon/system/ulib/c/libc.gni:13
+From //zircon/system/ulib/c/libc.gni:16
 
 ### use_lto
 
