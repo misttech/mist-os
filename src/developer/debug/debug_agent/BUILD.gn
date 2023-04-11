@@ -289,7 +289,6 @@ test("unit_tests") {
     "//src/developer/debug/ipc:tests",
     "//src/developer/debug/shared:tests",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/unwinder:tests_source",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]

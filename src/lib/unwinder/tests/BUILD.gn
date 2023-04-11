@@ -5,20 +5,6 @@
 # The test depends on UnwindLocal and doesn't work on macOS.
 assert(!is_mac)
 
-# The is_asan definition in BUILDCONFIG.gn doesn't work for host toolchains.
-_is_asan = toolchain_variant.tags + [
-             "asan",
-             "asan-ubsan",
-             "hwasan",
-             "hwasan-ubsan",
-           ] -
-           [
-             "asan",
-             "asan-ubsan",
-             "hwasan",
-             "hwasan-ubsan",
-           ] != toolchain_variant.tags
-
 source_set("tests") {
   testonly = true
 
@@ -38,18 +24,18 @@ source_set("cfi_only") {
 
   sources = [ "cfi_only.cc" ]
 
-  # ASan build requires frame pointer and/or shadow call stack for fast unwinding.
-  # See //zircon/system/ulib/c/sanitizers/backtrace.h.
-  # We generally don't want to mess it up so don't touch the config if _is_asan.
-  if (!_is_asan) {
-    # When not _is_asan, remove the default_frame_pointers so we could override the config.
-    # Only default_frame_pointers is in the default config list, the unwind tables and shadow call
-    # stacks are enabled implicitly in the compiler (on appropriate platforms).
+  configs += [ "//build/config:no-shadow-call-stack" ]
+
+  # Some build variants explicitly require frame pointers. E.g., ASan build requires frame pointer
+  # and/or shadow call stack for fast unwinding. See //zircon/system/ulib/c/sanitizers/backtrace.h.
+  # We generally don't want to mess it up so don't touch the config in these cases.
+  #
+  # Only default_frame_pointers is in the config list, the unwind tables and shadow call stacks are
+  # enabled implicitly in the compiler on appropriate platforms.
+  if (configs + [ "//build/config:default_frame_pointers" ] -
+      [ "//build/config:default_frame_pointers" ] != configs) {
     configs -= [ "//build/config:default_frame_pointers" ]
-    configs += [
-      "//build/config:no_frame_pointers",
-      "//build/config:no-shadow-call-stack",
-    ]
+    configs += [ "//build/config:no_frame_pointers" ]
   }
 }
 
@@ -60,7 +46,8 @@ source_set("scs_only") {
 
   configs += [ ":no_unwind_tables" ]
 
-  if (!_is_asan) {
+  if (configs + [ "//build/config:default_frame_pointers" ] -
+      [ "//build/config:default_frame_pointers" ] != configs) {
     configs -= [ "//build/config:default_frame_pointers" ]
     configs += [ "//build/config:no_frame_pointers" ]
   }
@@ -71,14 +58,15 @@ source_set("fp_only") {
 
   sources = [ "fp_only.cc" ]
 
-  configs += [ ":no_unwind_tables" ]
+  configs += [
+    ":no_unwind_tables",
+    "//build/config:no-shadow-call-stack",
+  ]
 
-  if (!_is_asan) {
+  if (configs + [ "//build/config:default_frame_pointers" ] -
+      [ "//build/config:default_frame_pointers" ] != configs) {
     configs -= [ "//build/config:default_frame_pointers" ]
-    configs += [
-      "//build/config:frame_pointers",
-      "//build/config:no-shadow-call-stack",
-    ]
+    configs += [ "//build/config:frame_pointers" ]
   }
 }
 
