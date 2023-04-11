@@ -710,20 +710,12 @@ mod test {
         let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify waiters when data is available to read.
         [&waiter1, &waiter2].iter().for_each(|waiter| {
             input_file.wait_async(
-                &FileObject::new(
-                    Box::new(input_file.clone()),
-                    // The input node doesn't really live at the root of the filesystem.
-                    // But the test doesn't need to be 100% representative of production.
-                    current_task
-                        .lookup_path_from_root(b".")
-                        .expect("failed to get namespace node for root"),
-                    OpenFlags::empty(),
-                ),
+                &file_object,
                 &current_task,
                 waiter,
                 FdEvents::POLLIN,
@@ -770,19 +762,11 @@ mod test {
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let waiter = Waiter::new();
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify `waiter` when data is available to read.
         input_file.wait_async(
-            &FileObject::new(
-                Box::new(input_file.clone()),
-                // The input node doesn't really live at the root of the filesystem.
-                // But the test doesn't need to be 100% representative of production.
-                current_task
-                    .lookup_path_from_root(b".")
-                    .expect("failed to get namespace node for root"),
-                OpenFlags::empty(),
-            ),
+            &file_object,
             &current_task,
             &waiter,
             FdEvents::POLLIN,
@@ -843,7 +827,7 @@ mod test {
         let (input_file, mut touch_source_stream, relay_thread) = start_input();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify `waiter` when data is available to read.
         let waitkeys = [&waiter1, &waiter2]
@@ -851,15 +835,7 @@ mod test {
             .map(|waiter| {
                 input_file
                     .wait_async(
-                        &FileObject::new(
-                            Box::new(input_file.clone()),
-                            // The input node doesn't really live at the root of the filesystem.
-                            // But the test doesn't need to be 100% representative of production.
-                            current_task
-                                .lookup_path_from_root(b".")
-                                .expect("failed to get namespace node for root"),
-                            OpenFlags::empty(),
-                        ),
+                        &file_object,
                         &current_task,
                         waiter,
                         FdEvents::POLLIN,
