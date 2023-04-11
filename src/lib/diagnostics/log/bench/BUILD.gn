@@ -12,7 +12,12 @@ rustc_binary("encoding-bin") {
 
   source_root = "src/encoding.rs"
 
-  deps = [ "//src/developer/fuchsia-criterion" ]
+  deps = [
+    "//sdk/fidl/fuchsia.diagnostics.stream:fuchsia.diagnostics.stream_rust",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
+    "//src/developer/fuchsia-criterion",
+    "//src/lib/diagnostics/log/encoding/rust",
+  ]
 
   sources = [ "src/encoding.rs" ]
 }

@@ -126,7 +126,8 @@ where
         Ok(())
     }
 
-    pub(super) fn write_argument(&mut self, argument: &Argument) -> Result<(), EncodingError> {
+    /// Writes an argument with this encoder.
+    pub fn write_argument(&mut self, argument: &Argument) -> Result<(), EncodingError> {
         let starting_idx = self.buf.cursor();
 
         let header_slot = self.buf.put_slot(std::mem::size_of::<Header>())?;
@@ -499,6 +500,25 @@ impl BufMutShared for Cursor<Vec<u8>> {
 }
 
 impl BufMutShared for Cursor<&mut [u8]> {
+    fn capacity(&self) -> usize {
+        self.get_ref().len()
+    }
+
+    fn cursor(&self) -> usize {
+        self.position() as usize
+    }
+
+    unsafe fn advance_cursor(&mut self, n: usize) {
+        self.set_position(self.position() + n as u64);
+    }
+
+    unsafe fn put_slice_at(&mut self, to_put: &[u8], offset: usize) {
+        let dest = &mut self.get_mut()[offset..(offset + to_put.len())];
+        dest.copy_from_slice(to_put);
+    }
+}
+
+impl<const N: usize> BufMutShared for Cursor<[u8; N]> {
     fn capacity(&self) -> usize {
         self.get_ref().len()
     }

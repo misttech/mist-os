@@ -1,0 +1,11 @@
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Boolean
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Floating
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/SignedInt
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/16
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/128
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/256
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/512
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/1024
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/Text/32000
+fuchsia.diagnostics_log_rust.encoding: Encoder/Argument/UnsignedInt
+fuchsia.diagnostics_log_rust.encoding: Encoder/Create
